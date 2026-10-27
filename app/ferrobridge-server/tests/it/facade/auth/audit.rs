@@ -6,10 +6,11 @@
 
 use std::future::Future;
 
-use ferrobridge_server::telemetry::Rendering;
-use ferrobridge_server::telemetry::subscriber;
+use ferrohealth_telemetry::section::Rendering;
 use http::StatusCode;
 use jsonwebtoken::Algorithm;
+
+use crate::support::subscriber;
 
 use super::Issuer;
 use super::authority;

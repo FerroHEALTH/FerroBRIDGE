@@ -3,11 +3,12 @@
 
 //! The command line: one binary, one subcommand per job.
 //!
-//! `serve` runs the server; the batch jobs share the same configuration and
-//! the same run path. No specification governs the command line: our own
-//! design.
+//! `serve`, `config check` and `healthcheck` are the family's, from
+//! `ferrohealth-server`; the batch jobs share the same configuration and the
+//! same run path. No specification governs the command line: our own design.
 
 use clap::{Parser, Subcommand};
+use ferrohealth_server::cli::{Common, ConfigArgs, ConfigCommand};
 use std::path::PathBuf;
 
 /// The `ferrobridge` command line.
@@ -18,9 +19,10 @@ use std::path::PathBuf;
     about = "The FerroBRIDGE bridge between openEHR, HL7 FHIR and the OMOP CDM"
 )]
 pub struct Cli {
-    /// The configuration file to read, overriding `FERROBRIDGE_CONFIG`.
-    #[arg(long, value_name = "PATH", global = true)]
-    pub config: Option<PathBuf>,
+    /// The configuration file to read, overriding `FERROBRIDGE_CONFIG`, and
+    /// the `--set key=value` pairs applied over it and the environment.
+    #[command(flatten)]
+    pub config: ConfigArgs,
     /// The job to run.
     #[command(subcommand)]
     pub command: Command,
@@ -29,8 +31,9 @@ pub struct Cli {
 /// What the binary does.
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Command {
-    /// Serves the HTTP surface until the process is asked to stop.
-    Serve,
+    /// `serve`, `config check` and `healthcheck`.
+    #[command(flatten)]
+    Common(Common),
     /// Runs an OMOP extract, transform and load job.
     Etl {
         /// The job to run.
@@ -156,7 +159,7 @@ impl Command {
     #[must_use]
     pub const fn pending_issue(&self) -> Option<u32> {
         match self {
-            Self::Serve
+            Self::Common(_)
             | Self::Cdm { .. }
             | Self::Etl { .. }
             | Self::Mapping { .. }
@@ -169,7 +172,11 @@ impl Command {
     #[must_use]
     pub const fn spelling(&self) -> &'static str {
         match self {
-            Self::Serve => "serve",
+            Self::Common(Common::Serve) => "serve",
+            Self::Common(Common::Config {
+                command: ConfigCommand::Check,
+            }) => "config check",
+            Self::Common(Common::Healthcheck) => "healthcheck",
             Self::Etl {
                 command: Etl::Run { .. },
             } => "etl run",
@@ -196,12 +203,13 @@ impl Command {
 mod tests {
     use super::{Cdm, Cli, Command, Etl, Mapping, ReportFormat, Vocab};
     use clap::Parser;
+    use ferrohealth_server::cli::{Common, ConfigCommand};
     use std::path::PathBuf;
 
     #[test]
     fn every_documented_subcommand_parses() {
         let cases: [(&[&str], Command); 10] = [
-            (&["ferrobridge", "serve"], Command::Serve),
+            (&["ferrobridge", "serve"], Command::Common(Common::Serve)),
             (
                 &["ferrobridge", "etl", "run"],
                 Command::Etl {
@@ -298,7 +306,26 @@ mod tests {
         for (argv, expected) in cases {
             let cli = Cli::try_parse_from(argv).expect("the subcommand parses");
             assert_eq!(expected, cli.command, "{argv:?}");
-            assert_eq!(None, cli.config, "no --config was given");
+            assert_eq!(None, cli.config.config, "no --config was given");
+        }
+    }
+
+    #[test]
+    fn the_family_subcommands_parse_beside_the_jobs() {
+        for (argv, expected) in [
+            (
+                ["ferrobridge", "config", "check"].as_slice(),
+                Command::Common(Common::Config {
+                    command: ConfigCommand::Check,
+                }),
+            ),
+            (
+                ["ferrobridge", "healthcheck"].as_slice(),
+                Command::Common(Common::Healthcheck),
+            ),
+        ] {
+            let cli = Cli::try_parse_from(argv).expect("the subcommand parses");
+            assert_eq!(expected, cli.command, "{argv:?}");
         }
     }
 
@@ -306,7 +333,23 @@ mod tests {
     fn the_config_flag_is_global_and_reads_a_path() {
         let cli = Cli::try_parse_from(["ferrobridge", "serve", "--config", "/etc/fb.toml"])
             .expect("--config parses after the subcommand");
-        assert_eq!(Some(PathBuf::from("/etc/fb.toml")), cli.config);
+        assert_eq!(Some(PathBuf::from("/etc/fb.toml")), cli.config.config);
+    }
+
+    #[test]
+    fn a_set_pair_is_global_and_repeats() {
+        let cli = Cli::try_parse_from([
+            "ferrobridge",
+            "config",
+            "check",
+            "--set",
+            "server.listen=0.0.0.0:8080",
+            "--set",
+            "telemetry.format=json",
+        ])
+        .expect("--set parses after the subcommand");
+        assert_eq!(2, cli.config.sets.len());
+        assert_eq!("config check", cli.command.spelling());
     }
 
     #[test]
@@ -331,7 +374,7 @@ mod tests {
 
     #[test]
     fn a_pending_job_names_the_issue_that_lands_it() {
-        assert_eq!(None, Command::Serve.pending_issue());
+        assert_eq!(None, Command::Common(Common::Serve).pending_issue());
         assert_eq!(
             None,
             Command::Cdm {

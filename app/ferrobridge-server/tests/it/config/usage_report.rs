@@ -6,12 +6,11 @@
 
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
-use ferrobridge_server::usage_report::config::{Deployment, ENDPOINT};
+use ferrohealth_usage_report::section::{Deployment, ENDPOINT};
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::env;
-use super::refusal;
 
 #[test]
 fn the_report_is_on_by_default_with_no_state_directory() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +18,7 @@ fn the_report_is_on_by_default_with_no_state_directory() -> Result<(), Box<dyn s
         .resolve()?
         .usage_report;
     assert!(report.enabled);
-    assert_eq!(ENDPOINT, report.endpoint.as_str());
+    assert_eq!(ENDPOINT, report.endpoint.url().as_str());
     assert_eq!(None, report.state_dir, "no state directory keeps it silent");
     assert_eq!(Deployment::Unknown, report.deployment);
     Ok(())
@@ -38,7 +37,10 @@ fn every_usage_report_key_is_read_from_the_file() -> Result<(), Box<dyn std::err
         .resolve()?
         .usage_report;
     assert!(!report.enabled);
-    assert_eq!("http://127.0.0.1:9/v1/report", report.endpoint.as_str());
+    assert_eq!(
+        "http://127.0.0.1:9/v1/report",
+        report.endpoint.url().as_str()
+    );
     assert_eq!(
         Some(Path::new("/var/lib/ferrobridge/state")),
         report.state_dir.as_deref()
@@ -64,25 +66,31 @@ fn the_environment_switches_the_report_off() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
-fn a_collector_off_https_or_with_credentials_is_refused() -> Result<(), Box<dyn std::error::Error>>
-{
+fn a_collector_off_https_or_with_credentials_is_refused() {
     for endpoint in [
         "http://report.example/v1/report",
         "https://user:pw@report.example/v1/report",
         "ftp://report.example/",
     ] {
-        let error = refusal(&format!("[usage_report]\nendpoint = \"{endpoint}\"\n"))?;
+        let error = Config::from_sources(
+            Some(&format!("[usage_report]\nendpoint = \"{endpoint}\"\n")),
+            &BTreeMap::new(),
+        )
+        .expect_err("the collector is refused");
         assert!(
-            matches!(&error, Error::ReportEndpoint { key } if key == "usage_report.endpoint"),
+            matches!(&error, Error::Parse { source } if source.to_string().contains("usage_report.endpoint")),
             "{endpoint}: {error:?}"
         );
     }
-    let error = refusal("[usage_report]\nendpoint = \"not a url\"\n")?;
+    let error = Config::from_sources(
+        Some("[usage_report]\nendpoint = \"not a url\"\n"),
+        &BTreeMap::new(),
+    )
+    .expect_err("not a url is refused");
     assert!(
-        matches!(&error, Error::Url { key, .. } if key == "usage_report.endpoint"),
+        matches!(&error, Error::Parse { source } if source.to_string().contains("usage_report.endpoint")),
         "{error:?}"
     );
-    Ok(())
 }
 
 #[test]

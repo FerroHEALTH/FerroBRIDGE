@@ -76,7 +76,9 @@ pub enum Source {
     File,
     /// An environment variable, which wins over the file.
     Environment,
-    /// Neither: the bridge's own default.
+    /// A `--set key=value` argument, which wins over the environment.
+    Set,
+    /// None of them: the bridge's own default.
     Default,
 }
 

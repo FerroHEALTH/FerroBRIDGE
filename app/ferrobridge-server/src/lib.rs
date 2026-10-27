@@ -4,11 +4,12 @@
 //! The FerroBRIDGE server library: the run path the `ferrobridge` binary and
 //! its integration tests share.
 //!
-//! [`cli`] parses the command line, [`config`] reads the file and the
-//! environment into one [`config::Settings`], [`telemetry`] installs the
-//! subscriber, [`router`] builds the HTTP surface over [`state::AppState`],
-//! and [`serve`] runs it on a bound listener until the process is asked to
-//! stop. `main.rs` only hands in the arguments and returns the exit code.
+//! [`cli`] parses the command line, [`config`] reads the file, the
+//! environment and the `--set` pairs into one [`config::Settings`],
+//! `ferrohealth-telemetry` installs the console, [`router`] builds the HTTP
+//! surface over [`state::AppState`] inside the stack of `ferrohealth-server`,
+//! and [`serve_until`] runs it on a bound listener until the process is asked
+//! to stop. `main.rs` only hands in the arguments and returns the exit code.
 #![doc(test(attr(deny(warnings))))]
 
 pub mod banner;
@@ -21,7 +22,6 @@ pub mod config;
 pub mod credentials;
 pub mod etl;
 pub mod facade;
-pub mod health;
 pub mod hl7v2;
 pub mod indicators;
 mod jobs;
@@ -31,12 +31,9 @@ pub mod operations;
 pub mod operator;
 pub mod panic;
 pub mod quality;
-pub mod request_id;
-pub mod request_log;
 pub mod smart;
 pub mod startup;
 pub mod state;
-pub mod telemetry;
 pub mod terminology;
 pub mod usage_report;
 pub mod walk;
@@ -48,19 +45,25 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
-use axum::extract::State;
+use axum::extract::Request;
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use clap::Parser;
-use http::StatusCode;
+use ferrohealth_config::loader::Loaded;
+use ferrohealth_server::cli::{Common, ConfigCommand};
+use ferrohealth_server::health::Health;
+use ferrohealth_server::healthcheck::Outcome;
+use ferrohealth_server::section::ServerSection;
+use ferrohealth_server::serve::{Drained, ServeError};
+use ferrohealth_server::stack::{self, StackPolicy};
+use ferrohealth_telemetry::request_log::{RequestId, RequestLog};
+use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
+use http::HeaderValue;
 use tokio::net::TcpListener;
-use tower_http::catch_panic::CatchPanicLayer;
-use tower_http::limit::RequestBodyLimitLayer;
-use tower_http::request_id::{PropagateRequestIdLayer, SetRequestIdLayer};
-use tower_http::timeout::TimeoutLayer;
 
 use crate::cli::Cli;
-use crate::config::{Config, ServerSettings, Settings};
+use crate::config::{Config, Settings};
 use crate::state::AppState;
 
 /// The exit code of a job that parses and does not run yet.
@@ -83,6 +86,9 @@ pub const EXIT_CONFIG: u8 = 78;
 /// not run from a set that failed it, which exits 1.
 pub const EXIT_CHECK_UNAVAILABLE: u8 = 69;
 
+/// How long `healthcheck` waits for the running server's answer.
+pub const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(3);
+
 /// Runs the binary with `args` and returns the process exit code.
 ///
 /// `args` is the whole argument vector, the program name included, so the
@@ -104,15 +110,23 @@ where
         Ok(job) => job,
         Err(code) => return code,
     };
-    let resolved = Config::load(cli.config.as_deref()).and_then(|config| match job {
+    let loaded = match Config::load(cli.config.config.as_deref(), &cli.config.sets) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            eprintln!("ferrobridge: cannot start: {}", chain(&error));
+            return ExitCode::from(EXIT_CONFIG);
+        }
+    };
+    match job {
+        Job::ConfigCheck => return config_check(loaded),
+        Job::Healthcheck => return healthcheck_command(&loaded.settings().server),
+        _ => {}
+    }
+    let config = Config::from_loaded(loaded);
+    let resolved = match job {
         Job::Serve => config.resolve(),
-        Job::CdmInit { .. }
-        | Job::VocabLoad { .. }
-        | Job::EtlRun(_)
-        | Job::DqCheck { .. }
-        | Job::EtlFhir { .. }
-        | Job::MappingCheck { .. } => config.resolve_job(),
-    });
+        _ => config.resolve_job(),
+    };
     let settings = match resolved {
         Ok(settings) => settings,
         Err(error) => {
@@ -120,30 +134,109 @@ where
             return ExitCode::from(EXIT_CONFIG);
         }
     };
-    let stdout_is_terminal = std::io::stdout().is_terminal();
-    let format = settings.telemetry.format;
-    if matches!(job, Job::Serve)
-        && format.resolve(stdout_is_terminal) == telemetry::Rendering::Pretty
-    {
+    let console = Console::detect();
+    if matches!(job, Job::Serve) {
         banner::print(
             &startup::lanes(&settings),
-            format.colour(stdout_is_terminal),
+            settings
+                .telemetry
+                .format
+                .resolve(std::io::stdout().is_terminal()),
         );
     }
     // NOTE: no specification governs this: our own design; `mapping check`
     // installs no log subscriber, so its report is the whole of stdout.
-    let logs = !matches!(job, Job::MappingCheck { .. });
-    if logs
-        && let Err(error) = telemetry::init(
-            settings.telemetry.format,
-            &settings.telemetry.filter,
-            stdout_is_terminal,
-        )
-    {
+    if matches!(job, Job::MappingCheck { .. }) {
+        return job.run(settings);
+    }
+    let service = Service::new("ferrobridge", state::VERSION);
+    let telemetry = match Telemetry::new(&settings.telemetry, service) {
+        Ok(telemetry) => telemetry,
+        Err(error) => {
+            eprintln!("ferrobridge: cannot start: {}", chain(&error));
+            return ExitCode::from(EXIT_CONFIG);
+        }
+    };
+    if let Err(error) = telemetry.install(&settings.telemetry, &console) {
         eprintln!("ferrobridge: cannot start: {}", chain(&error));
         return ExitCode::from(EXIT_CONFIG);
     }
-    job.run(settings)
+    ferrohealth_telemetry::panic::install_hook();
+    let terminal = std::io::stdout().is_terminal();
+    tracing::info!(
+        format = match settings.telemetry.format.resolve(terminal) {
+            ferrohealth_telemetry::section::Rendering::Json => "json",
+            ferrohealth_telemetry::section::Rendering::Pretty => "pretty",
+        },
+        colour = console.colour(settings.telemetry.format),
+        filter = settings.telemetry.filter.as_str(),
+        "console"
+    );
+    let code = job.run(settings);
+    if let Err(error) = telemetry.shutdown() {
+        tracing::warn!(error = %error, "the telemetry did not flush");
+    }
+    code
+}
+
+/// `ferrobridge config check`: the running tree with every secret redacted
+/// and where each key came from, then every refusal the resolution finds.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "config check prints the running tree for a person and its refusals on stderr"
+)]
+fn config_check(loaded: Loaded<Config>) -> ExitCode {
+    let report = match ferrohealth_config::report::check_report(&loaded) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("ferrobridge config check: {}", chain(&error));
+            return ExitCode::from(EXIT_CONFIG);
+        }
+    };
+    println!("{report}");
+    match Config::from_loaded(loaded).resolve() {
+        Ok(_settings) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("ferrobridge config check: {}", chain(&error));
+            ExitCode::from(EXIT_CONFIG)
+        }
+    }
+}
+
+/// `ferrobridge healthcheck`: silent when the server beside this process is
+/// ready, the reason on stderr otherwise.
+#[expect(
+    clippy::print_stderr,
+    reason = "the probe's refusal is the whole of its output, and no log subscriber exists"
+)]
+fn healthcheck_command(section: &ServerSection) -> ExitCode {
+    let outcome = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime.block_on(healthcheck(section)),
+        Err(error) => Outcome::Failed(format!("the probe could not start: {error}")),
+    };
+    if outcome.exit_code() == 0 {
+        return ExitCode::SUCCESS;
+    }
+    eprintln!("ferrobridge healthcheck: {outcome}");
+    ExitCode::FAILURE
+}
+
+/// Asks the server `section` configures for its readiness over loopback.
+pub async fn healthcheck(section: &ServerSection) -> Outcome {
+    use ferrohealth_server::healthcheck::{check, check_tls, target};
+    let address = target(section.listen);
+    let base = section.base_path.as_str();
+    match &section.tls {
+        None => check(address, base, HEALTHCHECK_TIMEOUT).await,
+        Some(tls) => match ferrohealth_server::tls::HealthcheckTls::read(tls) {
+            Ok(pinned) => check_tls(address, base, HEALTHCHECK_TIMEOUT, &pinned).await,
+            Err(error) => Outcome::Failed(format!("the TLS files do not read: {error}")),
+        },
+    }
 }
 
 impl Job {
@@ -155,7 +248,14 @@ impl Job {
     )]
     fn of(command: &cli::Command) -> Result<Self, ExitCode> {
         Ok(match (command, command.pending_issue()) {
-            (cli::Command::Serve, None) => Self::Serve,
+            (cli::Command::Common(Common::Serve), None) => Self::Serve,
+            (
+                cli::Command::Common(Common::Config {
+                    command: ConfigCommand::Check,
+                }),
+                None,
+            ) => Self::ConfigCheck,
+            (cli::Command::Common(Common::Healthcheck), None) => Self::Healthcheck,
             (
                 cli::Command::Cdm {
                     command: cli::Cdm::Init { with_constraints },
@@ -225,6 +325,7 @@ impl Job {
     )]
     fn run(self, settings: Settings) -> ExitCode {
         match self {
+            Job::ConfigCheck | Job::Healthcheck => ExitCode::SUCCESS,
             Job::Serve => match serve_command(settings) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
@@ -320,6 +421,10 @@ impl Job {
 enum Job {
     /// `serve`.
     Serve,
+    /// `config check`.
+    ConfigCheck,
+    /// `healthcheck`.
+    Healthcheck,
     /// `cdm init`.
     CdmInit {
         /// Whether OHDSI's foreign keys follow the tables.
@@ -368,7 +473,13 @@ fn serve_command(settings: Settings) -> anyhow::Result<()> {
                 .await
                 .with_context(|| format!("binding {listen}"))
         };
-        boot::serve_settings(&settings, bind, boot::Backoff::default(), shutdown_signal()).await?;
+        boot::serve_settings(
+            &settings,
+            bind,
+            boot::Backoff::default(),
+            ferrohealth_server::serve::shutdown_signal(),
+        )
+        .await?;
         tracing::info!("ferrobridge stopped");
         Ok(())
     })
@@ -409,29 +520,28 @@ fn chain(error: &dyn std::error::Error) -> String {
     line
 }
 
-/// Builds the HTTP application over `state`, with the shared middleware.
+/// Builds the HTTP application over `state` inside the family's stack.
 ///
 /// `GET /` answers a small JSON document naming the product and its version,
-/// `GET /health/liveness` answers `200` while the process is up, and
-/// `GET /health/readiness` answers `200` when every registered indicator is up
-/// and `503` with each indicator's state otherwise, and `GET /health/info`
-/// answers the build facts and the pins as JSON. The two FHIRconnect
+/// and the stack serves `/health`, `/health/liveness`, `/health/readiness`
+/// and `/health/info` over the state's indicators. The two FHIRconnect
 /// operations and their direct forms are mounted under `/fhir`. Every route
 /// passes the layer of [`facade::guard::layer`], which checks the credential
 /// of a request under `/fhir` when the state carries a resource server and
 /// leaves the facade open when it does not.
-pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
+pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
-        .route("/health/liveness", get(liveness))
-        .route("/health/readiness", get(readiness))
-        .route("/health/info", get(info))
-        .with_state(Arc::clone(&state))
         .merge(operations::router(Arc::clone(&state)));
     if let Some(smart) = state.auth() {
         routes = routes.merge(smart::routes(smart));
         if let Some(operator) = state.operator() {
-            routes = routes.merge(operator::routes(Arc::clone(operator), smart));
+            routes = routes.merge(operator::routes(
+                Arc::clone(operator),
+                smart,
+                state.health().clone(),
+                state.lifecycle().clone(),
+            ));
         }
     }
     if let Some(mounted) = state.facade() {
@@ -457,39 +567,58 @@ pub fn router(state: Arc<AppState>, server: &ServerSettings) -> Router {
     with_middleware(routes, state, server)
 }
 
-/// Applies the middleware stack every FerroBRIDGE surface carries to `router`.
+/// Wraps `product` in the stack every FerroBRIDGE surface carries.
 ///
-/// Outermost first: the request-id normalizer, the layer that mints one, the
-/// panic renderer, the layer that propagates the id onto the response, the
-/// request log, the panic catcher, the FHIR edge renderer, the request timeout
-/// and the body-size ceiling. The renderer sits outside the propagate layer
-/// because it reads the id from the response the propagate layer has just
-/// stamped, and it answers a `/fhir` route with an `OperationOutcome`
-/// ([`panic::render`]). The edge renderer turns the timeout's and the ceiling's answer on
-/// a `/fhir` route into an `OperationOutcome` ([`facade::edge`]). The log sits
-/// outside the catcher, the timeout and the ceiling so a caught panic, a
-/// timeout and a `413` each leave their one request line like every other
-/// outcome.
-pub fn with_middleware(router: Router, state: Arc<AppState>, server: &ServerSettings) -> Router {
-    router
-        .layer(RequestBodyLimitLayer::new(server.body_limit))
-        .layer(TimeoutLayer::with_status_code(
-            StatusCode::REQUEST_TIMEOUT,
-            server.request_timeout,
-        ))
-        .layer(axum::middleware::from_fn_with_state(
-            facade::edge::Edge::new(server.body_limit, server.request_timeout),
-            facade::edge::render,
-        ))
-        .layer(CatchPanicLayer::custom(panic::caught))
-        .layer(axum::middleware::from_fn_with_state(
-            state,
-            request_log::log,
-        ))
-        .layer(PropagateRequestIdLayer::new(request_id::HEADER))
-        .layer(axum::middleware::from_fn(panic::render))
-        .layer(SetRequestIdLayer::new(request_id::HEADER, request_id::Mint))
-        .layer(axum::middleware::map_request(request_id::strip_illegal))
+/// The stack is `ferrohealth-server`'s request id, panic catch, timeout, body
+/// limit, compression and health routes, and `ferrohealth-telemetry`'s
+/// request log feeding the usage report's window.
+///
+/// A panic and a refusal the stack writes on a `/fhir` route answer an
+/// `OperationOutcome` ([`panic::body`], [`facade::edge::body`]). Each product
+/// route reads the server's request id from the `X-Request-Id` header, which
+/// the CDR calls carry onward.
+pub fn with_middleware(product: Router, state: Arc<AppState>, server: &ServerSection) -> Router {
+    let product = product.layer(axum::middleware::from_fn(correlate));
+    let policy = StackPolicy {
+        panic_body: panic::body(),
+        refusal_body: facade::edge::body(server.body_limit_bytes, server.request_timeout()),
+        request_log: RequestLog::new(state.logged_query_parameters())
+            .with_recorder(state.usage_window().clone()),
+    };
+    let edge = facade::edge::Edge::new(server.body_limit_bytes, server.request_timeout());
+    // TODO(#1290): the stack writes these once ferrohealth-server lets a refusal body choose its status.
+    stack::app(product, health(state), server, policy).layer(axum::middleware::from_fn_with_state(
+        edge,
+        facade::edge::fhir_refusals,
+    ))
+}
+
+/// Returns the health routes' view of `state`: its indicators, its lifecycle
+/// and the build facts with the pins and the lanes for `/health/info`.
+fn health(state: Arc<AppState>) -> Health {
+    Health::new(state.health().clone(), state.lifecycle().clone()).with_info(
+        build_info::BUILD,
+        move || match serde_json::to_value(state.info()) {
+            Ok(serde_json::Value::Object(map)) => map,
+            _ => serde_json::Map::new(),
+        },
+    )
+}
+
+/// Puts the server's request id in the request's `X-Request-Id` for the
+/// product routes, so a handler and the CDR calls it makes name the request
+/// as the request log does.
+async fn correlate(mut request: Request, next: Next) -> Response {
+    let id = request
+        .extensions()
+        .get::<RequestId>()
+        .and_then(|id| HeaderValue::from_str(id.id()).ok());
+    if let Some(id) = id {
+        request
+            .headers_mut()
+            .insert(ferrohealth_server::request_id::HEADER, id);
+    }
+    next.run(request).await
 }
 
 /// `GET /`: the product and the version, as JSON.
@@ -501,103 +630,33 @@ pub(crate) async fn root() -> Response {
     .into_response()
 }
 
-/// `GET /health/liveness`: `200` while the process is up.
-pub(crate) async fn liveness() -> StatusCode {
-    StatusCode::OK
-}
-
-/// `GET /health/info`: the build facts, the pins and the lanes, as JSON.
-async fn info(State(state): State<Arc<AppState>>) -> Response {
-    axum::Json(state.info()).into_response()
-}
-
-/// `GET /health/readiness`: the state of every registered indicator.
-pub(crate) async fn readiness(State(state): State<Arc<AppState>>) -> Response {
-    let report = state.health().evaluate().await;
-    (health::status(&report), axum::Json(report)).into_response()
-}
-
-/// Serves `app` on an already-bound listener until the process receives
-/// `SIGTERM` or `SIGINT`, then drains.
+/// Serves `app` on an already-bound listener as `server` configures it, over
+/// TLS when `[server.tls]` is set, until `shutdown` completes, then finishes
+/// the requests in flight within the drain bound of `server`.
+///
+/// `lifecycle` moves to serving when this starts and to draining on the
+/// signal, so readiness answers `503` while the drain runs.
 ///
 /// # Errors
-/// Returns the I/O error from accepting or serving connections.
-pub async fn serve(
-    listener: TcpListener,
-    app: Router,
-    server: &ServerSettings,
-) -> std::io::Result<()> {
-    serve_until(listener, app, server.shutdown_timeout, shutdown_signal()).await
-}
-
-/// Serves `app` on an already-bound listener until `shutdown` completes, then
-/// finishes the requests in flight within `drain`.
-///
-/// A container runtime stops a container with `SIGTERM` to PID 1 and kills it
-/// after a grace period, so the drain is bounded here too: a connection still
-/// open when `drain` elapses is dropped and the function returns.
-///
-/// # Errors
-/// Returns the I/O error from accepting or serving connections.
+/// Returns the error of `ferrohealth_server::serve::run`: TLS files that do
+/// not read, or an I/O error of the listener.
 pub async fn serve_until<F>(
     listener: TcpListener,
     app: Router,
-    drain: Duration,
+    server: &ServerSection,
+    lifecycle: ferrohealth_health::lifecycle::Lifecycle,
     shutdown: F,
-) -> std::io::Result<()>
+) -> Result<Drained, ServeError>
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    let signalled = Arc::new(tokio::sync::Notify::new());
-    let inner = Arc::clone(&signalled);
-    let server = axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            shutdown.await;
-            inner.notify_one();
-        })
-        .into_future();
-    let mut server = std::pin::pin!(server);
-    tokio::select! {
-        result = &mut server => return result,
-        () = signalled.notified() => {}
+    let drained =
+        ferrohealth_server::serve::run(listener, app, server, lifecycle, shutdown).await?;
+    if drained == Drained::Cut {
+        tracing::warn!(
+            drain_ms = server.shutdown_timeout().as_millis(),
+            "the drain did not finish in time; the remaining connections are dropped"
+        );
     }
-    if let Ok(result) = tokio::time::timeout(drain, server).await {
-        return result;
-    }
-    tracing::warn!(
-        drain_ms = drain.as_millis(),
-        "the drain did not finish in time; the remaining connections are dropped"
-    );
-    Ok(())
-}
-
-/// Completes when the process receives `SIGTERM` or `SIGINT`.
-///
-/// A failure to install a handler is logged and that arm never completes, so
-/// the server keeps serving and the runtime's own kill stays the backstop.
-pub async fn shutdown_signal() {
-    let interrupt = async {
-        match tokio::signal::ctrl_c().await {
-            Ok(()) => {}
-            Err(error) => {
-                tracing::error!(%error, "cannot listen for SIGINT");
-                std::future::pending::<()>().await;
-            }
-        }
-    };
-    let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                signal.recv().await;
-            }
-            Err(error) => {
-                tracing::error!(%error, "cannot listen for SIGTERM");
-                std::future::pending::<()>().await;
-            }
-        }
-    };
-    tokio::select! {
-        () = interrupt => tracing::info!("SIGINT received, draining"),
-        () = terminate => tracing::info!("SIGTERM received, draining"),
-    }
+    Ok(drained)
 }

@@ -18,10 +18,10 @@ use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::programs;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures;
+use ferrohealth_health::registry::Registry;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -275,11 +275,13 @@ pub(crate) fn app(facade: &Arc<Facade>) -> Router {
     let state = AppState::with_health(Registry::default()).with_facade(Arc::clone(facade));
     ferrobridge_server::router(
         Arc::new(state),
-        &ferrobridge_server::config::ServerSettings {
+        &ferrohealth_server::section::ServerSection {
             listen: "127.0.0.1:0".parse().expect("a socket address"),
-            request_timeout: core::time::Duration::from_secs(30),
-            shutdown_timeout: core::time::Duration::from_secs(5),
-            body_limit: 1024 * 1024,
+            request_timeout_ms: 30_000,
+            shutdown_timeout_ms: 5_000,
+            body_limit_bytes: 1024 * 1024,
+            compression: false,
+            ..ferrohealth_server::section::ServerSection::default()
         },
     )
 }

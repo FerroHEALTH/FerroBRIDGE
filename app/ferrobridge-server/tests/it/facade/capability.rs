@@ -268,8 +268,8 @@ fn a_compiler_warning_reaches_the_log_once_as_the_facade_loads() -> Result<(), B
         Arc::new(index),
     )]);
     let logs = support::Logs::default();
-    let capture = ferrobridge_server::telemetry::subscriber(
-        ferrobridge_server::telemetry::Rendering::Json,
+    let capture = support::subscriber(
+        ferrohealth_telemetry::section::Rendering::Json,
         "warn",
         false,
         logs.clone(),

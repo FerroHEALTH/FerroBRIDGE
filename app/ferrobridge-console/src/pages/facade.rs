@@ -12,8 +12,9 @@
 
 use ferrobridge_operator_api::capability::Capability;
 use ferrobridge_operator_api::configuration::Configuration;
-use ferrobridge_operator_api::health::{Info, Readiness, State};
+use ferrobridge_operator_api::health::Info;
 use ferrobridge_operator_api::operator::EngineState;
+use ferrohealth_health::document::{Readiness, State};
 use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
@@ -357,7 +358,11 @@ fn identity(readiness: &Loaded<Readiness>) -> AnyView {
 /// The state of the indicator `name`, with why when it is down.
 #[must_use]
 pub fn indicator(readiness: &Readiness, name: &str) -> AnyView {
-    match readiness.indicators.get(name) {
+    match readiness
+        .indicators
+        .iter()
+        .find(|indicator| indicator.name == name)
+    {
         Some(found) if found.state == State::Up => state(Mark::Ok, tr(Msg::StateUp), None),
         Some(found) => state(Mark::Bad, tr(Msg::StateUnreachable), found.detail.clone()),
         None => state(Mark::Neutral, tr(Msg::StateNotChecked), None),

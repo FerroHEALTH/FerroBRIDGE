@@ -12,7 +12,8 @@
 //! Settings tab shows whole.
 
 use ferrobridge_operator_api::configuration::{Configuration, SecretState, Value};
-use ferrobridge_operator_api::health::{Info, Readiness, State};
+use ferrobridge_operator_api::health::Info;
+use ferrohealth_health::document::{Readiness, State};
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
@@ -63,7 +64,11 @@ fn users(info: &Info, name: &str) -> Vec<String> {
 /// and the word: the readiness carries an indicator only for an upstream
 /// the bridge is configured with.
 fn upstream_state(readiness: &Readiness, name: &str) -> AnyView {
-    if readiness.indicators.contains_key(name) {
+    if readiness
+        .indicators
+        .iter()
+        .any(|indicator| indicator.name == name)
+    {
         indicator(readiness, name)
     } else {
         state(Mark::Neutral, tr(Msg::StateNotConfigured), None)
@@ -299,7 +304,10 @@ fn detail(
             return refused(refusal);
         }
     };
-    let found = readiness.indicators.get(name);
+    let found = readiness
+        .indicators
+        .iter()
+        .find(|indicator| indicator.name == name);
     let badge = match found {
         Some(found) if found.state == State::Up => state(Mark::Ok, tr(Msg::StateUp), None),
         Some(_) => state(Mark::Bad, tr(Msg::StateUnreachable), None),

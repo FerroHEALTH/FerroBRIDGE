@@ -1,136 +1,72 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! A handler panic becomes a `500` with a body, never a dropped connection.
+//! The body of a request whose handler panicked, which the panic catch of
+//! `ferrohealth-server` answers `500` with.
 //!
 //! The release profile pins `panic = "unwind"`, which is what lets
 //! `std::panic::catch_unwind` turn an unwound handler into a response
 //! (<https://doc.rust-lang.org/cargo/reference/profiles.html#panic>). The
-//! panic message reaches the log and never the body, since a handler may have
-//! panicked over clinical content. Under the FHIR base the body is an
+//! panic message reaches neither the body nor the log, since a handler may
+//! have panicked over clinical content. Under the FHIR base the body is an
 //! `OperationOutcome` with the `exception` issue, because R4 asks a server to
 //! answer an error with one (<https://hl7.org/fhir/R4/http.html>, §3.1.0.4);
-//! every other route answers a JSON object, whose shape no specification
-//! governs: our own design.
+//! every other route answers the family's JSON object.
 
-use axum::extract::Request;
-use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
-use http::{StatusCode, header};
-use std::any::Any;
+use std::sync::Arc;
+
+use ferrohealth_server::panic::PanicBody;
+use http::StatusCode;
 
 use crate::facade::outcome::{Issue, IssueType};
 
-/// The marker a caught panic leaves on its response.
-///
-/// The panic handler sees the payload and no request, so it marks the response
-/// and [`render`] fills the request id in outside the layer that sets it.
-#[derive(Debug, Clone)]
-struct Panicked(String);
-
-/// Renders a panicked handler as a `500` carrying its message as a marker.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "the `CatchPanicLayer` handler contract hands the payload over by value"
-)]
+/// Returns the panic body: an `OperationOutcome` naming the request id under
+/// the FHIR base, the family's JSON body everywhere else.
 #[must_use]
-pub fn caught(payload: Box<dyn Any + Send + 'static>) -> Response {
-    let message = payload
-        .downcast_ref::<&str>()
-        .map(|text| (*text).to_owned())
-        .or_else(|| payload.downcast_ref::<String>().cloned())
-        .unwrap_or_else(|| String::from("an unknown panic payload"));
-    let mut response = body(StatusCode::INTERNAL_SERVER_ERROR, "internal", "").into_response();
-    response.extensions_mut().insert(Panicked(message));
-    response
-}
-
-/// Fills the request id into a panic response and logs the panic.
-///
-/// It runs outside the layer that propagates the request id, so the header is
-/// already on the response and the body, the log line and the client's own
-/// trace name the same request. A request under the FHIR base answers an
-/// `OperationOutcome`, every other request the plain JSON body.
-pub async fn render(request: Request, next: Next) -> Response {
-    let fhir = crate::facade::edge::on_fhir_route(request.uri().path());
-    let response = next.run(request).await;
-    let Some(panicked) = response.extensions().get::<Panicked>().cloned() else {
-        return response;
-    };
-    let request_id = crate::request_id::of(response.headers())
-        .unwrap_or_default()
-        .to_owned();
-    tracing::error!(
-        request_id = request_id.as_str(),
-        panic = panicked.0.as_str(),
-        "the request handler panicked"
-    );
-    let (mut rendered, media) = if fhir {
-        let mut outcome = outcome(response.status(), &request_id);
-        let media = outcome.headers_mut().remove(header::CONTENT_TYPE);
-        (outcome, media)
-    } else {
-        (
-            body(response.status(), "internal", &request_id).into_response(),
-            None,
-        )
-    };
-    // The request id header the propagate layer set is on the old response;
-    // carry it so the client sees the same value the body names.
-    *rendered.headers_mut() = response.headers().clone();
-    rendered.headers_mut().insert(
-        header::CONTENT_TYPE,
-        media.unwrap_or(header::HeaderValue::from_static("application/json")),
-    );
-    rendered
-}
-
-/// Returns the `OperationOutcome` a panicked FHIR request answers, naming the
-/// request id and never the panic message.
-fn outcome(status: StatusCode, request_id: &str) -> Response {
-    crate::facade::reply::issue(
-        status,
-        Issue::error(IssueType::Exception).diagnosing(format!(
-            "the server failed while handling this request; request id {request_id}"
-        )),
-    )
-}
-
-/// Returns the JSON body this server answers an internal failure with.
-fn body(status: StatusCode, error: &str, request_id: &str) -> (StatusCode, String) {
-    let document = serde_json::json!({ "error": error, "request_id": request_id });
-    (status, document.to_string())
+pub fn body() -> PanicBody {
+    let plain = ferrohealth_server::panic::default_body();
+    Arc::new(move |uri, request_id| {
+        if crate::facade::edge::on_fhir_route(uri.path()) {
+            crate::facade::reply::issue(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Issue::error(IssueType::Exception).diagnosing(format!(
+                    "the server failed while handling this request; request id {request_id}"
+                )),
+            )
+        } else {
+            plain(uri, request_id)
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Panicked, caught};
-    use http::StatusCode;
+    use super::body;
+    use http::{StatusCode, Uri, header};
 
     #[test]
-    fn a_caught_panic_is_a_500_carrying_its_message_as_a_marker() {
-        let response = caught(Box::new("the handler gave up"));
-        assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, response.status());
-        assert_eq!(
-            Some("the handler gave up"),
-            response
-                .extensions()
-                .get::<Panicked>()
-                .map(|marked| marked.0.as_str())
+    fn a_fhir_route_answers_an_operation_outcome_and_another_route_json() {
+        let render = body();
+        let fhir = render(&Uri::from_static("/fhir/Patient/1"), "id-1");
+        assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, fhir.status());
+        assert!(
+            fhir.headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.starts_with("application/fhir+json")),
+            "{:?}",
+            fhir.headers()
         );
-    }
-
-    #[test]
-    fn an_owned_message_and_an_unknown_payload_both_reach_the_marker() {
-        let owned = caught(Box::new(String::from("owned message")));
-        assert_eq!(
-            Some("owned message"),
-            owned.extensions().get::<Panicked>().map(|m| m.0.as_str())
-        );
-        let unknown = caught(Box::new(7_u8));
-        assert_eq!(
-            Some("an unknown panic payload"),
-            unknown.extensions().get::<Panicked>().map(|m| m.0.as_str())
+        let plain = render(&Uri::from_static("/operator/mappings"), "id-2");
+        assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, plain.status());
+        assert!(
+            plain
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.starts_with("application/json")),
+            "{:?}",
+            plain.headers()
         );
     }
 }

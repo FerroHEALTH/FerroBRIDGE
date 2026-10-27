@@ -12,12 +12,12 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use ferrobridge_server::check::{self, Inputs, Templates};
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::operator::Operator;
 use ferrobridge_server::operator::files::{Language, Root};
 use ferrobridge_server::operator::snapshot::Snapshot;
 use ferrobridge_server::smart::Smart;
 use ferrobridge_server::state::AppState;
+use ferrohealth_health::registry::Registry;
 use http::{Request, StatusCode, header};
 use jsonwebtoken::Algorithm;
 use tower::ServiceExt as _;
@@ -154,8 +154,9 @@ fn digest(bytes: &[u8]) -> String {
 }
 
 /// The read-only operator routes, as a client calls them.
-const ROUTES: [&str; 4] = [
+const ROUTES: [&str; 5] = [
     "/operator/state",
+    "/operator/readiness",
     "/operator/configuration",
     "/operator/mappings",
     "/operator/mappings/fhirconnect/ferrobridge_facade.yml",
@@ -188,6 +189,21 @@ async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<
             "{route}"
         );
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_readiness_behind_the_operator_scope_names_the_phase() -> Result<(), Box<dyn Error>> {
+    let case = Case::new().await?;
+    let response = case.get("/operator/readiness", Some(OPERATOR)).await?;
+    assert_eq!(
+        StatusCode::SERVICE_UNAVAILABLE,
+        response.status(),
+        "a process that has not booted is not ready"
+    );
+    let document: serde_json::Value = serde_json::from_slice(&bytes(response).await?)?;
+    assert_eq!(Some("booting"), document["phase"].as_str(), "{document}");
+    assert_eq!(Some(&serde_json::json!([])), document.get("indicators"));
     Ok(())
 }
 
@@ -339,8 +355,8 @@ async fn a_path_that_escapes_its_directory_answers_404() -> Result<(), Box<dyn E
 fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
 -> Result<(), Box<dyn Error>> {
     let logs = crate::support::Logs::default();
-    let capture = ferrobridge_server::telemetry::subscriber(
-        ferrobridge_server::telemetry::Rendering::Json,
+    let capture = crate::support::subscriber(
+        ferrohealth_telemetry::section::Rendering::Json,
         "info",
         false,
         logs.clone(),

@@ -9,9 +9,10 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::Write as _;
 
+use crate::support::subscriber;
 use ferrobridge_operator_api::configuration::{Configuration, SecretState, Source, Value};
 use ferrobridge_server::config::Config;
-use ferrobridge_server::telemetry::{Rendering, subscriber};
+use ferrohealth_telemetry::section::Rendering;
 use http::StatusCode;
 
 use super::{Case, OPERATOR, bytes};

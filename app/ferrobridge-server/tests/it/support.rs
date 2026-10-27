@@ -4,12 +4,13 @@
 //! Shared helpers: a capturing log writer, test settings, a test state and a
 //! terminology translator.
 
-use ferrobridge_server::config::ServerSettings;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::terminology::Translator;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
+use ferrohealth_health::registry::Registry;
+use ferrohealth_server::section::ServerSection;
+use ferrohealth_telemetry::section::Rendering;
 use std::error::Error;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -62,14 +63,36 @@ impl<'a> MakeWriter<'a> for Logs {
     }
 }
 
-/// Returns server settings a test drives the middleware with.
-pub(crate) fn settings() -> ServerSettings {
-    ServerSettings {
+/// Returns server settings a test drives the middleware with: a 5 s request
+/// timeout and drain, a 1024-byte ceiling and no compression.
+pub(crate) fn settings() -> ServerSection {
+    ServerSection {
         listen: "127.0.0.1:0".parse().expect("a socket address"),
-        request_timeout: Duration::from_secs(5),
-        shutdown_timeout: Duration::from_secs(5),
-        body_limit: 1024,
+        request_timeout_ms: 5_000,
+        shutdown_timeout_ms: 5_000,
+        body_limit_bytes: 1024,
+        compression: false,
+        ..ServerSection::default()
     }
+}
+
+/// Returns a subscriber that writes the console of `rendering`, filtered by
+/// `filter`, to `writer`, as the family's console renders it.
+pub(crate) fn subscriber<W>(
+    rendering: Rendering,
+    filter: &str,
+    ansi: bool,
+    writer: W,
+) -> impl tracing::Subscriber + Send + Sync
+where
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+{
+    use tracing_subscriber::layer::SubscriberExt as _;
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(filter))
+        .with(ferrohealth_telemetry::console::layer(
+            rendering, ansi, writer,
+        ))
 }
 
 /// Returns a state with no indicator and no logged query parameter.
@@ -87,4 +110,13 @@ pub(crate) fn translator(server: &MockServer) -> Result<Translator, Box<dyn Erro
             max_backoff: Duration::from_millis(1),
         });
     Ok(Translator::new(Some(Client::new(config)?)))
+}
+
+/// Returns the count `counts` holds under the counter `name`, 0 when none.
+pub(crate) fn counter(counts: &ferrohealth_usage_report::window::Counts, name: &str) -> u64 {
+    counts
+        .counters
+        .iter()
+        .find(|(key, _)| key.as_str() == name)
+        .map_or(0, |(_, count)| *count)
 }

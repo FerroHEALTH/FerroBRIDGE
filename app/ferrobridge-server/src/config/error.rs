@@ -6,27 +6,18 @@
 
 use std::path::PathBuf;
 
-use crate::config::ENV_PREFIX;
 /// A configuration the server refuses to start on.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// The configuration file could not be read.
-    #[error("the configuration file {} could not be read", path.display())]
-    Read {
-        /// The path that was tried.
-        path: PathBuf,
-        /// What the file system reported.
-        #[source]
-        source: std::io::Error,
-    },
-    /// The configuration does not parse, names an unknown key, or holds a
-    /// value of the wrong type.
+    /// The configuration could not be read: a file that does not read, TOML
+    /// that does not parse, an unknown key or variable, or a value of the
+    /// wrong type, each named by its key.
     #[error("the configuration is not valid")]
     Parse {
-        /// What the TOML reader reported, with the offending key.
+        /// What the family's loader reported, with the offending key.
         #[source]
-        source: toml::de::Error,
+        source: ferrohealth_config::error::ConfigError,
     },
     /// The running configuration could not be written for the operator API.
     #[error("the running configuration could not be rendered for the operator API")]
@@ -34,26 +25,6 @@ pub enum Error {
         /// What the TOML writer reported.
         #[source]
         source: toml::ser::Error,
-    },
-    /// The merged configuration could not be written back for re-reading.
-    #[error("the configuration could not be assembled")]
-    Assemble {
-        /// What the TOML writer reported.
-        #[source]
-        source: toml::ser::Error,
-    },
-    /// An environment override names no key under the prefix.
-    #[error("{name} names no configuration key; use {ENV_PREFIX}<SECTION>__<KEY>")]
-    EnvName {
-        /// The variable that was read.
-        name: String,
-    },
-    /// An environment override addresses a key under a value that is not a
-    /// section.
-    #[error("{name} addresses a key under a value that is not a section")]
-    EnvShape {
-        /// The variable that was read.
-        name: String,
     },
     /// A value and its `_file` sibling are both set.
     #[error("{key} is set together with {key}_file; set one of them")]
@@ -72,12 +43,24 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+    /// A secret could not be read from its key or its `_file` sibling.
+    #[error("a secret could not be read")]
+    SecretFile {
+        /// What `ferrohealth-secret` reported, with the key.
+        #[source]
+        source: ferrohealth_secret::file::SecretError,
+    },
     /// A section is present and a key it needs is not set.
     #[error("{key} is not set, and its section is present")]
     Missing {
         /// The key that carries no value.
         key: String,
     },
+    /// `[server.caller_rate]` is set, and the bridge limits no caller's rate.
+    #[error(
+        "server.caller_rate: FerroBRIDGE applies no per-caller rate limit; remove the table, or bound the server with server.max_concurrent_requests"
+    )]
+    CallerRate,
     /// A socket address does not parse.
     #[error("{key} is not a socket address")]
     Listen {
@@ -340,13 +323,6 @@ pub enum Error {
     /// A size that would refuse every message.
     #[error("{key} is 0; a frame carries at least one byte")]
     FrameLimit {
-        /// The key that holds it.
-        key: String,
-    },
-    /// A collector endpoint that carries credentials or is plain `http` to a
-    /// host other than a loopback one.
-    #[error("{key} is not an https URL without credentials; only a loopback collector may be http")]
-    ReportEndpoint {
         /// The key that holds it.
         key: String,
     },

@@ -42,7 +42,7 @@ use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::status;
 use crate::terminology::{Direction, Session};
-use crate::usage_report::window::Window;
+use ferrohealth_usage_report::window::Window;
 
 /// What one rendered resource carries beside its body.
 #[derive(Debug, Clone)]
@@ -304,7 +304,7 @@ async fn produce(
         origin.demographics,
     )
     .map_err(|error| {
-        origin.usage.record_mapping_failure();
+        crate::usage_report::record_mapping_failure(origin.usage);
         Refusal::from(Refused::of_answer(&status::of_outbound_refusal(&error)))
     })?;
     let warnings = produced.warnings().to_vec();
@@ -544,12 +544,16 @@ mod tests {
             filled: Vec::new(),
         };
         let logs = Capture::default();
-        let subscriber = crate::telemetry::subscriber(
-            crate::telemetry::Rendering::Json,
-            "debug",
-            false,
-            logs.clone(),
-        );
+        let subscriber = {
+            use tracing_subscriber::layer::SubscriberExt as _;
+            tracing_subscriber::registry()
+                .with(tracing_subscriber::EnvFilter::new("debug"))
+                .with(ferrohealth_telemetry::console::layer(
+                    ferrohealth_telemetry::section::Rendering::Json,
+                    false,
+                    logs.clone(),
+                ))
+        };
         tracing::subscriber::with_default(subscriber, || log_outcome(&rendered));
         let text = logs.text();
         assert!(

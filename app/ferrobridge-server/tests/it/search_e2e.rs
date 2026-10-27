@@ -19,10 +19,10 @@ use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::programs;
 use ferrobridge_server::facade::search;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures;
+use ferrohealth_health::registry::Registry;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -398,9 +398,9 @@ fn app(facade: &Arc<Facade>) -> Router {
     let state = AppState::with_health(Registry::default()).with_facade(Arc::clone(facade));
     ferrobridge_server::router(
         Arc::new(state),
-        &ferrobridge_server::config::ServerSettings {
-            body_limit: 1024 * 1024,
-            request_timeout: core::time::Duration::from_secs(30),
+        &ferrohealth_server::section::ServerSection {
+            body_limit_bytes: 1024 * 1024,
+            request_timeout_ms: 30_000,
             ..crate::support::settings()
         },
     )

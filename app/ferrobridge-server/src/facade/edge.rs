@@ -1,15 +1,15 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The answers the middleware stack authors in front of a FHIR route, rendered
-//! as an `OperationOutcome`.
+//! The refusals the stack of `ferrohealth-server` writes in front of a FHIR
+//! route, rendered as an `OperationOutcome`.
 //!
-//! The body ceiling and the request timeout refuse a request before or around
-//! its handler, so their plain answers would reach a FHIR client as a body it
-//! cannot read. R4 asks a server to return an `OperationOutcome` with an error
-//! status (<https://hl7.org/fhir/R4/http.html>, §3.1.0.4), so under
-//! [`BASE_PATH`] [`render`] replaces each with one; every other route keeps the
-//! plain answer.
+//! The body ceiling, the request timeout and the overload bound refuse a
+//! request before or around its handler, so their plain answers would reach a
+//! FHIR client as a body it cannot read. R4 asks a server to return an
+//! `OperationOutcome` with an error status
+//! (<https://hl7.org/fhir/R4/http.html>, §3.1.0.4), so under [`BASE_PATH`]
+//! [`body`] writes one; every other route keeps the family's plain answer.
 //!
 //! The statuses are our own design, since no specification governs them: the
 //! ceiling stays `413 Content Too Large` (RFC 9110 §15.5.14) with the
@@ -20,17 +20,16 @@
 //! client repeat it, would invite a blind repeat of a write the CDR may
 //! already have committed.
 
+use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::Request;
-use axum::extract::State;
+use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::Response;
+use ferrohealth_server::refusal::RefusalBody;
 use http::StatusCode;
-use http::header;
 
 use crate::facade::BASE_PATH;
-use crate::facade::media::FHIR_JSON;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
@@ -55,47 +54,101 @@ impl Edge {
         }
     }
 
-    /// Returns the `OperationOutcome` answer that replaces `response` on a
-    /// FHIR route, or `response` itself when it is no edge answer.
-    ///
-    /// An answer that already carries the FHIR media type was authored by the
-    /// facade and is left alone.
+    /// Returns the `OperationOutcome` a FHIR route answers in place of a
+    /// refusal of `status`, or `None` for a status the edge leaves alone.
     #[must_use]
-    pub fn outcome_of(&self, response: Response) -> Response {
-        if carries_fhir(&response) {
-            return response;
-        }
-        match response.status() {
-            StatusCode::PAYLOAD_TOO_LARGE => reply::issue(
+    pub fn outcome_of(&self, status: StatusCode) -> Option<Response> {
+        match status {
+            StatusCode::PAYLOAD_TOO_LARGE => Some(reply::issue(
                 StatusCode::PAYLOAD_TOO_LARGE,
                 Issue::error(IssueType::TooLong).diagnosing(format!(
                     "the request body is over the {}-byte ceiling of this server",
                     self.body_limit
                 )),
-            ),
-            StatusCode::REQUEST_TIMEOUT => reply::issue(
+            )),
+            StatusCode::REQUEST_TIMEOUT => Some(reply::issue(
                 StatusCode::GATEWAY_TIMEOUT,
                 Issue::error(IssueType::Timeout).diagnosing(format!(
                     "the request did not complete within the {} ms this server allows; \
                      a write may have reached the openEHR service",
                     self.timeout.as_millis()
                 )),
-            ),
-            _ => response,
+            )),
+            StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE => Some(reply::issue(
+                status,
+                Issue::error(IssueType::Transient)
+                    .diagnosing("the server is busy; repeat the request later"),
+            )),
+            _ => None,
         }
     }
 }
 
-/// Renders the ceiling's and the timeout's answer on a FHIR route as an
-/// `OperationOutcome`.
-pub async fn render(State(edge): State<Edge>, request: Request, next: Next) -> Response {
+/// Returns the refusal body of a stack whose ceiling is `body_limit` bytes
+/// and whose requests may take `timeout`: an `OperationOutcome` under the
+/// FHIR base, the family's plain answer everywhere else.
+#[must_use]
+pub fn body(body_limit: usize, timeout: Duration) -> RefusalBody {
+    let edge = Edge::new(body_limit, timeout);
+    let plain = ferrohealth_server::refusal::default_body();
+    Arc::new(move |uri, request_id, status, reason| {
+        let outcome = on_fhir_route(uri.path())
+            .then(|| edge.outcome_of(status))
+            .flatten();
+        match outcome {
+            Some(mut outcome) => {
+                let answered = outcome.status();
+                if answered != status {
+                    outcome.extensions_mut().insert(Answered(answered));
+                }
+                outcome
+            }
+            None => plain(uri, request_id, status, reason),
+        }
+    })
+}
+
+/// The status a FHIR refusal answers when it differs from the stack's.
+///
+/// The stack writes a refusal under its own status, so the body marks the one
+/// the facade answers and [`fhir_refusals`] sets it outside the stack.
+#[derive(Debug, Clone, Copy)]
+struct Answered(StatusCode);
+
+/// Finishes the refusals on a FHIR route outside the stack.
+///
+/// A refusal the edge wrote takes the status its body chose (a timeout
+/// answers `504`), and a
+/// `413` the body extractor raised inside the routes, which the stack leaves
+/// in its plain form, becomes the `too-long` `OperationOutcome`.
+pub async fn fhir_refusals(State(edge): State<Edge>, request: Request, next: Next) -> Response {
     let fhir = on_fhir_route(request.uri().path());
-    let response = next.run(request).await;
-    if fhir {
-        edge.outcome_of(response)
-    } else {
-        response
+    let mut response = next.run(request).await;
+    if let Some(Answered(status)) = response.extensions().get::<Answered>().copied() {
+        *response.status_mut() = status;
+        return response;
     }
+    let plain = !response
+        .headers()
+        .get(http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with(crate::facade::media::FHIR_JSON));
+    if fhir
+        && plain
+        && response.status() == StatusCode::PAYLOAD_TOO_LARGE
+        && let Some(mut outcome) = edge.outcome_of(StatusCode::PAYLOAD_TOO_LARGE)
+    {
+        if let Some(id) = response
+            .headers()
+            .get(ferrohealth_server::request_id::HEADER)
+        {
+            outcome
+                .headers_mut()
+                .insert(ferrohealth_server::request_id::HEADER, id.clone());
+        }
+        return outcome;
+    }
+    response
 }
 
 /// Returns whether `path` is under [`BASE_PATH`].
@@ -104,19 +157,9 @@ pub(crate) fn on_fhir_route(path: &str) -> bool {
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }
 
-/// Returns whether `response` declares the FHIR JSON media type.
-fn carries_fhir(response: &Response) -> bool {
-    response
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.starts_with(FHIR_JSON))
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Edge, on_fhir_route};
-    use axum::response::IntoResponse;
     use http::StatusCode;
     use std::time::Duration;
 
@@ -134,16 +177,20 @@ mod tests {
 
     #[test]
     fn a_timeout_becomes_a_504_and_the_ceiling_stays_a_413() {
-        let timed_out = edge().outcome_of(StatusCode::REQUEST_TIMEOUT.into_response());
-        assert_eq!(StatusCode::GATEWAY_TIMEOUT, timed_out.status());
-        let oversized = edge().outcome_of(StatusCode::PAYLOAD_TOO_LARGE.into_response());
-        assert_eq!(StatusCode::PAYLOAD_TOO_LARGE, oversized.status());
+        let timed_out = edge().outcome_of(StatusCode::REQUEST_TIMEOUT);
+        assert_eq!(
+            Some(StatusCode::GATEWAY_TIMEOUT),
+            timed_out.map(|answer| answer.status())
+        );
+        let oversized = edge().outcome_of(StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(
+            Some(StatusCode::PAYLOAD_TOO_LARGE),
+            oversized.map(|answer| answer.status())
+        );
     }
 
     #[test]
     fn any_other_answer_is_left_alone() {
-        let answer = edge().outcome_of(StatusCode::NOT_FOUND.into_response());
-        assert_eq!(StatusCode::NOT_FOUND, answer.status());
-        assert!(answer.headers().get(http::header::CONTENT_TYPE).is_none());
+        assert!(edge().outcome_of(StatusCode::NOT_FOUND).is_none());
     }
 }

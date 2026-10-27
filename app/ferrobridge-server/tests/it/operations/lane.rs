@@ -115,8 +115,8 @@ fn a_compiler_warning_reaches_the_log_once_as_the_lane_loads() -> Result<(), Box
         templates: root.path().join("templates"),
     };
     let logs = support::Logs::default();
-    let capture = ferrobridge_server::telemetry::subscriber(
-        ferrobridge_server::telemetry::Rendering::Json,
+    let capture = support::subscriber(
+        ferrohealth_telemetry::section::Rendering::Json,
         "warn",
         false,
         logs.clone(),

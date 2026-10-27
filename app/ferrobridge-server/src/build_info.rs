@@ -11,6 +11,7 @@
 //! our own design.
 
 use ferrobridge_operator_api::health::{Build, Info, Lane, Pin};
+use ferrohealth_server::build_info::BuildInfo;
 
 /// The full git commit this binary was built from, or `unknown` outside a
 /// checkout.
@@ -36,6 +37,22 @@ pub const OPENEHR_CRATES: &str = env!("FERROBRIDGE_BUILD_OPENEHR_CRATES");
 
 /// The version `Cargo.lock` locks for `fhir-types`.
 pub const FHIR_TYPES: &str = env!("FERROBRIDGE_BUILD_FHIR_TYPES");
+
+/// This build, as the family's banner and `GET /health/info` name it: the
+/// version, the commit when the build ran in a checkout, the instant and the
+/// compiler.
+pub const BUILD: BuildInfo = {
+    let info = BuildInfo::new("ferrobridge", crate::state::VERSION)
+        .with_built_at(BUILT_AT)
+        .with_rustc(RUSTC);
+    // NOTE: no specification governs this: our own design; the build script
+    // writes `unknown` for a build outside a checkout, which names no commit.
+    if matches!(COMMIT.as_bytes(), b"unknown") {
+        info
+    } else {
+        info.with_commit(COMMIT)
+    }
+};
 
 /// Returns the pins the process serves, in the order the banner prints them.
 ///

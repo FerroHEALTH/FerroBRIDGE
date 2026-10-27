@@ -1,10 +1,9 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The health documents: `GET /health/info`, the build facts, pins and
-//! lanes, and `GET /health/readiness`, the state of every indicator.
-
-use std::collections::BTreeMap;
+//! The health document of the bridge's own: `GET /health/info`, the build
+//! facts, pins and lanes. `GET /health/readiness` answers the family's
+//! readiness document, `ferrohealth_health::document::Readiness`.
 
 use serde::{Deserialize, Serialize};
 
@@ -64,54 +63,3 @@ pub struct Lane {
     pub up: Option<bool>,
 }
 
-/// The state of one indicator, or of the aggregate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum State {
-    /// The subsystem answered.
-    Up,
-    /// The subsystem did not answer.
-    Down,
-}
-
-/// The outcome of one indicator check.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct IndicatorState {
-    /// Whether the subsystem answered.
-    pub state: State,
-    /// Why it did not, when it did not. Never a body and never a credential.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub detail: Option<String>,
-}
-
-impl IndicatorState {
-    /// Returns the state of a subsystem that answered.
-    #[must_use]
-    pub const fn up() -> Self {
-        Self {
-            state: State::Up,
-            detail: None,
-        }
-    }
-
-    /// Returns the state of a subsystem that did not answer, with the reason.
-    #[must_use]
-    pub fn down(detail: impl Into<String>) -> Self {
-        Self {
-            state: State::Down,
-            detail: Some(detail.into()),
-        }
-    }
-}
-
-/// What `GET /health/readiness` answers with, `200` while the aggregate is
-/// up and `503` while it is down.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Readiness {
-    /// The aggregate: down while any indicator is down.
-    pub state: State,
-    /// Every indicator by name, in name order.
-    pub indicators: BTreeMap<String, IndicatorState>,
-}

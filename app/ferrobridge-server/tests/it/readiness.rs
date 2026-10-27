@@ -4,7 +4,6 @@
 //! Readiness over a stubbed CDR: what the upstream answers decides the status.
 
 use crate::support;
-use axum::Router;
 use axum::body::Body;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::state::AppState;
@@ -20,22 +19,56 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 /// The ADL 1.4 template list the CDR probe reads (ITS-REST 1.1.0 Definition API).
 const PROBE_PATH: &str = "/v1/definition/template/adl1.4";
 
-/// Returns the router of a deployment whose CDR is `base`.
-async fn router(base: &str) -> Result<Router, Box<dyn Error>> {
+/// Returns the serving state of a deployment whose CDR is `base`.
+async fn router(base: &str) -> Result<Arc<AppState>, Box<dyn Error>> {
     let text = format!("[cdr]\nbase_url = \"{base}/v1\"\ntimeout_ms = 2000\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
-    let state = Arc::new(AppState::build(&settings).await?);
-    Ok(ferrobridge_server::router(state, &support::settings()))
+    Ok(serving(AppState::build(&settings).await?))
 }
 
-/// Sends `GET /health/readiness` through `app`.
-async fn readiness(app: Router) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
+/// Returns `state` as a process that serves, past its boot.
+fn serving(state: AppState) -> Arc<AppState> {
+    state.lifecycle().booted();
+    Arc::new(state)
+}
+
+/// Sends `GET /health/readiness` through the router over `state`, checks the
+/// open route names no indicator's detail, and returns its status with its
+/// state and every indicator by name, each with the detail the registry
+/// holds behind the route.
+async fn readiness(
+    state: Arc<AppState>,
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
+    let app = ferrobridge_server::router(Arc::clone(&state), &support::settings());
     let response = app
         .oneshot(Request::get("/health/readiness").body(Body::empty())?)
         .await?;
     let status = response.status();
     let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
-    Ok((status, serde_json::from_slice(&bytes)?))
+    let served: serde_json::Value = serde_json::from_slice(&bytes)?;
+    let listed = served["indicators"].as_array().ok_or("an indicator list")?;
+    assert!(
+        listed
+            .iter()
+            .all(|indicator| indicator.get("detail").is_none()),
+        "the open route names no detail: {served}"
+    );
+    let detailed = state.health().readiness(state.lifecycle()).await;
+    let indicators: serde_json::Map<String, serde_json::Value> = detailed
+        .indicators
+        .iter()
+        .map(|indicator| {
+            (
+                indicator.name.clone(),
+                serde_json::json!({ "state": indicator.state, "detail": indicator.detail }),
+            )
+        })
+        .collect();
+    assert_eq!(listed.len(), indicators.len(), "{served}");
+    Ok((
+        status,
+        serde_json::json!({ "state": served["state"], "indicators": indicators }),
+    ))
 }
 
 #[tokio::test]
@@ -137,10 +170,9 @@ async fn a_cdr_token_that_cannot_be_obtained_makes_readiness_five_hundred_and_th
         base = base
     );
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
-    let state = Arc::new(AppState::build(&settings).await?);
-    let app = ferrobridge_server::router(state, &support::settings());
+    let state = serving(AppState::build(&settings).await?);
 
-    let (status, document) = readiness(app).await?;
+    let (status, document) = readiness(state).await?;
     assert_eq!(StatusCode::SERVICE_UNAVAILABLE, status);
     assert_eq!(
         Some("down"),
@@ -177,7 +209,7 @@ async fn a_cdr_that_never_answers_makes_readiness_five_hundred_and_three()
 #[tokio::test]
 async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Box<dyn Error>> {
     let closed = closed_http_url()?;
-    let app = router(&closed).await?;
+    let app = ferrobridge_server::router(router(&closed).await?, &support::settings());
     let response = app
         .oneshot(Request::get("/health/liveness").body(Body::empty())?)
         .await?;
@@ -191,11 +223,10 @@ async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Bo
 
 /// Returns the router of a deployment whose only upstream is the CDM
 /// database `url`.
-async fn cdm_router(url: &str) -> Result<Router, Box<dyn Error>> {
+async fn cdm_router(url: &str) -> Result<Arc<AppState>, Box<dyn Error>> {
     let text = format!("[cdm]\nurl = {url:?}\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
-    let state = Arc::new(AppState::build(&settings).await?);
-    Ok(ferrobridge_server::router(state, &support::settings()))
+    Ok(serving(AppState::build(&settings).await?))
 }
 
 #[tokio::test]

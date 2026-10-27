@@ -51,6 +51,9 @@ fluent-templates.workspace = true
 # The bridge's health and operator documents, the contract the bridge
 # serializes with (docs/architecture.md section 4.10), drawn in both halves.
 ferrobridge-operator-api.workspace = true
+# The family's readiness document `GET /health/readiness` answers, in the
+# default build both halves compile.
+ferrohealth-health.workspace = true
 # The `Diagnostic` the operator API answers, read in its serde form.
 openehr-mapping-core.workspace = true
 # The status of a bridge refusal.

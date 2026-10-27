@@ -26,6 +26,9 @@ pub mod snapshot;
 
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use ferrohealth_health::lifecycle::Lifecycle;
+use ferrohealth_health::registry::Registry;
 use std::sync::RwLock;
 
 use axum::Router;
@@ -175,9 +178,18 @@ impl Operator {
     }
 }
 
-/// Returns the operator routes over `operator`, every one guarded by the
-/// gate of `smart` and its operator scope.
-pub fn routes(operator: Arc<Operator>, smart: &crate::smart::Smart) -> Router {
+/// Returns the operator routes over `operator` and the readiness of
+/// `health` in `lifecycle`'s phase, every one guarded by the gate of `smart`
+/// and its operator scope.
+pub fn routes(
+    operator: Arc<Operator>,
+    smart: &crate::smart::Smart,
+    health: Registry,
+    lifecycle: Lifecycle,
+) -> Router {
+    let readiness = Router::new()
+        .route("/operator/readiness", get(readiness))
+        .with_state((health, lifecycle));
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/configuration", get(running_configuration))
@@ -186,7 +198,21 @@ pub fn routes(operator: Arc<Operator>, smart: &crate::smart::Smart) -> Router {
         .route("/operator/mappings/{*path}", get(mapping).put(save::save))
         .route("/operator/reload", post(save::reload))
         .with_state(operator)
+        .merge(readiness)
         .route_layer(guard::layer(smart))
+}
+
+/// `GET /operator/readiness`: the readiness document with each indicator's
+/// detail, which the open `/health/readiness` withholds; `200` while the
+/// process is ready and `503` otherwise.
+async fn readiness(State((health, lifecycle)): State<(Registry, Lifecycle)>) -> Response {
+    let document = health.readiness(&lifecycle).await;
+    let status = if document.is_ready() {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    (status, axum::Json(document)).into_response()
 }
 
 /// `GET /operator/state`: the running load.

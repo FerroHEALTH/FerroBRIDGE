@@ -6,13 +6,14 @@
 //! faces and the mapping set to its upstreams.
 //!
 //! The stats read the running load and the readiness indicators; the flow
-//! reads the lanes `GET /health/info` names and the indicators of
-//! `GET /health/readiness`, so it draws while the operator API is off.
+//! reads the lanes `GET /health/info` names and the readiness indicators,
+//! which fall back to `GET /health/readiness` while the operator API is off.
 
 use std::borrow::Cow;
 
-use ferrobridge_operator_api::health::{Info, Lane, Readiness, State};
+use ferrobridge_operator_api::health::{Info, Lane};
 use ferrobridge_operator_api::operator::EngineState;
+use ferrohealth_health::document::{Readiness, State};
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
@@ -197,7 +198,12 @@ fn unknown_cards(off: bool) -> (AnyView, AnyView) {
 fn upstreams_card(readiness: &Readiness) -> AnyView {
     let checked = UPSTREAMS
         .iter()
-        .filter_map(|name| readiness.indicators.get(*name))
+        .filter_map(|name| {
+            readiness
+                .indicators
+                .iter()
+                .find(|indicator| indicator.name == *name)
+        })
         .collect::<Vec<_>>();
     let up = checked
         .iter()
@@ -256,7 +262,7 @@ fn attention(_info: &Info, readiness: &Readiness) -> Option<AnyView> {
     let down = readiness
         .indicators
         .iter()
-        .filter(|(_, indicator)| indicator.state == State::Down)
+        .filter(|indicator| indicator.state == State::Down)
         .collect::<Vec<_>>();
     if down.is_empty() {
         return None;
@@ -270,7 +276,8 @@ fn attention(_info: &Info, readiness: &Readiness) -> Option<AnyView> {
     let [_, kind, word, why] = &columns;
     let rows = down
         .iter()
-        .map(|(name, indicator)| {
+        .map(|indicator| {
+            let name = &indicator.name;
             let kind_word = if UPSTREAMS.contains(&name.as_str()) {
                 tr(Msg::KindConnection)
             } else {
@@ -324,7 +331,11 @@ fn face(info: &Info, name: &str, on: Msg) -> (FlowState, String) {
 
 /// The state and line of the upstream named `name`.
 fn upstream(readiness: &Readiness, name: &str) -> (FlowState, String, Option<String>) {
-    match readiness.indicators.get(name) {
+    match readiness
+        .indicators
+        .iter()
+        .find(|indicator| indicator.name == name)
+    {
         Some(indicator) if indicator.state == State::Up => {
             (FlowState::Up, tr(Msg::FlowUpstreamUp), None)
         }

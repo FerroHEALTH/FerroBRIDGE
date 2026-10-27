@@ -25,8 +25,7 @@ use tokio::net::TcpListener;
 
 use crate::config::Settings;
 
-use crate::health::{Check, HealthIndicator};
-use ferrobridge_operator_api::health::IndicatorState;
+use ferrohealth_health::registry::{Check, HealthIndicator, Outcome};
 
 /// How long the start waits between two attempts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,11 +117,7 @@ impl HealthIndicator for Startup {
     }
 
     fn check(&self) -> Check<'_> {
-        Box::pin(async move {
-            self.status
-                .reason()
-                .map_or_else(IndicatorState::up, IndicatorState::down)
-        })
+        Box::pin(async move { self.status.reason().map_or_else(Outcome::up, Outcome::down) })
     }
 }
 
@@ -212,7 +207,7 @@ where
 pub fn registry(
     settings: &Settings,
     status: &Status,
-) -> Result<crate::health::Registry, crate::cdr::error::CdrError> {
+) -> Result<ferrohealth_health::registry::Registry, crate::cdr::error::CdrError> {
     let mut indicators: Vec<Arc<dyn HealthIndicator>> =
         vec![Arc::new(Startup::new(status.clone()))];
     if let Some(cdr) = settings.cdr.as_ref() {
@@ -220,7 +215,7 @@ pub fn registry(
             crate::cdr::CdrClient::new(cdr)?,
         )));
     }
-    Ok(crate::health::Registry::new(indicators))
+    Ok(ferrohealth_health::registry::Registry::new(indicators))
 }
 
 /// Starts every lane `settings` configures and serves them on the listener
@@ -287,22 +282,32 @@ where
         Err(error) => return Err(error),
     };
     let state = Arc::new(started.state.with_lanes(started.lanes));
-    let ci = crate::usage_report::config::ci_of(|name| std::env::var(name).ok());
+    let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let report =
-        crate::usage_report::reporter::start(&settings.usage_report, Arc::clone(&state), began, ci)
-            .await;
+        crate::usage_report::start(&settings.usage_report, Arc::clone(&state), began, ci).await;
     let app = crate::router(Arc::clone(&state), &settings.server);
     match started.face {
-        None => crate::serve_until(
-            listener,
-            app,
-            settings.server.shutdown_timeout,
-            crate::lanes::stopped(&stop),
-        )
-        .await
-        .context("serving HTTP")?,
+        None => {
+            crate::serve_until(
+                listener,
+                app,
+                &settings.server,
+                state.lifecycle().clone(),
+                crate::lanes::stopped(&stop),
+            )
+            .await
+            .context("serving HTTP")?;
+        }
         Some(face) => {
-            crate::lanes::serve_with_face(listener, app, &settings.server, face, &stop).await?;
+            crate::lanes::serve_with_face(
+                listener,
+                app,
+                &settings.server,
+                state.lifecycle().clone(),
+                face,
+                &stop,
+            )
+            .await?;
         }
     }
     if let Some(report) = report {
@@ -340,18 +345,18 @@ async fn wait_for_cdr(
         crate::state::AppState::with_health(registry(settings, &status)?)
             .logging_query_parameters(settings.telemetry.logged_query_parameters.clone()),
     );
+    let lifecycle = state.lifecycle().clone();
     let app = crate::with_middleware(
         routes().with_state(Arc::clone(&state)),
         state,
         &settings.server,
     );
     let (done, _) = tokio::sync::watch::channel(false);
-    let probing = tokio::spawn(crate::serve_until(
-        probes,
-        app,
-        settings.server.shutdown_timeout,
-        crate::lanes::stopped(&done),
-    ));
+    let done_signal = crate::lanes::stopped(&done);
+    let server = settings.server.clone();
+    let probing = tokio::spawn(async move {
+        crate::serve_until(probes, app, &server, lifecycle, done_signal).await
+    });
     let started = tokio::select! {
         started = retry(&status, backoff, first, || crate::lanes::start(settings)) => Some(started),
         () = crate::lanes::stopped(stop) => None,
@@ -366,13 +371,11 @@ async fn wait_for_cdr(
         .transpose()
 }
 
-/// Returns the routes served while the start waits: the liveness and
-/// readiness probes, the root document, and `503` for everything else.
+/// Returns the routes served while the start waits: the root document, and
+/// `503` for everything else; the stack adds the health routes.
 pub(crate) fn routes() -> Router<Arc<crate::state::AppState>> {
     Router::new()
         .route("/", get(crate::root))
-        .route("/health/liveness", get(crate::liveness))
-        .route("/health/readiness", get(crate::readiness))
         .fallback(starting)
 }
 

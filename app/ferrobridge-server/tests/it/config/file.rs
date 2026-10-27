@@ -16,12 +16,15 @@ fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn
 {
     let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
     assert_eq!("0.0.0.0:9000", settings.server.listen.to_string());
-    assert_eq!(Duration::from_millis(1000), settings.server.request_timeout);
+    assert_eq!(
+        Duration::from_millis(1000),
+        settings.server.request_timeout()
+    );
     assert_eq!(
         Duration::from_millis(2000),
-        settings.server.shutdown_timeout
+        settings.server.shutdown_timeout()
     );
-    assert_eq!(4096, settings.server.body_limit);
+    assert_eq!(4096, settings.server.body_limit_bytes);
     assert_eq!(
         vec![String::from("_count")],
         settings.telemetry.logged_query_parameters

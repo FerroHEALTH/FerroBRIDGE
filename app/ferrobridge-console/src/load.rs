@@ -25,8 +25,9 @@
 
 use ferrobridge_operator_api::capability::Capability;
 use ferrobridge_operator_api::configuration::Configuration;
-use ferrobridge_operator_api::health::{Info, Readiness};
+use ferrobridge_operator_api::health::Info;
 use ferrobridge_operator_api::operator::{EngineState, Listed};
+use ferrohealth_health::document::Readiness;
 use leptos::prelude::*;
 use leptos::server_fn::ServerFn;
 
@@ -155,8 +156,9 @@ pub mod cached {
     use std::sync::Arc;
 
     use ferrobridge_operator_api::configuration::Configuration;
-    use ferrobridge_operator_api::health::{Info, Readiness};
+    use ferrobridge_operator_api::health::Info;
     use ferrobridge_operator_api::operator::{EngineState, Listed};
+    use ferrohealth_health::document::Readiness;
     use leptos::context::use_context;
     use tokio::sync::OnceCell;
 

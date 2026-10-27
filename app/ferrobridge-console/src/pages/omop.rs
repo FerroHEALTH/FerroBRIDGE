@@ -27,7 +27,7 @@ use crate::model::{Loaded, Outcome};
 use crate::pages::facade::{indicator, lane_on};
 use crate::pages::parts::{faulted, quiet, refused, section};
 use crate::pages::settings::rows;
-use ferrobridge_operator_api::health::Readiness;
+use ferrohealth_health::document::Readiness;
 
 /// The tabs, each its key and its words.
 const TABS: [(&str, Msg); 2] = [

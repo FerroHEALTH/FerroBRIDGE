@@ -18,11 +18,11 @@ mod terminology;
 use axum::Router;
 use axum::body::Body;
 use ferrobridge_server::config::MappingSettings;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::mappings;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::state::OperationsLane;
 use ferrobridge_server::terminology::Translator;
+use ferrohealth_health::registry::Registry;
 use http::{Request, Response, StatusCode, header};
 use std::error::Error;
 use std::sync::Arc;
@@ -155,9 +155,9 @@ fn state_with(
 ///
 /// A clinical document is larger than the shared test ceiling, so the
 /// operations run under the default one the server ships.
-fn server_settings() -> ferrobridge_server::config::ServerSettings {
-    ferrobridge_server::config::ServerSettings {
-        body_limit: 1024 * 1024,
+fn server_settings() -> ferrohealth_server::section::ServerSection {
+    ferrohealth_server::section::ServerSection {
+        body_limit_bytes: 1024 * 1024,
         ..support::settings()
     }
 }

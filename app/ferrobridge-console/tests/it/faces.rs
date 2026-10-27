@@ -80,7 +80,7 @@ async fn a_dashboard_with_every_indicator_up_needs_no_attention() -> Result<(), 
         &server,
         "/health/readiness",
         200,
-        &json!({"state": "up", "indicators": {"cdr": {"state": "up"}, "terminology": {"state": "up"}, "cdm": {"state": "up"}}}),
+        &json!({"state": "up", "phase": "serving", "indicators": [{"name": "cdm", "state": "up"}, {"name": "cdr", "state": "up"}, {"name": "terminology", "state": "up"}]}),
     )
     .await;
     answer(&server, "/operator/state", 200, &crate::stub::state()).await;

@@ -17,8 +17,9 @@ use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
 use ferrobridge_operator_api::configuration::Configuration;
-use ferrobridge_operator_api::health::{Info, Readiness};
+use ferrobridge_operator_api::health::Info;
 use ferrobridge_operator_api::operator::{EngineState, Listed};
+use ferrohealth_health::document::Readiness;
 use fhir_types::codec::{Json as _, Path, Value};
 use fhir_types::r4::capability_statement::CapabilityStatement;
 
@@ -277,9 +278,13 @@ impl Bridge {
             .map(|(_status, info)| info)
     }
 
-    /// Reads the bridge's readiness from `GET {base}health/readiness`, with
-    /// the status it answered: `200` while every indicator is up and `503`
-    /// while one is down, each with the report naming every indicator.
+    /// Reads the bridge's readiness from `GET {base}operator/readiness`,
+    /// which names why an indicator is down, with the status it answered:
+    /// `200` while the bridge is ready and `503` while it is not.
+    ///
+    /// A bridge whose operator API is off answers that route `404`; the
+    /// console then reads the open `GET {base}health/readiness`, which names
+    /// every indicator and its state and never its detail.
     ///
     /// # Errors
     /// Returns [`BridgeError::Refused`] for any other status, and the body
@@ -288,13 +293,17 @@ impl Bridge {
         &self,
         token: &AccessToken,
     ) -> Result<(StatusCode, Readiness), BridgeError> {
-        self.document(
-            "health/readiness",
-            "readiness report",
-            token,
-            &[StatusCode::OK, StatusCode::SERVICE_UNAVAILABLE],
-        )
-        .await
+        let accepted = [StatusCode::OK, StatusCode::SERVICE_UNAVAILABLE];
+        match self
+            .document("operator/readiness", "readiness report", token, &accepted)
+            .await
+        {
+            Err(BridgeError::Refused { status, .. }) if status == StatusCode::NOT_FOUND => {
+                self.document("health/readiness", "readiness report", token, &accepted)
+                    .await
+            }
+            answered => answered,
+        }
     }
 
     /// Reads the running load from the operator API, `GET

@@ -68,12 +68,14 @@ fn an_unknown_log_format_refuses_to_boot_and_names_its_key()
 #[test]
 fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
 -> Result<(), Box<dyn std::error::Error>> {
-    let listen = Config::from_sources(Some("[server]\nlisten = \"nowhere\"\n"), &BTreeMap::new())?
-        .resolve()
+    let listen = Config::from_sources(Some("[server]\nlisten = \"nowhere\"\n"), &BTreeMap::new())
         .expect_err("nowhere is not a socket address");
     match &listen {
-        Error::Listen { key, .. } => assert_eq!("server.listen", key),
-        other => return Err(format!("expected a listen error, got {other:?}").into()),
+        Error::Parse { source } => assert!(
+            source.to_string().contains("server.listen"),
+            "the refusal names the key: {source}"
+        ),
+        other => return Err(format!("expected a refusal of the key, got {other:?}").into()),
     }
 
     let url = Config::from_sources(Some("[cdr]\nbase_url = \"not a url\"\n"), &BTreeMap::new())?
@@ -114,5 +116,18 @@ fn a_section_that_is_present_and_names_no_url_refuses_to_boot()
         Error::Missing { key } => assert_eq!("cdr.base_url", key),
         other => return Err(format!("expected a missing key, got {other:?}").into()),
     }
+    Ok(())
+}
+
+#[test]
+fn a_caller_rate_refuses_to_boot_because_the_bridge_limits_no_caller()
+-> Result<(), Box<dyn std::error::Error>> {
+    let error = Config::from_sources(
+        Some("[server.caller_rate]\nrequests_per_second = 5\nburst = 10\n"),
+        &BTreeMap::new(),
+    )?
+    .resolve()
+    .expect_err("no caller rate is applied");
+    assert!(matches!(error, Error::CallerRate), "{error:?}");
     Ok(())
 }

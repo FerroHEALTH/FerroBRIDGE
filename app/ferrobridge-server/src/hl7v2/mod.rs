@@ -47,7 +47,7 @@ use crate::facade::Facade;
 use crate::facade::ingest::{Provenance, UnmappedEntries};
 use crate::hl7v2::answer::{Settled, Tally};
 use crate::hl7v2::stamped::Stamped;
-use crate::usage_report::window::Window;
+use ferrohealth_usage_report::window::Window;
 
 /// Loads the guide's `ConceptMaps`, the supplements `ferrobridge-hl7v2`
 /// ships, and every supplement directory of the settings over them, in order.
@@ -161,7 +161,7 @@ impl Face {
             profiles: settings.profiles.clone(),
             log_outcomes: settings.log_outcomes,
             senders: settings.senders.clone(),
-            usage: Arc::default(),
+            usage: Arc::new(crate::usage_report::window()),
         }
     }
 
@@ -227,7 +227,7 @@ impl Face {
         .instrument(span)
         .await;
         let code = answered.as_ref().map(|(code, _)| *code);
-        self.usage.record_message(started.elapsed(), code);
+        crate::usage_report::record_message(&self.usage, started.elapsed(), code);
         answered.map(|(_, reply)| reply)
     }
 
@@ -338,7 +338,7 @@ impl Handler for Face {
         let stamped = Stamped::now();
         let reply = ack::reject_frame(partial, &kind.to_string(), stamped.stamp());
         if reply.is_some() {
-            self.usage.record_acknowledgment(Code::Reject);
+            crate::usage_report::record_acknowledgment(&self.usage, Code::Reject);
         }
         reply
     }

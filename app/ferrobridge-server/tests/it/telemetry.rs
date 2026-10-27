@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console: the rendering `auto` resolves to, and the filter fallback.
+//! The console of `ferrohealth-telemetry` as the bridge runs it: the rendering
+//! `auto` resolves to, the filter, and one record per line.
 
 use crate::support::Logs;
-use ferrobridge_server::telemetry::{DEFAULT_FILTER, Format, Rendering, subscriber};
+use crate::support::subscriber;
+use ferrohealth_telemetry::section::{DEFAULT_FILTER, Format, Rendering};
 
 /// Writes one `info` line through a subscriber built for `rendering` and
 /// `filter`, and returns what it wrote.
@@ -50,11 +52,15 @@ fn the_pretty_rendering_writes_readable_text() {
 }
 
 #[test]
-fn a_filter_that_does_not_parse_falls_back_to_the_default_instead_of_dropping_the_line() {
-    let text = emitted(Rendering::Json, "info,=,,");
+fn a_filter_that_does_not_parse_refuses_to_boot_and_names_its_key() {
+    let error = ferrobridge_server::config::Config::from_sources(
+        Some("[telemetry]\nfilter = \"info,=,,\"\n"),
+        &std::collections::BTreeMap::new(),
+    )
+    .expect_err("the filter does not parse");
     assert!(
-        text.contains("a line"),
-        "the fallback filter still admits an info line: {text}"
+        format!("{error} {:?}", std::error::Error::source(&error)).contains("telemetry.filter"),
+        "{error:?}"
     );
 }
 

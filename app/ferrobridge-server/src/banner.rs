@@ -1,18 +1,21 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The boot banner: the wordmark, what this process is, the pins it serves
-//! and the lanes its configuration switches on.
+//! What FerroBRIDGE puts into the family's boot banner: the wordmark, the
+//! product line, the pins it serves and the lanes its configuration switches
+//! on.
 //!
-//! It prints to stdout before the log subscriber exists, and only when the
-//! console renders `pretty`, so a log pipeline reading `json` never sees it.
-//! Colour wraps text and never replaces it, so every line reads the same once
-//! a pipe or a log collector strips the escapes. No specification governs
-//! this: our own design.
+//! `ferrohealth_server::build_info::banner` draws the wordmark, the build
+//! line and the facts under them. It prints to stdout before the log
+//! subscriber exists, and only when the console renders `pretty`, so a log
+//! pipeline reading `json` never sees it. No specification governs this: our
+//! own design.
 
-use crate::build_info;
-use crate::startup::Lane;
 use ferrobridge_operator_api::health::Pin;
+use ferrohealth_server::build_info::{self, BuildInfo};
+use ferrohealth_telemetry::section::Rendering;
+
+use crate::startup::Lane;
 
 /// The wordmark in the `FIGlet` `standard` face, kept as text so the banner
 /// needs no font file and no dependency.
@@ -24,99 +27,80 @@ const WORDMARK: &str = r"
 |_|  \___|_|  |_|  \___/|____/|_| \_\___|____/ \____|_____|
 ";
 
-/// The product line printed under the wordmark, before the version.
+/// The product line printed under the build line.
 pub const PRODUCT_LINE: &str = "openEHR bridge to HL7 FHIR and the OMOP CDM";
 
-/// The maintainer named under the wordmark.
+/// The maintainer named in the banner.
 pub const MAINTAINER: &str = "Ruben Talstra";
 
-/// The project site named under the wordmark.
+/// The project site named in the banner.
 pub const SITE: &str = "https://ferrobridge.eu";
 
-/// The widest line the banner writes, in characters, colour escapes aside.
+/// The widest line the banner writes, in characters.
 pub const MAX_WIDTH: usize = 100;
 
-/// The escape that starts the wordmark's colour: bold cyan.
-const WORDMARK_COLOUR: &str = "\x1b[1;36m";
-/// The escape that marks a lane that is on: green.
-const ON_COLOUR: &str = "\x1b[32m";
-/// The escape that marks a lane that is off: dim.
-const OFF_COLOUR: &str = "\x1b[2m";
-/// The escape that ends a colour.
-const RESET: &str = "\x1b[0m";
-
-/// The width of the name column of the pin and lane lists.
-const NAME_WIDTH: usize = 18;
-
-/// Renders the banner for `version`, the served `pins` and the `lanes`, with
-/// colour when `colour` is set.
+/// Renders the banner of `info` for the served `pins` and the `lanes`, or
+/// `None` unless the console renders `pretty`.
 #[must_use]
-pub fn render(version: &str, pins: &[Pin], lanes: &[Lane], colour: bool) -> String {
-    let paint = |escape: &str, text: &str| {
-        if colour {
-            format!("{escape}{text}{RESET}")
-        } else {
-            text.to_owned()
-        }
-    };
-    let mut rows: Vec<String> = WORDMARK
-        .trim_start_matches('\n')
-        .lines()
-        .map(|line| paint(WORDMARK_COLOUR, line))
-        .collect();
-    rows.push(format!("  {PRODUCT_LINE} · v{version}"));
-    rows.push(format!("  Maintained by {MAINTAINER} · {SITE}"));
-    rows.push(String::new());
-    for pin in pins {
-        rows.push(format!("  {:<NAME_WIDTH$}{}", pin.name, pin.version));
-    }
-    rows.push(format!(
-        "  {:<NAME_WIDTH$}{} · {}",
-        "build",
-        build_info::COMMIT_SHORT,
-        build_info::BUILT_AT
-    ));
-    rows.push(String::new());
-    for lane in lanes {
-        let state = if lane.enabled {
-            paint(ON_COLOUR, "on ")
-        } else {
-            paint(OFF_COLOUR, "off")
-        };
-        let listens = lane
-            .listen
-            .as_ref()
-            .map(|listen| format!("listens on {listen}"));
-        let targets: Vec<&str> = listens.as_deref().into_iter().chain(lane.hosts()).collect();
-        let line = format!(
-            "  {:<NAME_WIDTH$}{state}  {}",
-            lane.name,
-            targets.join(", ")
-        );
-        rows.push(line.trim_end().to_owned());
-    }
-    let mut out = rows.join("\n");
-    out.push('\n');
-    out
+pub fn render(
+    info: &BuildInfo,
+    pins: &[Pin],
+    lanes: &[Lane],
+    rendering: Rendering,
+) -> Option<String> {
+    let mut facts: Vec<(&str, String)> = vec![
+        ("product", PRODUCT_LINE.to_owned()),
+        ("maintainer", MAINTAINER.to_owned()),
+        ("site", SITE.to_owned()),
+    ];
+    facts.extend(
+        pins.iter()
+            .map(|pin| (pin.name.as_str(), pin.version.clone())),
+    );
+    facts.extend(lanes.iter().map(|lane| (lane.name, lane_value(lane))));
+    build_info::banner(info, WORDMARK.trim_start_matches('\n'), &facts, rendering)
 }
 
-/// Prints the banner for this build to stdout.
+/// Returns what the banner says of `lane`: on or off, then the address it
+/// listens on and the hosts it reaches.
+fn lane_value(lane: &Lane) -> String {
+    let state = if lane.enabled { "on " } else { "off" };
+    let listens = lane
+        .listen
+        .as_ref()
+        .map(|listen| format!("listens on {listen}"));
+    let targets: Vec<&str> = listens.as_deref().into_iter().chain(lane.hosts()).collect();
+    format!("{state}  {}", targets.join(", "))
+        .trim_end()
+        .to_owned()
+}
+
+/// Prints the banner of this build to stdout when the console renders
+/// `pretty`.
 #[expect(
     clippy::print_stdout,
     reason = "the banner is console output and prints before any log subscriber exists"
 )]
-pub fn print(lanes: &[Lane], colour: bool) {
-    print!(
-        "{}",
-        render(crate::state::VERSION, &build_info::pins(), lanes, colour)
-    );
+pub fn print(lanes: &[Lane], rendering: Rendering) {
+    if let Some(banner) = render(
+        &crate::build_info::BUILD,
+        &crate::build_info::pins(),
+        lanes,
+        rendering,
+    ) {
+        print!("{banner}");
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{MAINTAINER, MAX_WIDTH, SITE, render};
+    use super::{MAINTAINER, MAX_WIDTH, PRODUCT_LINE, SITE, render};
     use crate::build_info::pins;
     use crate::startup::Lane;
+    use ferrohealth_server::build_info::BuildInfo;
+    use ferrohealth_telemetry::section::Rendering;
+
+    const INFO: BuildInfo = BuildInfo::new("ferrobridge", "1.2.3").with_commit("1a2b3c4d5e6f");
 
     fn lanes() -> Vec<Lane> {
         vec![
@@ -140,51 +124,34 @@ mod tests {
         ]
     }
 
-    /// Returns `text` with every ANSI escape sequence removed.
-    fn plain(text: &str) -> String {
-        let mut out = String::new();
-        let mut chars = text.chars();
-        while let Some(c) = chars.next() {
-            if c == '\x1b' {
-                for next in chars.by_ref() {
-                    if next == 'm' {
-                        break;
-                    }
-                }
-            } else {
-                out.push(c);
-            }
-        }
-        out
+    fn pretty(lanes: &[Lane]) -> String {
+        render(&INFO, &pins(), lanes, Rendering::Pretty).expect("pretty prints the banner")
     }
 
     #[test]
     fn the_banner_names_the_version_the_maintainer_and_the_site() {
-        let banner = render("1.2.3", &pins(), &lanes(), false);
-        assert!(banner.contains("openEHR bridge to HL7 FHIR and the OMOP CDM · v1.2.3"));
-        assert!(banner.contains(&format!("Maintained by {MAINTAINER} · {SITE}")));
+        let banner = pretty(&lanes());
+        assert!(banner.contains("ferrobridge 1.2.3 (1a2b3c4)"), "{banner}");
+        assert!(banner.contains(PRODUCT_LINE), "{banner}");
+        assert!(banner.contains(MAINTAINER), "{banner}");
+        assert!(banner.contains(SITE), "{banner}");
+    }
+
+    #[test]
+    fn a_json_console_prints_no_banner() {
+        assert_eq!(None, render(&INFO, &pins(), &lanes(), Rendering::Json));
     }
 
     #[test]
     fn every_line_fits_a_hundred_columns() {
-        let banner = render("1.2.3", &pins(), &lanes(), true);
-        for line in plain(&banner).lines() {
+        for line in pretty(&lanes()).lines() {
             assert!(line.chars().count() <= MAX_WIDTH, "{line:?}");
         }
     }
 
     #[test]
-    fn the_coloured_banner_reads_the_same_without_its_colour() {
-        let coloured = render("1.2.3", &pins(), &lanes(), true);
-        let uncoloured = render("1.2.3", &pins(), &lanes(), false);
-        assert_ne!(coloured, uncoloured, "colour is on");
-        assert_eq!(uncoloured, plain(&coloured));
-        assert!(!uncoloured.contains('\x1b'));
-    }
-
-    #[test]
     fn every_pin_and_every_lane_has_its_line() {
-        let banner = render("1.2.3", &pins(), &lanes(), false);
+        let banner = pretty(&lanes());
         for pin in pins() {
             assert!(
                 banner
@@ -193,15 +160,25 @@ mod tests {
                 "{pin:?}\n{banner}"
             );
         }
+        let line = |name: &str| {
+            banner
+                .lines()
+                .find(|line| line.trim_start().starts_with(name))
+                .map(str::to_owned)
+        };
         assert!(
-            banner.contains("facade            on   cdr.invalid:8443\n"),
+            line("facade").is_some_and(|line| line.ends_with("on   cdr.invalid:8443")),
             "{banner}"
         );
         assert!(
-            banner.contains("etl               on   cdr.invalid:8443, db.invalid:5432\n"),
+            line("etl")
+                .is_some_and(|line| line.ends_with("on   cdr.invalid:8443, db.invalid:5432")),
             "{banner}"
         );
-        assert!(banner.contains("terminology       off\n"), "{banner}");
+        assert!(
+            line("terminology").is_some_and(|line| line.ends_with("off")),
+            "{banner}"
+        );
     }
 
     #[test]
@@ -213,9 +190,9 @@ mod tests {
             cdr_host: Some(String::from("cdr.invalid:8443")),
             ..Lane::default()
         }];
-        let banner = render("1.2.3", &pins(), &lanes, false);
+        let banner = pretty(&lanes);
         assert!(
-            banner.contains("hl7v2             on   listens on 0.0.0.0:2575, cdr.invalid:8443\n"),
+            banner.contains("on   listens on 0.0.0.0:2575, cdr.invalid:8443\n"),
             "{banner}"
         );
     }
