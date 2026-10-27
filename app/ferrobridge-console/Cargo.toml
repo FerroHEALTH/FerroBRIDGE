@@ -91,9 +91,12 @@ cookie.workspace = true
 # `OperationOutcome` and `Parameters` of a run, in the terminology root set
 # of the generated model.
 fhir-types = { workspace = true, features = ["r4", "terminology"] }
-# The ID Token of a sign-in, verified against the provider's JWK Set
-# (OpenID Connect Core 1.0 §3.1.3.7).
-jsonwebtoken.workspace = true
+# The OpenID Connect relying party operators sign in through (`oidc`):
+# the authorization request with PKCE, the code exchange and the ID Token
+# check (OpenID Connect Core 1.0 §3.1.3.7), the refresh and the end-session
+# request; and the secret type its tokens arrive in.
+ferrohealth-secret.workspace = true
+ferrohealth-smart = { workspace = true, features = ["oidc"] }
 # The bridge client, the OpenID Provider's client, and the healthcheck job
 # asking the console beside it.
 reqwest.workspace = true
@@ -113,6 +116,8 @@ tracing-subscriber.workspace = true
 # The test OpenID Provider the sign-in, the refresh and the sign-out run
 # against; a dev-dependency links into no shipped artifact.
 ferrobridge-testkit.workspace = true
+# The sign-in cases sign a shared-secret ID Token the console must refuse.
+jsonwebtoken.workspace = true
 tempfile.workspace = true
 # The router driven in-process with `ServiceExt::oneshot`.
 tower.workspace = true

@@ -38,6 +38,8 @@ use crate::config::settings::{OidcSettings, Settings};
 use crate::locale::messages::Msg;
 use crate::locale::{catalog, negotiated, tr_in};
 use crate::session::Sessions;
+use ferrohealth_smart::metadata::{Http, ServerMetadata};
+use ferrohealth_smart::oidc::{OidcError, Provider, RelyingParty};
 
 /// The path of the console's own liveness route.
 pub const HEALTH: &str = "/health";
@@ -51,29 +53,45 @@ pub struct ConsoleState {
     settings: Arc<Settings>,
     sessions: Sessions,
     bridge: Bridge,
-    provider: reqwest::Client,
+    relying_party: Option<RelyingParty>,
+}
+
+/// Why the console's state could not be built.
+#[derive(Debug, thiserror::Error)]
+pub enum StateError {
+    /// A client of the bridge or of the OpenID Provider could not be built.
+    #[error(transparent)]
+    Client(#[from] BridgeError),
+    /// The configured OpenID Provider endpoints are not ones a relying party
+    /// can use.
+    #[error("the OpenID Provider's endpoints cannot be used")]
+    Provider {
+        /// What the relying party refused.
+        #[source]
+        source: OidcError,
+    },
 }
 
 impl ConsoleState {
     /// The state for `settings`, with an empty session store.
     ///
     /// # Errors
-    /// Returns the [`BridgeError`] of a bridge client, or of the client of
-    /// the OpenID Provider, that cannot be built.
-    pub fn new(settings: Settings) -> Result<Self, BridgeError> {
+    /// Returns [`StateError::Client`] when the bridge client, or the client of
+    /// the OpenID Provider, cannot be built, and [`StateError::Provider`]
+    /// when the configured provider endpoints are not ones a relying party
+    /// can use.
+    pub fn new(settings: Settings) -> Result<Self, StateError> {
         let bridge = Bridge::new(&settings.bridge)?;
-        // NOTE: RFC 6749 §3.2: the token endpoint answers the request itself, so
-        // the provider's client follows no redirect.
-        let provider = reqwest::Client::builder()
-            .timeout(settings.bridge.timeout)
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|source| BridgeError::Transport { source })?;
+        let relying_party = settings
+            .oidc
+            .as_ref()
+            .map(|oidc| relying_party(oidc, &settings))
+            .transpose()?;
         Ok(Self {
             sessions: Sessions::new(settings.session),
             settings: Arc::new(settings),
             bridge,
-            provider,
+            relying_party,
         })
     }
 
@@ -95,12 +113,52 @@ impl ConsoleState {
         &self.bridge
     }
 
-    /// The HTTP client of the OpenID Provider, which the sign-in exchanges
-    /// its code with and a session refreshes its access token with.
+    /// The relying party of the OpenID Provider (`ferrohealth-smart`), which
+    /// the sign-in exchanges its code with and a session refreshes its access
+    /// token with; `None` when no provider is configured.
     #[must_use]
-    pub fn provider(&self) -> &reqwest::Client {
-        &self.provider
+    pub fn relying_party(&self) -> Option<&RelyingParty> {
+        self.relying_party.as_ref()
     }
+}
+
+/// The relying party of the provider `oidc` names, calling it within the
+/// timeout of a call to the bridge.
+fn relying_party(oidc: &OidcSettings, settings: &Settings) -> Result<RelyingParty, StateError> {
+    // NOTE: RFC 6749 §3.2: the token endpoint answers the request itself, so
+    // the provider's client follows no redirect.
+    let client = reqwest::Client::builder()
+        .timeout(settings.bridge.timeout)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|source| BridgeError::Transport { source })?;
+    let metadata = ServerMetadata {
+        issuer: oidc.issuer.clone(),
+        authorization_endpoint: Some(oidc.authorization_endpoint.to_string()),
+        token_endpoint: Some(oidc.token_endpoint.to_string()),
+        jwks_uri: Some(oidc.jwks_uri.to_string()),
+        end_session_endpoint: oidc.end_session_endpoint.as_ref().map(ToString::to_string),
+        ..ServerMetadata::default()
+    };
+    let provider =
+        Provider::from_metadata(&metadata).map_err(|source| StateError::Provider { source })?;
+    let mut relying_party = RelyingParty::new(
+        Http::from_client(client),
+        provider,
+        oidc.client_id.clone(),
+        oidc.redirect_uri.clone(),
+    )
+    .with_scopes(oidc.scopes.iter().cloned());
+    if let Some(secret) = &oidc.client_secret {
+        relying_party = relying_party.with_client_secret(secret.clone());
+    }
+    if oidc.offline_access {
+        relying_party = relying_party.with_offline_access();
+    }
+    if let Some(redirect) = &oidc.post_logout_redirect_uri {
+        relying_party = relying_party.with_post_logout_redirect_uri(redirect.clone());
+    }
+    Ok(relying_party)
 }
 
 /// The Leptos options the console renders with: its site bundle under the

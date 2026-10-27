@@ -132,6 +132,11 @@ backon = "1.6.0"
 # The server adds `axum` for its guard; ferrobridge-term's `smart` feature
 # takes the token client alone.
 ferrohealth-smart = { version = "0.8.6", default-features = false, features = ["fetch"] }
+# The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
+# `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
+# query masked. Pinned exactly, as a product pins every shared crate.
+# Verified against crates.io on 2026-10-27 (0.2.0).
+ferrohealth-secret = "=0.2.0"
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off. Verified against crates.io on 2026-10-16 (11.1.0,

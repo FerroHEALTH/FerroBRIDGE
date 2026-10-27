@@ -1491,6 +1491,8 @@ dependencies = [
  "cookie",
  "ferrobridge-operator-api",
  "ferrobridge-testkit",
+ "ferrohealth-secret",
+ "ferrohealth-smart",
  "ferrohealth-ui",
  "fhir-types",
  "fluent-templates",
