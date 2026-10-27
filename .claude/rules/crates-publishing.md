@@ -60,7 +60,7 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   says so in its body and its CHANGELOG entry, naming what a consumer changes.
 - **A crate of this line takes a caret requirement on another family shared
   crate** (owner decision 2026-10-26): `ferrobridge-term` requires
-  `ferrohealth-smart = "0.7.4"`, never `=0.7.4`, because the FerroAUTH,
+  `ferrohealth-smart = "0.8.3"`, never `=0.8.3`, because the FerroAUTH,
   FerroAUDIT and FerroSYS lines never break on a patch. A smart patch then
   reaches a product through its lockfile without a release of this line
   first. A product still pins every shared crate exactly.
