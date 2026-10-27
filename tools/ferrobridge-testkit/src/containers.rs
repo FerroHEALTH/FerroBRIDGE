@@ -282,21 +282,14 @@ impl Terminology {
 /// [`HarnessError::Probe`] when the readiness probe cannot be sent, and
 /// [`HarnessError::NotReady`] when the server does not answer it in time.
 pub async fn terminology() -> Result<Terminology, HarnessError> {
-    let fixtures = Mount::bind_mount(TERMINOLOGY_FIXTURES, TERMINOLOGY_RESOURCES)
-        .with_access_mode(AccessMode::ReadOnly);
-    let container = TERMINOLOGY
-        .image()
-        .with_wait_for(WaitFor::message_on_stdout("listening"))
-        .with_exposed_port(TERMINOLOGY_PORT.tcp())
-        .with_mount(fixtures)
-        .with_env_var("FERROTERM_CODESYSTEMS", TERMINOLOGY_RESOURCES)
-        .with_env_var("FERROTERM_UI", "off")
-        .start()
-        .await
-        .map_err(|source| HarnessError::Container {
-            image: TERMINOLOGY.repository,
-            source,
-        })?;
+    let container =
+        terminology_request()
+            .start()
+            .await
+            .map_err(|source| HarnessError::Container {
+                image: TERMINOLOGY.repository,
+                source,
+            })?;
     let host = container
         .get_host()
         .await
@@ -492,6 +485,24 @@ pub async fn cdr() -> Result<Cdr, HarnessError> {
     })
 }
 
+/// Returns the request that starts the reference terminology server over
+/// the synthetic fixtures.
+///
+/// The usage report is switched off for the reason [`cdr_request`] gives. The
+/// pinned release sends none and ignores the key, which holds the next pin.
+fn terminology_request() -> ContainerRequest<GenericImage> {
+    let fixtures = Mount::bind_mount(TERMINOLOGY_FIXTURES, TERMINOLOGY_RESOURCES)
+        .with_access_mode(AccessMode::ReadOnly);
+    TERMINOLOGY
+        .image()
+        .with_wait_for(WaitFor::message_on_stdout("listening"))
+        .with_exposed_port(TERMINOLOGY_PORT.tcp())
+        .with_mount(fixtures)
+        .with_env_var("FERROTERM_CODESYSTEMS", TERMINOLOGY_RESOURCES)
+        .with_env_var("FERROTERM_UI", "off")
+        .with_env_var("FERROTERM__USAGE_REPORT__ENABLED", "false")
+}
+
 /// Returns the request that starts the reference CDR against `dsn` on
 /// `network`.
 ///
@@ -552,7 +563,9 @@ async fn await_readiness(url: &str) -> Result<(), HarnessError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, cdr_request};
+    use super::{
+        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, cdr_request, terminology_request,
+    };
 
     #[test]
     fn every_pin_names_a_tag_and_a_digest() {
@@ -587,6 +600,20 @@ mod tests {
             Some("false".to_owned()),
             usage_report,
             "a test CDR must not send a usage report"
+        );
+    }
+
+    #[test]
+    fn the_terminology_server_starts_with_its_usage_report_off() {
+        let request = terminology_request();
+        let usage_report = request
+            .env_vars()
+            .find(|(name, _)| name == "FERROTERM__USAGE_REPORT__ENABLED")
+            .map(|(_, value)| value.into_owned());
+        assert_eq!(
+            Some("false".to_owned()),
+            usage_report,
+            "a test terminology server must not send a usage report"
         );
     }
 }
