@@ -151,6 +151,7 @@ impl Posting {
     /// took, so the file and the set are read again.
     fn new() -> Self {
         let edit = ServerAction::<EditDraft>::new();
+        crate::load::drawn_after(edit);
         Effect::watch(
             move || edit.version().get(),
             move |_, _, _| {
