@@ -23,8 +23,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::{Request, State};
-use axum::middleware::Next;
 use axum::response::Response;
 use ferrohealth_server::refusal::RefusalBody;
 use http::StatusCode;
@@ -96,59 +94,15 @@ pub fn body(body_limit: usize, timeout: Duration) -> RefusalBody {
             .then(|| edge.outcome_of(status))
             .flatten();
         match outcome {
-            Some(mut outcome) => {
-                let answered = outcome.status();
-                if answered != status {
-                    outcome.extensions_mut().insert(Answered(answered));
-                }
-                outcome
+            // NOTE: RFC 9110 §15.6.5: the facade answers its timeout `504`, so the
+            // stack keeps the status the body chose over its own `408`.
+            Some(outcome) if status == StatusCode::REQUEST_TIMEOUT => {
+                ferrohealth_server::refusal::keep_status(outcome)
             }
+            Some(outcome) => outcome,
             None => plain(uri, request_id, status, reason),
         }
     })
-}
-
-/// The status a FHIR refusal answers when it differs from the stack's.
-///
-/// The stack writes a refusal under its own status, so the body marks the one
-/// the facade answers and [`fhir_refusals`] sets it outside the stack.
-#[derive(Debug, Clone, Copy)]
-struct Answered(StatusCode);
-
-/// Finishes the refusals on a FHIR route outside the stack.
-///
-/// A refusal the edge wrote takes the status its body chose (a timeout
-/// answers `504`), and a
-/// `413` the body extractor raised inside the routes, which the stack leaves
-/// in its plain form, becomes the `too-long` `OperationOutcome`.
-pub async fn fhir_refusals(State(edge): State<Edge>, request: Request, next: Next) -> Response {
-    let fhir = on_fhir_route(request.uri().path());
-    let mut response = next.run(request).await;
-    if let Some(Answered(status)) = response.extensions().get::<Answered>().copied() {
-        *response.status_mut() = status;
-        return response;
-    }
-    let plain = !response
-        .headers()
-        .get(http::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.starts_with(crate::facade::media::FHIR_JSON));
-    if fhir
-        && plain
-        && response.status() == StatusCode::PAYLOAD_TOO_LARGE
-        && let Some(mut outcome) = edge.outcome_of(StatusCode::PAYLOAD_TOO_LARGE)
-    {
-        if let Some(id) = response
-            .headers()
-            .get(ferrohealth_server::request_id::HEADER)
-        {
-            outcome
-                .headers_mut()
-                .insert(ferrohealth_server::request_id::HEADER, id.clone());
-        }
-        return outcome;
-    }
-    response
 }
 
 /// Returns whether `path` is under [`BASE_PATH`].

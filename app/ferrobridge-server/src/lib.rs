@@ -585,12 +585,7 @@ pub fn with_middleware(product: Router, state: Arc<AppState>, server: &ServerSec
         request_log: RequestLog::new(state.logged_query_parameters())
             .with_recorder(state.usage_window().clone()),
     };
-    let edge = facade::edge::Edge::new(server.body_limit_bytes, server.request_timeout());
-    // TODO(#1290): the stack writes these once ferrohealth-server lets a refusal body choose its status.
-    stack::app(product, health(state), server, policy).layer(axum::middleware::from_fn_with_state(
-        edge,
-        facade::edge::fhir_refusals,
-    ))
+    stack::app(product, health(state), server, policy)
 }
 
 /// Returns the health routes' view of `state`: its indicators, its lifecycle

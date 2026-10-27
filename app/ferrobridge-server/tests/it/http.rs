@@ -562,7 +562,6 @@ fn logged(router: Router, request: Request<Body>) -> (StatusCode, String) {
     (status, logs.text())
 }
 
-// TODO(#1290): fails until ferrohealth-server writes the request line of a refusal it answers.
 #[test]
 fn a_caught_panic_leaves_its_request_line() {
     let router = with_middleware(
@@ -591,6 +590,17 @@ fn a_caught_panic_leaves_its_request_line() {
         "the client's request id is echoed and never logged: {text}"
     );
     assert!(text.contains("\"client_named\":true"), "{text}");
+    let line = text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|line| line["message"] == "request")
+        .expect("the request line");
+    assert!(
+        line["request_id"]
+            .as_str()
+            .is_some_and(|id| uuid::Uuid::try_parse(id).is_ok()),
+        "the line names the server's own request id: {line}"
+    );
     assert_eq!(
         1,
         text.matches("\"message\":\"request\"").count(),
@@ -598,7 +608,6 @@ fn a_caught_panic_leaves_its_request_line() {
     );
 }
 
-// TODO(#1290): fails until ferrohealth-server writes the request line of a refusal it answers.
 #[test]
 fn a_timeout_leaves_its_request_line() {
     let mut settings = support::settings();
@@ -629,7 +638,6 @@ fn a_timeout_leaves_its_request_line() {
     );
 }
 
-// TODO(#1290): fails until ferrohealth-server writes the request line of a refusal it answers.
 #[test]
 fn a_refused_oversized_body_leaves_its_request_line() {
     let settings = support::settings();
