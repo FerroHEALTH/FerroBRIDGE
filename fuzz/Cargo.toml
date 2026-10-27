@@ -13,11 +13,15 @@ license = "BUSL-1.1"
 [package.metadata]
 cargo-fuzz = true
 
+# Its own workspace root, so cargo never adopts it into an enclosing
+# workspace, such as the main checkout around a worktree under .claude/.
+[workspace]
+
 [dependencies]
 libfuzzer-sys = "0.4.13"
 openehr-mapping-core = { path = "../crates/openehr-mapping-core" }
 # The same pin as the workspace (docs/VERSIONS.md); the anchor path is an RmPath.
-openehr-rm = "0.0.84"
+openehr-rm = "0.0.109"
 
 [[bin]]
 name = "mapping_loader"
