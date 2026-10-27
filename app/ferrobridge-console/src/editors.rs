@@ -10,16 +10,19 @@
 //! The mapping editor is the library's code editor (B2) beside the
 //! diagnostics of its draft (B3), whose caret and current line the two
 //! share. It sits inside the editor page's form, so its text area posts the
-//! draft with no WebAssembly. No specification governs the console: our own
-//! design.
+//! draft, with no WebAssembly and through the server function alike. The
+//! console keeps no copy of the text: each editor takes the `_by_edit` form
+//! and its text signal holds the opening text alone, so a key costs the
+//! console nothing (FerroUI #478). No specification governs the console:
+//! our own design.
 use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::diagnostics::{DiagnosticsWords, FileFindings, Position};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections_card};
 use ferrohealth_ui::view::template::list::list_empty;
 use ferrohealth_ui::widget::editor::{
-    Editor, EditorWords, LineMark, MarkKind, Opened, Panel, editor_diagnostics, editor_panel,
-    editor_split,
+    Editor, EditorWords, LineMark, MarkKind, Opened, Panel, editor_diagnostics,
+    editor_panel_by_edit, editor_split,
 };
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -94,13 +97,12 @@ pub fn MappingEditor(
     /// The diagnostics list's own words.
     rows: DiagnosticsWords,
 ) -> impl IntoView {
-    let value = RwSignal::new(draft);
     let caret = RwSignal::new(Position::default());
     let marks = Signal::stored(marks_of(&findings));
     let field = Editor {
         id: DRAFT.into(),
         language: Language::Yaml,
-        text: value.into(),
+        text: Signal::stored(draft),
         marks,
         editable: Signal::stored(true),
     };
@@ -110,7 +112,7 @@ pub fn MappingEditor(
         </button>
     }
     .into_any();
-    let panel = editor_panel(
+    let panel = editor_panel_by_edit(
         Panel {
             editor: field.clone(),
             label: text.label.clone(),
@@ -122,7 +124,9 @@ pub fn MappingEditor(
             end: None,
             words,
         },
-        move |typed| value.set(typed),
+        // NOTE: no specification governs this: our own design; the form posts the
+        // text area's draft, so the console needs no copy of the edits.
+        |_edit| {},
     );
     let count = u64::try_from(findings.findings.len()).unwrap_or(u64::MAX);
     let body = if findings.findings.is_empty() {
@@ -160,16 +164,17 @@ pub fn JsonInput(
     /// The text it holds as the page arrives: what the operator last posted.
     text: String,
 ) -> impl IntoView {
-    let value = RwSignal::new(text);
-    let editor = ferrohealth_ui::widget::editor::code_editor(
+    let editor = ferrohealth_ui::widget::editor::code_editor_by_edit(
         Editor {
             id: INPUT.into(),
             language: Language::Json,
-            text: value.into(),
+            text: Signal::stored(text),
             marks: Signal::stored(Vec::new()),
             editable: Signal::stored(true),
         },
-        move |typed| value.set(typed),
+        // NOTE: no specification governs this: our own design; the form posts the
+        // text area's input, so the console needs no copy of the edits.
+        |_edit| {},
     );
     view! {
         <label for=INPUT class="fui-sr-only">
