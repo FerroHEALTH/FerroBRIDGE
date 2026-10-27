@@ -22,7 +22,9 @@
 #
 # The change is what the head added since it forked from the base, read from
 # the diff against the merge base of the two, so a fragment that reached the
-# base after the fork is never counted as the change's own.
+# base after the fork is never counted as the change's own. A change that is
+# not committed is no part of the head: with no head-ref, the guard says so
+# on stderr when the working tree holds one, since its verdict reads none.
 #
 # Exit 0 when the change passes, 1 when it carries no entry or writes under
 # [Unreleased], and 2 on a usage error or a base and head with no merge base.
@@ -41,7 +43,7 @@ self_test() {
   # is removed.
   trap 'chmod -R u+w "$work" && rm -r -- "$work"' EXIT
   script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-  mkdir -p "$work/scripts/checks" "$work/changelog.d" "$work/app" "$work/docs"
+  mkdir -p "$work/scripts/checks" "$work/changelog.d" "$work/app/ferrobridge-console/src" "$work/docs"
   cp "$script" "$work/scripts/checks/changelog-guard.sh"
 
   # A repository of its own, so no global hook, signing key or identity of the
@@ -92,6 +94,7 @@ self_test() {
   printf 'The fragment format.\n' > "$work/changelog.d/README.md"
   printf -- '- An entry already released.\n' > "$work/changelog.d/1-old.added.md"
   echo 'code' > "$work/app/code.txt"
+  echo 'a route' > "$work/app/ferrobridge-console/src/server.rs"
   echo 'a page' > "$work/docs/page.md"
   commit "the fork point"
 
@@ -113,6 +116,9 @@ self_test() {
   branch none
   code
   commit "a change with no entry"
+  branch console
+  echo 'another route' >> "$work/app/ferrobridge-console/src/server.rs"
+  commit "a change to the operator console with no entry"
   branch invisible
   echo 'a clearer page' >> "$work/docs/page.md"
   commit "a change to no user-visible surface"
@@ -149,12 +155,25 @@ self_test() {
   expect "a change with no entry, behind a main that gained a fragment" 1 none
   says "the refusal" 'no changelog entry'
   expect "a waived change with no entry" 0 none --waived
+  expect "a change to the operator console with no entry" 1 console
+  says "the console refusal" 'no changelog entry'
   expect "a change to no user-visible surface" 0 invisible
   expect "a change to the README alone" 1 readme
   expect "a change that rewords a fragment it did not add" 1 reworded
   expect "a change that removes a fragment" 1 removed
   base_ref=moved expect "a change that moves an [Unreleased] entry into a fragment" 0 moved-out
   says "the moved entry" "adds the fragment"
+
+  stub_git checkout -q main
+  echo 'an uncommitted route' >> "$work/app/ferrobridge-console/src/server.rs"
+  status=0
+  (cd "$work" && bash scripts/checks/changelog-guard.sh main) > "$work/out" 2>&1 || status=$?
+  if [[ "$status" -ne 0 ]]; then
+    echo "changelog-guard: self-test failed: an uncommitted change exited $status, wanted 0." >&2
+    cat "$work/out" >&2
+    exit 1
+  fi
+  says "an uncommitted change" 'uncommitted'
   echo "changelog-guard: self-test passed."
 }
 
@@ -176,6 +195,9 @@ if [[ $# -lt 1 || $# -gt 2 || -z "${1:-}" || "${1:-}" = -* ]]; then
 fi
 base="$1"
 head="${2:-HEAD}"
+if [[ $# -eq 1 && -n "$(git status --porcelain --untracked-files=normal)" ]]; then
+  echo "changelog-guard: the working tree holds uncommitted changes, which this verdict does not read; commit them and run the guard again." >&2
+fi
 
 if ! fork="$(git merge-base "$base" "$head")"; then
   echo "changelog-guard: $base and $head have no merge base; check out the full history (fetch-depth: 0)." >&2
