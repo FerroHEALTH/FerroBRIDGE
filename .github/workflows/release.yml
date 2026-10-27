@@ -8,8 +8,9 @@
 #                                   └─ build-console ──┴───────────────┘                        └─ scan-and-tag ─────────────────┘
 #
 # plan refuses a tag whose milestone (titled exactly as the tag) is missing or
-# still holds an open item, or whose changelog section breaks the structure or
-# Security rules (scripts/release/plan.sh), and milestone closes the milestone
+# still holds an open item, whose changelog section breaks the structure or
+# Security rules, or whose tree still holds a changelog fragment the cut did
+# not assemble (scripts/release/plan.sh), and milestone closes the milestone
 # once every leg succeeded.
 #
 # The release is created as a DRAFT, the binaries, their SBOMs and their
@@ -122,7 +123,8 @@ jobs:
 
       # Every release fact, as ONE list: the milestone titled as the tag, the
       # product version in every file that declares it, the changelog's
-      # structure and Security rules for this section, the previous release
+      # structure and Security rules for this section, no fragment left under
+      # changelog.d/ unassembled, the previous release
       # taken by version from `git ls-remote`, and the changelog section as
       # the release notes with the support period and the link to the book's
       # CRA Annex II user information page appended. The list is

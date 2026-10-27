@@ -38,7 +38,7 @@ jobs:
   rerun:
     name: pr-guards
     if: >-
-      contains(fromJSON('["no-crate-bump"]'), github.event.label.name)
+      contains(fromJSON('["no-changelog", "no-crate-bump"]'), github.event.label.name)
       || (github.event.action == 'edited' && github.event.changes.body != null)
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -57,6 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${ACTION}:${LABEL}" in
+            *:no-changelog) guards=(changelog-guard) ;;
             *:no-crate-bump) guards=(crate-version-guard) ;;
             edited:) guards=(contribution-licence-guard) ;;
             *) echo "::error::no guard reads ${ACTION} ${LABEL}"; exit 1 ;;
