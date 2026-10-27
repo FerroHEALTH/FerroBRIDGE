@@ -36,8 +36,10 @@ release is cut when its milestone has no open issue left.
 - **An explicit flag where no specification governs the decision.** Write it
   plainly: this is FerroBRIDGE's own design. FHIR search, identity, failure
   policy, and extension ordering are all in that category.
-- **A changelog entry** under `[Unreleased]` for anything with a user-visible
-  effect. The format is Keep a Changelog 1.1.0.
+- **A changelog fragment** for anything with a user-visible effect: one file,
+  `changelog.d/<issue>-<kebab-slug>.<section>.md`, holding the entry as a
+  Keep a Changelog 1.1.0 list item. The release cut assembles the fragments
+  into `CHANGELOG.md`, so two pull requests never edit the same lines.
 - **Tests that measure against the specification.** Never adjust an expectation
   to match a bug, and never weaken or skip a test to get a build green.
 

@@ -184,6 +184,7 @@ classify() {
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
     scripts/checks/changelog-released.sh | scripts/checks/changelog-structure.sh) echo inert ;;
     scripts/checks/changelog-security.sh | scripts/lib/guard-args.sh) echo inert ;;
+    scripts/checks/changelog-guard.sh | changelog.d/*) echo inert ;;
     scripts/checks/vex-advisories.sh | scripts/checks/vex-reachability.sh) echo inert ;;
     scripts/checks/vex-coverage.sh | scripts/checks/advisory-exceptions.sh) echo inert ;;
     scripts/security/* | security/* | trivy.yaml | .trivyignore.yaml) echo inert ;;
@@ -530,6 +531,7 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-testkit -fhirconnect -ferrobridge-server"
   check "a doc page is inert" "docs/ci-cd.md" false ""
   check "the changelog is inert" "CHANGELOG.md" false ""
+  check "a changelog fragment is inert" "changelog.d/1289-changelog-fragments.changed.md" false ""
   check "the deployment probe is inert" "scripts/deploy-probe.sh" false ""
   check "another workflow is inert" ".github/workflows/docs.yml" false ""
   # The screenshot guard reads every page of the book and every console

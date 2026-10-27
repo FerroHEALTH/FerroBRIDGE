@@ -93,7 +93,9 @@ specification governs this: our own design".
 - Declare `Closes #N`, one keyword per issue.
 - Keep changes compiling and tested at every step; do not defer compilation.
 - Never weaken, skip, or delete a test to make a build pass.
-- Add a `CHANGELOG.md` entry under `[Unreleased]` for any user-visible change.
+- Add one fragment, `changelog.d/<issue>-<kebab-slug>.<section>.md`, for any
+  user-visible change, and leave `CHANGELOG.md` alone (`changelog.d/README.md`).
+  The release cut assembles the fragments into the changelog.
 - Every workflow `uses:` is pinned to a full commit SHA with a trailing version
   comment; keep it that way. `permissions:` is `{}` at the workflow level with
   the minimum granted per job, and no untrusted context is interpolated into a

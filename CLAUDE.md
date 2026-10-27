@@ -262,9 +262,8 @@ the testkit tool crate. Beside it:
   the operator console beside the bridge.
 - `.claude/`: the working discipline. `rules/` (the path-scoped and standing
   rules), `hooks/`, `skills/`, `agents/`, `memory/`.
-- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`, `watch-prs.sh` with
-  `changelog-merge.sh`, which keeps a branch's entries under `[Unreleased]`,
-  `labels.sh`, `migrate-fields.sh`).
+- `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`,
+  `watch-prs.sh`, `labels.sh`, `migrate-fields.sh`).
 - `scripts/checks/`: the committed guards. `comment-style.sh`; `versions.sh`,
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or
   claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate
@@ -275,8 +274,11 @@ the testkit tool crate. Beside it:
   `changelog-released.sh`, every released changelog section against its tag;
   `changelog-structure.sh` and `changelog-security.sh`, the Keep a Changelog
   types and the CRA Security rules (a reason line, a `GHSA-` id or VEX path
-  per entry) over `[Unreleased]` and, through `scripts/release/plan.sh`, over
-  the section a release cuts;
+  per entry) over `[Unreleased]` with the fragments folded in and, through
+  `scripts/release/plan.sh`, over the section a release cuts;
+  `changelog-guard.sh`, a fragment under `changelog.d/` for a user-visible
+  change and no edit of `[Unreleased]`, beside `scripts/release/changelog.sh`,
+  which checks the fragments and assembles them at the cut;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
   upstream release; and `conformance.sh`, the pass-list gate over the six
   corpora under `conformance/` (fifteen: the two mapping libraries, the
@@ -445,8 +447,11 @@ and forbids the scratchpad root, so one worker never publishes another's file
   footer, no emoji marker, ever. This is an absolute rule with no exceptions.
   A `PreToolUse` hook blocks a commit or PR command carrying one.
 - **Keep the changelog.** `CHANGELOG.md` follows Keep a Changelog 1.1.0: every
-  change with user-visible effect adds an entry under `[Unreleased]` in the
-  same PR. Releases are cut from the changelog.
+  change with user-visible effect adds one fragment,
+  `changelog.d/<issue>-<kebab-slug>.<section>.md`, in the same PR and never
+  edits `[Unreleased]` (`changelog.d/README.md`). The release cut assembles
+  the fragments into the version's section, and releases are cut from the
+  changelog.
 - **Never weaken, skip, or delete a test** to make a build pass, and never edit
   a test to route around a bug it exposes (`.claude/rules/testing.md`).
 - **Record progress on the tracker and commit before ending a session.** Issues
