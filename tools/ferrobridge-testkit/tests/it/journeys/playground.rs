@@ -41,11 +41,13 @@ const HYDRATED: &str = "//button[@aria-controls = 'user-menu-menu' and @aria-exp
 /// The id of the playground's run button.
 const RUN: &str = "pg-run";
 
-/// Waits for the page to hydrate: the root element marked `data-hydrated`,
-/// which the console sets once the page and its route have hydrated, and the
+/// Waits for the page to hydrate: the root element marked `data-ferroui-hydrated`,
+/// which FerroUI sets once the page and its route have hydrated, and the
 /// user menu saying whether its menu is open.
 pub(crate) async fn hydrated(browser: &Browser) -> Result<(), Box<dyn Error>> {
-    browser.element(By::Css("html[data-hydrated]")).await?;
+    browser
+        .element(By::Css("html[data-ferroui-hydrated]"))
+        .await?;
     browser.element(By::XPath(HYDRATED)).await?;
     Ok(())
 }

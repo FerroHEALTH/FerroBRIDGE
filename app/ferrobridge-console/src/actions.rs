@@ -28,8 +28,8 @@ use serde::{Deserialize, Serialize};
 use crate::locale::messages::Msg;
 use crate::model::{Answered, Loaded, ViewError};
 
-// TODO(#1265): the forms post through `<ActionForm>` once FerroUI fixes its
-// fallback's dependence on the `Referer` (FerroHEALTH/FerroUI#449).
+// TODO(#1265): the forms post through `<ActionForm>` once its plain post can
+// bring an answer back to its page (FerroHEALTH/FerroUI#485).
 
 /// The outcome of the reload the operator just asked for.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
