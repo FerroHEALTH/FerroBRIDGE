@@ -193,9 +193,11 @@ impl Stack {
         let cookie = state
             .sessions()
             .cookie_name(ferrobridge_console::session::COOKIE);
+        let lifecycle = state.lifecycle().clone();
         tokio::spawn(ferrobridge_console::server::serve(
             listener,
             ferrobridge_console::server::router(state),
+            lifecycle,
             std::future::pending(),
         ));
         Ok(Self {

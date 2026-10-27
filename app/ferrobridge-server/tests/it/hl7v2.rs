@@ -30,9 +30,9 @@ use ferrobridge_server::facade::programs;
 use ferrobridge_server::hl7v2::Face;
 use ferrobridge_server::hl7v2::Listener;
 use ferrobridge_server::hl7v2::Listening;
-use ferrobridge_server::usage_report::window::{Counts, Window};
 use ferrobridge_testkit::stubs::its_rest;
 use ferrobridge_testkit::stubs::terminology;
+use ferrohealth_usage_report::window::{Counts, Window};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -256,7 +256,7 @@ impl Serving {
     async fn start(facade: Arc<Facade>, lane: Hl7v2Settings) -> Result<Self, Box<dyn Error>> {
         let (terminology_server, terminology) = terminology_stub().await;
         let corpus = ferrobridge_server::hl7v2::load_corpus(&lane)?;
-        let usage = Arc::new(Window::default());
+        let usage = Arc::new(ferrobridge_server::usage_report::window());
         let face = Arc::new(
             Face::new(facade, corpus, Some(terminology), &lane).with_usage(Arc::clone(&usage)),
         );
@@ -402,16 +402,17 @@ impl Running {
 fn assert_counted(counts: &Counts, (aa, ae, ar): (u64, u64, u64), mapping_failures: u64) {
     let messages = counts
         .groups
-        .get(&ferrobridge_server::usage_report::payload::Group::Hl7v2Message)
-        .map(ferrobridge_server::usage_report::window::GroupCounts::total);
+        .iter()
+        .find(|(key, _)| key.as_str() == ferrobridge_server::usage_report::HL7V2_MESSAGE)
+        .map(|(_, group)| group.total());
     assert_eq!(Some(1), messages, "one message is timed");
     assert_eq!(
         (aa, ae, ar, mapping_failures),
         (
-            counts.hl7v2_aa,
-            counts.hl7v2_ae,
-            counts.hl7v2_ar,
-            counts.mapping_failures
+            crate::support::counter(counts, "hl7v2_aa"),
+            crate::support::counter(counts, "hl7v2_ae"),
+            crate::support::counter(counts, "hl7v2_ar"),
+            crate::support::counter(counts, "mapping_failures")
         ),
         "the acknowledgment codes and the mapping failures"
     );

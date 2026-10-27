@@ -63,14 +63,18 @@ published crate line), and
 the testkit tool crate. Beside it:
 
 - `app/ferrobridge-server`: the bridge's one binary, `ferrobridge` (#21). A thin
-  `main.rs` over the library run path, the five subcommands, the TOML and
-  environment configuration tree with `_file` secrets and `deny_unknown_fields`
-  throughout, the `tracing` console, the request log that carries the matched
-  route and never a body, the health family over an indicator registry, the
-  `tower-http` stack (request id, panic catch, timeout, body ceiling), and the
-  bounded drain on `SIGTERM`. `serve`, `cdm init`, `etl run` and
-  `mapping check` run (the last over `check`, the checker the operator API
-  shares, #595); `vocab load` parses and names the issue that lands it.
+  `main.rs` over the library run path and the subcommands, wiring the
+  FerroSYS crates (#1287): `ferrohealth-config` reads the configuration tree
+  (file, `FERROBRIDGE__` environment, `--set`, `_file` secrets through
+  `ferrohealth-secret`, `deny_unknown_fields` throughout),
+  `ferrohealth-telemetry` is the console and the request log that carries the
+  matched route and never a body, `ferrohealth-health` the indicator registry
+  and lifecycle, and `ferrohealth-server` the stack (request id, panic catch,
+  timeout, body ceiling, health routes), the listener with its TLS, the
+  bounded drain on `SIGTERM` and the `serve`, `config check` and
+  `healthcheck` subcommands (#1260). `cdm init`, `etl run`, `etl fhir`,
+  `vocab load`, `dq check` and `mapping check` run beside them (the last over
+  `check`, the checker the operator API shares, #595).
   `src/cdr/` reaches the CDR through the generated ITS-REST 1.1.0 client of
   `openehr-its` (`rest-client`, #285, #293): the handle built from `[cdr]`
   with its `SecretString` credentials or, under `[cdr.credentials.oauth]`, the
@@ -105,11 +109,11 @@ the testkit tool crate. Beside it:
   handler takes the caller's `Access`. `src/credentials.rs` hands the
   client-credentials token of `ferrohealth-smart` (cached, renewed once on a
   `401`) to the CDR and terminology clients, the token both lanes take under
-  `[<lane>.credentials.oauth]`. `src/usage_report/`
-  sends the installation report to FerroPULSE on its envelope v2 behind
-  `[usage_report]` (#581): one `start` and one `daily` report from `serve`,
-  the latency window the request log fills by route group, and the instance
-  id under `state_dir`, validated against the vendored schema in the tests.
+  `[<lane>.credentials.oauth]`. `src/usage_report/` is what the bridge puts
+  into the FerroPULSE report of `ferrohealth-usage-report` behind
+  `[usage_report]` (#581): its `status`, its request groups by route
+  template and its HL7 v2 and mapping counters, validated against the
+  vendored schema in the tests.
   `src/operator/` is the
   read-only operator API behind `[operator]` and `[auth]` (#596): the guard
   that admits only a token carrying `auth.product_scope`, the mapping roots

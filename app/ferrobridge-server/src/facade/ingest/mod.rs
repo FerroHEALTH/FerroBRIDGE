@@ -62,7 +62,7 @@ use crate::facade::programs::Programs;
 use crate::facade::request::Inbound;
 use crate::facade::status;
 use crate::terminology::Translator;
-use crate::usage_report::window::Window;
+use ferrohealth_usage_report::window::Window;
 
 use binding::canonical_of;
 

@@ -5,13 +5,15 @@
 //! panic body, the timeout, the body ceiling and the one request log line.
 
 use crate::support;
+use crate::support::subscriber;
 use axum::Router;
 use axum::body::Body;
 use axum::routing::get;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
-use ferrobridge_server::telemetry::{Rendering, subscriber};
-use ferrobridge_server::{request_id, with_middleware};
+use ferrobridge_server::with_middleware;
+use ferrohealth_health::registry::Registry;
+use ferrohealth_server::request_id;
+use ferrohealth_telemetry::section::Rendering;
 use http::{Request, Response, StatusCode, header};
 use std::sync::Arc;
 use std::time::Duration;
@@ -128,8 +130,10 @@ async fn liveness_is_two_hundred_once_the_router_is_built() -> Result<(), Box<dy
 
 #[tokio::test]
 async fn readiness_with_no_indicator_is_two_hundred() -> Result<(), Box<dyn std::error::Error>> {
+    let state = support::state();
+    state.lifecycle().booted();
     let (status, body) = call(
-        app(),
+        ferrobridge_server::router(state, &support::settings()),
         Request::get("/health/readiness").body(Body::empty())?,
     )
     .await?;
@@ -230,7 +234,11 @@ async fn a_panicking_handler_yields_a_five_hundred_with_the_request_id_in_its_bo
         "a non-FHIR route keeps its plain answer"
     );
     assert_eq!(Some("internal"), document["error"].as_str());
-    assert_eq!(Some("corr-panic"), document["request_id"].as_str());
+    let named = document["request_id"].as_str().unwrap_or_default();
+    assert!(
+        uuid::Uuid::try_parse(named).is_ok(),
+        "the body names the server's own request id, never the client's: {document}"
+    );
     assert!(
         !String::from_utf8_lossy(&bytes).contains("the handler gave up"),
         "the panic message never reaches the client"
@@ -275,7 +283,10 @@ async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_req
     assert_eq!(Some("error"), issue["severity"].as_str());
     assert_eq!(Some("exception"), issue["code"].as_str());
     let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
-    assert!(diagnostics.contains("corr-fhir-panic"), "{issue}");
+    assert!(
+        !diagnostics.contains("corr-fhir-panic") && diagnostics.contains("request id "),
+        "the outcome names the server's own request id, never the client's: {issue}"
+    );
     assert!(
         !issue.to_string().contains("synthetic-clinical-text"),
         "the panic message never reaches the client"
@@ -287,7 +298,7 @@ async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_req
 async fn a_request_past_the_timeout_yields_four_hundred_and_eight()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut settings = support::settings();
-    settings.request_timeout = Duration::from_millis(20);
+    settings.request_timeout_ms = 20;
     let router = with_middleware(
         Router::new().route(
             "/slow",
@@ -309,7 +320,7 @@ async fn a_request_past_the_timeout_yields_four_hundred_and_eight()
 async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen()
 -> Result<(), Box<dyn std::error::Error>> {
     let settings = support::settings();
-    let oversized = "x".repeat(settings.body_limit + 1);
+    let oversized = "x".repeat(settings.body_limit_bytes + 1);
     let request = Request::post("/health/liveness")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))?;
@@ -344,7 +355,7 @@ async fn edge_outcome(
 /// timeout and whose `/fhir/echo` route reads its body.
 fn edge_app() -> Router {
     let mut settings = support::settings();
-    settings.request_timeout = Duration::from_millis(20);
+    settings.request_timeout_ms = 20;
     let slow = || async {
         tokio::time::sleep(Duration::from_secs(5)).await;
         StatusCode::OK
@@ -401,7 +412,7 @@ async fn a_request_past_the_timeout_off_the_fhir_surface_keeps_its_plain_408()
 #[tokio::test]
 async fn a_fhir_body_declared_over_the_ceiling_answers_a_413_operation_outcome()
 -> Result<(), Box<dyn std::error::Error>> {
-    let oversized = "x".repeat(support::settings().body_limit + 1);
+    let oversized = "x".repeat(support::settings().body_limit_bytes + 1);
     let request = Request::post("/fhir/echo")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))?;
@@ -423,7 +434,7 @@ async fn a_fhir_body_declared_over_the_ceiling_answers_a_413_operation_outcome()
 #[tokio::test]
 async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
 -> Result<(), Box<dyn std::error::Error>> {
-    let oversized = "x".repeat(support::settings().body_limit + 1);
+    let oversized = "x".repeat(support::settings().body_limit_bytes + 1);
     let chunks = futures_util::stream::iter([Ok::<_, std::io::Error>(oversized)]);
     let request = Request::post("/fhir/echo").body(Body::from_stream(chunks))?;
 
@@ -438,7 +449,7 @@ async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
 #[tokio::test]
 async fn a_body_over_the_ceiling_off_the_fhir_surface_keeps_its_plain_413()
 -> Result<(), Box<dyn std::error::Error>> {
-    let oversized = "x".repeat(support::settings().body_limit + 1);
+    let oversized = "x".repeat(support::settings().body_limit_bytes + 1);
     let request = Request::post("/health/liveness")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))?;
@@ -486,7 +497,11 @@ fn the_request_log_carries_the_route_and_never_a_body_or_an_unlisted_query_value
     assert!(text.contains("\"method\":\"GET\""), "{text}");
     assert!(text.contains("\"status\":200"), "{text}");
     assert!(text.contains("\"latency_ms\""), "{text}");
-    assert!(text.contains("\"request_id\":\"corr-log\""), "{text}");
+    assert!(
+        !text.contains("corr-log"),
+        "the client's request id is echoed and never logged: {text}"
+    );
+    assert!(text.contains("\"client_named\":true"), "{text}");
     assert!(text.contains("_count=10"), "an allowed value is logged");
     assert!(
         !text.contains("SYNTHETIC-1234"),
@@ -570,7 +585,22 @@ fn a_caught_panic_leaves_its_request_line() {
     assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status);
     assert!(text.contains("\"route\":\"/boom\""), "{text}");
     assert!(text.contains("\"status\":500"), "{text}");
-    assert!(text.contains("\"request_id\":\"corr-panic-log\""), "{text}");
+    assert!(
+        !text.contains("corr-panic-log"),
+        "the client's request id is echoed and never logged: {text}"
+    );
+    assert!(text.contains("\"client_named\":true"), "{text}");
+    let line = text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|line| line["message"] == "request")
+        .expect("the request line");
+    assert!(
+        line["request_id"]
+            .as_str()
+            .is_some_and(|id| uuid::Uuid::try_parse(id).is_ok()),
+        "the line names the server's own request id: {line}"
+    );
     assert_eq!(
         1,
         text.matches("\"message\":\"request\"").count(),
@@ -581,7 +611,7 @@ fn a_caught_panic_leaves_its_request_line() {
 #[test]
 fn a_timeout_leaves_its_request_line() {
     let mut settings = support::settings();
-    settings.request_timeout = Duration::from_millis(20);
+    settings.request_timeout_ms = 20;
     let router = with_middleware(
         Router::new().route(
             "/slow",
@@ -611,7 +641,7 @@ fn a_timeout_leaves_its_request_line() {
 #[test]
 fn a_refused_oversized_body_leaves_its_request_line() {
     let settings = support::settings();
-    let oversized = "x".repeat(settings.body_limit + 1);
+    let oversized = "x".repeat(settings.body_limit_bytes + 1);
     let request = Request::post("/health/liveness")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))
@@ -636,7 +666,7 @@ fn an_unmatched_request_logs_no_part_of_its_path() {
     let (status, text) = logged(app(), request);
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(
-        text.contains(ferrobridge_server::request_log::UNMATCHED),
+        text.contains(ferrohealth_telemetry::request_log::UNMATCHED),
         "the line names the unmatched marker: {text}"
     );
     assert!(

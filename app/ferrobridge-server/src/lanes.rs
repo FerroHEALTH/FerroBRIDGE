@@ -14,11 +14,13 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
-use crate::config::{self, ServerSettings, Settings};
+use crate::config::{self, Settings};
 use crate::serve_until;
 use crate::state::{self, AppState};
 use crate::terminology::Translator;
 use crate::{cdr, check, facade, hl7v2, operator, smart, startup};
+use ferrohealth_health::lifecycle::Lifecycle;
+use ferrohealth_server::section::ServerSection;
 use std::collections::BTreeMap;
 
 /// Every lane of one start, built and ready to serve.
@@ -157,7 +159,7 @@ async fn start_hl7v2(
             hl7v2::Face::new(facade, corpus, terminology, lane)
                 .with_usage(Arc::clone(state.usage_window())),
         ),
-        listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout),
+        listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout()),
         listening: listening.clone(),
     };
     Ok((face, listening))
@@ -171,14 +173,15 @@ async fn start_hl7v2(
 pub(crate) async fn serve_with_face(
     listener: TcpListener,
     app: Router,
-    server: &ServerSettings,
+    server: &ServerSection,
+    lifecycle: Lifecycle,
     face: StartedFace,
     stop: &tokio::sync::watch::Sender<bool>,
 ) -> anyhow::Result<()> {
     use anyhow::Context;
 
     let http = async {
-        let ended = serve_until(listener, app, server.shutdown_timeout, stopped(stop)).await;
+        let ended = serve_until(listener, app, server, lifecycle, stopped(stop)).await;
         stop.send_replace(true);
         ended
     };

@@ -16,12 +16,12 @@ use ferrobridge_server::check::Report;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::operator::Operator;
 use ferrobridge_server::operator::files::{Language, Root};
 use ferrobridge_server::operator::reload::Reloader;
 use ferrobridge_server::operator::snapshot::Snapshot;
 use ferrobridge_server::state::{AppState, OperationsLane};
+use ferrohealth_health::registry::Registry;
 use http::{Request, StatusCode, header};
 use jsonwebtoken::Algorithm;
 use tower::ServiceExt as _;
@@ -298,9 +298,9 @@ impl Case {
 }
 
 /// Returns server settings whose body ceiling admits a mapping file.
-fn server_settings() -> ferrobridge_server::config::ServerSettings {
-    ferrobridge_server::config::ServerSettings {
-        body_limit: 1024 * 1024,
+fn server_settings() -> ferrohealth_server::section::ServerSection {
+    ferrohealth_server::section::ServerSection {
+        body_limit_bytes: 1024 * 1024,
         ..crate::support::settings()
     }
 }
@@ -573,8 +573,8 @@ async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<()
 fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
 -> Result<(), Box<dyn Error>> {
     let logs = crate::support::Logs::default();
-    let capture = ferrobridge_server::telemetry::subscriber(
-        ferrobridge_server::telemetry::Rendering::Json,
+    let capture = crate::support::subscriber(
+        ferrohealth_telemetry::section::Rendering::Json,
         "info",
         false,
         logs.clone(),

@@ -6,14 +6,15 @@
 
 use std::path::Path;
 
+use ferrohealth_secret::file::read_secret;
+use ferrohealth_secret::secret::Secret;
 use ferrohealth_smart::client::ClientCredentials;
 use ferrohealth_smart::config::CredentialsSection;
 use ferrohealth_smart::config::Outbound;
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::SecretString;
 
 use super::error::Error;
 use super::section::Cdm;
-use super::section::Secret;
 
 /// What a `[<lane>.credentials]` table resolves to.
 pub(super) enum Upstream {
@@ -81,30 +82,17 @@ pub(super) fn cdm_connection_key(
     }
 }
 
-/// Returns the secret `key` names, inline or from its `_file` sibling.
+/// Returns the secret `key` names, inline or from the file its `_file`
+/// sibling names, through `ferrohealth-secret`.
 ///
-/// The file's text is a [`SecretString`] from the read, and the trimmed copy
-/// is taken from it, so neither form outlives the call unzeroed.
+/// # Errors
+/// Returns [`Error::SecretFile`] when both are set, or the file cannot be read
+/// or holds nothing.
 pub(super) fn secret(
     key: &str,
     inline: Option<&Secret>,
     file: Option<&Path>,
 ) -> Result<Option<SecretString>, Error> {
-    match (inline, file) {
-        (Some(_), Some(_)) => Err(Error::Conflict {
-            key: key.to_owned(),
-        }),
-        (Some(value), None) => Ok(Some(value.secret().clone())),
-        (None, Some(path)) => {
-            let text = SecretString::from(std::fs::read_to_string(path).map_err(|source| {
-                Error::Secret {
-                    key: format!("{key}_file"),
-                    path: path.to_path_buf(),
-                    source,
-                }
-            })?);
-            Ok(Some(SecretString::from(text.expose_secret().trim())))
-        }
-        (None, None) => Ok(None),
-    }
+    read_secret(key, inline.map(Secret::to_secret_string), file)
+        .map_err(|source| Error::SecretFile { source })
 }

@@ -1,37 +1,36 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! Configuration: an optional TOML file, then environment overrides, then one
+//! Configuration: the defaults, an optional TOML file, the environment and
+//! the `--set` pairs, read by `ferrohealth-config` into one tree, then one
 //! typed [`Settings`] the run path holds.
 //!
 //! Every struct refuses an unknown key, every default lives inline in its own
 //! `Default` impl, and every credential is reachable through a `<key>_file`
-//! sibling read at boot. A lane is off until its section is present. No
-//! specification governs the configuration: our own design.
+//! sibling read at boot. A lane is off until its section is present. The
+//! `[server]`, `[telemetry]` and `[usage_report]` sections are the family's
+//! own, from `ferrohealth-server`, `ferrohealth-telemetry` and
+//! `ferrohealth-usage-report`. No specification governs the configuration:
+//! our own design.
 
 mod auth;
 mod credentials;
 pub mod error;
-mod overrides;
-pub mod provenance;
 mod resolve;
 pub mod section;
 
+use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_config::provenance::Provenance;
+use ferrohealth_server::section::ServerSection;
+use ferrohealth_telemetry::section::TelemetrySection;
+use ferrohealth_usage_report::section::UsageReportSection;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
-
-use crate::telemetry::{FILTER_ENV, FORMAT_ENV, Format};
 
 use error::Error;
-use overrides::CONSOLE_OVERRIDES;
-use overrides::apply_console_overrides;
-use overrides::apply_override;
-use overrides::parse_override;
-use overrides::retype;
 use resolve::resolve_cdm;
 use resolve::resolve_cdr;
 use resolve::resolve_etl;
@@ -46,12 +45,12 @@ use section::Hl7v2;
 use section::Mappings;
 use section::Operations;
 use section::Operator;
-use section::Server;
-use section::Telemetry;
 use section::Terminology;
 use section::facade::Facade;
 
-use provenance::Provenance;
+/// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
+/// `[server] listen`, and `FERROBRIDGE_CONFIG` names the file.
+pub const PREFIX: &str = "FERROBRIDGE";
 
 /// The prefix of every environment override.
 ///
@@ -62,17 +61,36 @@ pub const ENV_PREFIX: &str = "FERROBRIDGE__";
 /// The environment variable naming the configuration file.
 pub const CONFIG_PATH_ENV: &str = "FERROBRIDGE_CONFIG";
 
+/// The variable that sets `telemetry.format`.
+pub const FORMAT_ENV: &str = "FERROBRIDGE_LOG_FORMAT";
+
+/// The variable that sets `telemetry.filter`.
+pub const FILTER_ENV: &str = "RUST_LOG";
+
+/// The loader of the bridge's tree, with the two console variables as the
+/// aliases of the keys they set.
+///
+/// # Errors
+/// Returns the loader's error when the prefix is refused, which it never is
+/// for [`PREFIX`].
+pub fn loader() -> Result<Loader, ferrohealth_config::error::ConfigError> {
+    Ok(Loader::new(PREFIX)?
+        .alias(FORMAT_ENV, "telemetry.format")
+        .alias(FILTER_ENV, "telemetry.filter"))
+}
+
 /// The whole configuration tree, as a file and the environment state it.
 ///
-/// It serializes with every secret redacted ([`section::Secret`]), so the
-/// operator API can answer the running configuration.
+/// It serializes with every secret redacted (`ferrohealth_secret`'s
+/// `Secret`, and the redacted sections of `ferrohealth-smart`), so the
+/// operator API and `config check` can answer the running configuration.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// The HTTP surface.
-    pub server: Server,
+    pub server: ServerSection,
     /// The console.
-    pub telemetry: Telemetry,
+    pub telemetry: TelemetrySection,
     /// The openEHR CDR, when one is configured.
     pub cdr: Option<Cdr>,
     /// The FHIR terminology server, when one is configured.
@@ -93,7 +111,7 @@ pub struct Config {
     /// The HL7 v2 face, off until its section turns it on.
     pub hl7v2: Hl7v2,
     /// The installation report to `FerroPULSE`.
-    pub usage_report: section::UsageReport,
+    pub usage_report: UsageReportSection,
     /// The operator API, off until its section turns it on.
     pub operator: Operator,
     /// Where each key came from, which the load records and no file states.
@@ -102,38 +120,27 @@ pub struct Config {
 }
 
 impl Config {
-    /// Reads the configuration file `path` names, then the environment.
-    ///
-    /// `path` is what `--config` named; without it the file is the one
-    /// `FERROBRIDGE_CONFIG` names, and without that the defaults stand.
+    /// Reads the configuration of the running process: the file `path`
+    /// names, or the one `FERROBRIDGE_CONFIG` names, the environment and the
+    /// `--set` pairs `sets`, with where each key came from.
     ///
     /// # Errors
-    /// Returns [`Error::Read`] when a named file cannot be read and every
-    /// other [`Error`] the merge and the parse produce.
-    pub fn load(path: Option<&Path>) -> Result<Self, Error> {
-        let named = path
-            .map(Path::to_path_buf)
-            .or_else(|| std::env::var_os(CONFIG_PATH_ENV).map(PathBuf::from));
-        let text = match named.as_ref() {
-            None => None,
-            Some(path) => {
-                let text = std::fs::read_to_string(path).map_err(|source| Error::Read {
-                    path: path.clone(),
-                    source,
-                })?;
-                Some(text)
-            }
-        };
-        let environment: BTreeMap<String, String> = std::env::vars()
-            .filter(|(name, _)| {
-                name.starts_with(ENV_PREFIX) || name == FORMAT_ENV || name == FILTER_ENV
-            })
-            .collect();
-        let mut config = Self::from_sources(text.as_deref(), &environment)?;
-        if let Some(path) = named {
-            config.provenance.read_from(path);
+    /// Returns [`Error::Parse`] when the file cannot be read, a key or a
+    /// variable is unknown, or a value does not read as its key.
+    pub fn load(path: Option<&Path>, sets: &[(String, String)]) -> Result<Loaded<Self>, Error> {
+        loader()
+            .and_then(|loader| loader.load_with(path, sets))
+            .map_err(|source| Error::Parse { source })
+    }
+
+    /// Returns the tree `loaded` read, with its provenance.
+    #[must_use]
+    pub fn from_loaded(loaded: Loaded<Self>) -> Self {
+        let (config, provenance) = loaded.into_parts();
+        Self {
+            provenance,
+            ..config
         }
-        Ok(config)
     }
 
     /// Returns where each key came from.
@@ -149,62 +156,16 @@ impl Config {
     /// edition 2024 and this workspace forbids `unsafe`.
     ///
     /// # Errors
-    /// Returns [`Error::Parse`] for TOML that does not read as this tree,
-    /// [`Error::EnvName`] and [`Error::EnvShape`] for an override that names
-    /// no key, and [`Error::Assemble`] when the merged tree cannot be written.
+    /// Returns [`Error::Parse`] for TOML that does not read as this tree and
+    /// for an override that names no key.
     pub fn from_sources(
         text: Option<&str>,
         environment: &BTreeMap<String, String>,
     ) -> Result<Self, Error> {
-        let file = match text {
-            None => toml::Table::new(),
-            Some(text) => toml::from_str(text).map_err(|source| Error::Parse { source })?,
-        };
-        let mut overrides = Vec::new();
-        for (name, raw) in environment {
-            if let Some(item) = parse_override(name, raw)? {
-                overrides.push(item);
-            }
-        }
-        let mut environment_keys: BTreeSet<String> =
-            overrides.iter().map(overrides::Override::key).collect();
-        for (variable, key) in CONSOLE_OVERRIDES {
-            if environment.contains_key(variable) {
-                environment_keys.insert(format!("telemetry.{key}"));
-            }
-        }
-        let provenance = Provenance::new(text.is_some().then_some(&file), environment_keys);
-        // Each pass places one more override typed, so the loop ends after at
-        // most one pass per override.
-        let mut typed = BTreeSet::new();
-        loop {
-            let mut table = file.clone();
-            for (index, item) in overrides.iter().enumerate() {
-                apply_override(&mut table, item, typed.contains(&index))?;
-            }
-            apply_console_overrides(&mut table, environment)?;
-            // The merged tree is written back and re-read so every refusal
-            // carries the key and its position, which a `Table` cannot report.
-            let merged = toml::to_string(&table).map_err(|source| Error::Assemble { source })?;
-            let source = match toml::from_str::<Self>(&merged) {
-                Ok(config) => {
-                    return Ok(Self {
-                        provenance,
-                        ..config
-                    });
-                }
-                Err(source) => source,
-            };
-            let retyped = source
-                .span()
-                .and_then(|span| retype(&overrides, &typed, &merged, &span));
-            match retyped {
-                Some(index) => {
-                    typed.insert(index);
-                }
-                None => return Err(Error::Parse { source }),
-            }
-        }
+        loader()
+            .and_then(|loader| loader.load_sources(text, None, environment))
+            .map(Self::from_loaded)
+            .map_err(|source| Error::Parse { source })
     }
 
     /// Returns whether the tree serves a surface `[auth]` guards: the facade,
@@ -264,26 +225,12 @@ impl Config {
                 }),
             });
         }
-        let listen = self
-            .server
-            .listen
-            .parse::<SocketAddr>()
-            .map_err(|source| Error::Listen {
-                key: String::from("server.listen"),
-                source,
-            })?;
+        if self.server.caller_rate.is_some() {
+            return Err(Error::CallerRate);
+        }
         Ok(Settings {
-            server: ServerSettings {
-                listen,
-                request_timeout: Duration::from_millis(self.server.request_timeout_ms),
-                shutdown_timeout: Duration::from_millis(self.server.shutdown_timeout_ms),
-                body_limit: self.server.body_limit_bytes,
-            },
-            telemetry: TelemetrySettings {
-                format: self.telemetry.format,
-                filter: self.telemetry.filter.clone(),
-                logged_query_parameters: self.telemetry.logged_query_parameters.clone(),
-            },
+            server: self.server.clone(),
+            telemetry: self.telemetry.clone(),
             cdr: self.cdr.as_ref().map(resolve_cdr).transpose()?,
             terminology: self
                 .terminology
@@ -321,7 +268,7 @@ impl Config {
                 composition_language: self.operations.composition_language.clone(),
                 composition_territory: self.operations.composition_territory.clone(),
             },
-            usage_report: crate::usage_report::config::resolve(&self.usage_report)?,
+            usage_report: self.usage_report.clone(),
             operator: resolve::resolve_operator(&self.operator, &self.auth)?,
             configuration: if serves && self.operator.enabled {
                 Some(
@@ -384,9 +331,9 @@ pub struct Hl7v2Settings {
 #[derive(Debug)]
 pub struct Settings {
     /// The HTTP surface.
-    pub server: ServerSettings,
+    pub server: ServerSection,
     /// The console.
-    pub telemetry: TelemetrySettings,
+    pub telemetry: TelemetrySection,
     /// The CDR client configuration, when the lane is on.
     pub cdr: Option<crate::cdr::config::CdrConfig>,
     /// The terminology client configuration, when the lane is on.
@@ -419,7 +366,7 @@ pub struct Settings {
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.
-    pub usage_report: crate::usage_report::config::UsageReportSettings,
+    pub usage_report: UsageReportSection,
     /// The operator API, when it is mounted.
     pub operator: Option<crate::operator::OperatorSettings>,
     /// The running configuration the operator API answers, when it is
@@ -468,30 +415,6 @@ pub struct OperationsSettings {
     pub composition_territory: Option<String>,
 }
 
-/// The HTTP surface, resolved.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerSettings {
-    /// The socket address to bind.
-    pub listen: SocketAddr,
-    /// How long one request may take before the server answers `408`.
-    pub request_timeout: Duration,
-    /// How long the drain may take after the stop signal.
-    pub shutdown_timeout: Duration,
-    /// The largest request body the server reads before answering `413`.
-    pub body_limit: usize,
-}
-
-/// The console, resolved.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TelemetrySettings {
-    /// The rendering.
-    pub format: Format,
-    /// The `tracing` filter directive.
-    pub filter: String,
-    /// The query parameter names whose values may reach the request log.
-    pub logged_query_parameters: Vec<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::Config;
@@ -502,7 +425,7 @@ mod tests {
     fn an_absent_file_and_an_empty_environment_leave_the_defaults() {
         let config = Config::from_sources(None, &BTreeMap::new()).expect("the defaults parse");
         assert_eq!(format!("{:?}", Config::default()), format!("{config:?}"));
-        assert_eq!("127.0.0.1:8080", config.server.listen);
+        assert_eq!("127.0.0.1:8080", config.server.listen.to_string());
         assert_eq!(1024 * 1024, config.server.body_limit_bytes);
         assert_eq!(10_000, config.server.shutdown_timeout_ms);
         assert_eq!(
@@ -520,7 +443,7 @@ mod tests {
         let error =
             Config::from_sources(Some("[server]\nlisten = \"127.0.0.1:1\"\n"), &environment)
                 .expect_err("listen is a string, not a section");
-        assert!(matches!(error, Error::EnvShape { .. }), "{error:?}");
+        assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     }
 
     #[test]
@@ -528,7 +451,8 @@ mod tests {
         let error = Config::from_sources(Some("[server]\nlisten_port = 8080\n"), &BTreeMap::new())
             .expect_err("an unknown key is refused");
         assert!(
-            format!("{:?}", std::error::Error::source(&error)).contains("listen_port"),
+            error.to_string().contains("listen_port")
+                || format!("{:?}", std::error::Error::source(&error)).contains("listen_port"),
             "the refusal names the key: {error:?}"
         );
     }

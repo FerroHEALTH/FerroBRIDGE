@@ -224,9 +224,13 @@ the banner and human-readable lines in `docker compose logs`
 
 ## The health probe
 
-The image declares no `HEALTHCHECK`. A distroless image has no shell and no
-HTTP client, and the binary carries no probe subcommand, so the probe is
-external. Two endpoints answer it:
+A distroless image has no shell and no HTTP client, so the image's
+`HEALTHCHECK` runs the binary itself: `ferrobridge healthcheck` asks the
+running server for `GET /health/readiness` on loopback (where
+`FERROBRIDGE__SERVER__LISTEN` says, over TLS when `[server.tls]` is set) and
+exits 0 only on `200`. It checks every 30 seconds after a 60-second start
+period. Kubernetes ignores the instruction and keeps its own probes. The
+endpoints, the FerroHEALTH family's (`ferrohealth-server`):
 
 - `GET /health/liveness` answers `200` while the process is up. Restart the
   container when it stops answering.
@@ -240,21 +244,28 @@ external. Two endpoints answer it:
   `SELECT 1`; a refused connection or a failed query counts as down. Take the
   instance out of the load balancer when it does not answer `200`.
 
-Readiness answers `503` when any indicator is down, with a JSON body naming the
-aggregate and every indicator by name:
+Readiness answers `200` only while the process serves and no indicator is
+down, and `503` otherwise, also while it boots and while it drains after
+`SIGTERM`. The body names the aggregate, the phase and every indicator with
+its state, sorted by name, and never why an indicator is down, since anyone
+who reaches the port reads it:
 
 ```json
 {
   "state": "down",
-  "indicators": {
-    "cdr": { "state": "up" },
-    "terminology": { "state": "down", "detail": "the upstream answered 503 Service Unavailable" }
-  }
+  "phase": "serving",
+  "indicators": [
+    { "name": "cdr", "state": "up" },
+    { "name": "terminology", "state": "down" }
+  ]
 }
 ```
 
-The `detail` names the upstream status or the reason the call never reached it,
-and never a body, a credential, or clinical content. A probe that reaches the
+`GET /health` answers the same status with the aggregate alone. The operator
+API answers the same document with each indicator's `detail` at
+`GET /operator/readiness`, behind its scope ([The operator
+API](operator-api.md)): the detail names the upstream status or the reason the
+call never reached it, and never a body, a credential, or clinical content. A probe that reaches the
 upstream counts it up, `401` and `404` included; a `5xx` and a failure to
 connect count it down. Each check is bounded, so a wedged upstream cannot hang
 the probe. In Kubernetes, point `livenessProbe` at `/health/liveness` and

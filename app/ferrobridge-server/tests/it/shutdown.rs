@@ -34,11 +34,21 @@ async fn a_request_in_flight_finishes_after_the_stop_signal() -> Result<(), Box<
     let address = listener.local_addr()?;
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let server = tokio::spawn(async move {
-        serve_until(listener, app(), Duration::from_secs(5), async move {
-            if stopped.await.is_err() {
-                tracing::debug!("the stop channel closed");
-            }
-        })
+        let server = ferrohealth_server::section::ServerSection {
+            shutdown_timeout_ms: 5_000,
+            ..support::settings()
+        };
+        serve_until(
+            listener,
+            app(),
+            &server,
+            ferrohealth_health::lifecycle::Lifecycle::default(),
+            async move {
+                if stopped.await.is_err() {
+                    tracing::debug!("the stop channel closed");
+                }
+            },
+        )
         .await
     });
 
@@ -64,11 +74,21 @@ async fn the_server_returns_once_the_drain_is_done() -> Result<(), Box<dyn Error
     let address = listener.local_addr()?;
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let server = tokio::spawn(async move {
-        serve_until(listener, app(), Duration::from_millis(500), async move {
-            if stopped.await.is_err() {
-                tracing::debug!("the stop channel closed");
-            }
-        })
+        let server = ferrohealth_server::section::ServerSection {
+            shutdown_timeout_ms: 500,
+            ..support::settings()
+        };
+        serve_until(
+            listener,
+            app(),
+            &server,
+            ferrohealth_health::lifecycle::Lifecycle::default(),
+            async move {
+                if stopped.await.is_err() {
+                    tracing::debug!("the stop channel closed");
+                }
+            },
+        )
         .await
     });
 

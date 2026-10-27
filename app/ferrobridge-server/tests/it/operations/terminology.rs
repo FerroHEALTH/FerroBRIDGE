@@ -323,7 +323,10 @@ async fn a_run_the_engine_refuses_is_counted_as_a_mapping_failure() -> Result<()
     )
     .await?;
     assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
-    assert_eq!(1, state.usage_window().take().mapping_failures);
+    assert_eq!(
+        1,
+        crate::support::counter(&state.usage_window().take(), "mapping_failures")
+    );
     let (status, _, body) = call(
         app,
         Request::post("/fhir/$toopenehr")
@@ -334,7 +337,7 @@ async fn a_run_the_engine_refuses_is_counted_as_a_mapping_failure() -> Result<()
     assert_eq!(StatusCode::UNSUPPORTED_MEDIA_TYPE, status, "{body}");
     assert_eq!(
         0,
-        state.usage_window().take().mapping_failures,
+        crate::support::counter(&state.usage_window().take(), "mapping_failures"),
         "a request refused before a program ran is no mapping failure"
     );
     Ok(())

@@ -9,7 +9,7 @@
 //!
 //! A sign-out is a `POST`, which the server takes only from the console's own
 //! pages, as it takes every request that is not a safe method
-//! ([`crate::server::same_origin`]). The end-session request is the
+//! (`ferrohealth_server::same_origin`). The end-session request is the
 //! relying party's of `ferrohealth-smart`.
 
 use axum::Extension;

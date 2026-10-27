@@ -96,7 +96,10 @@ async fn the_health_route_answers_up_with_the_headers() {
     assert_eq!(StatusCode::OK, response.status());
     assert_hardened(&response);
     assert_eq!("no-store", header(&response, &CACHE_CONTROL));
-    assert_eq!(r#"{"status":"up"}"#, text(response).await);
+    assert_eq!(r#"{"state":"up"}"#, text(response).await);
+    let readiness = send(&site, get("/health/readiness")).await;
+    assert_eq!(StatusCode::OK, readiness.status());
+    assert_hardened(&readiness);
 }
 
 #[tokio::test]

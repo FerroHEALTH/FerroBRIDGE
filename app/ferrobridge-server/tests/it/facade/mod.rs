@@ -48,10 +48,10 @@ use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::programs;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::state::OperationsLane;
 use ferrobridge_server::terminology::Translator;
+use ferrohealth_health::registry::Registry;
 use fhirconnect::operations::programs::ProgramSet;
 use http::Request;
 use http::Response;
@@ -199,9 +199,9 @@ impl Harness {
 ///
 /// The body ceiling is wider than the shared one because a transaction Bundle
 /// carries more than one resource.
-fn server_settings() -> ferrobridge_server::config::ServerSettings {
-    ferrobridge_server::config::ServerSettings {
-        body_limit: 1024 * 1024,
+fn server_settings() -> ferrohealth_server::section::ServerSection {
+    ferrohealth_server::section::ServerSection {
+        body_limit_bytes: 1024 * 1024,
         ..support::settings()
     }
 }

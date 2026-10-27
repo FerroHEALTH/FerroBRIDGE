@@ -11,10 +11,10 @@ use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
-use ferrobridge_server::health::Registry;
 use ferrobridge_server::smart::Smart;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::state::OperationsLane;
+use ferrohealth_health::registry::Registry;
 use fhirconnect::operations::programs::ProgramSet;
 use http::Request;
 use http::StatusCode;

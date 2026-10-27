@@ -449,8 +449,8 @@ fn a_batch_with_one_failing_entry_answers_200_and_counts_the_failure() -> Result
     // field of the batch's log line: no specification governs this, our own
     // design.
     let logs = crate::support::Logs::default();
-    let capture = ferrobridge_server::telemetry::subscriber(
-        ferrobridge_server::telemetry::Rendering::Json,
+    let capture = crate::support::subscriber(
+        ferrohealth_telemetry::section::Rendering::Json,
         "info",
         false,
         logs.clone(),

@@ -16,16 +16,18 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   variable table in `website/book/src/operate/`, and a case under
   `tests/it/config/`. A key with no documented variable name is a key an
   operator cannot set. `src/config/` holds the tree and its resolved settings
-  in `mod.rs`, the refusals (`Error`) in `error`, the environment overrides
-  in `overrides`, each lane's
-  resolution in `resolve` and the upstream credentials in `credentials`.
+  in `mod.rs` (read by `ferrohealth-config`'s loader), the refusals (`Error`)
+  in `error`, each lane's resolution in `resolve` and the upstream
+  credentials in `credentials`. `[server]`, `[telemetry]` and
+  `[usage_report]` are the FerroSYS crates' sections, never a local copy.
 - **A secret is reachable through a `<key>_file` sibling, read once at boot**,
   and lives in a `SecretString` after that. A value and its `_file` together is
   a boot error, and so is an unknown key. The refusal names the key.
 - **No clinical content in any log line.** The request log carries the matched
   route, never the raw URL, and a query value only from the allowlist. A body
-  never reaches the log, a `Debug` rendering, or an error message. Adding a
-  field to `request_log` needs the same judgement as adding one to a wire body.
+  never reaches the log, a `Debug` rendering, or an error message. The line
+  is `ferrohealth-telemetry`'s; a field a handler adds to it needs the same
+  judgement as one added to a wire body.
 - **An upstream failure is a typed error carrying the upstream status.** A
   readiness indicator reports a reason; it never reports up because a call
   failed quietly.
@@ -41,7 +43,7 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   they drive the public seams: `run`, `Config::from_sources`, `router`,
   `with_middleware`, `serve_until`, `boot::serve_settings`. A test that needs
   its own route builds one and hands it to `with_middleware`, so the stack
-  under test is the shipped stack.
+  under test is the shipped stack of `ferrohealth-server`.
 - The upstream stubs are `wiremock`; every fixture is synthetic.
 
 ## The CDR client (`src/cdr/`)

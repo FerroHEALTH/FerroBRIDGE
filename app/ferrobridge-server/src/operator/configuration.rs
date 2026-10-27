@@ -6,7 +6,7 @@
 //! each secret by reference alone.
 //!
 //! The tree is serialized with every secret already redacted
-//! ([`crate::config::section::Secret`], and the redacted sections of
+//! (`ferrohealth_secret`'s `Secret`, and the redacted sections of
 //! `ferrohealth-smart`), so no secret value reaches the document. A secret
 //! and its `_file` sibling are drawn as one entry, keyed by the secret,
 //! whose value is its state. No specification governs the document: our
@@ -17,8 +17,7 @@ use std::collections::BTreeMap;
 use ferrobridge_operator_api::configuration::{Configuration, Entry, SecretState, Source, Value};
 
 use crate::config::Config;
-use crate::config::provenance::Provenance;
-use crate::config::section::Secret;
+use ferrohealth_config::provenance::Provenance;
 
 /// The secrets the tree holds as a value or through a `_file` sibling, by
 /// dotted key; a key under an array of tables names the array.
@@ -69,6 +68,17 @@ pub fn document(
     })
 }
 
+/// Returns where `provenance` says the dotted key `key` came from.
+fn source_of(provenance: &Provenance, key: &str) -> Source {
+    use ferrohealth_config::provenance::Source as Layer;
+    match provenance.source(key) {
+        Layer::Default => Source::Default,
+        Layer::File => Source::File,
+        Layer::Environment => Source::Environment,
+        Layer::Set => Source::Set,
+    }
+}
+
 /// Joins `prefix` and `name` into a dotted key.
 fn dotted(prefix: &str, name: &str) -> String {
     if prefix.is_empty() {
@@ -82,7 +92,7 @@ fn dotted(prefix: &str, name: &str) -> String {
 fn walk(path: &str, table: &toml::Table, provenance: &Provenance, out: &mut Vec<Entry>) {
     let folded = fold_secrets(path, table);
     for (name, value, set_by) in folded.secrets {
-        let source = set_by.map_or(Source::Default, |key| provenance.source(&key));
+        let source = set_by.map_or(Source::Default, |key| source_of(provenance, &key));
         out.push(Entry {
             key: dotted(path, &name),
             value,
@@ -99,7 +109,7 @@ fn walk(path: &str, table: &toml::Table, provenance: &Provenance, out: &mut Vec<
         } else {
             out.push(Entry {
                 value: convert(&key, value),
-                source: provenance.source(&key),
+                source: source_of(provenance, &key),
                 key,
             });
         }
@@ -169,7 +179,9 @@ fn child_name<'k>(path: &str, key: &'k str) -> Option<&'k str> {
 /// Converts the value of `key` that is not a table.
 fn convert(key: &str, value: &toml::Value) -> Value {
     match value {
-        toml::Value::String(text) if text == Secret::REDACTED => Value::Secret(SecretState::Set),
+        toml::Value::String(text) if text == ferrohealth_secret::REDACTED => {
+            Value::Secret(SecretState::Set)
+        }
         toml::Value::String(text) => Value::String(text.clone()),
         toml::Value::Integer(number) => Value::Integer(*number),
         toml::Value::Float(number) => Value::Float(*number),

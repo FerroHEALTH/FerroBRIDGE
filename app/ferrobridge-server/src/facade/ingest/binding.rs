@@ -256,7 +256,7 @@ impl Ingest<'_> {
             .await;
         let built = built.inspect_err(|_| {
             if let Some(usage) = self.usage {
-                usage.record_mapping_failure();
+                crate::usage_report::record_mapping_failure(usage);
             }
         })?;
         let consumed = built.consumed().to_vec();

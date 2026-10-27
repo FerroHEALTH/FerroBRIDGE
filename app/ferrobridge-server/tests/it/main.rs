@@ -17,6 +17,7 @@
 mod boot;
 mod cdm;
 mod cdr;
+mod commands;
 mod config;
 mod console;
 mod etl;

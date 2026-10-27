@@ -54,7 +54,7 @@ use crate::facade::identity::claims::Claims;
 use crate::facade::identity::store::Store;
 use crate::facade::programs::Programs;
 use crate::terminology::Translator;
-use crate::usage_report::window::Window;
+use ferrohealth_usage_report::window::Window;
 
 /// The path every facade route sits under.
 ///
@@ -192,7 +192,7 @@ impl Facade {
             party_search: None,
             translator: Translator::default(),
             references: references::Policy::default(),
-            usage: Arc::default(),
+            usage: Arc::new(crate::usage_report::window()),
         }
     }
 
@@ -379,7 +379,7 @@ impl Facade {
     #[must_use]
     pub fn client_for(&self, headers: &http::HeaderMap) -> CdrClient {
         headers
-            .get(crate::request_id::HEADER)
+            .get(ferrohealth_server::request_id::HEADER)
             .and_then(|value| value.to_str().ok())
             .and_then(|text| crate::cdr::ids::RequestId::new(text).ok())
             .map_or_else(|| self.client.clone(), |id| self.client.with_request_id(id))

@@ -60,11 +60,13 @@
 #
 #   FERROBRIDGE_BIND_HOST=10.0.0.7 docker compose up
 #
-# HEALTH. The image is distroless and has no shell, and the binary carries no
-# probe subcommand, so no service below declares a `healthcheck` over the
-# bridge. Probe it from outside: GET /health/liveness answers 200 while the
-# process is up, and GET /health/readiness answers 200 when every configured
-# upstream answered and 503 with a JSON body naming each one otherwise.
+# HEALTH. The image's own HEALTHCHECK runs `ferrobridge healthcheck`, which
+# asks the server for GET /health/readiness on loopback and exits 0 only on
+# 200, so `docker compose ps` shows the bridge healthy once it serves and every
+# configured upstream answered. GET /health/liveness answers 200 while the
+# process is up, and GET /health/readiness answers 503 with a JSON body naming
+# each indicator and its state otherwise. `ferrobridge config check` prints the
+# running configuration with every secret redacted.
 #
 # PROFILES. The `cdm` profile stands up the OMOP CDM database and applies the
 # DDL; the `vocab` profile loads an OHDSI Athena export you downloaded

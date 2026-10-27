@@ -263,7 +263,11 @@ async fn a_composition_the_outbound_mapping_refuses_is_counted_as_a_mapping_fail
         first_issue(&body)["code"].as_str(),
         "{body}"
     );
-    assert_eq!(1, harness.facade.usage().take().mapping_failures, "{body}");
+    assert_eq!(
+        1,
+        crate::support::counter(&harness.facade.usage().take(), "mapping_failures"),
+        "{body}"
+    );
     Ok(())
 }
 
@@ -279,6 +283,10 @@ async fn a_read_the_outbound_mapping_answers_counts_no_mapping_failure()
     )
     .await?;
     assert_eq!(StatusCode::OK, status, "{body}");
-    assert_eq!(0, harness.facade.usage().take().mapping_failures, "{body}");
+    assert_eq!(
+        0,
+        crate::support::counter(&harness.facade.usage().take(), "mapping_failures"),
+        "{body}"
+    );
     Ok(())
 }

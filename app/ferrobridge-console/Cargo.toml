@@ -51,6 +51,9 @@ fluent-templates.workspace = true
 # The bridge's health and operator documents, the contract the bridge
 # serializes with (docs/architecture.md section 4.10), drawn in both halves.
 ferrobridge-operator-api.workspace = true
+# The family's readiness document `GET /health/readiness` answers, in the
+# default build both halves compile.
+ferrohealth-health.workspace = true
 # The `Diagnostic` the operator API answers, read in its serde form.
 openehr-mapping-core.workspace = true
 # The status of a bridge refusal.
@@ -86,6 +89,16 @@ base64.workspace = true
 clap.workspace = true
 # The `__Host-` session cookies (RFC 6265bis).
 cookie.workspace = true
+# The family's process plumbing (FerroSYS): the configuration loader and its
+# `_file` secrets, the console log, the health routes over a registry and a
+# lifecycle, the browser security headers, the same-origin check, the drain,
+# the healthcheck and the `serve`, `config check` and `healthcheck`
+# subcommands.
+ferrohealth-config.workspace = true
+ferrohealth-health = { workspace = true, features = ["registry"] }
+ferrohealth-secret.workspace = true
+ferrohealth-server = { workspace = true, features = ["console"] }
+ferrohealth-telemetry.workspace = true
 # The R4 CapabilityStatement the bridge client reads from `/fhir/metadata`
 # and the console reduces to the operator contract's `Capability`, and the
 # `OperationOutcome` and `Parameters` of a run, in the terminology root set
@@ -94,23 +107,19 @@ fhir-types = { workspace = true, features = ["r4", "terminology"] }
 # The OpenID Connect relying party operators sign in through (`oidc`):
 # the authorization request with PKCE, the code exchange and the ID Token
 # check (OpenID Connect Core 1.0 §3.1.3.7), the refresh and the end-session
-# request; and the secret type its tokens arrive in.
-ferrohealth-secret.workspace = true
+# request.
 ferrohealth-smart = { workspace = true, features = ["oidc"] }
-# The bridge client, the OpenID Provider's client, and the healthcheck job
-# asking the console beside it.
+# The bridge client and the OpenID Provider's client.
 reqwest.workspace = true
 # A secret read from the configuration and every token a session holds,
 # zeroed when dropped.
 secrecy.workspace = true
 # `sync` holds one refresh of a session's access token at a time.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
-toml.workspace = true
 # The site bundle is served brotli- or gzip-compressed, as the request's
 # Accept-Encoding chooses.
-tower-http = { workspace = true, features = ["set-header", "compression-br", "compression-gzip"] }
+tower-http = { workspace = true, features = ["compression-br", "compression-gzip"] }
 tracing.workspace = true
-tracing-subscriber.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 # The test OpenID Provider the sign-in, the refresh and the sign-out run
@@ -121,6 +130,8 @@ jsonwebtoken.workspace = true
 tempfile.workspace = true
 # The router driven in-process with `ServiceExt::oneshot`.
 tower.workspace = true
+# The tests capture the log into memory.
+tracing-subscriber.workspace = true
 wiremock.workspace = true
 
 [lints]

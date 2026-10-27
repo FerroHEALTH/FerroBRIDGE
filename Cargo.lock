@@ -1491,8 +1491,12 @@ dependencies = [
  "cookie",
  "ferrobridge-operator-api",
  "ferrobridge-testkit",
+ "ferrohealth-config",
+ "ferrohealth-health",
  "ferrohealth-secret",
+ "ferrohealth-server",
  "ferrohealth-smart",
+ "ferrohealth-telemetry",
  "ferrohealth-ui",
  "fhir-types",
  "fluent-templates",
@@ -1510,7 +1514,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "toml",
  "tower",
  "tower-http 0.7.1",
  "tracing",
@@ -1589,7 +1592,13 @@ dependencies = [
  "ferrobridge-operator-api",
  "ferrobridge-term",
  "ferrobridge-testkit",
+ "ferrohealth-config",
+ "ferrohealth-health",
+ "ferrohealth-secret",
+ "ferrohealth-server",
  "ferrohealth-smart",
+ "ferrohealth-telemetry",
+ "ferrohealth-usage-report",
  "fhir-types",
  "fhirconnect",
  "futures-core",
@@ -1624,7 +1633,6 @@ dependencies = [
  "tokio-postgres",
  "toml",
  "tower",
- "tower-http 0.7.1",
  "tracing",
  "tracing-subscriber",
  "url",
@@ -1706,6 +1714,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrohealth-config"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fb490bb6126a8536e8ee377284d746cc14f7c42423c4d7ec58e6e3d16a3c4c2"
+dependencies = [
+ "ferrohealth-secret",
+ "percent-encoding",
+ "serde",
+ "thiserror 2.0.21",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "ferrohealth-health"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca0d0ca4b126d9126a243088689e2e40b8ef0cef39352466196ab4079350d189"
+dependencies = [
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "ferrohealth-secret"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1715,6 +1747,36 @@ dependencies = [
  "serde",
  "thiserror 2.0.21",
  "url",
+]
+
+[[package]]
+name = "ferrohealth-server"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fcd8d0cf56d07e1ec5bba0db0aae39b2d524e2ac7d5f90ce58a8e5ab4950a59"
+dependencies = [
+ "axum",
+ "clap",
+ "ferrohealth-health",
+ "ferrohealth-secret",
+ "ferrohealth-telemetry",
+ "http",
+ "hyper",
+ "hyper-util",
+ "ipnet",
+ "pin-project-lite",
+ "rustls",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-rustls",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+ "url",
+ "uuid",
 ]
 
 [[package]]
@@ -1743,6 +1805,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrohealth-telemetry"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2520fcd3daaf7053226ae5fc5107471d277f4dac94907eea9536c7583805a2c"
+dependencies = [
+ "axum",
+ "ferrohealth-secret",
+ "http",
+ "opentelemetry",
+ "opentelemetry_sdk",
+ "pin-project-lite",
+ "secrecy",
+ "serde",
+ "thiserror 2.0.21",
+ "tower",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ferrohealth-ui"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1755,6 +1838,25 @@ dependencies = [
  "serde",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "ferrohealth-usage-report"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "244de83090953a4d780a29304837cc250980e834bf98fcfa98598ce8f7cd2859"
+dependencies = [
+ "ferrohealth-telemetry",
+ "http",
+ "jiff",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "url",
+ "uuid",
 ]
 
 [[package]]
@@ -2394,9 +2496,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "1.11.1"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27b501faa50e7a26c3d3560ca625132f4078a17771f4810baf70475ae48cbe43"
+checksum = "2c3e324da4c95177d6291d4c8730197c0d1822f8a9766814a4a44fa5ab797c9c"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -3778,6 +3880,37 @@ name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+
+[[package]]
+name = "opentelemetry"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c1f1a6ac9c875a4941e4c7c085b61e8f4daa326de03b4701768c3491a6ad9ee"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "pin-project-lite",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "opentelemetry_sdk"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "372a912db2974d1990207006fd0e3aa0ef3fd4ad3be43c65cfaadf2206866061"
+dependencies = [
+ "futures-channel",
+ "futures-executor",
+ "futures-util",
+ "opentelemetry",
+ "percent-encoding",
+ "portable-atomic",
+ "rand 0.9.5",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
+]
 
 [[package]]
 name = "or_poisoned"
@@ -5876,9 +6009,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
-version = "0.26.5"
+version = "0.26.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0c85f2c3ef0b1cd58b36682f4b17aaa995f0e5db534d85692b4903abce21f67"
+checksum = "c9cc2678c2cdd569ef8215e2afd7954ada2ae20b4fdd2c5fe6139a3b02d105db"
 dependencies = [
  "rustls",
  "tokio",
@@ -6130,6 +6263,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-opentelemetry"
+version = "0.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a904802a1b902f43638b677ff2a650847e3b4404101b6c586d648e8c1e3e8fe"
+dependencies = [
+ "js-sys",
+ "opentelemetry",
+ "tracing",
+ "tracing-core",
+ "tracing-subscriber",
+ "web-time",
+]
+
+[[package]]
 name = "tracing-serde"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6366,12 +6513,13 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.28.0"
+version = "1.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cc1186384beb7dd8eedea376413fd654937285ea6c9cfbb928dc3043ea4b606"
+checksum = "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
+ "rand 0.10.3",
  "serde_core",
  "sha1_smol",
  "wasm-bindgen",
@@ -6432,9 +6580,9 @@ dependencies = [
 
 [[package]]
 name = "want"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa7760aed19e106de2c7c0b581b509f2f25d3dacaf737cb82ac61bc6d760b0e"
+checksum = "ec4cdd0dd910afe868b7ef477227d8d538b46b3075031afee8a9f2acb0a2ed0b"
 dependencies = [
  "try-lock",
 ]

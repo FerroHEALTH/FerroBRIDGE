@@ -81,6 +81,14 @@ exceptions = [
   # ferrohealth-secret is the family's one mask, which ferrohealth-smart
   # renders its secrets and URLs through, the same Licensor's crate.
   { allow = ["BUSL-1.1"], crate = "ferrohealth-secret" },
+  # The FerroSYS crates are the family's process plumbing the server and the
+  # console run on (configuration, telemetry, health, the server shell and the
+  # usage report), the same Licensor's crates under the same licence.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-config" },
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-health" },
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-server" },
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-telemetry" },
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-usage-report" },
   { allow = ["BUSL-1.1"], crate = "openehr-mapping-core" },
   { allow = ["BUSL-1.1"], crate = "fhirconnect" },
   { allow = ["BUSL-1.1"], crate = "omocl" },

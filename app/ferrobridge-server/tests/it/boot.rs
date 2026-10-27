@@ -111,15 +111,13 @@ async fn a_cdr_that_answers_late_keeps_the_process_up_until_the_lanes_start()
         let client = reqwest::Client::new();
         let waiting = readiness_until(&client, address, StatusCode::SERVICE_UNAVAILABLE).await?;
         assert_eq!(
-            "down", waiting["indicators"]["startup"]["state"],
+            Some("down"),
+            indicator(&waiting, "startup").and_then(|startup| startup["state"].as_str()),
             "{waiting}"
         );
-        let detail = waiting["indicators"]["startup"]["detail"]
-            .as_str()
-            .unwrap_or_default();
         assert!(
-            detail.contains("503"),
-            "the wait names the CDR answer: {detail}"
+            indicator(&waiting, "startup").is_some_and(|startup| startup.get("detail").is_none()),
+            "the open route names the indicator and never its detail: {waiting}"
         );
         let (liveness, _) = get(&client, address, "/health/liveness").await?;
         assert_eq!(StatusCode::OK, liveness, "the process stays up");
@@ -134,10 +132,14 @@ async fn a_cdr_that_answers_late_keeps_the_process_up_until_the_lanes_start()
         .await;
         let ready = readiness_until(&client, address, StatusCode::OK).await?;
         assert!(
-            ready["indicators"].get("startup").is_none(),
+            indicator(&ready, "startup").is_none(),
             "the started lanes report their own indicators: {ready}"
         );
-        assert_eq!("up", ready["indicators"]["cdr"]["state"], "{ready}");
+        assert_eq!(
+            Some("up"),
+            indicator(&ready, "cdr").and_then(|cdr| cdr["state"].as_str()),
+            "{ready}"
+        );
         stop.send(()).map_err(|()| "the server is gone")?;
         Ok::<(), Box<dyn Error>>(())
     };
@@ -198,4 +200,12 @@ async fn a_stop_while_the_cdr_is_not_ready_ends_the_wait() -> Result<(), Box<dyn
     probed?;
     served?;
     Ok(())
+}
+
+/// Returns the indicator called `name` in the readiness document `document`.
+fn indicator<'d>(document: &'d serde_json::Value, name: &str) -> Option<&'d serde_json::Value> {
+    document["indicators"]
+        .as_array()?
+        .iter()
+        .find(|indicator| indicator["name"] == name)
 }

@@ -13,8 +13,6 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
 ## What it holds
 
 - `health::Info`: `GET /health/info`, the build facts, pins and lanes.
-- `health::Readiness`: `GET /health/readiness`, the state of every
-  readiness indicator.
 - `operator::EngineState`: `GET /operator/state`, the contexts, models,
   extensions, templates and OMOCL files of the running load, with its
   counts and diagnostics.
@@ -22,7 +20,7 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
 - `operator::LoadReport`: the answer of a draft check, a save and a reload.
 - `configuration::Configuration`: `GET /operator/configuration`, every key
   of the configuration the bridge started on with its value and its source
-  (the file, the environment or the default), each secret by reference
+  (the file, the environment, a `--set` argument or the default), each secret by reference
   alone: set, read from a file, or unset.
 
 Every document refuses an unknown field, and every diagnostic is

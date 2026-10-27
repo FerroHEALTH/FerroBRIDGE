@@ -44,6 +44,16 @@ jiff.workspace = true
 # The SMART resource server in front of the facade and the operator API, and
 # the client credentials token of the CDR and terminology lanes.
 ferrohealth-smart = { workspace = true, features = ["axum"] }
+# The family's process plumbing (FerroSYS): the configuration loader and its
+# secrets, the health registry, the stack around the routes with the listener,
+# the drain and the three common subcommands, the console and request log, and
+# the usage report.
+ferrohealth-config.workspace = true
+ferrohealth-health = { workspace = true, features = ["registry"] }
+ferrohealth-secret.workspace = true
+ferrohealth-server.workspace = true
+ferrohealth-telemetry = { workspace = true, features = ["axum"] }
+ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
 # The AOM2 operational template the adl2 route serves, and the HRID parser an
 # adl2 template ETag is read with.
 openehr-am.workspace = true
@@ -82,9 +92,7 @@ sha2.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 toml.workspace = true
-tower-http.workspace = true
 tracing.workspace = true
-tracing-subscriber.workspace = true
 url.workspace = true
 uuid = { workspace = true, features = ["v5"] }
 
@@ -118,6 +126,8 @@ tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time
 # The ETL cases read back what the writer wrote.
 tokio-postgres.workspace = true
 tower.workspace = true
+# The tests capture the console of ferrohealth-telemetry into memory.
+tracing-subscriber.workspace = true
 wiremock.workspace = true
 
 [lints]

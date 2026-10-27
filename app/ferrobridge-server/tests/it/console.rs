@@ -69,11 +69,12 @@ fn every_lane_is_reported_with_the_hosts_it_reaches() -> Result<(), Box<dyn Erro
 fn the_banner_names_the_hosts_and_never_the_user_information() -> Result<(), Box<dyn Error>> {
     let settings = Config::from_sources(Some(FILE), &BTreeMap::new())?.resolve()?;
     let text = banner::render(
-        "0.0.0",
+        &build_info::BUILD,
         &build_info::pins(),
         &startup::lanes(&settings),
-        false,
-    );
+        ferrohealth_telemetry::section::Rendering::Pretty,
+    )
+    .ok_or("pretty prints the banner")?;
     assert!(text.contains("cdr.invalid:8080"), "{text}");
     assert!(text.contains("tx.invalid"), "{text}");
     assert!(!text.contains("s3cret"), "no credential: {text}");

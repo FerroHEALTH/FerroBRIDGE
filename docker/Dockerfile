@@ -35,10 +35,12 @@ EXPOSE 8080/tcp
 # it does not read, so `runAsNonRoot: true` refuses a named USER.
 USER 65532:65532
 
-# No HEALTHCHECK: the base has no shell and no HTTP client, and the binary has
-# no probe subcommand, so the probe is external, a GET /health/liveness (and
-# /health/readiness for the upstreams) from the orchestrator or the compose
-# file. Kubernetes ignores the instruction and keeps its own probes anyway.
+# The base has no shell and no HTTP client, so the binary probes itself:
+# `ferrobridge healthcheck` asks the running server for /health/readiness on
+# loopback and exits 0 only on 200. The start period covers a boot that waits
+# for its CDR. Kubernetes ignores the instruction and keeps its own probes.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD ["/usr/local/bin/ferrobridge", "healthcheck"]
 
 # Exec form: the binary is PID 1 and receives SIGTERM itself, which it drains
 # on. CMD is the default job, so a Kubernetes Job sets `args:` alone and never

@@ -4,61 +4,15 @@
 //! The file tree: one struct per TOML section, each refusing an unknown key
 //! and holding its defaults in its own `Default` impl.
 
-use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use ferrohealth_smart::config::CredentialsSection;
 
-use crate::telemetry::{DEFAULT_FILTER, Format};
+use ferrohealth_secret::secret::Secret;
 
 pub mod facade;
-
-/// A secret written inline in the configuration: a [`SecretString`] from the
-/// parse, so its `Debug` rendering is redacted and its memory is zeroed when
-/// it is dropped.
-///
-/// It compares by value so a parsed tree can be compared with another, and
-/// serializes as [`Secret::REDACTED`], never its value, so the running
-/// configuration can be rendered. No specification governs this: our own
-/// design.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(transparent)]
-pub struct Secret(SecretString);
-
-impl Secret {
-    /// What a set secret serializes as.
-    pub const REDACTED: &str = "[redacted]";
-}
-
-impl Serialize for Secret {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(Self::REDACTED)
-    }
-}
-
-impl Secret {
-    /// Returns the secret.
-    #[must_use]
-    pub const fn secret(&self) -> &SecretString {
-        &self.0
-    }
-}
-
-impl From<&str> for Secret {
-    fn from(value: &str) -> Self {
-        Self(SecretString::from(value))
-    }
-}
-
-impl PartialEq for Secret {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.expose_secret() == other.0.expose_secret()
-    }
-}
-
-impl Eq for Secret {}
 
 /// The mapping set this deployment runs.
 ///
@@ -221,56 +175,6 @@ impl Default for Operations {
             composer: String::from("FHIRconnect"),
             composition_language: None,
             composition_territory: None,
-        }
-    }
-}
-
-/// The HTTP surface.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Server {
-    /// The socket address to bind.
-    pub listen: String,
-    /// How long one request may take before the server answers `408`.
-    pub request_timeout_ms: u64,
-    /// How long the drain may take after the stop signal.
-    pub shutdown_timeout_ms: u64,
-    /// The largest request body the server reads before answering `413`.
-    pub body_limit_bytes: usize,
-}
-
-impl Default for Server {
-    fn default() -> Self {
-        Self {
-            listen: String::from("127.0.0.1:8080"),
-            request_timeout_ms: 30_000,
-            shutdown_timeout_ms: 10_000,
-            body_limit_bytes: 1024 * 1024,
-        }
-    }
-}
-
-/// The console.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Telemetry {
-    /// The rendering: `auto`, `json` or `pretty`.
-    pub format: Format,
-    /// The `tracing` filter directive.
-    pub filter: String,
-    /// The query parameter names whose values may reach the request log.
-    ///
-    /// Empty by default, so no query value is ever logged until a deployment
-    /// names a parameter it knows carries no identifiable content.
-    pub logged_query_parameters: Vec<String>,
-}
-
-impl Default for Telemetry {
-    fn default() -> Self {
-        Self {
-            format: Format::Auto,
-            filter: String::from(DEFAULT_FILTER),
-            logged_query_parameters: Vec::new(),
         }
     }
 }
@@ -474,36 +378,6 @@ impl Default for Retry {
             max_attempts: 3,
             initial_backoff_ms: 200,
             max_backoff_ms: 5_000,
-        }
-    }
-}
-
-/// The `FerroHEALTH` installation report to `FerroPULSE`.
-///
-/// On by default, and silent without a writable `state_dir`, because without
-/// a stable instance id each restart would count as a new installation. A CI
-/// environment keeps it off whatever `enabled` says. No specification
-/// governs this configuration: our own design.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct UsageReport {
-    /// Whether the server sends the report.
-    pub enabled: bool,
-    /// The collector endpoint: `https`, or `http` to a loopback host.
-    pub endpoint: String,
-    /// The writable directory the instance id is kept in.
-    pub state_dir: Option<PathBuf>,
-    /// How the server was deployed: `helm`, `compose`, `binary` or `unknown`.
-    pub deployment: crate::usage_report::config::Deployment,
-}
-
-impl Default for UsageReport {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            endpoint: String::from(crate::usage_report::config::ENDPOINT),
-            state_dir: None,
-            deployment: crate::usage_report::config::Deployment::Unknown,
         }
     }
 }

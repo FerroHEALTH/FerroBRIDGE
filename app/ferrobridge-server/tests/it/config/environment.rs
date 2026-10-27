@@ -6,7 +6,8 @@
 
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::error::Error;
-use ferrobridge_server::telemetry::{DEFAULT_FILTER, FILTER_ENV, FORMAT_ENV, Format};
+use ferrobridge_server::config::{FILTER_ENV, FORMAT_ENV};
+use ferrohealth_telemetry::section::{DEFAULT_FILTER, Format};
 use std::collections::BTreeMap;
 
 use super::FULL;
@@ -83,18 +84,18 @@ fn the_console_variables_win_over_the_file_and_the_tree_overrides()
     ]);
     let config = Config::from_sources(Some(file), &tree)?;
     assert_eq!(Format::Auto, config.telemetry.format);
-    assert_eq!("error", config.telemetry.filter);
+    assert_eq!("error", config.telemetry.filter.as_str());
 
     let mut both = tree;
     both.insert(String::from(FORMAT_ENV), String::from("pretty"));
     both.insert(String::from(FILTER_ENV), String::from("debug,hyper=warn"));
     let config = Config::from_sources(Some(file), &both)?;
     assert_eq!(Format::Pretty, config.telemetry.format);
-    assert_eq!("debug,hyper=warn", config.telemetry.filter);
+    assert_eq!("debug,hyper=warn", config.telemetry.filter.as_str());
 
     let config = Config::from_sources(None, &env(FORMAT_ENV, "json"))?;
     assert_eq!(Format::Json, config.telemetry.format);
-    assert_eq!(DEFAULT_FILTER, config.telemetry.filter);
+    assert_eq!(DEFAULT_FILTER, config.telemetry.filter.as_str());
     Ok(())
 }
 

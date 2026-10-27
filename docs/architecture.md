@@ -2136,6 +2136,22 @@ drops the connection) and the CDR has. Every optional lane (the facade, the
 change-feed adapter, the outbound stream) is off until configured, and a lane
 that carries identifiable data says so at start-up.
 
+**The plumbing is the FerroSYS crates (#1287).** Since 2026-10-27 the server
+holds wiring alone for that shape: `ferrohealth-config` reads the tree (the
+file, the `FERROBRIDGE__` environment with `FERROBRIDGE_LOG_FORMAT` and
+`RUST_LOG` as aliases, and `--set`), `ferrohealth-secret` reads the `_file`
+siblings and redacts every secret as `***`, `ferrohealth-telemetry` is the
+console and the request log, `ferrohealth-health` the registry and the
+booting, serving and draining lifecycle, `ferrohealth-server` the stack, the
+listener with its TLS, the drain and the `serve`, `config check` and
+`healthcheck` subcommands, and `ferrohealth-usage-report` the FerroPULSE
+report. The open `/health/readiness` names each indicator and never its
+detail; `GET /operator/readiness` answers the detail behind the operator
+scope. Two gaps of the shared stack stay as product wiring until FerroSYS
+closes them (#1290): a refusal the edge answers leaves no request line, and
+the facade's `504` timeout and streamed `413` are set outside the stack. No
+specification governs process plumbing: our own design.
+
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
 `docs/VERSIONS.md`: `openehr-base`, `openehr-rm`, `openehr-its`,

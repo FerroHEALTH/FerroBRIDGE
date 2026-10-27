@@ -135,7 +135,7 @@ pub(crate) async fn batch(
 ) -> Result<Response, Refusal> {
     let entries = read_entries(bundle)?;
     let full_urls: BTreeSet<&str> = entries.iter().filter_map(|entry| entry.full_url).collect();
-    let request_id = crate::request_id::of(headers).unwrap_or_default();
+    let request_id = ferrohealth_server::request_id::of_client(headers).unwrap_or_default();
     let mut answered: Vec<Option<BundleEntry>> = vec![None; entries.len()];
     for entry in in_processing_order(&entries) {
         let started = Instant::now();

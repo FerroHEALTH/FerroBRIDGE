@@ -11,8 +11,7 @@
 
 use http::StatusCode;
 
-use crate::health::{Check, HealthIndicator};
-use ferrobridge_operator_api::health::IndicatorState;
+use ferrohealth_health::registry::{Check, HealthIndicator, Outcome};
 
 /// The openEHR CDR probe.
 #[derive(Debug, Clone)]
@@ -93,7 +92,7 @@ impl Cdm {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
             .min_connections(0)
-            .acquire_timeout(crate::health::CHECK_TIMEOUT)
+            .acquire_timeout(ferrohealth_health::registry::CHECK_TIMEOUT)
             .connect_lazy_with(connection.pool_options()?);
         Ok(Self { pool })
     }
@@ -107,8 +106,8 @@ impl HealthIndicator for Cdm {
     fn check(&self) -> Check<'_> {
         Box::pin(async move {
             match sqlx::query("SELECT 1").execute(&self.pool).await {
-                Ok(_answered) => IndicatorState::up(),
-                Err(error) => IndicatorState::down(reason(error)),
+                Ok(_answered) => Outcome::up(),
+                Err(error) => Outcome::down(reason(error)),
             }
         })
     }
@@ -145,10 +144,10 @@ impl HealthIndicator for IdentityStore {
             // the store without touching a recorded identity.
             let probe = crate::facade::identity::ExternalResourceId::new("ferrobridge-readiness");
             match probe {
-                Err(error) => IndicatorState::down(reason(error)),
+                Err(error) => Outcome::down(reason(error)),
                 Ok(key) => match self.store.internal_of("OperationOutcome", &key) {
-                    Ok(_answered) => IndicatorState::up(),
-                    Err(error) => IndicatorState::down(reason(error)),
+                    Ok(_answered) => Outcome::up(),
+                    Err(error) => Outcome::down(reason(error)),
                 },
             }
         })
@@ -181,9 +180,9 @@ impl HealthIndicator for Hl7v2Listener {
     fn check(&self) -> Check<'_> {
         Box::pin(async move {
             if self.listening.is_up() {
-                IndicatorState::up()
+                Outcome::up()
             } else {
-                IndicatorState::down("the MLLP listener is not accepting connections")
+                Outcome::down("the MLLP listener is not accepting connections")
             }
         })
     }
@@ -206,25 +205,25 @@ fn reason(error: impl std::error::Error) -> String {
 }
 
 /// Returns the indicator state a probe outcome means.
-fn classify(outcome: Result<StatusCode, String>) -> IndicatorState {
+fn classify(outcome: Result<StatusCode, String>) -> Outcome {
     match outcome {
-        Err(detail) => IndicatorState::down(detail),
+        Err(detail) => Outcome::down(detail),
         Ok(status) if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN => {
-            IndicatorState::down(format!(
+            Outcome::down(format!(
                 "the upstream refused the configured credentials with {status}"
             ))
         }
         Ok(status) if status.is_server_error() => {
-            IndicatorState::down(format!("the upstream answered {status}"))
+            Outcome::down(format!("the upstream answered {status}"))
         }
-        Ok(_) => IndicatorState::up(),
+        Ok(_) => Outcome::up(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::classify;
-    use ferrobridge_operator_api::health::State;
+    use ferrohealth_health::document::State;
     use http::StatusCode;
 
     #[test]
@@ -234,7 +233,7 @@ mod tests {
             StatusCode::BAD_REQUEST,
             StatusCode::NOT_FOUND,
         ] {
-            assert_eq!(State::Up, classify(Ok(reachable)).state, "{reachable}");
+            assert_eq!(State::Up, classify(Ok(reachable)).state(), "{reachable}");
         }
         for unreachable in [
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -242,7 +241,7 @@ mod tests {
         ] {
             assert_eq!(
                 State::Down,
-                classify(Ok(unreachable)).state,
+                classify(Ok(unreachable)).state(),
                 "{unreachable}"
             );
         }
@@ -252,14 +251,13 @@ mod tests {
     fn a_refused_credential_is_down_and_names_the_status() {
         for refused in [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN] {
             let outcome = classify(Ok(refused));
-            assert_eq!(State::Down, outcome.state, "{refused}");
+            assert_eq!(State::Down, outcome.state(), "{refused}");
             assert!(
                 outcome
-                    .detail
-                    .as_deref()
+                    .detail()
                     .is_some_and(|detail| detail.contains(refused.as_str())),
                 "the detail names {refused}: {:?}",
-                outcome.detail
+                outcome.detail()
             );
         }
     }
@@ -267,10 +265,7 @@ mod tests {
     #[test]
     fn a_call_that_never_reached_the_upstream_is_down_and_keeps_its_reason() {
         let outcome = classify(Err(String::from("the request could not be sent")));
-        assert_eq!(State::Down, outcome.state);
-        assert_eq!(
-            Some("the request could not be sent"),
-            outcome.detail.as_deref()
-        );
+        assert_eq!(State::Down, outcome.state());
+        assert_eq!(Some("the request could not be sent"), outcome.detail());
     }
 }

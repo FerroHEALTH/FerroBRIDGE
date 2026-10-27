@@ -53,18 +53,36 @@ pub(crate) fn info() -> serde_json::Value {
 }
 
 /// The synthetic `GET /health/readiness` document: every indicator up but
-/// the terminology server.
+/// the terminology server, with no detail, as the open route answers.
 pub(crate) fn readiness() -> serde_json::Value {
     json!({
         "state": "down",
-        "indicators": {
-            "cdr": {"state": "up"},
-            "terminology": {"state": "down", "detail": "answers 503"},
-            "cdm": {"state": "up"},
-            "identity-store": {"state": "up"},
-            "hl7v2-listener": {"state": "up"}
-        }
+        "phase": "serving",
+        "indicators": [
+            {"name": "cdm", "state": "up"},
+            {"name": "cdr", "state": "up"},
+            {"name": "hl7v2-listener", "state": "up"},
+            {"name": "identity-store", "state": "up"},
+            {"name": "terminology", "state": "down"}
+        ]
     })
+}
+
+/// The synthetic `GET /operator/readiness` document: [`readiness`] with why
+/// the terminology server is down.
+pub(crate) fn detailed_readiness() -> serde_json::Value {
+    let mut document = readiness();
+    if let Some(terminology) = document["indicators"]
+        .as_array_mut()
+        .and_then(|indicators| {
+            indicators
+                .iter_mut()
+                .find(|indicator| indicator["name"] == "terminology")
+        })
+    {
+        terminology["detail"] = json!("answers 503");
+    }
+    document
 }
 
 /// The synthetic `GET /operator/state` document: one context, two
@@ -243,6 +261,7 @@ pub(crate) async fn bridge() -> MockServer {
     let server = MockServer::start().await;
     answer(&server, "/health/info", 200, &info()).await;
     answer(&server, "/health/readiness", 503, &readiness()).await;
+    answer(&server, "/operator/readiness", 503, &detailed_readiness()).await;
     answer(&server, "/operator/state", 200, &state()).await;
     answer(&server, "/operator/mappings", 200, &listing()).await;
     answer(

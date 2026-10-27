@@ -69,6 +69,17 @@ What the running load compiled, as one JSON document:
 - `counts` and `diagnostics`: what `ferrobridge mapping check` reports for
   the same configuration, read once at start-up.
 
+## `GET /operator/readiness`
+
+The readiness document `GET /health/readiness` answers, with why each
+indicator that is down is down: `state` (`up`, `degraded` or `down`), `phase`
+(`booting`, `serving` or `draining`) and `indicators`, each with its `name`,
+its `state` and, when it is not up, its `detail`, which names the upstream
+status or the reason the call never reached it and never a body, a
+credential, or clinical content. It answers `200` while the bridge is ready
+and `503` otherwise. The operator console reads it, and falls back to the
+open route, which names no detail, while the operator API is off.
+
 ## `GET /operator/configuration`
 
 The configuration the bridge started on, as one JSON document. The bridge
@@ -82,7 +93,7 @@ holds what it runs on until the next start:
   each with its dotted `key` (`cdr.credentials.oauth.client_id`), its
   `value` and its `source`: `file`, `environment` (a `FERROBRIDGE__`
   variable, `FERROBRIDGE_LOG_FORMAT` or `RUST_LOG`, which win over the
-  file) or `default`.
+  file), `set` (a `--set` argument, which wins over both) or `default`.
 
 A `value` carries its `kind` (`string`, `integer`, `float`, `boolean`,
 `list`, `table` or `secret`) beside it. A secret is never answered by value.

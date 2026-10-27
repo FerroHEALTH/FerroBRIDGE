@@ -191,7 +191,8 @@ daily report:
 - **`histogram`:** 11 request counts, one per latency bucket. The bucket upper
   bounds in milliseconds are 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000,
   and no bound for the last.
-- **`counters`:**
+- **`counters`:** each counter that counted something in the window; a
+  counter that stayed at 0 is left out.
   - `responses_4xx`: the responses with a 4xx status over every counted
     group.
   - `hl7v2_aa`, `hl7v2_ae`, `hl7v2_ar`: the acknowledgments the HL7 v2 face

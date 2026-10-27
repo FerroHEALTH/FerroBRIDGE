@@ -120,16 +120,16 @@ fn serve_until_the_bind_fails(format: &str) -> String {
 fn serve_under_pretty_prints_the_banner_with_the_version_and_the_pins() {
     let stdout = serve_until_the_bind_fails("pretty");
     assert!(
-        stdout.contains(&format!(
-            "openEHR bridge to HL7 FHIR and the OMOP CDM · v{}",
-            env!("CARGO_PKG_VERSION")
-        )),
+        stdout.contains(&format!("ferrobridge {}", env!("CARGO_PKG_VERSION"))),
         "{stdout}"
     );
-    assert!(
-        stdout.contains("Maintained by Ruben Talstra · https://ferrobridge.eu"),
-        "{stdout}"
-    );
+    for fact in [
+        "openEHR bridge to HL7 FHIR and the OMOP CDM",
+        "Ruben Talstra",
+        "https://ferrobridge.eu",
+    ] {
+        assert!(stdout.contains(fact), "{fact}: {stdout}");
+    }
     for pin in ferrobridge_server::build_info::pins() {
         assert!(stdout.contains(&pin.version), "{pin:?}: {stdout}");
     }
@@ -139,7 +139,7 @@ fn serve_under_pretty_prints_the_banner_with_the_version_and_the_pins() {
 #[test]
 fn serve_under_json_prints_no_banner_and_only_json_lines() {
     let stdout = serve_until_the_bind_fails("json");
-    assert!(!stdout.contains("Maintained by"), "{stdout}");
+    assert!(!stdout.contains("https://ferrobridge.eu"), "{stdout}");
     let events: Vec<serde_json::Value> = stdout
         .lines()
         .map(|line| serde_json::from_str(line).expect("every line is a JSON object"))

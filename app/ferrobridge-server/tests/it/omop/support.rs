@@ -469,7 +469,10 @@ pub(super) async fn build_cdm(postgres: &Postgres) -> Result<(), Box<dyn Error>>
 
 /// Runs `etl run` once through the job the binary calls.
 pub(super) async fn etl_run(config: &Path) -> Result<RunReport, Box<dyn Error>> {
-    let settings = ferrobridge_server::config::Config::load(Some(config))?.resolve()?;
+    let settings = ferrobridge_server::config::Config::from_loaded(
+        ferrobridge_server::config::Config::load(Some(config), &[])?,
+    )
+    .resolve()?;
     Ok(ferrobridge_server::etl::job::run(&settings, &RunOptions::default()).await?)
 }
 

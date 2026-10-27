@@ -51,7 +51,7 @@ use crate::state::AppState;
 use crate::state::OperationsLane;
 use crate::state::OperationsOff;
 use crate::terminology::Direction;
-use crate::usage_report::window::Window;
+use ferrohealth_usage_report::window::Window;
 
 /// The FHIR JSON media type, the one both operations exchange.
 pub const FHIR_JSON: &str = "application/fhir+json";
@@ -422,7 +422,7 @@ fn with_query(request: ToFhirRequest, query: &OperationQuery) -> ToFhirRequest {
 /// request refused before a program ran is not.
 fn refused(usage: &Window, error: &OperationError) -> Response {
     if matches!(error, OperationError::Mapping { .. }) {
-        usage.record_mapping_failure();
+        crate::usage_report::record_mapping_failure(usage);
     }
     if crate::terminology::failed_upstream(error) {
         return outcome(StatusCode::BAD_GATEWAY, &upstream_outcome(error));

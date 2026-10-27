@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! What every handler shares: the health registry and the log allowlist.
+//! What every handler shares: the health registry, the lifecycle and the log
+//! allowlist.
 
 use std::sync::Arc;
 
@@ -12,9 +13,10 @@ use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::operations::programs::ProgramSet;
 
 use crate::config::Settings;
-use crate::health::Registry;
 use crate::indicators;
 use crate::terminology::Translator;
+use ferrohealth_health::lifecycle::Lifecycle;
+use ferrohealth_health::registry::Registry;
 
 /// The product name the root document reports.
 pub const PRODUCT: &str = "FerroBRIDGE";
@@ -182,6 +184,8 @@ pub enum OperationsOff {
 pub struct AppState {
     /// The indicators readiness runs.
     health: Registry,
+    /// Where the process is in its life: booting, serving or draining.
+    lifecycle: Lifecycle,
     /// The query parameter names whose values may reach the request log.
     logged_query_parameters: Vec<String>,
     /// The FHIR facade, when its lane is on.
@@ -201,7 +205,7 @@ pub struct AppState {
     /// The resource server, when inbound authentication is on.
     auth: Option<Arc<crate::smart::Smart>>,
     /// The requests the usage report counts, recorded by the request log.
-    usage: Arc<crate::usage_report::window::Window>,
+    usage: Arc<ferrohealth_usage_report::window::Window>,
     /// The operator API, when `[operator] enabled` mounts it.
     operator: Option<Arc<crate::operator::Operator>>,
     /// The one client of the `[terminology]` server, when one is configured,
@@ -223,7 +227,8 @@ impl AppState {
     /// refuses the configuration it was handed, and
     /// [`crate::config::error::Error::Mappings`] when the mapping set does not load.
     pub async fn build(settings: &Settings) -> Result<Self, crate::config::error::Error> {
-        let mut indicators: Vec<Arc<dyn crate::health::HealthIndicator>> = Vec::new();
+        let mut indicators: Vec<Arc<dyn ferrohealth_health::registry::HealthIndicator>> =
+            Vec::new();
         let mut cdr = None;
         if let Some(config) = settings.cdr.as_ref() {
             let client = crate::cdr::CdrClient::new(config).map_err(|source| {
@@ -289,6 +294,7 @@ impl AppState {
         });
         Ok(Self {
             health: Registry::new(indicators),
+            lifecycle: Lifecycle::default(),
             logged_query_parameters: settings.telemetry.logged_query_parameters.clone(),
             facade: None,
             operations,
@@ -300,7 +306,7 @@ impl AppState {
             lanes: Vec::new(),
             hl7v2: None,
             auth: None,
-            usage: Arc::default(),
+            usage: Arc::new(crate::usage_report::window()),
             operator: None,
             terminology,
         })
@@ -312,6 +318,7 @@ impl AppState {
     pub fn with_health(health: Registry) -> Self {
         Self {
             health,
+            lifecycle: Lifecycle::default(),
             logged_query_parameters: Vec::new(),
             facade: None,
             operations: None,
@@ -319,7 +326,7 @@ impl AppState {
             lanes: Vec::new(),
             hl7v2: None,
             auth: None,
-            usage: Arc::default(),
+            usage: Arc::new(crate::usage_report::window()),
             operator: None,
             terminology: None,
         }
@@ -465,6 +472,12 @@ impl AppState {
         &self.health
     }
 
+    /// Returns the lifecycle the health routes and the drain share.
+    #[must_use]
+    pub const fn lifecycle(&self) -> &Lifecycle {
+        &self.lifecycle
+    }
+
     /// Returns the query parameter names whose values may reach the log.
     #[must_use]
     pub fn logged_query_parameters(&self) -> &[String] {
@@ -480,7 +493,7 @@ impl AppState {
     /// Returns the window the request log records the usage report's
     /// request counts into.
     #[must_use]
-    pub const fn usage_window(&self) -> &Arc<crate::usage_report::window::Window> {
+    pub const fn usage_window(&self) -> &Arc<ferrohealth_usage_report::window::Window> {
         &self.usage
     }
 }
@@ -488,9 +501,9 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::AppState;
-    use crate::health::Registry;
     use crate::hl7v2::Listening;
     use crate::startup::Lane;
+    use ferrohealth_health::registry::Registry;
 
     fn lanes() -> Vec<Lane> {
         vec![
