@@ -20,7 +20,7 @@ observation_period_type_concept_id = 32880
 "#;
 
 /// A visit query with the four projections.
-const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
+const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value, v/uid/value";
 
 /// Resolves `text`, returning the refusal.
 fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
@@ -141,6 +141,26 @@ fn a_composition_query_without_an_order_refuses_to_boot() -> Result<(), Box<dyn 
 
 // NOTE: QUERY AQL 1.1.0 §6 leaves a query's version scope open without
 // LATEST_VERSION, and a deletion is a version with Void data (RM Common §6.2.5).
+// NOTE: openEHR RM Common 1.1.0 §6 (Contributions): every version of one
+// contribution carries its commit time, so that order alone leaves ties.
+#[test]
+fn a_composition_query_ordered_by_the_commit_instant_alone_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal(&ETL.replace(
+        " ORDER BY v/uid/value",
+        " ORDER BY v/commit_audit/time_committed/value",
+    ))?;
+    match &error {
+        Error::Aql { key, source } => {
+            assert_eq!("etl.aql", key);
+            assert!(matches!(**source, AqlError::Unkeyed { .. }), "{source:?}");
+            assert!(source.to_string().contains("v/uid/value"), "{source}");
+        }
+        other => return Err(format!("expected an AQL refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
 #[test]
 fn a_composition_query_over_every_version_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
 {

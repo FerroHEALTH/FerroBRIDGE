@@ -433,7 +433,7 @@ refuses every job.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
-| `aql` | none | no | The composition query, which `etl run` needs and `etl fhir` does not read; `etl run` refuses to start without it. It aliases `ehr_id`, `version_uid` and the whole `composition`, carries an `ORDER BY` and no `LIMIT`. Every `COMPOSITION` it reads sits below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)). It may name `$since`, which `--since` binds. It may also alias `versioned_object_uid`, which the runner then checks against the version; when it does not, the runner reads it from the `version_uid`, whose `object_id` part names the versioned object (openEHR RM Common 1.1.0, `OBJECT_VERSION_ID`) |
+| `aql` | none | no | The composition query, which `etl run` needs and `etl fhir` does not read; `etl run` refuses to start without it. It aliases `ehr_id`, `version_uid` and the whole `composition`, carries an `ORDER BY` that ends in `v/uid/value` and no `LIMIT`. Every `COMPOSITION` it reads sits below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)). It may name `$since`, which `--since` binds. It may also alias `versioned_object_uid`, which the runner then checks against the version; when it does not, the runner reads it from the `version_uid`, whose `object_id` part names the versioned object (openEHR RM Common 1.1.0, `OBJECT_VERSION_ID`) |
 | `page_size` | `100` | no | The `fetch` of each page of either query, and the number of watermarks each batch of the deletion check reads |
 | `deletions` | `remove` | no | What a run does with a composition the CDR reports deleted: `remove` deletes its rows, links and watermark, `report` lists it in the run report and keeps them. Any other value refuses the start ([Deleted compositions](../integrate/omop-etl.md#deleted-compositions)) |
 | `quality_checks` | `false` | no | With `true`, `etl run` runs the ported Data Quality Dashboard checks over the tables it wrote, `PERSON` and the derived tables once the load is done, and the run report carries their verdicts and every failing check id. A failed check never rolls the committed load back. `ferrobridge dq check` runs the same checks over the whole CDM ([Checking a populated database](../integrate/omop-etl.md#checking-a-populated-database-with-the-data-quality-dashboard)) |
@@ -449,7 +449,7 @@ by EHR and source, each visit spanning the earliest start to the latest end.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
-| `aql` | none, required | no | The visit query, aliasing `ehr_id`, `visit_source`, `visit_start` and `visit_end`, with an `ORDER BY`, every `COMPOSITION` it reads below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)), and no `$since` ([The visits the query no longer answers](../integrate/omop-etl.md#the-visits-the-query-no-longer-answers)) |
+| `aql` | none, required | no | The visit query, aliasing `ehr_id`, `visit_source`, `visit_start` and `visit_end`, with an `ORDER BY` that ends in `v/uid/value`, every `COMPOSITION` it reads below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)), and no `$since` ([The visits the query no longer answers](../integrate/omop-etl.md#the-visits-the-query-no-longer-answers)) |
 | `visit_concept_id` | none, required | no | The `visit_concept_id` of every visit |
 | `visit_type_concept_id` | none, required | no | The `visit_type_concept_id` of every visit |
 

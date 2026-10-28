@@ -121,8 +121,8 @@ pub const POSTGRES: PinnedImage = PinnedImage {
 /// The reference openEHR CDR, which speaks ITS-REST 1.1.0.
 pub const CDR: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr",
-    tag: "5.1.0",
-    digest: "sha256:d5d28c3473ba46107e0bced4af995020366dcaea7da450fcf8126ff7604a4fb9",
+    tag: "5.5.0",
+    digest: "sha256:e1b15849a3792481a7f16680081b1ae6a2d7160d66e5cb1657fcef5cccfed0dc",
 };
 
 /// The PostgreSQL the reference CDR image documents as its database.
@@ -132,8 +132,8 @@ pub const CDR: PinnedImage = PinnedImage {
 /// rather than against a bare PostgreSQL.
 pub const CDR_POSTGRES: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr-postgres",
-    tag: "5.1.0",
-    digest: "sha256:1b10c0e11acceb26d9afa878c123279dfb7e1b20d63073ac4a9cdd36b8394908",
+    tag: "5.5.0",
+    digest: "sha256:dfe1d5c1bb95d31d3f6ff00fec03cd76ae20d57d20e6225b31e5bc68adf7fa81",
 };
 
 /// The reference FHIR terminology server.
@@ -508,7 +508,8 @@ fn terminology_request() -> ContainerRequest<GenericImage> {
 ///
 /// The usage report is switched off: a container does not inherit the CI
 /// runner's environment, so the CDR's own CI detection cannot see that it runs
-/// in a test, and every run would report itself as an installation.
+/// in a test, and every run would report itself as an installation. The EHR
+/// index is the CDR's own, since the harness runs no patient identity source.
 fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
     CDR.image()
         .with_wait_for(WaitFor::message_on_stdout("ferroehr-rest listening"))
@@ -516,6 +517,7 @@ fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
         .with_network(network)
         .with_env_var("FERROEHR__DB__URL", dsn)
         .with_env_var("FERROEHR__AUTH__ENABLED", "false")
+        .with_env_var("FERROEHR__EHR_INDEX__PROVIDER", "local")
         .with_env_var("FERROEHR__USAGE_REPORT__ENABLED", "false")
 }
 

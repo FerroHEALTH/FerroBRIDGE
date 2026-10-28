@@ -43,7 +43,7 @@ const LABORATORY_FILES: [&str; 3] = [
 const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, \
     v/uid/value AS version_uid, c AS composition \
     FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
-    ORDER BY c/context/start_time/value";
+    ORDER BY c/context/start_time/value, v/uid/value";
 
 /// The visit query: one visit per EHR and health care facility, spanning the
 /// contexts of the latest version of each composition recorded there, so a
@@ -52,7 +52,7 @@ const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, \
     c/context/health_care_facility/name AS visit_source, \
     c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
     FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
-    ORDER BY c/context/start_time/value";
+    ORDER BY c/context/start_time/value, v/uid/value";
 
 /// The `*_type_concept_id` the run writes, a synthetic record type.
 const TYPE_CONCEPT: i32 = 5101;

@@ -40,7 +40,7 @@ use std::error::Error;
 const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, \
     v/uid/value AS version_uid, c AS composition \
     FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
-    ORDER BY c/context/start_time/value";
+    ORDER BY c/context/start_time/value, v/uid/value";
 
 /// The visit query of the OMOP round trip: three leaves of the one
 /// `EVENT_CONTEXT` of each composition's latest version.
@@ -48,7 +48,7 @@ const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, \
     c/context/health_care_facility/name AS visit_source, \
     c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
     FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
-    ORDER BY c/context/start_time/value";
+    ORDER BY c/context/start_time/value, v/uid/value";
 
 /// The FLAT path of the laboratory result the fixture fills.
 const RESULT: &str = "synthetic_laboratory_report/synthetic_laboratory_result:0";
