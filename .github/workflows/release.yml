@@ -165,11 +165,18 @@ jobs:
           ]}'
           echo "console_targets=$(printf '%s' "$console_targets" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
 
+      # The notes and, under ehds/, the information sheet and the
+      # instructions for use the plan wrote with this release's facts (EHDS
+      # Art. 30(1)(d), Art. 38), so github-release attaches the copies the
+      # plan checked.
       - name: Upload the release notes
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-notes
-          path: release-notes.md
+          path: |
+            release-notes.md
+            ehds/*.md
+          if-no-files-found: error
 
   # ---- github-release: create the release as a DRAFT ------------------------
 
@@ -239,6 +246,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
         run: gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber compose.yaml
+
+      # The EHR system's information sheet and instructions for use accompany
+      # every release free of charge (EHDS Art. 30(1)(d)): the FerroHEALTH
+      # book's pages at the pinned commit with this release's facts appended,
+      # written by scripts/release/system-documents.sh in the plan job.
+      - name: Attach the EHDS system documents
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for page in information-sheet instructions-for-use; do
+            file="ehds/ferrobridge-${TAG}-${page}.md"
+            test -s "$file" || { echo "::error::$file is missing from the plan's artifact" >&2; exit 1; }
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "$file"
+          done
 
   # ---- build-binaries: the SLSA Build L3 lane, once per target --------------
   # A call and nothing else. See the graph comment at the top of this file:
@@ -478,6 +501,9 @@ jobs:
               || missing="$missing ferrobridge-console-${TAG}-site${suffix}"
           done
           printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
+          for page in information-sheet instructions-for-use; do
+            printf '%s\n' "$assets" | grep -Fxq "ferrobridge-${TAG}-${page}.md" || missing="$missing ferrobridge-${TAG}-${page}.md"
+          done
           for record in "ferrobridge-${TAG}-vulnerability-record.json" "ferrobridge-${TAG}-trivy-reports.tar.gz"; do
             printf '%s\n' "$assets" | grep -Fxq "$record" || missing="$missing $record"
           done
