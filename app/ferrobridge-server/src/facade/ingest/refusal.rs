@@ -90,11 +90,12 @@ pub(super) fn stored_identifier(error: &impl std::fmt::Display) -> Refused {
     )
 }
 
-/// The refusal a stored entry path that names two entries renders as: a
-/// `500`, since the identity map holds a binding it cannot resolve (no
-/// specification governs the identity map: our own design).
-impl From<engine::entry::AmbiguousEntry> for Refused {
-    fn from(error: engine::entry::AmbiguousEntry) -> Self {
+/// The refusal a composition whose entries cannot be named renders as: a
+/// `500`, since the template the program was compiled against cannot answer
+/// for its own start archetype (no specification governs this: our own
+/// design).
+impl From<engine::entry::EntryError> for Refused {
+    fn from(error: engine::entry::EntryError) -> Self {
         Self::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(chain(&error)),

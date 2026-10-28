@@ -61,7 +61,7 @@ async fn code_and_system_are_compared_on_the_one_node_the_from_binds() -> Result
         vec![
             String::from("SNOMED-CT"),
             String::from("44054006"),
-            String::from("ferrobridge.diagnose.v1"),
+            String::from("ferrobridge.diagnoses.v1"),
         ],
         bound(query)
     );

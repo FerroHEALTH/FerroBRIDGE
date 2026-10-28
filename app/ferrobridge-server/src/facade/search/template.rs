@@ -140,11 +140,12 @@ pub struct Placement {
 /// Returns where the template places the nodes carrying `archetype`, or
 /// `None` when it holds none or gives them two RM classes.
 ///
-/// A search answers the entries of the archetype among the composition's own
-/// `content` items, and an AQL `CONTAINS` also finds one nested in a
-/// `SECTION`: QUERY AQL 1.1.0 §3.13.2.2 defines no direct-child form. So a
-/// count over `CONTAINS` agrees with the search only when every placement
-/// is top-level (no specification governs the count: our own design).
+/// An AQL `CONTAINS` finds a node at any depth (QUERY AQL 1.1.0 §3.13.2.2
+/// defines no direct-child form), while the search answers the occurrences
+/// the template's repeating nodes name. The two agree for certain only when
+/// every placement is a `content` item of the composition itself, so only
+/// then is the count one `CONTAINS` query (no specification governs the
+/// count: our own design).
 #[must_use]
 pub fn placement(index: &WebTemplateIndex, archetype: &str) -> Option<Placement> {
     let placed: Vec<&ResolvedNode> = index

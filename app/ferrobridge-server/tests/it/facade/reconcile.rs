@@ -307,10 +307,18 @@ async fn a_retry_binds_the_identity_the_cdr_stored_as_a_first_delivery_does()
     let (retried_id, retried_binding) =
         bound(&retried, body["entry"][0]["response"]["location"].as_str())?;
 
+    // NOTE: FHIRconnect v1.0.0 `engine/id-management.adoc` §Deterministic IDs, by
+    // the owner's ruling on #1276: the id hashes the container and the entry path,
+    // so the entry uid the CDR assigned does not enter it.
     assert_eq!(
-        ASSIGNED_ENTRY_UID, first_id,
-        "the id is the stored entry uid"
+        fhirconnect::engine::identity::deterministic_id(
+            &first_binding.versioned_object_uid,
+            &first_binding.entry_path
+        ),
+        first_id,
+        "the id is the deterministic id of the stored entry"
     );
+    assert_ne!(ASSIGNED_ENTRY_UID, first_id, "the entry uid is no id");
     assert_eq!(first_id, retried_id);
     assert_eq!(first_binding, retried_binding);
     Ok(())

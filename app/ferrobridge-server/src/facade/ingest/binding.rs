@@ -326,7 +326,7 @@ impl Ingest<'_> {
         composition: &CanonicalComposition,
         path: &str,
     ) -> Result<Written, Refused> {
-        let entry = engine::entry::entry_named(program.program(), composition, path)?.ok_or_else(|| {
+        let entry = engine::entry::entry_named(program.program(), program.index(), composition, path)?.ok_or_else(|| {
             Refused::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(
@@ -425,14 +425,15 @@ impl Ingest<'_> {
         version: &ObjectVersionId,
         composition: &CanonicalComposition,
     ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
-        let entry = engine::entry::entry_of(program.program(), composition).ok_or_else(|| {
-            Refused::new(
+        let entry = engine::entry::entry_of(program.program(), program.index(), composition)?
+            .ok_or_else(|| {
+                Refused::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(
                     "the committed composition carries no entry of the archetype the program maps",
                 ),
             )
-        })?;
+            })?;
         self.bind_entry(program, resource_type, ehr_id, version, composition, &entry)
     }
 
@@ -453,37 +454,18 @@ impl Ingest<'_> {
         // NOTE: no specification governs this: our own design, every further resource
         // of a split is bound as a created resource of its own when the entry is
         // rendered, so the entry's identity is its first occurrence.
-        let path = entry.identity_path();
-        let key = EntryKey::new(versioned_object_uid(version), path.as_str(), 0);
+        let path = entry.identity_path().to_owned();
+        let key = EntryKey::new(versioned_object_uid(version), path.as_str());
         let map_key = derive::map_key(&key);
-        let mut recorded = self
+        let recorded = self
             .store
             .internal_of(resource_type, &map_key)
             .map_err(|error| store_refusal(&error))?;
-        if recorded.is_none()
-            && let Some(legacy) = entry.legacy_path()
-        {
-            // The map wins once written: an id an earlier build recorded under
-            // the legacy path of the entry still stands, when that path names
-            // this entry and no other.
-            let earlier = EntryKey::new(versioned_object_uid(version), legacy.as_str(), 0);
-            let held = self
-                .store
-                .internal_of(resource_type, &derive::map_key(&earlier))
-                .map_err(|error| store_refusal(&error))?;
-            if held.is_some()
-                && engine::entry::entry_named(program.program(), composition, &legacy)?
-                    .is_some_and(|named| named == *entry)
-            {
-                recorded = held;
-            }
-        }
         let id = if let Some(known) = recorded {
             known
         } else {
-            let (fresh, _source) = derive::derive(&key, entry.uid());
             self.store
-                .record_internal(resource_type, &map_key, &fresh)
+                .record_internal(resource_type, &map_key, &derive::entry_id(&key))
                 .map_err(|error| store_refusal(&error))?
         };
         let binding = CompositionBinding {
@@ -492,7 +474,7 @@ impl Ingest<'_> {
             template_id: String::from(composition.template_id()),
             resource_type: String::from(resource_type),
             entry_path: path,
-            split: key.split(),
+            split: 0,
             context: program.program().context().to_string(),
             derivation: Some(derive::DERIVATION),
             created: None,

@@ -54,7 +54,7 @@ on [docs.rs](https://docs.rs/eehrxf).
 ## The profile checks
 
 The crate holds what it reads and what it writes to the pinned profiles in
-three ways:
+four ways:
 
 - **The crosswalks:** a test per category holds every row to the packages
   it names, and fails when an element a producer must populate has no row,
@@ -72,6 +72,17 @@ three ways:
   repository's FHIR R4 profile validator, over the category's `Bundle`
   profile and its whole dependency closure
   ([Full validation](receiving-documents.md#full-validation)).
+- **HL7's FHIR Validator over the documents it writes:** the suites that
+  write a patient summary document and hold it to the profiles also write it
+  to the directory `EEHRXF_EMIT_DIR` names. The CI `fhir-validator` job runs
+  HL7's FHIR Validator over every one of them, offline, against
+  `hl7.fhir.eu.eps` 1.0.0-ballot, `hl7.fhir.eu.base` 2.0.1 and the
+  MyHealth@EU Master Value Sets Catalogue, with the jar and every package
+  pinned by sha256 in `docs/VERSIONS.md`. It fails on an error, a fatal issue
+  or a claimed profile the validator could not find. Its results, each
+  document with the validator's outcome and a summary, are the
+  `eehrxf-fhir-validation` artifact of the run. They are the evidence for the
+  documents the component writes.
 
 ## The definitions it publishes
 

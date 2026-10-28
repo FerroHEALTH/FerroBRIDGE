@@ -69,11 +69,16 @@ use stub::mount_create;
 use stub::mount_ehr;
 
 /// The fixture directory this suite loads its mapping set from.
-const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures");
+pub(crate) const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/repeated");
 
 /// The fixture directory whose model holds a mapping that runs out of openEHR
 /// only, so an inbound run declares a loss on a FHIR element.
 const ONE_WAY_FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/one_way");
+
+/// The fixture directory whose context maps the diagnoses the synthetic
+/// sectioned template holds inside a `SECTION`.
+pub(crate) const SECTIONED_FIXTURES: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/sectioned");
 
 /// The profile the fixture context claims.
 const PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis";
@@ -145,10 +150,15 @@ impl Harness {
 
     /// Returns the canonical composition `resource` maps to.
     fn composition_of(&self, resource: &serde_json::Value) -> serde_json::Value {
+        self.composition_under("ferrobridge_facade.context", resource)
+    }
+
+    /// Returns the composition the program of `context` maps `resource` to.
+    fn composition_under(&self, context: &str, resource: &serde_json::Value) -> serde_json::Value {
         let loaded = self
             .facade
             .programs()
-            .by_context("ferrobridge_facade.context")
+            .by_context(context)
             .cloned()
             .expect("the fixture context compiled");
         let document: fhir_types::codec::Value = serde_json::from_value(resource.clone())
@@ -314,6 +324,26 @@ async fn facade_over(
         )
         .mount(&cdr)
         .await;
+    for (id, opt) in [
+        (
+            ferrobridge_testkit::fixtures::DIAGNOSES_TEMPLATE_ID,
+            ferrobridge_testkit::fixtures::DIAGNOSES_OPT,
+        ),
+        (
+            ferrobridge_testkit::fixtures::DIAGNOSE_SECTIONED_TEMPLATE_ID,
+            ferrobridge_testkit::fixtures::DIAGNOSE_SECTIONED_OPT,
+        ),
+    ] {
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path(format!("/definition/template/adl1.4/{id}")))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Content-Type", "application/xml")
+                    .set_body_string(opt),
+            )
+            .mount(&cdr)
+            .await;
+    }
     let set = programs::read_set(std::path::Path::new(fixtures)).expect("the mapping set loads");
     let templates = programs::fetch_templates(&set, &client(&cdr))
         .await

@@ -218,32 +218,139 @@ fn output(image: &str, theme: Theme, width: Width) -> PathBuf {
 }
 
 /// Has the browser report `theme` as the system's colour scheme, so the
-/// form controls the browser draws match the page.
+/// form controls the browser draws match the page, and ask for reduced
+/// motion, so a control the last action left under the pointer or in focus
+/// is drawn at rest and never midway through its transition.
 async fn scheme(browser: &Browser, theme: Theme) -> Result<(), Box<dyn Error>> {
     browser
         .driver()
         .cdp()
         .send_raw(
             "Emulation.setEmulatedMedia",
-            json!({ "features": [{ "name": "prefers-color-scheme", "value": theme.word() }] }),
+            json!({ "features": [
+                { "name": "prefers-color-scheme", "value": theme.word() },
+                { "name": "prefers-reduced-motion", "value": "reduce" }
+            ] }),
         )
         .await?;
     Ok(())
 }
 
-/// The height of the page's content, in whole CSS pixels from [`HEIGHT`] to
-/// [`TALLEST`].
+/// The height of the page's content once its layout has settled, in whole
+/// CSS pixels from [`HEIGHT`] to [`TALLEST`].
+///
+/// A panel the page fills after its ready element shows, such as a code view
+/// laying out an answer, still grows for a frame or two, so the height is
+/// read after the fonts load and two animation frames pass, again until two
+/// readings agree, at most [`SETTLE_READINGS`] times.
 async fn content_height(browser: &Browser) -> Result<u32, Box<dyn Error>> {
-    let metrics = browser
+    let mut last = None;
+    for _ in 0..SETTLE_READINGS {
+        settle(browser).await?;
+        let metrics = browser
+            .driver()
+            .cdp()
+            .send_raw("Page.getLayoutMetrics", json!({}))
+            .await?;
+        let metrics: LayoutMetrics = serde_json::from_value(metrics)?;
+        let content = metrics.css_content_size.height;
+        let tall = (HEIGHT..=TALLEST)
+            .find(|tall| f64::from(*tall) >= content)
+            .unwrap_or(TALLEST);
+        if last == Some(tall) {
+            return Ok(tall);
+        }
+        last = Some(tall);
+    }
+    Err(format!("the page's height did not settle in {SETTLE_READINGS} readings").into())
+}
+
+/// How many times [`content_height`] reads the height before it gives up.
+const SETTLE_READINGS: usize = 20;
+
+/// The largest difference on one channel of one pixel that a new capture
+/// may show against the image on disk and still leave that image in place.
+///
+/// Two captures of an unchanged page differ by at most 2 of 255 along the
+/// border of a form control (Chrome 155 on macOS), while a changed glyph,
+/// colour or layout moves pixels by far more (no specification governs this:
+/// our own design).
+const ANTIALIASING: u8 = 2;
+
+/// Writes `png` to `path` unless the image already there shows the same page:
+/// the same size and colour type, and no channel of any pixel more than
+/// [`ANTIALIASING`] apart.
+fn keep_or_write(path: &Path, png: &[u8]) -> Result<(), Box<dyn Error>> {
+    if let Ok(held) = std::fs::read(path)
+        && same_page(&held, png)
+    {
+        return Ok(());
+    }
+    std::fs::write(path, png)?;
+    Ok(())
+}
+
+/// Whether two PNG images show the same page within [`ANTIALIASING`].
+fn same_page(held: &[u8], fresh: &[u8]) -> bool {
+    let (Some(held), Some(fresh)) = (pixels(held), pixels(fresh)) else {
+        return false;
+    };
+    held.0 == fresh.0
+        && held.1.len() == fresh.1.len()
+        && held
+            .1
+            .iter()
+            .zip(&fresh.1)
+            .all(|(one, other)| one.abs_diff(*other) <= ANTIALIASING)
+}
+
+/// A decoded PNG: its size and colour type, and its samples.
+type Decoded = ((u32, u32, png::ColorType), Vec<u8>);
+
+/// Returns the decoded image, or `None` when `bytes` is no PNG this reads.
+fn pixels(bytes: &[u8]) -> Option<Decoded> {
+    let mut reader = png::Decoder::new(std::io::Cursor::new(bytes))
+        .read_info()
+        .ok()?;
+    let mut buffer = vec![0; reader.output_buffer_size()?];
+    let info = reader.next_frame(&mut buffer).ok()?;
+    buffer.truncate(info.buffer_size());
+    Some(((info.width, info.height, info.color_type), buffer))
+}
+
+/// Moves the pointer to the page's top left corner, over no control.
+///
+/// The pointer stays where the last click left it, and Chrome works out what
+/// lies under it again only some time after a layout change, such as the
+/// resize to the page's height, so a control there could be captured hovered
+/// in one run and at rest in the next.
+async fn rest_pointer(browser: &Browser) -> Result<(), Box<dyn Error>> {
+    browser
         .driver()
         .cdp()
-        .send_raw("Page.getLayoutMetrics", json!({}))
+        .send_raw(
+            "Input.dispatchMouseEvent",
+            json!({ "type": "mouseMoved", "x": 1, "y": 1 }),
+        )
         .await?;
-    let metrics: LayoutMetrics = serde_json::from_value(metrics)?;
-    let content = metrics.css_content_size.height;
-    Ok((HEIGHT..=TALLEST)
-        .find(|tall| f64::from(*tall) >= content)
-        .unwrap_or(TALLEST))
+    Ok(())
+}
+
+/// Waits until the page's fonts have loaded and two animation frames have
+/// been drawn, so a layout the last change started has been painted.
+async fn settle(browser: &Browser) -> Result<(), Box<dyn Error>> {
+    browser
+        .driver()
+        .cdp()
+        .send_raw(
+            "Runtime.evaluate",
+            json!({
+                "expression": "document.fonts.ready.then(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(true)))))",
+                "awaitPromise": true,
+            }),
+        )
+        .await?;
+    Ok(())
 }
 
 /// The part of a Chrome `DevTools` Protocol answer that names a DOM node.
@@ -299,12 +406,14 @@ async fn capture(
     if shot.shell {
         hydrated(browser).await?;
     }
+    rest_pointer(browser).await?;
     let height = content_height(browser).await?;
     window(browser, width, height).await?;
     to_top(browser).await?;
+    settle(browser).await?;
     let png = browser.driver().screenshot_as_png().await?;
     window(browser, width, HEIGHT).await?;
-    std::fs::write(output(shot.image, theme, width), png)?;
+    keep_or_write(&output(shot.image, theme, width), &png)?;
     if shot.route != NOT_FOUND.route {
         return browser.console_clean(shot.image).await;
     }

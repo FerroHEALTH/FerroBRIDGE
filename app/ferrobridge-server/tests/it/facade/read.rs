@@ -99,7 +99,7 @@ async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
         &ferrobridge_server::facade::identity::record::CompositionBinding {
             ehr_id: String::from(EHR_ID),
             versioned_object_uid: String::from(CONTAINER),
-            template_id: String::from("ferrobridge.diagnose.v1"),
+            template_id: String::from("ferrobridge.diagnoses.v1"),
             resource_type: String::from("Condition"),
             entry_path: String::from("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
             split: 0,
@@ -199,13 +199,21 @@ async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_t
             let record = serde_json::json!({
                 "ehr_id": EHR_ID,
                 "versioned_object_uid": "not a uid",
-                "template_id": "ferrobridge.diagnose.v1",
+                "template_id": "ferrobridge.diagnoses.v1",
                 "resource_type": "Condition",
                 "entry_path": "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]",
                 "split": 0,
                 "context": "ferrobridge_facade.context"
             });
             table.insert("Condition\u{1f}badcontainer", record.to_string().as_str())?;
+            let meta: redb::TableDefinition<'static, &str, &str> =
+                redb::TableDefinition::new("store_meta");
+            write.open_table(meta)?.insert(
+                "schema",
+                ferrobridge_server::facade::identity::redb_store::SCHEMA
+                    .to_string()
+                    .as_str(),
+            )?;
         }
         write.commit()?;
     }

@@ -653,18 +653,23 @@ pub(crate) fn entry_view(
     binding: &CompositionBinding,
     id: &FhirResourceId,
 ) -> Result<CanonicalComposition, Refusal> {
-    let entry = engine::entry::entry_named(program.program(), composition, &binding.entry_path)
-        .map_err(|error| Refusal::from(Refused::from(error)))?
-        .ok_or_else(|| {
-            reply::refusal(
-                StatusCode::NOT_FOUND,
-                Issue::error(IssueType::NotFound).diagnosing(format!(
-                    "{}/{} names an entry the composition version no longer holds",
-                    binding.resource_type,
-                    id.as_str()
-                )),
-            )
-        })?;
+    let entry = engine::entry::entry_named(
+        program.program(),
+        program.index(),
+        composition,
+        &binding.entry_path,
+    )
+    .map_err(|error| Refusal::from(Refused::from(error)))?
+    .ok_or_else(|| {
+        reply::refusal(
+            StatusCode::NOT_FOUND,
+            Issue::error(IssueType::NotFound).diagnosing(format!(
+                "{}/{} names an entry the composition version no longer holds",
+                binding.resource_type,
+                id.as_str()
+            )),
+        )
+    })?;
     Ok(entry.isolate(composition))
 }
 

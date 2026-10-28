@@ -334,7 +334,10 @@ the whole program once per instance, the context's `openehrCondition`
 evaluated at that instance, so each occurrence is its own resource
 (`Each::Mapped`) or not applicable (`Each::NotApplicable`). `traverse::to_fhir`
 maps the first instance and declares the rest as
-`Loss::UnmappedOccurrences`, never mixing them.
+`Loss::UnmappedOccurrences`, never mixing them. `traverse::occurrence::
+occurrences` names the same instances by positions and entry path without
+running the program, so the FHIR facade addresses each occurrence by the path
+and the deterministic id `$tofhir` gives it (#1276).
 
 ## Tests
 

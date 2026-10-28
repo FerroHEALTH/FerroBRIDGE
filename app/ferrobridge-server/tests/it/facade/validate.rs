@@ -140,7 +140,7 @@ async fn validate_names_the_template_and_the_ehr_disposition() -> Result<(), Box
     assert!(
         information.iter().any(|issue| issue["diagnostics"]
             .as_str()
-            .is_some_and(|text| text.contains("ferrobridge.diagnose.v1"))),
+            .is_some_and(|text| text.contains("ferrobridge.diagnoses.v1"))),
         "an information issue names the template: {body}"
     );
     assert!(
