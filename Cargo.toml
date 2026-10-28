@@ -263,9 +263,10 @@ wiremock = "0.6.5"
 # over chromedriver, with the Chrome DevTools Protocol for the screenshots'
 # window size and colour scheme, and the process-group kill that stops a
 # journey's chromedriver with every Chrome it started. FerroFED drives its
-# console with the same pair. Verified against crates.io on 2026-10-18
-# (thirtyfour 0.37.5 published 2026-08-12; rustix 1.1.5 is in the lock).
-thirtyfour = { version = "0.37.5", default-features = false, features = ["reqwest", "cdp"] }
+# console with the same pair. Verified against crates.io on 2026-10-28
+# (thirtyfour 0.38.1 published 2026-10-21 with the RUSTSEC-2026-0381 fix;
+# rustix 1.1.5 is in the lock).
+thirtyfour = { version = "0.38.1", default-features = false, features = ["reqwest", "cdp"] }
 rustix = { version = "1.1.5", default-features = false, features = ["std", "process"] }
 # The end-to-end lane's container harness and the PostgreSQL client the CDM
 # catalogue is read with (docs/VERSIONS.md).

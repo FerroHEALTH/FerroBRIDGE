@@ -478,8 +478,8 @@ WebDriver, through chromedriver, with the `thirtyfour` client, a test-only
 dependency of the testkit. Chrome and chromedriver come as one Chrome for
 Testing release, which `browser-actions/setup-chrome` installs in the
 `journeys (browser)` job of `ci.yml`, so the browser and its driver always
-match. `thirtyfour` 0.37.5 is the newest release older than two weeks on
-2026-10-18, and the Chrome for Testing release is the one FerroFED's journeys
+match. `thirtyfour` 0.38.1 is the release that carries the RUSTSEC-2026-0381
+fix, taken on 2026-10-28, and the Chrome for Testing release is the one FerroFED's journeys
 pin, the newest stable one on 2026-10-14. The weekly
 `scripts/checks/pin-freshness.sh` reports a newer Stable release.
 
@@ -494,7 +494,7 @@ equals the `x-goog-hash` the storage bucket serves with it, and the
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `thirtyfour` | 0.37.5 | the root `Cargo.toml` `[workspace.dependencies]` |
+| `thirtyfour` | 0.38.1 | the root `Cargo.toml` `[workspace.dependencies]` |
 | Chrome for Testing (Chrome and chromedriver) | 155.0.8059.79 | the `chrome-version` of `.github/workflows/ci.yml`, and `scripts/release/journey-tools.sh` |
 | Chrome for Testing, `chrome-linux64.zip` SHA-256 | `bcd9a79130d7e44d70f93be87042e9bcee7fe0f0b3898e06b8c9bed5fb619dcd` | `scripts/release/journey-tools.sh` |
 | Chrome for Testing, `chrome-mac-arm64.zip` SHA-256 | `e141a7cbf948780bb7d381860bd5a7944c6736f79b9918b9826fccb199d28ea4` | `scripts/release/journey-tools.sh` |
