@@ -212,7 +212,7 @@ jobs:
       # syft reads the dependency list cargo-auditable embedded in the binary,
       # so the SBOM names the crates rather than the two files in the image.
       - name: Install syft
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
         with:
           tool: syft@1.51.1
       - name: Generate one SBOM per platform
