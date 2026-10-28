@@ -23,3 +23,19 @@ is unfinished work.
 fixing what fails. A change to the lane itself is rehearsed with a
 `-rc.N` pre-release tag first, also pushed from here. Docs and PR bodies
 never contain "the owner runs" for a tag; they describe what the cut does.
+
+On 2026-10-27 the owner extended this to the `crates-io` deployment
+environment: "you approve the crates-io always okay". Every pending
+`crates-io` approval on a release or publish-crates run, in every
+FerroHEALTH repository, is approved from the session without asking.
+
+On 2026-10-28 the owner cut the preflight from the tag step: "no preflight
+just cut the stupid release so it can run the release CI". The release
+workflow's own `plan` job checks the release facts, so the session tags the
+merged release PR's merge commit directly and lets the lane refuse what is
+wrong.
+
+Later on 2026-10-28 the owner handed over the merge too: "you merge it for me
+as well do not wait for me". A release PR gets auto-merge armed like any other
+PR once its preflight passes, and the session tags its merge commit as soon as
+it lands. Nothing in a release cut waits on the owner.
