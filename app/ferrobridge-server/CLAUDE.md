@@ -98,9 +98,11 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   `ObjectVersionId`; `FhirResourceId`, `ExternalResourceId` and
   `PersonId` are this side's. A function never takes a bare `String` where one
   of them belongs, so a swapped argument is a compile error.
-- **The map wins once written.** A derived id is derived once. Changing the
-  derivation must never rename a resource a client already holds, so the store
-  is read before the derivation runs.
+- **The map wins once written.** A derived id is derived once, and the store
+  is read before the derivation runs. A derivation change never renames a
+  resource silently: it raises the store schema, and the bridge refuses a file
+  of the older schema at boot, naming the reset (identity derivation 3 and
+  schema 4, the owner's ruling on #1276).
 - **Clinical content reaches neither a log line nor the identity store.** A
   handler logs the matched route, the status and identifiers. A resource body,
   a composition, and a CDR error body stay out of `tracing`, out of a `Debug`

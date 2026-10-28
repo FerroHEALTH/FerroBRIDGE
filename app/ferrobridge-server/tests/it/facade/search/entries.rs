@@ -11,11 +11,8 @@
 
 use ferrobridge_server::facade::identity::FhirResourceId;
 use ferrobridge_server::facade::identity::derive;
-use ferrobridge_server::facade::identity::derive::EntryKey;
-use ferrobridge_server::facade::identity::record::CompositionBinding;
 use ferrobridge_server::facade::identity::store::Store;
 use http::StatusCode;
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use std::collections::BTreeSet;
 use std::error::Error;
 use wiremock::Mock;
@@ -379,67 +376,6 @@ async fn an_accurate_total_is_one_count_query_for_one_and_two_entry_compositions
     Ok(())
 }
 
-/// Records `id` for the entry of the composition `path` names, as a build
-/// that wrote no derivation did.
-fn record_earlier(
-    harness: &super::super::Harness,
-    path: &str,
-    id: &FhirResourceId,
-) -> Result<(), Box<dyn Error>> {
-    let key = EntryKey::new(HierObjectId::new(super::super::CONTAINER)?, path, 0);
-    harness
-        .store
-        .record_internal("Condition", &derive::map_key(&key), id)?;
-    harness.store.record_binding(
-        "Condition",
-        id,
-        &CompositionBinding {
-            ehr_id: String::from(super::super::EHR_ID),
-            versioned_object_uid: String::from(super::super::CONTAINER),
-            template_id: String::from("ferrobridge.diagnose.v1"),
-            resource_type: String::from("Condition"),
-            entry_path: String::from(path),
-            split: 0,
-            context: String::from("ferrobridge_facade.context"),
-            derivation: None,
-            created: None,
-        },
-    )?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn an_id_an_earlier_build_recorded_under_the_comma_path_keeps_answering_its_entry()
--> Result<(), Box<dyn Error>> {
-    // A build up to 0.0.6 keyed the second diagnosis by
-    // `/content[<archetype>, 2]`, a path the BASE grammar refuses; the map
-    // wins once written, so that id still names the second diagnosis.
-    let harness = searching().await;
-    let (composition, _first, second) = two_diagnoses(&harness);
-    let legacy = FhirResourceId::new("legacysecond")?;
-    record_earlier(&harness, &format!("/content[{DIAGNOSIS}, 2]"), &legacy)?;
-    mount_rows(
-        &harness.cdr,
-        &[node_row(VERSION_ONE, &composition, &second)],
-    )
-    .await;
-    let (status, body) = get(&harness, "Condition?code=SYN-002").await?;
-    assert_eq!(StatusCode::OK, status, "{body}");
-    let entry = matches(&body).first().copied().ok_or("one match")?;
-    assert_eq!(Some("SYN-002"), code_of(entry), "{body}");
-    assert_eq!(Some("legacysecond"), id_of(entry), "{body}");
-
-    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
-    let (status, read) = get(&harness, "Condition/legacysecond").await?;
-    assert_eq!(StatusCode::OK, status, "{read}");
-    assert_eq!(
-        Some("SYN-002"),
-        read["code"]["coding"][0]["code"].as_str(),
-        "{read}"
-    );
-    Ok(())
-}
-
 #[tokio::test]
 async fn a_later_entry_is_bound_by_the_positional_path_of_its_place_in_content()
 -> Result<(), Box<dyn Error>> {
@@ -465,91 +401,107 @@ async fn a_later_entry_is_bound_by_the_positional_path_of_its_place_in_content()
     Ok(())
 }
 
-/// The archetype of the `content` items [`with_foreign`] puts before the
-/// diagnoses, which the fixture context does not map.
-const FOREIGN: &str = "openEHR-EHR-EVALUATION.adverse_reaction_risk.v1";
-
-/// Returns `composition` with `count` items of [`FOREIGN`] before its
-/// content, each a copy of its first diagnosis under that archetype.
-fn with_foreign(composition: &serde_json::Value, count: usize) -> serde_json::Value {
-    let mut foreign = diagnosis(composition);
-    foreign["archetype_node_id"] = serde_json::json!(FOREIGN);
-    let mut changed = composition.clone();
-    let content = changed["content"]
-        .as_array_mut()
-        .expect("the composition has content");
-    for _ in 0..count {
-        content.insert(0, foreign.clone());
-    }
-    changed
-}
-
-#[tokio::test]
-async fn a_comma_path_a_build_up_to_0_0_5_recorded_reads_as_the_first_entry_at_its_place()
--> Result<(), Box<dyn Error>> {
-    // Builds up to 0.0.5 bound the first diagnosis by its place in content:
-    // the third item here, and the composition holds no third diagnosis.
-    let harness = searching().await;
-    let (composition, _, _) = two_diagnoses(&harness);
-    let composition = with_foreign(&composition, 2);
-    let early = FhirResourceId::new("earlyfirst")?;
-    record_earlier(&harness, &format!("/content[{DIAGNOSIS}, 3]"), &early)?;
-    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
-    let (status, read) = get(&harness, "Condition/earlyfirst").await?;
-    assert_eq!(StatusCode::OK, status, "{read}");
-    assert_eq!(
-        Some("SYN-001"),
-        read["code"]["coding"][0]["code"].as_str(),
-        "{read}"
+/// Returns the ids of the `Condition`s `$tofhir` answers for `composition`,
+/// run by the operations lane over the mapping set under `fixtures` and the
+/// operational template `template`.
+pub(super) async fn tofhir_ids(
+    fixtures: &str,
+    template: &str,
+    composition: &serde_json::Value,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    let templates = root.path().join("templates");
+    std::fs::create_dir_all(&templates)?;
+    std::fs::write(templates.join("template.opt"), template)?;
+    let settings = ferrobridge_server::config::MappingSettings {
+        directory: std::path::PathBuf::from(fixtures),
+        templates,
+    };
+    let lane = ferrobridge_server::state::OperationsLane::new(
+        ferrobridge_server::mappings::load(&settings)?,
+        "Device/ferrobridge-test",
     );
-    Ok(())
+    let state = std::sync::Arc::new(
+        ferrobridge_server::state::AppState::with_health(
+            ferrohealth_health::registry::Registry::default(),
+        )
+        .serving_operations(lane),
+    );
+    let app = ferrobridge_server::router(
+        state,
+        &ferrohealth_server::section::ServerSection {
+            body_limit_bytes: 1024 * 1024,
+            ..crate::support::settings()
+        },
+    );
+    let request = serde_json::json!({
+        "resourceType": "Parameters",
+        "parameter": [
+            { "name": "composition", "valueString": composition.to_string() },
+            {
+                "name": "context",
+                "part": [{ "name": "patient", "valueReference": { "reference": super::SUBJECT } }],
+            },
+        ],
+    });
+    let response = tower::ServiceExt::oneshot(
+        app,
+        http::Request::post("/fhir/$tofhir")
+            .header(http::header::CONTENT_TYPE, "application/fhir+json")
+            .body(axum::body::Body::from(request.to_string()))?,
+    )
+    .await?;
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
+    let answer: serde_json::Value = serde_json::from_slice(&bytes)?;
+    assert_eq!(StatusCode::OK, status, "{answer}");
+    Ok(answer["entry"]
+        .as_array()
+        .ok_or("the answer is a Bundle")?
+        .iter()
+        .filter(|entry| entry["resource"]["resourceType"] == "Condition")
+        .filter_map(|entry| entry["resource"]["id"].as_str().map(str::to_owned))
+        .collect())
 }
 
+// NOTE: FHIRconnect v1.0.0 `engine/id-management.adoc` §Deterministic IDs: one
+// occurrence takes one id, the hash of the composition uid and the entry path.
 #[tokio::test]
-async fn a_comma_path_whose_two_readings_name_two_entries_is_reported() -> Result<(), Box<dyn Error>>
-{
-    // `/content[<archetype>, 2]` is the first diagnosis as builds up to 0.0.5
-    // wrote it and the second as 0.0.6 wrote it; the read reports the binding.
+async fn the_facade_read_its_search_and_tofhir_give_each_occurrence_one_id()
+-> Result<(), Box<dyn Error>> {
     let harness = searching().await;
-    let (composition, _, _) = two_diagnoses(&harness);
-    let composition = with_foreign(&composition, 1);
-    let path = format!("/content[{DIAGNOSIS}, 2]");
-    record_earlier(&harness, &path, &FhirResourceId::new("splitread")?)?;
-    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
-    let (status, body) = get(&harness, "Condition/splitread").await?;
-    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
-    let issue = &body["issue"][0];
-    assert_eq!(Some("exception"), issue["code"].as_str(), "{body}");
-    let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
-    assert!(diagnostics.contains(&path), "{body}");
-    assert!(!body.to_string().contains("SYN-00"), "{body}");
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_search_meeting_a_comma_key_with_two_readings_is_reported() -> Result<(), Box<dyn Error>>
-{
-    // The second diagnosis's 0.0.6 key is the first diagnosis's key as builds
-    // up to 0.0.5 wrote it, so binding it would move an id between entries.
-    let harness = searching().await;
-    let (composition, _, second) = two_diagnoses(&harness);
-    let composition = with_foreign(&composition, 1);
-    record_earlier(
-        &harness,
-        &format!("/content[{DIAGNOSIS}, 2]"),
-        &FhirResourceId::new("splitsearch")?,
-    )?;
+    let (composition, first, second) = two_diagnoses(&harness);
     mount_rows(
         &harness.cdr,
-        &[node_row(VERSION_ONE, &composition, &second)],
+        &[
+            node_row(VERSION_ONE, &composition, &first),
+            node_row(VERSION_ONE, &composition, &second),
+        ],
     )
     .await;
-    let (status, body) = get(&harness, "Condition?code=SYN-002").await?;
-    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
-    assert_eq!(
-        Some("exception"),
-        body["issue"][0]["code"].as_str(),
-        "{body}"
-    );
+    let (status, body) = get(&harness, "Condition?code=SYN-001,SYN-002").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let searched: Vec<String> = matches(&body)
+        .iter()
+        .filter_map(|entry| id_of(entry).map(str::to_owned))
+        .collect();
+    assert_eq!(2, searched.len(), "{body}");
+
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    for id in &searched {
+        let (status, read) = get(&harness, &format!("Condition/{id}")).await?;
+        assert_eq!(StatusCode::OK, status, "{read}");
+        assert_eq!(Some(id.as_str()), read["id"].as_str());
+    }
+
+    let mut held = composition.clone();
+    held["uid"] = serde_json::json!({ "_type": "OBJECT_VERSION_ID", "value": VERSION_ONE });
+    let answered = tofhir_ids(
+        super::super::FIXTURES,
+        ferrobridge_testkit::fixtures::DIAGNOSES_OPT,
+        &held,
+    )
+    .await?;
+    assert_eq!(searched, answered);
     Ok(())
 }

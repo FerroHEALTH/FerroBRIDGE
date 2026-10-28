@@ -157,7 +157,7 @@ async fn a_template_the_cdr_does_not_hold_names_the_context_and_the_status()
             ref context,
             status,
         } => {
-            assert_eq!("ferrobridge.diagnose.v1", template);
+            assert_eq!("ferrobridge.diagnoses.v1", template);
             assert_eq!("ferrobridge_facade.context", context);
             assert_eq!(StatusCode::NOT_FOUND, status);
         }

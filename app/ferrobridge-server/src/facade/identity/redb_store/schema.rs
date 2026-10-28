@@ -22,15 +22,25 @@ use crate::facade::identity::store::StoreError;
 
 /// Checks the schema `meta` records and stamps it with [`SCHEMA`].
 ///
-/// A file with no schema row reads as [`OLDEST_SCHEMA`]. A schema this build
-/// does not read is refused before anything else is written, so a later build
-/// can raise [`OLDEST_SCHEMA`] and refuse an older file by name.
-pub(super) fn stamp(meta: &mut redb::Table<'_, &str, &str>, path: &Path) -> Result<(), StoreError> {
+/// `fresh` says the file held no table before this open. A file that held
+/// tables and no schema row was written by a build up to 0.0.6, schema 1. A
+/// schema this build does not read is refused before anything else is
+/// written, and the refusal names the file and its schema.
+pub(super) fn stamp(
+    meta: &mut redb::Table<'_, &str, &str>,
+    path: &Path,
+    fresh: bool,
+) -> Result<(), StoreError> {
     let held = meta
         .get(SCHEMA_KEY)
         .map_err(transaction)?
         .map(|value| value.value().to_owned());
-    if let Some(text) = held {
+    let found = match held {
+        Some(text) => Some(text),
+        None if fresh => None,
+        None => Some(String::from("1")),
+    };
+    if let Some(text) = found {
         let readable = text
             .parse::<u32>()
             .is_ok_and(|schema| (OLDEST_SCHEMA..=SCHEMA).contains(&schema));
@@ -84,7 +94,6 @@ pub(super) fn backfill(
 #[cfg(test)]
 mod tests {
     use crate::cdr::ids::EhrId;
-    use crate::facade::identity::redb_store::BINDINGS;
     use crate::facade::identity::redb_store::META;
     use crate::facade::identity::redb_store::PATIENTS;
     use crate::facade::identity::redb_store::RedbStore;
@@ -109,6 +118,9 @@ mod tests {
                         "bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11",
                     )
                     .expect("the row");
+                let mut meta = write.open_table(META).expect("the table");
+                meta.insert(SCHEMA_KEY, SCHEMA.to_string().as_str())
+                    .expect("the row");
             }
             write.commit().expect("the commit");
         }
@@ -119,12 +131,13 @@ mod tests {
             store.person_of(&ehr).expect("the read")
         );
     }
-    /// Returns the schema row of the store file at `path`.
+    /// Returns the schema row of the store file at `path`, or `None` when
+    /// the file holds no schema table or no row in it.
     fn schema_of(path: &std::path::Path) -> Option<String> {
         use redb::ReadableDatabase;
         let database = redb::Database::open(path).expect("the file");
         let read = database.begin_read().expect("a read");
-        let meta = read.open_table(META).expect("the table");
+        let meta = read.open_table(META).ok()?;
         meta.get(SCHEMA_KEY)
             .expect("the row reads")
             .map(|value| value.value().to_owned())
@@ -160,17 +173,21 @@ mod tests {
     }
 
     #[test]
-    fn a_store_an_earlier_build_wrote_without_a_schema_opens_and_is_stamped() {
+    fn a_store_an_earlier_build_wrote_without_a_schema_is_refused_as_schema_1() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let path = directory.path().join("identity.redb");
         file_with_schema(&path, None);
-        drop(RedbStore::open(&path).expect("the open"));
-        assert_eq!(Some(SCHEMA.to_string()), schema_of(&path));
+        let refused = RedbStore::open(&path).expect_err("schema 1 is refused");
+        assert!(
+            matches!(refused, StoreError::Schema { ref found, .. } if found == "1"),
+            "{refused}"
+        );
+        assert_eq!(None, schema_of(&path), "a refused file is left as it was");
     }
 
     #[test]
     fn a_store_in_a_schema_this_build_does_not_read_is_refused_by_name() {
-        for found in ["0", "99", "two"] {
+        for found in ["0", "1", "2", "3", "99", "two"] {
             let directory = tempfile::tempdir().expect("a temporary directory");
             let path = directory.path().join("identity.redb");
             file_with_schema(&path, Some(found));
@@ -178,9 +195,13 @@ mod tests {
             assert!(
                 matches!(
                     refused,
-                    StoreError::Schema { found: ref held, oldest: 1, newest: 3, .. } if held == found
+                    StoreError::Schema { found: ref held, oldest: 4, newest: 4, .. } if held == found
                 ),
                 "{refused}"
+            );
+            assert!(
+                refused.to_string().contains("removing the file"),
+                "the refusal names the reset: {refused}"
             );
             assert_eq!(
                 Some(String::from(found)),
@@ -191,36 +212,12 @@ mod tests {
     }
 
     #[test]
-    fn a_schema_2_store_opens_is_stamped_3_and_its_bindings_are_entries_own() {
+    fn a_store_of_the_schema_this_build_writes_opens() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let path = directory.path().join("identity.redb");
-        let internal = FhirResourceId::new("abc").expect("a legal FHIR id");
-        let key = crate::facade::identity::record::internal_key("Condition", &internal);
-        {
-            let database = redb::Database::create(&path).expect("the file");
-            let write = database.begin_write().expect("a write");
-            {
-                let mut meta = write.open_table(META).expect("the table");
-                meta.insert(SCHEMA_KEY, "2").expect("the row");
-                let mut bindings = write.open_table(BINDINGS).expect("the table");
-                bindings
-                    .insert(
-                        key.as_str(),
-                        r#"{"ehr_id":"bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11","versioned_object_uid":"uid-1","template_id":"ferrobridge.diagnose.v1","resource_type":"Condition","entry_path":"/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]","split":0,"context":"ferrobridge_diagnosis.context","derivation":2}"#,
-                    )
-                    .expect("the row");
-            }
-            write.commit().expect("the commit");
-        }
-        let store = RedbStore::open(&path).expect("the open");
-        let held = store
-            .binding_of("Condition", &internal)
-            .expect("the read")
-            .expect("the binding");
-        assert_eq!(None, held.created, "a schema 2 binding is the entry's own");
-        assert_eq!(Some(2), held.derivation);
-        drop(store);
-        assert_eq!(Some(String::from("3")), schema_of(&path));
+        file_with_schema(&path, Some("4"));
+        drop(RedbStore::open(&path).expect("the open"));
+        assert_eq!(Some(SCHEMA.to_string()), schema_of(&path));
     }
 
     #[test]
@@ -237,7 +234,7 @@ mod tests {
             entry_path: String::from("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
             split: 0,
             context: String::from("ferrobridge_diagnosis.context"),
-            derivation: Some(2),
+            derivation: Some(crate::facade::identity::derive::DERIVATION),
             created: Some(crate::facade::identity::record::CreatedBy {
                 parent_type: String::from("Condition"),
                 parent_id: String::from("parent-1"),
@@ -254,38 +251,6 @@ mod tests {
             reopened
                 .binding_of("Observation", &internal)
                 .expect("the read")
-        );
-    }
-
-    #[test]
-    fn a_binding_an_earlier_build_wrote_reads_back_with_no_derivation() {
-        let directory = tempfile::tempdir().expect("a temporary directory");
-        let path = directory.path().join("identity.redb");
-        let internal = FhirResourceId::new("abc").expect("a legal FHIR id");
-        let key = crate::facade::identity::record::internal_key("Condition", &internal);
-        {
-            let database = redb::Database::create(&path).expect("the file");
-            let write = database.begin_write().expect("a write");
-            {
-                let mut bindings = write.open_table(BINDINGS).expect("the table");
-                bindings
-                    .insert(
-                        key.as_str(),
-                        r#"{"ehr_id":"bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11","versioned_object_uid":"uid-1","template_id":"ferrobridge.diagnose.v1","resource_type":"Condition","entry_path":"/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1, 2]","split":0,"context":"ferrobridge_diagnosis.context"}"#,
-                    )
-                    .expect("the row");
-            }
-            write.commit().expect("the commit");
-        }
-        let store = RedbStore::open(&path).expect("the open");
-        let held = store
-            .binding_of("Condition", &internal)
-            .expect("the read")
-            .expect("the binding");
-        assert_eq!(None, held.derivation);
-        assert_eq!(
-            "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1, 2]",
-            held.entry_path
         );
     }
 }

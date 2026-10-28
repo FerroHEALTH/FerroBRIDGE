@@ -189,6 +189,10 @@ async fn compile(context: Context) -> Result<Compiled, Box<dyn Error>> {
             ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
         ),
         (
+            "ferrobridge.diagnoses.v1",
+            ferrobridge_testkit::fixtures::DIAGNOSES_OPT,
+        ),
+        (
             "KDS_Diagnose",
             ferrobridge_testkit::fixtures::KDS_DIAGNOSE_OPT,
         ),

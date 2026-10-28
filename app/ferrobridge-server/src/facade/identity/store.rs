@@ -57,7 +57,7 @@ pub enum StoreError {
     },
     /// The store file carries a schema this build does not read.
     #[error(
-        "the identity store at {path} carries schema {found}, and this build reads schemas {oldest} to {newest}"
+        "the identity store at {path} carries schema {found}, and this build reads schemas {oldest} to {newest}; a store of an older schema is reset by removing the file, which the bridge then creates anew"
     )]
     Schema {
         /// The path that was opened.

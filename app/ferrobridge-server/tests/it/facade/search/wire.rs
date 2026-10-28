@@ -114,7 +114,7 @@ async fn a_search_answers_one_entry_per_composition_in_a_well_formed_searchset()
     );
     let values = bound(query);
     assert!(
-        values.contains(&String::from("ferrobridge.diagnose.v1")),
+        values.contains(&String::from("ferrobridge.diagnoses.v1")),
         "{values:?}"
     );
     assert!(values.contains(&String::from(EHR_ID)), "{values:?}");

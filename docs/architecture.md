@@ -752,8 +752,9 @@ ours:
   upstream as a request for a definition.
 - `slotArchetype` recursion is cycle-checked over the whole chain, not one
   level.
-- `hierarchy` `split` produces N resources from one archetype path; the
-  deterministic id then includes the split occurrence (section 9).
+- `hierarchy` `split` produces N resources from one archetype path; each
+  further resource is bound as a created resource, whose id frames the
+  occurrence positions (section 9).
 - Type coercion is strict: a value that does not parse as the resolved RM leaf
   type or FHIR element type is a refusal, never a best-effort conversion (the
   specification delegates strictness to the vendor; this is the vendor's
@@ -2242,95 +2243,84 @@ draft upstream change.
   (<https://sevkohler.github.io/FHIRconnect-spec/build/site/FHIRconnect/v1.0.0/engine/id-management.html>);
   the open revision (specification pull request #94) recommends the
   `LOCATABLE.uid` of the composition's entries instead, citing the BASE
-  uid-based predicate. Three facts pin the shape. FHIR R4 `Resource.id` is
+  uid-based predicate. By the owner's ruling on #1276 (2026-10-26) the facade
+  and `$tofhir` use the released recommendation, one scheme on every surface,
+  so the facade's read, its search and `$tofhir` give one occurrence one id;
+  a test asserts it. Three facts pin the inputs. FHIR R4 `Resource.id` is
   `[A-Za-z0-9\-\.]{1,64}` and "once assigned, this value never changes"
   (<https://hl7.org/fhir/R4/resource.html>). An openEHR `OBJECT_VERSION_ID` is
   `object_id::creating_system_id::version_tree_id`, and only the leading
   `object_id` (the `versioned_object_uid`) is stable across updates (RM Common
-  §OBJECT_VERSION_ID). An entry's `LOCATABLE.uid` is optional in the RM and
-  most CDRs and templates leave it unset, so it cannot be the only input. So
-  the id is derived from the entry's `uid` when the entry carries one, and
-  otherwise from a SHA-256 over (`versioned_object_uid`, entry path, split
-  occurrence), rendered as 52 lowercase base32 characters with no padding,
-  which fits the FHIR id grammar and stays stable across composition
-  versions; `meta.versionId` carries the `version_tree_id`. Whichever input
-  produced the id, the identity map records it, and the map wins from then
-  on, so an entry that gains a `uid` in a later version does not change its
-  FHIR id. A hash over the full version id would change the FHIR id on every
-  update and break the FHIR rule. The released recommendation's key is not
-  unique under a `hierarchy` split, so the split occurrence is part of the
-  input. The id map (`redb`) records patient identifier to `ehr_id`, external
-  to internal resource id, internal resource id to composition uid, and
-  source resource `id` and `meta.versionId` to the mapping that consumed
-  them, so a `PUT` resolves, a re-sent Bundle is recognised, and a re-sent
-  resource updates rather than duplicates (section 4.6). The acknowledged
-  failure mode (a re-sent Bundle omitting one resource reads as a different
-  mapping) is documented, not hidden. The store file records its schema
-  (#298): this build writes schema 3, reads 1 to 3 (a file without the row
-  is schema 1, written by 0.0.6 or earlier), and refuses any other by name,
-  so a later build that drops a schema refuses the older file. Schema 3
-  (#225) adds the binding of a resource an outbound run creates: a further
-  `hierarchy.split` occurrence or a `reference` target is bound under the
-  id a SHA-256 over the parent's entry key, the creating mapping, the
-  occurrence positions and the split's `unique` values derives, recorded
-  with its parent, so the parent references it as `<Type>/<id>` and a read
-  of that id maps the parent's entry again and answers the created resource
-  (a contained resource has no independent identity, R4 references.html
+  §OBJECT_VERSION_ID), so it is the composition uid the hash reads. An entry's
+  `LOCATABLE.uid` is optional in the RM and most CDRs and templates leave it
+  unset, so it does not enter the id. Where the section is silent our own rule
+  fills it, labelled as ours: the hash is SHA-256 over the two fields, each
+  framed with its byte length, rendered as 52 lowercase RFC 4648 base32
+  characters with no padding, inside the FHIR id grammar
+  (`fhirconnect::engine::identity::deterministic_id`). `meta.versionId`
+  carries the `version_tree_id`. A hash over the full version id would change
+  the FHIR id on every update and break the FHIR rule. The id map (`redb`)
+  records patient identifier to `ehr_id`, external to internal resource id,
+  internal resource id to composition uid and entry path, and source resource
+  `id` and `meta.versionId` to the mapping that consumed them, so a `PUT`
+  resolves, a re-sent Bundle is recognised, and a re-sent resource updates
+  rather than duplicates (section 4.6). The acknowledged failure mode (a
+  re-sent Bundle omitting one resource reads as a different mapping) is
+  documented, not hidden. The store file records its schema (#298): this
+  build writes and reads schema 4, the bindings of identity derivation 3. The
+  ids of derivation 2 (an entry's `LOCATABLE.uid`, else a hash that also
+  framed a split occurrence, over a `content`-only path) differ, and no
+  deployment served the facade before the change, so a file of schema 1 to 3
+  is refused at boot by name and its reset is to remove the file; a file with
+  tables and no schema row is schema 1. A resource an outbound run creates (a
+  further `hierarchy.split` occurrence or a `reference` target, #225) is bound
+  under the id a SHA-256 over the parent's entry key, the creating mapping,
+  the occurrence positions and the split's `unique` values derives, recorded
+  with its parent, so the parent references it as `<Type>/<id>` and a read of
+  that id maps the parent's entry again and answers the created resource (a
+  contained resource has no independent identity, R4 references.html
   §2.3.0.8). The binding is recorded the first time the facade answers the
-  parent, and the map wins from then on. A source `id`
-  a store written before 0.0.4 bound to two compositions answers `409`, and
-  the refusal names each composition's resource id, whose update revises it.
+  parent, and the map wins from then on. A source `id` a store bound to two
+  compositions answers `409`, and the refusal names each composition's
+  resource id, whose update revises it.
 
-  Each `content` item of the archetype a context's start model mapping names
-  is a resource of its own (#530). The first item keys the identity map by
-  the archetype predicate `/content[<archetype>]`, the path it has when it is
-  the only one, so a composition that gains a second entry does not rename
-  the resource of its first. Every further item keys it by the positional
-  predicate `/content[<n>]`, `n` its 1-based place in `content`, which openEHR
-  BASE Release 1.2.0, Paths and Locators, §Using Positional Parameters, writes
-  the same in openEHR and XPath (#242). Both are built with the `openehr-rm`
-  path types and parse back. This is identity derivation 2, and each binding
-  records the derivation that wrote its path. Builds up to 0.0.6 wrote
-  `/content[<archetype>, <n>]`, `n` the place among the items of the
-  archetype, which the BASE grammar reads as the name-based predicate
-  shortcut and refuses; a binding without a derivation may carry that form,
-  the facade still reads it, and an entry whose new key the map does not
-  hold is looked up under its old key first, so no recorded id moves. The
-  old form has two readings (#659): builds up to 0.0.5 bound only the first
-  item of the archetype, with `n` its place in `content`, and 0.0.6 bound
-  the `n`th item of the archetype. A stored path resolves when one reading
-  names an item or both name the same one; when they name two items the
-  binding cannot say which entry it meant, and a read, a search or a bind
-  that meets it answers `500` with an `exception` issue naming the path. The
-  binding records the path; a read, a vread or an `_id` search finds the
-  entry by its place and
-  maps the composition with every other item of the archetype removed. A
-  search query selects each node its `FROM` binds, and the facade answers the
-  entries that hold every selected node; a row whose nodes lie in no entry,
-  and every row of a search binding no node, answers every entry of the
-  archetype, of which `_id` keeps the ones it names (#658). `Bundle.total`
-  is one `COUNT(*)` with the entry bound as `CONTAINS <class> x[<archetype>]`
-  when the search binds no node and no `_id` and the template places the
-  entry only among the composition's own `content` items (#661). AQL 1.1.0
-  §3.13.2.2 defines no direct-child containment, so `CONTAINS` also finds an
-  entry nested in a `SECTION`; such a template, a bound node or an `_id`
-  reads the rows and counts each entry once, and `_total=estimate` always
-  answers from a count query. The
-  place is positional, so removing or inserting an earlier `content` item in a
-  later version moves the identity of the entries after it, the same property
-  the released
-  recommendation's entry path has. No specification governs how a row names
-  its entry: our own design.
+  Each occurrence of the archetype a context's start model mapping names is a
+  resource of its own (#530, #1276), wherever the template places it: a
+  `content` item, an item of a `SECTION` at any depth, or an instance
+  repeating below another entry. The facade names the occurrences with the
+  engine's own walk (`fhirconnect::engine::traverse::occurrence`), the one
+  `$tofhir` names them by: the instance path follows the template path, the
+  first instance at a repeating node keeps the template's predicate and every
+  later one takes the 1-based positional predicate of its place in its
+  container, as openEHR BASE Release 1.2.0, Paths and Locators, §Using
+  Positional Parameters, writes it, so a composition that gains a second
+  occurrence does not rename its first, and the path parses back and
+  navigates to its occurrence. A context whose start is the composition
+  itself names `/`. The binding records the path; a read, a vread or an `_id`
+  search finds the occurrence by its path and maps the composition with every
+  other occurrence removed, at any depth. A search query selects each node
+  its `FROM` binds, and the facade answers the occurrences that hold every
+  selected node; a row whose nodes lie in no occurrence, and every row of a
+  search binding no node, answers every occurrence, of which `_id` keeps the
+  ones it names (#658). `Bundle.total` is one `COUNT(*)` with the entry bound
+  as `CONTAINS <class> x[<archetype>]` when the search binds no node and no
+  `_id` and the template places the entry only among the composition's own
+  `content` items (#661). AQL 1.1.0 §3.13.2.2 defines no direct-child
+  containment, so `CONTAINS` also finds an entry nested in a `SECTION`; such a
+  template, a bound node or an `_id` reads the rows and counts each entry
+  once, and `_total=estimate` always answers from a count query. The place is
+  positional, so removing or inserting an earlier item in a container in a
+  later version moves the identity of the occurrences after it, the same
+  property the released recommendation's entry path has. No specification
+  governs how a row names its entry: our own design.
 
   ```mermaid
   flowchart TB
-      E["Entry in a composition version"] --> M{"Identity map has<br/>this entry?"}
+      E["Occurrence of the start archetype"] --> P["Entry path: the template path,<br/>a later instance by its place in its container"]
+      P --> M{"Identity map has<br/>this occurrence?"}
       M -->|"yes"| K["Use the recorded FHIR id<br/>(the map wins once written)"]
-      M -->|"no"| U{"Entry carries<br/>LOCATABLE.uid?"}
-      U -->|"yes"| A["id from the entry uid"]
-      U -->|"no"| B["id = SHA-256(versioned_object_uid, entry path, split occurrence)<br/>base32, 52 characters"]
-      A --> W["Record in the map"]
-      B --> W
+      M -->|"no"| B["id = SHA-256(versioned_object_uid, entry path)<br/>base32, 52 characters, as $tofhir derives it"]
+      B --> W["Record in the map"]
       W --> V["meta.versionId = version_tree_id"]
       K --> V
   ```
