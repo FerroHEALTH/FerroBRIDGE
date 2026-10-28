@@ -271,6 +271,10 @@ wiremock = "0.6.5"
 # rustix 1.1.5 is in the lock).
 thirtyfour = { version = "0.38.1", default-features = false, features = ["reqwest", "cdp"] }
 rustix = { version = "1.1.5", default-features = false, features = ["std", "process"] }
+# The screenshot capture's pixel comparison, which keeps an image on disk when
+# a new capture differs from it only by the antialiasing of a form control.
+# Verified against crates.io on 2026-10-28 (png 0.18.1, MIT OR Apache-2.0).
+png = "0.18.1"
 # The end-to-end lane's container harness and the PostgreSQL client the CDM
 # catalogue is read with (docs/VERSIONS.md).
 testcontainers = "0.28.0"

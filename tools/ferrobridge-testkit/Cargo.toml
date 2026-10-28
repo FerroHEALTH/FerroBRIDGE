@@ -52,6 +52,8 @@ ferrobridge-server = { path = "../../app/ferrobridge-server" }
 ferrobridge-console = { path = "../../app/ferrobridge-console" }
 anyhow.workspace = true
 thirtyfour.workspace = true
+# The screenshot capture compares a new image with the one on disk.
+png.workspace = true
 toml.workspace = true
 tracing-subscriber.workspace = true
 

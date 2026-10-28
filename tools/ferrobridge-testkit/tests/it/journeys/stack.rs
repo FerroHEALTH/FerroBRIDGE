@@ -310,16 +310,21 @@ async fn cdr(port: u16) -> Result<MockServer, Box<dyn Error>> {
     Ok(cdr)
 }
 
+/// Where a capture keeps its mapping trees: one fixed path outside the
+/// checkout, so the pages that draw it look the same from every worktree (no
+/// specification governs this: our own design).
+const CAPTURE_TREES: &str = "/tmp/ferrobridge-journey-capture";
+
 /// The mapping tree: the provisioned mappings, the template, and the
 /// console's empty directory. A capture's tree (`port` not `0`) is
-/// `target/journey-capture/bridge-<port>`, the same path each run, since
-/// the configuration and diagnostics pages draw it; every other tree is a
-/// fresh temporary directory.
+/// [`CAPTURE_TREES`]`/bridge-<port>`, the same path each run and in every
+/// checkout, since the configuration and diagnostics pages draw it; every
+/// other tree is a fresh temporary directory.
 fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
     let tree = if port == 0 {
         tempfile::tempdir()?
     } else {
-        let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/journey-capture");
+        let base = Path::new(CAPTURE_TREES).to_path_buf();
         let name = format!("bridge-{port}");
         std::fs::create_dir_all(&base)?;
         let base = base.canonicalize()?;
@@ -381,7 +386,8 @@ async fn bridge(
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n\n\
-         [operator]\nenabled = true\nmapping_dir = {console}\n",
+         [operator]\nenabled = true\nmapping_dir = {console}\n\n\
+         [usage_report]\nenabled = false\n",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
     );

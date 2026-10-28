@@ -16,7 +16,9 @@
 # carries it on its own command line (`--env
 # FERROBRIDGE__USAGE_REPORT__ENABLED=false`): a container inherits nothing
 # from the shell. A Rust test that starts the binary with `serve` sets
-# `.env("FERROBRIDGE__USAGE_REPORT__ENABLED", "false")` on that `Command`.
+# `.env("FERROBRIDGE__USAGE_REPORT__ENABLED", "false")` on that `Command`,
+# and one that runs the server in process through `serve_settings` writes
+# `[usage_report]\nenabled = false` into the configuration it resolves.
 # A one-shot job (`cdm`, `etl`, `mapping`, `vocab`, `--help`, `--version`)
 # sends no report and is not a launch. The server also stays silent when
 # `GITHUB_ACTIONS` or `CI` is set; this guard covers what that misses, a
@@ -52,6 +54,9 @@ readonly RUN_SWITCH='(-e|--env)[[:space:]=]+["'\'']?FERROBRIDGE__USAGE_REPORT__E
 readonly RUST_BINARY='CARGO_BIN_EXE_ferrobridge'
 readonly RUST_LAUNCH='\.arg\( ?"serve" ?\)'
 readonly RUST_SWITCH='\.env\( ?"FERROBRIDGE__USAGE_REPORT__ENABLED", ?"false",? ?\)'
+# A Rust test that runs the server in process, and the table it writes.
+readonly RUST_IN_PROCESS='serve_settings\('
+readonly RUST_TABLE='\[usage_report\]\\nenabled = false'
 # A one-shot job that starts no server.
 readonly ONE_SHOT='[[:space:]"'\'',](cdm|etl|mapping|vocab|--help|--version)(["'\''[:space:],]|$)'
 
@@ -147,11 +152,14 @@ rust_findings() {
   local f text
   while IFS= read -r f; do
     [[ -n "$f" ]] || continue
-    grep -q "$RUST_BINARY" "$f" || continue
     text="$(tr '\n' ' ' < "$f" | tr -s '[:space:]' ' ')"
-    grep -qE "$RUST_LAUNCH" <<< "$text" || continue
-    grep -qE "$RUST_SWITCH" <<< "$text" || printf '%s\n' "$f"
-  done < <("$@" | grep -E '^(app|tools|crates)/.*\.rs$' | sort)
+    if grep -q "$RUST_BINARY" "$f" && grep -qE "$RUST_LAUNCH" <<< "$text"; then
+      grep -qE "$RUST_SWITCH" <<< "$text" || printf '%s\n' "$f"
+    elif [[ "$f" == */tests/* ]] && grep -qE "$RUST_IN_PROCESS" <<< "$text"; then
+      grep -qE "$RUST_TABLE" <<< "$text" || printf '%s\n' "$f"
+    fi
+  done < <("$@" | grep -E '^(app|tools|crates)/.*\.rs$' | sort |
+    xargs grep -lE "$RUST_BINARY|serve_settings" -- 2>/dev/null || true)
 }
 
 # --- Sibling servers: the family products a launcher starts besides this one.
@@ -311,6 +319,8 @@ self_test() {
   printf 'Command::new(env!("CARGO_BIN_EXE_ferrobridge"))\n    .arg("serve")\n    .output()\n' > "$tmp/app/server/tests/on.rs"
   printf 'Command::new(env!("CARGO_BIN_EXE_ferrobridge"))\n    .arg("serve")\n    .env(\n        "FERROBRIDGE__USAGE_REPORT__ENABLED",\n        "false",\n    )\n' > "$tmp/app/server/tests/off.rs"
   printf 'Command::new(env!("CARGO_BIN_EXE_ferrobridge"))\n    .args(["cdm", "init"])\n' > "$tmp/app/server/tests/job.rs"
+  printf 'let text = "[cdr]\\nbase_url = 1\\n";\nserve_settings(\n    &settings,\n)\n' > "$tmp/app/server/tests/inproc-on.rs"
+  printf 'let text = "[cdr]\\n\\n[usage_report]\\nenabled = false\\n";\nserve_settings(&settings)\n' > "$tmp/app/server/tests/inproc-off.rs"
 
   # Sibling servers: Compose services, a docker run and a Rust harness.
   mkdir -p "$tmp/scripts" "$tmp/tools/bare/src" "$tmp/tools/held/src"
@@ -337,7 +347,7 @@ self_test() {
   fi
   for name in scripts/on.sh scripts/bin-on.sh scripts/cargo-on.sh scripts/compose-on.sh scripts/long-on.sh \
     scripts/helm-on.sh scripts/fam/orphan.sh .github/workflows/run-on.yml .github/workflows/run-job-env.yml \
-    .github/workflows/bin-on.yml app/server/tests/on.rs; do
+    .github/workflows/bin-on.yml app/server/tests/on.rs app/server/tests/inproc-on.rs; do
     grep -qxF "$name" <<< "$found" || {
       echo "self-test: $name was not caught" >&2
       failures=1
@@ -345,14 +355,14 @@ self_test() {
   done
   for name in scripts/off.sh scripts/bin-off.sh scripts/helm-off.sh scripts/commented.sh scripts/jobs.sh \
     scripts/check.sh scripts/fam/covered.sh scripts/carrier.sh scripts/bare-carrier.sh .github/workflows/run-off.yml \
-    .github/workflows/bin-off.yml "$SELF" docker/one-shot.sh app/server/tests/off.rs app/server/tests/job.rs; do
+    .github/workflows/bin-off.yml "$SELF" docker/one-shot.sh app/server/tests/off.rs app/server/tests/job.rs app/server/tests/inproc-off.rs; do
     if grep -qxF "$name" <<< "$found"; then
       echo "self-test: $name was wrongly caught" >&2
       failures=1
     fi
   done
   [[ "$failures" -eq 0 ]] || return 1
-  echo "usage-report-off: self-test OK (eleven unswitched launchers and six unswitched sibling servers caught, fifteen clean or exempt files and eight sibling cases allowed)."
+  echo "usage-report-off: self-test OK (twelve unswitched launchers and six unswitched sibling servers caught, sixteen clean or exempt files and eight sibling cases allowed)."
 }
 
 report() {
@@ -366,7 +376,8 @@ report() {
   while IFS= read -r f; do printf '  %s\n' "$f" >&2; done <<< "$found"
   echo "Set FERROBRIDGE__USAGE_REPORT__ENABLED=false in the launcher (or in every script" >&2
   echo "that sources it, or in the workflow env); a docker run of the server passes" >&2
-  echo "--env FERROBRIDGE__USAGE_REPORT__ENABLED=false on its own command line." >&2
+  echo "--env FERROBRIDGE__USAGE_REPORT__ENABLED=false on its own command line, and a test" >&2
+  echo "that runs serve_settings writes [usage_report] enabled = false into its configuration." >&2
   echo "A sibling server named (KEY) takes its own key: false, or \${FERROBRIDGE__USAGE_REPORT__ENABLED...}," >&2
   echo "in its Compose environment, --env KEY=false on a docker run, and" >&2
   echo ".with_env_var(\"KEY\", \"false\") in a Rust harness." >&2

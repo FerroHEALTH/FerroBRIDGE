@@ -207,12 +207,13 @@ pub(super) const PAGES: [Shot; 33] = [
 /// The page no route answers.
 pub(super) const NOT_FOUND: Shot = Shot::page("not-found", "*", "/no/such/page", "//h1");
 
-/// A `$toopenehr` the bridge answered.
+/// A `$toopenehr` the bridge answered: the answer's badge beside the problem
+/// name, which the Bundle the page sends carries too.
 pub(super) const PLAYGROUND_ANSWERED: Shot = Shot::page(
     "playground-answered",
     "/playground/:tab",
     "/playground/toopenehr",
-    "//*[contains(., 'Synthetic problem one')]",
+    "//main[contains(., 'Answered') and contains(., 'Synthetic problem one')]",
 );
 
 /// A `$tofhir` the bridge refused.
