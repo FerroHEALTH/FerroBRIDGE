@@ -38,7 +38,7 @@ const BACKOFF: Backoff = Backoff {
 /// fixture mapping set.
 fn settings(cdr: &MockServer) -> Result<Settings, Box<dyn Error>> {
     let text = format!(
-        "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n",
+        "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n\n[usage_report]\nenabled = false\n",
         cdr.uri()
     );
     Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?)

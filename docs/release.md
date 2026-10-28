@@ -309,9 +309,12 @@ before a real cut.
    take the book's operator console screenshots again on the release
    commit's tree: `scripts/release/journey-tools.sh target/journey-tools`,
    the release site bundle (`scripts/release/console-site.sh --release`), then
-   `FERROBRIDGE_SCREENSHOTS=1 cargo nextest run -p ferrobridge-testkit -E
-   'test(/screenshots::the_book_shows/)'`. The capture writes the version it
-   ran at to `website/book/src/operate/img/console/captured-version.txt`, and
+   `SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" FERROBRIDGE_JOURNEYS=1
+   FERROBRIDGE_SCREENSHOTS=1 cargo nextest run -p ferrobridge-testkit -E
+   'test(/journeys::(screenshots|states)::/)' --test-threads 1`.
+   `SOURCE_DATE_EPOCH` fixes the build instant the About page draws, so a
+   second capture of the same commit writes the same bytes. The capture
+   writes the version it ran at to `website/book/src/operate/img/console/captured-version.txt`, and
    the screenshot guard of the ordinary suite fails until that names the
    workspace version. Read every image before the bump merges.
 5. **The changelog names the release.** Run
