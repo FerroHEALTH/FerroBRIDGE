@@ -48,7 +48,7 @@ const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, \
 /// The visit query of the derivation case.
 const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, \
     c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
-    FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
+    FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value, v/uid/value";
 
 /// The synthetic EHR.
 const EHR: &str = "7d44b88c-4199-4bad-97dc-d78268e01398";

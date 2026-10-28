@@ -155,7 +155,7 @@ mod tests {
     /// A visit query with the four projections.
     const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/context/other_context/items[at0001]/value/value AS visit_source, \
         c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
-        FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value";
+        FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY c/context/start_time/value, v/uid/value";
 
     #[test]
     fn an_offset_is_dropped_and_the_wall_clock_time_kept() {

@@ -328,6 +328,14 @@ against the version, and when it does not, the bridge reads it from the
 `version_uid`, whose first part names the versioned object (openEHR RM
 Common 1.1.0, `OBJECT_VERSION_ID`).
 
+The bridge reads the answer page by page with the `offset` and `fetch` of the
+query API, and a row keeps its page only when the order is total. Every
+version committed in one contribution carries the contribution's commit time
+(openEHR RM Common 1.1.0, Contributions), so two rows can tie on the commit
+instant. The `ORDER BY` of both queries therefore ends in `v/uid/value`, the
+uid of the `VERSION v[LATEST_VERSION]` variable, which names one row each,
+and the bridge refuses to load a query whose order ends in anything else.
+
 Both queries read every `COMPOSITION` below `VERSION v[LATEST_VERSION]`, and
 the bridge refuses to load a query that reads one without that scope. A
 deleted composition's newest version holds no data (openEHR RM Common 1.1.0
@@ -337,10 +345,17 @@ mapping nor widens a visit, so a changed composition is written once. AQL
 a query without a `VERSION` gets, so the scope is written out:
 
 ```text
-SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition
-FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c
-ORDER BY c/context/start_time/value
+SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid,
+       vo/uid/value AS versioned_object_uid, c AS composition
+FROM EHR e CONTAINS VERSIONED_OBJECT vo
+     CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c
+WHERE v/commit_audit/time_committed/value > $since
+ORDER BY v/commit_audit/time_committed/value, v/uid/value
 ```
+
+A CDR that does not take `VERSIONED_OBJECT` in the `FROM` runs the same query
+without the `vo` step and its column; the bridge then reads the versioned
+object from the `version_uid`.
 
 The query selects the composition whole, and the mappings read its leaves.
 Leave leaf paths through a repeated node, such as two values of one
