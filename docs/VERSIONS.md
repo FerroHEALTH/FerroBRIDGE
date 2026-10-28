@@ -100,7 +100,7 @@ dependency pins below.
 | Item | Pin | Repeated in |
 |---|---|---|
 | `serde-saphyr` | 2.0.0 | `docs/architecture.md` §7, the root `Cargo.toml` `[workspace.dependencies]` |
-| `jsonschema` | 0.57.0 | `docs/architecture.md` §7, the root `Cargo.toml` `[workspace.dependencies]` (the FHIRconnect mapping schemas) |
+| `jsonschema` | 0.59.0 | `docs/architecture.md` §7, the root `Cargo.toml` `[workspace.dependencies]` (the FHIRconnect mapping schemas) |
 | `reqwest` | 0.13.5 | `docs/architecture.md` §7, the root `Cargo.toml` `[workspace.dependencies]` |
 | `backon` | 1.6.0 | `docs/architecture.md` §7, the root `Cargo.toml` `[workspace.dependencies]` |
 | `url` | 2.5.8 | the root `Cargo.toml` `[workspace.dependencies]` |
