@@ -25,6 +25,7 @@ use fhirconnect::engine::seam::ResourceIdentity;
 use fhirconnect::engine::seam::ResourceRequest;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::Each;
+use fhirconnect::engine::traverse::occurrence::occurrences;
 use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::engine::traverse::to_fhir_each;
 use fhirconnect::engine::traverse::to_openehr;
@@ -188,6 +189,41 @@ fn each_occurrence_of_the_start_archetype_is_its_own_resource() -> Result<(), Bo
             .get(1)
             .is_some_and(|(_, _, json)| json.get("note").is_none()),
         "the second occurrence carries no note of the first's: {mapped:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_occurrences_are_named_as_each_run_names_them() -> Result<(), Box<dyn Error>> {
+    let (program, index) = eu_condition_program()?;
+    let composition = two_diagnoses(&program, &index)?;
+    let named: Vec<(Vec<u32>, String)> = occurrences(&program, &index, &composition)?
+        .iter()
+        .map(|one| (one.positions().to_vec(), one.path().to_owned()))
+        .collect();
+    let each: Vec<(Vec<u32>, String)> = to_fhir_each(
+        &program,
+        &SCHEMAS,
+        &index,
+        &composition,
+        &Seams::default(),
+        &CallContext::new(),
+    )?
+    .into_iter()
+    .map(|one| match one {
+        Each::Mapped {
+            occurrence, path, ..
+        }
+        | Each::NotApplicable { occurrence, path } => (occurrence, path),
+    })
+    .collect();
+    assert_eq!(each, named);
+    assert_eq!(
+        named,
+        [
+            (vec![1], String::from(FIRST_PATH)),
+            (vec![2], String::from(SECOND_PATH))
+        ]
     );
     Ok(())
 }

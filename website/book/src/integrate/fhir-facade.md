@@ -226,14 +226,20 @@ the outcome names the candidates, so the fix is a pin rather than a guess.
 ## Identity
 
 A FHIR resource id has to be stable across composition versions, because R4
-fixes that "once assigned, this value never changes". The facade derives it
-from the entry's `LOCATABLE.uid` when the entry carries one that the R4 `id`
-grammar admits, and otherwise from a SHA-256 over the version container, the
-entry path and the split occurrence, rendered as 52 lowercase base32
-characters. `meta.versionId` carries the openEHR `version_tree_id` and never
-enters the derivation, so a new version of a composition reads back under the
-same id with a new `meta.versionId`. `meta.source` names the openEHR version
-uid the answer was read from.
+fixes that "once assigned, this value never changes". The facade gives each
+resource the deterministic id the FHIRconnect engine chapter recommends, a hash
+of the composition uid and the entry path, the same id `$tofhir` answers for
+the same occurrence. The composition uid is the version container, the part of
+the `OBJECT_VERSION_ID` that stays the same across versions. The entry path
+names one occurrence of the context's start archetype wherever the template
+places it: a `content` item, an item of a `SECTION` at any depth, or an instance
+repeating below another entry, with a later occurrence named by its place in
+its container, as in `/content[openEHR-EHR-SECTION.adhoc.v1]/items[2]`. Each
+occurrence is a resource of its own. The hash is SHA-256, written as 52
+lowercase base32 characters. `meta.versionId` carries the openEHR
+`version_tree_id` and never enters the derivation, so a new version of a
+composition reads back under the same id with a new `meta.versionId`.
+`meta.source` names the openEHR version uid the answer was read from.
 
 The identity map is a `redb` file with seven tables: a patient identifier to its
 `ehr_id` and each `ehr_id` back to the first person recorded for it, an
@@ -241,8 +247,11 @@ external resource id to the internal one, an internal id to the
 composition version container with the entry path and split occurrence, and the
 source resource `id` with its `meta.versionId` to the mapping that consumed
 them, beside the contribution each source was committed in and each
-`Resource.identifier` of a committed resource. The map wins once written, so a derivation change never renames a
-resource a client already holds. The store keeps identifiers and nothing else:
+`Resource.identifier` of a committed resource. The map wins once written. The
+store file records its schema, and a file an earlier schema wrote is refused at
+boot with its path named: the ids this release derives differ from the ids the
+facade served before 0.0.14, so the reset is to remove the file, which the
+bridge then creates anew. The store keeps identifiers and nothing else:
 no clinical content is written into it, and a test greps the file for a mapped
 value to prove it.
 

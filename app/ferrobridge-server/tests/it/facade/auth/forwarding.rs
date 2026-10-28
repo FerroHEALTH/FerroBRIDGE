@@ -64,12 +64,12 @@ async fn credentialed() -> Result<Harness, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
-            "/definition/template/adl1.4/ferrobridge.diagnose.v1",
+            "/definition/template/adl1.4/ferrobridge.diagnoses.v1",
         ))
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("Content-Type", "application/xml")
-                .set_body_string(ferrobridge_testkit::fixtures::DIAGNOSE_OPT),
+                .set_body_string(ferrobridge_testkit::fixtures::DIAGNOSES_OPT),
         )
         .mount(&cdr)
         .await;

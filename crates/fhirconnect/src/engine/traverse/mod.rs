@@ -30,6 +30,7 @@ pub mod event;
 pub mod functions;
 pub mod links;
 pub mod manual;
+pub mod occurrence;
 pub mod party;
 pub mod place;
 pub mod programmed;

@@ -66,16 +66,16 @@ const SCHEMA_KEY: &str = "schema";
 
 /// The schema this build writes.
 ///
-/// Schema 2 adds the identity derivation to each composition binding, and
-/// schema 3 the binding of a resource an outbound run creates, which names its
-/// parent; a binding without one is an entry's own, so a file of schema 1 or 2
-/// reads unchanged. A file with no schema row was written by a build up to
-/// 0.0.6 and reads as schema 1 (no specification governs the store: our own
+/// Schema 4 holds the bindings of identity derivation 3, whose ids are the
+/// deterministic ids the engine's `$tofhir` answers. An id an earlier
+/// schema recorded was derived another way, so a file of schema 1 to 3 is
+/// refused rather than read, and its reset is to remove the file, which the
+/// bridge then creates anew (no specification governs the store: our own
 /// design).
-pub const SCHEMA: u32 = 3;
+pub const SCHEMA: u32 = 4;
 
 /// The oldest schema this build reads.
-pub const OLDEST_SCHEMA: u32 = 1;
+pub const OLDEST_SCHEMA: u32 = 4;
 
 /// The identity map of one configured CDR, on disk.
 ///
@@ -115,8 +115,9 @@ impl RedbStore {
         };
         let write = store.database.begin_write().map_err(transaction)?;
         {
+            let fresh = write.list_tables().map_err(transaction)?.next().is_none();
             let mut meta = write.open_table(META).map_err(transaction)?;
-            schema::stamp(&mut meta, path)?;
+            schema::stamp(&mut meta, path, fresh)?;
             let patients = write.open_table(PATIENTS).map_err(transaction)?;
             let mut subjects = write.open_table(SUBJECTS).map_err(transaction)?;
             schema::backfill(&patients, &mut subjects)?;

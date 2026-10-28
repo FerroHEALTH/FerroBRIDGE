@@ -535,7 +535,9 @@ fn matched(
     position: usize,
 ) -> Result<Vec<Entry>, Refusal> {
     let program = plan.program.program();
-    let every = engine::entry::entries_of(program, &read.composition);
+    let index = plan.program.index();
+    let every = engine::entry::entries_of(program, index, &read.composition)
+        .map_err(|error| Refusal::from(Refused::from(error)))?;
     let nodes = plan.conditions.as_ref().map_or(0, Conditions::node_count);
     let mut chosen: Option<Vec<Entry>> = None;
     for node in 0..nodes {
@@ -564,9 +566,13 @@ fn matched(
         let mut named = Vec::new();
         for binding in bindings {
             if binding.versioned_object_uid == container.value()
-                && let Some(entry) =
-                    engine::entry::entry_named(program, &read.composition, &binding.entry_path)
-                        .map_err(|error| Refusal::from(Refused::from(error)))?
+                && let Some(entry) = engine::entry::entry_named(
+                    program,
+                    index,
+                    &read.composition,
+                    &binding.entry_path,
+                )
+                .map_err(|error| Refusal::from(Refused::from(error)))?
             {
                 named.push(entry.ordinal());
             }

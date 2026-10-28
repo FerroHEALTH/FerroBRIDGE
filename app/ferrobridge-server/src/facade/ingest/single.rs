@@ -191,10 +191,13 @@ impl Ingest<'_> {
                 )
             })?;
         let whole = canonical_of(&standing.composition, built)?;
-        Ok(
-            engine::entry::entry_named(program.program(), &whole, &binding.entry_path)?
-                .map(|entry| (whole, entry)),
-        )
+        Ok(engine::entry::entry_named(
+            program.program(),
+            program.index(),
+            &whole,
+            &binding.entry_path,
+        )?
+        .map(|entry| (whole, entry)))
     }
 
     /// Commits the first version of a composition for `inbound`.
@@ -519,20 +522,25 @@ fn splice(
     revision: &Revision<'_>,
 ) -> Result<CanonicalComposition, Refused> {
     let standing = canonical_of(revision.standing, built)?;
-    let target = engine::entry::entry_named(program.program(), &standing, revision.entry_path)?
-        .ok_or_else(|| {
-            Refused::new(
-                StatusCode::NOT_FOUND,
-                Issue::error(IssueType::NotFound).diagnosing(format!(
-                    "the composition version {} no longer holds the entry the resource names",
-                    revision.preceding.value()
-                )),
-            )
-        })?;
-    if engine::entry::entries_of(program.program(), &standing).len() <= 1 {
+    let target = engine::entry::entry_named(
+        program.program(),
+        program.index(),
+        &standing,
+        revision.entry_path,
+    )?
+    .ok_or_else(|| {
+        Refused::new(
+            StatusCode::NOT_FOUND,
+            Issue::error(IssueType::NotFound).diagnosing(format!(
+                "the composition version {} no longer holds the entry the resource names",
+                revision.preceding.value()
+            )),
+        )
+    })?;
+    if engine::entry::entries_of(program.program(), program.index(), &standing)?.len() <= 1 {
         return Ok(built.clone());
     }
-    let item = engine::entry::entry_of(program.program(), built)
+    let item = engine::entry::entry_of(program.program(), program.index(), built)?
         .and_then(|entry| entry.item(built).cloned())
         .ok_or_else(|| {
             Refused::new(
@@ -574,10 +582,10 @@ fn would_commit(
     built: &CanonicalComposition,
     sent: Composition,
 ) -> Result<Option<Composition>, Refused> {
-    if engine::entry::entries_of(program.program(), whole).len() <= 1 {
+    if engine::entry::entries_of(program.program(), program.index(), whole)?.len() <= 1 {
         return Ok(Some(sent));
     }
-    let Some(item) = engine::entry::entry_of(program.program(), built)
+    let Some(item) = engine::entry::entry_of(program.program(), program.index(), built)?
         .and_then(|mapped| mapped.item(built).cloned())
     else {
         return Ok(None);

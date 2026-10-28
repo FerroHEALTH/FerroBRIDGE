@@ -81,6 +81,27 @@ pub const DIAGNOSE_OPT: &str = include_str!("../fixtures/opt/diagnose.opt");
 /// The template identifier [`DIAGNOSE_OPT`] declares.
 pub const DIAGNOSE_TEMPLATE_ID: &str = "ferrobridge.diagnose.v1";
 
+/// A synthetic operational template whose diagnoses repeat.
+///
+/// Its `COMPOSITION` holds one or more of the `EVALUATION`s of
+/// [`DIAGNOSE_OPT`], so the start archetype of a diagnosis context repeats
+/// among the composition's `content`. The template identifier is
+/// `ferrobridge.diagnoses.v1`.
+pub const DIAGNOSES_OPT: &str = include_str!("../fixtures/opt/diagnoses.opt");
+
+/// The template identifier [`DIAGNOSES_OPT`] declares.
+pub const DIAGNOSES_TEMPLATE_ID: &str = "ferrobridge.diagnoses.v1";
+
+/// A synthetic operational template whose diagnoses sit inside a section.
+///
+/// It holds the diagnoses of [`DIAGNOSE_OPT`] inside one `SECTION.adhoc.v1`,
+/// so the start archetype of a diagnosis context sits below a section. The
+/// template identifier is `ferrobridge.diagnose_sectioned.v1`.
+pub const DIAGNOSE_SECTIONED_OPT: &str = include_str!("../fixtures/opt/diagnose_sectioned.opt");
+
+/// The template identifier [`DIAGNOSE_SECTIONED_OPT`] declares.
+pub const DIAGNOSE_SECTIONED_TEMPLATE_ID: &str = "ferrobridge.diagnose_sectioned.v1";
+
 /// A synthetic operational template shaped like a laboratory report.
 ///
 /// One `COMPOSITION` holds any number of
