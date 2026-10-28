@@ -55,11 +55,11 @@ v0.0.4 (OMOP). Nothing is scaffolded before its issues are filed.
 ## Repo map
 
 The Cargo workspace (#107) holds the root manifests with the full lint set,
-eleven library crates (three at 0.0.0, the version that holds their crates.io
+twelve library crates (three at 0.0.0, the version that holds their crates.io
 names until a first publish, and `fhir-types`, `hl7v2-types`,
 `openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
-`ferrobridge-hl7v2`, `ferrobridge-fhirpath` and `ferrobridge-validator` on the
-published crate line), and
+`ferrobridge-hl7v2`, `ferrobridge-fhirpath`, `ferrobridge-validator` and
+`eehrxf` on the published crate line), and
 the testkit tool crate. Beside it:
 
 - `app/ferrobridge-server`: the bridge's one binary, `ferrobridge` (#21). A thin
@@ -211,6 +211,16 @@ the testkit tool crate. Beside it:
   extensions by `url`. `report` holds typed issues and every slicing,
   invariant, binding and profile it met and did not evaluate, and converts to
   an R4 `OperationOutcome`.
+- `crates/eehrxf`: the European interoperability software component of an
+  EHR system under Regulation (EU) 2025/327 (Art 25(1)), moved here from
+  FerroFED by the owner decision of 2026-10-28 (#1314), where every further
+  component change is made: `dataset` reads the Xt-EHR EHDS Logical
+  Information Models package, one feature per Art 14(1) category carries
+  its `crosswalk` to the HL7 Europe profiles, `fhir-r4` writes and receives
+  the exchange format in FHIR R4 with no openEHR crate, and `openehr` maps
+  openEHR to it through `fhirconnect`. Its tests read the HL7 Europe and
+  Xt-EHR tarballs `scripts/vendor/eehrxf.sh` vendors under `docs/specs/`;
+  full validation of a received document is `ferrobridge-validator`.
 - `tools/fhir-codegen`: the generator, with the seven vendored HL7 FHIR
   packages under `vendor/` (411 MB, a `PROVENANCE.md` each; one is the
   v2-to-FHIR guide, #252, and one the STU3 core package behind the `stu3`
@@ -249,7 +259,10 @@ the testkit tool crate. Beside it:
   corpus with a `PROVENANCE.md`, fetched by `scripts/vendor/*.sh` from the pins
   in `docs/VERSIONS.md`: FHIRconnect with its schemas and the REST API
   chapter, the FHIRconnect mapping library, OMOCL, the OMOP CDM v5.4
-  definitions and PostgreSQL DDL, and the ITS-REST OpenAPI documents. Beside
+  definitions and PostgreSQL DDL, the ITS-REST OpenAPI documents, and the
+  corpora the `eehrxf` tests read (the Xt-EHR models, the HL7 Europe guides,
+  the MyHealth@EU catalogue, FR Core and four FHIR R4 pages), each pinned
+  file by file by URL and sha256 (`scripts/vendor/lib/pinned.sh`). Beside
   them, `fhir-packages/` holds the R4 profile validator's package set (#435),
   one `<package>#<version>` tree per pin, fetched at build time by
   `scripts/vendor/profile-packages.sh` into the ignored `package/` and never

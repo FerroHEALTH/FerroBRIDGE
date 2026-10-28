@@ -1348,6 +1348,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
+name = "eehrxf"
+version = "0.1.128"
+dependencies = [
+ "async-trait",
+ "ferrobridge-term",
+ "ferrobridge-validator",
+ "fhir-types",
+ "fhirconnect",
+ "flate2",
+ "http",
+ "openehr-base",
+ "openehr-its",
+ "openehr-mapping-core",
+ "openehr-rm",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tar",
+ "thiserror 2.0.21",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "either"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

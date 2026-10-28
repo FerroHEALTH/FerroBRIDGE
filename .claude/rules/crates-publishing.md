@@ -10,7 +10,7 @@ paths: ["crates/**", "scripts/release/**", ".github/workflows/publish-crates.yml
 The `crates/*` members are published on crates.io under plain names
 (`fhir-types`, `hl7v2-types`, `openehr-mapping-core`, `fhirconnect`, `omocl`,
 `omop-cdm`, `ferrobridge-term`, `ferrobridge-hl7v2`, `ferrobridge-fhirpath`,
-`ferrobridge-validator`) so other projects can
+`ferrobridge-validator`, `eehrxf`) so other projects can
 depend on them. The server (`app/*`) and the tools (`tools/*`) are never
 published.
 Every member is BUSL-1.1 except the two generated crates, which are
@@ -30,7 +30,9 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   of `docs/VERSIONS.md`); `openehr-mapping-core` and `fhirconnect` joined it
   at their first publish (#397), `ferrobridge-term`, `ferrobridge-fhirpath`
   and `ferrobridge-validator` at 0.1.126 (#432), `hl7v2-types` and
-  `ferrobridge-hl7v2` at 0.1.127 (#1131), and every other member still
+  `ferrobridge-hl7v2` at 0.1.127 (#1131), `eehrxf` at 0.1.128 when it moved
+  here from FerroFED (#1314; its crates.io name already held 0.0.0 and its two
+  Trusted Publisher entries name this repository), and every other member still
   holds its name at the 0.0.0 placeholder until it joins the line at its own
   first publish.
 

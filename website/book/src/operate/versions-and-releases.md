@@ -34,17 +34,17 @@ The library crates are published on crates.io under plain names so other Rust
 projects can depend on them: `fhir-types`, `hl7v2-types`,
 `openehr-mapping-core`, `fhirconnect`, `omocl`, `omop-cdm`,
 `ferrobridge-operator-api`, `ferrobridge-term`, `ferrobridge-hl7v2`,
-`ferrobridge-fhirpath` and `ferrobridge-validator`. Each carries the
+`ferrobridge-fhirpath`, `ferrobridge-validator` and `eehrxf`. Each carries the
 `version` in its own
 `crates/*/Cargo.toml`, and that number never adopts the product version or a
 specification version.
 
-The set is deliberately not lockstep. Eight members carry a real 0.1.x line:
+The set is deliberately not lockstep. Nine members carry a real 0.1.x line:
 `fhir-types` continues the sequence it had on crates.io before it moved here
 from the sibling terminology server, and `hl7v2-types`,
 `openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
-`ferrobridge-hl7v2`, `ferrobridge-fhirpath` and `ferrobridge-validator`
-joined it on their first publish. Every other member still sits
+`ferrobridge-hl7v2`, `ferrobridge-fhirpath`, `ferrobridge-validator` and
+`eehrxf` joined it on their first publish. Every other member still sits
 at the 0.0.0 placeholder that holds its name on the registry until its
 first real release. A 0.0.0 on crates.io is a name reservation and nothing
 else: it compiles, it carries the licence and the metadata, and it is not the

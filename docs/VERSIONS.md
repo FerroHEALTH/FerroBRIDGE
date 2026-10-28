@@ -31,9 +31,13 @@ records why the value is what it is. The guard compares the first token of each
 
 A corpus is pinned by commit or immutable tag, never by a moving tag or a
 `latest` URL, and vendored by a committed `scripts/vendor/*.sh` with a
-`PROVENANCE.md` (`.claude/rules/vendored-inputs.md`). Each script below reads
-its pin from this table, and `scripts/checks/versions.sh` reads each vendored
-`PROVENANCE.md` back and fails when it names a different commit or tag.
+`PROVENANCE.md` (`.claude/rules/vendored-inputs.md`). A corpus with no commit
+to pin, a FHIR package from the package registry or a page of a published
+specification, is pinned file by file by URL and sha256
+(`scripts/vendor/lib/pinned.sh`), and its row carries the pin-set digest over
+those pins. Each script below reads its pin from this table, and
+`scripts/checks/versions.sh` reads each vendored `PROVENANCE.md` back and
+fails when it names a different commit, tag or pin-set digest.
 
 | Item | Pin | Repeated in |
 |---|---|---|
@@ -68,6 +72,16 @@ its pin from this table, and `scripts/checks/versions.sh` reads each vendored
 | HL7 v2 samples: AIRA MQE (build time, never committed) | `immregistries/mqe` commit `8b8a4274e1830cdb78ff5c8627763e1625caeac7` path `examples` files `9` digest `1fbda5ede288bdaf9ea53b16ded2149f11627cf4b0b39d2837299ab5803972b7` | `scripts/vendor/hl7v2-samples.sh --build-time`, `crates/ferrobridge-hl7v2/vendor/aira-mqe/PROVENANCE.md`, the same cache key |
 | FHIRPath test suite (R4) | `FHIR/fhir-test-cases` commit `9b57d9564f3f7e0343c020942155df13e56ef7a7` path `r4/fhirpath/tests-fhir-r4.xml` and the inputs it names files `13` digest `af9848ea9d046b288289adf64f199d4b4d0bdfebf6c000496b6e7f69a4b0dc48` | `scripts/vendor/fhirpath-tests.sh`, `docs/specs/fhirpath-tests/PROVENANCE.md`, `conformance/fhirpath-r4/PROVENANCE.md` |
 | HL7 v2+ licence page | `HL7/v2plus` commit `1a8fbb7e198047d71b9b13ceb582aaded4fa19f3` path `license.html` sha256 `48e2d1108ab38faafb9993342a9626b52d673ce2e683ef123716950564d76efd` | `scripts/vendor/v2ig.sh` and `scripts/vendor/v2-legacy.sh` (quoted verbatim in `tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md` and `tools/fhir-codegen/vendor/hl7-v2-legacy/PROVENANCE.md`) |
+| Xt-EHR EHDS Logical Information Models | package `xtehr.eu.ehds.models` 1.0.0, pin-set digest `796cc0974133058ba0b34d9b678baf272eb89b1ceeddc6930e6d66936a38c953`, tarball sha256 `a4853e58a869468464847e2eafa50fb07349e6da1e99456a0d93aae27848e1f8` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-xtehr-models/PROVENANCE.md` |
+| HL7 Europe Base and Core | package `hl7.fhir.eu.base` 2.0.1, pin-set digest `b84f7ba0799903e6bf4d2bf0ecaeeaefd0f71510238c7e30d63244ff6c603c67`, tarball sha256 `3fb23b64d70656ea809e1ad66d84d5d008400e18424266debf176cb46fba0b4a` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-base/PROVENANCE.md` |
+| HL7 Europe Patient Summary | package `hl7.fhir.eu.eps` 1.0.0-ballot, pin-set digest `ba59282865c06a3819a25d92b4110f5d6c84b2df2b0f4e0ae34092a66659f038`, tarball sha256 `e0fff1fb20d3daf75609259faa6b860131ebf4fc8890bb68f0da882307afc33c` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-eps/PROVENANCE.md` |
+| HL7 Europe Medication Prescription and Dispense | package `hl7.fhir.eu.mpd` 1.0.0, pin-set digest `4c4ea5572812dbacfc87573af4165742284a0825b0a200fa606df07393ea9758`, tarball sha256 `f1bc1084efc93e16ae4b45c1bb71340385d314a72031949c4a7e0d97aea5fd6b` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-mpd/PROVENANCE.md` |
+| HL7 Europe Laboratory Report | package `hl7.fhir.eu.laboratory` 2.0.0, pin-set digest `716111c5e8d1a60490dd0ac34f5e98534fd83cce8055218e05f7d675778af682`, tarball sha256 `097aa45c6efcdbc3f25ead8b7d448fee5011b5e7ecf264aa400c5e2c69c5c488` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-laboratory/PROVENANCE.md` |
+| HL7 Europe Imaging Report | package `hl7.fhir.eu.imaging` 1.0.0-ballot, pin-set digest `aad98731a1f2597d6a7defa2c7f6ab7297781b677398383346c5592f913c9f4b`, tarball sha256 `bb6012bd7a019ac82f5e939dd6e892e6db6b15fd2931dcf7cc445c1ad92c3d70` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-imaging/PROVENANCE.md` |
+| HL7 Europe Hospital Discharge Report | package `hl7.fhir.eu.hdr` 1.0.0, pin-set digest `8193d59700b891ed87e1e0da87bc62517dba751a449c9c65e7b7c8eb1982fba8`, tarball sha256 `eedf9af9f66b68cd66f7d6c678a36dfba86b0920df4ef15e8d2da900c4134879` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-hdr/PROVENANCE.md` |
+| MyHealth@EU Master Value Sets Catalogue | package `myhealth.eu.fhir.mvc-package` 9.1.0, pin-set digest `06f68a58f7382db396f029b1c0a420fcac6cbf53d8a948df47594937b0886749`, tarball sha256 `3f99350f36a2a1ea17b7fde37c39ff766bd5c3bc9a29c6183af1acfd07b78ce1` | `scripts/vendor/eehrxf.sh`, `docs/specs/ehdsi-mvc/PROVENANCE.md` |
+| HL7 France FR Core | package `hl7.fhir.fr.core` 2.2.0, pin-set digest `a2806a8c83c2b0b85a4b8c2cfd12effc5d37c3c2c0c2670406b840532698510a`, tarball sha256 `085e61bf579829a6d5520c6f388d763d27ba400f9f6ca548bc88da5545ba13f9` | `scripts/vendor/eehrxf.sh`, `docs/specs/fr-ans/PROVENANCE.md` |
+| FHIR R4 core specification pages | `hl7.org/fhir/R4/` 4.0.1, pin-set digest `f83b3f5adeb29f74a8c465292689bbdbbf7c6b609b9d5a643ab6954b483244a7`, the Extensibility (2.5.0), Defining Extensions (2.5.1), StructureDefinition and License and Legal Terms (2.20) pages | `scripts/vendor/eehrxf.sh`, `docs/specs/fhir-r4/PROVENANCE.md` |
 | UCUM essence | `ucum-org/ucum` tag `v2.2` commit `d060c6d3dfe3b0deb196c190b8024d95385e0b92` path `ucum-essence.xml` sha256 `dfccea1b5dc284245ebae97edd1dc03c45864da4e87df55bc9851797b4fd0b61` | `scripts/vendor/ucum.sh`, `crates/ferrobridge-fhirpath/vendor/ucum/PROVENANCE.md` (embedded whole in the `ferrobridge-fhirpath` crate) |
 | FerroPULSE report envelope v2 | `FerroHEALTH/FerroPULSE` commit `322fcecd54144e9194bd9b0d7a240d2635633b10` path `schemas/report-envelope.v2.json` sha256 `09048000b428cbb010d165b52a4579f60672c471f167a3b58410226dddfec9c2`, with the examples under `schemas/examples/report-envelope.v2/` | `scripts/vendor/ferropulse-schemas.sh`, `app/ferrobridge-server/tests/fixtures/ferropulse/PROVENANCE.md` (the usage report contract is `docs/report-v2.md` at the same commit) |
 
@@ -325,8 +339,9 @@ change that breaks a public API is a patch too, so a consumer pins a crate of
 the line exactly (owner decision 2026-10-17, #510).
 `openehr-mapping-core` and `fhirconnect` joined the line at 0.1.108 with their
 first publish (#397), and `ferrobridge-term`, `ferrobridge-fhirpath` and
-`ferrobridge-validator` joined it at 0.1.126 (#432), and `hl7v2-types` and
-`ferrobridge-hl7v2` at 0.1.127 (#1131). Every other library crate holds its name with a 0.0.0
+`ferrobridge-validator` joined it at 0.1.126 (#432), `hl7v2-types` and
+`ferrobridge-hl7v2` at 0.1.127 (#1131), and `eehrxf` at 0.1.128 when it moved
+here from FerroFED, where it reached 0.0.40 unpublished (#1314). Every other library crate holds its name with a 0.0.0
 placeholder (#107), outside the line until its first publish, when it joins
 at the line's current value.
 

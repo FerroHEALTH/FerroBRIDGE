@@ -208,6 +208,10 @@ classify() {
     # Writes only the CKM archetypes under the testkit's fixtures, which the
     # medication template the testkit builds reads.
     scripts/vendor/ckm-medication.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
+    # The corpora only the eehrxf tests read, and the script that writes them.
+    docs/specs/eu-xtehr-models/* | docs/specs/eu-hl7-*/* | docs/specs/fhir-r4/*) echo "only eehrxf" ;;
+    docs/specs/ehdsi-mvc/* | docs/specs/fr-ans/*) echo "only eehrxf" ;;
+    scripts/vendor/eehrxf.sh | scripts/vendor/lib/pinned.sh) echo "only eehrxf" ;;
     crates/* | app/* | tools/*) echo member ;;
     *) echo global ;;
   esac

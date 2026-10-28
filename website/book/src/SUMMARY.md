@@ -12,6 +12,9 @@
 - [Pinned versions](evaluate/versions.md)
 - [Build order](evaluate/build-order.md)
 - [EHDS readiness](evaluate/ehds-readiness.md)
+- [The interoperability component](evaluate/interoperability-component.md)
+  - [The category crosswalks](evaluate/category-crosswalks.md)
+  - [Receiving a document](evaluate/receiving-documents.md)
 - [Licensing](evaluate/licensing.md)
 - [CRA information for users](evaluate/cra-user-information.md)
 
