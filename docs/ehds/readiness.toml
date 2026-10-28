@@ -157,14 +157,14 @@ template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Lab
 context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition.context.yml"
 test = "app/ferrobridge-server/tests/it/facade/document.rs::the_document_is_the_composition_and_every_resource_it_creates"
 claimed = false
-remark = "assembled by the facade's Composition/$document; the assembly is proven on a synthetic Composition context"
+remark = "assembled by the facade's Composition/$document, proven on a synthetic Composition context; the claimed document is the interoperability component's (`eehrxf`) laboratory document"
 
 [[category]]
 article = "14(1)(f)"
 name = "Discharge reports"
-note = "HL7 Europe Hospital Discharge Report is at 0.1.0-ballot on superseded dependencies and deferred (docs/architecture.md section 4.8)."
+note = "HL7 Europe Hospital Discharge Report 1.0.0 (R4, 2026-10-16) is pinned, and the interoperability component (`eehrxf`) holds its crosswalk; no context maps its Composition, because no template carries a discharge report."
 
 [[category.row]]
 target = "Discharge report Composition"
-package = "hl7.fhir.eu.hdr 0.1.0-ballot"
+package = "hl7.fhir.eu.hdr 1.0.0"
 gap = "no discharge report template in the openEHR international CKM"

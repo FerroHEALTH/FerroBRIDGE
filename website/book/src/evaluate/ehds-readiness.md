@@ -76,14 +76,14 @@ HL7 Europe Imaging Report is at 1.0.0-ballot and deferred (docs/architecture.md 
 | `Observation-resultslab-eu-lab` | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_result_survive_the_round_trip` |
 | `Specimen-eu-lab` | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_specimen_survive_the_round_trip` |
 | `Composition-eu-lab` | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_document_composition_survive_the_round_trip` |
-| `Bundle-eu-lab` (produced, not claimed); assembled by the facade's Composition/$document; the assembly is proven on a synthetic Composition context | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_document_is_the_composition_and_every_resource_it_creates` |
+| `Bundle-eu-lab` (produced, not claimed); assembled by the facade's Composition/$document, proven on a synthetic Composition context; the claimed document is the interoperability component's (`eehrxf`) laboratory document | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_document_is_the_composition_and_every_resource_it_creates` |
 
 ### Article 14(1)(f): Discharge reports
 
-HL7 Europe Hospital Discharge Report is at 0.1.0-ballot on superseded dependencies and deferred (docs/architecture.md section 4.8).
+HL7 Europe Hospital Discharge Report 1.0.0 (R4, 2026-10-16) is pinned, and the interoperability component (`eehrxf`) holds its crosswalk; no context maps its Composition, because no template carries a discharge report.
 
 | Target profile | Package | Committed template | Transform proven |
 |---|---|---|---|
-| `Discharge report Composition` | hl7.fhir.eu.hdr 0.1.0-ballot | none: no discharge report template in the openEHR international CKM | no |
+| `Discharge report Composition` | hl7.fhir.eu.hdr 1.0.0 | none: no discharge report template in the openEHR international CKM | no |
 
 <!-- readiness:end -->

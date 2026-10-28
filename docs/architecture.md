@@ -1133,7 +1133,7 @@ from each guide's `package-list.json` and `ImplementationGuide` resource):
 | HL7 Europe Medication Prescription and Dispense | `hl7.fhir.eu.mpd` | 1.0.0, STU 1 active, R4 (2026-05-11) | third: four profiles, covers both prescriptions and dispensations, the earlier obligation date |
 | HL7 Europe Patient Summary | `hl7.fhir.eu.eps` | 1.0.0-ballot, draft, R4 (2026-06-06); declares conformance with IPS 2.0.0 while IPS is at 2.0.1 (STU 2, R4, 2026-06-19) | pinned at 1.0.0-ballot for the profile validator, with IPS 2.0.0 as its package declares; no context mapping targets it yet: the canonicals are stable enough to design against, the constraints will move before STU 1 |
 | HL7 Europe Imaging Report | `hl7.fhir.eu.imaging` | 1.0.0-ballot, draft, R4 (2026-03-16); key-image selection profiled on `Basic` because R4 has no `ImagingSelection`; depends on `ihe.iti.mhd` and `fhir.dicom` | deferred: an R4 workaround set with two heavy dependencies |
-| HL7 Europe Hospital Discharge Report | `hl7.fhir.eu.hdr` | 0.1.0-ballot, draft, R4 (2025-06-03); depends on superseded Base 0.1.0-ballot, Laboratory 0.1.1 and IPS 1.1.0 | deferred outright: fifteen months stale, everything built on it would be rewritten |
+| HL7 Europe Hospital Discharge Report | `hl7.fhir.eu.hdr` | 1.0.0, R4 (2026-10-16), on Base 2.0.1 and IPS 2.0.1; read 2026-10-28 from its `package.json`, pinned with the `eehrxf` crate (#1314), which holds its crosswalk; it replaced 0.1.0-ballot (2025-06-03) on superseded Base 0.1.0-ballot, Laboratory 0.1.1 and IPS 1.1.0 | no context: no template carries a discharge report, a corpus gap |
 
 **The R4 profile validator's package set** is pinned ahead of any mapping
 (#435): EPS 1.0.0-ballot, EU Base 2.0.1 and IPS 2.0.0, with every package
@@ -1202,6 +1202,13 @@ model, which FHIRconnect's composition chapter lets a context start at
 without a composition slot: one section carries the test's code and
 references the `DiagnosticReport-eu-lab`, whose status and identifier it
 reads out of openEHR only, since the Composition writes those nodes going in.
+The facade's `Composition/$document` assembles the document `Bundle` from
+that context without claiming `Bundle-eu-lab`. The claimed laboratory
+document is the `eehrxf` crate's: its document assembly holds the
+`Composition-eu-lab` and the `DiagnosticReport-eu-lab` to one another, and it
+maps openEHR content through these contexts in its `openehr` feature (#1324).
+The contexts stay in the FHIRconnect path, because `eehrxf` runs FHIRconnect
+contexts as its input and authors none (decision on #116, 2026-10-28).
 
 **Decision:** profile mappings are authored in this repository, in the
 specification's own customisation mechanism (a context and its extensions per
