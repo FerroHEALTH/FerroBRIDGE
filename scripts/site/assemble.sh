@@ -70,6 +70,26 @@ cp -R assets/brand "$OUT/assets/"
 # that makes it useful.
 cp llms.txt "$OUT/llms.txt"
 
+# Each FHIR definition the interoperability component publishes, a
+# StructureDefinition-<id>.json beside the code that writes it, is served at
+# its ferrobridge.eu URL, fhir/StructureDefinition/<id>, and beside it as
+# <id>.json, which GitHub Pages serves as application/json (FHIR R4
+# extensibility.html 2.5.1: the definition SHALL be available to every party
+# that exchanges the extension). The archetype-local code systems are
+# described by a page of the landing tree at their base.
+for definition in crates/eehrxf/src/*/StructureDefinition-*.json; do
+  [[ -e "$definition" ]] || continue
+  name="$(basename "$definition" .json)"
+  id="${name#StructureDefinition-}"
+  if [[ -e "$OUT/fhir/StructureDefinition/$id" ]]; then
+    echo "assemble: two definitions are served at fhir/StructureDefinition/$id" >&2
+    exit 1
+  fi
+  mkdir -p "$OUT/fhir/StructureDefinition"
+  cp "$definition" "$OUT/fhir/StructureDefinition/$id"
+  cp "$definition" "$OUT/fhir/StructureDefinition/$id.json"
+done
+
 if roadmap > "$block" 2>/dev/null && [ -s "$block" ]; then
   awk -v blockfile="$block" '
     /<!-- roadmap:begin -->/ { print; while ((getline line < blockfile) > 0) print line; skip = 1; next }

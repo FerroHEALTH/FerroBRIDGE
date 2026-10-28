@@ -43,7 +43,7 @@ const EVALUATION: &str = "openEHR-EHR-EVALUATION.ferrofed_allergy.v1";
 const COMPOSITION: &str = "openEHR-EHR-COMPOSITION.ferrofed_summary.v1";
 
 /// The system of the evaluation archetype's local codes.
-const EVALUATION_SYSTEM: &str = "https://ferrofed.eu/fhir/CodeSystem/archetype-local/openEHR-EHR-EVALUATION.ferrofed_allergy.v1";
+const EVALUATION_SYSTEM: &str = "https://ferrobridge.eu/fhir/CodeSystem/archetype-local/openEHR-EHR-EVALUATION.ferrofed_allergy.v1";
 
 /// The term definitions of the synthetic allergy template, written in
 /// English.
@@ -184,7 +184,7 @@ fn the_same_local_code_of_two_archetypes_is_two_systems() -> TestResult {
     assert_eq!(
         first(&of_composition),
         Some((
-            "https://ferrofed.eu/fhir/CodeSystem/archetype-local/openEHR-EHR-COMPOSITION.ferrofed_summary.v1",
+            "https://ferrobridge.eu/fhir/CodeSystem/archetype-local/openEHR-EHR-COMPOSITION.ferrofed_summary.v1",
             "at0000"
         ))
     );

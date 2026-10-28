@@ -2109,6 +2109,26 @@ flowchart BT
 An arrow points at a dependency. The dotted arrows are emission and test
 support, not runtime dependencies.
 
+**The canonical URLs `eehrxf` defines live under `ferrobridge.eu`** (decision
+on #1319, 2026-10-28). The component writes two things of its own: the
+archetype-local code systems, `https://ferrobridge.eu/fhir/CodeSystem/archetype-local/`
+followed by the archetype id, because no openEHR, HL7 or FHIRconnect text
+defines a URI for an archetype's local codes; and the extension
+`https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations` on
+`MedicationRequest.dispenseRequest`, because no Xt-EHR element and no MPD
+profile carries the dispensations an item has left. FHIR R4 asks that a
+canonical URL "SHALL be globally unique, and SHOULD be an address at which
+this ... definition is (or will be) published" (resource.html, `url`;
+extensibility.html §2.5.1), and the component is published from this
+repository (no temporary homes, owner 2026-10-28), so the definitions sit
+under the domain of the product that publishes them. The site serves the
+extension's `StructureDefinition` at its URL and at the same URL with
+`.json` (`scripts/site/assemble.sh`), and a page at the code systems' base
+describes them. The crate carried `ferrofed.eu` bases from where it was
+built; no production deployment holds a document written with them, so the
+bases move with no compatibility alias, and FerroFED takes the `eehrxf`
+release that carries the new URLs.
+
 **One published crate per concern** (owner decision 2026-09-05, after a
 duplication check against both siblings): a finer split into twelve was
 scaffolded and collapsed, because each language is one thing to a consumer

@@ -208,7 +208,7 @@ fn a_multi_item_prescription_round_trips() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn a_member_request_reads_and_writes_back_the_same_json() -> Result<(), Box<dyn Error>> {
-    let text = r#"{"resourceType":"MedicationRequest","meta":{"profile":["http://hl7.eu/fhir/mpd/StructureDefinition/MedicationRequest-eu-mpd"]},"identifier":[{"system":"urn:oid:2.999.1.7.1","value":"RX-0004"}],"status":"active","intent":"order","medicationCodeableConcept":{"coding":[{"system":"urn:oid:2.999.1.7.2","code":"product-4"}]},"subject":{"reference":"Patient/example-patient"},"authoredOn":"2026-02-01","requester":{"reference":"Practitioner/example-prescriber"},"dosageInstruction":[{"text":"two a day"}],"dispenseRequest":{"extension":[{"url":"https://ferrofed.eu/fhir/StructureDefinition/remaining-dispensations","valueUnsignedInt":4}],"numberOfRepeatsAllowed":5}}"#;
+    let text = r#"{"resourceType":"MedicationRequest","meta":{"profile":["http://hl7.eu/fhir/mpd/StructureDefinition/MedicationRequest-eu-mpd"]},"identifier":[{"system":"urn:oid:2.999.1.7.1","value":"RX-0004"}],"status":"active","intent":"order","medicationCodeableConcept":{"coding":[{"system":"urn:oid:2.999.1.7.2","code":"product-4"}]},"subject":{"reference":"Patient/example-patient"},"authoredOn":"2026-02-01","requester":{"reference":"Practitioner/example-prescriber"},"dosageInstruction":[{"text":"two a day"}],"dispenseRequest":{"extension":[{"url":"https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations","valueUnsignedInt":4}],"numberOfRepeatsAllowed":5}}"#;
     let prescription = Prescription::read(&[text])?;
     let [item] = prescription.items.as_slice() else {
         return Err("one item".into());

@@ -73,6 +73,22 @@ three ways:
   profile and its whole dependency closure
   ([Full validation](receiving-documents.md#full-validation)).
 
+## The definitions it publishes
+
+The component writes two things no specification defines, and FerroBRIDGE
+publishes both under its own domain:
+
+- **The archetype-local code systems:** an archetype's local codes are
+  written under `https://ferrobridge.eu/fhir/CodeSystem/archetype-local/`
+  followed by the archetype id, one code system per archetype. The page at
+  that base describes them.
+- **The remaining-dispensations extension:** the number of dispensations a
+  prescription item has left travels in
+  `https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations`
+  on `MedicationRequest.dispenseRequest`, as a `valueUnsignedInt`. The site
+  serves its `StructureDefinition` at that URL, and at the same URL with
+  `.json`.
+
 ## The pinned proxies
 
 Each proxy is vendored by `scripts/vendor/eehrxf.sh` as the archive its
