@@ -1,7 +1,7 @@
 {
   "resourceType": "StructureDefinition",
   "id": "remaining-dispensations",
-  "url": "https://ferrofed.eu/fhir/StructureDefinition/remaining-dispensations",
+  "url": "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations",
   "name": "RemainingDispensations",
   "title": "Remaining dispensations",
   "status": "active",
@@ -40,7 +40,7 @@
       {
         "id": "Extension.url",
         "path": "Extension.url",
-        "fixedUri": "https://ferrofed.eu/fhir/StructureDefinition/remaining-dispensations"
+        "fixedUri": "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations"
       },
       {
         "id": "Extension.value[x]",

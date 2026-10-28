@@ -40,13 +40,14 @@ use crate::terminology::ehn;
 ///
 /// No openEHR, HL7 or FHIRconnect text defines a URI for an archetype's
 /// local codes, so this is a code system of the component's own, under the
-/// `ferrofed.eu` domain it was first published from, one per archetype:
+/// `ferrobridge.eu` domain of the product that publishes the component, one
+/// per archetype, described at this base on the FerroBRIDGE site:
 /// an archetype id "denotes a single archetype", and two versions of an
 /// archetype "are actually two distinct archetypes" (openEHR BASE Release
 /// 1.1.0, Base Types, Archetype Identifiers), so two archetypes' `at0003`
 /// are two concepts under two systems.
 // NOTE: no specification governs this: our own design, a URI under a domain Cadasto B.V. holds.
-pub const ARCHETYPE_LOCAL: &str = "https://ferrofed.eu/fhir/CodeSystem/archetype-local/";
+pub const ARCHETYPE_LOCAL: &str = "https://ferrobridge.eu/fhir/CodeSystem/archetype-local/";
 
 /// The openEHR terminology identifiers this crate maps, each with the FHIR
 /// system URI of [`ehn`] it names.

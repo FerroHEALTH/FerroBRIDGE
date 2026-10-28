@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>FerroBRIDGE: the archetype-local code systems</title>
+  <meta name="description" content="The code systems FerroBRIDGE's interoperability component writes an openEHR archetype's local codes under: this base followed by the archetype id.">
+  <link rel="canonical" href="https://ferrobridge.eu/fhir/CodeSystem/archetype-local/">
+  <link rel="stylesheet" href="../../../style.css">
+  <link rel="icon" href="../../../assets/brand/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <main>
+    <h1>The archetype-local code systems</h1>
+    <p><code>https://ferrobridge.eu/fhir/CodeSystem/archetype-local/</code> is the
+      base of a family of code systems, one per openEHR archetype. The system of an
+      archetype's local codes is this base followed by the archetype id, such as
+      <code>https://ferrobridge.eu/fhir/CodeSystem/archetype-local/openEHR-EHR-EVALUATION.problem_diagnosis.v1</code>.
+      The codes are the archetype's own at-codes, and their meaning is the term the
+      archetype or the operational template defines for each.</p>
+    <p>No openEHR, HL7 or FHIRconnect text defines a URI for an archetype's local
+      codes, so this family is FerroBRIDGE's own. An archetype id names a single
+      archetype, and two versions of one archetype are two distinct archetypes
+      (openEHR BASE, Base Types, Archetype Identifiers), so the <code>at0003</code> of
+      two archetypes are two concepts under two systems.</p>
+    <p>The interoperability component, the <code>eehrxf</code> crate, writes these
+      systems when it turns an openEHR text item into FHIR codings. The
+      <a href="../../../docs/evaluate/interoperability-component.html">interoperability
+      component's page</a> describes it.</p>
+  </main>
+</body>
+</html>

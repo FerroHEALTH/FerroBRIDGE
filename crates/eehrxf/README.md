@@ -56,10 +56,10 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   it contains, against the vendored MPD profiles by the rules of the
   `receive` check. The number of dispensations an item has left travels in
   the extension
-  `https://ferrofed.eu/fhir/StructureDefinition/remaining-dispensations` on
+  `https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations` on
   `dispenseRequest`, written only when a value is given; its FHIR R4
   `StructureDefinition` is `REMAINING_DISPENSATIONS_DEFINITION`, which the
-  documentation site serves at that URL.
+  FerroBRIDGE site serves at that URL.
 - `receive` (feature `fhir-r4`): a document received in the exchange format
   (Annex II 2.2 and 2.3). `ReceivedDocument::read` decodes it against FHIR R4,
   holds it to the document rules of the R4 `Bundle` (`bdl-9`, `bdl-10`,
@@ -82,7 +82,8 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   displayed with its term from the operational template (`local`), and any
   other code in no preferred system under eHN PS Art 10(7). `system` writes
   each coding's system as a FHIR URI: a local code under its archetype's
-  code system, the openEHR names `SNOMED-CT`, `LOINC` and `ICD10` as their
+  code system (`https://ferrobridge.eu/fhir/CodeSystem/archetype-local/`
+  followed by the archetype id, described at that base), the openEHR names `SNOMED-CT`, `LOINC` and `ICD10` as their
   URIs, and a code of a terminology with no known URI as no coding, in the
   narrative and reported as unmapped. `ehn` holds the
   eHN Patient Summary §4 preferred systems, the default set. `Expansions` reads the value set

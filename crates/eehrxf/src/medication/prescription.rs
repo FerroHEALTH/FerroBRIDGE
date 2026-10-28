@@ -55,7 +55,7 @@ use crate::receive::conform::Conformance;
 /// No element of the Xt-EHR model or of the MPD profiles carries it:
 /// `numberOfRepeatsAllowed` is the number authorised.
 pub const REMAINING_DISPENSATIONS: &str =
-    "https://ferrofed.eu/fhir/StructureDefinition/remaining-dispensations";
+    "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations";
 
 /// The FHIR R4 `StructureDefinition` of [`REMAINING_DISPENSATIONS`], as JSON.
 ///
