@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+#
+# The standards FerroBRIDGE supports, with where each release reads the
+# version from, for the information sheet's EHDS Art. 38(2)(e) facts that
+# scripts/release/system-documents.sh appends to the copy a release attaches.
+# Columns, tab-separated: the standard, the source of its version.
+#   first:<item>     the first word of the Pin cell of the docs/VERSIONS.md
+#                    row whose first cell is <item>
+#   cell:<item>      that whole Pin cell
+#   package:<item>   the version after the package name in that Pin cell
+#   tag:<item>       the git tag that Pin cell names
+#   image:<item>     the tag of the container image that Pin cell names
+#   text:<words>     a fact no pin file carries, stated once here
+HL7 FHIR	cell:FHIR
+FHIRconnect	first:FHIRconnect
+HL7 Europe Base and Core	package:HL7 Europe Base and Core
+HL7 Europe Laboratory Report	package:HL7 Europe Laboratory Report
+HL7 Europe Medication Prescription and Dispense	package:HL7 Europe Medication Prescription and Dispense
+HL7 FHIR terminology operations	text:R4 and R4B
+FHIRPath	text:Normative Release 2.0.0
+UCUM	tag:UCUM essence
+OMOP Common Data Model	first:OMOP CDM
+OMOCL	first:OMOCL
+openEHR ITS-REST	first:openEHR ITS-REST
+openEHR Reference Model (RM)	first:openEHR RM
+openEHR Archetype Query Language (AQL)	text:1.1.0
+HL7 Version 2 messages	text:2.3 to 2.9.1
+HL7 v2-to-FHIR mappings	first:`hl7.fhir.uv.v2mappings` (the v2-to-FHIR IG)
+MLLP	text:Release 1
+SMART App Launch	first:`hl7.fhir.uv.smart-app-launch`
+OAuth 2.0 bearer tokens, JWT, OpenID Connect	text:RFC 6750, RFC 7519, OpenID Connect Core 1.0
+TLS	text:1.2 and 1.3
+PostgreSQL	image:PostgreSQL image

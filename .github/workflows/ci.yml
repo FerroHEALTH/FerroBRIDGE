@@ -326,6 +326,9 @@ jobs:
       - run: bash scripts/release/changelog.sh --check
       - run: bash scripts/release/changelog.sh --check-preview
       - run: bash scripts/release/plan.sh --self-test
+      # The EHDS system documents' pin, standards readers, page check, the
+      # attached copies and the notes section, over fixtures and the pins.
+      - run: bash scripts/release/system-documents.sh --self-test
       # The weekly freshness read's own reader of the Chrome for Testing
       # feed, over fixtures and with no network.
       - run: bash scripts/checks/pin-freshness.sh --self-test

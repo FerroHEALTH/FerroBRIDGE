@@ -371,7 +371,8 @@ The checks, in the order the plan job runs them:
 | The section being cut opens its `### Security` with the reason when it mixes security and functional changes, and every Security entry names a GHSA id or a `security/vex/` path | `scripts/checks/changelog-security.sh --section X.Y.Z` |
 | No fragment is left under `changelog.d/` for the notes to miss | `plan.sh` (`check_changelog_fragments`, with `scripts/release/changelog.sh --check`) |
 | The previous release resolves from the pushed tags | `plan.sh prev-tag` |
-| The changelog section becomes the notes, with the support period and the CRA user information link | `plan.sh notes` |
+| The changelog section becomes the notes, with the support period, the CRA user information link and the pinned EHDS system documents | `plan.sh notes` |
+| The information sheet and the instructions for use at the pinned FerroHEALTH commit carry the pinned revision, are written with this release's facts, and the notes name the pinned revisions | `plan.sh` (`check_ehds_documents`, with `scripts/release/system-documents.sh`) |
 
 The previous release is resolved from `git ls-remote --tags origin 'v*'`, by
 version order. A tag that was pushed but whose release never published still
@@ -385,6 +386,24 @@ page, the Annex II information CRA Art 13(18) has accompany each release. The
 book is published from `main`, so every release links the same address, and
 `plan.sh notes` refuses when `website/book/src/SUMMARY.md` does not list the
 page.
+
+The EHR system Cadasto B.V. declares under the EHDS is FerroEHR with
+FerroBRIDGE, and its information sheet, instructions for use, readiness
+record and technical documentation are pages of the FerroHEALTH book.
+`docs/ehds/system-documents.env` pins the FerroHEALTH commit a release takes
+them from and the revision date of each page there. The plan fetches the
+information sheet and the instructions for use at that commit, refuses a page
+whose `Revised` line differs from the pin, makes the family book's relative
+links absolute, stamps the release's version and date under the title, and
+replaces the page's "This copy" section with FerroBRIDGE's facts: the system
+version (this release with the FerroEHR release its end-to-end tests run
+against, the FerroEHR CDR image row of `docs/VERSIONS.md`), the release date
+(EHDS Art. 38(2)(b)), and the versions of the standards in
+`docs/ehds/standards.tsv`, read from `docs/VERSIONS.md` (Art. 38(2)(e)). The
+`github-release` job attaches both copies, `finalize-release` refuses a draft
+without them, and the notes name the four pinned revisions. To move the pin,
+set the commit and the four dates together, read from the pages at that
+commit.
 
 You need `gh` logged in, because the milestone check reads the tracker. A
 missing tool refuses its check; it is never skipped.

@@ -174,6 +174,7 @@ classify() {
     .github/*) echo inert ;;
     .claude/* | website/* | assets/* | docker/* | fuzz/* | scripts/gh/* | scripts/release/*) echo inert ;;
     docs/ci-cd.md | docs/release.md | docs/post-market.md) echo inert ;;
+    docs/ehds/system-documents.env | docs/ehds/standards.tsv) echo inert ;;
     AI_STATEMENT.md | CHANGELOG.md | CITATION.cff | CLAUDE.md | CODE_OF_CONDUCT.md) echo inert ;;
     CONTRIBUTING.md | GOVERNANCE.md | MAINTAINERS.md | SECURITY.md | SUPPORT.md) echo inert ;;
     LICENSE | NOTICE | llms.txt | compose.yaml | sonar-project.properties) echo inert ;;

@@ -19,7 +19,8 @@
 #       release published, and ancestry plays no part.
 #   plan.sh notes <tag> <file>
 #       Writes the release notes for <tag>: its changelog section, the
-#       support period and the link to the CRA user information in the book.
+#       support period, the link to the CRA user information in the book and
+#       the pinned revisions of the EHDS system documents.
 #   plan.sh support-end <YYYY-MM-DD>
 #       Prints the month the support period of a release of that date ends.
 #   plan.sh --self-test
@@ -38,6 +39,12 @@ readonly TAG_RE='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
 # release links the same page.
 readonly CRA_PAGE='evaluate/cra-user-information.md'
 readonly CRA_URL='https://ferrobridge.eu/docs/evaluate/cra-user-information.html'
+
+# The EHDS system documents: the pin, the notes section and the attached
+# copies (EHDS Art. 30(1)(d), Art. 38), called by absolute path because the
+# self-test composes notes in a scratch tree.
+SYSTEM_DOCUMENTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/system-documents.sh"
+readonly SYSTEM_DOCUMENTS
 
 usage() {
   echo "usage: plan.sh checks <tag> [--notes <file>] | prev-tag <tag> | notes <tag> <file> | support-end <YYYY-MM-DD> | --self-test" >&2
@@ -142,6 +149,10 @@ notes() {
     echo "### Information and instructions to the user (CRA Annex II)"
     echo
     echo "[CRA information and instructions to the user for $tag]($CRA_URL): the manufacturer, the vulnerability contact, the support period, secure use, updates and decommissioning (Regulation (EU) 2024/2847 Art 13(18) and Annex II)."
+    # EHDS Art. 30(1)(d) and Art. 37: the revision of each system page of
+    # the FerroHEALTH book this release relies on, read from the pin.
+    echo
+    bash "$SYSTEM_DOCUMENTS" notes-section
   } >>"$out"
 }
 
@@ -235,6 +246,16 @@ check_notes() {
   cat "$NOTES"
 }
 
+# The information sheet and the instructions for use at the pinned
+# FerroHEALTH commit, refused when a page's revision differs from the pin,
+# written with this release's facts beside the notes as ehds/, which the
+# github-release job attaches; and the notes refused unless they name the
+# pinned revisions.
+check_ehds_documents() {
+  bash "$SYSTEM_DOCUMENTS" attach "$TAG" "$(dirname "$NOTES")/ehds"
+  bash "$SYSTEM_DOCUMENTS" check-notes "$NOTES"
+}
+
 # The list: "<function> <title>", in the order the plan job runs them.
 list() {
   cat <<'EOF'
@@ -244,7 +265,8 @@ check_changelog_structure Changelog structure (no duplicate subsections, canonic
 check_changelog_security The Security section of the cut names its advisories and its reason
 check_changelog_fragments No changelog fragment is left unassembled
 check_prev_tag The previous release resolves from the pushed tags
-check_notes The changelog section for this tag becomes the release notes, with the support period and the CRA user information link
+check_notes The changelog section for this tag becomes the release notes, with the support period, the CRA user information link and the EHDS system documents
+check_ehds_documents The EHDS system documents at the pinned revision, with this release's facts, and the notes naming them
 EOF
 }
 
@@ -298,10 +320,12 @@ self_test_notes() {
     "$(sed -n '1,/^### Support period$/p' "$tmp/notes.md"; echo)" "$want"
   expect "the support period names its end month" \
     "$(grep -c 'until the end of October 2031' "$tmp/notes.md")" "1"
-  expect "the CRA section follows the support period" \
-    "$(grep '^### ' "$tmp/notes.md" | tail -n2 | tr '\n' '|')" "### Support period|### Information and instructions to the user (CRA Annex II)|"
-  expect "the notes end with the CRA user information link" \
-    "$(tail -n1 "$tmp/notes.md" | grep -cF "[CRA information and instructions to the user for v1.2.3]($CRA_URL)")" "1"
+  expect "the CRA section and then the EHDS section follow the support period" \
+    "$(grep '^### ' "$tmp/notes.md" | tail -n3 | tr '\n' '|')" "### Support period|### Information and instructions to the user (CRA Annex II)|### The EHDS system documents|"
+  expect "the CRA section carries the CRA user information link" \
+    "$(sed -n '/^### Information and instructions/,/^### The EHDS/p' "$tmp/notes.md" | grep -cF "[CRA information and instructions to the user for v1.2.3]($CRA_URL)")" "1"
+  expect "the notes end with the pinned EHDS revisions the notes check accepts" \
+    "$(bash "$SYSTEM_DOCUMENTS" check-notes "$tmp/notes.md" >/dev/null 2>&1 && echo named || echo "$refused")" named
   : >"$tmp/website/book/src/SUMMARY.md"
   expect "a page the book does not list is refused" \
     "$( (cd "$tmp" && notes v1.2.3 "$tmp/notes.md") 2>/dev/null && echo composed || echo "$refused")" "$refused"
