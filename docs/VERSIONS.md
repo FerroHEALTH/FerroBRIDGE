@@ -307,7 +307,7 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.terminology.r4` | 6.3.0 files `4389` digest `67c5e37eee889968f623290df576cf8a24a6de8936c0ad4b14e742b6faf9833f` | `docs/specs/fhir-packages/hl7.terminology.r4#6.3.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 6.2.0 files `4342` digest `6d074864dff5ce089248b6113b6049b0420b8db1ffbb2837bf4e39847d3e28fe` | `docs/specs/fhir-packages/hl7.terminology.r4#6.2.0/PROVENANCE.md` |
 
-## HL7 FHIR Validator (the agreement corpus's reference, regeneration only, never committed)
+## HL7 FHIR Validator (the agreement corpus's reference and the exchange-format lane, never committed)
 
 The profile validator's agreement corpus (#442) compares it with the HL7 FHIR
 Validator, prior art and never the oracle. The reference outcomes under
@@ -317,7 +317,11 @@ below, fetching each into the ignored `target/hl7-validator/` and checking its
 sha256 before it runs. The jar comes from the `hapifhir/org.hl7.fhir.core`
 GitHub release of that version; each package is a tarball of the FHIR package
 registry that the validator loads for FHIR 4.0.1 beyond R4 core and the
-profile packages above. Nothing here is read by a build or a test.
+profile packages above. The CI `fhir-validator` job runs the same jar over
+the same cache on the documents the `eehrxf` suites write
+(`scripts/checks/fhir-validator.sh`, #1318); the last three rows are the
+dependency closure of the MyHealth@EU Master Value Sets Catalogue it loads.
+No build reads anything here.
 
 | Item | Pin | Repeated in |
 |---|---|---|
@@ -327,6 +331,9 @@ profile packages above. Nothing here is read by a build or a test.
 | `hl7.fhir.uv.extensions` | 5.3.0 sha256 `6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.terminology.r5` | 7.1.0 sha256 `473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.extensions.r5` | 5.2.0 sha256 `e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.fhir.uv.ips` | 1.1.0 sha256 `403c4141101810e924f2928287985084819d8a5cc3a62e2b3840a557129840ef` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology.r4` | 5.0.0 sha256 `c863bef14eddb01d2884d8f14826b9b152f9fcef6b99e107025136af69ce2c18` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `fhir.dicom` | 2022.4.20221006 sha256 `117a6137c7f08220a92aadaec23f10e603730fc13b583d46011a777a1f23e7ed` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 
 ## Crate line
 

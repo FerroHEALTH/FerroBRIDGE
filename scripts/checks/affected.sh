@@ -199,6 +199,9 @@ classify() {
     conformance/*/*) corpus_class "$(cut -d/ -f2 <<<"$1")" ;;
     conformance/* | scripts/checks/conformance.sh | README.md) echo "packages $(conformance_packages)" ;;
     scripts/checks/sqlx-offline.sh) echo "packages omop-cdm" ;;
+    # The exchange-format validator lane judges the documents the eehrxf
+    # suites write, so a change to it runs those suites and the lane.
+    scripts/checks/fhir-validator.sh) echo "packages eehrxf" ;;
     # Writes only the vendored FerroPULSE schema the server's tests read.
     scripts/vendor/ferropulse-schemas.sh) echo "packages ferrobridge-server" ;;
     # Writes only the agreement corpus's reference outcomes the validator's tests read.
