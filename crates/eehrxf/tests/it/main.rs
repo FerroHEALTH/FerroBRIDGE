@@ -7,6 +7,8 @@
 //! the test-scoped relaxations of `clippy.toml` reach their helpers too.
 
 #[cfg(test)]
+mod boundary;
+#[cfg(test)]
 mod category;
 #[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
