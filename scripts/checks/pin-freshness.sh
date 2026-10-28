@@ -22,9 +22,14 @@
 # endpoint lists. Needs an authenticated `gh`, curl and jq. `--self-test` runs
 # the Chrome for Testing reader over fixtures and needs no network.
 #
-# Exit 0 when every pin is current, 1 when at least one is behind (each such
-# line starts with STALE), 2 when a release could not be read, so a network
-# failure never reads as a fresh pin.
+# A pin cell that ends in `held: <reason>` records why its pin stays behind
+# the newest release; such a pin is reported HELD with its reason and never
+# counts as stale. The version of a cell is the word after the package name
+# when the cell reads `package <name> <version>`, else its first word.
+#
+# Exit 0 when every pin is current or held, 1 when at least one is behind
+# (each such line starts with STALE), 2 when a release could not be read, so a
+# network failure never reads as a fresh pin.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -45,15 +50,50 @@ cargo-leptos	leptos-rs/cargo-leptos
 Binaryen	WebAssembly/binaryen"
 
 # The second cell of the matrix row whose first cell is $1, with the backticks
-# stripped and only the first token kept, the same shape versions.sh reads.
-matrix_pin() {
+# stripped.
+matrix_cell() {
   awk -F'|' -v want="$1" '
     NF >= 3 {
       label = $2; value = $3
       gsub(/`/, "", label); gsub(/^[ \t]+|[ \t]+$/, "", label)
-      gsub(/^[ \t]+|[ \t]+$/, "", value)
-      if (label == want) { split(value, f, " "); print f[1]; exit }
+      gsub(/`/, "", value); gsub(/^[ \t]+|[ \t]+$/, "", value)
+      if (label == want) { print value; exit }
     }' "$MATRIX"
+}
+
+# The version a pin cell on stdin names: the word after the package name when
+# the cell reads `package <name> <version>`, else its first word, the same
+# token versions.sh reads.
+cell_version() {
+  awk '{
+    if ($1 == "package" && NF >= 3) { v = $3; sub(/,$/, "", v); print v }
+    else { print $1 }
+    exit
+  }'
+}
+
+# The reason a pin cell on stdin records for a pin held behind the newest
+# release, the text after `held:` up to the end of the cell, or nothing.
+cell_held() {
+  sed -n 's/.*held: *\(.*\)$/\1/p' | sed 's/[[:space:]]*$//'
+}
+
+# The version the matrix row whose first cell is $1 pins.
+matrix_pin() {
+  matrix_cell "$1" | cell_version
+}
+
+# The newest version a registry metadata document on stdin names: its
+# `latest` dist-tag, or its highest version by version order when it has
+# none, as a package published only as a ballot is.
+registry_newest() {
+  local document tagged
+  document="$(cat)"
+  if tagged="$(jq -er '."dist-tags".latest' <<< "$document" 2>/dev/null)"; then
+    printf '%s\n' "$tagged"
+    return
+  fi
+  jq -er '.versions | keys[]' <<< "$document" | sort -V | tail -n 1 | grep .
 }
 
 # The Chrome for Testing release the browser journeys run Chrome and
@@ -100,6 +140,18 @@ self_test() {
   expect "current   " "$got" "an equal pin"
   got="$(verdict "$CHROME_LABEL" 1.2.3.4 1.2.3.5 feed | cut -c1-10)"
   expect "STALE     " "$got" "a pin behind the newest Stable"
+  got="$(cell_version <<< 'package hl7.fhir.eu.laboratory 2.0.0, pin-set digest ab, tarball sha256 cd')"
+  expect "2.0.0" "$got" "the version of a package cell"
+  got="$(cell_version <<< 'v1.0.0 (grammar)')"
+  expect "v1.0.0" "$got" "the first word of another cell"
+  got="$(cell_held <<< 'package a 2.0.0, pin-set digest ab, held: 2.1.0 needs THO 7.4.0')"
+  expect "2.1.0 needs THO 7.4.0" "$got" "the reason of a held pin"
+  got="$(cell_held <<< 'package a 2.0.0, pin-set digest ab')"
+  expect "" "$got" "a pin with no reason"
+  got="$(registry_newest <<< '{"dist-tags":{"latest":"2.1.0"},"versions":{"2.0.0":{},"2.1.0":{}}}')"
+  expect "2.1.0" "$got" "the latest tag of a package"
+  got="$(registry_newest <<< '{"versions":{"0.9.0-ballot":{},"1.0.0-ballot":{}}}')"
+  expect "1.0.0-ballot" "$got" "the highest version of a ballot-only package"
   got="$(matrix_pin "$CHROME_LABEL")"
   case "$got" in
     [0-9]*.[0-9]*.[0-9]*.[0-9]*) ;;
@@ -214,10 +266,11 @@ done <<< "$WATCHED_COMMITS"
 
 # One "matrix label<TAB>registry metadata URL" record per line: a FHIR package
 # pinned by version, read against the `latest` dist-tag the FHIR package
-# registry publishes for it (the npm registry shape both registries speak).
-# Of the profile set only the two roots with a `latest` tag are read: every
-# other row is pinned at the version a dependent names, and the third root,
-# hl7.fhir.eu.eps, has one ballot version and no `latest` tag.
+# registry publishes for it (the npm registry shape both registries speak),
+# or, for a package with ballot versions only and no `latest` tag, against its
+# highest version. Of the profile set only the two roots with a `latest` tag
+# are read: every other row is pinned at the version a dependent names. The
+# corpora the eehrxf crate reads are read by their package rows (#1335).
 readonly WATCHED_PACKAGES="\
 hl7.fhir.r3.core	https://packages.fhir.org/hl7.fhir.r3.core
 hl7.fhir.r4.core	https://packages.fhir.org/hl7.fhir.r4.core
@@ -232,7 +285,17 @@ hl7.fhir.r3.examples	https://packages.fhir.org/hl7.fhir.r3.examples
 hl7.fhir.r4.examples	https://packages.fhir.org/hl7.fhir.r4.examples
 hl7.fhir.r4b.examples	https://packages.fhir.org/hl7.fhir.r4b.examples
 hl7.fhir.r5.examples	https://packages.fhir.org/hl7.fhir.r5.examples
-hl7.fhir.r6.examples	https://packages2.fhir.org/packages/hl7.fhir.r6.examples"
+hl7.fhir.r6.examples	https://packages2.fhir.org/packages/hl7.fhir.r6.examples
+Xt-EHR EHDS Logical Information Models	https://packages.fhir.org/xtehr.eu.ehds.models
+HL7 Europe Base and Core	https://packages.fhir.org/hl7.fhir.eu.base
+HL7 Europe Patient Summary	https://packages.fhir.org/hl7.fhir.eu.eps
+HL7 Europe Medication Prescription and Dispense	https://packages.fhir.org/hl7.fhir.eu.mpd
+HL7 Europe Laboratory Report	https://packages.fhir.org/hl7.fhir.eu.laboratory
+HL7 Europe Imaging Report	https://packages.fhir.org/hl7.fhir.eu.imaging
+HL7 Europe Hospital Discharge Report	https://packages.fhir.org/hl7.fhir.eu.hdr
+MyHealth@EU Master Value Sets Catalogue	https://packages.fhir.org/myhealth.eu.fhir.mvc-package
+HL7 France FR Core	https://packages.fhir.org/hl7.fhir.fr.core"
+
 
 while IFS=$'\t' read -r label url; do
   [ -n "$label" ] || continue
@@ -244,14 +307,17 @@ while IFS=$'\t' read -r label url; do
     continue
   fi
 
-  if ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$url" | jq -er '."dist-tags".latest' 2>&1)"; then
+  if ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$url" | registry_newest 2>&1)"; then
     printf 'UNREADABLE %s: could not read the latest version at %s (%s)\n' "$label" "$url" "$latest"
     unreadable=1
     continue
   fi
 
+  held="$(matrix_cell "$label" | cell_held)"
   if [ "$pinned" = "$latest" ]; then
     printf 'current    %s %s (%s)\n' "$label" "$pinned" "$url"
+  elif [ -n "$held" ]; then
+    printf 'HELD       %s: pinned %s, the registry names %s latest, held: %s (%s)\n' "$label" "$pinned" "$latest" "$held" "$url"
   else
     printf 'STALE      %s: pinned %s, the registry names %s latest (%s)\n' "$label" "$pinned" "$latest" "$url"
     stale=1

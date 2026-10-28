@@ -349,13 +349,16 @@ digest.
 project, which is the tag the image and the installer both carry. A corpus
 pinned by commit on a repository with no releases is compared with the head of
 the branch it follows, and a FHIR package (the core packages, THO, the
-v2-to-FHIR guide, the examples packages and the two profile-set roots that
-carry a `latest` tag) with the `latest` dist-tag of its registry, and the
-Chrome for Testing release of the browser journeys with the newest Stable
+v2-to-FHIR guide, the examples packages, the two profile-set roots that
+carry a `latest` tag, and every package the `eehrxf` crate reads) with the
+`latest` dist-tag of its registry, or with its highest version when it is
+published as a ballot only, and the Chrome for Testing release of the browser journeys with the newest Stable
 version its `last-known-good-versions.json` endpoint lists; the `versions`
 job runs that reader over fixtures with `--self-test`. The two KDS
 fixture rows pin one file each and the UCUM row a release tag, so the script
-leaves them out. The workflow runs it every Monday and on dispatch. When a pin is behind it opens one issue
+leaves them out. A pin cell that ends in `held: <reason>` records why the pin
+stays behind the newest release; the script reports it as HELD with that
+reason and never as stale. The workflow runs it every Monday and on dispatch. When a pin is behind it opens one issue
 carrying the report, and when an open issue already carries that report it adds
 nothing. The issue goes through `scripts/gh/fields.sh new` as a Task at Low
 priority and Low effort. The job's default token may not read the
