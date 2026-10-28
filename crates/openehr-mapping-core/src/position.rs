@@ -8,7 +8,7 @@ use core::fmt;
 /// A line and column in a YAML source document, both 1-based.
 ///
 /// The YAML parser reports character-based, 1-indexed coordinates
-/// (<https://docs.rs/serde-saphyr/1.2.0/serde_saphyr/struct.Location.html>),
+/// (<https://docs.rs/serde-saphyr/2.0.0/serde_saphyr/struct.Location.html>),
 /// and this type carries them unchanged so a diagnostic points at the same
 /// place an editor does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

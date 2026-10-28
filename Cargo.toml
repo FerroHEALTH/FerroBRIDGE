@@ -31,7 +31,7 @@ csv = "1.4.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["raw_value"] }
 # The maintained serde YAML: anchors, aliases, merge keys and source spans.
-serde-saphyr = { version = "1.3.0", default-features = false, features = ["deserialize"] }
+serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
 # draft-07 JSON Schema validation for the FHIRconnect mapping schemas. Both
 # schemas are self-contained, so no remote or file reference resolver is built.
 jsonschema = { version = "0.58.6", default-features = false }
@@ -68,7 +68,7 @@ socket2 = "0.6.5"
 # version: cargo resolves the path locally and the version on crates.io.
 fhir-types = { path = "crates/fhir-types", version = "0.1.128", default-features = false }
 hl7v2-types = { path = "crates/hl7v2-types", version = "0.1.127" }
-openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.134" }
+openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "0.1.135" }
 # The health and operator documents the server writes and the console reads.
 ferrobridge-operator-api = { path = "crates/ferrobridge-operator-api", version = "0.0.0" }
 # The OMOP CDM layer, taken metadata-only by default: a consumer that writes
@@ -86,11 +86,11 @@ ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.12
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
-ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.160" }
+ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.161" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.
-fhirconnect = { path = "crates/fhirconnect", version = "0.1.202" }
+fhirconnect = { path = "crates/fhirconnect", version = "0.1.203" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }

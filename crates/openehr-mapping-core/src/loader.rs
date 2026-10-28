@@ -4,7 +4,7 @@
 //! The YAML loader: one file in, a header and a positioned value tree out.
 //!
 //! The parser is `serde-saphyr`
-//! (<https://docs.rs/serde-saphyr/1.2.0/serde_saphyr/>), which resolves
+//! (<https://docs.rs/serde-saphyr/2.0.0/serde_saphyr/>), which resolves
 //! anchors, aliases and merge keys and reports 1-based character positions for
 //! both values and errors. The OMOCL corpus needs the first of those: 57 of
 //! its 208 files define an anchor.
