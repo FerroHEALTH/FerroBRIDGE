@@ -720,11 +720,84 @@ jobs:
           cargo hack nextest run "${args[@]}" --locked --no-tests=pass
           cargo hack test --doc "${args[@]}" --locked
       # eehrxf has no default feature, so its suites run with every feature on.
+      # The suites that hold a patient summary document to the vendored
+      # profiles also write it under EEHRXF_EMIT_DIR, for the fhir-validator
+      # job.
       - if: contains(matrix.packages, 'eehrxf')
+        env:
+          EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
           set -euo pipefail
           cargo nextest run -p eehrxf --all-features --locked --no-tests=pass
           cargo test --doc -p eehrxf --all-features --locked
+      - name: Upload the emitted exchange-format documents
+        if: contains(matrix.packages, 'eehrxf')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eehrxf-documents
+          path: ${{ runner.temp }}/eehrxf-documents/
+          if-no-files-found: error
+          retention-days: 7
+
+  # HL7's FHIR Validator over the patient summary documents the eehrxf suites
+  # write (#1318; no specification governs the lane: our own design), the
+  # evidence the component's page cites for the exchange format. It runs
+  # offline, the jar and the packages pinned in the "HL7 FHIR Validator"
+  # table of docs/VERSIONS.md, and fails on an error, a fatal issue or a
+  # claimed profile it could not find (scripts/checks/fhir-validator.sh). Its
+  # results are the eehrxf-fhir-validation artifact; the validator is never
+  # shipped.
+  fhir-validator:
+    name: fhir-validator (eehrxf documents)
+    needs: [detect, test]
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && contains(needs.detect.outputs.test-matrix, 'eehrxf')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Download the emitted exchange-format documents
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: eehrxf-documents
+          path: ${{ runner.temp }}/eehrxf-documents
+      - name: Read the pinned profile packages
+        id: profile-packages
+        run: echo "key=$(bash scripts/vendor/profile-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the profile packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: docs/specs/fhir-packages/*/package
+          key: profile-packages-${{ steps.profile-packages.outputs.key }}
+      - name: Fetch and verify the profile packages
+        run: bash scripts/vendor/profile-packages.sh
+      - name: The judge holds to its rules
+        run: bash scripts/checks/fhir-validator.sh --self-test
+      - name: Every document passes the HL7 FHIR Validator
+        run: |
+          set -euo pipefail
+          status=0
+          bash scripts/checks/fhir-validator.sh \
+            "$RUNNER_TEMP/eehrxf-documents" target/fhir-validation || status=$?
+          if [[ -f target/fhir-validation/summary.md ]]; then
+            cat target/fhir-validation/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
+      - name: Upload the validator's results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eehrxf-fhir-validation
+          path: target/fhir-validation/
+          if-no-files-found: ignore
+          retention-days: 30
 
   # The conformance gate (#24): the corpus tests measure the vendored
   # FHIRconnect and OMOCL libraries, the round-trip chains, the REST
@@ -1457,6 +1530,7 @@ jobs:
       - clippy
       - clippy-fhir-types
       - test
+      - fhir-validator
       - conformance
       - e2e
       - sqlx-offline
