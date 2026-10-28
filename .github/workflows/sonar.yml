@@ -226,7 +226,10 @@ jobs:
           cargo llvm-cov clean --workspace
           for package in $PACKAGES; do
             echo "::group::${package}"
-            cargo llvm-cov nextest --locked --no-report --no-tests=pass -p "${package}"
+            features=()
+            # eehrxf has no default feature; its suites need every feature on.
+            [ "${package}" = eehrxf ] && features=(--all-features)
+            cargo llvm-cov nextest --locked --no-report --no-tests=pass -p "${package}" "${features[@]}"
             echo "::endgroup::"
           done
           cargo llvm-cov report --lcov --output-path lcov.info \

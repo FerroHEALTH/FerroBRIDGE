@@ -89,6 +89,7 @@ carriers = [
   "tachys",
 ]
 workspace_roots = [
+  "eehrxf",
   "ferrobridge-console",
   "ferrobridge-fhirpath",
   "ferrobridge-hl7v2",

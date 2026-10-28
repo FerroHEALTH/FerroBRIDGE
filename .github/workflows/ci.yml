@@ -574,6 +574,10 @@ jobs:
       # consumer that takes only the listener, the parser and the ack (#1221).
       - if: contains(matrix.packages, 'ferrobridge-hl7v2')
         run: cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
+      # eehrxf has no default feature: one feature per Art 14(1) category and
+      # one per serialisation, each linted on its own as well as together.
+      - if: contains(matrix.packages, 'eehrxf')
+        run: cargo hack clippy -p eehrxf --each-feature --all-targets --locked -- -D warnings
 
   clippy-fhir-types:
     name: clippy-fhir-types (${{ matrix.version }}, resources)
@@ -712,6 +716,12 @@ jobs:
           for package in "${packages[@]}"; do args+=(-p "$package"); done
           cargo hack nextest run "${args[@]}" --locked --no-tests=pass
           cargo hack test --doc "${args[@]}" --locked
+      # eehrxf has no default feature, so its suites run with every feature on.
+      - if: contains(matrix.packages, 'eehrxf')
+        run: |
+          set -euo pipefail
+          cargo nextest run -p eehrxf --all-features --locked --no-tests=pass
+          cargo test --doc -p eehrxf --all-features --locked
 
   # The conformance gate (#24): the corpus tests measure the vendored
   # FHIRconnect and OMOCL libraries, the round-trip chains, the REST

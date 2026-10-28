@@ -91,3 +91,7 @@ fuzz/coverage/
 # (<https://insta.rs/docs/cli/>).
 *.pending-snap
 *.snap.new
+
+# The cache-only artefacts of a corpus pinned file by file
+# (scripts/vendor/lib/pinned.sh), read locally and never redistributed.
+/.vendor-cache/

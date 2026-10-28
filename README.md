@@ -195,7 +195,7 @@ continue from here.
 - The FHIR model for STU3 to R6, HL7 v2 tables, a FHIRPath evaluator, a FHIR R4 profile validator and a terminology client, published as Rust crates (listed below)
 
 <details>
-<summary><b>Published crates</b> (11)</summary>
+<summary><b>Published crates</b> (12)</summary>
 
 | Crate | What it does | Version | Docs | Downloads |
 |---|---|---|---|---|
@@ -209,6 +209,7 @@ continue from here.
 | [`ferrobridge-hl7v2`](https://crates.io/crates/ferrobridge-hl7v2) | The HL7 v2 face: MLLP, parsing, acknowledgments and the v2-to-FHIR map | [![crates.io](https://img.shields.io/crates/v/ferrobridge-hl7v2?logo=rust&label=crates.io)](https://crates.io/crates/ferrobridge-hl7v2) | [![docs.rs](https://img.shields.io/docsrs/ferrobridge-hl7v2?logo=docsdotrs&label=docs.rs)](https://docs.rs/ferrobridge-hl7v2) | [![downloads](https://img.shields.io/crates/d/ferrobridge-hl7v2?logo=rust&label=downloads)](https://crates.io/crates/ferrobridge-hl7v2) |
 | [`ferrobridge-fhirpath`](https://crates.io/crates/ferrobridge-fhirpath) | A FHIRPath 2.0.0 evaluator with the FHIR R4 additions | [![crates.io](https://img.shields.io/crates/v/ferrobridge-fhirpath?logo=rust&label=crates.io)](https://crates.io/crates/ferrobridge-fhirpath) | [![docs.rs](https://img.shields.io/docsrs/ferrobridge-fhirpath?logo=docsdotrs&label=docs.rs)](https://docs.rs/ferrobridge-fhirpath) | [![downloads](https://img.shields.io/crates/d/ferrobridge-fhirpath?logo=rust&label=downloads)](https://crates.io/crates/ferrobridge-fhirpath) |
 | [`ferrobridge-validator`](https://crates.io/crates/ferrobridge-validator) | A FHIR R4 and STU3 profile validator over packages read offline | [![crates.io](https://img.shields.io/crates/v/ferrobridge-validator?logo=rust&label=crates.io)](https://crates.io/crates/ferrobridge-validator) | [![docs.rs](https://img.shields.io/docsrs/ferrobridge-validator?logo=docsdotrs&label=docs.rs)](https://docs.rs/ferrobridge-validator) | [![downloads](https://img.shields.io/crates/d/ferrobridge-validator?logo=rust&label=downloads)](https://crates.io/crates/ferrobridge-validator) |
+| [`eehrxf`](https://crates.io/crates/eehrxf) | The European interoperability component of an EHR system under the EHDS Regulation: the exchange format in FHIR R4, mapped from openEHR | [![crates.io](https://img.shields.io/crates/v/eehrxf?logo=rust&label=crates.io)](https://crates.io/crates/eehrxf) | [![docs.rs](https://img.shields.io/docsrs/eehrxf?logo=docsdotrs&label=docs.rs)](https://docs.rs/eehrxf) | [![downloads](https://img.shields.io/crates/d/eehrxf?logo=rust&label=downloads)](https://crates.io/crates/eehrxf) |
 | [`ferrobridge-operator-api`](https://crates.io/crates/ferrobridge-operator-api) | The health and operator documents the bridge and its console share | [![crates.io](https://img.shields.io/crates/v/ferrobridge-operator-api?logo=rust&label=crates.io)](https://crates.io/crates/ferrobridge-operator-api) | [![docs.rs](https://img.shields.io/docsrs/ferrobridge-operator-api?logo=docsdotrs&label=docs.rs)](https://docs.rs/ferrobridge-operator-api) | [![downloads](https://img.shields.io/crates/d/ferrobridge-operator-api?logo=rust&label=downloads)](https://crates.io/crates/ferrobridge-operator-api) |
 
 </details>

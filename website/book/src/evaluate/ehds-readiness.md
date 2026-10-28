@@ -17,6 +17,11 @@ The HL7 Europe implementation guides are the current proxy for the exchange
 format, and FerroBRIDGE targets them on FHIR R4. When the implementing act is
 adopted, the targets below are re-read against it.
 
+This page is the FHIR facade's mapping matrix. The European interoperability
+software component an EHR system carries under Art 25(1), with its dataset
+model, its category crosswalks and the receipt of a document, is the
+`eehrxf` crate ([The interoperability component](interoperability-component.md)).
+
 ## The matrix
 
 Each row is a target profile with the committed template it maps from and the

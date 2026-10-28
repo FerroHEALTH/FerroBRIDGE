@@ -15,6 +15,7 @@
         ],
         "package": "paste@1.0.15",
         "workspace_roots": [
+          "eehrxf",
           "ferrobridge-console",
           "ferrobridge-fhirpath",
           "ferrobridge-hl7v2",

@@ -60,9 +60,9 @@
 #                          fixtures, the HL7 v2 message sets under
 #                          crates/ferrobridge-hl7v2/vendor/ and the
 #                          build-time HL7 v2 definitions name
-#                          the commit or tag the docs/VERSIONS.md corpus row
-#                          pins for them, and every sha256 or tree digest the
-#                          row records.
+#                          the commit, tag or pin-set digest the
+#                          docs/VERSIONS.md corpus row pins for them, and
+#                          every sha256 or tree digest the row records.
 #  10. FHIR packages       every row of the docs/VERSIONS.md FHIR-packages
 #                          table against the Version line of its
 #                          tools/fhir-codegen/vendor/<package>/PROVENANCE.md,
@@ -717,11 +717,13 @@ pin_cell_of() {
 }
 
 # The reference a pin cell names: its first 40-hex token, else the token after
-# the word `tag`.
+# the word `tag`, else the token after the words `pin-set digest`, which a
+# corpus pinned file by file carries (scripts/vendor/lib/pinned.sh).
 pinned_ref_of() {
   awk '{
     for (i = 1; i <= NF; i++) if ($i ~ /^[0-9a-f]{40}$/) { print $i; exit }
     for (i = 1; i < NF; i++) if ($i == "tag") { t = $(i + 1); gsub(/[,.;:]+$/, "", t); print t; exit }
+    for (i = 1; i + 1 < NF; i++) if ($i == "pin-set" && $(i + 1) == "digest") { t = $(i + 2); gsub(/[,.;:]+$/, "", t); print t; exit }
   }' <<< "$1"
 }
 
@@ -733,6 +735,16 @@ docs/specs/omop-cdm|OMOP CDM definitions and PostgreSQL DDL
 docs/specs/dqd|OHDSI Data Quality Dashboard
 docs/specs/its-rest|openEHR ITS-REST OpenAPI
 docs/specs/fhirpath-tests|FHIRPath test suite (R4)
+docs/specs/eu-xtehr-models|Xt-EHR EHDS Logical Information Models
+docs/specs/eu-hl7-base|HL7 Europe Base and Core
+docs/specs/eu-hl7-eps|HL7 Europe Patient Summary
+docs/specs/eu-hl7-mpd|HL7 Europe Medication Prescription and Dispense
+docs/specs/eu-hl7-laboratory|HL7 Europe Laboratory Report
+docs/specs/eu-hl7-imaging|HL7 Europe Imaging Report
+docs/specs/eu-hl7-hdr|HL7 Europe Hospital Discharge Report
+docs/specs/ehdsi-mvc|MyHealth@EU Master Value Sets Catalogue
+docs/specs/fr-ans|HL7 France FR Core
+docs/specs/fhir-r4|FHIR R4 core specification pages
 crates/ferrobridge-fhirpath/vendor/ucum|UCUM essence
 app/ferrobridge-server/tests/fixtures/ferropulse|FerroPULSE report envelope v2
 tools/ferrobridge-testkit/fixtures/opt/kds|KDS Diagnose operational template (fixture)
