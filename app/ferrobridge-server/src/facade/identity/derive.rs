@@ -13,13 +13,12 @@
 //! across updates, so an update keeps the id as FHIR R4 asks ("once
 //! assigned, this value never changes", <https://hl7.org/fhir/R4/resource.html>);
 //! `meta.versionId` carries the `version_tree_id`. A resource an outbound run
-//! creates beside its entry takes the digest [`created_digest`] derives. The
+//! creates beside its entry takes the id [`created_id`] derives. The
 //! hash, its rendering and the created resources' key are not fixed by the
 //! section: our own design.
 
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 
-use fhirconnect::engine::identity::base32;
 use fhirconnect::engine::identity::deterministic_id;
 use fhirconnect::engine::seam::IdentityRequest;
 
@@ -96,114 +95,38 @@ pub fn map_key(key: &EntryKey) -> ExternalResourceId {
         .unwrap_or_else(|_refusal| ExternalResourceId::of_digest(&id))
 }
 
-/// What one resource an outbound run creates is addressed by, before any
-/// store lookup.
+/// Returns the id of the resource `request` describes.
 ///
-/// The key is the entry its parent is bound to and the request the engine
-/// names the created resource with: its type, the parent's type, the mapping
-/// that creates it, the openEHR positions of the occurrence and a split's
-/// `unique` values. The composition's version uid the request may carry is
-/// left out, so the id stays stable across composition versions as an entry's
-/// does (no specification governs this: our own design).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CreatedKey {
-    /// The version container of the parent's entry.
-    versioned_object_uid: String,
-    /// The path of the parent's entry.
-    entry_path: String,
-    /// The split occurrence of the parent's binding.
-    split: u32,
-    /// The resource type of the created resource.
-    resource_type: String,
-    /// The resource type of the parent.
-    parent_type: String,
-    /// The mapping or model that creates the resource.
-    mapping: String,
-    /// The openEHR positions of the occurrence, outermost first.
-    occurrence: Vec<u32>,
-    /// The `unique` values of a split, in declaration order.
-    unique: Vec<String>,
-}
-
-/// Returns the key of the resource `request` describes, created by a run over
-/// the entry `parent` binds.
-#[must_use]
-pub fn created_key(parent: &CompositionBinding, request: &IdentityRequest) -> CreatedKey {
-    CreatedKey {
-        versioned_object_uid: parent.versioned_object_uid.clone(),
-        entry_path: parent.entry_path.clone(),
-        split: parent.split,
-        resource_type: request.resource_type().to_owned(),
-        parent_type: request.parent_type().to_owned(),
-        mapping: request.mapping().to_owned(),
-        occurrence: request.occurrence().to_vec(),
-        unique: request.unique().to_vec(),
-    }
-}
-
-/// Returns the identity-map key of one created resource.
-///
-/// As [`map_key`] does for an entry, the key is the digest itself, so the map
-/// wins once written.
-#[must_use]
-pub fn created_map_key(key: &CreatedKey) -> ExternalResourceId {
-    let digest = created_digest(key);
-    // The digest is 52 base32 characters, which carry no control character,
-    // so the constructor cannot refuse, and the fallback keeps the request
-    // path free of a panic.
-    ExternalResourceId::new(digest.as_str())
-        .unwrap_or_else(|_refusal| ExternalResourceId::of_digest(&digest))
-}
-
-/// Returns the digest-derived id of one created resource.
-///
-/// Every field is framed with its byte length and every list with its count,
-/// behind a `created` tag no entry key starts with, so no created key frames
-/// to the bytes of another key. No specification governs the framing: our
-/// own design.
+/// The resource is created by a run over the occurrence `parent` binds, and
+/// its id is the deterministic id `$tofhir` gives the same created resource
+/// ([`fhirconnect::engine::identity::created_id`]).
 ///
 /// # Panics
 ///
-/// Never in practice: 32 digest bytes render as exactly 52 characters of the
-/// base32 alphabet, and every one of them is inside the R4 `id` grammar.
+/// Never in practice: the engine renders 32 digest bytes as 52 lowercase
+/// base32 characters, every one of them inside the R4 `id` grammar.
 #[must_use]
 #[expect(
     clippy::expect_used,
-    reason = "base32 emits only alphabet characters, and 32 digest bytes render as exactly 52 of them, so the rendering is always inside the R4 id grammar; a_created_digest_is_52_characters_inside_the_r4_grammar pins both facts"
+    reason = "the created id is 52 lowercase base32 characters, always inside the R4 id grammar; a_created_id_is_the_one_tofhir_answers pins it"
 )]
-pub fn created_digest(key: &CreatedKey) -> FhirResourceId {
-    use sha2::Digest;
+pub fn created_id(parent: &CompositionBinding, request: &IdentityRequest) -> FhirResourceId {
+    let id = fhirconnect::engine::identity::created_id(
+        &parent.versioned_object_uid,
+        &parent.entry_path,
+        request,
+    );
+    FhirResourceId::new(&id).expect("a created id should be a legal FHIR id")
+}
 
-    let mut hasher = sha2::Sha256::new();
-    let mut frame = |field: &[u8]| {
-        hasher.update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_be_bytes());
-        hasher.update(field);
-    };
-    frame(b"created");
-    frame(key.versioned_object_uid.as_bytes());
-    frame(key.entry_path.as_bytes());
-    frame(&key.split.to_be_bytes());
-    frame(key.resource_type.as_bytes());
-    frame(key.parent_type.as_bytes());
-    frame(key.mapping.as_bytes());
-    frame(
-        &u64::try_from(key.occurrence.len())
-            .unwrap_or(u64::MAX)
-            .to_be_bytes(),
-    );
-    for position in &key.occurrence {
-        frame(&position.to_be_bytes());
-    }
-    frame(
-        &u64::try_from(key.unique.len())
-            .unwrap_or(u64::MAX)
-            .to_be_bytes(),
-    );
-    for value in &key.unique {
-        frame(value.as_bytes());
-    }
-    let rendered = base32(hasher.finalize().as_slice());
-    FhirResourceId::new(&rendered).expect("a base32 rendering should be a legal FHIR id")
+/// Returns the identity-map key of one created resource: its id, so the map
+/// wins once written.
+#[must_use]
+pub fn created_map_key(id: &FhirResourceId) -> ExternalResourceId {
+    // NOTE: no specification governs this: our own design; the id carries no
+    // control character, so the fallback keeps the request path free of a panic.
+    ExternalResourceId::new(id.as_str())
+        .unwrap_or_else(|_refusal| ExternalResourceId::of_digest(id))
 }
 
 #[cfg(test)]
@@ -264,19 +187,25 @@ mod tests {
             fhirconnect::engine::seam::IdentityRequest::new("Condition", "Condition", "split")
                 .with_occurrence(vec![position])
                 .with_unique(unique.iter().map(|value| String::from(*value)).collect());
-        super::created_digest(&super::created_key(&parent(), &request))
+        super::created_id(&parent(), &request)
     }
 
     #[test]
-    fn a_created_digest_is_52_characters_inside_the_r4_grammar() {
-        let id = created_at(2, &[]);
+    fn a_created_id_is_the_one_tofhir_answers() {
+        let request =
+            fhirconnect::engine::seam::IdentityRequest::new("Condition", "Condition", "split")
+                .with_occurrence(vec![2]);
+        let id = super::created_id(&parent(), &request);
+        assert_eq!(
+            fhirconnect::engine::identity::created_id(
+                CONTAINER,
+                "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]",
+                &request
+            ),
+            id.as_str()
+        );
         assert_eq!(DIGEST_CHARACTERS, id.as_str().chars().count());
         assert!(is_fhir_id(id.as_str()), "{id} is outside the R4 grammar");
-        assert_eq!(
-            id,
-            created_at(2, &[]),
-            "the same request derives the same id"
-        );
     }
 
     #[test]
@@ -296,13 +225,13 @@ mod tests {
             .with_composition(format!("{CONTAINER}::ferroehr::1"));
         let two = request.with_composition(format!("{CONTAINER}::ferroehr::2"));
         assert_eq!(
-            super::created_digest(&super::created_key(&parent(), &one)),
-            super::created_digest(&super::created_key(&parent(), &two))
+            super::created_id(&parent(), &one),
+            super::created_id(&parent(), &two)
         );
     }
 
     #[test]
-    fn a_created_digest_never_equals_the_entry_digest_of_its_parent() {
+    fn a_created_id_never_equals_the_entry_id_of_its_parent() {
         let entry = key("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]");
         assert_ne!(entry_id(&entry), created_at(1, &[]));
     }

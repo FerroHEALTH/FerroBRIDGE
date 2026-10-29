@@ -23,6 +23,8 @@
 
 use sha2::Digest;
 
+use crate::engine::seam::IdentityRequest;
+
 /// The RFC 4648 §6 base32 alphabet, lowercased.
 const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 
@@ -51,6 +53,57 @@ pub fn deterministic_id(versioned_object_uid: &str, entry_path: &str) -> String 
     for field in [versioned_object_uid.as_bytes(), entry_path.as_bytes()] {
         hasher.update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_be_bytes());
         hasher.update(field);
+    }
+    base32(hasher.finalize().as_slice())
+}
+
+/// Returns the deterministic id of a resource a run creates beside the one it maps.
+///
+/// The resource is a further `hierarchy.split` occurrence or a `reference`
+/// target, created under the occurrence at `entry_path` of the composition
+/// whose version container is `versioned_object_uid`.
+///
+/// The id hashes the occurrence the parent maps, as [`deterministic_id`]
+/// does, with what names the created resource within it: its type, the
+/// parent's type, the creating mapping, its openEHR positions and a split's
+/// `unique` values. The composition's version never enters it, so a new
+/// version keeps every created id, as `engine/id-management.adoc`
+/// §Deterministic IDs asks of every exported resource. Every field is framed
+/// with its byte length and every list with its count, behind a `created`
+/// tag, so no created key frames to the bytes of another key; no
+/// specification governs the key or its framing, our own design.
+#[must_use]
+pub fn created_id(
+    versioned_object_uid: &str,
+    entry_path: &str,
+    request: &IdentityRequest,
+) -> String {
+    let mut hasher = sha2::Sha256::new();
+    let mut frame = |field: &[u8]| {
+        hasher.update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_be_bytes());
+        hasher.update(field);
+    };
+    frame(b"created");
+    frame(versioned_object_uid.as_bytes());
+    frame(entry_path.as_bytes());
+    frame(request.resource_type().as_bytes());
+    frame(request.parent_type().as_bytes());
+    frame(request.mapping().as_bytes());
+    frame(
+        &u64::try_from(request.occurrence().len())
+            .unwrap_or(u64::MAX)
+            .to_be_bytes(),
+    );
+    for position in request.occurrence() {
+        frame(&position.to_be_bytes());
+    }
+    frame(
+        &u64::try_from(request.unique().len())
+            .unwrap_or(u64::MAX)
+            .to_be_bytes(),
+    );
+    for value in request.unique() {
+        frame(value.as_bytes());
     }
     base32(hasher.finalize().as_slice())
 }

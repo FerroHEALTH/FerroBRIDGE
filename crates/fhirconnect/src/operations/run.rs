@@ -29,16 +29,12 @@ use crate::engine::identity;
 use crate::engine::origin::Origin;
 use crate::engine::origin::SourceItem;
 use crate::engine::outcome::Location;
-use crate::engine::outcome::Loss;
-use crate::engine::outcome::Outcome;
 use crate::engine::outcome::Warning;
 use crate::engine::seam::BundleReferences;
 use crate::engine::seam::ResourceRequest;
 use crate::engine::seam::Seams;
 use crate::engine::traverse;
 use crate::engine::traverse::Defaults;
-use crate::engine::traverse::Each;
-use crate::engine::traverse::error::EngineError;
 use crate::operations::contract::CompositionPayload;
 use crate::operations::contract::Format;
 use crate::operations::contract::ToFhirRequest;
@@ -47,6 +43,7 @@ use crate::operations::contract::ToOpenehrRequest;
 use crate::operations::contract::ToOpenehrResponse;
 use crate::operations::error::OperationError;
 use crate::operations::issues;
+use crate::operations::occurrences;
 use crate::operations::programs::ProgramSet;
 use crate::operations::provenance;
 use crate::operations::provenance::CompositionSource;
@@ -213,7 +210,7 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
         .map_err(|source| OperationError::Select { source })?;
     let context = request.context().cloned().unwrap_or_default();
     let (occurrences, mut warnings) =
-        occurrences(program, table, index, &composition, seams, &context)?;
+        occurrences::occurrences(program, table, index, &composition, seams, &context)?;
     let resource_type = String::from(program.resource().as_str());
     let mut targets = Vec::new();
     let mut resources = Vec::new();
@@ -279,78 +276,6 @@ pub fn to_fhir_with_warnings<T: Table + ?Sized>(
         reads: Vec::new(),
     })
 }
-
-/// Returns every occurrence of the context's start archetype that maps, with
-/// the run of each, and the losses of the occurrences that did not.
-///
-/// `$tofhir` answers "one or more FHIR resources" (`engine/rest-api.adoc`
-/// §`$tofhir`), so each occurrence of a start archetype the composition holds
-/// more than once is its own resource ([`traverse::to_fhir_each`]). An
-/// occurrence the context's condition does not admit maps no resource and is
-/// counted as [`Loss::InapplicableOccurrences`]; when it admits none, the run
-/// refuses as [`traverse::to_fhir`] does. A composition holding no occurrence
-/// runs once, as before. No specification governs this: our own design.
-///
-/// # Errors
-///
-/// Returns [`OperationError::Mapping`] for an occurrence the program cannot
-/// map, and when the condition admits no occurrence.
-fn occurrences<T: Table + ?Sized>(
-    program: &Program,
-    table: &T,
-    index: &WebTemplateIndex,
-    composition: &CanonicalComposition,
-    seams: &Seams<'_>,
-    context: &CallContext,
-) -> Result<(Vec<MappedOccurrence>, Vec<Warning>), OperationError> {
-    let refused = |source| OperationError::Mapping {
-        source: Box::new(source),
-    };
-    let each = traverse::to_fhir_each(program, table, index, composition, seams, context)
-        .map_err(refused)?;
-    if each.is_empty() {
-        let outcome = traverse::to_fhir(program, table, index, composition, seams, context)
-            .map_err(refused)?;
-        // NOTE: a composition holding no occurrence maps one resource from
-        // the root; no specification governs this, our own design.
-        return Ok((
-            vec![(Vec::new(), String::from(identity::ROOT_PATH), outcome)],
-            Vec::new(),
-        ));
-    }
-    let mut mapped = Vec::new();
-    let mut inapplicable = 0_usize;
-    for one in each {
-        match one {
-            Each::Mapped {
-                occurrence,
-                path,
-                outcome,
-            } => mapped.push((occurrence, path, outcome)),
-            Each::NotApplicable { .. } => inapplicable = inapplicable.saturating_add(1),
-        }
-    }
-    if mapped.is_empty() {
-        return Err(refused(EngineError::NotApplicable {
-            context: String::from(program.context().as_str()),
-        }));
-    }
-    let mut warnings = Vec::new();
-    if inapplicable > 0 {
-        warnings.push(Warning::new(
-            Loss::InapplicableOccurrences {
-                archetype: traverse::start_archetype(program),
-                count: inapplicable,
-            },
-            Location::default(),
-        ));
-    }
-    Ok((mapped, warnings))
-}
-
-/// One occurrence of the start archetype that mapped: its positions, its
-/// entry path and its run.
-type MappedOccurrence = (Vec<u32>, String, Outcome<Value>);
 
 /// Refuses an answer in which two resources take one `<type>/<id>`.
 ///
@@ -498,7 +423,7 @@ fn composition_of(
 }
 
 /// Returns the `OBJECT_VERSION_ID` a composition carries, when it carries one.
-fn composition_uid(composition: &CanonicalComposition) -> Option<&str> {
+pub(super) fn composition_uid(composition: &CanonicalComposition) -> Option<&str> {
     composition.value().get("uid")?.get("value")?.as_str()
 }
 

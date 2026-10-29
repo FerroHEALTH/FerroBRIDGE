@@ -35,6 +35,8 @@ pub mod error;
 
 pub mod issues;
 
+mod occurrences;
+
 pub mod programs;
 
 pub mod provenance;
