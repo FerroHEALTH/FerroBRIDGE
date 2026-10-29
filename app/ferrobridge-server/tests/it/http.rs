@@ -229,12 +229,16 @@ async fn a_panicking_handler_yields_a_five_hundred_with_the_request_id_in_its_bo
     let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
     let document: serde_json::Value = serde_json::from_slice(&bytes)?;
     assert_eq!(
-        Some("application/json"),
+        Some("application/problem+json"),
         document_media.as_deref(),
-        "a non-FHIR route keeps its plain answer"
+        "a non-FHIR route answers an RFC 9457 problem"
     );
-    assert_eq!(Some("internal"), document["error"].as_str());
-    let named = document["request_id"].as_str().unwrap_or_default();
+    assert_eq!(Some("about:blank"), document["type"].as_str());
+    assert_eq!(Some(500), document["status"].as_u64());
+    let named = document["instance"]
+        .as_str()
+        .and_then(|instance| instance.strip_prefix("urn:uuid:"))
+        .unwrap_or_default();
     assert!(
         uuid::Uuid::try_parse(named).is_ok(),
         "the body names the server's own request id, never the client's: {document}"
@@ -394,7 +398,7 @@ async fn a_fhir_request_past_the_timeout_answers_a_504_operation_outcome()
 }
 
 #[tokio::test]
-async fn a_request_past_the_timeout_off_the_fhir_surface_keeps_its_plain_408()
+async fn a_request_past_the_timeout_off_the_fhir_surface_answers_a_408_problem()
 -> Result<(), Box<dyn std::error::Error>> {
     let response = raw(edge_app(), Request::get("/slow").body(Body::empty())?).await?;
     assert_eq!(StatusCode::REQUEST_TIMEOUT, response.status());
@@ -403,8 +407,8 @@ async fn a_request_past_the_timeout_off_the_fhir_surface_keeps_its_plain_408()
             .headers()
             .get(header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
-            .is_none_or(|value| !value.starts_with("application/fhir+json")),
-        "a non-FHIR route answers no FHIR document"
+            .is_some_and(|value| value.starts_with("application/problem+json")),
+        "a non-FHIR route answers an RFC 9457 problem, never a FHIR document"
     );
     Ok(())
 }
@@ -447,7 +451,7 @@ async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
 }
 
 #[tokio::test]
-async fn a_body_over_the_ceiling_off_the_fhir_surface_keeps_its_plain_413()
+async fn a_body_over_the_ceiling_off_the_fhir_surface_answers_a_413_problem()
 -> Result<(), Box<dyn std::error::Error>> {
     let oversized = "x".repeat(support::settings().body_limit_bytes + 1);
     let request = Request::post("/health/liveness")
@@ -461,8 +465,8 @@ async fn a_body_over_the_ceiling_off_the_fhir_surface_keeps_its_plain_413()
             .headers()
             .get(header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
-            .is_none_or(|value| !value.starts_with("application/fhir+json")),
-        "a non-FHIR route answers no FHIR document"
+            .is_some_and(|value| value.starts_with("application/problem+json")),
+        "a non-FHIR route answers an RFC 9457 problem, never a FHIR document"
     );
     Ok(())
 }

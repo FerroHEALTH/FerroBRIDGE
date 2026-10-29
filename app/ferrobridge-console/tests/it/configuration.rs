@@ -150,7 +150,12 @@ async fn a_refused_configuration_is_drawn_where_the_settings_would_be() -> Resul
         &server,
         "/operator/configuration",
         403,
-        &serde_json::json!({"error": "insufficient_scope", "message": "the operator scope is needed"}),
+        &serde_json::json!({
+            "type": "https://ferrobridge.eu/docs/operate/problems.html#not-permitted",
+            "title": "The access token does not carry the operator scope",
+            "status": 403,
+            "detail": "the access token does not carry the operator scope"
+        }),
     )
     .await;
     let (service, cookie) = signed_in(&server).await?;
@@ -158,6 +163,10 @@ async fn a_refused_configuration_is_drawn_where_the_settings_would_be() -> Resul
     assert_eq!(StatusCode::OK, response.status());
     assert!(page.contains(">Configuration</h1>"), "{page}");
     assert!(page.contains("403"), "{page}");
+    assert!(
+        page.contains("does not carry the operator scope"),
+        "the problem's words are drawn: {page}"
+    );
     let (_response, list) = send(&service, get_with("/connections", &cookie)?).await?;
     let list = list.replace("<!>", "");
     assert!(list.contains("openEHR CDR"), "the list still draws: {list}");

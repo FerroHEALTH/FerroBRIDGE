@@ -13,6 +13,8 @@
 
 use ferrobridge_operator_api::operator::LoadReport;
 #[cfg(not(target_arch = "wasm32"))]
+use ferrobridge_operator_api::problem::Problem;
+#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::codec::{Json as _, Path, Value};
 #[cfg(not(target_arch = "wasm32"))]
 use fhir_types::r4::operation_outcome::OperationOutcome;
@@ -54,8 +56,9 @@ pub enum Refusal {
         /// The status the bridge answered with.
         #[serde(with = "status_code")]
         status: StatusCode,
-        /// The diagnostics of the `OperationOutcome` it answered with, in
-        /// order; empty when its body carried none.
+        /// The diagnostics of the `OperationOutcome` or the title and detail
+        /// of the problem it answered with, in order; empty when its body
+        /// carried none.
         diagnostics: Vec<String>,
     },
     /// The bridge did not accept the operator's access token (`401`), so the
@@ -281,16 +284,23 @@ pub fn loaded<T>(result: Result<T, BridgeError>) -> Loaded<T> {
     }
 }
 
-/// The words of each issue of the R4 `OperationOutcome` `body` holds, in
-/// order: its `details.text` and its `diagnostics`, each when present
-/// (FHIR R4 `operationoutcome.html`, `OperationOutcome.issue`).
+/// The words of a refusal `body`: each issue of an R4 `OperationOutcome`, in
+/// order, its `details.text` and its `diagnostics` when present (FHIR R4
+/// `operationoutcome.html`, `OperationOutcome.issue`), or the `title` and
+/// the `detail` of an RFC 9457 problem (§3.1.3, §3.1.4), which the bridge
+/// answers outside its FHIR routes.
 #[cfg(not(target_arch = "wasm32"))]
 fn diagnostics(body: &str) -> Vec<String> {
-    // NOTE: no specification governs this: our own design; a refusal body
-    // that is no OperationOutcome carries no diagnostics, and its status stands.
+    // NOTE: no specification governs this: our own design; a body that is
+    // neither document carries no diagnostics, and its status stands.
     let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
         return Vec::new();
     };
+    if value.get("resourceType").is_none() {
+        return serde_json::from_value::<Problem>(value)
+            .map(|problem| problem.title.into_iter().chain(problem.detail).collect())
+            .unwrap_or_default();
+    }
     let Value::Object(object) = Value::from_serde_json(value) else {
         return Vec::new();
     };
@@ -355,6 +365,23 @@ mod tests {
             }),
             refusal(&detailed),
             "an issue's details.text is its words too"
+        );
+        let problem = BridgeError::Refused {
+            status: StatusCode::CONFLICT,
+            body: String::from(
+                r#"{"type":"https://ferrobridge.eu/docs/operate/problems.html#provisioned","title":"A provisioned file holds this path","status":409,"detail":"the console never writes one"}"#,
+            ),
+        };
+        assert_eq!(
+            Ok(Refusal::Bridge {
+                status: StatusCode::CONFLICT,
+                diagnostics: vec![
+                    String::from("A provisioned file holds this path"),
+                    String::from("the console never writes one"),
+                ],
+            }),
+            refusal(&problem),
+            "an RFC 9457 problem's title and detail are its words"
         );
         let plain = BridgeError::Refused {
             status: StatusCode::SERVICE_UNAVAILABLE,

@@ -25,6 +25,7 @@ use tower::ServiceExt as _;
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, challenge, ec_key, mint};
 
 mod configuration;
+mod problem;
 mod save;
 
 /// The clean mapping set the facade suite runs.

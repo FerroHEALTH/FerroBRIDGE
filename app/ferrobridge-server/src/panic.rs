@@ -11,7 +11,8 @@
 //! have panicked over clinical content. Under the FHIR base the body is an
 //! `OperationOutcome` with the `exception` issue, because R4 asks a server to
 //! answer an error with one (<https://hl7.org/fhir/R4/http.html>, §3.1.0.4);
-//! every other route answers the family's JSON object.
+//! every other route answers an RFC 9457 `about:blank` problem with a fixed
+//! detail.
 
 use std::sync::Arc;
 
@@ -21,10 +22,10 @@ use http::StatusCode;
 use crate::facade::outcome::{Issue, IssueType};
 
 /// Returns the panic body: an `OperationOutcome` naming the request id under
-/// the FHIR base, the family's JSON body everywhere else.
+/// the FHIR base, an RFC 9457 problem everywhere else.
 #[must_use]
 pub fn body() -> PanicBody {
-    let plain = ferrohealth_server::panic::default_body();
+    let plain = ferrohealth_server::problem::panic_body();
     Arc::new(move |uri, request_id| {
         if crate::facade::edge::on_fhir_route(uri.path()) {
             crate::facade::reply::issue(
@@ -45,7 +46,7 @@ mod tests {
     use http::{StatusCode, Uri, header};
 
     #[test]
-    fn a_fhir_route_answers_an_operation_outcome_and_another_route_json() {
+    fn a_fhir_route_answers_an_operation_outcome_and_another_route_a_problem() {
         let render = body();
         let fhir = render(&Uri::from_static("/fhir/Patient/1"), "id-1");
         assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, fhir.status());
@@ -64,7 +65,7 @@ mod tests {
                 .headers()
                 .get(header::CONTENT_TYPE)
                 .and_then(|value| value.to_str().ok())
-                .is_some_and(|value| value.starts_with("application/json")),
+                .is_some_and(|value| value.starts_with("application/problem+json")),
             "{:?}",
             plain.headers()
         );

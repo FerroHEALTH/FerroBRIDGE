@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! What every operator route requires, for the `ferrohealth-smart` layer in
-//! front of it, and the JSON body a refusal answers with.
+//! front of it, and the problem details a refusal answers with.
 //!
 //! A request without a valid credential answers `401` and one whose token
 //! does not carry the operator scope answers `403` (RFC 6750 §3.1). The
@@ -11,7 +11,6 @@
 //! design.
 
 use axum::extract::MatchedPath;
-use axum::response::IntoResponse;
 use axum::response::Response;
 use ferrohealth_smart::guard::AuthLayer;
 use ferrohealth_smart::guard::Classify;
@@ -21,11 +20,10 @@ use ferrohealth_smart::guard::Target;
 use ferrohealth_smart::refusal::Refusal;
 use http::Extensions;
 use http::Method;
-use http::StatusCode;
 use http::Uri;
-use http::header;
 use http::request::Parts;
 
+use crate::problem::{Kind, respond};
 use crate::smart::Smart;
 
 /// The `tracing` target of the change record a save or a reload writes
@@ -50,7 +48,9 @@ impl Classify for Classifier {
     }
 }
 
-/// The JSON body every refusal of the layer answers with.
+/// The problem details every refusal of the layer answers with (RFC 9457).
+///
+/// A refusal whose status says all there is to say is `about:blank`.
 #[derive(Debug, Clone)]
 pub struct Body {
     /// The realm every challenge names.
@@ -59,31 +59,20 @@ pub struct Body {
 
 impl Render for Body {
     fn render(&self, refused: &Refusal, _parts: &Parts) -> Response {
-        let (error, message) = match refused {
-            Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => (
-                "unauthorized",
-                "the request carries no valid access token for this server",
-            ),
-            Refusal::InvalidRequest => (
-                "invalid_request",
-                "the Authorization header carries no single credential",
-            ),
-            Refusal::Forbidden | Refusal::Unclassified => (
-                "forbidden",
-                "the access token does not carry the operator scope",
-            ),
-            Refusal::Unavailable => (
-                "unavailable",
+        let problem = match refused {
+            Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => Kind::Unauthenticated
+                .problem("the request carries no valid access token for this server"),
+            Refusal::InvalidRequest => Kind::InvalidRequest
+                .problem("the Authorization header carries no single credential"),
+            Refusal::Forbidden | Refusal::Unclassified => Kind::NotPermitted
+                .problem("the access token does not carry the operator scope"),
+            Refusal::Unavailable => Kind::AuthorizationUnavailable.problem(
                 "the access token could not be checked: the authorization server's keys could not be read",
             ),
-            _ => ("refused", "the request was refused at the gate"),
+            _ => ferrohealth_server::problem::Problem::new(refused.status())
+                .with_detail("the request was refused at the gate"),
         };
-        refusal(
-            refused.status(),
-            refused.challenge(self.realm.as_deref()).as_deref(),
-            error,
-            message,
-        )
+        respond(problem, refused.challenge(self.realm.as_deref()).as_deref())
     }
 }
 
@@ -99,24 +88,4 @@ pub fn layer(smart: &Smart) -> AuthLayer<Classifier> {
         scope: smart.operator_scope().to_owned(),
     };
     AuthLayer::new(gate, classifier).with_render(body)
-}
-
-/// Returns an operator refusal: `status`, an optional challenge and a JSON
-/// body naming the error.
-pub fn refusal(
-    status: StatusCode,
-    challenge: Option<&str>,
-    error: &str,
-    message: &str,
-) -> Response {
-    let body = axum::Json(serde_json::json!({ "error": error, "message": message }));
-    let mut response = (status, body).into_response();
-    if let Some(challenge) = challenge
-        && let Ok(value) = http::HeaderValue::from_str(challenge)
-    {
-        response
-            .headers_mut()
-            .insert(header::WWW_AUTHENTICATE, value);
-    }
-    response
 }

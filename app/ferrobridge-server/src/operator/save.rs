@@ -29,11 +29,11 @@ use http::header;
 use crate::operator::Operator;
 use crate::operator::files;
 use crate::operator::guard::AUDIT_TARGET;
-use crate::operator::guard::refusal;
 use crate::operator::reload::Draft;
 use crate::operator::reload::Prepared;
 use crate::operator::reload::ReloadError;
 use crate::operator::reload::Reloader;
+use crate::problem::{Kind, refuse};
 
 /// The header a save names its reason in.
 pub const REASON: &str = "ferrobridge-reason";
@@ -121,10 +121,8 @@ pub async fn save(
         return bad_path();
     }
     let Some(reason) = reason(&headers) else {
-        return refusal(
-            StatusCode::BAD_REQUEST,
-            None,
-            "reason-required",
+        return refuse(
+            Kind::ReasonRequired,
             "a save names its reason in the Ferrobridge-Reason header, one line of at most 200 characters",
         );
     };
@@ -311,22 +309,16 @@ pub enum Failure {
 impl IntoResponse for Failure {
     fn into_response(self) -> Response {
         match self {
-            Self::PreconditionRequired => refusal(
-                StatusCode::PRECONDITION_REQUIRED,
-                None,
-                "precondition-required",
+            Self::PreconditionRequired => refuse(
+                Kind::PreconditionRequired,
                 "send If-Match with the file's ETag, or If-None-Match: * for a new file",
             ),
-            Self::PreconditionFailed { .. } => refusal(
-                StatusCode::PRECONDITION_FAILED,
-                None,
-                "precondition-failed",
+            Self::PreconditionFailed { .. } => refuse(
+                Kind::PreconditionFailed,
                 "the file changed since the ETag the save names",
             ),
-            Self::Provisioned => refusal(
-                StatusCode::CONFLICT,
-                None,
-                "provisioned",
+            Self::Provisioned => refuse(
+                Kind::Provisioned,
                 "a provisioned file holds this path, and the console never writes one",
             ),
             Self::Write(_) | Self::Read(_) | Self::Task(_) => {
@@ -334,10 +326,8 @@ impl IntoResponse for Failure {
                     error = crate::facade::outcome::chain(&self),
                     "an operator save could not reach the file system"
                 );
-                refusal(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    None,
-                    "unwritable",
+                refuse(
+                    Kind::Unwritable,
                     "the mapping directory could not be written",
                 )
             }
@@ -506,20 +496,16 @@ where
 
 /// Returns the `409` of an operator API with no `mapping_dir`.
 fn unconfigured() -> Response {
-    refusal(
-        StatusCode::CONFLICT,
-        None,
-        "not-configured",
+    refuse(
+        Kind::NotConfigured,
         "no [operator] mapping_dir is configured, so the operator API checks and saves nothing",
     )
 }
 
 /// Returns the `400` of a path the console cannot save at.
 fn bad_path() -> Response {
-    refusal(
-        StatusCode::BAD_REQUEST,
-        None,
-        "bad-path",
+    refuse(
+        Kind::BadPath,
         "the path names no FHIRconnect or OMOCL mapping file the console can write",
     )
 }
@@ -530,10 +516,8 @@ fn unavailable(error: &ReloadError) -> Response {
         error = crate::facade::outcome::chain(error),
         "the mapping set could not be reloaded"
     );
-    refusal(
-        StatusCode::SERVICE_UNAVAILABLE,
-        None,
-        "unavailable",
-        &crate::facade::outcome::chain(error),
+    refuse(
+        Kind::ReloadUnavailable,
+        "the mapping set could not be reloaded; the bridge log names the cause",
     )
 }
