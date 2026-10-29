@@ -29,7 +29,9 @@ use jsonwebtoken::Algorithm;
 use super::Issuer;
 use super::authority;
 use super::bearing;
+use super::challenge;
 use super::ec_key;
+use super::get;
 use super::mint;
 use super::secured;
 use crate::facade::harness;
@@ -244,4 +246,33 @@ fn the_walk_reads_each_form_a_route_template_takes() {
         vec![Method::GET, Method::PUT],
         methods_of(".route(p, get(handlers::read_route).put(handlers::update_route))")
     );
+}
+
+// A path no route matches carries no route template for the guard to
+// classify, so the guard passes it to the default `404`, which names no
+// challenge, while a route template under `/fhir` meets the gate, both
+// through the stack of `ferrohealth-server` (FerroHEALTH/FerroSYS#199).
+#[tokio::test]
+async fn an_unmatched_path_under_the_guard_is_a_bare_404_and_a_routed_one_is_challenged()
+-> Result<(), Box<dyn Error>> {
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let harness = harness().await;
+    let authority = authority(issuer.settings()).await;
+    for path in [
+        "/fhir/Condition/1/_history/1/unrouted",
+        "/operator/unrouted",
+    ] {
+        let response = raw(secured(&harness, &authority), get(path)).await?;
+        assert_eq!(StatusCode::NOT_FOUND, response.status(), "{path}");
+        assert_eq!(None, challenge(&response), "{path}");
+        let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+        assert!(bytes.is_empty(), "{path}");
+    }
+    let response = raw(secured(&harness, &authority), get("/fhir/Practitioner")).await?;
+    assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+    assert_eq!(Some("Bearer"), challenge(&response).as_deref());
+    let response = raw(secured(&harness, &authority), get("/health/liveness")).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    Ok(())
 }
