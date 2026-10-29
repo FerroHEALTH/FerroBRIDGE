@@ -70,7 +70,8 @@ The section is the FerroHEALTH family's (`ferrohealth-server`).
 | `listen` | `127.0.0.1:8080` | The socket address to bind |
 | `base_path` | empty | The path every route is served under: empty, or starting with `/` and not ending with one |
 | `request_timeout_ms` | `30000` | How long one request may take before the server answers `408` (`504` under `/fhir`) |
-| `header_read_timeout_ms` | `30000` | How long a client may take to send a request head, counted from accept or from its last response; a client that has not sent one by then, one that sent nothing included, is disconnected |
+| `header_read_timeout_ms` | `30000` | How long a client may take to send a request head, counted from accept or from the first byte of each later head on a kept-alive connection; a client that has not sent one by then, one that sent nothing included, is disconnected |
+| `idle_timeout_ms` | `120000` | How long a kept-alive HTTP/1.1 connection may wait for its next request before the server closes it with a clean end of stream |
 | `body_limit_bytes` | `1048576` | The largest request body read before the server answers `413` |
 | `drain_delay_ms` | `0` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
 | `shutdown_timeout_ms` | `10000` | How long the requests in flight may take once the listener closed |
