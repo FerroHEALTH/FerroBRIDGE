@@ -44,6 +44,86 @@ pub struct ErrorBody {
     pub errors: Vec<serde_json::Value>,
 }
 
+/// The RFC 9457 problem details a CDR answers a refusal with.
+///
+/// A CDR that follows Problem Details for HTTP APIs
+/// (<https://www.rfc-editor.org/rfc/rfc9457>) answers its errors as
+/// `application/problem+json` with the §3.1 members `type`, `title`,
+/// `status`, `detail` and `instance`. The reference CDR adds the extension
+/// member `errors`, each a `{path, detail}` violation, to a refused write that
+/// asked for `Prefer: return=representation`. ITS-REST 1.1.0 names neither
+/// form, so this reader sits beside [`ErrorBody`] and a body that is neither
+/// keeps its raw text.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+#[non_exhaustive]
+pub struct ProblemDetails {
+    /// The problem type URI (§3.1.1).
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    /// The short summary of the problem type (§3.1.3).
+    pub title: Option<String>,
+    /// The HTTP status the CDR names (§3.1.2).
+    pub status: Option<u16>,
+    /// The explanation of this occurrence (§3.1.4).
+    pub detail: Option<String>,
+    /// The URI of this occurrence (§3.1.5).
+    pub instance: Option<String>,
+    /// The violations of a refused write, an extension member (§3.2).
+    pub errors: Vec<ProblemViolation>,
+}
+
+/// One violation the `errors` extension member of a problem names.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+#[non_exhaustive]
+pub struct ProblemViolation {
+    /// The path of the node that violates a constraint.
+    pub path: Option<String>,
+    /// What the constraint says.
+    pub detail: Option<String>,
+}
+
+impl ProblemDetails {
+    /// Returns the problem details `body` holds, or `None` when it holds
+    /// none.
+    ///
+    /// A body that is no JSON object, or one with neither a `type` nor a
+    /// `title` nor a `detail`, is not a problem, so the caller keeps reading
+    /// it the way it read it before.
+    #[must_use]
+    pub fn of(body: &[u8]) -> Option<Self> {
+        // NOTE: RFC 9457 §3 makes every member optional and ITS-REST 1.1.0 names no
+        // problem body, so a body that does not decode is legitimately not one.
+        let decoded = serde_json::from_slice::<Self>(body).ok()?;
+        (decoded.kind.is_some() || decoded.title.is_some() || decoded.detail.is_some())
+            .then_some(decoded)
+    }
+
+    /// Returns the words a refusal carries: the title, the detail, and each
+    /// violation as `path: detail`, joined by `; `.
+    #[must_use]
+    pub fn words(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        match (self.title.as_deref(), self.detail.as_deref()) {
+            (Some(title), Some(detail)) => parts.push(format!("{title}: {detail}")),
+            (Some(one), None) | (None, Some(one)) => parts.push(one.to_owned()),
+            (None, None) => {}
+        }
+        for violation in &self.errors {
+            match (violation.path.as_deref(), violation.detail.as_deref()) {
+                (Some(path), Some(detail)) => parts.push(format!("{path}: {detail}")),
+                (Some(one), None) | (None, Some(one)) => parts.push(one.to_owned()),
+                (None, None) => {}
+            }
+        }
+        if let Some(kind) = self.kind.as_deref().filter(|kind| *kind != "about:blank") {
+            parts.push(format!("({kind})"));
+        }
+        parts.join("; ")
+    }
+}
+
 /// The status, headers and body one CDR answer carried.
 ///
 /// The body can be clinical content, so the `Debug` rendering names its length
@@ -58,6 +138,9 @@ pub struct Upstream {
     body: String,
     /// The decoded error body, when the body was one.
     error: Option<ErrorBody>,
+    /// The decoded problem details, when the body was a problem, boxed so
+    /// the answer stays small inside the errors that carry it.
+    problem: Option<Box<ProblemDetails>>,
 }
 
 impl Upstream {
@@ -70,11 +153,13 @@ impl Upstream {
         let error = serde_json::from_str::<ErrorBody>(&body)
             .ok()
             .filter(|decoded| decoded != &ErrorBody::default());
+        let problem = ProblemDetails::of(body.as_bytes()).map(Box::new);
         Self {
             status,
             headers,
             body,
             error,
+            problem,
         }
     }
 
@@ -106,6 +191,12 @@ impl Upstream {
     pub const fn error(&self) -> Option<&ErrorBody> {
         self.error.as_ref()
     }
+
+    /// Returns the decoded problem details, when the service sent them.
+    #[must_use]
+    pub fn problem(&self) -> Option<&ProblemDetails> {
+        self.problem.as_deref()
+    }
 }
 
 impl std::fmt::Debug for Upstream {
@@ -119,9 +210,12 @@ impl std::fmt::Debug for Upstream {
 
 impl std::fmt::Display for Upstream {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.error.as_ref().and_then(|error| error.message.as_ref()) {
-            Some(message) => write!(f, "{} ({message})", self.status),
-            None => write!(f, "{}", self.status),
+        if let Some(message) = self.error.as_ref().and_then(|error| error.message.as_ref()) {
+            return write!(f, "{} ({message})", self.status);
+        }
+        match self.problem.as_deref().map(ProblemDetails::words) {
+            Some(words) if !words.is_empty() => write!(f, "{} ({words})", self.status),
+            _ => write!(f, "{}", self.status),
         }
     }
 }
