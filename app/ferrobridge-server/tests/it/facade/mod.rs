@@ -704,12 +704,7 @@ async fn tofhir_over(
         ferrobridge_server::mappings::load(&settings)?,
         "Device/ferrobridge-test",
     );
-    let state = Arc::new(
-        AppState::with_health(
-            Registry::default(),
-        )
-        .serving_operations(lane),
-    );
+    let state = Arc::new(AppState::with_health(Registry::default()).serving_operations(lane));
     let app = ferrobridge_server::router(
         state,
         &ferrohealth_server::section::ServerSection {
