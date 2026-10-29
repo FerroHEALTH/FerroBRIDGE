@@ -57,12 +57,6 @@ pins="docs/VERSIONS.md"
 ua="ferrobridge-vendor (scripts/vendor/profile-packages.sh)"
 stamp_dir="${PROFILE_PACKAGES_STAMPS:-target/profile-packages-verified}"
 
-# The attempts one registry fetch gets, and the first pause between two of
-# them in seconds, doubled after every failure. A transient error from the
-# registry is retried; one that outlasts the last attempt still fails.
-fetch_attempts=4
-fetch_pause=2
-
 # What stamped_state found: the count and digest, and whether the stamp
 # answered.
 stamped=""
@@ -159,24 +153,6 @@ provenance_gap() {
   fi
 }
 
-# Runs the command $2... up to $1 times, pausing with a doubling backoff
-# between attempts, and fails with the status of the last attempt.
-with_retries() {
-  local attempts="$1" pause="$fetch_pause" attempt=1 status
-  shift
-  while true; do
-    "$@" && return 0
-    status=$?
-    if [[ "$attempt" -ge "$attempts" ]]; then
-      return "$status"
-    fi
-    echo "   attempt $attempt of $attempts failed with status $status; retrying in ${pause}s" >&2
-    sleep "$pause"
-    pause=$((pause * 2))
-    attempt=$((attempt + 1))
-  done
-}
-
 # Fetches the package reference $1 into $vendor_dir/$1. With $2 = 1 it takes
 # the registry's bytes as they are, rewrites the PROVENANCE.md and prints the
 # count and digest to record; otherwise the staged tree must match the pinned
@@ -187,7 +163,7 @@ fetch_one() {
   local meta_url meta shasum tarball_url tmp got sha256 license files digest gap
   echo "== $pkg $ver"
   meta_url="$registry/$pkg"
-  meta="$(with_retries "$fetch_attempts" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$meta_url")" \
+  meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$meta_url")" \
     || die "cannot read registry metadata for $pkg"
   shasum="$(jq -r --arg v "$ver" '.versions[$v].dist.shasum // empty' <<< "$meta")"
   tarball_url="$(jq -r --arg v "$ver" '.versions[$v].dist.tarball // empty' <<< "$meta")"
@@ -195,7 +171,7 @@ fetch_one() {
   [[ -n "$tarball_url" ]] || die "the registry lists no tarball for $pkg $ver"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"; trap - RETURN' RETURN
-  with_retries "$fetch_attempts" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
+  with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
     || die "download of $pkg $ver failed"
   got="$(shasum -a 1 "$tmp/pkg.tgz" | cut -d' ' -f1)"
   [[ "$got" = "$shasum" ]] || die "checksum mismatch for $pkg $ver: registry $shasum, downloaded $got"
@@ -547,6 +523,7 @@ PINS
 
   # A fetch that fails twice and then answers is retried to success; one that
   # never answers fails after the last attempt with its own status.
+  # shellcheck disable=SC2034 # read by with_retries in lib/corpus.sh
   fetch_pause=0
   printf '0' > "$work/tries"
   with_retries 4 flaky "$work/tries" 2 2> "$work/out" \
