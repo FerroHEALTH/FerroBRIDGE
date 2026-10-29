@@ -43,6 +43,7 @@ use http::header;
 
 use crate::operator::files::Root;
 use crate::operator::snapshot::Snapshot;
+use crate::problem::{Kind, refuse};
 
 /// The media type a mapping file is served with.
 const YAML: &str = "application/yaml";
@@ -224,10 +225,8 @@ async fn state(State(operator): State<Arc<Operator>>) -> Response {
 async fn running_configuration(State(operator): State<Arc<Operator>>) -> Response {
     match operator.configuration.as_ref() {
         Some(configuration) => axum::Json(configuration).into_response(),
-        None => guard::refusal(
-            StatusCode::NOT_FOUND,
-            None,
-            "not-found",
+        None => refuse(
+            Kind::NotFound,
             "this operator API answers no running configuration",
         ),
     }
@@ -287,24 +286,14 @@ async fn blocking(work: impl FnOnce() -> Response + Send + 'static) -> Response 
         Ok(response) => response,
         Err(error) => {
             tracing::error!(%error, "an operator file read did not finish");
-            guard::refusal(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                None,
-                "unreadable",
-                "a mapping directory could not be read",
-            )
+            refuse(Kind::Unreadable, "a mapping directory could not be read")
         }
     }
 }
 
 /// Returns the `404` of a path that names no mapping file.
 fn absent() -> Response {
-    guard::refusal(
-        StatusCode::NOT_FOUND,
-        None,
-        "not-found",
-        "no mapping file is at this path",
-    )
+    refuse(Kind::NotFound, "no mapping file is at this path")
 }
 
 /// Returns the `500` of a mapping directory that could not be read.
@@ -314,10 +303,5 @@ fn unreadable(error: &crate::walk::Error) -> Response {
         error = %error.source,
         "a mapping directory could not be read"
     );
-    guard::refusal(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        None,
-        "unreadable",
-        "a mapping directory could not be read",
-    )
+    refuse(Kind::Unreadable, "a mapping directory could not be read")
 }

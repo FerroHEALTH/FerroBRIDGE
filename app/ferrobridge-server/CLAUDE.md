@@ -93,6 +93,10 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   facade authors is an `OperationOutcome` with an `issue.code` from the R4
   value set; the openEHR body travels verbatim inside `issue.diagnostics` and
   never reaches the wire as its own document.
+  Outside `/fhir` (the operator API, the health routes, the stack's own
+  refusals) every error body is an RFC 9457 problem from `src/problem.rs`:
+  a type defined once in its registry with its section on the book's
+  Problem types page, and a fixed detail that quotes nothing of the request.
 - **Ids are newtypes.** `EhrId` comes from the `cdr` module, the version
   container and the version are the `openehr-base` `HierObjectId` and
   `ObjectVersionId`; `FhirResourceId`, `ExternalResourceId` and

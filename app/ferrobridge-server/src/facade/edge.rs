@@ -9,7 +9,8 @@
 //! FHIR client as a body it cannot read. R4 asks a server to return an
 //! `OperationOutcome` with an error status
 //! (<https://hl7.org/fhir/R4/http.html>, §3.1.0.4), so under [`BASE_PATH`]
-//! [`body`] writes one; every other route keeps the family's plain answer.
+//! [`body`] writes one; every other route answers an RFC 9457 `about:blank`
+//! problem (`ferrohealth_server::problem::refusal_body`).
 //!
 //! The statuses are our own design, since no specification governs them: the
 //! ceiling stays `413 Content Too Large` (RFC 9110 §15.5.14) with the
@@ -84,11 +85,11 @@ impl Edge {
 
 /// Returns the refusal body of a stack whose ceiling is `body_limit` bytes
 /// and whose requests may take `timeout`: an `OperationOutcome` under the
-/// FHIR base, the family's plain answer everywhere else.
+/// FHIR base, an RFC 9457 problem everywhere else.
 #[must_use]
 pub fn body(body_limit: usize, timeout: Duration) -> RefusalBody {
     let edge = Edge::new(body_limit, timeout);
-    let plain = ferrohealth_server::refusal::default_body();
+    let plain = ferrohealth_server::problem::refusal_body();
     Arc::new(move |uri, request_id, status, reason| {
         let outcome = on_fhir_route(uri.path())
             .then(|| edge.outcome_of(status))

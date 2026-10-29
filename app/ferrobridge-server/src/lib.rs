@@ -30,6 +30,7 @@ pub mod mappings;
 pub mod operations;
 pub mod operator;
 pub mod panic;
+pub mod problem;
 pub mod quality;
 pub mod smart;
 pub mod startup;

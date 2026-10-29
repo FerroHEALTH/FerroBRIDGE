@@ -45,7 +45,8 @@ refuses the start.
 | a valid token without the operator scope | `403` with `WWW-Authenticate: Bearer error="insufficient_scope"` |
 | the issuer's keys cannot be read | `503` |
 
-Each refusal has a JSON body with `error` and `message`.
+Each refusal is an RFC 9457 problem details document
+([Problem types](problems.md)), served as `application/problem+json`.
 
 The operator scope also admits the operations that commit nothing to the
 CDR: `POST /fhir/{type}/$validate` beside its `c` or `u` permission, and
