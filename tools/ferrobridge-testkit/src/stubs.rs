@@ -168,6 +168,34 @@ pub mod its_rest {
             .set_body_string(error_body(message, &[]))
     }
 
+    /// Returns the `422` of content that fails semantic validation, as RFC
+    /// 9457 problem details.
+    ///
+    /// The body is `application/problem+json` with the §3.1 members and, as a
+    /// write that asked for `Prefer: return=representation` gets it, the
+    /// `errors` extension member of one `{path, detail}` per violation
+    /// (<https://www.rfc-editor.org/rfc/rfc9457>).
+    #[must_use]
+    pub fn unprocessable_problem(detail: &str, violations: &[(&str, &str)]) -> ResponseTemplate {
+        let errors: Vec<serde_json::Value> = violations
+            .iter()
+            .map(|(path, detail)| serde_json::json!({ "path": path, "detail": detail }))
+            .collect();
+        ResponseTemplate::new(422)
+            .insert_header("Content-Type", "application/problem+json")
+            .set_body_string(
+                serde_json::json!({
+                    "type": "https://cdr.example.org/problems#validation-failed",
+                    "title": "Validation failed",
+                    "status": 422,
+                    "detail": detail,
+                    "instance": "urn:uuid:4d6f1c2a-0000-4000-8000-000000000001",
+                    "errors": errors,
+                })
+                .to_string(),
+            )
+    }
+
     /// Returns the `Error` body of the `OpenAPI` schema as canonical JSON.
     fn error_body(message: &str, validation_errors: &[&str]) -> String {
         serde_json::json!({

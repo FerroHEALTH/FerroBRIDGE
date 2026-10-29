@@ -994,8 +994,9 @@ expression is a load error: the reference CDR's connector let `where()` and
   is not authorisation.
 - **Two error vocabularies never mix on one wire.** Everything the facade
   authors is an `OperationOutcome`; an upstream openEHR error body
-  (`{error, message, validationErrors}`) is carried inside
-  `issue.diagnostics` and never returned raw.
+  (`{error, message, validationErrors}`), or the RFC 9457 problem details a
+  CDR answers in its place (`title`, `detail` and the `errors` violations), is
+  carried inside `issue.diagnostics` and never returned raw.
 
 The inbound path, as one create:
 

@@ -459,6 +459,37 @@ async fn an_update_carrying_a_malformed_if_match_is_four_hundred_and_commits_not
     Ok(())
 }
 
+// NOTE: RFC 9457 §3.1 and §3.2: the CDR's problem details are its words about the
+// refusal, so the detail and each violation reach the OperationOutcome.
+#[tokio::test]
+async fn a_problem_details_refusal_reaches_the_outcome_with_its_violations()
+-> Result<(), Box<dyn Error>> {
+    let harness = harness().await;
+    mount_ehr(&harness.cdr).await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path(format!("/ehr/{EHR_ID}/composition")))
+        .respond_with(ferrobridge_testkit::stubs::its_rest::unprocessable_problem(
+            "the composition is invalid",
+            &[("/content[0]", "is required")],
+        ))
+        .mount(&harness.cdr)
+        .await;
+    let (status, body) = call(harness.app(), post_condition(&condition())).await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    let diagnostics = first_issue(&body)["diagnostics"]
+        .as_str()
+        .ok_or("the outcome carries diagnostics")?;
+    assert!(
+        diagnostics.contains("Validation failed: the composition is invalid"),
+        "{diagnostics}"
+    );
+    assert!(
+        diagnostics.contains("/content[0]: is required"),
+        "{diagnostics}"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn invalid_mapped_content_stores_nothing() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;

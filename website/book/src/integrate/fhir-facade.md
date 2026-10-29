@@ -209,7 +209,12 @@ Everything the facade authors is an `OperationOutcome` with an `issue.code`
 from the R4 value set. An openEHR error body never reaches the wire as its own
 document: the CDR's `message` and every `validationErrors` entry travel
 verbatim inside `issue.diagnostics`, which keeps one error vocabulary on the
-wire while losing nothing the CDR said.
+wire while losing nothing the CDR said. A CDR that answers RFC 9457 problem
+details (`application/problem+json`) is read the same way: its `title`, its
+`detail`, each `errors` violation as `path: detail`, and its problem `type`.
+The bridge's composition and contribution writes send
+`Prefer: return=representation`, so a CDR that lists violations only for such
+a write lists them.
 
 ## Program selection
 

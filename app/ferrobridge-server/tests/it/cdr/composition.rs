@@ -170,6 +170,56 @@ async fn create_composition_reports_the_422_validation_errors() -> Result<(), Bo
     Ok(())
 }
 
+// NOTE: RFC 9457 §3.1 and §3.2: a CDR that answers problem details names the
+// violations in its `errors` extension member when the write asked for them.
+#[tokio::test]
+async fn create_composition_reports_the_violations_of_a_problem_details_422()
+-> Result<(), Box<dyn Error>> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(format!("/v1/ehr/{EHR}/composition")))
+        .and(wiremock::matchers::header(
+            "Prefer",
+            "return=representation",
+        ))
+        .respond_with(ferrobridge_testkit::stubs::its_rest::unprocessable_problem(
+            "the template does not validate the composition",
+            &[("/content[0]", "unknown node")],
+        ))
+        .mount(&server)
+        .await;
+
+    let answered = support::client(&server)?
+        .create_composition(
+            &EhrId::new(EHR)?,
+            &support::composition()?,
+            &support::commit_context()?,
+            Prefer::Representation,
+        )
+        .await?;
+    assert!(
+        matches!(
+            answered.outcome,
+            CompositionCreateOutcome::UnprocessableEntity { .. }
+        ),
+        "{:?}",
+        answered.outcome
+    );
+    let problem = answered
+        .upstream
+        .problem()
+        .ok_or("the 422 body decodes as problem details")?;
+    assert_eq!(
+        Some("the template does not validate the composition"),
+        problem.detail.as_deref()
+    );
+    assert_eq!(1, problem.errors.len());
+    assert_eq!(Some("/content[0]"), problem.errors[0].path.as_deref());
+    let shown = answered.upstream.to_string();
+    assert!(shown.contains("/content[0]: unknown node"), "{shown}");
+    Ok(())
+}
+
 #[tokio::test]
 async fn create_composition_reports_the_400() -> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;

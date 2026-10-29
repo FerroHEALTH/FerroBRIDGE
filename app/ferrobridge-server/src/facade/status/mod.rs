@@ -339,14 +339,19 @@ impl Answer {
 /// Returns the diagnostics text of one `status` answer whose body is `body`.
 ///
 /// The openEHR error body travels verbatim: the `message` and every
-/// `validationErrors` entry the CDR sent, and the raw body when the CDR sent
-/// something that is not an error body. It never reaches the wire as its own
-/// document (no specification governs this: our own design).
+/// `validationErrors` entry the CDR sent, or, from a CDR that answers RFC
+/// 9457 problem details, the `title`, the `detail` and every `errors` entry,
+/// and the raw body when the CDR sent something that is neither. It never
+/// reaches the wire as its own document (no specification governs this: our
+/// own design).
 #[must_use]
 pub fn diagnostics(status: StatusCode, body: &ErrorBody) -> String {
     let mut text = format!("the openEHR service answered {status}");
-    match body.message() {
-        Some(message) => {
+    let problem = crate::cdr::error::ProblemDetails::of(body.raw())
+        .map(|problem| problem.words())
+        .filter(|words| !words.is_empty());
+    match (body.message(), problem) {
+        (Some(message), _) => {
             text.push_str(": ");
             text.push_str(message);
             for entry in body.validation_errors() {
@@ -354,11 +359,15 @@ pub fn diagnostics(status: StatusCode, body: &ErrorBody) -> String {
                 text.push_str(entry);
             }
         }
-        None if !body.is_empty() => {
+        (None, Some(words)) => {
+            text.push_str(": ");
+            text.push_str(&words);
+        }
+        (None, None) if !body.is_empty() => {
             text.push_str(": ");
             text.push_str(&String::from_utf8_lossy(body.raw()));
         }
-        None => {}
+        (None, None) => {}
     }
     text
 }
@@ -663,6 +672,41 @@ mod tests {
             QUERY_TIMEOUT,
             super::of_extension_refusal(&timed_out, "party").row()
         );
+    }
+
+    // NOTE: RFC 9457 §3.1 and §3.2: the title, the detail and an extension
+    // member's violations explain the refusal, so each reaches the diagnostics.
+    #[test]
+    fn the_problem_details_a_cdr_answers_reach_the_diagnostics() {
+        let text = diagnostics(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &body(
+                r#"{"type":"https://cdr.example.org/problems#validation-failed","title":"Validation failed","status":422,"detail":"the composition is invalid","instance":"urn:uuid:4d6f1c2a-0000-4000-8000-000000000001","errors":[{"path":"/content[0]","detail":"is required"}]}"#,
+            ),
+        );
+        assert!(text.contains("422"), "{text}");
+        assert!(
+            text.contains("Validation failed: the composition is invalid"),
+            "{text}"
+        );
+        assert!(text.contains("/content[0]: is required"), "{text}");
+        assert!(text.contains("#validation-failed"), "{text}");
+        assert!(!text.contains("urn:uuid"), "the instance stays out: {text}");
+    }
+
+    #[test]
+    fn a_problem_of_about_blank_carries_its_title_alone() {
+        let text = diagnostics(
+            StatusCode::NOT_FOUND,
+            &body(r#"{"type":"about:blank","title":"Not Found","status":404}"#),
+        );
+        assert!(text.ends_with(": Not Found"), "{text}");
+    }
+
+    #[test]
+    fn a_json_body_that_is_no_problem_keeps_its_raw_text() {
+        let text = diagnostics(StatusCode::BAD_REQUEST, &body(r#"{"unknown":"x"}"#));
+        assert!(text.contains(r#"{"unknown":"x"}"#), "{text}");
     }
 
     #[test]
