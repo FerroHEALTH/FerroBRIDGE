@@ -25,6 +25,425 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.14] - 2026-10-29
+
+The EU profile release. FHIRconnect contexts round-trip the HL7 Europe Base
+and Core `medicalTestResult-eu-core`, the Laboratory Report
+`Composition-eu-lab` and the Medication Prescription and Dispense profiles,
+and the facade answers `Composition/$document`. The `eehrxf` crate, the
+European interoperability software component, moves here from FerroFED, its
+canonical URLs move to `ferrobridge.eu`, and HL7's FHIR Validator checks the
+documents its suites write. The server and the operator console run on the
+FerroSYS crates, with `config check`, `healthcheck`, the family's `[server]`
+keys and `GET /operator/readiness`. The facade and `$tofhir` give every
+resource, created ones included, one deterministic id, which is a breaking
+change for stored ids. The CDR client reads RFC 9457 problem details, and
+every error outside the FHIR routes is one. Each release now attaches the EHR
+system's information sheet and instructions for use.
+
+The library crates publish at `fhirconnect` 0.1.206, `ferrobridge-term`
+0.1.141, `ferrobridge-validator` 0.1.141, `ferrobridge-hl7v2` 0.1.164,
+`openehr-mapping-core` 0.1.135 and `eehrxf` 0.1.131, and `fhir-types`
+0.1.128, `ferrobridge-fhirpath` 0.1.128 and `hl7v2-types` 0.1.127 stay where
+they are. A crate version an entry below names is the step at which that
+change came in.
+
+### Added
+
+- **`Composition/$document` on the FHIR facade** (#116, the R4 operation
+  `Composition-document`). `GET /fhir/Composition/{id}/$document`, and
+  `GET /fhir/Composition/$document?id={id}`, answer a document Bundle: an
+  identifier derived from the composition version, the assembly timestamp,
+  the Composition first and then every resource its context's outbound run
+  creates, each with its read URL as `fullUrl`. The caller needs read on every
+  type the document carries. `persist=true` and `graph` are refused with an
+  `OperationOutcome`, and the operation is declared on `Composition` in the
+  `CapabilityStatement`. The facade now binds a context whose start is a
+  composition model, such as `Composition-eu-lab`, to the composition itself.
+- **The HL7 Europe Laboratory Report 2.0.0 `Composition-eu-lab` round trip**
+  (#116). A FerroBRIDGE document context starts at the report composition of
+  the published `KDS_Laborbericht` template and maps it to a
+  `Composition-eu-lab`: status, identifier, date, author, the LOINC 11502-2
+  type and a title, and one section that carries the test's code and
+  references the `DiagnosticReport-eu-lab`, which references its results and
+  specimens. The document's report reads its status and identifier out of
+  openEHR, because the Composition writes those nodes going in.
+- **The HL7 Europe Base and Core 2.0.0 `medicalTestResult-eu-core` round
+  trip** (#116). A FerroBRIDGE context maps the laboratory test result of the
+  published `KDS_Laborbericht` template to a `medicalTestResult-eu-core`
+  Observation, with its category, code, effective time, status and report
+  identifier, and each analyte as a member `Observation-resultslab-eu-lab`
+  it references. The result's status travels through the codes the R4
+  diagnostic-report-status and observation-status code systems share.
+- **The HL7 Europe Medication Prescription and Dispense 1.0.0 round trip**
+  (#116). Two FerroBRIDGE contexts map FerroBRIDGE's medication template, an
+  ADL 2 template over seven published CKM archetypes, to
+  `MedicationRequest-eu-mpd` and `MedicationDispense-eu-mpd`, each with a
+  referenced `Medication-eu-mpd` and the dosage as a `Dosage-eu-mpd`; the
+  dispense is the medication ACTION at its careflow step "Prescription
+  dispensed". `scripts/vendor/ckm-medication.sh` vendors the archetypes at
+  the CKM mirror commit `docs/VERSIONS.md` pins, and the suites build the
+  operational template at test time. `fhirconnect` 0.1.196 (with `ferrobridge-hl7v2` 0.1.152 and `openehr-mapping-core` 0.1.131) takes
+  `openehr-adl` as a test dependency, and the bridge moves to the
+  `openehr-*` crates at 0.0.100, whose ADL 2 Web Template builder reads the
+  ADL 1.4 term constraints of the CKM sources.
+- **The EHDS readiness page in the book** (#116). It states the legal status
+  plainly: Regulation (EU) 2025/327 names the six priority categories, the
+  implementing act that fixes the exchange format is not adopted, and the HL7
+  Europe guides are the current proxy, so nothing is a conformance claim. Its
+  readiness matrix lists, per category, each target profile with its
+  committed template and the round-trip test that proves the transform, and
+  records the patient summary Composition, imaging and discharge reports as
+  corpus gaps. A `fhirconnect` test generates the matrix from
+  `docs/ehds/readiness.toml` and fails when a template, a context or a test it
+  names is gone. `fhirconnect` 0.1.198 (with `ferrobridge-hl7v2` 0.1.153)
+  takes `toml` as a test dependency.
+- **`ferrobridge config check` and `ferrobridge healthcheck`** (#1260), the
+  FerroHEALTH family's subcommands from `ferrohealth-server`. `config check`
+  prints the running configuration one key per line with where each value
+  came from and every secret as `***`, then resolves it as `serve` does and
+  exits 78 with every refusal on stderr. `healthcheck` asks the running
+  server for `/health/readiness` on loopback and exits 0 only on `200`, and
+  the image declares a `HEALTHCHECK` through it. Every subcommand takes
+  `--set key=value`, applied over the file and the environment.
+- **`$tofhir` answers one resource per occurrence of a repeated start
+  archetype** (#1271). A composition holding two diagnoses answers two
+  Conditions under one `Provenance`, each with a stable id derived from the
+  composition and its occurrence, and an occurrence the context's condition
+  does not admit is counted in the `OperationOutcome`. The identity seam's
+  request names the occurrence, and two resources taking one id refuse the
+  call.
+- **Each release attaches the EHR system's information sheet and
+  instructions for use.** The EHR system Cadasto B.V. declares under the
+  EHDS is FerroEHR with FerroBRIDGE, and both documents are pages of the
+  FerroHEALTH book. The release lane takes them at the FerroHEALTH commit
+  `docs/ehds/system-documents.env` pins, refuses a page whose revision
+  differs from the pin, and attaches `ferrobridge-<tag>-information-sheet.md`
+  and `ferrobridge-<tag>-instructions-for-use.md` with the release's facts
+  appended: the system version, the release date (EHDS Art. 38(2)(b)) and
+  the versions of the standards FerroBRIDGE supports (Art. 38(2)(e)). The
+  release notes name the pinned revision of each system page (#1279).
+- **`ferrobridge-hl7v2` sends over MLLP** (#1281). `mllp::send` opens a
+  connection within a connect timeout, writes one message as one MLLP frame
+  and returns the one reply frame within a reply timeout, bounded by the
+  codec's ceiling. A refused connection, either timeout, a peer that closes
+  before or inside its reply, and a reply past the ceiling are each their own
+  `SendError` variant, and none carries the message or the reply. FerroPIX
+  sends its ITI-10 notifications through it.
+- **The family's `[server]` keys** (#1287): `base_path`,
+  `header_read_timeout_ms`, `drain_delay_ms`, `max_concurrent_requests`,
+  `retry_after_s`, `trusted_proxies`, `forwarded_header`, `compression`,
+  `compression_min_bytes` and `[server.tls]`, and `[telemetry] environment`.
+- **`GET /operator/readiness`** behind the operator scope: the readiness
+  document with why each indicator is down, which the open route no longer
+  names. The operator console reads it, and falls back to the open route
+  while the operator API is off (#1287).
+- **The `eehrxf` crate, the European interoperability software component of
+  an EHR system under Regulation (EU) 2025/327 (Art 2(2)(n), Art 25(1)),
+  joins the crate line at 0.1.128.** It moves here from the FerroHEALTH
+  federation gateway, where it was built up to 0.0.40 and never published,
+  so its earlier history is that project's changelog. It carries the
+  format-neutral dataset model read from the Xt-EHR EHDS Logical Information
+  Models, one feature per Art 14(1) category with its crosswalk to the HL7
+  Europe profiles, the exchange format in FHIR R4 (`fhir-r4`), and the
+  mapping between openEHR and that format through `fhirconnect`
+  (`openehr`). Against 0.0.40 its one change of behaviour is the id of a
+  resource mapped from a composition, which is now the FHIRconnect
+  deterministic id `fhirconnect` 0.1.203 derives from the composition's uid
+  and the entry path (FHIRconnect v1.0.0, engine/id-management.adoc,
+  Deterministic IDs). The corpora its tests read are vendored by
+  `scripts/vendor/eehrxf.sh`, and the book gains the component's pages: the
+  component, the category crosswalks and receiving a document (#1314).
+- **HL7's FHIR Validator checks the documents the `eehrxf` suites write.** The
+  CI `fhir-validator` job runs it offline over every patient summary document
+  the suites emit under `EEHRXF_EMIT_DIR`, against the HL7 Europe Patient
+  Summary and Base and Core profiles and the MyHealth@EU Master Value Sets
+  Catalogue. It fails on an error, a fatal issue or a claimed profile it
+  could not find, and keeps its results as the `eehrxf-fhir-validation`
+  artifact (`scripts/checks/fhir-validator.sh`) (#1318).
+- **The CDR client reads RFC 9457 problem details.** A CDR that answers its
+  refusals as `application/problem+json` keeps its explanation on the facade:
+  the problem's `title`, `detail`, each `errors` violation as `path: detail`,
+  and its `type` reach the `OperationOutcome` diagnostics, as a
+  `{message, validationErrors}` body still does. The composition and
+  contribution writes already send `Prefer: return=representation`, so a CDR
+  that lists violations only for such a write lists them (#1334).
+- The run report of `etl fhir` carries an element ledger (#408): per input
+  resource, every element with a value and one of four outcomes. `mapped`
+  names the openEHR node a FHIRconnect mapping read the element into and the
+  CDM `table.column` targets an OMOCL column reads there, `dropped` names the
+  loss a mapping declared, `refused` the reason the resource or its
+  composition was refused, and `unmapped` marks an element no mapping names
+  or no column reads where it went. The text report adds a `ledger` line with
+  the counts. `fhirconnect` 0.1.193 records every element a mapping reads
+  going into openEHR (`Outcome::reads`, `Transformed::reads`), the OMOCL
+  program names the composition node each CDM column reads
+  (`Program::column_reads`), and `ferrobridge-hl7v2` moves to 0.1.147.
+
+### Changed
+
+- `openehr-mapping-core` and `ferrobridge-operator-api` compile for
+  `wasm32-unknown-unknown`, so the operator console's browser half can draw
+  the bridge's documents. The workspace takes `openehr-its` without its
+  ITS-REST client, which only the server adds, and the console CI lane
+  checks the operator contract for wasm32
+  ([#1256](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1256)).
+- The operator console hydrates the whole page on FerroUI 0.5.0: the
+  server draws the first page and the browser draws every page after it,
+  so a link, a tab, the search or an action no longer reloads the document,
+  and the browser's back and forward walk the pages you visited. The pages
+  load in five groups, each the first time you open one of its pages or
+  earlier while the browser is idle. Every page and action still works with
+  no WebAssembly, as plain links and form posts. The facade's
+  `CapabilityStatement` reaches the browser reduced to the new
+  `ferrobridge-operator-api` `capability::Capability` document, which the
+  console's server writes, and the entry WebAssembly's budget rises to
+  646 KiB
+  ([#1256](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1256)).
+- **The operator console takes FerroUI 0.5.5** (`=0.5.5`), and Reload the
+  set, the mapping editor's check and save, and the playground's runs post
+  to their server functions through `<ActionForm>` in FerroUI's answer mode.
+  With no WebAssembly the browser posts to `/api/reload`, `/api/edit` or
+  `/api/run` and the console draws the page the form was on with the answer
+  and what the operator entered; the browser's address stays at the
+  function's. The console's own post routes for these actions
+  (`POST /mappings`, `POST /mappings/new`, `POST /mappings/edit/…`,
+  `POST /playground` and its tabs) are gone (#1265).
+- **The operator console takes FerroUI 0.5.4** (`=0.5.4`, from 0.5.1). It
+  hydrates through FerroUI's `widget::hydration::hydrate`, so the page's
+  mark is `data-ferroui-hydrated` and a click or a submit before hydration
+  ends is left to the browser; a post the console draws in the page counts
+  as drawn, so a busy search box ends its wait; the mapping editor and the
+  playground's input take the `_by_edit` editors and keep no copy of the
+  text; the skip link moves the focus to the main area on a hydrated page.
+  The forms keep their own post routes as the no-WebAssembly path until
+  FerroUI's `<ActionForm>` can bring an answer back to its page (#1265).
+- The operator console takes FerroUI 0.5.1. Its shell is drawn once and
+  follows the router, so the search's words and the navigation's scroll
+  survive a link, and the user menu closes once one of its items is
+  chosen. The library marks the page once it has hydrated, and a debug
+  build names a page changed before then (#1267).
+- **Breaking: the FHIR facade's resource ids are the deterministic ids
+  `$tofhir` answers, and every occurrence of a start archetype is a resource
+  of its own.** A resource id is now the hash FHIRconnect v1.0.0 recommends
+  over the composition uid and the entry path (`engine/id-management.adoc`,
+  §Deterministic IDs), the id `$tofhir` gives the same occurrence; an entry's
+  `LOCATABLE.uid` no longer becomes its id. The facade finds the occurrences
+  the way the engine does, so a start archetype inside a `SECTION`, at any
+  depth, and an instance repeating below another entry each read, search and
+  bind as their own resource, under an entry path such as
+  `/content[openEHR-EHR-SECTION.adhoc.v1]/items[2]`. Every id the facade
+  served before changes. The identity store writes schema 4 and refuses a
+  file of an earlier schema at boot, naming it: remove the
+  `[facade] identity_store` file to reset it, and the bridge creates it anew.
+  `fhirconnect` 0.1.205 (with `ferrobridge-hl7v2` 0.1.163 and `eehrxf`
+  0.1.129) adds `engine::traverse::occurrence`, which names the
+  occurrences `to_fhir_each` maps without running the program (#1276).
+- **Breaking for stored resource ids: `$tofhir` ids follow the FHIRconnect
+  deterministic id** (#1276). A resource the identity seam and the mapping
+  give no id takes the hash `engine/id-management.adoc` §Deterministic IDs
+  recommends, over the composition's `object_id` and the entry path of its
+  occurrence, as 52 lowercase base32 characters, in place of the
+  composition's `object_id` and the `<uid>.2` form. An id a caller stored
+  from an earlier `$tofhir` answer no longer matches; map the composition
+  again to read the new id. The identity seam's request carries the entry
+  path, and `fhirconnect::engine::identity` and
+  `WebTemplateIndex::entry_path` are the shared derivation the FHIR facade
+  adopts next.
+- **`ferrohealth-smart` 0.7.3** for the workspace and `ferrobridge-term`'s
+  `smart` feature (`ferrobridge-term` 0.1.138, with `ferrobridge-hl7v2`
+  0.1.155 and `ferrobridge-validator` 0.1.138). It renders every secret and
+  masked URL of the shared sections through `ferrohealth-secret`, the
+  family's one mask: a secret shows as `***` in place of `[redacted]`, and a
+  masked URL hides its query too (#1278).
+- **`ferrobridge-term` 0.1.139 requires `ferrohealth-smart` 0.7.4 as a caret
+  requirement** in place of an exact pin, so a smart patch reaches a product
+  through its lockfile without a release of this line first. The products
+  keep pinning `ferrobridge-term` exactly (#1282).
+- **`ferrohealth-smart` 0.8** (caret `0.8.3`) for the workspace and
+  `ferrobridge-term`'s `smart` feature (`ferrobridge-term` 0.1.140, with
+  `ferrobridge-hl7v2` 0.1.159 and `ferrobridge-validator` 0.1.140), so a
+  product on the 0.8 line hands its `TokenSource` to the terminology client.
+  This breaks the `smart` feature's API for a consumer still on
+  `ferrohealth-smart` 0.7: it moves to 0.8 with this release (#1285).
+- **The operator console runs on the FerroSYS crates** (#1287): its
+  configuration through `ferrohealth-config` and `ferrohealth-secret` (every
+  `FERROBRIDGE_CONSOLE__` variable keeps its name, `--set` joins them,
+  `RUST_LOG` is the alias of the new `[telemetry] filter`), its log through
+  `ferrohealth-telemetry`, and its security headers, same-origin check,
+  health routes, drain, healthcheck and subcommands through
+  `ferrohealth-server`. `config check` prints the running configuration with
+  every secret as `***`; `healthcheck` asks `/health/readiness`; `GET /health`
+  answers `{"state":"up"}`; a `_file` secret loses its trailing line ending
+  alone; the 403 of a cross-site post is in the console's configured
+  language.
+- **The operator console signs operators in through `ferrohealth-smart`'s
+  OpenID Connect relying party** (`oidc::RelyingParty`), in place of its own
+  authorization request, PKCE, code exchange, ID Token check, refresh and
+  end-session request. The `[oidc]` keys, the sign-in and sign-out routes
+  and the sign-in page's states are unchanged (#1287).
+- **`ferrohealth-smart` 0.8.6 and the `openehr-*` crates 0.0.109** (#1287).
+  The workspace requires `ferrohealth-smart` as the caret `0.8.6` and the
+  nine `openehr-*` crates at 0.0.109, the newest releases on crates.io on
+  2026-10-27, and still takes `openehr-sdt` with `flat` alone. An
+  `INTERVAL_EVENT`'s `math_function` now reads back through FLAT with the
+  openEHR terminology's text for its code, which the `fhirconnect` round-trip
+  law records as a change.
+  `openehr-mapping-core` 0.1.134, `fhirconnect` 0.1.202, `ferrobridge-term`
+  0.1.141, `ferrobridge-hl7v2` 0.1.160 and `ferrobridge-validator` 0.1.141
+  follow their requirements.
+- **The server runs on the FerroSYS crates** (#1287): `ferrohealth-config`,
+  `ferrohealth-secret`, `ferrohealth-telemetry`, `ferrohealth-health`,
+  `ferrohealth-server` and `ferrohealth-usage-report`, pinned exactly, in
+  place of its own configuration loader, console, request log, request id,
+  panic catch, health registry, drain and usage report. Every key and
+  variable keeps its name. What an operator sees change: a secret renders as
+  `***`; a `_file` secret loses its trailing line ending alone and an empty
+  file is refused; a `[telemetry] filter` that does not parse refuses the
+  start; a refusal names the closest known key and several are reported at
+  once; `[server.caller_rate]` and `[telemetry.otlp]` are refused; a
+  response is compressed when the client accepts gzip or Brotli. The
+  readiness document is the family's: `phase` beside `state`, the indicators
+  as a list sorted by name, readiness `503` while the process boots or
+  drains, `GET /health` answers the state alone, and the open route names no
+  indicator's detail. The request log never logs the client's
+  `X-Request-Id`: the line, a panic or refusal body and the CDR calls name the
+  server's own id, and the client's is echoed on the response. The panic line
+  never names the panic message. The banner is the family's, and
+  `/health/info` names the commit in seven characters. The usage report
+  leaves out a counter that stayed at 0.
+- A pull request records its user-visible effect as a fragment,
+  `changelog.d/<issue>-<kebab-slug>.<section>.md` (`changelog.d/README.md`),
+  and no longer edits `CHANGELOG.md`, so two open pull requests stop
+  conflicting on `[Unreleased]`. The release cut assembles the fragments into
+  the version's section with `scripts/release/changelog.sh --assemble` and
+  deletes them, and the release `plan` job refuses a tag that still has one.
+  CI refuses a malformed fragment, a change that writes under `[Unreleased]`,
+  and a change to a user-visible surface with no fragment unless it carries
+  the `no-changelog` label. `scripts/gh/changelog-merge.sh` is retired (#1289).
+- **`serde-saphyr` 2.0.0.** The mapping loader, the search declaration
+  reader and the fuzz targets parse YAML with `serde-saphyr` 2.0.0. A
+  consumer of `openehr-mapping-core` that walks the source of
+  `LoadError::Yaml` now meets `serde_saphyr::Error` of 2.0.0, whose
+  `AliasError` carries the original error.
+  `openehr-mapping-core` 0.1.135, `fhirconnect` 0.1.203 and
+  `ferrobridge-hl7v2` 0.1.161 follow their requirements (#1315).
+- **`jsonschema` 0.59.0.** The FHIRconnect and OMOCL mapping schemas are
+  checked with `jsonschema` 0.59.0, which refuses a value whose regex match
+  the engine cannot finish where 0.58 accepted it under `not` or
+  `patternProperties`. `fhirconnect` 0.1.204 and `ferrobridge-hl7v2`
+  0.1.162 follow their requirements (#1317).
+- **Breaking: the canonical URLs `eehrxf` defines move to `ferrobridge.eu`.**
+  The archetype-local code systems are
+  `https://ferrobridge.eu/fhir/CodeSystem/archetype-local/` followed by the
+  archetype id, and the remaining-dispensations extension is
+  `https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations`,
+  where they were under `ferrofed.eu`. The FerroBRIDGE site serves the
+  extension's `StructureDefinition` at its URL and describes the code systems
+  at their base. No compatibility alias reads the old URLs, since no
+  production deployment holds a document written with them; a consumer
+  that matches either URL updates it. `eehrxf` 0.1.130 (#1319).
+- **Breaking: a resource a run creates takes one id on `$tofhir` and on the
+  FHIR facade, and keeps it in every composition version.** A further
+  `hierarchy.split` occurrence and a `reference` target are named by
+  `fhirconnect::engine::identity::created_id`, a hash of the composition's
+  version container, the entry path of the occurrence that creates them, and
+  their type, the parent's type, the creating mapping, their openEHR
+  positions and a split's `unique` values. `$tofhir` framed the full version
+  id into the hash, so each new version renamed every created resource, and
+  the facade derived a different id of its own. Every created id either
+  surface answered before changes. `$tofhir` now maps each occurrence on its
+  own (`engine::traverse::occurrence::to_fhir_at`) with an identity sink
+  anchored at it.
+  `fhirconnect` 0.1.206 (with `ferrobridge-hl7v2` 0.1.164 and `eehrxf`
+  0.1.131) (#1332).
+- **Problem details for every error outside the FHIR routes** (#1333,
+  RFC 9457). The operator API answers every refusal as
+  `application/problem+json` with the status it answered before, where it
+  answered a JSON object with `error` and `message`. Each problem's `type`
+  links to its section of the new Problem types page of the book, such as
+  `https://ferrobridge.eu/docs/operate/problems.html#provisioned`, and a
+  refusal whose status says all there is to say is `about:blank`. The
+  stack's own `408`, `413`, `429`, `503` and panic `500` on a non-FHIR route
+  are problems too, the request id as a `urn:uuid:` instance. No problem
+  quotes a path, a mapping body, a reason, a token or an upstream answer; a
+  `503` of a reload names its cause in the server log. The FHIR facade and
+  the operations keep `OperationOutcome`. The operator console reads a
+  problem's title and detail into the refusal it draws. Migration: a client
+  of the operator API reads `type`, `title` and `detail` in place of `error`
+  and `message`. The server takes `ferrohealth-server` 0.3.9.
+- **The bridge writes the composition's `language`, `territory` and
+  `composer`, the `_feeder_audit`, `_link:i`, `_participation:i`,
+  `_other_participation:i`, `_provider` and `_health_care_facility`
+  families, and a role's `performer` whole, under `|raw`** (#618, #1000),
+  through the `openehr-sdt` 0.0.99 builder. A composer that carries
+  identifiers, and a provider or facility with an external reference, now
+  reach the composition whole, where the `ctx/` keys and the suffix
+  spellings left those parts out or refused them. A party builds through
+  `build_party`, with each member of a value at the root passed as
+  `<root>/<attribute>|raw`. The last local openEHR spellings of #618 are
+  gone. `fhirconnect` 0.1.197, `openehr-mapping-core` 0.1.132,
+  `ferrobridge-hl7v2` 0.1.151.
+- **The bridge takes the `openehr-*` crates at 0.0.99 and drops three local
+  openEHR spellings** (#618). The archetype HRID of an ADL 2 template ETag
+  and of an archetype node id now reads through `openehr-am`'s `FromStr` for
+  `ArchetypeHrid`, so the server no longer depends on `openehr-adl`. A
+  `TERMINOLOGY_ID` is built with `openehr-base`'s `TerminologyId::new`. The
+  `change_type` and `lifecycle_state` codes and rubrics of a commit come from
+  `openehr-term`'s named concepts, now a direct dependency. What the bridge
+  writes is unchanged. `fhirconnect` 0.1.195, `openehr-mapping-core` 0.1.130
+  and `ferrobridge-hl7v2` 0.1.149 carry the new pins. `fhirconnect` removes
+  the public `fhirconnect::engine::lens::code_phrase::terminology_id`; a
+  caller uses `TerminologyId::new(system, version)`.
+
+### Fixed
+
+- **A `manual` entry whose openEHR paths reach two data elements writes
+  both.** The engine merged every path of one entry into the element the
+  last path reached, so an entry that set the `current_state` and the
+  `careflow_step` below one `ism_transition` wrote only the careflow step,
+  with no diagnostic, and the build then defaulted the state. Each data
+  element the paths reach is now created, as FHIRconnect's manual mappings
+  page says ("Full FHIR or openEHR elements are created from all given
+  paths") (#116).
+- **A composition holding a context's start archetype more than once maps
+  each occurrence on its own** (#1254). The FHIRconnect engine mixed the
+  entries into one resource, taking a field from whichever entry had it. The
+  new `traverse::to_fhir_each` maps every occurrence to its own resource, with
+  the context's condition checked per occurrence, and `traverse::to_fhir`
+  maps the first and reports the rest as the `unmapped-occurrences` warning.
+- **The `[etl]` queries must end their `ORDER BY` in `v/uid/value`.** The
+  versions of one contribution share its commit time (openEHR RM Common
+  1.1.0, Contributions), so a composition query ordered by
+  `v/commit_audit/time_committed/value` alone could tie, and offset paging
+  over a tie can skip or repeat a row. `etl run` now refuses to start when
+  the composition or visit query's last order key is not the `uid/value` of
+  its `VERSION [LATEST_VERSION]` variable; add `, v/uid/value` to the end of
+  the `ORDER BY` to upgrade. The book's composition query is the batch
+  contract over `VERSIONED_OBJECT`, and the end-to-end tests run against the
+  reference CDR release that takes `VERSIONED_OBJECT` in `FROM` (#1284).
+
+### Security
+
+Shipped with functional changes because: the library crates publish from `main` one patch per change, and `main` already holds the unreleased changes above, so a separate security-only crate patch has no tree to come from.
+
+- The bridge and `ferrobridge-term`'s `smart` feature take
+  `ferrohealth-smart` 0.7.1 in place of 0.7.0: every earlier release can
+  render a configured URL's credentials in full (CWE-532,
+  GHSA-vphj-3f8c-5hpx). `ferrobridge-term` 0.1.137,
+  `ferrobridge-hl7v2` 0.1.152 and `ferrobridge-validator` 0.1.137 carry it, so
+  a product pinning `ferrobridge-term` can take the patched crate (#1264).
+- The server and the operator console take `ferrohealth-server` 0.3.7 in
+  place of 0.3.6 (GHSA-2mc2-h3jq-c5wg). Every earlier release held a
+  plain-HTTP connection that never sent a byte for as long as the client
+  kept it open, so a client with no credentials could exhaust the process's
+  file descriptors, and the listener then retried a failed `accept` at once
+  and logged every failure. Such a connection now closes once
+  `[server] header_read_timeout_ms` passes, counted from accept, and the
+  listener backs off after an `EMFILE` or `ENFILE`. A response to a request
+  whose body the routes left unread, such as a `404` to a `POST` of an
+  unserved path, now carries `Connection: close` (#1310).
+
 ## [0.0.13] - 2026-10-25
 
 The security and OMOP release. A write the facade makes for an authenticated
@@ -4947,7 +5366,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.13...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.14...HEAD
+[0.0.14]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.10...v0.0.11
