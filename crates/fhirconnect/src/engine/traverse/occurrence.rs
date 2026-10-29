@@ -12,11 +12,17 @@
 //! `$tofhir` operation answers for that occurrence. No specification governs
 //! how an occurrence is named: our own design.
 
+use fhir_types::codec::Value;
 use openehr_mapping_core::composition::CanonicalComposition;
+use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::WebTemplateIndex;
 
+use crate::engine::context::CallContext;
+use crate::engine::outcome::Outcome;
+use crate::engine::seam::Seams;
 use crate::engine::traverse::error::EngineError;
 use crate::resolve::program::Program;
+use crate::tree::element::Table;
 
 /// One occurrence of a context's start archetype in a composition.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,4 +84,45 @@ pub fn occurrences(
         });
     }
     Ok(found)
+}
+
+/// Runs `program` over the one occurrence `occurrence` names, producing its
+/// resource, as [`super::to_fhir_each`] runs each occurrence.
+///
+/// A caller that maps the occurrences one at a time does so to hand each run
+/// seams of its own, such as an identity sink anchored at that occurrence.
+///
+/// # Errors
+///
+/// [`EngineError`] for any element the occurrence cannot map, including
+/// [`EngineError::NotApplicable`] when the context's condition does not hold
+/// at it.
+pub fn to_fhir_at<T: Table + ?Sized>(
+    program: &Program,
+    table: &T,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    seams: &Seams<'_>,
+    context: &CallContext,
+    occurrence: &StartOccurrence,
+) -> Result<Outcome<Value>, EngineError> {
+    super::composition_program(program)?;
+    let mut instance = Vec::with_capacity(occurrence.positions.len());
+    for position in &occurrence.positions {
+        instance.push(
+            RmPosition::new(*position).map_err(|source| EngineError::Position {
+                mapping: String::from(program.context().as_str()),
+                source,
+            })?,
+        );
+    }
+    super::read_out(
+        program,
+        table,
+        index,
+        composition,
+        seams,
+        context,
+        &instance,
+    )
 }

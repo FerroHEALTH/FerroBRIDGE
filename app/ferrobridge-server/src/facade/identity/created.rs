@@ -75,14 +75,13 @@ impl<'a> CreatedIdentities<'a> {
                 parent: format!("{}/{}", self.parent_type, self.parent),
             })?;
         let created_type = request.resource_type();
-        let key = derive::created_key(&parent, request);
-        let map_key = derive::created_map_key(&key);
+        let derived = derive::created_id(&parent, request);
+        let map_key = derive::created_map_key(&derived);
         let id = match self.store.internal_of(created_type, &map_key)? {
             Some(known) => known,
-            None => {
-                self.store
-                    .record_internal(created_type, &map_key, &derive::created_digest(&key))?
-            }
+            None => self
+                .store
+                .record_internal(created_type, &map_key, &derived)?,
         };
         let binding = CompositionBinding {
             resource_type: created_type.to_owned(),

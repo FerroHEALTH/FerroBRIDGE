@@ -409,59 +409,8 @@ pub(super) async fn tofhir_ids(
     template: &str,
     composition: &serde_json::Value,
 ) -> Result<Vec<String>, Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    let templates = root.path().join("templates");
-    std::fs::create_dir_all(&templates)?;
-    std::fs::write(templates.join("template.opt"), template)?;
-    let settings = ferrobridge_server::config::MappingSettings {
-        directory: std::path::PathBuf::from(fixtures),
-        templates,
-    };
-    let lane = ferrobridge_server::state::OperationsLane::new(
-        ferrobridge_server::mappings::load(&settings)?,
-        "Device/ferrobridge-test",
-    );
-    let state = std::sync::Arc::new(
-        ferrobridge_server::state::AppState::with_health(
-            ferrohealth_health::registry::Registry::default(),
-        )
-        .serving_operations(lane),
-    );
-    let app = ferrobridge_server::router(
-        state,
-        &ferrohealth_server::section::ServerSection {
-            body_limit_bytes: 1024 * 1024,
-            ..crate::support::settings()
-        },
-    );
-    let request = serde_json::json!({
-        "resourceType": "Parameters",
-        "parameter": [
-            { "name": "composition", "valueString": composition.to_string() },
-            {
-                "name": "context",
-                "part": [{ "name": "patient", "valueReference": { "reference": super::SUBJECT } }],
-            },
-        ],
-    });
-    let response = tower::ServiceExt::oneshot(
-        app,
-        http::Request::post("/fhir/$tofhir")
-            .header(http::header::CONTENT_TYPE, "application/fhir+json")
-            .body(axum::body::Body::from(request.to_string()))?,
-    )
-    .await?;
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
-    let answer: serde_json::Value = serde_json::from_slice(&bytes)?;
-    assert_eq!(StatusCode::OK, status, "{answer}");
-    Ok(answer["entry"]
-        .as_array()
-        .ok_or("the answer is a Bundle")?
-        .iter()
-        .filter(|entry| entry["resource"]["resourceType"] == "Condition")
-        .filter_map(|entry| entry["resource"]["id"].as_str().map(str::to_owned))
-        .collect())
+    let answer = super::super::tofhir(fixtures, template, composition).await?;
+    Ok(super::super::ids_of_type(&answer, "Condition"))
 }
 
 // NOTE: FHIRconnect v1.0.0 `engine/id-management.adoc` §Deterministic IDs: one

@@ -250,7 +250,7 @@ async fn a_further_split_occurrence_answers_a_read_of_its_own() -> Result<(), Bo
         .ok_or("the parent is bound")?;
     let request = IdentityRequest::new("Condition", "Condition", "ferrobridge_created_split")
         .with_occurrence(vec![2]);
-    let id = derive::created_digest(&derive::created_key(&binding, &request));
+    let id = derive::created_id(&binding, &request);
     let (status, body) = call(
         harness.app(),
         Request::get(format!("/fhir/Condition/{id}")).body(Body::empty())?,
@@ -282,7 +282,7 @@ async fn an_update_of_a_created_resource_is_refused() -> Result<(), Box<dyn Erro
         .ok_or("the parent is bound")?;
     let request = IdentityRequest::new("Condition", "Condition", "ferrobridge_created_split")
         .with_occurrence(vec![2]);
-    let id = derive::created_digest(&derive::created_key(&binding, &request));
+    let id = derive::created_id(&binding, &request);
     let mut revised = with_sites(&["Right knee"]);
     revised["id"] = serde_json::json!(id.as_str());
     let (status, body) = call(
@@ -339,5 +339,81 @@ async fn a_type_only_a_reference_creates_is_declared_readable() -> Result<(), Bo
     .await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "{refused}");
     assert_eq!(Some("not-supported"), refused["issue"][0]["code"].as_str());
+    Ok(())
+}
+
+/// Returns `composition` carrying the version uid `version`, as the CDR
+/// stores it.
+fn at_version(composition: &serde_json::Value, version: &str) -> serde_json::Value {
+    let mut held = composition.clone();
+    held["uid"] = serde_json::json!({ "_type": "OBJECT_VERSION_ID", "value": version });
+    held
+}
+
+// NOTE: FHIRconnect v1.0.0 `engine/id-management.adoc` §Deterministic IDs: every
+// exported resource keeps its id, so a created one takes one id on both surfaces.
+#[tokio::test]
+async fn a_reference_target_takes_one_id_on_the_facade_and_on_tofhir_in_every_version()
+-> Result<(), Box<dyn Error>> {
+    let harness = harness_over(CREATED, settings()).await;
+    let (id, _parent) = created_observation(&harness).await?;
+    let composition = composition_under(
+        &harness,
+        "ferrobridge_created_reference.context",
+        &with_evidence(),
+    );
+    for version in [VERSION_ONE, &VERSION_ONE.replace("::1", "::2")] {
+        let answer = super::tofhir_with(
+            CREATED,
+            &[
+                "ferrobridge_created_reference.context.yml",
+                "ferrobridge_created_reference.yml",
+            ],
+            ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
+            &at_version(&composition, version),
+        )
+        .await?;
+        assert_eq!(
+            vec![id.clone()],
+            super::ids_of_type(&answer, "Observation"),
+            "{version}"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_further_split_occurrence_takes_one_id_on_the_facade_and_on_tofhir()
+-> Result<(), Box<dyn Error>> {
+    let harness = harness_over(CREATED, settings()).await;
+    let resource = with_sites(&["Left knee", "Right knee"]);
+    let composition = composition_under(&harness, "ferrobridge_created_split.context", &resource);
+    let parent = create(&harness, &resource, &composition).await?;
+    let parent_id = FhirResourceId::new(parent["id"].as_str().ok_or("the parent has an id")?)?;
+    let binding = harness
+        .store
+        .binding_of("Condition", &parent_id)?
+        .ok_or("the parent is bound")?;
+    let request = IdentityRequest::new("Condition", "Condition", "ferrobridge_created_split")
+        .with_occurrence(vec![2]);
+    let created = derive::created_id(&binding, &request);
+    let answer = super::tofhir_with(
+        CREATED,
+        &[
+            "ferrobridge_created_split.context.yml",
+            "ferrobridge_created_split.yml",
+        ],
+        ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
+        &at_version(&composition, VERSION_ONE),
+    )
+    .await?;
+    assert_eq!(
+        vec![
+            String::from(parent_id.as_str()),
+            String::from(created.as_str())
+        ],
+        super::ids_of_type(&answer, "Condition"),
+        "{answer}"
+    );
     Ok(())
 }
