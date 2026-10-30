@@ -1,6 +1,6 @@
 ---
 name: ferroui
-description: One shared UI component library, FerroHEALTH/FerroUI, for every FerroHEALTH console, linked by a pinned Cargo dependency; every console is reactive; the owner signed off on migrating the sibling consoles to it from here
+description: One shared UI component library, FerroHEALTH/FerroUI, for every FerroHEALTH console, linked by a pinned Cargo dependency; every console is server-rendered since FerroUI 0.6 (#510); the owner signed off on migrating the sibling consoles to it from here
 metadata:
   type: project
 ---
@@ -37,10 +37,12 @@ construction.
   `ferroterm-viewer` binary and image, a backend-for-frontend holding the
   operator's session, the terminology server serving no UI files, so FerroUI
   targets one rendering model.
-- **Every console is reactive** (owner, 2026-10-25,
-  [[reactive-console-ui]], [[family-architecture]]): a link, a form or an
-  action never reloads the whole document. WebAssembly is the normal path
-  and the no-WebAssembly page only the fallback (FerroUI #410).
+- **Every console is server-rendered** (owner, 2026-10-29, FerroUI #510,
+  [[reactive-console-ui]]): every page is drawn whole on the console's server
+  from FerroUI's Askama components, a navigation is one document, an
+  in-page change is one of FerroUI's plain script modules over what the
+  server drew, and there is no Leptos and no WebAssembly. It supersedes the
+  hydrated mode of 2026-10-25 (FerroUI #410).
 - **The owner signed off on editing the sibling repositories for this
   migration** (2026-10-18: "it's an sign off you are allwed to update there
   repo's"). Each change is made in that repository's own checkout, branch and
@@ -48,7 +50,7 @@ construction.
   a FerroBRIDGE branch ([[sibling-projects]]).
 - **FerroUI is a fully set up repository**, not just a crate (owner, 2026-10-18:
   "so this repo is fully setup and everything!!"): `CLAUDE.md` and `.claude/`
-  (rules with `leptos-ui.md` as its own component rule set, agents, skills,
+  (rules with `console-ui.md` as its own component rule set, agents, skills,
   hooks, memory), the README and the community files, BUSL `LICENSE` and
   `NOTICE` with SPDX headers, CI with the same workflow security and a single
   required `conclusion`, the Rust gates, Dependabot, CodeQL, Scorecard, the

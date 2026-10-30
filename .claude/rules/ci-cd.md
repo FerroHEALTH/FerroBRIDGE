@@ -64,8 +64,8 @@ Fourteen workflows:
   its own output as a consumer would.
 - `.github/workflows/release-console.yml`: the reusable operator console lane
   (#603). It builds the musl console binary per architecture with
-  `cargo auditable` and the site bundle with the pinned console tools, attests
-  both and attaches them to the draft, then verifies them against its own
+  `cargo auditable`, attests each and attaches it to the draft, then
+  verifies them against its own
   signer identity, stages them for `docker/console/Dockerfile`, pushes
   `ghcr.io/ferrohealth/ferrobridge-console`, and attests and verifies the image
   as `release-image.yml` does. All three are reusable workflows because SLSA

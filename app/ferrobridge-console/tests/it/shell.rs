@@ -57,7 +57,7 @@ async fn the_shell_carries_the_lockup_the_status_the_user_menu_and_no_theme_togg
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, page) = send(&service, get_with("/", &cookie)?).await?;
-    assert!(page.contains("/pkg/ferrobridge-icon.svg"), "{page}");
+    assert!(page.contains("/brand/ferrobridge-icon.svg"), "{page}");
     assert!(page.contains("Bridge up"), "{page}");
     assert!(page.contains("version 0.0.8"), "{page}");
     assert!(page.contains(OPERATOR_NAME), "{page}");

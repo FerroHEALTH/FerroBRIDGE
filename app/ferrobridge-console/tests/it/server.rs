@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The console's HTTP surface driven in-process: the health route, the
-//! pages, the site bundle, and the security headers on each.
+//! pages, FerroUI's assets, and the security headers on each.
 
 use axum::body::Body;
 use http::header::{
-    ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_SECURITY_POLICY, REFERRER_POLICY,
-    VARY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
+    ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_SECURITY_POLICY, CONTENT_TYPE,
+    REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
 };
 use http::{Request, Response, StatusCode};
 use tower::ServiceExt as _;
@@ -16,19 +16,9 @@ use ferrobridge_console::server::{ConsoleState, router};
 
 use crate::support::settings;
 
-/// A site root holding a WebAssembly file big enough to be compressed.
-fn site() -> tempfile::TempDir {
-    let site = tempfile::tempdir().expect("a temporary directory");
-    let pkg = site.path().join("pkg");
-    std::fs::create_dir_all(&pkg).expect("the pkg directory");
-    std::fs::write(pkg.join("ferrobridge-console.wasm"), vec![0_u8; 4096]).expect("the bundle");
-    site
-}
-
-/// Sends `request` to a console over the site root `site`.
-async fn send(site: &tempfile::TempDir, request: Request<Body>) -> Response<Body> {
-    let state =
-        ConsoleState::new(settings(site.path(), "http://127.0.0.1:9/")).expect("the state builds");
+/// Sends `request` to a console whose bridge is out of reach.
+async fn send(request: Request<Body>) -> Response<Body> {
+    let state = ConsoleState::new(settings("http://127.0.0.1:9/")).expect("the state builds");
     router(state)
         .oneshot(request)
         .await
@@ -61,15 +51,6 @@ async fn text(response: Response<Body>) -> String {
     String::from_utf8(bytes.to_vec()).expect("a UTF-8 body")
 }
 
-/// The script nonce `policy` names.
-fn nonce(policy: &str) -> &str {
-    policy
-        .split_once("'nonce-")
-        .and_then(|(_, rest)| rest.split_once('\''))
-        .map(|(nonce, _)| nonce)
-        .expect("the policy names a nonce")
-}
-
 /// Asserts the headers every answer carries.
 fn assert_hardened(response: &Response<Body>) {
     assert_eq!(
@@ -86,26 +67,29 @@ fn assert_hardened(response: &Response<Body>) {
     let policy = header(response, &CONTENT_SECURITY_POLICY);
     assert!(!policy.contains("'unsafe-inline'"), "{policy}");
     assert!(!policy.contains("'unsafe-eval'"), "{policy}");
+    assert!(!policy.contains("'wasm-unsafe-eval'"), "{policy}");
+    assert!(!policy.contains("'nonce-"), "{policy}");
+    assert!(policy.contains("script-src 'self';"), "{policy}");
+    assert!(policy.contains("style-src 'self';"), "{policy}");
     assert!(policy.contains("frame-ancestors 'none'"), "{policy}");
 }
 
 #[tokio::test]
 async fn the_health_route_answers_up_with_the_headers() {
-    let site = site();
-    let response = send(&site, get("/health")).await;
+    let response = send(get("/health")).await;
     assert_eq!(StatusCode::OK, response.status());
     assert_hardened(&response);
     assert_eq!("no-store", header(&response, &CACHE_CONTROL));
     assert_eq!(r#"{"state":"up"}"#, text(response).await);
-    let readiness = send(&site, get("/health/readiness")).await;
+    let readiness = send(get("/health/readiness")).await;
     assert_eq!(StatusCode::OK, readiness.status());
     assert_hardened(&readiness);
 }
 
 #[tokio::test]
-async fn a_page_carries_a_fresh_nonce_its_scripts_use_and_is_never_stored_or_compressed() {
-    let site = site();
-    let first = send(&site, get("/")).await;
+async fn a_page_loads_the_librarys_assets_under_the_strict_policy_and_is_never_stored_or_compressed()
+ {
+    let first = send(get("/")).await;
     assert_eq!(StatusCode::OK, first.status());
     assert_hardened(&first);
     assert_eq!("no-store", header(&first, &CACHE_CONTROL));
@@ -113,57 +97,74 @@ async fn a_page_carries_a_fresh_nonce_its_scripts_use_and_is_never_stored_or_com
         first.headers().get(CONTENT_ENCODING).is_none(),
         "a document is never compressed"
     );
-    let policy = header(&first, &CONTENT_SECURITY_POLICY).to_owned();
     let page = text(first).await;
-    let minted = nonce(&policy);
+    let base = format!("/ferrohealth-ui/{}", ferrohealth_ui::serve::VERSION);
+    for asset in [
+        format!("{base}/ferrohealth-ui.css"),
+        format!("{base}/themes/ferrobridge.css"),
+        format!("{base}/scripts/fui.js"),
+    ] {
+        assert!(page.contains(&asset), "the page loads {asset}: {page}");
+    }
+    assert!(!page.contains("nonce="), "no script needs a nonce: {page}");
     assert!(
-        page.contains(&format!("nonce=\"{minted}\"")),
-        "the page's scripts carry the nonce the policy names"
+        !page.contains(".wasm"),
+        "the page loads no WebAssembly: {page}"
     );
-    assert!(
-        page.contains("/pkg/ferrobridge-console.wasm"),
-        "the page loads the bundle cargo-leptos writes"
-    );
-    let second = send(&site, get("/")).await;
-    let again = header(&second, &CONTENT_SECURITY_POLICY).to_owned();
-    assert_ne!(minted, nonce(&again), "each response mints its own nonce");
+    assert!(!page.contains(" style="), "no inline style: {page}");
 }
 
 #[tokio::test]
 async fn an_unknown_path_is_a_404_page_with_the_headers() {
-    let site = site();
-    let response = send(&site, get("/no-such-page")).await;
+    let response = send(get("/no-such-page")).await;
     assert_eq!(StatusCode::NOT_FOUND, response.status());
     assert_hardened(&response);
     assert_eq!("no-store", header(&response, &CACHE_CONTROL));
 }
 
 #[tokio::test]
-async fn the_bundle_is_served_compressed_and_revalidated() {
-    let site = site();
-    let response = send(&site, get("/pkg/ferrobridge-console.wasm")).await;
-    assert_eq!(StatusCode::OK, response.status());
-    assert_hardened(&response);
-    assert_eq!("br", header(&response, &CONTENT_ENCODING));
-    assert!(
-        header(&response, &VARY).contains("accept-encoding"),
-        "the answer varies on the encoding"
+async fn the_librarys_assets_are_served_for_a_year_under_their_version() {
+    let base = format!("/ferrohealth-ui/{}", ferrohealth_ui::serve::VERSION);
+    for (asset, kind) in [
+        (format!("{base}/scripts/fui.js"), "text/javascript"),
+        (format!("{base}/ferrohealth-ui.css"), "text/css"),
+        (format!("{base}/themes/ferrobridge.css"), "text/css"),
+    ] {
+        let response = send(get(&asset)).await;
+        assert_eq!(StatusCode::OK, response.status(), "{asset}");
+        assert_hardened(&response);
+        assert!(
+            header(&response, &CONTENT_TYPE).starts_with(kind),
+            "{asset}"
+        );
+        assert_eq!(
+            "public, max-age=31536000, immutable",
+            header(&response, &CACHE_CONTROL),
+            "{asset}"
+        );
+        assert!(
+            response.headers().get(CONTENT_ENCODING).is_none(),
+            "{asset} is served as it stands"
+        );
+    }
+    let stale = send(get("/ferrohealth-ui/0.0.0/scripts/fui.js")).await;
+    assert_eq!(
+        StatusCode::NOT_FOUND,
+        stale.status(),
+        "another version's path holds nothing"
     );
-    assert_eq!("no-cache", header(&response, &CACHE_CONTROL));
 }
 
 #[tokio::test]
-async fn the_favicon_the_site_root_holds_is_served_whole() {
-    let site = site();
+async fn the_favicon_the_console_ships_is_served_whole() {
     let shipped = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/public/favicon.ico"))
         .expect("the shipped favicon");
-    std::fs::write(site.path().join("favicon.ico"), &shipped).expect("the favicon");
-    let response = send(&site, get("/favicon.ico")).await;
+    let response = send(get("/favicon.ico")).await;
     assert_eq!(StatusCode::OK, response.status());
     assert_hardened(&response);
     assert!(
         response.headers().get(CONTENT_ENCODING).is_none(),
-        "only the bundle under /pkg/ is compressed"
+        "the favicon is served as it stands"
     );
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await

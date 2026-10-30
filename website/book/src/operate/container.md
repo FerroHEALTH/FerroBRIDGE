@@ -295,16 +295,15 @@ rules:
 | Platforms | `linux/amd64` and `linux/arm64` |
 | User | uid 65532, gid 65532, written numerically |
 | Entrypoint | `/usr/local/bin/ferrobridge-console`, exec form, with `serve` as the default command |
-| Site bundle | `/site`, root-owned and read-only to the runtime user |
 | Port | 3000/tcp |
 | Health check | `HEALTHCHECK` through `ferrobridge-console healthcheck` |
 
 The image compiles nothing: the release lane builds the static console
-binary per architecture and the site bundle (the WebAssembly, its JavaScript
-glue and the stylesheet), attests both, and stages them before the image is
-built. It sets `FERROBRIDGE_CONSOLE__SERVER__LISTEN=0.0.0.0:3000` and
-`FERROBRIDGE_CONSOLE__SERVER__SITE_ROOT=/site`, because the binary's own
-defaults are loopback and a checkout's `target/site`.
+binary per architecture, attests it, and stages it before the image is built.
+The binary serves every page, stylesheet and script module itself, so the
+image carries nothing beside it. It sets
+`FERROBRIDGE_CONSOLE__SERVER__LISTEN=0.0.0.0:3000`, because the binary's own
+default is loopback.
 
 Unlike the bridge image, the console image declares a `HEALTHCHECK`. The base
 still has no shell and no HTTP client, so the probe is the binary's own

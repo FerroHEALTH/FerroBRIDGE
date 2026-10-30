@@ -124,24 +124,23 @@ the testkit tool crate. Beside it:
   at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
   lanes, `mapping check` and the reload share (#725).
 - `app/ferrobridge-console`: the operator console (#599, `docs/architecture.md`
-  §4.10), its own binary `ferrobridge-console`: a Leptos app on FerroUI
-  0.5.1 that hydrates the whole page (#1256): the server draws the first
-  page, the browser draws every page after it from five lazy route groups
-  (`src/routes.rs`), reads go through server functions (`src/load.rs`) and
-  each action is a form post with no WebAssembly and a server function once
-  hydrated (`src/actions.rs`), halves chosen by target, with `serve`, `config check`
-  and `healthcheck`, the TOML configuration with `FERROBRIDGE_CONSOLE__`
-  overrides and `_file` secrets, the nonce CSP and the other browser security
-  headers, and the typed bridge client (`src/bridge/`). Its server half
-  links only `openehr-mapping-core`, `fhir-types` and
-  `ferrobridge-operator-api` of the workspace and its browser half
-  `openehr-mapping-core` and `ferrobridge-operator-api` alone, held by
-  `tests/it/boundary.rs`; the CI `console` lane
-  lints the wasm32 half and builds the site bundle against its budget
-  (`.claude/rules/leptos-ui.md`). FerroUI (`ferrohealth-ui`, pinned exactly)
-  leads its UI: its components, design and component rules come from the
-  FerroUI repository at the tag of the pin, and a missing part is a FerroUI
-  issue, never a local copy.
+  §4.10), its own binary `ferrobridge-console`, every page drawn on its
+  server with FerroUI 0.6 and no Leptos or WebAssembly (#1355): each request
+  read once into a `Visit` (`src/visit.rs`) whose `Reads` ask the bridge
+  each document once (`src/load.rs`), the page its path names picked in
+  `src/routes.rs` and put in the document and shell by `src/app.rs`, and
+  Reload, the editor and the playground posting to their own page, which
+  draws the bridge's answer (`src/actions.rs`, `src/posts.rs`), with
+  `serve`, `config check` and `healthcheck`, the TOML configuration with
+  `FERROBRIDGE_CONSOLE__` overrides and `_file` secrets, the strict CSP
+  (`script-src 'self'; style-src 'self'`) and the other browser security
+  headers, and the typed bridge client (`src/bridge/`). It links only
+  `openehr-mapping-core`, `fhir-types` and `ferrobridge-operator-api` of the
+  workspace and no Leptos crate, held by `tests/it/boundary.rs`
+  (`.claude/rules/console-ui.md`). FerroUI (`ferrohealth-ui`, pinned
+  exactly) leads its UI: its components, script modules, design and
+  component rules come from the FerroUI repository at the tag of the pin,
+  and a missing part is a FerroUI issue, never a local copy.
 
 - `crates/fhir-types`: the generated FHIR model, Apache-2.0, emitted whole by
   the generator below and never hand-edited: one module per version, STU3,
@@ -272,7 +271,7 @@ the testkit tool crate. Beside it:
   static pinned by index digest, copying the binary the release lane stages
   under `dist/<os>_<arch>/`; it compiles nothing. `docker/console/Dockerfile`
   is the operator console's recipe (#603) on the same base, copying the
-  console binary and site bundle staged under `dist/console/`.
+  console binary staged under `dist/console/`.
 - `compose.yaml`: the quickstart that runs the published image with the
   hardening set, file secrets, the `cdm`, `cdm-init` and `vocab-load`
   profiles over the pinned PostgreSQL, and the `console` profile that runs
@@ -520,7 +519,7 @@ apply always. Read the relevant one before working in that area.
   the research that fixes the boundary.
 - `.claude/rules/vendored-inputs.md`: every external corpus is fetched by a
   committed `scripts/vendor/*.sh`, vendored verbatim, provenance-stamped.
-- `.claude/rules/leptos-ui.md`: the operator console's Leptos discipline,
+- `.claude/rules/console-ui.md`: the operator console's discipline,
   scoped to `app/ferrobridge-console/**`. FerroUI leads the UI: the rule opens
   with FerroUI's consumer guide and component rules and keeps only what is
   particular to this console.

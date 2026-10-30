@@ -7,7 +7,10 @@
 use std::borrow::Cow;
 
 use ferrobridge_operator_api::operator::{Language, Listed, Owner};
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::query::Query;
 use ferrohealth_ui::table::filter::{
     FilterChoice, FilterMenu, Find, MenuForm, filter_menu, find_form,
 };
@@ -17,10 +20,10 @@ use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::template::list::{ActiveFilters, FilterChip, active_filters};
-use leptos::prelude::*;
 
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
+use crate::markup::{code, h, t};
 use crate::pages::mappings::count;
 use crate::pages::mappings::tab_href;
 use crate::pages::parts::{
@@ -46,9 +49,9 @@ struct FileFilters {
 
 impl FileFilters {
     /// The filters `query` names; a value that names nothing is no filter.
-    fn read(query: &leptos_router::params::ParamsMap) -> Self {
+    fn read(query: &Query) -> Self {
         Self {
-            words: query.get("q").unwrap_or_default().trim().to_owned(),
+            words: query.get_str("q").unwrap_or_default().trim().to_owned(),
             languages: kept(query, "language", &LANGUAGES, language_key),
             owners: kept(query, "owner", &OWNERS, owner_key),
         }
@@ -100,16 +103,21 @@ impl FileFilters {
 /// The choices of `all` the query names under `key`, by `key_of`: none
 /// when it names every choice or none of them, since both keep every row.
 fn kept<T: Copy + PartialEq>(
-    query: &leptos_router::params::ParamsMap,
+    query: &Query,
     key: &str,
     all: &[T],
     key_of: fn(T) -> &'static str,
 ) -> Vec<T> {
-    let named = query.get_all(key).unwrap_or_default();
+    let named = query
+        .pairs()
+        .iter()
+        .filter(|(name, _)| name == key)
+        .map(|(_, value)| value)
+        .collect::<Vec<_>>();
     let kept = all
         .iter()
         .copied()
-        .filter(|choice| named.iter().any(|name| name == key_of(*choice)))
+        .filter(|choice| named.iter().any(|name| *name == key_of(*choice)))
         .collect::<Vec<_>>();
     if kept.len() == all.len() {
         Vec::new()
@@ -143,7 +151,7 @@ fn encoded(words: &str) -> String {
 /// filter menus, whose checkboxes its form sends with the find words, each
 /// choice counting the files it keeps among `listing` under the other
 /// filters.
-fn files_toolbar(filters: &FileFilters, listing: &[Listed]) -> AnyView {
+fn files_toolbar(l: &Locale, filters: &FileFilters, listing: &[Listed]) -> Html {
     let counted = |with: &FileFilters| {
         u64::try_from(listing.iter().filter(|file| with.keeps(file)).count()).unwrap_or(u64::MAX)
     };
@@ -171,49 +179,55 @@ fn files_toolbar(filters: &FileFilters, listing: &[Listed]) -> AnyView {
             };
             FilterChoice::new(
                 owner_key(owner),
-                owner_word(owner),
+                owner_word(l, owner),
                 counted(&with),
                 filters.owners.is_empty() || filters.owners.contains(&owner),
             )
         })
         .collect();
-    let language_menu = filter_menu(FilterMenu {
-        id: "filter-language",
-        name: "language",
-        glyph: Glyph::LIST_FILTER,
-        label: tr(Msg::ColLanguage).into(),
-        title: tr(Msg::FilterShowLanguages),
-        choices: languages,
-        note: None,
-        form: MenuForm::Enclosing,
-    });
-    let owner_menu = filter_menu(FilterMenu {
-        id: "filter-owner",
-        name: "owner",
-        glyph: Glyph::LIST_FILTER,
-        label: tr(Msg::ColOwner).into(),
-        title: tr(Msg::FilterShowOwners),
-        choices: owners,
-        note: None,
-        form: MenuForm::Enclosing,
-    });
+    let language_menu = filter_menu(
+        l,
+        FilterMenu {
+            id: "filter-language",
+            name: "language",
+            glyph: Glyph::LIST_FILTER,
+            label: tr(l, Msg::ColLanguage).into(),
+            title: tr(l, Msg::FilterShowLanguages),
+            choices: languages,
+            note: None,
+            form: MenuForm::Enclosing,
+        },
+    );
+    let owner_menu = filter_menu(
+        l,
+        FilterMenu {
+            id: "filter-owner",
+            name: "owner",
+            glyph: Glyph::LIST_FILTER,
+            label: tr(l, Msg::ColOwner).into(),
+            title: tr(l, Msg::FilterShowOwners),
+            choices: owners,
+            note: None,
+            form: MenuForm::Enclosing,
+        },
+    );
     find_form(
         Find {
             id: "find-files",
             name: "q",
-            label: &tr(Msg::FindFiles),
+            label: &tr(l, Msg::FindFiles),
             value: &filters.words,
             source: StateSource::Url,
             action: None,
             fields: &[],
         },
-        view! { {language_menu} {owner_menu} },
+        language_menu.then(owner_menu),
     )
 }
 
 /// The Files tab's active filter chips, `total` of `all` files shown, or
 /// nothing while no filter is set.
-fn files_chips(filters: &FileFilters, total: u32, all: usize) -> Option<AnyView> {
+fn files_chips(l: &Locale, filters: &FileFilters, total: u32, all: usize) -> Option<Html> {
     let mut chips = Vec::new();
     if !filters.languages.is_empty() {
         let value = filters
@@ -223,7 +237,7 @@ fn files_chips(filters: &FileFilters, total: u32, all: usize) -> Option<AnyView>
             .collect::<Vec<_>>()
             .join(", ");
         chips.push(FilterChip {
-            label: tr_with(Msg::ChipLanguage, &[("value", value.into())]),
+            label: tr_with(l, Msg::ChipLanguage, &[("value", value.into())]),
             remove: filters.href(Some("language"), None),
         });
     }
@@ -231,22 +245,23 @@ fn files_chips(filters: &FileFilters, total: u32, all: usize) -> Option<AnyView>
         let value = filters
             .owners
             .iter()
-            .map(|owner| owner_word(*owner))
+            .map(|owner| owner_word(l, *owner))
             .collect::<Vec<_>>()
             .join(", ");
         chips.push(FilterChip {
-            label: tr_with(Msg::ChipOwner, &[("value", value.into())]),
+            label: tr_with(l, Msg::ChipOwner, &[("value", value.into())]),
             remove: filters.href(Some("owner"), None),
         });
     }
     if !filters.words.is_empty() {
         chips.push(FilterChip {
-            label: tr_with(Msg::ChipPath, &[("value", filters.words.clone().into())]),
+            label: tr_with(l, Msg::ChipPath, &[("value", filters.words.clone().into())]),
             remove: filters.href(Some("q"), None),
         });
     }
     (!chips.is_empty()).then(|| {
         active_filters(
+            l,
             ActiveFilters {
                 chips,
                 clear: tab_href("files"),
@@ -259,10 +274,7 @@ fn files_chips(filters: &FileFilters, total: u32, all: usize) -> Option<AnyView>
 
 /// The Files tab: the find field and the filters, the files on the page,
 /// and the pager.
-pub(super) fn files_body(
-    query: &leptos_router::params::ParamsMap,
-    listing: &[Listed],
-) -> (AnyView, Option<AnyView>) {
+pub(super) fn files_body(l: &Locale, query: &Query, listing: &[Listed]) -> (Html, Option<Html>) {
     let filters = FileFilters::read(query);
     let mut kept = listing
         .iter()
@@ -273,57 +285,63 @@ pub(super) fn files_body(
     let paging = Paging::from_query(query);
     let window = Window::over(total, paging);
     let shown = window.slice(&kept);
-    let toolbar = files_toolbar(&filters, listing);
-    let chips = files_chips(&filters, total, listing.len());
+    let toolbar = files_toolbar(l, &filters, listing);
+    let chips = files_chips(l, &filters, total, listing.len()).unwrap_or_default();
     let table = if shown.is_empty() {
         quiet(
-            tr(Msg::NoFileMatches),
-            Some((tr(Msg::ClearFilters), tab_href("files"))),
+            tr(l, Msg::NoFileMatches),
+            Some((tr(l, Msg::ClearFilters), tab_href("files"))),
         )
     } else {
-        files_table(shown)
+        files_table(l, shown)
     };
-    let body = view! {
-        <div class="fui-panel-body fui-stack">{toolbar} {chips}</div>
-        {table}
-    }
-    .into_any();
+    let body = h(format!(
+        r#"<div class="fui-panel-body fui-stack">{toolbar}{chips}</div>{table}"#
+    ));
     let pager = (total > 0).then(|| {
         let href = |paging: Paging| filters.href(None, Some(paging));
-        link_pager(Listing::new(Cow::Owned(tr(Msg::TabFiles))), window, &href)
+        link_pager(
+            l,
+            Listing::new(Cow::Owned(tr(l, Msg::TabFiles))),
+            window,
+            &href,
+        )
     });
     (body, pager)
 }
 
 /// The files on the page.
-fn files_table(files: &[&Listed]) -> AnyView {
+fn files_table(l: &Locale, files: &[&Listed]) -> Html {
     let columns = [
-        Column::text("path", tr(Msg::ColPath)).role(Role::Title),
-        Column::text("kind", tr(Msg::ColKind)).role(Role::Sub),
-        Column::text("owner", tr(Msg::ColOwner)).role(Role::Wide),
-        Column::text("diagnostics", tr(Msg::ColDiagnostics)),
+        Column::text("path", tr(l, Msg::ColPath)).role(Role::Title),
+        Column::text("kind", tr(l, Msg::ColKind)).role(Role::Sub),
+        Column::text("owner", tr(l, Msg::ColOwner)).role(Role::Wide),
+        Column::text("diagnostics", tr(l, Msg::ColDiagnostics)),
     ];
     let [_, kind, owner, word] = &columns;
     let rows = files
         .iter()
         .map(|file| {
             let (errors, warnings) = tally(&file.diagnostics);
-            view! {
-                <tr>
-                    {title_cell(Some(&file_href(&file.path)), view! { <code>{file.path.clone()}</code> }, None)}
-                    {cell(kind, file.kind.clone().unwrap_or_else(|| String::from("–")))}
-                    {cell(owner, owner_tag(file.owner))}
-                    {cell(word, diagnostics_state(errors, warnings, Msg::StateNoDiagnostic))}
-                </tr>
-            }
+            h(format!(
+                "<tr>{}{}{}{}</tr>",
+                title_cell(Some(&file_href(&file.path)), code(&file.path), None),
+                cell(
+                    kind,
+                    t(file.kind.clone().unwrap_or_else(|| String::from("–")))
+                ),
+                cell(owner, owner_tag(l, file.owner)),
+                cell(
+                    word,
+                    diagnostics_state(l, errors, warnings, Msg::StateNoDiagnostic)
+                ),
+            ))
         })
-        .collect_view()
-        .into_any();
+        .collect::<Html>();
     data_table(DataTable {
-        caption: &tr(Msg::TabFiles),
+        caption: &tr(l, Msg::TabFiles),
         columns: &columns,
         sorting: Sorting::default(),
         body: Body::Rows(rows),
     })
-    .into_any()
 }

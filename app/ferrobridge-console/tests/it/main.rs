@@ -3,7 +3,6 @@
 
 //! The integration tests of the operator console, one binary with a module
 //! per subject.
-#![cfg(not(target_arch = "wasm32"))]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

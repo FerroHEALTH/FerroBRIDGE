@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The FerroBRIDGE operator console image: one static binary and its site
-# bundle on distroless static, per platform. Nothing is compiled here. The
-# release lane (.github/workflows/release-console.yml) builds and attests the
-# musl binaries and the site bundle and stages them under dist/console/ before
+# The FerroBRIDGE operator console image: one static binary on distroless
+# static, per platform, which serves every page, stylesheet and script module
+# itself. Nothing is compiled here. The release lane
+# (.github/workflows/release-console.yml) builds and attests the musl
+# binaries and stages them under dist/console/ before
 # this file is built for linux/amd64 and linux/arm64. The root .dockerignore
 # holds the build context to dist/.
 #
@@ -24,18 +25,14 @@ FROM gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e77
 ARG TARGETOS
 ARG TARGETARCH
 
-# Root-owned, executable, and not writable by the runtime user. The site
-# bundle is the same for every architecture and root-owned too, so the
-# runtime user reads it and cannot change it.
+# Root-owned, executable, and not writable by the runtime user.
 COPY --chmod=0555 dist/console/${TARGETOS}_${TARGETARCH}/ferrobridge-console /usr/local/bin/ferrobridge-console
-COPY dist/console/site/ /site/
 
-# The binary's own defaults are loopback and a checkout's target/site, so the
-# image listens on every interface on the documented port and serves the
-# bundle it carries. Every override is FERROBRIDGE_CONSOLE__<SECTION>__<KEY>,
-# and every secret is read from the file its `_file` sibling names.
-ENV FERROBRIDGE_CONSOLE__SERVER__LISTEN=0.0.0.0:3000 \
-    FERROBRIDGE_CONSOLE__SERVER__SITE_ROOT=/site
+# The binary's own default is loopback, so the image listens on every
+# interface on the documented port. Every override is
+# FERROBRIDGE_CONSOLE__<SECTION>__<KEY>, and every secret is read from the
+# file its `_file` sibling names.
+ENV FERROBRIDGE_CONSOLE__SERVER__LISTEN=0.0.0.0:3000
 EXPOSE 3000/tcp
 
 # Numeric on purpose: the kubelet cannot resolve a user name against an image

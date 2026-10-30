@@ -14,6 +14,8 @@
 use ferrobridge_operator_api::configuration::{Configuration, SecretState, Value};
 use ferrobridge_operator_api::health::Info;
 use ferrohealth_health::document::{Readiness, State};
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
@@ -25,21 +27,21 @@ use ferrohealth_ui::view::surface::{Crumb, Header, definitions, page_heading, pa
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 use ferrohealth_ui::view::template::list::{ListCard, list_card};
-use leptos::prelude::*;
-use leptos_router::hooks::use_params_map;
 
-use crate::app::{CONNECTIONS, page_title};
+use crate::app::{CONNECTIONS, Drawn};
 use crate::locale::messages::Msg;
 use crate::locale::tr;
+use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::dashboard::{UPSTREAMS, indicator_name};
 use crate::pages::facade::indicator;
 use crate::pages::parts::{faulted, quiet, refused, section};
 use crate::pages::settings::rows::{self, Credentials};
+use crate::visit::Visit;
 
 /// The lanes that use the upstream `name`, as `GET /health/info` names
 /// them, each its words.
-fn users(info: &Info, name: &str) -> Vec<String> {
+fn users(l: &Locale, info: &Info, name: &str) -> Vec<String> {
     let uses = |lane: &str| match name {
         "cdr" => matches!(lane, "facade" | "operations" | "hl7v2" | "etl"),
         "terminology" => matches!(lane, "facade" | "operations" | "hl7v2"),
@@ -50,12 +52,15 @@ fn users(info: &Info, name: &str) -> Vec<String> {
         .iter()
         .filter(|lane| lane.enabled && uses(&lane.name))
         .map(|lane| {
-            tr(match lane.name.as_str() {
-                "facade" => Msg::FhirFacade,
-                "operations" => Msg::Playground,
-                "hl7v2" => Msg::Hl7v2,
-                _ => Msg::OmopEtl,
-            })
+            tr(
+                l,
+                match lane.name.as_str() {
+                    "facade" => Msg::FhirFacade,
+                    "operations" => Msg::Playground,
+                    "hl7v2" => Msg::Hl7v2,
+                    _ => Msg::OmopEtl,
+                },
+            )
         })
         .collect()
 }
@@ -63,15 +68,15 @@ fn users(info: &Info, name: &str) -> Vec<String> {
 /// The state of the upstream `name` as its indicator reports it, the tone
 /// and the word: the readiness carries an indicator only for an upstream
 /// the bridge is configured with.
-fn upstream_state(readiness: &Readiness, name: &str) -> AnyView {
+fn upstream_state(l: &Locale, readiness: &Readiness, name: &str) -> Html {
     if readiness
         .indicators
         .iter()
         .any(|indicator| indicator.name == name)
     {
-        indicator(readiness, name)
+        indicator(l, readiness, name)
     } else {
-        state(Mark::Neutral, tr(Msg::StateNotConfigured), None)
+        state(Mark::Neutral, tr(l, Msg::StateNotConfigured), None)
     }
 }
 
@@ -90,7 +95,7 @@ fn host(configuration: &Configuration, name: &str) -> Option<String> {
 
 /// How the upstream `name` signs in, in words, its secrets by reference;
 /// a dash for an upstream the configuration has no section for.
-fn credentials_words(configuration: &Configuration, name: &str) -> String {
+fn credentials_words(l: &Locale, configuration: &Configuration, name: &str) -> String {
     let section = format!("{name}.");
     if !configuration
         .entries
@@ -101,6 +106,7 @@ fn credentials_words(configuration: &Configuration, name: &str) -> String {
     }
     if name == "cdm" {
         return tr(
+            l,
             match configuration.entry("cdm.url").map(|entry| &entry.value) {
                 Some(Value::Secret(SecretState::File { .. })) => Msg::CredentialsUrlFile,
                 Some(Value::Secret(SecretState::Set)) => Msg::CredentialsUrl,
@@ -108,54 +114,50 @@ fn credentials_words(configuration: &Configuration, name: &str) -> String {
             },
         );
     }
-    tr(match rows::credentials(configuration, name) {
-        Credentials::Oauth => Msg::CredentialsOauth,
-        Credentials::Basic => Msg::CredentialsBasic,
-        Credentials::None => Msg::CredentialsNone,
-    })
+    tr(
+        l,
+        match rows::credentials(configuration, name) {
+            Credentials::Oauth => Msg::CredentialsOauth,
+            Credentials::Basic => Msg::CredentialsBasic,
+            Credentials::None => Msg::CredentialsNone,
+        },
+    )
 }
 
 /// The page that lists the upstreams.
-#[must_use]
-pub fn page() -> impl IntoView {
-    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
-    let readiness = Resource::new(crate::load::changes, |_| crate::load::readiness_now());
-    let configuration = Resource::new(crate::load::changes, |_| crate::load::configuration_now());
-    view! {
-        {page_title(tr(Msg::Connections))}
-        <Suspense>
-            {move || Suspend::new(async move {
-                let info = info.await;
-                let readiness = readiness.await;
-                let configuration = configuration.await;
-                list(&info, &readiness, &configuration)
-            })}
-        </Suspense>
-    }
+pub async fn page(visit: &Visit) -> Drawn {
+    let info = visit.reads.info().await;
+    let readiness = visit.reads.readiness().await;
+    let configuration = visit.reads.configuration().await;
+    Drawn::shell(
+        visit.tr(Msg::Connections),
+        list(&visit.locale, &info, &readiness, &configuration),
+    )
 }
 
 /// The list over the lanes, the readiness and the running configuration.
 fn list(
+    l: &Locale,
     info: &Loaded<Info>,
     readiness: &Loaded<Readiness>,
     configuration: &Loaded<Configuration>,
-) -> AnyView {
+) -> Html {
     let header = page_heading(
+        l,
         Header {
-            title: tr(Msg::Connections).into(),
-            subtitle: Some(tr(Msg::ConnectionsSubtitle).into()),
+            title: tr(l, Msg::Connections).into(),
+            subtitle: Some(tr(l, Msg::ConnectionsSubtitle).into()),
             ..Header::default()
         },
         ActionGroup::none(),
-    )
-    .into_any();
+    );
     let (info, readiness) = match (info, readiness) {
         (Ok(Outcome::Shown(info)), Ok(Outcome::Shown(readiness))) => (info, readiness),
         (Err(fault), _) | (_, Err(fault)) => {
-            return view! { {header} {faulted(fault, CONNECTIONS)} }.into_any();
+            return header.then(faulted(l, fault, CONNECTIONS));
         }
         (Ok(Outcome::Refused(refusal)), _) | (_, Ok(Outcome::Refused(refusal))) => {
-            return view! { {header} {refused(refusal)} }.into_any();
+            return header.then(refused(l, refusal));
         }
     };
     let configuration = match configuration {
@@ -163,17 +165,17 @@ fn list(
         Ok(Outcome::Refused(_)) | Err(_) => None,
     };
     let columns = [
-        Column::text("connection", tr(Msg::ColConnection)).role(Role::Title),
-        Column::text("host", tr(Msg::ColHost)).role(Role::Sub),
-        Column::text("credentials", tr(Msg::ColCredentials)),
-        Column::text("used", tr(Msg::ColUsedBy)).role(Role::Sub),
-        Column::text("state", tr(Msg::ColState)).titled(tr(Msg::StateFromReadiness)),
+        Column::text("connection", tr(l, Msg::ColConnection)).role(Role::Title),
+        Column::text("host", tr(l, Msg::ColHost)).role(Role::Sub),
+        Column::text("credentials", tr(l, Msg::ColCredentials)),
+        Column::text("used", tr(l, Msg::ColUsedBy)).role(Role::Sub),
+        Column::text("state", tr(l, Msg::ColState)).titled(tr(l, Msg::StateFromReadiness)),
     ];
     let [_, host_column, credentials_column, used, word] = &columns;
     let rows = UPSTREAMS
         .iter()
         .map(|name| {
-            let by = users(info, name);
+            let by = users(l, info, name);
             let by = if by.is_empty() {
                 String::from("–")
             } else {
@@ -181,47 +183,44 @@ fn list(
             };
             let address = configuration
                 .and_then(|configuration| host(configuration, name))
-                .map_or_else(
-                    || String::from("–").into_any(),
-                    |host| view! { <code>{host}</code> }.into_any(),
-                );
+                .map_or_else(|| t("–"), code);
             let signs_in = configuration.map_or_else(
                 || String::from("–"),
-                |configuration| credentials_words(configuration, name),
+                |configuration| credentials_words(l, configuration, name),
             );
-            view! {
-                <tr>
-                    {title_cell(Some(&format!("{CONNECTIONS}/{name}")), indicator_name(name), None)}
-                    {cell(host_column, address)}
-                    {cell(credentials_column, signs_in)}
-                    {cell(used, by)}
-                    {cell(word, upstream_state(readiness, name))}
-                </tr>
-            }
+            h(format!(
+                "<tr>{}{}{}{}{}</tr>",
+                title_cell(
+                    Some(&format!("{CONNECTIONS}/{name}")),
+                    t(indicator_name(l, name)),
+                    None
+                ),
+                cell(host_column, address),
+                cell(credentials_column, t(signs_in)),
+                cell(used, t(by)),
+                cell(word, upstream_state(l, readiness, name)),
+            ))
         })
-        .collect_view()
-        .into_any();
+        .collect::<Html>();
     let table = data_table(DataTable {
-        caption: &tr(Msg::Connections),
+        caption: &tr(l, Msg::Connections),
         columns: &columns,
         sorting: Sorting::default(),
         body: Body::Rows(rows),
-    })
-    .into_any();
-    let card = list_card(ListCard {
-        title: tr(Msg::Connections),
-        count: Some(u64::try_from(UPSTREAMS.len()).unwrap_or(u64::MAX).into()),
-        order: None,
-        tabs: None,
-        actions: None,
-        body: table,
-        pager: None,
     });
-    view! {
-        {header}
-        <div class="fui-list-page">{card}</div>
-    }
-    .into_any()
+    let card = list_card(
+        l,
+        ListCard {
+            title: tr(l, Msg::Connections),
+            count: Some(u64::try_from(UPSTREAMS.len()).unwrap_or(u64::MAX).into()),
+            order: None,
+            tabs: None,
+            actions: None,
+            body: table,
+            pager: None,
+        },
+    );
+    header.then(h(format!(r#"<div class="fui-list-page">{card}</div>"#)))
 }
 
 /// The tabs of a connection, each its key and its words.
@@ -240,68 +239,54 @@ fn tab_href(name: &str, key: &str) -> String {
 }
 
 /// The page of the upstream the route names, on the tab it names.
-#[must_use]
-pub fn connection_page() -> impl IntoView {
-    let (name, tab) = use_params_map().with_untracked(|params| {
-        (
-            params.get("name").unwrap_or_default(),
-            params
-                .get("tab")
-                .unwrap_or_else(|| String::from("overview")),
-        )
-    });
+pub async fn connection_page(visit: &Visit) -> Drawn {
+    let name = visit.segment(1).unwrap_or_default().to_owned();
+    let tab = visit.segment(2).unwrap_or("overview").to_owned();
     if !UPSTREAMS.contains(&name.as_str()) || !TABS.iter().any(|(key, _)| *key == tab) {
-        return crate::pages::errors::not_found().into_any();
+        return crate::pages::errors::not_found(visit);
     }
-    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
-    let readiness = Resource::new(crate::load::changes, |_| crate::load::readiness_now());
-    let configuration = (tab == "settings")
-        .then(|| Resource::new(crate::load::changes, |_| crate::load::configuration_now()));
-    view! {
-        {page_title(indicator_name(&name))}
-        <Suspense>
-            {move || {
-                let name = name.clone();
-                let tab = tab.clone();
-                Suspend::new(async move {
-                    let info = info.await;
-                    let readiness = readiness.await;
-                    let configuration = match configuration {
-                        Some(configuration) => Some(configuration.await),
-                        None => None,
-                    };
-                    detail(&name, &tab, &info, &readiness, configuration.as_ref())
-                })
-            }}
-        </Suspense>
-    }
-    .into_any()
+    let info = visit.reads.info().await;
+    let readiness = visit.reads.readiness().await;
+    let configuration = if tab == "settings" {
+        Some(visit.reads.configuration().await)
+    } else {
+        None
+    };
+    let l = &visit.locale;
+    Drawn::shell(
+        indicator_name(l, &name),
+        detail(l, &name, &tab, &info, &readiness, configuration.as_ref()),
+    )
 }
 
 /// What the upstream `name` is, in one sentence.
-fn subtitle(name: &str) -> String {
-    tr(match name {
-        "cdr" => Msg::CdrSubtitle,
-        "terminology" => Msg::TerminologySubtitle,
-        _ => Msg::CdmSubtitle,
-    })
+fn subtitle(l: &Locale, name: &str) -> String {
+    tr(
+        l,
+        match name {
+            "cdr" => Msg::CdrSubtitle,
+            "terminology" => Msg::TerminologySubtitle,
+            _ => Msg::CdmSubtitle,
+        },
+    )
 }
 
 /// The detail page of the upstream `name`, on the tab `tab`.
 fn detail(
+    l: &Locale,
     name: &str,
     tab: &str,
     info: &Loaded<Info>,
     readiness: &Loaded<Readiness>,
     configuration: Option<&Loaded<Configuration>>,
-) -> AnyView {
+) -> Html {
     let (info, readiness) = match (info, readiness) {
         (Ok(Outcome::Shown(info)), Ok(Outcome::Shown(readiness))) => (info, readiness),
         (Err(fault), _) | (_, Err(fault)) => {
-            return faulted(fault, &tab_href(name, tab));
+            return faulted(l, fault, &tab_href(name, tab));
         }
         (Ok(Outcome::Refused(refusal)), _) | (_, Ok(Outcome::Refused(refusal))) => {
-            return refused(refusal);
+            return refused(l, refusal);
         }
     };
     let found = readiness
@@ -309,9 +294,9 @@ fn detail(
         .iter()
         .find(|indicator| indicator.name == name);
     let badge = match found {
-        Some(found) if found.state == State::Up => state(Mark::Ok, tr(Msg::StateUp), None),
-        Some(_) => state(Mark::Bad, tr(Msg::StateUnreachable), None),
-        None => state(Mark::Neutral, tr(Msg::StateNotConfigured), None),
+        Some(found) if found.state == State::Up => state(Mark::Ok, tr(l, Msg::StateUp), None),
+        Some(_) => state(Mark::Bad, tr(l, Msg::StateUnreachable), None),
+        None => state(Mark::Neutral, tr(l, Msg::StateNotConfigured), None),
     };
     let warning = found
         .filter(|found| found.state == State::Down)
@@ -320,61 +305,66 @@ fn detail(
                 Tone::Bad,
                 Announce::Status,
                 None,
-                found
+                t(found
                     .detail
                     .clone()
-                    .unwrap_or_else(|| tr(Msg::NoAnswerDetail)),
+                    .unwrap_or_else(|| tr(l, Msg::NoAnswerDetail))),
             )
-            .into_any()
         });
-    let by = users(info, name);
+    let by = users(l, info, name);
     let used = if by.is_empty() {
-        quiet(tr(Msg::UsedByNoLane), None)
+        quiet(tr(l, Msg::UsedByNoLane), None)
     } else {
         definitions(
             by.into_iter()
-                .map(|lane| (lane, tr(Msg::UsesIt).into_any()))
+                .map(|lane| (lane, t(tr(l, Msg::UsesIt))))
                 .collect(),
         )
-        .into_any()
     };
-    let states =
-        definitions(vec![(tr(Msg::Readiness), upstream_state(readiness, name))]).into_any();
+    let states = definitions(vec![(
+        tr(l, Msg::Readiness),
+        upstream_state(l, readiness, name),
+    )]);
     let body = match configuration.filter(|_| tab == "settings") {
         Some(configuration) => {
             let rows = match configuration {
                 Ok(Outcome::Shown(shown)) => rows::connection(shown, name),
                 Ok(Outcome::Refused(_)) | Err(_) => Vec::new(),
             };
-            crate::pages::settings::tab(configuration, &rows, &tab_href(name, tab))
+            crate::pages::settings::tab(l, configuration, &rows, &tab_href(name, tab))
         }
-        None if found.is_none() => quiet(tr(Msg::UpstreamNotConfigured), None),
-        None => panel_sections(view! {
-            {warning.map(|warning| ferrohealth_ui::view::surface::panel_section(None, warning))}
-            {section(tr(Msg::State), None, states)}
-            {section(tr(Msg::ColUsedBy), None, used)}
-        }),
+        None if found.is_none() => quiet(tr(l, Msg::UpstreamNotConfigured), None),
+        None => panel_sections(Html::join([
+            warning
+                .map(|warning| ferrohealth_ui::view::surface::panel_section(l, None, warning))
+                .unwrap_or_default(),
+            section(l, tr(l, Msg::State), None, states),
+            section(l, tr(l, Msg::ColUsedBy), None, used),
+        ])),
     };
     let tabs = TabRow {
-        label: indicator_name(name),
+        label: indicator_name(l, name),
         tabs: TABS
             .iter()
-            .map(|(key, words)| Tab::new(*key, tab_href(name, key), tr(*words)))
+            .map(|(key, words)| Tab::new(*key, tab_href(name, key), tr(l, *words)))
             .collect(),
         current: tab.to_owned(),
     };
-    detail_page(DetailPage {
-        header: Header {
-            title: indicator_name(name).into(),
-            subtitle: Some(subtitle(name).into()),
-            subtitle_view: None,
-            crumbs: vec![Crumb::new(tr(Msg::Connections), CONNECTIONS)],
-            mono: false,
-            badge: Some(badge),
+    detail_page(
+        l,
+        DetailPage {
+            header: Header {
+                title: indicator_name(l, name).into(),
+                subtitle: Some(subtitle(l, name).into()),
+                subtitle_view: None,
+                crumbs: vec![Crumb::new(tr(l, Msg::Connections), CONNECTIONS)],
+                mono: false,
+                badge: Some(badge),
+            },
+            actions: ActionGroup::none(),
+            stepper: None,
+            tabs: Some(tabs),
+            body,
         },
-        actions: ActionGroup::none(),
-        stepper: None,
-        tabs: Some(tabs),
-        body,
-    })
+    )
 }

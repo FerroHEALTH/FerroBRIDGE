@@ -475,24 +475,6 @@ follow it. `trivy` is installed by the digest-pinned
 names, and `versions.sh` reads each of those back against its row; it is the
 version FerroEHR's release lane runs.
 
-## Operator console build tools
-
-The `console` job of `.github/workflows/ci.yml` builds the operator console's
-site bundle (`app/ferrobridge-console`, #599) with three tools. cargo-leptos
-and the wasm-bindgen CLI are fetched by the digest-pinned
-`taiki-e/install-action`; the wasm-bindgen CLI equals the `wasm-bindgen`
-crate requirement of the root `Cargo.toml`, because the CLI and the crate
-must agree on the bindings they write. Binaryen's `wasm-opt` is installed by
-`scripts/release/console-tools.sh`, checked against its SHA-256.
-
-| Item | Pin | Repeated in |
-|---|---|---|
-| `cargo-leptos` | 0.3.11 | `.github/workflows/ci.yml` (the `console` job), `.github/workflows/release-console.yml` |
-| `wasm-bindgen` | 0.2.129 | `.github/workflows/ci.yml` (the `console` job), `.github/workflows/release-console.yml`, the root `Cargo.toml` `[workspace.dependencies]` |
-| Binaryen | version_133 | `scripts/release/console-tools.sh` |
-
-`scripts/checks/versions.sh` reads each of them back against these rows.
-
 ## Operator console browser journeys
 
 The browser journeys (#602) drive the console in headless Chrome over

@@ -12,6 +12,8 @@
 
 use ferrobridge_operator_api::operator::{EngineState, Listed, Owner, Program};
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::i18n::Phrase;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
@@ -19,6 +21,7 @@ use ferrohealth_ui::table::view::{
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::code::{Code, CodeHead, Digest, code_viewer};
 use ferrohealth_ui::view::diagnostics::{FileFindings, diagnostics};
 use ferrohealth_ui::view::notice::{Announce, notice};
@@ -28,19 +31,18 @@ use ferrohealth_ui::view::surface::{
     source_split,
 };
 use ferrohealth_ui::view::tabs::{Tab, binder};
-use ferrohealth_ui::widget::action_menu::{Act, Action};
-use leptos::prelude::*;
-use leptos_router::hooks::{use_params_map, use_query_map};
 use openehr_mapping_core::diagnostic::Diagnostic;
 
-use crate::app::{FACADE, FILES, TEMPLATES, page_title};
+use crate::app::{Drawn, FACADE, FILES, TEMPLATES};
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
+use crate::markup::{code, h, t};
 use crate::model::{Loaded, OpenedFile, Outcome};
 use crate::pages::parts::{
     diagnostics_state, edit_href, faulted, file_href, findings, language_name, line_diagnostics,
     quiet, refused_operator, section, short, tally, wire_path, with_markup,
 };
+use crate::visit::Visit;
 
 /// The id prefix of the code viewer's lines, which a diagnostic links to.
 const LINE_IDS: &str = "L";
@@ -49,44 +51,35 @@ const LINE_IDS: &str = "L";
 const COPY_ID: &str = "file-copy";
 
 /// The page of the file the route names.
-#[must_use]
-pub fn page() -> impl IntoView {
-    let path = use_params_map()
-        .with_untracked(|params| params.get("path"))
-        .and_then(|raw| crate::pages::parts::decoded(&raw))
+pub async fn page(visit: &Visit) -> Drawn {
+    let path = visit
+        .path
+        .strip_prefix(FILES)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .and_then(crate::pages::parts::decoded)
         .unwrap_or_default();
     if path.is_empty() {
-        return crate::pages::mappings::page().into_any();
+        return crate::pages::mappings::page(visit, None).await;
     }
-    let program_tab =
-        use_query_map().with_untracked(|query| query.get("tab")) == Some(String::from("program"));
+    let program_tab = visit.param("tab") == Some("program");
     // NOTE: RFC 3986 §3.5: a fragment never reaches the server, so the line a
     // diagnostic links to is reached by the browser alone, unmarked.
     let current = None;
-    let file = Resource::new(
-        {
-            let path = path.clone();
-            move || (crate::load::changes(), path.clone())
-        },
-        |(_, path)| crate::load::file_now(path),
-    );
-    let listing = Resource::new(crate::load::changes, |_| crate::load::listing_now());
-    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
-    view! {
-        {page_title(short(&path).to_owned())}
-        <Suspense>
-            {move || {
-                let path = path.clone();
-                Suspend::new(async move {
-                    let file = file.await;
-                    let listing = listing.await;
-                    let state = state.await;
-                    drawn(&path, program_tab, current, &file, &listing, &state)
-                })
-            }}
-        </Suspense>
+    let file = visit.reads.opened(&path).await;
+    let listing = visit.reads.listing().await;
+    let state = visit.reads.running().await;
+    match drawn(
+        &visit.locale,
+        &path,
+        program_tab,
+        current,
+        &file,
+        &listing,
+        &state,
+    ) {
+        Some(body) => Drawn::shell(short(&path).to_owned(), body),
+        None => crate::pages::errors::not_found(visit),
     }
-    .into_any()
 }
 
 /// What kind of mapping file a path holds, which decides its sections.
@@ -116,29 +109,31 @@ fn kind_of(listed: Option<&Listed>, state: &EngineState, path: &str) -> Kind {
     }
 }
 
-/// The page over the file and what the running load says of it.
+/// The page over the file and what the running load says of it, `None`
+/// for a file the bridge does not hold.
 fn drawn(
+    l: &Locale,
     path: &str,
     program_tab: bool,
     current: Option<u32>,
     file: &Loaded<OpenedFile>,
     listing: &Loaded<Vec<Listed>>,
     state: &Loaded<EngineState>,
-) -> AnyView {
+) -> Option<Html> {
     let (file, listing, state) = match (file, listing, state) {
         (Ok(Outcome::Shown(file)), Ok(Outcome::Shown(listing)), Ok(Outcome::Shown(state))) => {
             (file, listing, state)
         }
         (Err(fault), _, _) | (_, Err(fault), _) | (_, _, Err(fault)) => {
-            return faulted(fault, &file_href(path));
+            return Some(faulted(l, fault, &file_href(path)));
         }
         (Ok(Outcome::Refused(refusal)), _, _)
         | (_, Ok(Outcome::Refused(refusal)), _)
         | (_, _, Ok(Outcome::Refused(refusal))) => {
             if refusal.not_served() && matches!(file, Ok(Outcome::Refused(_))) {
-                return crate::pages::errors::not_found().into_any();
+                return None;
             }
-            return refused_operator(refusal);
+            return Some(refused_operator(l, refusal));
         }
     };
     let listed = listing.iter().find(|each| each.path == path);
@@ -157,65 +152,66 @@ fn drawn(
         .find(|program| program.file.as_deref() == Some(path));
     let text = file.text.clone();
     let badge = if text.is_none() {
-        ferrohealth_ui::view::state::state(Mark::Bad, tr(Msg::StateNotUtf8), None)
+        ferrohealth_ui::view::state::state(Mark::Bad, tr(l, Msg::StateNotUtf8), None)
     } else {
-        diagnostics_state(errors, warnings, Msg::StateCompiles)
+        diagnostics_state(l, errors, warnings, Msg::StateCompiles)
     };
     let header = Header {
         title: short(path).to_owned().into(),
         subtitle: None,
-        subtitle_view: Some(subtitle(kind, program, owner, path)),
-        crumbs: vec![Crumb::new(tr(Msg::MappingSet), FILES)],
+        subtitle_view: Some(subtitle(l, kind, program, owner, path)),
+        crumbs: vec![Crumb::new(tr(l, Msg::MappingSet), FILES)],
         mono: false,
         badge: Some(badge),
     };
     let source = match &text {
-        Some(text) => source_panel(path, text, &found, current, listed),
+        Some(text) => source_panel(l, path, text, &found, current, listed),
         None => source_split(
             quiet(
-                tr(Msg::FileNotUtf8),
-                Some((tr(Msg::EveryFile), String::from(FILES))),
+                tr(l, Msg::FileNotUtf8),
+                Some((tr(l, Msg::EveryFile), String::from(FILES))),
             ),
-            diagnostics_section(path, &found, current),
+            diagnostics_section(l, path, &found, current),
         ),
     };
-    let lock = (read_only && text.is_some()).then(|| {
+    let lock = if read_only && text.is_some() {
         notice(
             Tone::Info,
             Announce::Status,
             None,
-            tr(Msg::ProvisionedNotice),
+            t(tr(l, Msg::ProvisionedNotice)),
         )
-        .into_any()
-    });
+    } else {
+        Html::empty()
+    };
     let sections = match kind {
         Kind::Context => {
             let body = if program_tab {
                 program.map_or_else(
-                    || quiet(tr(Msg::NoProgram), None),
-                    |program| program_panel(program, listing),
+                    || quiet(tr(l, Msg::NoProgram), None),
+                    |program| program_panel(l, program, listing),
                 )
             } else {
                 source
             };
-            context_tabs(path, program_tab, body)
+            context_tabs(l, path, program_tab, body)
         }
         Kind::Model => {
-            let used = used_by(path, state);
-            view! { {panel_sections_card(tr(Msg::TabSource), source)} {used} }.into_any()
+            let used = used_by(l, path, state);
+            panel_sections_card(tr(l, Msg::TabSource), source).then(used)
         }
-        Kind::Other => panel_sections_card(tr(Msg::TabSource), source),
+        Kind::Other => panel_sections_card(tr(l, Msg::TabSource), source),
     };
-    view! {
-        {page_heading(header, actions_of(path, text.is_some(), read_only))}
-        <div class="fui-stack">{lock} {sections}</div>
-    }
-    .into_any()
+    Some(
+        page_heading(l, header, actions_of(l, path, text.is_some(), read_only)).then(h(format!(
+            r#"<div class="fui-stack">{lock}{sections}</div>"#
+        ))),
+    )
 }
 
 /// The title row's action of the file at `path`: Edit for a console file,
 /// Check a draft for a provisioned one, and none for a file not shown.
-fn actions_of(path: &str, shown: bool, read_only: bool) -> ActionGroup {
+fn actions_of(l: &Locale, path: &str, shown: bool, read_only: bool) -> ActionGroup {
     if !shown {
         return ActionGroup::none();
     }
@@ -226,21 +222,22 @@ fn actions_of(path: &str, shown: bool, read_only: bool) -> ActionGroup {
     };
     ActionGroup::primary(Action::new(
         Some(glyph),
-        tr(words),
+        tr(l, words),
         Act::Link(edit_href(path)),
     ))
 }
 
 /// The binder tabs of a context file, Source and Program, joined to `body`.
-fn context_tabs(path: &str, program_tab: bool, body: AnyView) -> AnyView {
+fn context_tabs(l: &Locale, path: &str, program_tab: bool, body: Html) -> Html {
     binder(
-        tr_with(Msg::FileSections, &[("name", short(path).into())]),
+        l,
+        tr_with(l, Msg::FileSections, &[("name", short(path).into())]),
         vec![
-            Tab::new("source", file_href(path), tr(Msg::TabSource)),
+            Tab::new("source", file_href(path), tr(l, Msg::TabSource)),
             Tab::new(
                 "program",
                 format!("{}?tab=program", file_href(path)),
-                tr(Msg::TabProgram),
+                tr(l, Msg::TabProgram),
             ),
         ],
         if program_tab { "program" } else { "source" },
@@ -250,14 +247,18 @@ fn context_tabs(path: &str, program_tab: bool, body: AnyView) -> AnyView {
 
 /// The subtitle of a file of `kind`: what it is, and who owns it, a
 /// context's resource type in bold and its template a code link.
-fn subtitle(kind: Kind, program: Option<&Program>, owner: Owner, path: &str) -> AnyView {
-    let by = tr(match owner {
-        Owner::Console => Msg::SavedByConsole,
-        Owner::Provisioned => Msg::Provisioned,
-    });
+fn subtitle(l: &Locale, kind: Kind, program: Option<&Program>, owner: Owner, path: &str) -> Html {
+    let by = tr(
+        l,
+        match owner {
+            Owner::Console => Msg::SavedByConsole,
+            Owner::Provisioned => Msg::Provisioned,
+        },
+    );
     let text = match (kind, program) {
         (Kind::Context, Some(program)) => {
             let text = tr_with(
+                l,
                 Msg::ContextSubtitle,
                 &[
                     ("resource", Phrase::open("resource")),
@@ -270,35 +271,40 @@ fn subtitle(kind: Kind, program: Option<&Program>, owner: Owner, path: &str) -> 
             return with_markup(
                 &text,
                 vec![
-                    ("resource", view! { <strong>{resource}</strong> }.into_any()),
+                    ("resource", h(format!("<strong>{}</strong>", t(resource)))),
                     (
                         "template",
-                        view! {
-                            <a href=format!("{TEMPLATES}/{template}")>
-                                <code>{template.clone()}</code>
-                            </a>
-                        }
-                        .into_any(),
+                        h(format!(
+                            r#"<a href="{}">{}</a>"#,
+                            t(format!("{TEMPLATES}/{template}")),
+                            code(&template)
+                        )),
                     ),
                 ],
             );
         }
-        (Kind::Model, _) => tr_with(Msg::ModelSubtitle, &[("owned", by.into())]),
-        _ if path.starts_with("omocl/") => tr_with(Msg::OmoclSubtitle, &[("owned", by.into())]),
-        _ => tr_with(Msg::FileSubtitle, &[("owned", by.into())]),
+        (Kind::Model, _) => tr_with(l, Msg::ModelSubtitle, &[("owned", by.into())]),
+        _ if path.starts_with("omocl/") => tr_with(l, Msg::OmoclSubtitle, &[("owned", by.into())]),
+        _ => tr_with(l, Msg::FileSubtitle, &[("owned", by.into())]),
     };
-    view! { {text} }.into_any()
+    t(text)
 }
 
 /// The diagnostics section beside the source: the findings of the file,
 /// the line `current` marked, or a quiet line when there is none.
-fn diagnostics_section(path: &str, found: &[&Diagnostic], current: Option<u32>) -> AnyView {
+fn diagnostics_section(
+    l: &Locale,
+    path: &str,
+    found: &[&Diagnostic],
+    current: Option<u32>,
+) -> Html {
     let count = u64::try_from(found.len()).unwrap_or(u64::MAX);
     let body = if found.is_empty() {
-        quiet(tr(Msg::NoFileDiagnostics), None)
+        quiet(tr(l, Msg::NoFileDiagnostics), None)
     } else {
         diagnostics(
-            &tr(Msg::TabDiagnostics),
+            l,
+            &tr(l, Msg::TabDiagnostics),
             &FileFindings {
                 file: path.to_owned(),
                 href: None,
@@ -309,30 +315,33 @@ fn diagnostics_section(path: &str, found: &[&Diagnostic], current: Option<u32>) 
             },
         )
     };
-    section(tr(Msg::TabDiagnostics), Some(count), body)
+    section(l, tr(l, Msg::TabDiagnostics), Some(count), body)
 }
 
 /// The Source tab: the file as the bridge serves it beside its diagnostics.
 fn source_panel(
+    l: &Locale,
     path: &str,
     text: &str,
     found: &[&Diagnostic],
     current: Option<u32>,
     listed: Option<&Listed>,
-) -> AnyView {
+) -> Html {
     let mut tags = Vec::new();
     if let Some(listed) = listed {
         tags.push(language_name(listed.language).to_owned());
-        tags.push(crate::pages::parts::owner_word(listed.owner));
+        tags.push(crate::pages::parts::owner_word(l, listed.owner));
     }
     let digest = listed.map(|listed| Digest {
         text: tr_with(
+            l,
             Msg::ShortDigest,
             &[("digest", short_digest(&listed.sha256).into())],
         ),
-        title: tr(Msg::DigestTitle),
+        title: tr(l, Msg::DigestTitle),
     });
     let viewer = code_viewer(
+        l,
         Some(CodeHead {
             title: path.to_owned(),
             tags,
@@ -349,7 +358,7 @@ fn source_panel(
             diagnostics: line_diagnostics(found),
         },
     );
-    source_split(viewer, diagnostics_section(path, found, current))
+    source_split(viewer, diagnostics_section(l, path, found, current))
 }
 
 /// A digest shortened to its first and last eight characters.
@@ -366,32 +375,24 @@ pub fn short_digest(digest: &str) -> String {
 
 /// The Program tab: what the context compiled, its models, its search and
 /// where it runs.
-fn program_panel(program: &Program, listing: &[Listed]) -> AnyView {
+fn program_panel(l: &Locale, program: &Program, listing: &[Listed]) -> Html {
+    let template = h(format!(
+        r#"<a href="{}">{}</a>"#,
+        t(format!("{TEMPLATES}/{}", program.template)),
+        code(&program.template)
+    ));
     let facts = facts_row(vec![
+        (tr(l, Msg::ColResourceType), t(&program.resource_type)),
         (
-            tr(Msg::ColResourceType),
-            program.resource_type.clone().into_any(),
+            tr(l, Msg::FactProfile),
+            code(format!("{}|{}", program.profile, program.profile_version)),
         ),
-        (
-            tr(Msg::FactProfile),
-            view! { <code>{format!("{}|{}", program.profile, program.profile_version)}</code> }
-                .into_any(),
-        ),
-        (
-            tr(Msg::ColTemplate),
-            view! {
-                <a href=format!("{TEMPLATES}/{}", program.template)>
-                    <code>{program.template.clone()}</code>
-                </a>
-            }
-            .into_any(),
-        ),
-    ])
-    .into_any();
+        (tr(l, Msg::ColTemplate), template),
+    ]);
     let columns = [
-        Column::text("model", tr(Msg::ColModel)).role(Role::Title),
-        Column::text("file", tr(Msg::ColFile)).role(Role::Wide),
-        Column::text("owner", tr(Msg::ColOwner)),
+        Column::text("model", tr(l, Msg::ColModel)).role(Role::Title),
+        Column::text("file", tr(l, Msg::ColFile)).role(Role::Wide),
+        Column::text("owner", tr(l, Msg::ColOwner)),
     ];
     let [_, file, owner] = &columns;
     let rows = program
@@ -403,57 +404,55 @@ fn program_panel(program: &Program, listing: &[Listed]) -> AnyView {
                 .file
                 .as_deref()
                 .and_then(|path| listing.iter().find(|each| each.path == path))
-                .map(|listed| crate::pages::parts::owner_tag(listed.owner));
-            view! {
-                <tr>
-                    {title_cell(href.as_deref(), model.name.clone(), None)}
-                    {cell(file, model.file.clone().map(|path| view! { <code>{path}</code> }))}
-                    {cell(owner, owner_tag)}
-                </tr>
-            }
+                .map(|listed| crate::pages::parts::owner_tag(l, listed.owner))
+                .unwrap_or_default();
+            h(format!(
+                "<tr>{}{}{}</tr>",
+                title_cell(href.as_deref(), t(&model.name), None),
+                cell(file, model.file.as_deref().map(code).unwrap_or_default()),
+                cell(owner, owner_tag),
+            ))
         })
-        .collect_view()
-        .into_any();
+        .collect::<Html>();
     let models = data_table(DataTable {
-        caption: &tr(Msg::ColModels),
+        caption: &tr(l, Msg::ColModels),
         columns: &columns,
         sorting: Sorting::default(),
         body: Body::Rows(rows),
-    })
-    .into_any();
+    });
     let search = match &program.search {
-        Some(search) => {
-            view! { <p class="fui-panel-body"><code>{search.clone()}</code></p> }.into_any()
-        }
+        Some(search) => h(format!(r#"<p class="fui-panel-body">{}</p>"#, code(search))),
         None => quiet(
             tr_with(
+                l,
                 Msg::NoSearch,
                 &[("resource", program.resource_type.clone().into())],
             ),
             None,
         ),
     };
-    let runs =
-        definitions(vec![
+    let runs = definitions(vec![
         (
-            tr(Msg::FhirFacade),
-            view! { <a href=format!("{FACADE}/capability")>{program.resource_type.clone()}</a> }
-                .into_any(),
+            tr(l, Msg::FhirFacade),
+            h(format!(
+                r#"<a href="{}">{}</a>"#,
+                t(format!("{FACADE}/capability")),
+                t(&program.resource_type)
+            )),
         ),
-        (tr(Msg::FlowOperations), view! { <code>"$tofhir, $toopenehr"</code> }.into_any()),
-    ])
-        .into_any();
+        (tr(l, Msg::FlowOperations), code("$tofhir, $toopenehr")),
+    ]);
     let count = u64::try_from(program.models.len()).unwrap_or(u64::MAX);
-    panel_sections(view! {
-        {section(tr(Msg::CompiledProgram), None, facts)}
-        {section(tr(Msg::ColModels), Some(count), models)}
-        {section(tr(Msg::ColSearch), None, search)}
-        {section(tr(Msg::WhereItRuns), None, runs)}
-    })
+    panel_sections(Html::join([
+        section(l, tr(l, Msg::CompiledProgram), None, facts),
+        section(l, tr(l, Msg::ColModels), Some(count), models),
+        section(l, tr(l, Msg::ColSearch), None, search),
+        section(l, tr(l, Msg::WhereItRuns), None, runs),
+    ]))
 }
 
 /// The contexts that read with the model at `path`.
-fn used_by(path: &str, state: &EngineState) -> AnyView {
+fn used_by(l: &Locale, path: &str, state: &EngineState) -> Html {
     let users = state
         .contexts
         .iter()
@@ -465,34 +464,34 @@ fn used_by(path: &str, state: &EngineState) -> AnyView {
         })
         .collect::<Vec<_>>();
     let columns = [
-        Column::text("context", tr(Msg::ColContext)).role(Role::Title),
-        Column::text("resource", tr(Msg::ColResourceType)).role(Role::Sub),
+        Column::text("context", tr(l, Msg::ColContext)).role(Role::Title),
+        Column::text("resource", tr(l, Msg::ColResourceType)).role(Role::Sub),
     ];
     let [_, resource] = &columns;
     let body = if users.is_empty() {
-        quiet(tr(Msg::UsedByNone), None)
+        quiet(tr(l, Msg::UsedByNone), None)
     } else {
         let rows = users
             .iter()
             .map(|program| {
                 let href = crate::pages::mappings::program_href(program);
-                view! {
-                    <tr>
-                        {title_cell(href.as_deref(), program.context.clone(), None)}
-                        {cell(resource, program.resource_type.clone())}
-                    </tr>
-                }
+                h(format!(
+                    "<tr>{}{}</tr>",
+                    title_cell(href.as_deref(), t(&program.context), None),
+                    cell(resource, t(&program.resource_type)),
+                ))
             })
-            .collect_view()
-            .into_any();
+            .collect::<Html>();
         data_table(DataTable {
-            caption: &tr(Msg::UsedBy),
+            caption: &tr(l, Msg::UsedBy),
             columns: &columns,
             sorting: Sorting::default(),
             body: Body::Rows(rows),
         })
-        .into_any()
     };
     let count = u64::try_from(users.len()).unwrap_or(u64::MAX);
-    panel_sections_card(tr(Msg::UsedBy), section(tr(Msg::UsedBy), Some(count), body))
+    panel_sections_card(
+        tr(l, Msg::UsedBy),
+        section(l, tr(l, Msg::UsedBy), Some(count), body),
+    )
 }

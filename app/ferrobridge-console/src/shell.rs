@@ -5,7 +5,8 @@
 //! components of `ferrohealth_ui` as the reviewed FerroBRIDGE design lays
 //! it out.
 //!
-//! The top bar holds the drawer button, the FerroBRIDGE lockup, the search
+//! Every handler draws the shell around its page, the navigation marking
+//! the page its path names. The top bar holds the drawer button, the FerroBRIDGE lockup, the search
 //! over the running load, the bridge's status pill and the user menu, which
 //! alone sets the theme (FerroUI family rule 5). The navigation groups
 //! Overview, Mappings, Bridge and Console, folds to its rail from 48 rem up
@@ -17,14 +18,13 @@
 use std::borrow::Cow;
 
 use ferrobridge_operator_api::operator::EngineState;
-use ferrohealth_ui::i18n::Arg;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::{Arg, Locale};
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::view::menu::{ThemeChoice, UserMenu, user_menu};
+use ferrohealth_ui::view::nav::{Count, Entry, Group, Rail, Sidebar, sidebar};
 use ferrohealth_ui::view::shell::{Footer, Shell, TopBar, brand_mark, lockup, topbar};
 use ferrohealth_ui::view::status::{Reach, StatusPill, status_pill};
-use ferrohealth_ui::widget::menu::{ThemeChoice, UserMenu, user_menu};
-use ferrohealth_ui::widget::nav::{Count, Entry, Group, Rail, Sidebar, sidebar};
-use leptos::prelude::*;
-use leptos_router::hooks::use_location;
 use openehr_mapping_core::diagnostic::Severity;
 
 use crate::app::{
@@ -34,6 +34,7 @@ use crate::app::{
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::model::{Loaded, Outcome, Refusal, ViewError};
+use crate::visit::Visit;
 
 /// The id of the navigation, which the drawer button opens.
 pub const SIDEBAR_ID: &str = "sidebar";
@@ -56,149 +57,121 @@ pub fn footer_names() -> Footer {
 
 /// The FerroBRIDGE lockup that leads to the dashboard.
 #[must_use]
-pub fn console_lockup() -> AnyView {
+pub fn console_lockup(locale: &Locale) -> Html {
     lockup(
         DASHBOARD,
         brand_mark(MARK_LIGHT, MARK_DARK),
         "FerroBRIDGE",
-        tr(Msg::Console),
+        tr(locale, Msg::Console),
     )
-    .into_any()
 }
 
-/// Returns the signed-in page around `content`: the top bar, the
-/// navigation and the footer, each part reading the bridge as it is drawn.
-#[must_use]
-pub fn shell(content: AnyView) -> AnyView {
-    // NOTE: FerroUI `docs/consoles.md`, "How a console builds", step 10: the shell
-    // is drawn once, and the navigation and the `back` of its forms follow the router.
-    ferrohealth_ui::widget::nav::follow_path();
-    let path = use_location().pathname.get_untracked();
-    let words = if path == crate::pages::search::SEARCH {
-        leptos_router::hooks::use_query_map()
-            .with_untracked(|query| query.get("q"))
-            .unwrap_or_default()
+/// Returns the signed-in page around `content`, with the docked bar `dock`
+/// and the toast region `toasts`: the top bar, the navigation and the
+/// footer, each part reading the bridge as it is drawn.
+pub async fn shell(visit: &Visit, content: Html, dock: Option<Html>, toasts: Html) -> Html {
+    let locale = &visit.locale;
+    let words = if visit.path == crate::pages::search::SEARCH {
+        visit.param("q").unwrap_or_default().to_owned()
     } else {
         String::new()
     };
-    let info = Resource::new(crate::load::changes, |_| crate::load::info_now());
-    let state = Resource::new(crate::load::changes, |_| crate::load::state_now());
-    let drawn_at = path.clone();
-    let bar = view! {
-        <Suspense>
-            {move || {
-                let path = drawn_at.clone();
-                let words = words.clone();
-                let visit = crate::visit::visit();
-                Suspend::new(async move {
-                    let info = info.await;
-                    top_bar(&info, &path, &words, &visit)
-                })
-            }}
-        </Suspense>
-    }
-    .into_any();
-    let nav = view! {
-        <Suspense>
-            {move || {
-                let path = path.clone();
-                let rail = crate::visit::visit().chosen().rail;
-                Suspend::new(async move {
-                    let state = state.await;
-                    navigation(&path, rail, &state)
-                })
-            }}
-        </Suspense>
-    }
-    .into_any();
-    ferrohealth_ui::view::shell::shell(Shell {
-        topbar: bar,
-        banner: None,
-        sidebar: nav,
-        content,
-        dock: None,
-        footer: footer_names(),
-    })
+    let info = visit.reads.info().await;
+    let state = visit.reads.running().await;
+    let bar = top_bar(visit, &info, &words);
+    let nav = navigation(locale, &visit.path, visit.chosen.rail, &state);
+    ferrohealth_ui::view::shell::shell(
+        locale,
+        Shell {
+            topbar: bar,
+            banner: None,
+            sidebar: nav,
+            content,
+            dock,
+            toasts,
+            footer: footer_names(),
+        },
+    )
 }
 
-/// The top bar of the shell drawn at `path` in the visit `visit`, with the
-/// bridge's state from `info` and the search's `words`; the theme choice's
-/// `back` follows the router from there.
+/// The top bar of the shell drawn for `visit`, with the bridge's state from
+/// `info` and the search's `words`.
 fn top_bar(
+    visit: &Visit,
     info: &Loaded<ferrobridge_operator_api::health::Info>,
-    path: &str,
     words: &str,
-    visit: &crate::visit::Visit,
-) -> AnyView {
-    let chosen = visit.chosen().preferences;
+) -> Html {
+    let locale = &visit.locale;
     let operator = visit
         .operator
         .clone()
-        .unwrap_or_else(crate::app::unnamed_operator);
-    let menu = user_menu(UserMenu {
-        id: MENU_ID,
-        label: operator.clone(),
-        name: Some(operator.clone()),
-        who: operator,
-        line: tr(Msg::OperatorLine),
-        preferences: String::from(PREFERENCES),
-        theme: ThemeChoice {
-            current: chosen.theme,
-            action: String::from(crate::app::PREFERENCE),
-            back: path.to_owned(),
+        .unwrap_or_else(|| crate::app::unnamed_operator(locale));
+    let menu = user_menu(
+        locale,
+        UserMenu {
+            id: MENU_ID,
+            label: operator.clone(),
+            name: Some(operator.clone()),
+            who: operator,
+            line: tr(locale, Msg::OperatorLine),
+            preferences: String::from(PREFERENCES),
+            theme: ThemeChoice {
+                current: visit.chosen.preferences.theme,
+                action: String::from(crate::app::PREFERENCE),
+                back: visit.path.clone(),
+            },
+            choices: Vec::new(),
+            links: Vec::new(),
+            shortcuts: None,
+            sign_out: Some(String::from(SIGN_OUT)),
         },
-        choices: Vec::new(),
-        links: Vec::new(),
-        shortcuts: None,
-        sign_out: Some(String::from(SIGN_OUT)),
-    });
-    let pill = status_pill(pill(info));
-    let end = view! {
-        {pill}
-        {menu}
-    }
-    .into_any();
-    let search = crate::pages::search::search_box(words);
-    topbar(TopBar {
-        sidebar: SIDEBAR_ID,
-        lockup: console_lockup(),
-        search: Some(search),
-        end,
-    })
+    );
+    let pill = status_pill(pill(locale, info));
+    let search = crate::pages::search::search_box(locale, words);
+    topbar(
+        locale,
+        TopBar {
+            sidebar: SIDEBAR_ID,
+            lockup: console_lockup(locale),
+            search: Some(search),
+            end: pill.then(menu),
+        },
+    )
 }
 
 /// The status pill for the bridge's `info`: up with its version, refused,
 /// unreachable, or unknown.
 #[must_use]
-pub fn pill(info: &Loaded<ferrobridge_operator_api::health::Info>) -> StatusPill {
+pub fn pill(locale: &Locale, info: &Loaded<ferrobridge_operator_api::health::Info>) -> StatusPill {
     match info {
         Ok(Outcome::Shown(info)) => StatusPill {
             reach: Reach::Up,
-            words: tr(Msg::BridgeUp),
+            words: tr(locale, Msg::BridgeUp),
             detail: Some(tr_with(
+                locale,
                 Msg::BridgeVersion,
                 &[("version", Arg::from(info.version.as_str()))],
             )),
         },
         Ok(Outcome::Refused(Refusal::NotAuthenticated)) => StatusPill {
             reach: Reach::Refused,
-            words: tr(Msg::BridgeRefused401),
+            words: tr(locale, Msg::BridgeRefused401),
             detail: None,
         },
         Ok(Outcome::Refused(refusal)) => StatusPill {
             reach: Reach::Unknown,
-            words: tr(Msg::BridgeUnknown),
-            detail: Some(refusal.text()),
+            words: tr(locale, Msg::BridgeUnknown),
+            detail: Some(refusal.text(locale)),
         },
         Err(ViewError::Unreachable) => StatusPill {
             reach: Reach::Unreachable,
-            words: tr(Msg::BridgeUnreachable),
+            words: tr(locale, Msg::BridgeUnreachable),
             detail: None,
         },
         Err(fault) => StatusPill {
             reach: Reach::Unknown,
-            words: tr(Msg::BridgeUnknown),
-            detail: Some(fault.text()),
+            words: tr(locale, Msg::BridgeUnknown),
+            detail: Some(fault.text(locale)),
         },
     }
 }
@@ -206,7 +179,7 @@ pub fn pill(info: &Loaded<ferrobridge_operator_api::health::Info>) -> StatusPill
 /// The count the Mapping set entry carries for the running load `state`:
 /// its errors, or a dash with the reason no count is known (R12).
 #[must_use]
-pub fn error_count(state: &Loaded<EngineState>) -> Count {
+pub fn error_count(locale: &Locale, state: &Loaded<EngineState>) -> Count {
     match state {
         Ok(Outcome::Shown(state)) => {
             let errors = state
@@ -217,35 +190,34 @@ pub fn error_count(state: &Loaded<EngineState>) -> Count {
             let count = u32::try_from(errors).unwrap_or(u32::MAX);
             Count::Known {
                 count,
-                words: tr_with(Msg::NavErrors, &[("count", Arg::from(count))]),
+                words: tr_with(locale, Msg::NavErrors, &[("count", Arg::from(count))]),
             }
         }
         Ok(Outcome::Refused(refusal)) if refusal.not_served() => Count::Unknown {
-            why: tr(Msg::NavUnknownOff),
+            why: tr(locale, Msg::NavUnknownOff),
         },
         Ok(Outcome::Refused(_)) | Err(_) => Count::Unknown {
-            why: tr(Msg::NavUnknownDown),
+            why: tr(locale, Msg::NavUnknownDown),
         },
     }
 }
 
 /// The navigation of the shell drawn at `path`, folded to its rail when
-/// `rail`, with the running load's count; the page it marks follows the
-/// router from there.
-fn navigation(path: &str, rail: bool, state: &Loaded<EngineState>) -> AnyView {
+/// `rail`, with the running load's count.
+fn navigation(locale: &Locale, path: &str, rail: bool, state: &Loaded<EngineState>) -> Html {
     let entry = |href: &'static str, label: Msg, glyph: Glyph, exact: bool| Entry {
         href: Cow::Borrowed(href),
-        label: Cow::Owned(tr(label)),
+        label: Cow::Owned(tr(locale, label)),
         glyph,
         exact,
         count: None,
     };
     let mut set = entry(MAPPINGS, Msg::MappingSet, Glyph::LAYERS, false);
-    set.count = Some(error_count(state));
+    set.count = Some(error_count(locale, state));
     let groups = vec![
         Group {
             id: "nav-overview",
-            title: Cow::Owned(tr(Msg::Overview)),
+            title: Cow::Owned(tr(locale, Msg::Overview)),
             entries: vec![entry(
                 DASHBOARD,
                 Msg::Dashboard,
@@ -255,7 +227,7 @@ fn navigation(path: &str, rail: bool, state: &Loaded<EngineState>) -> AnyView {
         },
         Group {
             id: "nav-mappings",
-            title: Cow::Owned(tr(Msg::Mappings)),
+            title: Cow::Owned(tr(locale, Msg::Mappings)),
             entries: vec![
                 set,
                 entry(PLAYGROUND, Msg::Playground, Glyph::FLASK_CONICAL, false),
@@ -263,7 +235,7 @@ fn navigation(path: &str, rail: bool, state: &Loaded<EngineState>) -> AnyView {
         },
         Group {
             id: "nav-bridge",
-            title: Cow::Owned(tr(Msg::Bridge)),
+            title: Cow::Owned(tr(locale, Msg::Bridge)),
             entries: vec![
                 entry(FACADE, Msg::FhirFacade, Glyph::FLAME, false),
                 entry(HL7V2, Msg::Hl7v2, Glyph::MESSAGE_SQUARE, false),
@@ -273,23 +245,26 @@ fn navigation(path: &str, rail: bool, state: &Loaded<EngineState>) -> AnyView {
         },
         Group {
             id: "nav-console",
-            title: Cow::Owned(tr(Msg::ConsoleGroup)),
+            title: Cow::Owned(tr(locale, Msg::ConsoleGroup)),
             entries: vec![
                 entry(CONFIGURATION, Msg::Configuration, Glyph::FILE_TEXT, false),
                 entry(ABOUT, Msg::About, Glyph::INFO, true),
             ],
         },
     ];
-    sidebar(Sidebar {
-        id: SIDEBAR_ID,
-        label: tr(Msg::ConsoleNavigation),
-        groups,
-        current: path.to_owned(),
-        rail: Some(Rail {
-            collapsed: rail,
-            action: String::from(crate::app::SIDEBAR),
-            back: path.to_owned(),
-        }),
-        nest: None,
-    })
+    sidebar(
+        locale,
+        Sidebar {
+            id: SIDEBAR_ID,
+            label: tr(locale, Msg::ConsoleNavigation),
+            groups,
+            current: path.to_owned(),
+            rail: Some(Rail {
+                collapsed: rail,
+                action: String::from(crate::app::SIDEBAR),
+                back: path.to_owned(),
+            }),
+            nest: None,
+        },
+    )
 }

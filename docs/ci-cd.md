@@ -89,7 +89,7 @@ A changed path reaches packages in one of these ways:
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
-| `.claude/rules/leptos-ui.md`, `scripts/release/console-*.sh`, `scripts/checks/console-*.sh`, `scripts/release/journey-tools.sh`, `scripts/checks/stray-literals.*` | `ferrobridge-console` (the rule holds its bundle budget; the scripts build and measure its site bundle, install the browser its journeys drive and check its sources for stray literals) |
+| `.claude/rules/console-ui.md`, `scripts/release/journey-tools.sh`, `scripts/checks/stray-literals.*` | `ferrobridge-console` (the rule holds what its pages, posts and journeys keep; the scripts install the browser its journeys drive and check its sources for stray literals) |
 | `website/book/src/**` | the testkit's own tests (its screenshot guard reads every page of the book and every console screenshot) |
 | `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh` | everything |
 | the rest of `.github/`, the rest of `.claude/`, the rest of `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, the rest of `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
@@ -106,8 +106,7 @@ maps it. Each lane then reads one output:
 | `codegen-drift`, `codegen-emit-tests` | `fhir-codegen` is reached (its sources, its vendored packages, `fhir-types` or `hl7v2-types`) |
 | `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |
 | `sqlx-offline` | `omop-cdm` is reached |
-| `console (wasm32 and site bundle)` | `ferrobridge-console` is reached: its browser half linted for `wasm32-unknown-unknown`, its release site bundle built, held to the budget of `.claude/rules/leptos-ui.md` §12, and checked for build-host paths |
-| `journeys (browser)` | `ferrobridge-console` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console serving the release site bundle |
+| `journeys (browser)` | `ferrobridge-console` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console, with FerroUI's script modules loaded and refused |
 | `conformance` | a package `conformance.sh` runs is reached |
 | `e2e (containers)` | one of `omop-cdm`, `ferrobridge-server`, `ferrobridge-term`, `ferrobridge-testkit` is reached; it runs those of them that are |
 | `rustfmt`, `cargo-deny`, `dependency-review` and every tier-1 job | always (`cargo-deny` because the advisory database moves without a change) |
@@ -491,7 +490,7 @@ actionlint lanes read.
 | `release.yml` | on a `v*` tag: plan, draft, the three calls, publish, crates.io | none of its own |
 | `release-build.yml` | called once per target, on a runner of that architecture | `cargo-auditable`, `cargo-cyclonedx`, `syft` |
 | `release-image.yml` | called once the musl binaries exist | `syft` |
-| `release-console.yml` | called once the draft exists: the console binaries, its site bundle and its image | `cargo-auditable`, `syft`, `cargo-leptos`, `wasm-bindgen` |
+| `release-console.yml` | called once the draft exists: the console binaries and its image | `cargo-auditable`, `syft` |
 
 Those versions are rows of `docs/VERSIONS.md`, and
 `scripts/checks/versions.sh` reads every `tool:` line of the three release

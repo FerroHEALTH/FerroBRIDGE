@@ -38,7 +38,6 @@ use crate::config::settings::SessionSettings;
 
 mod cookies;
 pub mod refresh;
-pub mod request;
 
 /// The name of the cookie that carries a signed-in session, under the
 /// `__Host-` prefix when the cookie is `Secure`.

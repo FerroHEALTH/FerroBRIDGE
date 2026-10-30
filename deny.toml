@@ -13,13 +13,7 @@ version = 2
 # Fail on any RustSec advisory. Add exceptions explicitly, dated, and each
 # naming the event that deletes it.
 yanked = "deny"
-ignore = [
-  # 2026-10-17 (#599): paste is unmaintained, a compile-time proc-macro under
-  # the Leptos 0.8 family of the operator console with no runtime surface.
-  # Deleted when no Leptos crate in the lock depends on paste.
-  # https://rustsec.org/advisories/RUSTSEC-2024-0436
-  { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained; a compile-time proc-macro under the Leptos 0.8 family of the operator console, with no runtime surface" },
-]
+ignore = []
 
 [licenses]
 version = 2

@@ -12,20 +12,16 @@
 //! the server's does. No specification governs the console: our own design.
 
 use ferrobridge_operator_api::operator::LoadReport;
-#[cfg(not(target_arch = "wasm32"))]
 use ferrobridge_operator_api::problem::Problem;
-#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::codec::{Json as _, Path, Value};
-#[cfg(not(target_arch = "wasm32"))]
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use http::StatusCode;
-use leptos::server_fn::codec::JsonEncoding;
-use leptos::server_fn::error::{FromServerFnError, ServerFnErrorErr};
 use serde::{Deserialize, Serialize};
 
-#[cfg(not(target_arch = "wasm32"))]
 use crate::bridge::BridgeError;
 use crate::locale::messages::Msg;
+use ferrohealth_ui::i18n::Locale;
+
 use crate::locale::{tr, tr_with};
 
 /// What the bridge answered when the console did its part.
@@ -68,21 +64,22 @@ pub enum Refusal {
     /// the field and never quotes what was entered.
     Invalid {
         /// What is wrong, by field.
-        reason: String,
+        reason: Msg,
     },
 }
 
 impl Refusal {
-    /// The words of the refusal in the page's locale: its status and the
+    /// The words of the refusal in `locale`: its status and the
     /// diagnostics the bridge carried, in order.
     #[must_use]
-    pub fn text(&self) -> String {
+    pub fn text(&self, locale: &Locale) -> String {
         match self {
             Self::Bridge {
                 status,
                 diagnostics,
             } => {
                 let mut text = tr_with(
+                    locale,
                     Msg::BridgeRefusedStatus,
                     &[("status", status.as_u16().to_string().into())],
                 );
@@ -92,8 +89,8 @@ impl Refusal {
                 }
                 text
             }
-            Self::NotAuthenticated => tr(Msg::BridgeRefusedSignIn),
-            Self::Invalid { reason } => reason.clone(),
+            Self::NotAuthenticated => tr(locale, Msg::BridgeRefusedSignIn),
+            Self::Invalid { reason } => tr(locale, *reason),
         }
     }
 
@@ -134,26 +131,18 @@ pub enum ViewError {
 }
 
 impl ViewError {
-    /// The words of the fault in the page's locale; its `Display` is the log's.
+    /// The words of the fault in `locale`; its `Display` is the log's.
     #[must_use]
-    pub fn text(&self) -> String {
-        tr(match self {
-            Self::SignedOut => Msg::ViewSignedOut,
-            Self::Unreadable => Msg::ViewUnreadable,
-            Self::Unreachable => Msg::ViewUnreachable,
-            Self::Unavailable => Msg::ViewUnavailable,
-        })
-    }
-}
-
-impl FromServerFnError for ViewError {
-    type Encoder = JsonEncoding;
-
-    fn from_server_fn_error(value: ServerFnErrorErr) -> Self {
-        // NOTE: no specification governs this: our own design; a page that cannot
-        // reach the console's own server function is a view the console cannot serve.
-        leptos::logging::warn!("a server function did not answer: {value}");
-        Self::Unavailable
+    pub fn text(&self, locale: &Locale) -> String {
+        tr(
+            locale,
+            match self {
+                Self::SignedOut => Msg::ViewSignedOut,
+                Self::Unreadable => Msg::ViewUnreadable,
+                Self::Unreachable => Msg::ViewUnreachable,
+                Self::Unavailable => Msg::ViewUnavailable,
+            },
+        )
     }
 }
 
@@ -227,7 +216,6 @@ pub enum SessionState {
 /// Returns [`ViewError::Unreachable`] for a bridge that gave no answer,
 /// [`ViewError::Unreadable`] for an answer this console cannot read, and
 /// [`ViewError::Unavailable`] for a request the console could not send.
-#[cfg(not(target_arch = "wasm32"))]
 pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
     match error {
         BridgeError::Refused { status, body } => {
@@ -253,13 +241,13 @@ pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
             Err(ViewError::Unreadable)
         }
         BridgeError::Path => Ok(Refusal::Invalid {
-            reason: tr(Msg::InvalidPath),
+            reason: Msg::InvalidPath,
         }),
         BridgeError::ResourceType => Ok(Refusal::Invalid {
-            reason: tr(Msg::InvalidResourceType),
+            reason: Msg::InvalidResourceType,
         }),
         BridgeError::Reason => Ok(Refusal::Invalid {
-            reason: tr(Msg::InvalidReason),
+            reason: Msg::InvalidReason,
         }),
         BridgeError::Route { .. }
         | BridgeError::Token
@@ -276,7 +264,6 @@ pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
 ///
 /// # Errors
 /// As [`refusal`].
-#[cfg(not(target_arch = "wasm32"))]
 pub fn loaded<T>(result: Result<T, BridgeError>) -> Loaded<T> {
     match result {
         Ok(document) => Ok(Outcome::Shown(document)),
@@ -289,7 +276,6 @@ pub fn loaded<T>(result: Result<T, BridgeError>) -> Loaded<T> {
 /// `operationoutcome.html`, `OperationOutcome.issue`), or the `title` and
 /// the `detail` of an RFC 9457 problem (§3.1.3, §3.1.4), which the bridge
 /// answers outside its FHIR routes.
-#[cfg(not(target_arch = "wasm32"))]
 fn diagnostics(body: &str) -> Vec<String> {
     // NOTE: no specification governs this: our own design; a body that is
     // neither document carries no diagnostics, and its status stands.
@@ -403,21 +389,22 @@ mod tests {
 
     #[test]
     fn a_refusal_and_a_fault_draw_their_english_words_from_the_catalog() {
+        let english = ferrohealth_ui::i18n::Locale::english();
         let refused = Refusal::Bridge {
             status: StatusCode::SERVICE_UNAVAILABLE,
             diagnostics: vec![String::from("synthetic diagnostic")],
         };
         assert_eq!(
             "The bridge refused the request (503). synthetic diagnostic",
-            refused.text()
+            refused.text(&english)
         );
         assert_eq!(
             "The bridge did not accept your sign-in (401). Sign in again.",
-            Refusal::NotAuthenticated.text()
+            Refusal::NotAuthenticated.text(&english)
         );
         assert_eq!(
             "The bridge answered with a body this console cannot read.",
-            ViewError::Unreadable.text()
+            ViewError::Unreadable.text(&english)
         );
         assert!(
             Refusal::Bridge {

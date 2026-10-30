@@ -11,82 +11,81 @@
 //! the console refused, which hands its state to the page it draws.
 
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::view::shell::{brand_mark, centred, lockup_plain};
+use ferrohealth_ui::view::shell::{brand_mark, lockup_plain};
 use ferrohealth_ui::view::sign_in::{Notice, Provider, SignIn, State, sign_in};
-use leptos::prelude::*;
 
-use crate::app::{MARK_DARK, MARK_LIGHT, SIGN_IN, page_title};
+use crate::app::{Drawn, MARK_DARK, MARK_LIGHT, SIGN_IN};
 use crate::locale::messages::Msg;
-use crate::locale::tr;
+use crate::visit::Visit;
 
 /// The state a sign-in route hands the page it draws.
 #[derive(Debug, Clone)]
 pub struct Arrived(pub State);
 
-/// The state of a visitor's sign-in: the one a route handed over, or what
-/// the console's configuration and the request's cookies say.
-fn arrived() -> State {
-    if let Some(Arrived(state)) = use_context::<Arrived>() {
-        return state;
-    }
-    let visit = crate::visit::visit();
+/// The state of a visitor's sign-in: what the console's configuration and
+/// the request's cookies say.
+fn arrived(visit: &Visit) -> State {
     if visit.sign_in {
         if visit.ended {
-            State::Expired(Notice::new(tr(Msg::SignInExpired)))
+            State::Expired(Notice::new(visit.tr(Msg::SignInExpired)))
         } else {
             State::Ready
         }
     } else {
         State::Unavailable(Notice {
-            text: tr(Msg::SignInUnavailable),
-            detail: Some(tr(Msg::SignInUnavailableDetail)),
+            text: visit.tr(Msg::SignInUnavailable),
+            detail: Some(visit.tr(Msg::SignInUnavailableDetail)),
             retry: None,
         })
     }
 }
 
 /// The sign-in card in `state`.
-fn card(state: State) -> AnyView {
+fn card(visit: &Visit, state: State) -> Drawn {
+    let locale = &visit.locale;
     let lockup = lockup_plain(
         brand_mark(MARK_LIGHT, MARK_DARK),
         "FerroBRIDGE",
-        tr(Msg::Console),
-    )
-    .into_any();
-    let card = sign_in(SignIn {
-        lockup,
-        title: Some(tr(Msg::SignInTitle)),
-        state,
-        provider: Some(Provider {
-            href: String::from(SIGN_IN),
-            label: tr(Msg::SignInWithProvider),
-            busy: tr(Msg::SignInRedirecting),
-            glyph: Glyph::LOG_IN,
-        }),
-        basic: None,
-        line: None,
-        note: Some(tr(Msg::SignInNote)),
-        links: vec![(
-            tr(Msg::Documentation),
-            String::from("https://ferrobridge.eu/docs/"),
-        )],
-        caption: Some(tr(Msg::SignInCaption)),
-    });
-    view! {
-        {page_title(tr(Msg::SignIn))}
-        {centred(card.into_any(), crate::shell::footer_names())}
-    }
-    .into_any()
+        visit.tr(Msg::Console),
+    );
+    let card = sign_in(
+        locale,
+        SignIn {
+            lockup,
+            title: Some(visit.tr(Msg::SignInTitle)),
+            state,
+            provider: Some(Provider {
+                href: String::from(SIGN_IN),
+                label: visit.tr(Msg::SignInWithProvider),
+                busy: visit.tr(Msg::SignInRedirecting),
+                glyph: Glyph::LOG_IN,
+            }),
+            basic: None,
+            line: None,
+            note: Some(visit.tr(Msg::SignInNote)),
+            links: vec![(
+                visit.tr(Msg::Documentation),
+                String::from("https://ferrobridge.eu/docs/"),
+            )],
+            caption: Some(visit.tr(Msg::SignInCaption)),
+        },
+    );
+    Drawn::centred(visit.tr(Msg::SignIn), card)
 }
 
-/// The landing page of a visitor: the sign-in in the state they arrived in.
+/// The landing page of a visitor: the sign-in in the state a sign-in route
+/// handed over, or the one they arrived in.
 #[must_use]
-pub fn sign_in_page() -> impl IntoView {
-    card(arrived())
+pub fn sign_in_page(visit: &Visit, handed: Option<Arrived>) -> Drawn {
+    let state = handed.map_or_else(|| arrived(visit), |Arrived(state)| state);
+    card(visit, state)
 }
 
 /// The page a signed-out operator lands on: the sign-in, saying so.
 #[must_use]
-pub fn signed_out_page() -> impl IntoView {
-    card(State::SignedOut(Notice::new(tr(Msg::SignedOut))))
+pub fn signed_out_page(visit: &Visit) -> Drawn {
+    card(
+        visit,
+        State::SignedOut(Notice::new(visit.tr(Msg::SignedOut))),
+    )
 }

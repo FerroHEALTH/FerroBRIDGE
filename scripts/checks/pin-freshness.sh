@@ -45,9 +45,7 @@ hadolint	hadolint/hadolint
 trivy	aquasecurity/trivy
 mdBook	rust-lang/mdBook
 mdbook-toc	badboy/mdbook-toc
-mdbook-mermaid	badboy/mdbook-mermaid
-cargo-leptos	leptos-rs/cargo-leptos
-Binaryen	WebAssembly/binaryen"
+mdbook-mermaid	badboy/mdbook-mermaid"
 
 # The second cell of the matrix row whose first cell is $1, with the backticks
 # stripped.
@@ -193,8 +191,8 @@ while IFS=$'\t' read -r label repo; do
     unreadable=1
     continue
   fi
-  # A leading v is a version prefix only before a digit (v1.2.3, never
-  # Binaryen's version_133).
+  # A leading v is a version prefix only before a digit (v1.2.3, never a
+  # tag such as version_133).
   latest="$tag"
   [[ $tag =~ ^v[0-9] ]] && latest="${tag#v}"
 
