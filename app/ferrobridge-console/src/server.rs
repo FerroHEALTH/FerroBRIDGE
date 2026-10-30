@@ -257,6 +257,7 @@ pub fn policy(form_action: &str) -> HeaderValue {
 /// the family's, which admits the WebAssembly and the nonce a hydrated
 /// console needs.
 async fn strict_policy(policy: HeaderValue, request: Request, next: Next) -> Response {
+    // TODO(#1358): take this policy from ferrohealth-server once FerroSYS#202 ships.
     let mut response = next.run(request).await;
     response
         .headers_mut()
