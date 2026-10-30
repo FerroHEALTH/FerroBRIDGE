@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "ferrobridge-console"
-description = "The FerroBRIDGE operator console: a Leptos app rendered on the server with its interactive parts hydrated as islands, and a backend-for-frontend over the bridge's public HTTP surface"
+description = "The FerroBRIDGE operator console: every page drawn on the server from FerroUI's components, and a backend-for-frontend over the bridge's public HTTP surface"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,73 +13,38 @@ authors.workspace = true
 # The application is never published, whatever the workspace switch says.
 publish = false
 
-# One crate, two halves (the Leptos book, server-side rendering): the rlib
-# feeds the server binary and the cdylib is the WebAssembly bundle whose
-# islands the browser hydrates. cargo-leptos builds the cdylib for wasm32 and
-# the binary for the host.
 [lib]
-crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [[bin]]
 name = "ferrobridge-console"
 path = "src/main.rs"
 
-# Both halves on every target. The server half and the browser half are
-# chosen by target rather than by Cargo feature, so `--all-features` over the
-# workspace can never turn both on at once; a target dependency's features
-# apply only to a build for that target (the Cargo reference, resolver
-# version 2 and later). No specification governs this: our own design.
+# Of the workspace's own crates the console may link openehr-mapping-core,
+# fhir-types (r4) and ferrobridge-operator-api and no other, and no Leptos
+# crate or WebAssembly glue at all (docs/architecture.md section 4.10);
+# tests/it/boundary.rs walks the resolved graph and fails on any other.
 [dependencies]
-# The whole page hydrates in the browser (FerroUI `docs/consoles.md`, "How a
-# console builds"): the server draws it, the browser takes it over, and every
-# page after the first is drawn in the browser, its code loaded per lazy
-# route. Neither half turns on the `leptos` feature `islands`.
-leptos.workspace = true
-leptos_meta.workspace = true
-leptos_router.workspace = true
-# The state the server read and every bridge document cross to the browser
-# as JSON, through serde.
+# The FerroHEALTH components, stylesheet, role tokens and script modules,
+# every page drawn on the server (FerroUI `docs/consoles.md`, "How a console
+# builds"); its default `axum` feature serves the library's assets.
+ferrohealth-ui.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-# The FerroHEALTH components, stylesheet and role tokens, in both halves;
-# the stylesheet and the FerroBRIDGE theme are served from it as they stand.
-ferrohealth-ui.workspace = true
-# The console's own string catalogs under locales/, embedded in both halves,
-# so a page drawn in the browser speaks as the server's does.
+# The console's own string catalogs under locales/.
 fluent-templates.workspace = true
 # The bridge's health and operator documents, the contract the bridge
-# serializes with (docs/architecture.md section 4.10), drawn in both halves.
+# serializes with (docs/architecture.md section 4.10).
 ferrobridge-operator-api.workspace = true
-# The family's readiness document `GET /health/readiness` answers, in the
-# default build both halves compile.
-ferrohealth-health.workspace = true
+# The family's readiness document `GET /health/readiness` answers, and the
+# registry the console's own health routes read.
+ferrohealth-health = { workspace = true, features = ["registry"] }
 # The `Diagnostic` the operator API answers, read in its serde form.
 openehr-mapping-core.workspace = true
-# The status of a bridge refusal.
 http.workspace = true
 thiserror.workspace = true
 # The bridge's address a page names, and the words of a search link.
 url.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-leptos = { workspace = true, features = ["hydrate"] }
-wasm-bindgen.workspace = true
-# The hydration future, run before the leptos executor exists.
-wasm-bindgen-futures.workspace = true
-console_error_panic_hook.workspace = true
-
-# The server half. Of the workspace's own crates it may link
-# openehr-mapping-core, fhir-types (r4) and ferrobridge-operator-api and no
-# other, and the browser half
-# links none (docs/architecture.md section 4.10); tests/it/boundary.rs walks
-# the resolved graph and fails on any other.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-# The per-request script nonce of the Content-Security-Policy rides `nonce`.
-leptos = { workspace = true, features = ["ssr", "nonce"] }
-leptos_axum.workspace = true
-leptos_meta = { workspace = true, features = ["ssr"] }
-leptos_router = { workspace = true, features = ["ssr"] }
 # The random session ids, PKCE verifiers, states and nonces, the SHA-256 of
 # the PKCE challenge (RFC 7636 §4.2) and the constant-time comparisons, from
 # the crypto library rustls already builds on.
@@ -95,7 +60,6 @@ cookie.workspace = true
 # the healthcheck and the `serve`, `config check` and `healthcheck`
 # subcommands.
 ferrohealth-config.workspace = true
-ferrohealth-health = { workspace = true, features = ["registry"] }
 ferrohealth-secret.workspace = true
 ferrohealth-server = { workspace = true, features = ["console"] }
 ferrohealth-telemetry.workspace = true
@@ -114,14 +78,12 @@ reqwest.workspace = true
 # A secret read from the configuration and every token a session holds,
 # zeroed when dropped.
 secrecy.workspace = true
-# `sync` holds one refresh of a session's access token at a time.
+# `sync` holds one refresh of a session's access token at a time, and keeps
+# each document a request reads from the bridge once.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
-# The site bundle is served brotli- or gzip-compressed, as the request's
-# Accept-Encoding chooses.
-tower-http = { workspace = true, features = ["compression-br", "compression-gzip"] }
 tracing.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+[dev-dependencies]
 # The test OpenID Provider the sign-in, the refresh and the sign-out run
 # against; a dev-dependency links into no shipped artifact.
 ferrobridge-testkit.workspace = true
@@ -136,21 +98,3 @@ wiremock.workspace = true
 
 [lints]
 workspace = true
-
-# cargo-leptos: the site bundle (the WebAssembly and its JavaScript glue)
-# under target/site, the server binary beside it. The stylesheet and the
-# FerroBRIDGE theme are the library's, both served by the server from the
-# binary (crate::server), so the bundle carries no CSS.
-[package.metadata.leptos]
-output-name = "ferrobridge-console"
-site-root = "target/site"
-site-pkg-dir = "pkg"
-# Copied into the site root as it stands: the brand favicon, which a browser
-# asks for at /favicon.ico on every first page (#602).
-assets-dir = "public"
-site-addr = "127.0.0.1:3000"
-reload-port = 3001
-lib-profile-release = "wasm-release"
-# A dev build keeps its component types, as the server half does, so the
-# bundle hydrates the pages the server rendered.
-disable-erase-components = true

@@ -6,7 +6,7 @@
 - [Family architecture](family-architecture.md): five separate servers that
   reach each other only over published protocols, shared crates for
   cross-cutting work, nothing hand-written that a shared crate covers,
-  reactive consoles; FerroFORMS, the umbrella and Veredictum out of scope;
+  server-rendered consoles; FerroFORMS, the umbrella and Veredictum out of scope;
   owner 2026-10-25
 - [Product scope](product-scope.md): the owner's product statement is the
   ceiling on what this repository may claim; standalone server and
@@ -83,7 +83,7 @@
 - [Worker wait loops](worker-wait-loops.md) — worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
 - [PR backlog discipline](pr-backlog-discipline.md) — several open PRs are fine if each merges cleanly; no stacked PRs, overlapping work in sequence, every open PR tracked to its merge; owner 2026-10-17
 - [Autonomous loop](autonomous-loop.md) — never stop, never wait idle, never ask the owner; keep working the issues while PRs drain; owner 2026-10-17
-- [FerroUI](ferroui.md): one shared UI component library for every console, pinned Cargo dependency, reactive, owner sign-off to migrate the siblings; owner 2026-10-18
+- [FerroUI](ferroui.md): one shared UI component library for every console, pinned Cargo dependency, server-rendered since 0.6 (#510), owner sign-off to migrate the siblings; owner 2026-10-18
 - [One milestone at a time](one-milestone-at-a-time.md) — every worker on the current milestone until it is cut; an externally blocked straggler moves to the next
 - [Release closes milestone](release-closes-milestone.md): release.yml refuses a tag whose milestone is missing or not empty and closes it after every leg; check it after a manual or recovery release; owner 2026-10-19 (#983)
 - [Worker scratch subfolders](worker-scratch-subfolders.md): each worker writes scratch files under its own scratchpad subfolder, never the root; check a file is yours before `--body-file` and re-read the PR body after; 2026-10-20 (#1021)
@@ -91,9 +91,9 @@
 - [Family toolchain](family-toolchain.md): newest stable Rust as toolchain, the toolchain minus one as MSRV (1.99.1 and 1.98 on 2026-10-21); check the Rust blog first; never lower an MSRV; owner 2026-10-21
 - [Worktrees in the repo](worktrees-in-repo.md): every worktree at <repo>/.claude/worktrees/<name>, never a sibling folder; owner 2026-10-21
 - [Console redesign program](console-redesign-program.md): design-first, PIX, FED, BRIDGE, TERM, then EHR, the orchestrator reviews and moves on, then FerroUI finished across 0.3.0 to 0.3.2 before one lockstep console rollout (FerroUI#161, v0.4.0); owner 2026-10-21 and 2026-10-22
-- [Reactive console UI](reactive-console-ui.md): owner 2026-10-25, no full
-  page reload for an interaction; WebAssembly is the normal path, the
-  no-WebAssembly page the fallback (FerroUI #410)
+- [Reactive console UI](reactive-console-ui.md): superseded by the owner on
+  2026-10-29 (FerroUI #510): server-rendered consoles, plain script modules,
+  no WebAssembly; a navigation is one document
 - [Contribution licence attestation](contribution-licence-attestation.md): owner
   2026-10-25, always tick the licence checkbox on PRs opened for the owner,
   never ask

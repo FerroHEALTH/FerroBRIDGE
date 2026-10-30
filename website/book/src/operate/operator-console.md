@@ -98,15 +98,13 @@ at most; the arrow keys walk them, Enter opens the chosen one, and Enter
 with none chosen, or "See all results", opens the search page, which lists
 every match in the page.
 
-The console draws the first page on its server and sends it whole. Once
-its WebAssembly has loaded, the browser draws every page after that
-itself: a link, the search, a tab or an action changes the page without
-loading a new document, and the browser's back and forward buttons walk
-the pages you visited. Each group of pages loads its code the first time
-you open one of them, or earlier while the browser is idle. Every page
-and every action also works before that code arrives, or without it:
-each action is then a plain form post that the console answers with the
-page it drew.
+The console draws every page on its server and sends it whole: a link,
+the search, a tab or an action loads one complete page, and the browser's
+back and forward buttons walk the pages you visited. A few small scripts
+add behaviour on top, such as the editor's highlighting as you type, the
+search's suggestions and the menus and dialogs, and every page and every
+action works without them: each action is a plain form post that the
+console answers with the page it drew.
 
 - **Dashboard** (`/`): the running load's contexts, its errors and
   warnings, the upstreams the bridge reaches, what needs attention, and

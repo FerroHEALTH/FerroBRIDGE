@@ -16,7 +16,7 @@ use tracing_subscriber::fmt::MakeWriter;
 
 use crate::journeys::browser::{Browser, with_browser};
 use crate::journeys::journeys_enabled;
-use crate::journeys::playground::hydrated;
+use crate::journeys::playground::loaded;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::{CONTEXT, Stack};
 
@@ -115,7 +115,7 @@ pub(crate) async fn draft(
     draft: &str,
 ) -> Result<(), Box<dyn Error>> {
     browser.goto(&stack.url("/mappings/new")).await?;
-    hydrated(browser).await?;
+    loaded(browser).await?;
     browser
         .element(By::Id("editor-path"))
         .await?
@@ -154,7 +154,7 @@ pub(crate) async fn save(browser: &Browser, reason: &str) -> Result<(), Box<dyn 
 /// Reloads the set from the Mapping set's More menu and its confirmation.
 pub(crate) async fn reload(browser: &Browser, stack: &Stack) -> Result<(), Box<dyn Error>> {
     browser.goto(&stack.url("/mappings")).await?;
-    hydrated(browser).await?;
+    loaded(browser).await?;
     browser
         .element(By::XPath("//summary[contains(@aria-controls, 'set-more')]"))
         .await?

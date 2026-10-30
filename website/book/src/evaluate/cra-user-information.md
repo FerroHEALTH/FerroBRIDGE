@@ -16,7 +16,7 @@ B.V. publishes it on the
 [GitHub release page](https://github.com/FerroHEALTH/FerroBRIDGE/releases):
 the `ferrobridge` binary for four Linux targets, the
 `ghcr.io/ferrohealth/ferrobridge` container image, the operator console's
-`ferrobridge-console` binaries, site bundle and
+`ferrobridge-console` binaries and
 `ghcr.io/ferrohealth/ferrobridge-console` image, the quickstart
 `compose.yaml`, and the library crates on crates.io.
 

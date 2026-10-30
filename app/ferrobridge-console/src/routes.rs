@@ -1,19 +1,51 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's pages as lazy routes, one for each group of the
-//! navigation an operator reads together.
+//! The console's pages by the path that names each, and the dispatch that
+//! draws the one a request names.
 //!
-//! Under `cargo leptos build --split` each group loads its code from chunks
-//! of its own (the Leptos book, "Code Splitting"), so the first page costs
-//! the entry and its group, and every route of a group draws the page its
-//! path names. [`ROUTES`] tells the library which link loads which group
-//! ahead of a visit (`ferrohealth_ui::widget::prefetch`). No specification
-//! governs the grouping: our own design.
+//! A page is one async function of its module, `page(&Visit) -> Drawn`,
+//! which reads the bridge and draws the page once, whole; [`draw`] picks
+//! it by path behind the session's guard, and [`posted`] draws the page a
+//! form posts its answer to. No specification governs the routing: our own
+//! design.
 
-use ferrohealth_ui::widget::prefetch::Route;
-use leptos::prelude::*;
-use leptos_router::{LazyRoute, lazy_route};
+use axum::response::Response;
+
+use crate::app::Drawn;
+use crate::model::SessionState;
+use crate::visit::Visit;
+
+/// Every route the console draws a page for, as a pattern: `:name` stands
+/// for one path segment and `*path` for the rest of the path. A path no
+/// pattern matches draws the not-found page.
+pub const ROUTES: &[&str] = &[
+    "/",
+    "/search",
+    "/mappings",
+    "/mappings/new",
+    "/mappings/:tab",
+    "/mappings/files/*path",
+    "/mappings/templates/:id",
+    "/mappings/edit/*path",
+    "/playground",
+    "/playground/:tab",
+    "/facade",
+    "/facade/:tab",
+    "/hl7v2",
+    "/hl7v2/:tab",
+    "/omop",
+    "/omop/:tab",
+    "/connections",
+    "/connections/:name",
+    "/connections/:name/:tab",
+    "/configuration",
+    "/configuration/:tab",
+    "/preferences",
+    "/preferences/:section",
+    "/about",
+    "/signed-out",
+];
 
 /// A console page, as its path names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +82,8 @@ pub enum Page {
     Preferences,
     /// `/about`.
     About,
+    /// `/signed-out`.
+    SignedOut,
 }
 
 impl Page {
@@ -74,134 +108,67 @@ impl Page {
             ["configuration"] | ["configuration", _] => Self::Configuration,
             ["preferences"] | ["preferences", _] => Self::Preferences,
             ["about"] => Self::About,
+            ["signed-out"] => Self::SignedOut,
             _ => return None,
         })
     }
 }
 
-/// Declares the lazy route `$name` of a group of pages, drawing each page
-/// `$page` by its function `$draw` behind the session's guard.
-///
-/// Each group matches its own pages alone, so its chunks hold their code
-/// and no other group's, and draws its page again when the address changes.
-macro_rules! group {
-    ($(#[$doc:meta])* $name:ident { $($(#[$arm:meta])* $page:ident => $draw:path),+ $(,)? }) => {
-        $(#[$doc])*
-        #[derive(Debug, Clone, Copy)]
-        pub struct $name;
-
-        #[lazy_route]
-        impl LazyRoute for $name {
-            fn data() -> Self {
-                Self
-            }
-
-            fn view(_this: Self) -> AnyView {
-                let location = leptos_router::hooks::use_location();
-                // NOTE: leptos_router, `Route`: a navigation that stays on a route keeps
-                // its view, so the group draws the page its address names as it changes.
-                (move || {
-                    location.search.track();
-                    match Page::of(&location.pathname.get()) {
-                        $($(#[$arm])* Some(Page::$page) => crate::app::guarded($draw),)+
-                        _ => ().into_any(),
-                    }
-                })
-                .into_any()
-            }
+/// The page `visit` names for its session: the page for a signed-in
+/// operator, the sign-in for a visitor, and the fault page when the console
+/// cannot read its session store.
+pub async fn draw(visit: &Visit) -> Drawn {
+    use crate::pages;
+    let page = Page::of(&visit.path);
+    if page == Some(Page::SignedOut) {
+        return pages::sign_in::signed_out_page(visit);
+    }
+    match visit.session {
+        SessionState::SignedIn => {}
+        SessionState::SignedOut => {
+            let drawn = pages::sign_in::sign_in_page(visit, None);
+            return match page {
+                Some(_) => drawn,
+                None => drawn.with_status(http::StatusCode::NOT_FOUND),
+            };
         }
+        SessionState::Unreadable => return pages::errors::unreadable(visit),
+    }
+    let Some(page) = page else {
+        return pages::errors::not_found(visit);
     };
+    match page {
+        Page::Dashboard => pages::dashboard::page(visit).await,
+        Page::Search => pages::search::page(visit).await,
+        Page::Mappings => pages::mappings::page(visit, None).await,
+        Page::File => pages::file::page(visit).await,
+        Page::Template => pages::template::page(visit).await,
+        Page::NewFile | Page::Editor => pages::editor::page(visit, None).await,
+        Page::Playground => pages::playground::page(visit, None).await,
+        Page::Facade => pages::facade::page(visit).await,
+        Page::Hl7v2 => pages::hl7v2::page(visit).await,
+        Page::Omop => pages::omop::page(visit).await,
+        Page::Connections => pages::connections::page(visit).await,
+        Page::Connection => pages::connections::connection_page(visit).await,
+        Page::Configuration => pages::configuration::page(visit).await,
+        Page::Preferences => pages::preferences::page(visit),
+        Page::About => pages::about::page(visit).await,
+        Page::SignedOut => pages::sign_in::signed_out_page(visit),
+    }
 }
 
-group!(
-    /// The dashboard and the search page.
-    LOverview {
-        Dashboard => crate::pages::dashboard::page,
-        Search => crate::pages::search::page,
+/// The answer to the form body `body` posted to the page `visit` names: the
+/// page drawn again with the bridge's answer, or a redirect; `None` for a
+/// page that takes no post. The caller has checked the session.
+pub async fn posted(visit: &Visit, body: &str) -> Option<Response> {
+    use crate::pages;
+    match Page::of(&visit.path)? {
+        Page::Mappings => Some(pages::mappings::reload(visit).await),
+        Page::NewFile | Page::Editor => Some(pages::editor::posted(visit, body).await),
+        Page::Playground => Some(pages::playground::posted(visit, body).await),
+        _ => None,
     }
-);
-
-group!(
-    /// The mapping set, a file and a template.
-    LMappings {
-        Mappings => crate::pages::mappings::page,
-        File => crate::pages::file::page,
-        Template => crate::pages::template::page,
-    }
-);
-
-group!(
-    /// The two workbenches, the editor and the playground, which draw the
-    /// code editor.
-    LWorkbench {
-        NewFile => crate::pages::editor::new_page,
-        Editor => crate::pages::editor::page,
-        Playground => crate::pages::playground::page,
-    }
-);
-
-group!(
-    /// The bridge's faces and its connections.
-    LBridge {
-        Facade => crate::pages::facade::page,
-        Hl7v2 => crate::pages::hl7v2::page,
-        Omop => crate::pages::omop::page,
-        Connections => crate::pages::connections::page,
-        Connection => crate::pages::connections::connection_page,
-    }
-);
-
-group!(
-    /// The bridge's configuration, Your preferences and About.
-    LConsole {
-        Configuration => crate::pages::configuration::page,
-        Preferences => crate::pages::preferences::page,
-        About => crate::pages::about::page,
-    }
-);
-
-/// The route at `path`, loaded by the group `$group`.
-macro_rules! route {
-    ($path:literal, $group:ident, $idle:literal) => {
-        Route {
-            path: $path,
-            preload: || Box::pin($group::preload()),
-            idle: $idle,
-        }
-    };
 }
-
-/// Every route by its path and the group that draws it.
-///
-/// The groups of the main navigation load once the first page is idle,
-/// each once, through the first of its routes; every other route loads on
-/// a hover or a focus.
-pub static ROUTES: &[Route] = &[
-    route!("/", LOverview, true),
-    route!("/search", LOverview, false),
-    route!("/mappings", LMappings, true),
-    route!("/mappings/:tab", LMappings, false),
-    route!("/mappings/files/*path", LMappings, false),
-    route!("/mappings/templates/:id", LMappings, false),
-    route!("/mappings/new", LWorkbench, false),
-    route!("/mappings/edit/*path", LWorkbench, false),
-    route!("/playground", LWorkbench, true),
-    route!("/playground/:tab", LWorkbench, false),
-    route!("/facade", LBridge, true),
-    route!("/facade/:tab", LBridge, false),
-    route!("/hl7v2", LBridge, false),
-    route!("/hl7v2/:tab", LBridge, false),
-    route!("/omop", LBridge, false),
-    route!("/omop/:tab", LBridge, false),
-    route!("/connections", LBridge, false),
-    route!("/connections/:name", LBridge, false),
-    route!("/connections/:name/:tab", LBridge, false),
-    route!("/configuration", LConsole, true),
-    route!("/configuration/:tab", LConsole, false),
-    route!("/preferences", LConsole, false),
-    route!("/preferences/:section", LConsole, false),
-    route!("/about", LConsole, false),
-];
 
 #[cfg(test)]
 mod tests {
@@ -211,17 +178,39 @@ mod tests {
     fn every_route_names_a_page() {
         for route in ROUTES {
             let path = route
-                .path
                 .replace(":tab", "a")
                 .replace(":section", "b")
                 .replace(":name", "c")
                 .replace(":id", "d")
                 .replace("*path", "e/f.yml");
-            assert!(Page::of(&path).is_some(), "{}", route.path);
+            assert!(Page::of(&path).is_some(), "{route}");
         }
-        assert_eq!(Some(Page::NewFile), Page::of("/mappings/new"));
-        assert_eq!(Some(Page::Mappings), Page::of("/mappings/files"));
-        assert_eq!(Some(Page::File), Page::of("/mappings/files/a/b.yml"));
+    }
+
+    #[test]
+    fn every_path_names_its_page() {
+        for (path, page) in [
+            ("/", Page::Dashboard),
+            ("/search", Page::Search),
+            ("/mappings", Page::Mappings),
+            ("/mappings/files", Page::Mappings),
+            ("/mappings/files/e/f.yml", Page::File),
+            ("/mappings/templates/d", Page::Template),
+            ("/mappings/new", Page::NewFile),
+            ("/mappings/edit/e/f.yml", Page::Editor),
+            ("/playground/a", Page::Playground),
+            ("/facade/a", Page::Facade),
+            ("/hl7v2/a", Page::Hl7v2),
+            ("/omop/a", Page::Omop),
+            ("/connections", Page::Connections),
+            ("/connections/c/a", Page::Connection),
+            ("/configuration/a", Page::Configuration),
+            ("/preferences/b", Page::Preferences),
+            ("/about", Page::About),
+            ("/signed-out", Page::SignedOut),
+        ] {
+            assert_eq!(Some(page), Page::of(path), "{path}");
+        }
         assert_eq!(None, Page::of("/no/such/page"));
     }
 }

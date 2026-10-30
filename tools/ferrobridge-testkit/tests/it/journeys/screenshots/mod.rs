@@ -37,7 +37,7 @@ use crate::journeys::browser::{Browser, with_browser};
 use crate::journeys::editor::{
     MISSING_TEMPLATE, TEMPLATE, context, context_path, draft, press, reload, save,
 };
-use crate::journeys::playground::{bundle, hydrated, to_fhir, to_openehr};
+use crate::journeys::playground::{bundle, loaded, to_fhir, to_openehr};
 use crate::journeys::screenshots::catalogue::EDIT_CHECKED;
 use crate::journeys::screenshots::catalogue::EDIT_CONFIRM;
 use crate::journeys::screenshots::catalogue::EDIT_REFUSED;
@@ -108,15 +108,15 @@ const TALLEST: u32 = 8000;
 struct Shot {
     /// The image's name, without the theme suffix and the extension.
     image: &'static str,
-    /// The route of the console's router the page answers, as `path!` names
-    /// it, or `*` for the fallback.
+    /// The route the page answers, as `ferrobridge_console::routes::ROUTES`
+    /// names it, or `*` for a path the console does not serve.
     route: &'static str,
     /// The path the browser loads.
     url: &'static str,
     /// The `XPath` of an element the page shows once it has loaded.
     ready: &'static str,
-    /// Whether the page is drawn in the shell, whose hydration the capture
-    /// waits for.
+    /// Whether the page is drawn in the shell, whose script modules the
+    /// capture waits for.
     shell: bool,
 }
 
@@ -404,7 +404,7 @@ async fn capture(
         .element(By::Css(format!(r#"html[data-theme="{}"]"#, theme.word())))
         .await?;
     if shot.shell {
-        hydrated(browser).await?;
+        loaded(browser).await?;
     }
     rest_pointer(browser).await?;
     let height = content_height(browser).await?;
@@ -462,11 +462,11 @@ async fn answers(
     (theme, width): (Theme, Width),
 ) -> Result<(), Box<dyn Error>> {
     browser.goto(&stack.url("/playground/toopenehr")).await?;
-    hydrated(browser).await?;
+    loaded(browser).await?;
     to_openehr(browser, &bundle()?).await?;
     capture(browser, &PLAYGROUND_ANSWERED, theme, width).await?;
     browser.goto(&stack.url("/playground")).await?;
-    hydrated(browser).await?;
+    loaded(browser).await?;
     to_fhir(browser, "{}").await?;
     capture(browser, &PLAYGROUND_REFUSED, theme, width).await?;
 
@@ -552,29 +552,17 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
     Ok(())
 }
 
-/// The routes the console's router declares, read from its source.
+/// The routes the console draws a page for, and `*`, the page for a path
+/// it does not serve.
 fn routes() -> Result<BTreeSet<String>, Box<dyn Error>> {
-    // NOTE: no specification governs this: our own design; the testkit's
-    // dev-dependency on the console already reaches it, so the path is joined
-    // from parts and scripts/checks/affected.sh reads no second edge from it.
-    let source = std::fs::read_to_string(
-        root()
-            .join("app")
-            .join("ferrobridge-console")
-            .join("src")
-            .join("app.rs"),
-    )?;
-    let mut routes: BTreeSet<String> = source
-        .split("path!(\"")
-        .skip(1)
-        .filter_map(|rest| rest.split_once('"').map(|(route, _)| route.to_owned()))
+    let mut routes: BTreeSet<String> = ferrobridge_console::routes::ROUTES
+        .iter()
+        .map(|route| (*route).to_owned())
         .collect();
     if routes.is_empty() {
-        return Err("the console's router declares no path!(…) route".into());
+        return Err("the console declares no route".into());
     }
-    if source.contains("fallback=") {
-        routes.insert(String::from("*"));
-    }
+    routes.insert(String::from("*"));
     Ok(routes)
 }
 

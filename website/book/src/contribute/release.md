@@ -72,7 +72,7 @@ plan ── github-release (draft) ─┬─ build-binaries ── build-image �
   `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`.
 - **build-console** calls the reusable `release-console.yml` once the draft
   exists. It builds the operator console's two musl binaries with
-  `cargo auditable` and its site bundle, attaches each with its checksum and
+  `cargo auditable`, attaches each with its checksum and
   provenance (the binaries with an SBOM too), verifies them against its own
   signer identity, and pushes `ghcr.io/ferrohealth/ferrobridge-console` for
   `linux/amd64` and `linux/arm64` with the bridge image's attestations.

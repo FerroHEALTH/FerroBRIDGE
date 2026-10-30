@@ -14,20 +14,17 @@ use serde_json::json;
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use crate::stub::{answer, answer_post, bridge, info, signed_in, statement};
+use crate::stub::{answer, bridge, info, signed_in, statement};
 use crate::support::{Captured, get_with, header, send};
 
-/// A plain post of `form` from the playground tab at `page`, as its answer form sends
-/// it to `/api/run` with the page's address, carrying `cookie`.
+/// A plain post of `form` from the playground tab at `page`, as its form
+/// sends it to the tab's own address, carrying `cookie`.
 fn post(
     page: &str,
     form: &str,
     cookie: &str,
 ) -> Result<http::Request<axum::body::Body>, Box<dyn Error>> {
-    let address = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair("address", page)
-        .finish();
-    answer_post("/api/run", page, &format!("{form}&{address}"), cookie)
+    crate::stub::post(page, form, cookie)
 }
 
 /// A marker in every payload, which no log line may carry.
@@ -300,16 +297,10 @@ async fn every_tab_is_a_post_form_carrying_its_own_address() -> Result<(), Box<d
     ] {
         let (_response, body) = send(&service, get_with(route, &cookie)?).await?;
         assert!(
-            body.contains(r#"<form action="/api/run" method="post" class="fui-panel""#),
-            "{route}: {body}"
-        );
-        assert!(
-            body.contains(&format!(r#"name="address" value="{route}""#)),
-            "{route}: {body}"
-        );
-        assert!(
-            body.contains(&format!(r#"name="ferroui_answer" value="{route}""#)),
-            "a plain post draws its answer on {route}: {body}"
+            body.contains(&format!(
+                r#"<form method="post" action="{route}" class="fui-panel""#
+            )),
+            "a post draws its answer on {route}: {body}"
         );
         assert!(body.contains(r#"name="input""#), "{route}");
     }

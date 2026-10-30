@@ -20,7 +20,7 @@ use serde_json::json;
 use thirtyfour::{By, Cookie, WebElement};
 
 use crate::journeys::browser::{Browser, with_browser};
-use crate::journeys::playground::hydrated;
+use crate::journeys::playground::loaded;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::{Lanes, Stack};
 
@@ -130,7 +130,7 @@ async fn every_state(browser: &Browser, stack: &Stack, theme: &str) -> Result<()
     sign_in(browser, stack).await?;
     browser.goto(&stack.url("/mappings/files")).await?;
     browser.element(By::XPath("//table//tbody//tr")).await?;
-    hydrated(browser).await?;
+    loaded(browser).await?;
     let sidebar = browser.element(By::Id("sidebar")).await?;
     let entry = browser
         .element(By::XPath(
@@ -153,14 +153,14 @@ async fn every_state(browser: &Browser, stack: &Stack, theme: &str) -> Result<()
     browser.element(By::Css("#user-menu:popover-open")).await?;
     shot_of_view(browser, "user-menu", theme).await?;
     browser.goto(&stack.url("/playground")).await?;
-    hydrated(browser).await?;
+    loaded(browser).await?;
     let run = browser.element(By::Id("pg-run")).await?;
     focus(browser, &run).await?;
     let form = browser.element(By::XPath("//main//form")).await?;
     shot_of(browser, &form, "focus-run", theme).await?;
     layout(browser, 390, 900, theme).await?;
     browser.goto(&stack.url("/mappings/files")).await?;
-    hydrated(browser).await?;
+    loaded(browser).await?;
     browser
         .element(By::XPath("//button[@commandfor = 'sidebar']"))
         .await?

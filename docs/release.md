@@ -24,7 +24,7 @@ flowchart LR
   draft --> b2["binaries<br/>x86_64 musl"]
   draft --> b3["binaries<br/>aarch64 gnu"]
   draft --> b4["binaries<br/>aarch64 musl"]
-  draft --> console["console<br/>binaries, site bundle, image"]
+  draft --> console["console<br/>binaries, image"]
   b2 --> image["image<br/>linux/amd64, linux/arm64<br/>pushed by digest"]
   b4 --> image
   b1 --> record["vulnerability-record<br/>every finding judged"]
@@ -63,8 +63,7 @@ flowchart LR
   builds `ghcr.io/ferrohealth/ferrobridge` for `linux/amd64` and `linux/arm64`
   from them. It pushes the image by digest with no tag.
 - **build-console** calls `release-console.yml` once the draft exists. It
-  builds the operator console's musl binaries and its site bundle, attaches
-  them to the draft, and builds `ghcr.io/ferrohealth/ferrobridge-console` for
+  builds the operator console's musl binaries, attaches them to the draft, and builds `ghcr.io/ferrohealth/ferrobridge-console` for
   `linux/amd64` and `linux/arm64` from them, pushed by digest with no tag.
 - **vulnerability-record** scans both images on both platforms and the four
   server tarballs with Trivy at every severity, unfixed findings included,
@@ -122,9 +121,9 @@ git. The same two commands reproduce the build on a laptop from a locally
 cross-compiled binary.
 
 `docker/console/Dockerfile`, the operator console's recipe, compiles nothing
-either. It copies `dist/console/${TARGETOS}_${TARGETARCH}/ferrobridge-console`
-and the site bundle at `dist/console/site/`, which `release-console.yml`
-stages from its own attested tarballs. The same `.dockerignore` applies.
+either. It copies `dist/console/${TARGETOS}_${TARGETARCH}/ferrobridge-console`,
+which `release-console.yml` stages from its own attested tarballs; the
+binary serves every page, stylesheet and script module itself. The same `.dockerignore` applies.
 
 ## Why the build jobs are reusable workflows
 
@@ -230,10 +229,7 @@ The console ships as an image on distroless static, so its binary is built
 for the two musl targets alone, `x86_64-unknown-linux-musl` and
 `aarch64-unknown-linux-musl`, each on a runner of its own architecture. The
 `plan` job names them once, and both the console lane's matrix and the asset
-check read that list. The site bundle is the same for every architecture and
-is built once, by `scripts/release/console-site.sh` with the tools
-`scripts/release/console-tools.sh` installs at their pinned digests, so
-cargo-leptos downloads nothing in the attested job. No job restores a cache.
+check read that list. No job restores a cache.
 
 Every name below is prefixed `ferrobridge-console-vX.Y.Z-`:
 
@@ -245,10 +241,6 @@ Every name below is prefixed `ferrobridge-console-vX.Y.Z-`:
 | `<target>.tar.gz.sigstore.json` | the Sigstore bundle of the build provenance |
 | `<target>.tar.gz.sbom.sigstore.json` | the Sigstore bundle of the SBOM attestation |
 | `<target>.tar.gz.intoto.jsonl` | the provenance DSSE envelope |
-| `site.tar.gz` | the site bundle: the WebAssembly, its JavaScript glue and the stylesheet under `site/pkg/` |
-| `site.tar.gz.sha256sum` | corruption detection, and not a signature |
-| `site.tar.gz.sigstore.json` | the Sigstore bundle of the bundle's provenance |
-| `site.tar.gz.intoto.jsonl` | the provenance DSSE envelope |
 
 `finalize-release` checks the whole set beside the bridge's. The image job
 takes the tarballs from this run's artifacts, verifies each against
@@ -308,8 +300,7 @@ before a real cut.
 4. **The console screenshots show the release.** After the version moves,
    take the book's operator console screenshots again on the release
    commit's tree: `scripts/release/journey-tools.sh target/journey-tools`,
-   the release site bundle (`scripts/release/console-site.sh --release`), then
-   `SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" FERROBRIDGE_JOURNEYS=1
+   then `SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" FERROBRIDGE_JOURNEYS=1
    FERROBRIDGE_SCREENSHOTS=1 cargo nextest run -p ferrobridge-testkit -E
    'test(/journeys::(screenshots|states)::/)' --test-threads 1`.
    `SOURCE_DATE_EPOCH` fixes the build instant the About page draws, so a

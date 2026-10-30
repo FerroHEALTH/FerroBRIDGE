@@ -13,7 +13,7 @@ use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use crate::stub::{BROKEN, CONTEXT, MODEL, OMOCL, answer, answer_post, bridge, signed_in};
+use crate::stub::{BROKEN, CONTEXT, MODEL, OMOCL, answer, bridge, post, signed_in};
 use crate::support::{drawn, get_with, send};
 
 #[tokio::test]
@@ -33,7 +33,7 @@ async fn the_contexts_tab_lists_each_context_with_its_owner_state_and_row_menu()
     assert!(body.contains("The running set does not compile"), "{body}");
     assert!(body.contains("Reload the set"), "{body}");
     assert!(
-        body.contains(r#"<form action="/api/reload" method="post" class="fui-action-form""#),
+        body.contains(r#"<form method="post" action="/mappings" class="fui-action-form""#),
         "the reload is a plain form post: {body}"
     );
     Ok(())
@@ -47,7 +47,10 @@ async fn the_diagnostics_tab_groups_the_load_by_file_escaped() -> Result<(), Box
     assert!(body.contains(BROKEN), "{body}");
     assert!(body.contains("missing-key"), "{body}");
     assert!(!body.contains("<script>alert(1)</script>"), "{body}");
-    assert!(body.contains("&lt;script&gt;"), "{body}");
+    assert!(
+        body.contains("&#60;script&#62;alert(1)&#60;/script&#62;"),
+        "{body}"
+    );
     Ok(())
 }
 
@@ -118,11 +121,7 @@ async fn a_reload_posts_and_the_page_draws_whether_it_replaced_the_set()
         .mount(&bridge)
         .await;
     let (service, cookie) = signed_in(&bridge).await?;
-    let (response, body) = send(
-        &service,
-        answer_post("/api/reload", "/mappings", "", &cookie)?,
-    )
-    .await?;
+    let (response, body) = send(&service, post("/mappings", "", &cookie)?).await?;
     assert_eq!(StatusCode::OK, response.status(), "{body}");
     assert!(
         body.contains("Reloaded: the set compiled and replaced the running one"),
@@ -147,11 +146,7 @@ async fn a_refused_reload_draws_its_diagnostics_and_the_set_stands() -> Result<(
         .mount(&bridge)
         .await;
     let (service, cookie) = signed_in(&bridge).await?;
-    let (_response, body) = send(
-        &service,
-        answer_post("/api/reload", "/mappings", "", &cookie)?,
-    )
-    .await?;
+    let (_response, body) = send(&service, post("/mappings", "", &cookie)?).await?;
     assert!(body.contains("Not reloaded"), "{body}");
     assert!(body.contains("unknown-archetype"), "{body}");
     assert!(body.contains("Diagnostics of the reload"), "{body}");

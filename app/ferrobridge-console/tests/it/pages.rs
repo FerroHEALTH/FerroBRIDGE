@@ -4,7 +4,7 @@
 //! Every page of the console in each state of the request's session: the
 //! sign-in for a visitor, and for a signed-in operator the page drawn whole
 //! on the server in the shell, its title in the document, never a token,
-//! and the islands it hydrates.
+//! and the script modules that add behaviour to what the server drew.
 
 use std::error::Error;
 
@@ -84,7 +84,8 @@ async fn every_page_is_drawn_whole_for_a_signed_in_operator() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn the_page_hydrates_whole() -> Result<(), Box<dyn Error>> {
+async fn the_page_is_drawn_whole_and_its_behaviour_loads_as_modules() -> Result<(), Box<dyn Error>>
+{
     let bridge = bridge().await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, body) = send(
@@ -92,11 +93,24 @@ async fn the_page_hydrates_whole() -> Result<(), Box<dyn Error>> {
         get_with(&format!("/mappings/edit/{CONTEXT}"), &cookie)?,
     )
     .await?;
-    assert!(body.contains("mod.hydrate()"), "{body}");
+    assert!(
+        body.contains(r#"<script type="module" src="/ferrohealth-ui/"#),
+        "the one loader of the library's modules: {body}"
+    );
+    assert_eq!(
+        1,
+        body.matches("<script").count(),
+        "no other script: {body}"
+    );
+    assert!(!body.contains("hydrate"), "nothing hydrates: {body}");
     assert!(!body.contains("<leptos-island"), "no island: {body}");
     assert!(
         drawn(&body).contains(r#"name="draft""#),
         "the editor is drawn in the page: {body}"
+    );
+    assert!(
+        drawn(&body).contains(r#"data-fui="editor""#),
+        "the editor's module is named on what the server drew: {body}"
     );
     Ok(())
 }

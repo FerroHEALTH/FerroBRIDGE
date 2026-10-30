@@ -12,7 +12,7 @@ use thirtyfour::By;
 
 use crate::journeys::browser::{until, with_browser};
 use crate::journeys::journeys_enabled;
-use crate::journeys::playground::hydrated;
+use crate::journeys::playground::loaded;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::Stack;
 
@@ -32,7 +32,7 @@ async fn the_configuration_opens_how_it_works_and_each_tab_reads_its_keys()
         browser
             .element(By::XPath("//*[contains(., 'telemetry.format')]"))
             .await?;
-        hydrated(browser).await?;
+        loaded(browser).await?;
         browser
             .element(By::XPath("//button[@commandfor = 'how-configuration']"))
             .await?

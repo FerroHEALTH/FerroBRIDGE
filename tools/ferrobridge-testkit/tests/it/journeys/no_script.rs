@@ -1,15 +1,15 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console with its WebAssembly withheld: every page the navigation
+//! The console with its script modules refused: every page the navigation
 //! leads to still draws its content, and a plain post of the playground and
 //! of the editor draws its page with the answer and the posted fields
 //! (FerroUI `docs/consoles.md`, An action that answers on its page).
 //!
-//! The browser is refused the bundle's WebAssembly, its glue and its
-//! chunks, so nothing hydrates, as on a page whose WebAssembly has not
-//! loaded or will not; the stylesheets under `/pkg/` still load. A refused
-//! bundle file is the one browser error a page may log here.
+//! The browser is refused every script module of FerroUI
+//! (`/ferrohealth-ui/<version>/scripts/`), the loader among them, as on a
+//! page whose modules have not loaded or will not; the stylesheets still
+//! load. A refused module is the one browser error a page may log here.
 
 use std::error::Error;
 
@@ -24,15 +24,11 @@ use crate::journeys::playground::bundle;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::Stack;
 
-/// The slug of the context the editor checks with the WebAssembly withheld.
-const NO_WASM: &str = "nowasm";
+/// The slug of the context the editor checks with the modules withheld.
+const NO_SCRIPT: &str = "noscript";
 
-/// The bundle files the browser is refused.
-const WITHHELD: [&str; 3] = [
-    "*/pkg/ferrobridge-console*",
-    "*/pkg/__wasm_split*",
-    "*/pkg/*.wasm",
-];
+/// The address pattern of FerroUI's script modules.
+const WITHHELD: &str = "*/ferrohealth-ui/*/scripts/*";
 
 /// Every navigation entry: its words, the page it leads to, and the words
 /// that page draws in its main region.
@@ -47,29 +43,28 @@ const ENTRIES: [(&str, &str, &str); 8] = [
     ("About", "/about", "About"),
 ];
 
-/// Refuses the browser the bundle's files.
-async fn withhold_the_webassembly(browser: &Browser) -> Result<(), Box<dyn Error>> {
+/// Refuses the browser every script module.
+async fn withhold_the_modules(browser: &Browser) -> Result<(), Box<dyn Error>> {
     let cdp = browser.driver().cdp();
     cdp.send_raw("Network.enable", json!({})).await?;
-    cdp.send_raw("Network.setBlockedURLs", json!({ "urls": WITHHELD }))
+    cdp.send_raw("Network.setBlockedURLs", json!({ "urls": [WITHHELD] }))
         .await?;
     Ok(())
 }
 
-/// Fails on any browser error other than a refused bundle file, naming
-/// `step`.
-async fn only_the_bundle_refused(browser: &Browser, step: &str) -> Result<(), Box<dyn Error>> {
+/// Fails on any browser error other than a refused module, naming `step`.
+async fn only_the_modules_refused(browser: &Browser, step: &str) -> Result<(), Box<dyn Error>> {
     let others: Vec<String> = browser
         .console_errors()
         .await?
         .into_iter()
-        .filter(|entry| !entry.contains("/pkg/"))
+        .filter(|entry| !entry.contains("/scripts/"))
         .collect();
     if others.is_empty() {
         Ok(())
     } else {
         Err(format!(
-            "the browser logged {} error(s) other than the withheld bundle during {step}:\n{}",
+            "the browser logged {} error(s) other than the withheld modules during {step}:\n{}",
             others.len(),
             others.join("\n")
         )
@@ -77,27 +72,25 @@ async fn only_the_bundle_refused(browser: &Browser, step: &str) -> Result<(), Bo
     }
 }
 
-/// Fails if the page hydrated: the user menu's button says whether its
-/// menu is open only once it has.
-async fn not_hydrated(browser: &Browser, step: &str) -> Result<(), Box<dyn Error>> {
+/// Fails if a module ran: FerroUI's loader marks the root element as it
+/// starts.
+async fn no_module_ran(browser: &Browser, step: &str) -> Result<(), Box<dyn Error>> {
     browser
         .element(By::XPath("//button[@aria-controls = 'user-menu-menu']"))
         .await?;
-    let hydrated = browser
+    let ran = browser
         .driver()
-        .find_all(By::XPath(
-            "//button[@aria-controls = 'user-menu-menu' and @aria-expanded]",
-        ))
+        .find_all(By::Css(format!("html[{}]", ferrohealth_ui::script::MARK)))
         .await?;
-    if hydrated.is_empty() {
+    if ran.is_empty() {
         Ok(())
     } else {
-        Err(format!("{step} hydrated with its WebAssembly withheld").into())
+        Err(format!("{step} ran a module with the modules withheld").into())
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn every_page_and_a_post_work_with_the_webassembly_withheld() -> Result<(), Box<dyn Error>> {
+async fn every_page_and_a_post_work_with_the_modules_withheld() -> Result<(), Box<dyn Error>> {
     if !journeys_enabled() {
         return Ok(());
     }
@@ -105,9 +98,9 @@ async fn every_page_and_a_post_work_with_the_webassembly_withheld() -> Result<()
     let bundle = bundle()?;
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
-        withhold_the_webassembly(browser).await?;
+        withhold_the_modules(browser).await?;
         browser.goto(&stack.url("/")).await?;
-        not_hydrated(browser, "the dashboard").await?;
+        no_module_ran(browser, "the dashboard").await?;
         for (words, path, heading) in ENTRIES {
             browser
                 .element(By::XPath(format!(
@@ -119,12 +112,12 @@ async fn every_page_and_a_post_work_with_the_webassembly_withheld() -> Result<()
             browser.at(&stack.url(path)).await?;
             browser.titled(&format!("{heading} · {PRODUCT}")).await?;
             browser.text("main", heading).await?;
-            not_hydrated(browser, words).await?;
-            only_the_bundle_refused(browser, words).await?;
+            no_module_ran(browser, words).await?;
+            only_the_modules_refused(browser, words).await?;
         }
 
         browser.goto(&stack.url("/playground/toopenehr")).await?;
-        not_hydrated(browser, "the playground").await?;
+        no_module_ran(browser, "the playground").await?;
         browser
             .element(By::Id("input"))
             .await?
@@ -132,21 +125,21 @@ async fn every_page_and_a_post_work_with_the_webassembly_withheld() -> Result<()
             .await?;
         browser.element(By::Id("pg-run")).await?.click().await?;
         browser.text("main", "Answered").await?;
-        browser.at(&stack.url("/api/run")).await?;
+        browser.at(&stack.url("/playground/toopenehr")).await?;
         assert_eq!(
             bundle.trim(),
             posted(browser, "input").await?.trim(),
             "the playground's answer keeps the posted input"
         );
-        not_hydrated(browser, "the playground's answer").await?;
+        no_module_ran(browser, "the playground's answer").await?;
 
-        let draft = context(NO_WASM, MISSING_TEMPLATE);
+        let draft = context(NO_SCRIPT, MISSING_TEMPLATE);
         browser.goto(&stack.url("/mappings/new")).await?;
-        not_hydrated(browser, "the editor").await?;
+        no_module_ran(browser, "the editor").await?;
         browser
             .element(By::Id("editor-path"))
             .await?
-            .send_keys(&context_path(NO_WASM))
+            .send_keys(&context_path(NO_SCRIPT))
             .await?;
         browser
             .element(By::Id("draft"))
@@ -157,14 +150,14 @@ async fn every_page_and_a_post_work_with_the_webassembly_withheld() -> Result<()
         browser
             .text("main", "The set does not compile with this draft")
             .await?;
-        browser.at(&stack.url("/api/edit")).await?;
+        browser.at(&stack.url("/mappings/new")).await?;
         assert_eq!(
             draft.trim(),
             posted(browser, "draft").await?.trim(),
             "the editor's answer keeps the posted draft"
         );
-        not_hydrated(browser, "the editor's answer").await?;
-        only_the_bundle_refused(browser, "a post").await
+        no_module_ran(browser, "the editor's answer").await?;
+        only_the_modules_refused(browser, "a post").await
     })
     .await
 }

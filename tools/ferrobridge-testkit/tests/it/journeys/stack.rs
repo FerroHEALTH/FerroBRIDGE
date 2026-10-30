@@ -4,8 +4,7 @@
 //! The stack a journey runs against, each part on loopback: a `wiremock`
 //! CDR, the test OpenID Provider, a running bridge over a synthetic mapping
 //! tree with its FHIR facade, operations lane and operator API, and a
-//! running console that serves its release site bundle and calls that
-//! bridge.
+//! running console that draws every page and calls that bridge.
 //!
 //! The bridge runs `ferrobridge serve`'s own run path,
 //! `ferrobridge_server::boot::serve_settings`. Its mapping tree holds one
@@ -22,10 +21,6 @@ use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-
-/// The environment variable naming the site bundle's directory, when it is
-/// not the workspace's `target/site`.
-const SITE_ENV: &str = "FERROBRIDGE_JOURNEYS_SITE";
 
 /// The console's client id at the provider.
 const CLIENT_ID: &str = "ferrobridge-console";
@@ -156,7 +151,6 @@ impl Stack {
     /// Starts the stack with the bridge running `lanes` on the loopback port
     /// `port`, `0` for one the system chooses.
     async fn start_on(lanes: Lanes, port: u16) -> Result<Self, Box<dyn Error>> {
-        let site = site_root()?;
         // NOTE: no specification governs this: our own design; a capture's CDR and
         // provider sit beside its bridge's port, since the pages draw their addresses.
         let cdr = cdr(neighbour(port, 10)?).await?;
@@ -173,13 +167,12 @@ impl Stack {
         let access_token = provider.access_token(&format!("{bridge}/fhir"), SCOPE)?;
         provider.approve(CLIENT_ID, &access_token).await;
         let text = format!(
-            "[server]\nsite_root = {site}\n\n[bridge]\nbase_url = \"{bridge}/\"\n\n\
+            "[bridge]\nbase_url = \"{bridge}/\"\n\n\
              [session]\nsecure_cookie = false\n\n\
              [oidc]\nissuer = \"{issuer}\"\nauthorization_endpoint = \"{authorization}\"\n\
              token_endpoint = \"{token}\"\njwks_uri = \"{jwks}\"\nclient_id = \"{CLIENT_ID}\"\n\
              redirect_uri = \"{console}/auth/callback\"\n\
              end_session_endpoint = \"{end_session}\"\npost_logout_redirect_uri = \"{console}/\"\n",
-            site = toml::Value::String(site.display().to_string()),
             issuer = provider.issuer(),
             authorization = provider.authorization_endpoint(),
             token = provider.token_endpoint(),
@@ -249,24 +242,6 @@ impl Stack {
     pub(crate) fn console_files(&self) -> PathBuf {
         self.tree.path().join("console")
     }
-}
-
-/// The site bundle's directory: [`SITE_ENV`], or the workspace's
-/// `target/site`, which must hold the WebAssembly cargo-leptos wrote.
-fn site_root() -> Result<PathBuf, Box<dyn Error>> {
-    let site = std::env::var_os(SITE_ENV).map_or_else(
-        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/site"),
-        PathBuf::from,
-    );
-    let bundle = site.join("pkg/ferrobridge-console.wasm");
-    if !bundle.is_file() {
-        return Err(format!(
-            "{} holds no site bundle: build it with scripts/release/console-site.sh --release, or name its directory in {SITE_ENV}",
-            site.display()
-        )
-        .into());
-    }
-    Ok(site)
 }
 
 /// The port `offset` above `port` for a capture, `0` when `port` is `0`.
