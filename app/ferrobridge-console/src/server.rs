@@ -9,7 +9,7 @@
 //! `ferrohealth-server`'s `console` (`nosniff`, `DENY` framing, no referrer,
 //! a same-origin opener, `no-store` on every document) under the console's
 //! own Content-Security-Policy, whose scripts and styles come from the
-//! console alone ([`POLICY`]). FerroUI's assets keep the year-long cache
+//! console alone ([`policy`]). FerroUI's assets keep the year-long cache
 //! their router sets, under a path that names the library's version. A
 //! request that is not a safe method is taken only
 //! from the console's own pages (`ferrohealth_server::same_origin`), and a
