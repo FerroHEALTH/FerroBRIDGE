@@ -135,24 +135,9 @@ fn settings_panel(l: &Locale, configuration: Option<&Loaded<Configuration>>) -> 
     }
 }
 
-/// The page over what the bridge answered.
-fn drawn(l: &Locale, tab: &str, answers: &Answers<'_>) -> Html {
-    let Answers {
-        info,
-        readiness,
-        capability,
-        running,
-        smart,
-        configuration,
-        base,
-    } = *answers;
-    let info = match info {
-        Ok(Outcome::Shown(info)) => info,
-        Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
-        Err(fault) => return faulted(l, fault, &tab_href(tab)),
-    };
-    let on = lane_on(info, "facade");
-    let header = Header {
+/// The page's header, for a facade that is `on` or off.
+fn header(l: &Locale, on: bool) -> Header {
+    Header {
         title: tr(l, Msg::FhirFacade).into(),
         subtitle: Some(
             tr(
@@ -173,7 +158,27 @@ fn drawn(l: &Locale, tab: &str, answers: &Answers<'_>) -> Html {
         } else {
             badge(Tone::Neutral, tr(l, Msg::StateOff))
         }),
+    }
+}
+
+/// The page over what the bridge answered.
+fn drawn(l: &Locale, tab: &str, answers: &Answers<'_>) -> Html {
+    let Answers {
+        info,
+        readiness,
+        capability,
+        running,
+        smart,
+        configuration,
+        base,
+    } = *answers;
+    let info = match info {
+        Ok(Outcome::Shown(info)) => info,
+        Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
+        Err(fault) => return faulted(l, fault, &tab_href(tab)),
     };
+    let on = lane_on(info, "facade");
+    let header = header(l, on);
     if !on {
         let body = if tab == "settings" {
             settings_panel(l, configuration)

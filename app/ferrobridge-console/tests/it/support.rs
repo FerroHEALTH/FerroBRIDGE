@@ -22,8 +22,7 @@ use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
 
 /// The settings a console with its bridge at `bridge` runs on.
 pub(crate) fn settings(bridge: &str) -> Settings {
-    let text =
-        format!("[server]\nlisten = \"127.0.0.1:0\"\n\n[bridge]\nbase_url = \"{bridge}\"\n",);
+    let text = format!("[server]\nlisten = \"127.0.0.1:0\"\n\n[bridge]\nbase_url = \"{bridge}\"\n");
     Config::from_sources(Some(&text), &BTreeMap::new())
         .expect("the configuration reads")
         .resolve()

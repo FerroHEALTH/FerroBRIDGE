@@ -42,7 +42,7 @@ const RUN: &str = "pg-run";
 /// starts handing each marked element to its module.
 pub(crate) async fn loaded(browser: &Browser) -> Result<(), Box<dyn Error>> {
     browser
-        .element(By::Css(&format!("html[{}]", ferrohealth_ui::script::MARK)))
+        .element(By::Css(format!("html[{}]", ferrohealth_ui::script::MARK)))
         .await?;
     Ok(())
 }

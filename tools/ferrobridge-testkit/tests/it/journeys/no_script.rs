@@ -80,7 +80,7 @@ async fn no_module_ran(browser: &Browser, step: &str) -> Result<(), Box<dyn Erro
         .await?;
     let ran = browser
         .driver()
-        .find_all(By::Css(&format!("html[{}]", ferrohealth_ui::script::MARK)))
+        .find_all(By::Css(format!("html[{}]", ferrohealth_ui::script::MARK)))
         .await?;
     if ran.is_empty() {
         Ok(())
