@@ -1318,7 +1318,7 @@ answer beside the posted fields. Every page and every post checks the
 operator's session first. FerroUI's small script modules, served by the
 console from the binary, add behaviour on top of what the server drew, and
 every page works without them. It is a backend-for-frontend, shipped as
-`ghcr.io/ferrohealth/ferrobridge-console`, drawn with FerroUI 0.6.0. The
+`ghcr.io/ferrohealth/ferrobridge-console`, drawn with FerroUI 0.6.2. The
 operator's OpenID Connect session (authorization code with PKCE) lives on
 the console's server, which calls the bridge with the operator's own access
 token. The bridge validates that token as the resource server it already is

@@ -7,15 +7,15 @@
 //!
 //! Every response carries the browser security headers of
 //! `ferrohealth-server`'s `console` (`nosniff`, `DENY` framing, no referrer,
-//! a same-origin opener, `no-store` on every document) under the console's
-//! own Content-Security-Policy, whose scripts and styles come from the
-//! console alone ([`policy`]). FerroUI's assets keep the year-long cache
-//! their router sets, under a path that names the library's version. A
-//! request that is not a safe method is taken only
-//! from the console's own pages (`ferrohealth_server::same_origin`), and a
-//! session's access token is refreshed before the request it arrives with is
-//! served. The health routes are the family's. No specification governs the
-//! console's HTTP surface: our own design.
+//! a same-origin opener, `no-store` on every document) under the policy of
+//! a server-rendered console (`ConsoleHeaders::server_rendered`), whose
+//! scripts and styles come from the console alone with no nonce. FerroUI's
+//! assets keep the year-long cache their router sets, under a path that
+//! names the library's version. A request that is not a safe method is taken
+//! only from the console's own pages (`ferrohealth_server::same_origin`),
+//! and a session's access token is refreshed before the request it arrives
+//! with is served. The health routes are the family's. No specification
+//! governs the console's HTTP surface: our own design.
 
 use std::sync::Arc;
 
@@ -31,7 +31,7 @@ use ferrohealth_server::health::Health;
 use ferrohealth_server::same_origin::{self, SameOrigin};
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::Drained;
-use http::header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE};
+use http::header::CONTENT_TYPE;
 use http::{HeaderValue, Method, StatusCode};
 
 use crate::bridge::{Bridge, BridgeError};
@@ -187,7 +187,6 @@ pub fn router(state: ConsoleState) -> axum::Router {
     let form_action = form_action(state.settings());
     let health = ferrohealth_server::health::routes(state.health().clone());
     let same_origin = same_origin_check(state.settings());
-    let policy = policy(&form_action);
     let pages = axum::Router::new()
         .merge(health)
         .nest(
@@ -221,48 +220,10 @@ pub fn router(state: ConsoleState) -> axum::Router {
             },
         ))
         .layer(Extension(state));
-    let headers = ConsoleHeaders::new(form_action);
-    pages
-        .layer(axum::middleware::from_fn(
-            move |request: Request, next: Next| console::headers(headers.clone(), request, next),
-        ))
-        .layer(axum::middleware::from_fn(
-            move |request: Request, next: Next| {
-                let policy = policy.clone();
-                strict_policy(policy, request, next)
-            },
-        ))
-}
-
-/// The Content-Security-Policy of every response, whose forms post to
-/// `form_action`.
-///
-/// Scripts and styles come from the console alone, with no inline script
-/// or style and no `eval` (Content Security Policy Level 3), the policy
-/// FerroUI's server-rendered pages need (`docs/consoles.md`, step 6).
-#[must_use]
-pub fn policy(form_action: &str) -> HeaderValue {
-    let text = format!(
-        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; \
-         connect-src 'self'; object-src 'none'; base-uri 'self'; form-action {form_action}; \
-         frame-ancestors 'none'"
-    );
-    // NOTE: no specification governs this: our own design; a form action that cannot
-    // be a header falls back to the strictest policy, which still blocks scripts.
-    HeaderValue::from_str(&text)
-        .unwrap_or_else(|_invalid| HeaderValue::from_static("default-src 'none'"))
-}
-
-/// Sets the console's own policy `policy` on the answer, in the place of
-/// the family's, which admits the WebAssembly and the nonce a hydrated
-/// console needs.
-async fn strict_policy(policy: HeaderValue, request: Request, next: Next) -> Response {
-    // TODO(#1358): take this policy from ferrohealth-server once FerroSYS#202 ships.
-    let mut response = next.run(request).await;
-    response
-        .headers_mut()
-        .insert(CONTENT_SECURITY_POLICY, policy);
-    response
+    let headers = ConsoleHeaders::server_rendered(form_action);
+    pages.layer(axum::middleware::from_fn(
+        move |request: Request, next: Next| console::headers(headers.clone(), request, next),
+    ))
 }
 
 /// Draws the page the request names: a `GET` reads it, and a `POST` to a

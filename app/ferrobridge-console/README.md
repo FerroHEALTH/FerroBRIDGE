@@ -4,7 +4,7 @@
 # ferrobridge-console
 
 The FerroBRIDGE Console, the operator console: the `ferrobridge-console`
-binary, which draws every page on its server with FerroUI 0.6.0 and sends
+binary, which draws every page on its server with FerroUI 0.6.2 and sends
 it whole, with a backend-for-frontend in front of the bridge. FerroUI's
 small script modules add behaviour on top, and every page works without
 them.

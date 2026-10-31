@@ -10,7 +10,7 @@ use std::error::Error;
 
 use thirtyfour::By;
 
-use crate::journeys::browser::{Browser, with_browser};
+use crate::journeys::browser::{Browser, until, with_browser};
 use crate::journeys::journeys_enabled;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::{Lanes, PROFILE, Stack};
@@ -38,13 +38,34 @@ pub(crate) fn bundle() -> Result<String, Box<dyn Error>> {
 const RUN: &str = "pg-run";
 
 /// Waits for the page's script modules: the root element marked by
-/// FerroUI's loader (`ferrohealth_ui::script::MARK`), which it sets as it
-/// starts handing each marked element to its module.
+/// FerroUI's loader (`ferrohealth_ui::script::MARK`), which it writes before
+/// any module arrives, and then every element that asks for a module
+/// (`ferrohealth_ui::script::HOOK`) marked ready by it
+/// (`ferrohealth_ui::script::READY`), so a journey drives no control before
+/// its module listens.
 pub(crate) async fn loaded(browser: &Browser) -> Result<(), Box<dyn Error>> {
     browser
         .element(By::Css(format!("html[{}]", ferrohealth_ui::script::MARK)))
         .await?;
-    Ok(())
+    let waiting = format!(
+        "[{}]:not([{}])",
+        ferrohealth_ui::script::HOOK,
+        ferrohealth_ui::script::READY
+    );
+    until(
+        "every module of the page has enhanced its element",
+        async || {
+            let left = browser
+                .driver()
+                .execute(
+                    "return document.querySelectorAll(arguments[0]).length;",
+                    vec![serde_json::Value::from(waiting.as_str())],
+                )
+                .await?;
+            Ok(left.json().as_u64() == Some(0))
+        },
+    )
+    .await
 }
 
 /// Writes `text` into the playground's input and presses its run.
