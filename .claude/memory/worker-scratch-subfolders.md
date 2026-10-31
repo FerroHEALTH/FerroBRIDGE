@@ -30,5 +30,4 @@ the next worker.
 - After setting a PR body, the worker re-reads it
   (`gh pr view <n> --json body,closingIssuesReferences`) and confirms the
   `Closes #N` lines name exactly its issues.
-- Related: [[subagent-reports-to-file]], [[pr-licence-box]],
-  [[worker-wait-loops]].
+- Related: [[subagent-reports-to-file]], [[worker-wait-loops]].

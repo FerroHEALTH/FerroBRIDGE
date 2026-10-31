@@ -55,8 +55,8 @@ each failing case names its reason in the result the conformance gate reads.
 
 Your contribution is licensed under the same Business Source License 1.1 that
 covers the project, and it grants the Licensor the relicensing right in
-CONTRIBUTING.md § Licensing of contributions. You keep your copyright; the
-pull request checkbox records your acceptance, and there is no separate
+CONTRIBUTING.md § Licensing of contributions. You keep your copyright;
+opening the pull request is your acceptance, and there is no separate
 agreement to sign.
 
 The rules in full are in

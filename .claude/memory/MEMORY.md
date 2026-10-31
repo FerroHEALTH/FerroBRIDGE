@@ -75,7 +75,6 @@
 - [HL7 v2 test corpora](hl7v2-test-corpora.md) — the vendored v2 message sets, their licences, and that no real traffic is public
 - [File-length rule](file-length-rule.md) — hand-written .rs ≤ 1000 lines, split at 750 into module folders; guard with ratchet allow-list (#351)
 - [Repo moved to FerroHEALTH](repo-moved-to-ferrohealth.md) — 2026-10-01 transfer; ghcr.io/ferrohealth image, org board #3, what keeps the old owner
-- [PR licence box](pr-licence-box.md) — tick the contribution-licence checkbox in every pull request body; owner standing consent 2026-10-08
 - [Native issue types and fields](native-issue-types-and-priority.md): type, priority and effort are the native issue type and the FerroHEALTH Priority and Effort fields, set with scripts/gh/fields.sh; bug, enhancement and P0 to P3 retired; owner 2026-10-08 (#416)
 - [Remove worktrees after merge](remove-worktrees-after-merge.md): remove each worktree, its branches and its target/ as soon as its PR merges, in every FerroHEALTH repository; cargo clean the locked ones; owner 2026-10-15 and 2026-10-19
 - [Worktree target dir](worktree-target-dir.md) — each worktree builds into its own target/; a shared CARGO_TARGET_DIR mixes two checkouts' builds; 2026-10-19
@@ -94,6 +93,3 @@
 - [Reactive console UI](reactive-console-ui.md): superseded by the owner on
   2026-10-29 (FerroUI #510): server-rendered consoles, plain script modules,
   no WebAssembly; a navigation is one document
-- [Contribution licence attestation](contribution-licence-attestation.md): owner
-  2026-10-25, always tick the licence checkbox on PRs opened for the owner,
-  never ask

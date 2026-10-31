@@ -39,7 +39,6 @@ the committed guards, so both are live code from day one and both need a gate.
 | `usage-report-off` | `scripts/checks/usage-report-off.sh --self-test`, then the guard itself: every launcher of the server in a script, a workflow or a Rust test switches the usage report off |
 | `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` and every issue `Command::pending_issue` names is open |
 | `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
-| `contribution-licence` | `scripts/checks/contribution-licence.sh` on a pull request: the licensing checkbox of the body is ticked |
 | `changelog-guard` | `scripts/checks/changelog-guard.sh --self-test`, then the guard on a pull request: a change to `app/`, `crates/`, `docker/`, `compose.yaml` or the root Cargo manifests adds a fragment under `changelog.d/` unless it carries `no-changelog`, and no change writes under `[Unreleased]` |
 | `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, and of `scripts/deploy-probe.sh` against a stub `curl` |
 
@@ -531,9 +530,8 @@ The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
 a commit gets one run. An `edited`, `labeled` or `unlabeled` event would start a
 second run on the same commit, the concurrency group would cancel the first,
 and that run's `conclusion` would report a failure on the head commit. The
-guards read the `no-crate-bump` label and the description from the API when
-they run, and `pr-guards.yml` listens for `labeled`, `unlabeled` and `edited`,
-waits for the CI run on the head commit to complete, and re-runs the guard the
+guards read the `no-changelog` and `no-crate-bump` labels from the API when
+they run, and `pr-guards.yml` listens for `labeled` and `unlabeled`, waits for the CI run on the head commit to complete, and re-runs the guard the
 change affects, which re-runs `conclusion` with it
 (<https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run>).
 
