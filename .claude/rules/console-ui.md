@@ -8,20 +8,20 @@ paths: ["app/ferrobridge-console/**"]
 # Operator console rules (`app/ferrobridge-console`)
 
 **FerroUI leads the UI.** The console draws with `ferrohealth-ui`, pinned
-exactly in the root `[workspace.dependencies]` (today `=0.6.0`), and the
+exactly in the root `[workspace.dependencies]` (today `=0.6.2`), and the
 FerroUI repository (FerroHEALTH/FerroUI) is the source for its components,
 design, tokens, icons, script modules, accessibility bar, interaction
 contract, words and quality control. Read these first, at the git tag that
-matches the pin (today `v0.6.0`):
+matches the pin (today `v0.6.2`):
 
-- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/docs/consoles.md):
+- [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/docs/consoles.md):
   the consumer guide, how a console uses the library.
-- [`.claude/rules/console-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/.claude/rules/console-ui.md):
+- [`.claude/rules/console-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/.claude/rules/console-ui.md):
   the component rules of every FerroHEALTH console. The section numbers this
-  file cites (FerroUI §N) are those of the `v0.6.0` copy.
-- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/crates/ferrohealth-ui/CLAUDE.md):
+  file cites (FerroUI §N) are those of the `v0.6.2` copy.
+- [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/crates/ferrohealth-ui/CLAUDE.md):
   the crate's own discipline and the interaction contract.
-- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.6.0/design/consoles/ferrobridge):
+- [`design/consoles/ferrobridge/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.6.2/design/consoles/ferrobridge):
   this console's pages, at 1440 and 390 pixels in both themes, which the
   screenshots are checked against.
 
@@ -163,7 +163,9 @@ clinical content. What is particular here:
   `ferrohealth_server::console` headers (`nosniff`, `DENY` framing, no
   referrer, a same-origin opener, `no-store` on every document) under the
   console's own Content-Security-Policy, `script-src 'self'; style-src
-  'self'` with no nonce, no `'unsafe-inline'` and no `'unsafe-eval'`. A new
+  'self'` with no nonce, no `'unsafe-inline'` and no `'unsafe-eval'`, which the
+  family writes for a console drawn on the server
+  (`ConsoleHeaders::server_rendered`, ferrohealth-server 0.4.2). A new
   inline script or style that needs the policy relaxed is the defect, not
   the policy. FerroUI's assets keep the year-long cache of their versioned
   path. `tests/it/server.rs` holds every header in-process.
@@ -194,7 +196,9 @@ a word as well as a tint.
   `FERROBRIDGE_JOURNEYS=1`, run against a running bridge and console in the
   `journeys (browser)` CI job, and fail on any `SEVERE` entry the browser
   logs. A journey that acts waits for the library's loader mark
-  (`ferrohealth_ui::script::MARK`, `journeys::playground::loaded`).
+  (`ferrohealth_ui::script::MARK`) and then for every element that asks
+  for a module to carry `ferrohealth_ui::script::READY`
+  (`journeys::playground::loaded`).
   `journeys::navigation` holds a link, the search and a form post to one
   document each and a dialog to none; `journeys::no_script` refuses the
   browser FerroUI's modules and holds every navigation entry and a post of

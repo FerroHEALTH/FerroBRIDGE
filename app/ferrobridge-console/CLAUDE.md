@@ -45,7 +45,7 @@ crate.
   other route answers `405`. `tests/it/forms.rs` lists every post and the
   pages that take none, and holds each to a live session from the
   console's own pages.
-- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.6.0`): its
+- **A view draws with `ferrohealth-ui`** (FerroUI, pinned `=0.6.2`): its
   components, templates, script modules and brand theme, never a local
   copy or override; a gap is a FerroUI issue and a `TODO(#N)` naming its
   tracking issue here. Markup of the console's own is escaped parts
