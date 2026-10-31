@@ -312,7 +312,7 @@ the testkit tool crate. Beside it:
   Published image scan, Publish crates, Pin freshness, Fuzz). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
-  `pr-guards.yml` re-runs the guard a changed label or description affects
+  `pr-guards.yml` re-runs the guard a changed label affects
   in the head commit's CI run.
   `release.yml` is dormant until a `v*` tag is pushed and cuts a release from
   the changelog section, and its `crates` leg publishes the library crates
@@ -491,8 +491,8 @@ in its header. A generated file keeps its `// @generated … DO NOT EDIT.` banne
 on the first line and carries the two SPDX lines under it, written by its
 emitter, which names Apache-2.0 for `crates/fhir-types` and `crates/hl7v2-types`. A contribution
 is licensed under the same licence and grants the Licensor the relicensing
-right in CONTRIBUTING.md § Licensing of contributions; the pull request
-checkbox records it and `contribution-licence-guard` enforces it.
+right in CONTRIBUTING.md § Licensing of contributions; opening the pull
+request is the contributor's acceptance of those terms.
 Vendored specifications and third-party material keep their upstream terms,
 recorded in a `PROVENANCE.md` beside each vendored tree
 (`.claude/rules/vendored-inputs.md`).

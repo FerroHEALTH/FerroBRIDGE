@@ -175,7 +175,7 @@ classify() {
     CONTRIBUTING.md | GOVERNANCE.md | MAINTAINERS.md | SECURITY.md | SUPPORT.md) echo inert ;;
     LICENSE | NOTICE | llms.txt | compose.yaml | sonar-project.properties) echo inert ;;
     .dockerignore | .editorconfig | .gitattributes | .gitignore | .hadolint.yaml | .mcp.json) echo inert ;;
-    scripts/checks/comment-style.sh | scripts/checks/contribution-licence.sh) echo inert ;;
+    scripts/checks/comment-style.sh) echo inert ;;
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
