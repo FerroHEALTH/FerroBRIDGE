@@ -759,6 +759,8 @@ sends and what each refusal looks like.
 | `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient`; each is one SMART App Launch 2.2.0 (Conformance, Capabilities) defines, or a full URI. `sso-openid-connect` also writes the issuer's `issuer`, which the document omits otherwise (Conformance, Metadata) |
 | `scopes_supported` | `[]` | The scopes the discovery document lists as `scopes_supported`; list only scopes the bridge honours, because "the server SHALL support all scopes listed here" (SMART App Launch 2.2.0, Conformance, Metadata). Empty omits the member |
 | `product_scope` | `__ferrobridge.operator` | The operator scope: it guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
+| `ca_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and under `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start |
+| `role_claims` | `["roles", "groups", "entitlements"]` | The claims a token's roles are read from, each a dotted path into the token's JSON (the default is the three RFC 9068 §2.2.3.1 names). A path with an empty step or with whitespace refuses the start. The bridge grants nothing by role: no route it guards asks for one, so the roles a token carries change no answer |
 
 Each `[[auth.issuer]]` table takes `issuer` and any of `audience`,
 `algorithms`, `token_profile`, `clock_skew_seconds`, `jwks_max_age_seconds`,
@@ -770,6 +772,10 @@ discovery document and the `CapabilityStatement` name the first.
 tokens. Each table takes `user`, the Argon2id PHC string of the password as
 `password_hash` or in the file `password_hash_file`, and `scopes`, the SMART
 scopes the user is granted, which the facade checks as it checks a token's.
+A user's `roles` list is accepted and, as with `role_claims`, grants nothing
+on the bridge. `[auth.basic] cache_ttl_seconds` (default `300`) is how long a
+password that verified is remembered, so a repeat request skips the Argon2id
+derivation; `0` remembers none.
 
 ```toml
 [[auth.basic.users]]
