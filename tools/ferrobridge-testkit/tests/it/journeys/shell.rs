@@ -13,7 +13,7 @@ use thirtyfour::By;
 
 use crate::journeys::browser::{Browser, until, with_browser};
 use crate::journeys::journeys_enabled;
-use crate::journeys::playground::hydrated;
+use crate::journeys::playground::loaded;
 use crate::journeys::sign_in::{sign_in, signed_out_shell};
 use crate::journeys::stack::Stack;
 
@@ -31,9 +31,9 @@ const ENTRIES: [(&str, &str, &str); 9] = [
     ("Dashboard", "/", "Dashboard"),
 ];
 
-/// Opens the user menu once the page has hydrated.
+/// Opens the user menu once the page's script modules run.
 pub(crate) async fn open_user_menu(browser: &Browser) -> Result<(), Box<dyn Error>> {
-    hydrated(browser).await?;
+    loaded(browser).await?;
     browser
         .element(By::XPath(
             "//header//button[@aria-controls = 'user-menu-menu']",

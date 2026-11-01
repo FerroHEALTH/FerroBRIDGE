@@ -34,8 +34,6 @@
 #   e2e_packages   those of them that are, space-separated
 #   test_matrix    the test shards as a matrix (JSON, one line)
 #   lint_matrix    the clippy and msrv shards as a matrix (JSON, one line)
-#   console        ferrobridge-console is affected (its wasm32 lint and its
-#                  site bundle)
 #   journeys       ferrobridge-console or ferrobridge-server is affected (the
 #                  console's browser journeys, which run both)
 #
@@ -157,11 +155,9 @@ classify() {
     # testkit's own corpus test.
     docs/VERSIONS.md) echo "packages ferrobridge-testkit" ;;
     .github/workflows/ci.yml | .github/actions/setup-rust/*) echo ci ;;
-    # The operator console's build surface: its Leptos rule holds the bundle
-    # budget, and these scripts install its tools, build its site bundle and
-    # measure it; each reaches the console as its own files would.
-    .claude/rules/leptos-ui.md) echo "packages ferrobridge-console" ;;
-    scripts/release/console-*.sh | scripts/checks/console-*.sh) echo "packages ferrobridge-console" ;;
+    # The operator console's rule holds what its pages, posts and journeys
+    # keep, so it reaches the console as its own files would.
+    .claude/rules/console-ui.md) echo "packages ferrobridge-console" ;;
     # The stray-literal guard and its allow and baseline files read only the
     # console's sources; the CI `stray-literals` job runs it on every change.
     scripts/checks/stray-literals.*) echo "packages ferrobridge-console" ;;
@@ -179,7 +175,7 @@ classify() {
     CONTRIBUTING.md | GOVERNANCE.md | MAINTAINERS.md | SECURITY.md | SUPPORT.md) echo inert ;;
     LICENSE | NOTICE | llms.txt | compose.yaml | sonar-project.properties) echo inert ;;
     .dockerignore | .editorconfig | .gitattributes | .gitignore | .hadolint.yaml | .mcp.json) echo inert ;;
-    scripts/checks/comment-style.sh | scripts/checks/contribution-licence.sh) echo inert ;;
+    scripts/checks/comment-style.sh) echo inert ;;
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
@@ -347,8 +343,6 @@ emit() {
   if [ -n "$e2e" ]; then flag=true; else flag=false; fi
   echo "e2e=$flag"
   echo "e2e_packages=$e2e"
-  if has "$packages" ferrobridge-console; then flag=true; else flag=false; fi
-  echo "console=$flag"
   if has "$packages" ferrobridge-console || has "$packages" ferrobridge-server; then
     flag=true
   else
@@ -603,12 +597,8 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the console reaches itself and nothing it does not link" \
     "app/ferrobridge-console/src/lib.rs" false \
     "+ferrobridge-console -fhir-types -openehr-mapping-core -ferrobridge-server"
-  check "the console's rule reaches the console" ".claude/rules/leptos-ui.md" false \
+  check "the console's rule reaches the console" ".claude/rules/console-ui.md" false \
     "+ferrobridge-console -ferrobridge-server -fhir-types"
-  check "the console's build scripts reach the console" "scripts/release/console-site.sh" false \
-    "+ferrobridge-console -ferrobridge-server"
-  check "the console's bundle checks reach the console" "scripts/checks/console-bundle.sh" false \
-    "+ferrobridge-console -ferrobridge-server"
   check "the stray-literal guard reaches the console alone" "scripts/checks/stray-literals.sh" false \
     "+ferrobridge-console -ferrobridge-server -fhir-codegen -fhir-types"
   check "the stray-literal baseline reaches the console alone" \

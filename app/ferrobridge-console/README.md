@@ -4,10 +4,10 @@
 # ferrobridge-console
 
 The FerroBRIDGE Console, the operator console: the `ferrobridge-console`
-binary, a Leptos app drawn with FerroUI 0.5.1 that hydrates the whole page:
-the server draws the first page and the browser draws every page after it,
-so no link or form reloads the document, with a backend-for-frontend in
-front of the bridge.
+binary, which draws every page on its server with FerroUI 0.6.2 and sends
+it whole, with a backend-for-frontend in front of the bridge. FerroUI's
+small script modules add behaviour on top, and every page works without
+them.
 
 Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
@@ -21,9 +21,8 @@ tabs and reload, each mapping file and template, the mapping editor (check,
 save under `If-Match` with a reason), the playground (`$tofhir`,
 `$toopenehr`, `$validate`), the FHIR facade, HL7 v2 and OMOP ETL pages,
 the connections, Your preferences and About. Every action is a form post
-the server answers with the page it draws, which is the page with no
-WebAssembly; once the page has hydrated, the action and every read go
-through the console's server functions, each checking the session first.
+the server answers with the page it draws, and every page and every post
+checks the session first.
 Under them: the browser security headers, operator sign-in
 with OpenID Connect, the configuration with its environment overrides and
 `_file` secrets, the typed bridge client that calls the bridge with the
@@ -61,7 +60,6 @@ does. A refused configuration exits `78`.
 ```toml
 [server]
 listen = "0.0.0.0:3000"
-site_root = "/site"
 
 [bridge]
 base_url = "https://bridge.example.org/"
@@ -102,19 +100,15 @@ names, never both.
 
 ## Building
 
-Build it with cargo-leptos, from the repository root:
+Build it with cargo, from the repository root:
 
 ```sh
-scripts/release/console-tools.sh "$HOME/.cache/ferrobridge-console-tools"
-export PATH="$HOME/.cache/ferrobridge-console-tools/bin:$PATH"
-scripts/release/console-site.sh --release
 cargo build --release -p ferrobridge-console
 ```
 
-The first line installs `wasm-opt` at its pinned release, checked against
-its SHA-256, and the site script refuses to run cargo-leptos unless the one
-on `PATH` matches those digests, so it never downloads it itself. That writes the site bundle under `target/site` and
-the server binary under `target/release`.
+That writes the binary under `target/release`. It carries every page, the
+stylesheet, the theme and the script modules it serves, so it needs no
+file beside it.
 
 ## Licence
 

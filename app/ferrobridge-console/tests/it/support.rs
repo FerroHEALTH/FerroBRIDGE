@@ -8,7 +8,6 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::Write;
-use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use axum::body::Body;
@@ -21,13 +20,9 @@ use ferrobridge_console::config::settings::Settings;
 use ferrobridge_console::server::{ConsoleState, router};
 use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
 
-/// The settings a console with its site bundle under `site_root` and its
-/// bridge at `bridge` runs on.
-pub(crate) fn settings(site_root: &Path, bridge: &str) -> Settings {
-    let text = format!(
-        "[server]\nlisten = \"127.0.0.1:0\"\nsite_root = {site_root:?}\n\n[bridge]\nbase_url = \"{bridge}\"\n",
-        site_root = site_root.to_string_lossy(),
-    );
+/// The settings a console with its bridge at `bridge` runs on.
+pub(crate) fn settings(bridge: &str) -> Settings {
+    let text = format!("[server]\nlisten = \"127.0.0.1:0\"\n\n[bridge]\nbase_url = \"{bridge}\"\n");
     Config::from_sources(Some(&text), &BTreeMap::new())
         .expect("the configuration reads")
         .resolve()
@@ -104,16 +99,15 @@ pub(crate) async fn send(
 }
 
 /// A `GET` of `path` with no body.
-/// The page `page` as it is drawn: without its scripts, which carry the
-/// documents the page read serialized for the browser, and without the
-/// hydration markers between its text nodes.
+/// The page `page` as it is drawn: without its script tags, the one loader
+/// of FerroUI's modules among them.
 pub(crate) fn drawn(page: &str) -> String {
     let mut pieces = page.split("<script");
     let mut out = pieces.next().unwrap_or_default().to_owned();
     for piece in pieces {
         out.push_str(piece.split_once("</script>").map_or("", |(_, after)| after));
     }
-    out.replace("<!>", "")
+    out
 }
 
 pub(crate) fn get(path: &str) -> Result<Request<Body>, Box<dyn Error>> {

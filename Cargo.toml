@@ -100,8 +100,7 @@ omocl = { path = "crates/omocl" }
 # The openEHR model, from the published crates (docs/architecture.md section 3).
 # openehr-its is the ITS wire layer: the OPT 1.4 reader (`opt14`) and canonical
 # JSON (`json`) for every member, so the mapping core and the operator contract
-# above it compile for wasm32 and the operator console's browser half can link
-# them (#1256). The server adds the generated ITS-REST 1.1.0 transport DTOs
+# above it take no transport (#1257). The server adds the generated ITS-REST 1.1.0 transport DTOs
 # (`rest`) and the generated client over its runtime (`rest-client`) in its own
 # manifest; the alternative is a hand-written copy of a generated model, which
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
@@ -155,8 +154,8 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body. Verified against
-# crates.io on 2026-10-29 (0.3.9).
-ferrohealth-server = { version = "=0.3.9", default-features = false }
+# crates.io on 2026-10-31 (0.4.2).
+ferrohealth-server = { version = "=0.4.2", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
 # the request log and the panic line. Verified against crates.io on 2026-10-27
 # (0.2.2).
@@ -227,29 +226,13 @@ chumsky = "0.13.0"
 # crates.io on 2026-10-15.
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 tar = { version = "0.4.46", default-features = false }
-# The operator console, app/ferrobridge-console (#599; no specification
-# governs it: our own design): Leptos rendered on the server and hydrated in
-# the browser. The server half and the browser half take their features per
-# target in that crate, so a workspace --all-features build never enables
-# both. The wasm-bindgen CLI of the console build must equal the wasm-bindgen
-# crate version, and scripts/checks/versions.sh holds the two to
-# docs/VERSIONS.md. Verified against crates.io on 2026-10-17.
-leptos = "0.8.22"
-leptos_axum = "0.8.10"
-leptos_meta = "0.8.7"
-leptos_router = "0.8.17"
-wasm-bindgen = "0.2.129"
-# The console drives its hydration itself, so it marks the page hydrated
-# once its lazy route has (FerroUI `docs/consoles.md`); already in the lock
-# through leptos. Verified against crates.io on 2026-10-26.
-wasm-bindgen-futures = "0.4.79"
-console_error_panic_hook = "0.1.7"
-# The FerroHEALTH components the console draws with: the shell, the views,
-# the table model, the highlighter, the Lucide icons, the stylesheet and the
-# role tokens, shared by every FerroHEALTH console. Pinned exactly, so the
-# console moves to a new version deliberately. Verified against crates.io on
-# 2026-10-27 (0.5.5).
-ferrohealth-ui = "=0.5.5"
+# The FerroHEALTH components the operator console (app/ferrobridge-console,
+# #599) draws with: the server-rendered views, the shell, the table model,
+# the highlighter, the Lucide icons, the stylesheet, the role tokens and the
+# script modules with the router that serves them, shared by every
+# FerroHEALTH console. Pinned exactly, so the console moves to a new version
+# deliberately. Verified against crates.io on 2026-10-31 (0.6.2, #1361).
+ferrohealth-ui = "=0.6.2"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -409,18 +392,6 @@ deref_by_slicing = "warn"
 panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
-
-# The operator console's WebAssembly bundle (app/ferrobridge-console), built
-# by cargo-leptos: optimized for size, since the browser downloads it (the
-# Cargo reference, profiles; no specification governs this: our own design).
-# It keeps the inherited overflow checks and drops the line tables, which
-# wasm-bindgen strips from the bundle anyway.
-[profile.wasm-release]
-inherits = "release"
-opt-level = "z"
-lto = true
-codegen-units = 1
-debug = false
 
 # The full-emit tests of fhir-codegen (`cargo nextest run --cargo-profile emit
 # -p fhir-codegen`): the emitter runs optimised, while the two generated crates

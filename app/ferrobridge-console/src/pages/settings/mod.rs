@@ -20,6 +20,8 @@ pub mod rows;
 use std::borrow::Cow;
 
 use ferrobridge_operator_api::configuration::{Configuration, Entry, SecretState, Source, Value};
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
 use ferrohealth_ui::view::layout::bullet_list;
@@ -29,10 +31,10 @@ use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::template::settings::{
     How, Setting, ValueSource, file_line, setting_row, settings_panel,
 };
-use leptos::prelude::*;
 
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
+use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::parts::{faulted, refused_operator};
 
@@ -82,7 +84,7 @@ pub struct Row {
 
 /// Returns the setting `row` draws over `configuration`.
 #[must_use]
-pub fn setting(configuration: &Configuration, row: &Row) -> Setting {
+pub fn setting(l: &Locale, configuration: &Configuration, row: &Row) -> Setting {
     let entries: Vec<(Option<&Entry>, Shape)> = row
         .keys
         .iter()
@@ -92,15 +94,15 @@ pub fn setting(configuration: &Configuration, row: &Row) -> Setting {
         .iter()
         .enumerate()
         .map(|(at, (entry, shape))| {
-            let joint = (at > 0).then_some(view! { " · " });
-            let value = entry.map_or_else(unset, |entry| value(&entry.value, *shape));
-            view! { {joint} {value} }.into_any()
+            let joint = if at > 0 { t(" · ") } else { Html::empty() };
+            let value = entry.map_or_else(|| unset(l), |entry| value(l, &entry.value, *shape));
+            joint.then(value)
         })
-        .collect_view();
+        .collect::<Html>();
     Setting {
-        label: tr(row.label),
-        description: tr(row.description),
-        value: values.into_any(),
+        label: tr(l, row.label),
+        description: tr(l, row.description),
+        value: values,
         source: origin(&entries),
         keys: row.keys.iter().map(|(key, _)| (*key).to_owned()).collect(),
         next_start: false,
@@ -124,41 +126,43 @@ fn origin(entries: &[(Option<&Entry>, Shape)]) -> Option<ValueSource> {
 }
 
 /// Returns the quiet dash of a key the configuration leaves unset.
-fn unset() -> AnyView {
-    view! { <span class="fui-muted">{tr(Msg::ValueNotSet)}</span> }.into_any()
+fn unset(l: &Locale) -> Html {
+    muted(tr(l, Msg::ValueNotSet))
+}
+
+/// Returns `words` in the muted face.
+fn muted(words: String) -> Html {
+    h(format!(r#"<span class="fui-muted">{}</span>"#, t(words)))
 }
 
 /// Returns `held` drawn as `shape`.
-fn value(held: &Value, shape: Shape) -> AnyView {
+fn value(l: &Locale, held: &Value, shape: Shape) -> Html {
     match (held, shape) {
-        (Value::Secret(state), _) => secret_state(&shown(state)),
-        (Value::Boolean(on), _) => switch(*on),
-        (Value::Integer(millis), Shape::Millis) => duration(*millis).into_any(),
-        (Value::Integer(bytes), Shape::Bytes) => size(*bytes).into_any(),
-        (Value::String(text), Shape::Word) if text.is_empty() => unset(),
-        (Value::String(text), Shape::Code) if text.is_empty() => unset(),
-        (Value::String(text), Shape::Code) => view! { <code>{text.clone()}</code> }.into_any(),
-        (Value::String(text), Shape::Query) => {
-            view! { <pre class="fui-code-panel"><code>{text.clone()}</code></pre> }.into_any()
-        }
-        (Value::List(items), Shape::Count) => count(items.len()),
-        (Value::Table(items), Shape::Count) => count(items.len()),
-        (Value::List(items), _) if items.is_empty() => {
-            view! { <span class="fui-muted">{tr(Msg::ValueNone)}</span> }.into_any()
-        }
+        (Value::Secret(state), _) => secret_state(l, &shown(state)),
+        (Value::Boolean(on), _) => switch(l, *on),
+        (Value::Integer(millis), Shape::Millis) => t(duration(l, *millis)),
+        (Value::Integer(bytes), Shape::Bytes) => t(size(l, *bytes)),
+        (Value::String(text), Shape::Word | Shape::Code) if text.is_empty() => unset(l),
+        (Value::String(text), Shape::Code) => code(text),
+        (Value::String(text), Shape::Query) => h(format!(
+            r#"<pre class="fui-code-panel">{}</pre>"#,
+            code(text)
+        )),
+        (Value::List(items), Shape::Count) => count(l, items.len()),
+        (Value::Table(items), Shape::Count) => count(l, items.len()),
+        (Value::List(items), _) if items.is_empty() => muted(tr(l, Msg::ValueNone)),
         (Value::List(items), _) => items
             .iter()
             .enumerate()
             .map(|(at, item)| {
-                let joint = (at > 0).then_some(view! { ", " });
-                view! { {joint} {value(item, Shape::Code)} }
+                let joint = if at > 0 { t(", ") } else { Html::empty() };
+                joint.then(value(l, item, Shape::Code))
             })
-            .collect_view()
-            .into_any(),
-        (Value::Table(_), _) => count(1),
-        (Value::String(text), _) => text.clone().into_any(),
-        (Value::Integer(number), _) => number.to_string().into_any(),
-        (Value::Float(number), _) => number.to_string().into_any(),
+            .collect::<Html>(),
+        (Value::Table(_), _) => count(l, 1),
+        (Value::String(text), _) => t(text),
+        (Value::Integer(number), _) => t(number.to_string()),
+        (Value::Float(number), _) => t(number.to_string()),
     }
 }
 
@@ -173,54 +177,57 @@ fn shown(state: &SecretState) -> secret::SecretState {
 
 /// Returns a switch read from the file: a state badge, never a raw on or
 /// off.
-fn switch(on: bool) -> AnyView {
+fn switch(l: &Locale, on: bool) -> Html {
     if on {
-        badge(Tone::Ok, tr(Msg::StateOn)).into_any()
+        badge(Tone::Ok, tr(l, Msg::StateOn))
     } else {
-        badge(Tone::Neutral, tr(Msg::StateOff)).into_any()
+        badge(Tone::Neutral, tr(l, Msg::StateOff))
     }
 }
 
 /// Returns how many entries a list or a table holds.
-fn count(entries: usize) -> AnyView {
+fn count(l: &Locale, entries: usize) -> Html {
     if entries == 0 {
-        view! { <span class="fui-muted">{tr(Msg::ValueNone)}</span> }.into_any()
+        muted(tr(l, Msg::ValueNone))
     } else {
-        tr_with(Msg::ValueEntries, &[("count", entries.into())]).into_any()
+        t(tr_with(l, Msg::ValueEntries, &[("count", entries.into())]))
     }
 }
 
 /// Returns a duration of `millis` milliseconds, in seconds where it is
 /// whole seconds.
 #[must_use]
-pub fn duration(millis: i64) -> String {
+pub fn duration(l: &Locale, millis: i64) -> String {
     if millis != 0 && millis % 1000 == 0 {
         tr_with(
+            l,
             Msg::ValueSeconds,
             &[("count", millis.div_euclid(1000).to_string().into())],
         )
     } else {
-        tr_with(Msg::ValueMillis, &[("count", millis.to_string().into())])
+        tr_with(l, Msg::ValueMillis, &[("count", millis.to_string().into())])
     }
 }
 
 /// Returns a size of `bytes`, in the largest whole binary unit.
 #[must_use]
-pub fn size(bytes: i64) -> String {
+pub fn size(l: &Locale, bytes: i64) -> String {
     const KIB: i64 = 1024;
     const MIB: i64 = 1024 * 1024;
     if bytes != 0 && bytes % MIB == 0 {
         tr_with(
+            l,
             Msg::ValueMib,
             &[("count", bytes.div_euclid(MIB).to_string().into())],
         )
     } else if bytes != 0 && bytes % KIB == 0 {
         tr_with(
+            l,
             Msg::ValueKib,
             &[("count", bytes.div_euclid(KIB).to_string().into())],
         )
     } else {
-        tr_with(Msg::ValueBytes, &[("count", bytes.to_string().into())])
+        tr_with(l, Msg::ValueBytes, &[("count", bytes.to_string().into())])
     }
 }
 
@@ -237,59 +244,50 @@ pub fn file_of(configuration: &Configuration) -> String {
 /// configuration, or the refusal or fault in their place, and the dialog
 /// the file line opens.
 #[must_use]
-pub fn tab(configuration: &Loaded<Configuration>, rows: &[Row], again: &str) -> AnyView {
+pub fn tab(l: &Locale, configuration: &Loaded<Configuration>, rows: &[Row], again: &str) -> Html {
     let configuration = match configuration {
         Ok(Outcome::Shown(configuration)) => configuration,
-        Ok(Outcome::Refused(refusal)) => return refused_operator(refusal),
-        Err(fault) => return faulted(fault, again),
+        Ok(Outcome::Refused(refusal)) => return refused_operator(l, refusal),
+        Err(fault) => return faulted(l, fault, again),
     };
     let drawn = rows
         .iter()
-        .map(|row| setting_row(setting(configuration, row), false))
+        .map(|row| setting_row(l, setting(l, configuration, row), false))
         .collect();
     let line = file_line(
-        file_of(configuration),
+        l,
+        &file_of(configuration),
         How::Dialog(Cow::Borrowed(HOW_DIALOG)),
     );
-    view! {
-        {settings_panel(line, None, drawn)}
-        {how_dialog()}
-    }
-    .into_any()
+    settings_panel(line, None, drawn).then(how_dialog(l))
 }
 
 /// Returns the dialog "How configuration works": where the settings are
 /// shown and how they change.
 #[must_use]
-pub fn how_dialog() -> AnyView {
+pub fn how_dialog(l: &Locale) -> Html {
     let shown = bullet_list(vec![
-        tr(Msg::HowHere).into_any(),
-        tr(Msg::HowFaces).into_any(),
-        tr(Msg::HowConnections).into_any(),
+        t(tr(l, Msg::HowHere)),
+        t(tr(l, Msg::HowFaces)),
+        t(tr(l, Msg::HowConnections)),
     ]);
-    let body = view! {
-        <p>{tr(Msg::HowIntro)}</p>
-        <div class="fui-ownership">
-            <div>
-                <h3>{tr(Msg::HowWhereTitle)}</h3>
-                <p class="fui-small fui-muted">{tr(Msg::HowWhere)}</p>
-                {shown}
-            </div>
-            <div>
-                <h3>{tr(Msg::HowChangeTitle)}</h3>
-                <p class="fui-small fui-muted">{tr(Msg::HowChange)}</p>
-            </div>
-        </div>
-        <p class="fui-small fui-muted">{tr(Msg::HowMappings)}</p>
-    };
+    let body = h(format!(
+        r#"<p>{intro}</p><div class="fui-ownership"><div><h3>{where_title}</h3><p class="fui-small fui-muted">{where_words}</p>{shown}</div><div><h3>{change_title}</h3><p class="fui-small fui-muted">{change}</p></div></div><p class="fui-small fui-muted">{mappings}</p>"#,
+        intro = t(tr(l, Msg::HowIntro)),
+        where_title = t(tr(l, Msg::HowWhereTitle)),
+        where_words = t(tr(l, Msg::HowWhere)),
+        change_title = t(tr(l, Msg::HowChangeTitle)),
+        change = t(tr(l, Msg::HowChange)),
+        mappings = t(tr(l, Msg::HowMappings)),
+    ));
     info_dialog(
+        l,
         Explanation {
             id: Cow::Borrowed(HOW_DIALOG),
-            title: tr(Msg::HowTitle).into(),
+            title: tr(l, Msg::HowTitle).into(),
         },
         body,
     )
-    .into_any()
 }
 
 #[cfg(test)]
@@ -298,15 +296,17 @@ mod tests {
 
     #[test]
     fn a_duration_reads_in_seconds_where_it_is_whole_seconds() {
-        assert_eq!("30 s", duration(30_000));
-        assert_eq!("250 ms", duration(250));
-        assert_eq!("0 ms", duration(0));
+        let l = &ferrohealth_ui::i18n::Locale::english();
+        assert_eq!("30 s", duration(l, 30_000));
+        assert_eq!("250 ms", duration(l, 250));
+        assert_eq!("0 ms", duration(l, 0));
     }
 
     #[test]
     fn a_size_reads_in_its_largest_whole_binary_unit() {
-        assert_eq!("1 MiB", size(1024 * 1024));
-        assert_eq!("64 KiB", size(64 * 1024));
-        assert_eq!("1000 bytes", size(1000));
+        let l = &ferrohealth_ui::i18n::Locale::english();
+        assert_eq!("1 MiB", size(l, 1024 * 1024));
+        assert_eq!("64 KiB", size(l, 64 * 1024));
+        assert_eq!("1000 bytes", size(l, 1000));
     }
 }

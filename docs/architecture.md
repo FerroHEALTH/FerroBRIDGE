@@ -1307,20 +1307,19 @@ FerroFED records as its decisions A55, A88 and A93 (#594, #260). The console
 is for an operator who wants to see what the bridge runs and work with its
 mapping files without a shell on the host.
 
-**The console is its own binary and image.** `app/ferrobridge-console` is a
-Leptos application that hydrates the whole page (FerroUI #410, `docs/consoles.md`
-"How a console builds"): the server draws the first page, the browser takes
-it over and draws every page after it, its pages loaded in five lazy route
-groups, so no link or form reloads the document (#1256). Every action is
-still a form post the server answers with the page it draws, which is the
-page with no WebAssembly; once the page has hydrated the same action goes
-through a server function and every read through one of the reads' server
-functions, each checking the operator's session first. It is a
-backend-for-frontend, shipped as `ghcr.io/ferrohealth/ferrobridge-console`,
-drawn with FerroUI 0.5.1.
-The server half and the browser half are chosen by compilation target, never
-by Cargo feature, so a workspace `--all-features` build never enables both.
-The operator's OpenID Connect session (authorization code with PKCE) lives on
+**The console is its own binary and image.** `app/ferrobridge-console` draws
+every page on its server (FerroUI #510, `docs/consoles.md` "How a console
+builds"): each page is an axum handler that reads the bridge and returns the
+whole document, drawn from FerroUI's server-rendered components, and a link
+loads its page as one document (#1355). Every action is a form post: a
+preference answers with a redirect, and Reload, the editor's check and save
+and the playground's runs post to their own page, which draws the bridge's
+answer beside the posted fields. Every page and every post checks the
+operator's session first. FerroUI's small script modules, served by the
+console from the binary, add behaviour on top of what the server drew, and
+every page works without them. It is a backend-for-frontend, shipped as
+`ghcr.io/ferrohealth/ferrobridge-console`, drawn with FerroUI 0.6.2. The
+operator's OpenID Connect session (authorization code with PKCE) lives on
 the console's server, which calls the bridge with the operator's own access
 token. The bridge validates that token as the resource server it already is
 (#400), serves no static asset and holds no browser session.
@@ -1333,12 +1332,10 @@ emits them), for the `OperationOutcome`, the `Parameters` of a run and the
 bridge's health and operator documents, which the bridge serializes and the
 console decodes, so a field renamed on one side fails the other's build. The
 contract crate carries serde types and nothing else: no engine, no I/O. The
-browser half links `openehr-mapping-core` and `ferrobridge-operator-api`
-alone, which compile for `wasm32-unknown-unknown`, so both halves draw a
-document from one definition. The FHIR model stays out of the browser: the
 console's server reduces the facade's `CapabilityStatement` to the contract
-crate's `capability::Capability`, the facts a page draws, since the R4 codec
-in the browser cost more than the rest of the bundle's growth (#1256). A dependency-closure test fails on any other workspace member, so
+crate's `capability::Capability`, the facts a page draws. The console links
+no Leptos crate and no WebAssembly glue. A dependency-closure test fails on
+any other workspace member and on a Leptos crate, so
 the console can never compile or run a mapping itself: every check,
 transform and save goes through the bridge. Linking these crates is what
 `codegen.md` asks of a consumer, which may not shadow a model the workspace
@@ -1348,11 +1345,12 @@ already defines.
 library** (published on crates.io, pinned exactly in the root
 `[workspace.dependencies]`), which every FerroHEALTH console shares. It is
 not a workspace crate, so the dependency-closure test admits it as it admits
-any other registry crate: it carries views, the stylesheet and the brand
-themes, and fetches nothing. The console keeps only its screens; the
-server serves the library's stylesheet and the library's FerroBRIDGE brand
-theme as two stylesheets of its own origin, so the
-Content-Security-Policy keeps `style-src 'self'`.
+any other registry crate: it carries the views, the stylesheet, the brand
+themes and the script modules, and fetches nothing. The console keeps only
+its screens; it mounts the library's asset router, which serves the
+stylesheet, the FerroBRIDGE theme and the modules from its own origin under
+a path that names the library's version, so the Content-Security-Policy is
+`script-src 'self'; style-src 'self'` with no nonce.
 
 **The operator API is off by default.** It is mounted under `/operator` on
 the bridge's listener when `[operator] enabled = true`, and enabling it
@@ -2951,7 +2949,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Bulk load | binary `COPY` via `tokio-postgres`, `sqlx` for checked queries | throughput; the reference engine's per-row persist is its ceiling | ORM-style inserts |
 | Demographics | in order: the patient-to-EHR link through `EHR_STATUS.subject.external_ref`; `Patient` from EHR-side person templates through FHIRconnect; the FHIRconnect demographics endpoint as our own port over the identity store; `PARTY` objects over the ITS-REST Demographic API behind a feature labelled DEVELOPMENT; party-rooted mappings as our own extension; demographic AQL as Cadasto's experimental extension documents it, behind a feature labelled with that extension, backing demographic FHIR search (#465, #480) | the link and EHR-side templates rest on STABLE texts (RM Common IM §4.2.1.1, ITS-REST EHR); the Demographic API is `x-status: DEVELOPMENT` at 1.1.0 and on master and has no search; FHIRconnect `engine/demographics.adoc` defines no endpoint interface; AQL 1.1.0 defines no demographic semantics (QUERY §3.13.2), and the owner expects Cadasto's extension to become that specification (owner direction 2026-10-15) | demographics left outside |
 | Party context | a context whose OPT is rooted at a `PERSON`, `ORGANISATION` or `ROLE` archetype is a party context, recognised from the OPT root's RM type; `$composition`, the composition defaults, `ctx/`, `participationsFunction` onto `EVENT_CONTEXT`, `link` and a composition-slotting `slotContext` refused at load; read through `item_at_path`; the build through the `openehr-sdt` party build, with `ROLE.performer` passed whole under `|raw` (#906, #1000); the FHIR id the party's `versioned_object_uid`, with no identity-map entry (sections 4.11 and 9, #471) | FHIRconnect v1.0.0 admits an `openEHR-DEMOGRAPHIC-*` archetype id and defines no party root; Simplified Formats defines FLAT for compositions only; only the `object_id` of an `OBJECT_VERSION_ID` is stable across versions (RM Common §OBJECT_VERSION_ID); no specification governs this: our own design | a new context key; a per-resource Rust mapping; an identity-map entry per party; the full `OBJECT_VERSION_ID` as the FHIR id |
-| Operator console shape | `app/ferrobridge-console`, a Leptos app rendered on the server and hydrated, with a backend-for-frontend, its own binary and image; halves chosen by target, never by feature; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
+| Operator console shape | `app/ferrobridge-console`, every page drawn on its server from FerroUI's components with FerroUI's script modules on top (#1355), with a backend-for-frontend, its own binary and image; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
 | Console crate boundary | the server half links `openehr-mapping-core`, `fhir-types` (`r4`, `terminology`) and `ferrobridge-operator-api` (the serde types of the health and operator documents, #777) and no other workspace crate, and the browser half `openehr-mapping-core` and `ferrobridge-operator-api` alone, enforced by a dependency-closure test | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`, and the bridge's own documents); one contract crate both sides compile against turns a renamed field into a build failure; excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the console reading the bridge's documents by field name; the engine crates linked so the console compiles mappings itself |
 | Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring the operator scope (`[auth] product_scope`); the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |
 | Mapping ownership and saving | provisioned directories read-only; console saves go to `[operator] mapping_dir`, written to a temporary file, synced and renamed; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a rename is atomic within one file system, so a reader sees the old file or the new one | writing back into the provisioned tree; saving without a check |

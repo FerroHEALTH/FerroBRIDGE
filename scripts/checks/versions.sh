@@ -35,12 +35,6 @@
 #                          cargo-auditable, cargo-cyclonedx and syft versions
 #                          the three release workflows install, against
 #                          docs/VERSIONS.md.
-#                          The operator console's build tools: cargo-leptos
-#                          and the wasm-bindgen CLI of the ci.yml console job
-#                          and of release-console.yml,
-#                          the wasm-bindgen crate requirement, and the
-#                          Binaryen release of
-#                          scripts/release/console-tools.sh.
 #                          The browser journeys: the thirtyfour requirement,
 #                          the chrome-version of the ci.yml journeys job, and
 #                          the release and SHA-256 digests of
@@ -500,7 +494,7 @@ for wf in .github/workflows/release.yml .github/workflows/scan-and-tag.yml .gith
 done
 [ "$trivy_seen" -gt 0 ] || note "no workflow installs trivy yet, skipped"
 
-echo "== operator console build tools (ci.yml, Cargo.toml, scripts/release/console-*.sh <-> docs/VERSIONS.md)"
+echo "== operator console journeys (ci.yml, Cargo.toml, scripts/release/journey-tools.sh <-> docs/VERSIONS.md)"
 if [ -f app/ferrobridge-console/Cargo.toml ]; then
   # The value of the first `NAME="..."` assignment in FILE.
   shell_pin() {
@@ -520,23 +514,6 @@ if [ -f app/ferrobridge-console/Cargo.toml ]; then
       note "OK: $row $found ($where)"
     fi
   }
-  for wf in .github/workflows/ci.yml .github/workflows/release-console.yml; do
-    if [ ! -f "$wf" ]; then
-      note "no $wf yet, skipped"
-      continue
-    fi
-    for tool in cargo-leptos wasm-bindgen; do
-      found="$(sed -nE "s|^[[:space:]]*tool:[[:space:]]*$tool@([^[:space:]]+).*|\1|p" "$wf" | sort -u)"
-      if [ "$(printf '%s\n' "$found" | grep -c . || true)" -gt 1 ]; then
-        bad "$tool: $wf installs more than one version ($(printf '%s' "$found" | tr '\n' ' '))"
-        continue
-      fi
-      console_pin "$tool" "$found" "$wf"
-    done
-  done
-  console_pin wasm-bindgen "$(manifest_req wasm-bindgen)" "the root Cargo.toml"
-  console_pin Binaryen "$(shell_pin binaryen_version scripts/release/console-tools.sh)" \
-    scripts/release/console-tools.sh
   # The browser journeys: the WebDriver client, the Chrome for Testing
   # release the journeys job installs, and the local install of that release
   # with each zip's SHA-256.

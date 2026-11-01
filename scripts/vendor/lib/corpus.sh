@@ -28,6 +28,31 @@ die() {
 
 say() { printf '%s: %s\n' "$corpus_script" "$*"; }
 
+# The attempts one registry fetch gets, and the first pause between two of
+# them in seconds, doubled after every failure. A transient error from the
+# registry is retried; one that outlasts the last attempt still fails.
+# shellcheck disable=SC2034 # read by the scripts that source this file
+fetch_attempts=4
+fetch_pause=2
+
+# Runs the command $2... up to $1 times, pausing with a doubling backoff
+# between attempts, and fails with the status of the last attempt.
+with_retries() {
+  local attempts="$1" pause="$fetch_pause" attempt=1 status
+  shift
+  while true; do
+    "$@" && return 0
+    status=$?
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      return "$status"
+    fi
+    echo "   attempt $attempt of $attempts failed with status $status; retrying in ${pause}s" >&2
+    sleep "$pause"
+    pause=$((pause * 2))
+    attempt=$((attempt + 1))
+  done
+}
+
 corpus_require() {
   local tool
   for tool in "$@"; do

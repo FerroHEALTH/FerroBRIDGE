@@ -95,7 +95,14 @@ note() { echo "vex-reachability: $*" >&2; fail=1; }
 # silence as agreement: a document with no `statements` array, or a jq failure
 # inside the process substitution feeding the loop, would run zero iterations
 # and report every statement verified.
+# An empty document is right only while deny.toml accepts no advisory, read
+# from deny.toml itself rather than from the document.
 expected="$(jq -r '.statements | length' "$DOC")"
+accepted="$(grep -cE '^[[:space:]]*\{[[:space:]]*id[[:space:]]*=' deny.toml || true)"
+if [[ "$expected" == 0 && "$accepted" == 0 ]]; then
+  echo "ok: deny.toml accepts no advisory and $DOC states none; nothing to verify"
+  exit 0
+fi
 [[ "$expected" -gt 0 ]] 2>/dev/null || {
   echo "error: $DOC declares no statements, so nothing would be verified" >&2
   exit 1

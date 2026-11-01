@@ -3,14 +3,14 @@
 
 //! The playground against the running bridge: a `$toopenehr` the bridge
 //! answers, a `$tofhir` it refuses, and a bridge whose operations lane is
-//! off. Each run is the playground's form, which the page answers in place;
-//! what the operator entered reaches no URL.
+//! off. Each run is the playground's form, which its tab's own address
+//! answers with the page; what the operator entered reaches no URL.
 
 use std::error::Error;
 
 use thirtyfour::By;
 
-use crate::journeys::browser::{Browser, with_browser};
+use crate::journeys::browser::{Browser, until, with_browser};
 use crate::journeys::journeys_enabled;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::{Lanes, PROFILE, Stack};
@@ -34,22 +34,38 @@ pub(crate) fn bundle() -> Result<String, Box<dyn Error>> {
     }))?)
 }
 
-/// The user menu's button once the page has hydrated: it says whether the
-/// menu is open only then.
-const HYDRATED: &str = "//button[@aria-controls = 'user-menu-menu' and @aria-expanded]";
-
 /// The id of the playground's run button.
 const RUN: &str = "pg-run";
 
-/// Waits for the page to hydrate: the root element marked `data-ferroui-hydrated`,
-/// which FerroUI sets once the page and its route have hydrated, and the
-/// user menu saying whether its menu is open.
-pub(crate) async fn hydrated(browser: &Browser) -> Result<(), Box<dyn Error>> {
+/// Waits for the page's script modules: the root element marked by
+/// FerroUI's loader (`ferrohealth_ui::script::MARK`), which it writes before
+/// any module arrives, and then every element that asks for a module
+/// (`ferrohealth_ui::script::HOOK`) marked ready by it
+/// (`ferrohealth_ui::script::READY`), so a journey drives no control before
+/// its module listens.
+pub(crate) async fn loaded(browser: &Browser) -> Result<(), Box<dyn Error>> {
     browser
-        .element(By::Css("html[data-ferroui-hydrated]"))
+        .element(By::Css(format!("html[{}]", ferrohealth_ui::script::MARK)))
         .await?;
-    browser.element(By::XPath(HYDRATED)).await?;
-    Ok(())
+    let waiting = format!(
+        "[{}]:not([{}])",
+        ferrohealth_ui::script::HOOK,
+        ferrohealth_ui::script::READY
+    );
+    until(
+        "every module of the page has enhanced its element",
+        async || {
+            let left = browser
+                .driver()
+                .execute(
+                    "return document.querySelectorAll(arguments[0]).length;",
+                    vec![serde_json::Value::from(waiting.as_str())],
+                )
+                .await?;
+            Ok(left.json().as_u64() == Some(0))
+        },
+    )
+    .await
 }
 
 /// Writes `text` into the playground's input and presses its run.
@@ -83,7 +99,7 @@ async fn a_transform_is_answered_and_a_refusal_keeps_its_status() -> Result<(), 
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
         browser.goto(&stack.url("/playground/toopenehr")).await?;
-        hydrated(browser).await?;
+        loaded(browser).await?;
         to_openehr(browser, &bundle).await?;
         browser.text("main", "Answered").await?;
         browser.text("main", "Synthetic problem one").await?;
@@ -91,7 +107,7 @@ async fn a_transform_is_answered_and_a_refusal_keeps_its_status() -> Result<(), 
         browser.console_clean("an answered $toopenehr").await?;
 
         browser.goto(&stack.url("/playground")).await?;
-        hydrated(browser).await?;
+        loaded(browser).await?;
         to_fhir(browser, "{}").await?;
         browser.text("main", "Refused").await?;
         browser
@@ -112,7 +128,7 @@ async fn a_bridge_whose_operations_are_off_disables_run() -> Result<(), Box<dyn 
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
         browser.goto(&stack.url("/playground/toopenehr")).await?;
-        hydrated(browser).await?;
+        loaded(browser).await?;
         browser
             .text("main", "Conversions are off on this bridge.")
             .await?;

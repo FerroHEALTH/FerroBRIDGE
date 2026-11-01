@@ -7,16 +7,16 @@
 //! Each journey drives headless Chrome over `WebDriver`, through a
 //! chromedriver of its own, against a running bridge (`ferrobridge serve`'s
 //! run path over a `wiremock` CDR and a synthetic mapping tree) and a running
-//! console that serves its release site bundle, so the browser hydrates the
-//! pages the server rendered. The operator signs in at the test OpenID
+//! console that draws every page, whose behaviour FerroUI's script modules
+//! add in the browser. The operator signs in at the test OpenID
 //! Provider of `ferrobridge_testkit::oidc`, whose access token the bridge
 //! validates. Each journey fails on any `SEVERE` entry the browser logs, and
 //! waits on elements explicitly, never on a timer.
 //!
 //! Without `FERROBRIDGE_JOURNEYS=1` each journey returns at once, so the
 //! ordinary suite needs no browser. The `journeys (browser)` job of
-//! `.github/workflows/ci.yml` sets it, installs the pinned Chrome for Testing
-//! and builds the bundle. The book's screenshots are taken on the same stack
+//! `.github/workflows/ci.yml` sets it and installs the pinned Chrome for
+//! Testing. The book's screenshots are taken on the same stack
 //! behind a gate of their own, `FERROBRIDGE_SCREENSHOTS` (`screenshots`),
 //! whose guard runs in the ordinary suite. No specification governs the
 //! journeys: our own design.
@@ -26,8 +26,9 @@ mod configuration;
 mod editor;
 mod engine;
 mod navigation;
-mod no_wasm;
+mod no_script;
 mod playground;
+mod reflow;
 mod screenshots;
 mod shell;
 mod sign_in;

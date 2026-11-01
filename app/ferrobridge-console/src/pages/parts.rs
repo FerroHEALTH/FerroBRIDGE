@@ -11,7 +11,8 @@
 use std::collections::BTreeMap;
 
 use ferrobridge_operator_api::operator::{Language, Owner};
-use ferrohealth_ui::i18n::Phrase;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::{Locale, Phrase};
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::code::{Gravity, LineDiagnostic};
 use ferrohealth_ui::view::diagnostics::{FileFindings, Finding, Position};
@@ -20,12 +21,12 @@ use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
 use ferrohealth_ui::view::tag::{Tag, tag};
 use ferrohealth_ui::view::template::list::{HeadingCount, list_empty};
-use leptos::prelude::*;
 use openehr_mapping_core::diagnostic::{Diagnostic, Severity};
 
 use crate::app::{EDIT, FILES};
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
+use crate::markup::{code, h, t};
 use crate::model::{Refusal, ViewError};
 
 /// The last segment of the wire path `path`, a file's name.
@@ -47,10 +48,10 @@ pub fn edit_href(path: &str) -> String {
 }
 
 /// Returns `text`, a message looked up with `Phrase::open` for each name in
-/// `parts`, with each open placeable drawn as the view `parts` gives it, such
-/// as a bold word or a code link in a page subtitle.
+/// `parts`, with each open placeable drawn as the markup `parts` gives it,
+/// such as a bold word or a code link in a page subtitle.
 #[must_use]
-pub fn with_markup(text: &str, mut parts: Vec<(&str, AnyView)>) -> AnyView {
+pub fn with_markup(text: &str, mut parts: Vec<(&str, Html)>) -> Html {
     let mut rest = text.to_owned();
     let mut drawn = Vec::new();
     loop {
@@ -62,36 +63,36 @@ pub fn with_markup(text: &str, mut parts: Vec<(&str, AnyView)>) -> AnyView {
             })
             .min();
         let Some((found, at)) = next else {
-            drawn.push(view! { {rest} }.into_any());
+            drawn.push(t(&rest));
             break;
         };
         let (name, part) = parts.swap_remove(at);
         let mut marked = rest.split_off(found);
         let after = marked.split_off(Phrase::open_mark(name).len().min(marked.len()));
-        drawn.push(view! { {rest} }.into_any());
+        drawn.push(t(&rest));
         drawn.push(part);
         rest = after;
     }
-    drawn.into_iter().collect_view().into_any()
+    Html::join(drawn)
 }
 
 /// Returns the state of a file or a context with `errors` and `warnings`.
 #[must_use]
-pub fn diagnostics_state(errors: usize, warnings: usize, clean: Msg) -> AnyView {
+pub fn diagnostics_state(l: &Locale, errors: usize, warnings: usize, clean: Msg) -> Html {
     if errors > 0 {
         state(
             Mark::Bad,
-            tr_with(Msg::CountErrors, &[("count", errors.into())]),
+            tr_with(l, Msg::CountErrors, &[("count", errors.into())]),
             None,
         )
     } else if warnings > 0 {
         state(
             Mark::Warn,
-            tr_with(Msg::CountWarnings, &[("count", warnings.into())]),
+            tr_with(l, Msg::CountWarnings, &[("count", warnings.into())]),
             None,
         )
     } else {
-        state(Mark::Ok, tr(clean), None)
+        state(Mark::Ok, tr(l, clean), None)
     }
 }
 
@@ -111,24 +112,27 @@ pub fn tally<'a>(diagnostics: impl IntoIterator<Item = &'a Diagnostic>) -> (usiz
 /// Returns the tag of a file's `owner`: the lock of a provisioned file the
 /// console never writes (F4), or the console's own.
 #[must_use]
-pub fn owner_tag(owner: Owner) -> AnyView {
+pub fn owner_tag(l: &Locale, owner: Owner) -> Html {
     match owner {
-        Owner::Provisioned => Tag::new(tr(Msg::OwnerProvisioned))
-            .locked(tr(Msg::OwnerProvisionedTitle))
+        Owner::Provisioned => Tag::new(tr(l, Msg::OwnerProvisioned))
+            .locked(tr(l, Msg::OwnerProvisionedTitle))
             .view(),
-        Owner::Console => Tag::new(tr(Msg::OwnerConsole))
-            .title(tr(Msg::OwnerConsoleTitle))
+        Owner::Console => Tag::new(tr(l, Msg::OwnerConsole))
+            .title(tr(l, Msg::OwnerConsoleTitle))
             .view(),
     }
 }
 
 /// The word of a file's `owner`.
 #[must_use]
-pub fn owner_word(owner: Owner) -> String {
-    tr(match owner {
-        Owner::Provisioned => Msg::OwnerProvisioned,
-        Owner::Console => Msg::OwnerConsole,
-    })
+pub fn owner_word(l: &Locale, owner: Owner) -> String {
+    tr(
+        l,
+        match owner {
+            Owner::Provisioned => Msg::OwnerProvisioned,
+            Owner::Console => Msg::OwnerConsole,
+        },
+    )
 }
 
 /// The name of a mapping `language`.
@@ -142,7 +146,7 @@ pub const fn language_name(language: Language) -> &'static str {
 
 /// Returns the tag of a mapping `language`.
 #[must_use]
-pub fn language_tag(language: Language) -> AnyView {
+pub fn language_tag(language: Language) -> Html {
     tag(language_name(language))
 }
 
@@ -229,8 +233,9 @@ pub fn by_file(diagnostics: &[Diagnostic]) -> Vec<FileFindings> {
 /// Returns one part of a tab panel (B10): `title` with its `count`, over
 /// `body`.
 #[must_use]
-pub fn section(title: String, count: Option<u64>, body: AnyView) -> AnyView {
+pub fn section(l: &Locale, title: String, count: Option<u64>, body: Html) -> Html {
     panel_section(
+        l,
         Some(SectionHead {
             title,
             count: count.map(HeadingCount::All),
@@ -243,68 +248,56 @@ pub fn section(title: String, count: Option<u64>, body: AnyView) -> AnyView {
 /// Returns one quiet line: an empty, off or no-match state with a text link
 /// at most.
 #[must_use]
-pub fn quiet(sentence: String, link: Option<(String, String)>) -> AnyView {
+pub fn quiet(sentence: String, link: Option<(String, String)>) -> Html {
     list_empty(sentence, link)
 }
 
 /// Returns the console's fault `fault` in the place of what it kept from
 /// the page, with the way to try again.
 #[must_use]
-pub fn faulted(fault_of: &ViewError, again: &str) -> AnyView {
-    let alert = fault(fault_of.text()).into_any();
-    let again = again.to_owned();
-    view! {
-        <div class="fui-stack">
-            {alert}
-            <p>
-                <a href=again class="fui-button fui-button-secondary">
-                    {ferrohealth_ui::icon::icon(Glyph::REFRESH_CW, "16")}
-                    {tr(Msg::TryAgain)}
-                </a>
-            </p>
-        </div>
-    }
-    .into_any()
+pub fn faulted(l: &Locale, fault_of: &ViewError, again: &str) -> Html {
+    h(format!(
+        r#"<div class="fui-stack">{alert}<p><a href="{again}" class="fui-button fui-button-secondary">{glyph}{words}</a></p></div>"#,
+        alert = fault(fault_of.text(l)),
+        again = t(again),
+        glyph = ferrohealth_ui::icon::icon(Glyph::REFRESH_CW, "16"),
+        words = t(tr(l, Msg::TryAgain)),
+    ))
 }
 
 /// Returns the bridge's refusal `refusal` in the place of what it refused.
 #[must_use]
-pub fn refused(refusal: &Refusal) -> AnyView {
+pub fn refused(l: &Locale, refusal: &Refusal) -> Html {
     let shown = ferrohealth_ui::view::refusal::Refusal {
         status: refusal.status().map(|status| status.as_u16()),
-        summary: refusal.text(),
+        summary: refusal.text(l),
         issues: Vec::new(),
         request: None,
         evidence: None,
     };
-    ferrohealth_ui::view::refusal::refusal(&shown).into_any()
+    ferrohealth_ui::view::refusal::refusal(l, &shown)
 }
 
 /// Returns the line that says the operator API is off on this bridge, with
 /// the configuration key that turns it on.
 #[must_use]
-pub fn operator_off() -> AnyView {
-    view! {
-        <div class="fui-stack">
-            {quiet(tr(Msg::OperatorOff), None)}
-            <p class="fui-small fui-muted">
-                <code>"[operator] enabled = false"</code>
-                " · "
-                {tr(Msg::OperatorOffHint)}
-            </p>
-        </div>
-    }
-    .into_any()
+pub fn operator_off(l: &Locale) -> Html {
+    h(format!(
+        r#"<div class="fui-stack">{quiet}<p class="fui-small fui-muted">{key} · {hint}</p></div>"#,
+        quiet = quiet(tr(l, Msg::OperatorOff), None),
+        key = code("[operator] enabled = false"),
+        hint = t(tr(l, Msg::OperatorOffHint)),
+    ))
 }
 
 /// Returns what a page draws in place of a document the bridge refused:
 /// the operator API's off line for its `404`, and the refusal otherwise.
 #[must_use]
-pub fn refused_operator(refusal: &Refusal) -> AnyView {
+pub fn refused_operator(l: &Locale, refusal: &Refusal) -> Html {
     if refusal.not_served() {
-        operator_off()
+        operator_off(l)
     } else {
-        refused(refusal)
+        refused(l, refusal)
     }
 }
 

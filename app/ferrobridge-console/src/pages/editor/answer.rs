@@ -4,8 +4,7 @@
 //! What the bridge answers a post of the editor.
 //!
 //! The reason and the path are checked, then the check, the confirmation or
-//! the save is sent. The server runs it for the editor's post and its server
-//! function alike.
+//! the save is sent.
 
 use crate::actions::{EditorAnswer, EditorPost, Field};
 use crate::bridge::AccessToken;

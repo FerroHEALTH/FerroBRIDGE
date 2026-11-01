@@ -1,39 +1,37 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's own components: the mapping editor and the playground's
-//! input.
-//!
-//! Each draws the library's code editor with state it shares with the
-//! console's own code (FerroUI `docs/consoles.md`, "What the console owns").
+//! The console's two uses of the library's code editor: the mapping editor
+//! and the playground's input.
 //!
 //! The mapping editor is the library's code editor (B2) beside the
-//! diagnostics of its draft (B3), whose caret and current line the two
-//! share. It sits inside the editor page's form, so its text area posts the
-//! draft, with no WebAssembly and through the server function alike. The
-//! console keeps no copy of the text: each editor takes the `_by_edit` form
-//! and its text signal holds the opening text alone, so a key costs the
-//! console nothing (FerroUI #478). No specification governs the console:
-//! our own design.
+//! diagnostics of its draft (B3), whose caret and current line the
+//! library's `editor` module keeps in step. It sits inside the editor
+//! page's form, so its text area posts the draft as any form control does
+//! (FerroUI `docs/consoles.md`, "An action that answers on its page"). No
+//! specification governs the console: our own design.
+
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::diagnostics::{DiagnosticsWords, FileFindings, Position};
+use ferrohealth_ui::view::editor::{
+    Editor, EditorWords, LineMark, MarkKind, Opened, Panel, code_editor, editor_diagnostics,
+    editor_panel, editor_split,
+};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections_card};
 use ferrohealth_ui::view::template::list::list_empty;
-use ferrohealth_ui::widget::editor::{
-    Editor, EditorWords, LineMark, MarkKind, Opened, Panel, editor_diagnostics,
-    editor_panel_by_edit, editor_split,
-};
-use leptos::prelude::*;
-use serde::{Deserialize, Serialize};
+
+use crate::markup::{h, t};
 
 /// The id and name of the editor's text area, which the page's form posts
 /// as the draft.
 pub const DRAFT: &str = "draft";
 
-/// The words the mapping editor draws beside the library's own, resolved
-/// on the server in the page's locale.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// The words the mapping editor draws beside the library's own, in the
+/// page's locale.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EditorText {
     /// The text area's accessible name.
     pub label: String,
@@ -72,71 +70,60 @@ fn marks_of(findings: &FileFindings) -> Vec<LineMark> {
     marks
 }
 
-/// The mapping editor: the code editor of `draft` beside the diagnostics
-/// `findings` of its last check, in step with its caret.
-#[component]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "a component takes its props by value"
-)]
-#[expect(
-    clippy::must_use_candidate,
-    reason = "the #[component] macro drops a #[must_use] from the function it writes"
-)]
-pub fn MappingEditor(
-    /// The draft the text area holds.
+/// Returns the mapping editor in `locale`: the code editor of `draft`
+/// beside the diagnostics `findings` of its last check, measured against
+/// `opened`, with the console's words `text`.
+#[must_use]
+pub fn mapping_editor(
+    locale: &Locale,
     draft: String,
-    /// What the draft is measured against.
     opened: Opened,
-    /// The findings of the draft's last check, or of the file as loaded.
-    findings: FileFindings,
-    /// The console's words.
+    findings: &FileFindings,
     text: EditorText,
-    /// The code editor's own words.
-    words: EditorWords,
-    /// The diagnostics list's own words.
-    rows: DiagnosticsWords,
-) -> impl IntoView {
-    let caret = RwSignal::new(Position::default());
-    let marks = Signal::stored(marks_of(&findings));
+) -> Html {
     let field = Editor {
         id: DRAFT.into(),
         language: Language::Yaml,
-        text: Signal::stored(draft),
-        marks,
-        editable: Signal::stored(true),
+        text: draft,
+        marks: marks_of(findings),
+        editable: true,
     };
-    let check = view! {
-        <button type="submit" name="decision" value="check" class=Variant::Secondary.small()>
-            {label(Some(ferrohealth_ui::icon::Glyph::LIST_CHECKS), text.check.clone())}
-        </button>
-    }
-    .into_any();
-    let panel = editor_panel_by_edit(
-        Panel {
-            editor: field.clone(),
-            label: text.label.clone(),
-            lead: text.lead.clone(),
-            facts: text.facts.clone(),
-            opened,
-            caret,
-            tools: Some(check),
-            end: None,
-            words,
-        },
-        // NOTE: no specification governs this: our own design; the form posts the
-        // text area's draft, so the console needs no copy of the edits.
-        |_edit| {},
-    );
-    let count = u64::try_from(findings.findings.len()).unwrap_or(u64::MAX);
+    let check = h(format!(
+        r#"<button type="submit" name="decision" value="check" class="{}">{}</button>"#,
+        Variant::Secondary.small(),
+        label(
+            Some(ferrohealth_ui::icon::Glyph::LIST_CHECKS),
+            text.check.clone()
+        ),
+    ));
+    let caret = Position::default();
     let body = if findings.findings.is_empty() {
         list_empty(text.none.clone(), None)
     } else {
-        editor_diagnostics(&text.diagnostics, &findings, &rows, field, caret)
+        editor_diagnostics(
+            &text.diagnostics,
+            findings,
+            &DiagnosticsWords::of(locale),
+            &field,
+            caret,
+        )
     };
+    let panel = editor_panel(Panel {
+        editor: field,
+        label: text.label.clone(),
+        lead: text.lead.clone(),
+        facts: text.facts.clone(),
+        opened,
+        caret,
+        tools: Some(check),
+        end: None,
+        words: EditorWords::of(locale),
+    });
+    let count = u64::try_from(findings.findings.len()).unwrap_or(u64::MAX);
     let side = panel_sections_card(
         text.diagnostics.clone(),
         panel_section(
+            locale,
             Some(SectionHead {
                 title: text.diagnostics,
                 count: Some(count.into()),
@@ -151,35 +138,20 @@ pub fn MappingEditor(
 /// The id and name of the playground's input, which its form posts.
 pub const INPUT: &str = "input";
 
-/// The playground's input: the highlighted editor of the JSON the operator
-/// runs an operation on, which the form around it posts.
-#[component]
-#[expect(
-    clippy::must_use_candidate,
-    reason = "the #[component] macro drops a #[must_use] from the function it writes"
-)]
-pub fn JsonInput(
-    /// The text area's accessible name.
-    label: String,
-    /// The text it holds as the page arrives: what the operator last posted.
-    text: String,
-) -> impl IntoView {
-    let editor = ferrohealth_ui::widget::editor::code_editor_by_edit(
-        Editor {
-            id: INPUT.into(),
-            language: Language::Json,
-            text: Signal::stored(text),
-            marks: Signal::stored(Vec::new()),
-            editable: Signal::stored(true),
-        },
-        // NOTE: no specification governs this: our own design; the form posts the
-        // text area's input, so the console needs no copy of the edits.
-        |_edit| {},
-    );
-    view! {
-        <label for=INPUT class="fui-sr-only">
-            {label}
-        </label>
-        {editor}
-    }
+/// Returns the playground's input: the highlighted editor of the JSON the
+/// operator runs an operation on, named `label`, holding `text`, what the
+/// operator last posted.
+#[must_use]
+pub fn json_input(label: &str, text: String) -> Html {
+    let editor = code_editor(&Editor {
+        id: INPUT.into(),
+        language: Language::Json,
+        text,
+        marks: Vec::new(),
+        editable: true,
+    });
+    h(format!(
+        r#"<label for="{INPUT}" class="fui-sr-only">{}</label>{editor}"#,
+        t(label)
+    ))
 }

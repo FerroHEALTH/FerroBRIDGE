@@ -90,7 +90,7 @@ impl Edge {
 pub fn body(body_limit: usize, timeout: Duration) -> RefusalBody {
     let edge = Edge::new(body_limit, timeout);
     let plain = ferrohealth_server::problem::refusal_body();
-    Arc::new(move |uri, request_id, status, reason| {
+    Arc::new(move |uri, ids, status, reason| {
         let outcome = on_fhir_route(uri.path())
             .then(|| edge.outcome_of(status))
             .flatten();
@@ -101,7 +101,7 @@ pub fn body(body_limit: usize, timeout: Duration) -> RefusalBody {
                 ferrohealth_server::refusal::keep_status(outcome)
             }
             Some(outcome) => outcome,
-            None => plain(uri, request_id, status, reason),
+            None => plain(uri, ids, status, reason),
         }
     })
 }

@@ -16,15 +16,13 @@
 //! The server chooses the locale once per request: the language the
 //! operator chose in Your preferences when the catalog holds it, else the
 //! best language of the request's `Accept-Language` the catalog holds, else
-//! the configured `[server] locale`. [`crate::app::App`] provides it, so the
-//! console's words and the components' words follow the same choice, and
-//! the document writes it as `<html lang>` (WCAG 2.2 SC 3.1.1). The catalog
-//! is embedded in both halves, and the browser takes the server's choice
-//! with the page ([`crate::visit`]), so a page drawn in the browser speaks
-//! as the server's does. No specification governs the catalog layout or the
-//! choice: our own design.
+//! the configured `[server] locale`. The request's [`crate::visit::Visit`]
+//! carries it to every page and component, so the console's words and the
+//! components' words follow the same choice, and the document writes it as
+//! `<html lang>` (WCAG 2.2 SC 3.1.1). No specification governs the catalog
+//! layout or the choice: our own design.
 
-use ferrohealth_ui::i18n::{Arg, Locale, Message, locale};
+use ferrohealth_ui::i18n::{Arg, Locale, Message};
 use fluent_templates::Loader;
 
 pub mod messages;
@@ -50,23 +48,16 @@ pub fn catalog() -> &'static (dyn Loader + Send + Sync) {
     &*CATALOG
 }
 
-/// The console's message `msg` in the page's locale.
+/// The console's message `msg` in `locale`.
 #[must_use]
-pub fn tr(msg: Msg) -> String {
-    tr_in(catalog(), &locale(), msg)
-}
-
-/// The console's message `msg` in the page's locale, with the placeables
-/// `args` filled in.
-#[must_use]
-pub fn tr_with(msg: Msg, args: &[(&'static str, Arg)]) -> String {
-    locale().lookup_with(catalog(), msg.id(), args)
+pub fn tr(locale: &Locale, msg: Msg) -> String {
+    tr_in(catalog(), locale, msg)
 }
 
 /// The console's message `msg` in `locale`, with the placeables `args`
-/// filled in: for a handler, where no page tree is in reach.
+/// filled in.
 #[must_use]
-pub fn tr_in_with(locale: &Locale, msg: Msg, args: &[(&'static str, Arg)]) -> String {
+pub fn tr_with(locale: &Locale, msg: Msg, args: &[(&'static str, Arg)]) -> String {
     locale.lookup_with(catalog(), msg.id(), args)
 }
 
@@ -97,47 +88,21 @@ pub fn shipped() -> Vec<Locale> {
         .collect()
 }
 
-/// The configured locale, English with no configuration in reach.
-#[cfg(not(target_arch = "wasm32"))]
-fn configured() -> Locale {
-    use leptos::context::use_context;
-    use_context::<crate::server::ConsoleState>()
-        .map_or_else(Locale::english, |state| state.settings().locale.clone())
-}
-
-/// The locale the request's browser asks for: the best language of its
-/// `Accept-Language` the catalog holds, else the configured one.
+/// The locale of a request whose preference cookies chose `chosen`: the
+/// language the operator chose when the console ships it, else `browser`,
+/// the one the browser asks for.
 #[must_use]
-#[cfg(not(target_arch = "wasm32"))]
-pub fn browser() -> Locale {
-    use leptos::context::use_context;
-    match use_context::<http::request::Parts>() {
-        Some(parts) => negotiated(&parts.headers, configured()),
-        None => Locale::negotiate_with("", catalog(), configured()),
-    }
-}
-
-/// The locale of the request being served: the language the operator chose
-/// when the console ships it, else the one the browser asks for.
-#[must_use]
-#[cfg(not(target_arch = "wasm32"))]
-pub fn requested() -> Locale {
-    let (preferences, prefix) = crate::visit::requested_preferences();
-    let chosen = crate::visit::chosen_in(&preferences, &prefix)
-        .preferences
-        .language;
+pub fn requested(chosen: &ferrohealth_ui::theme::Language, browser: &Locale) -> Locale {
     chosen
         .tag()
         .filter(|tag| shipped().iter().any(|shipped| shipped.tag() == *tag))
         .and_then(|tag| Locale::parse(tag).ok())
-        .unwrap_or_else(browser)
+        .unwrap_or_else(|| browser.clone())
 }
 
 /// The locale of a request with `headers`: the best language of its
-/// `Accept-Language` the catalog holds, else `configured`. For a plain axum
-/// handler, which runs outside the page tree.
+/// `Accept-Language` the catalog holds, else `configured`.
 #[must_use]
-#[cfg(not(target_arch = "wasm32"))]
 pub fn negotiated(headers: &http::HeaderMap, configured: Locale) -> Locale {
     // NOTE: RFC 9110 §12.5.4: a header that is no visible ASCII names no
     // language, so the request falls to the configured one.

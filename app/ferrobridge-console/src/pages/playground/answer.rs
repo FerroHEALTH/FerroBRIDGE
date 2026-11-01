@@ -4,8 +4,7 @@
 //! What the bridge answers a run of the playground.
 //!
 //! The input is checked, then `$tofhir`, `$toopenehr` or `$validate` is
-//! sent. The server runs it for the playground's post and its server
-//! function alike.
+//! sent.
 
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhir_types::r4::parameters::{Parameters, ParametersParameter, ParametersParameterValue};

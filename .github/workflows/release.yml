@@ -301,11 +301,11 @@ jobs:
       tag: ${{ needs.plan.outputs.tag }}
       version: ${{ needs.plan.outputs.version }}
 
-  # ---- build-console: the operator console's binaries, bundle and image ------
+  # ---- build-console: the operator console's binaries and image -------------
   # A call and nothing else, for the same Build L3 reason. It attaches the
   # console's assets to the draft, so it waits for the draft to exist.
   build-console:
-    name: console (binaries, site bundle, image)
+    name: console (binaries, image)
     needs: [plan, github-release]
     permissions:
       contents: write # attach the console's assets to the draft release
@@ -482,8 +482,7 @@ jobs:
                 || missing="$missing ferrobridge-${TAG}-${target}${suffix}"
             done
           done < <(printf '%s' "$TARGETS" | jq -r '.include[].target')
-          # Every suffix release-console.yml uploads: per console target, and
-          # once for the architecture-independent site bundle.
+          # Every suffix release-console.yml uploads, per console target.
           while IFS= read -r target; do
             for suffix in \
               ".tar.gz" \
@@ -496,10 +495,6 @@ jobs:
                 || missing="$missing ferrobridge-console-${TAG}-${target}${suffix}"
             done
           done < <(printf '%s' "$CONSOLE_TARGETS" | jq -r '.include[].target')
-          for suffix in ".tar.gz" ".tar.gz.sha256sum" ".tar.gz.sigstore.json" ".tar.gz.intoto.jsonl"; do
-            printf '%s\n' "$assets" | grep -Fxq "ferrobridge-console-${TAG}-site${suffix}" \
-              || missing="$missing ferrobridge-console-${TAG}-site${suffix}"
-          done
           printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
           for page in information-sheet instructions-for-use; do
             printf '%s\n' "$assets" | grep -Fxq "ferrobridge-${TAG}-${page}.md" || missing="$missing ferrobridge-${TAG}-${page}.md"

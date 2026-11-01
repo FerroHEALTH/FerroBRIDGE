@@ -2,18 +2,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The console's HTTP service: the health route, the sign-in routes, the
-//! Leptos pages, the form posts they send and the site bundle, under one
-//! set of browser security headers.
+//! pages, the form posts they send and FerroUI's assets, under one set of
+//! browser security headers.
 //!
 //! Every response carries the browser security headers of
-//! `ferrohealth-server`'s `console`: a Content-Security-Policy whose script
-//! source is a nonce minted for that response alone, `nosniff`, `DENY`
-//! framing and no referrer, and every document is `no-store`. Only the site
-//! bundle is compressed. A request that is not a safe method is taken only
-//! from the console's own pages (`ferrohealth_server::same_origin`), and a
-//! session's access token is refreshed before the request it arrives with is
-//! served. The health routes are the family's. No specification governs the
-//! console's HTTP surface: our own design.
+//! `ferrohealth-server`'s `console` (`nosniff`, `DENY` framing, no referrer,
+//! a same-origin opener, `no-store` on every document) under the policy of
+//! a server-rendered console (`ConsoleHeaders::server_rendered`), whose
+//! scripts and styles come from the console alone with no nonce. FerroUI's
+//! assets keep the year-long cache their router sets, under a path that
+//! names the library's version. A request that is not a safe method is taken
+//! only from the console's own pages (`ferrohealth_server::same_origin`),
+//! and a session's access token is refreshed before the request it arrives
+//! with is served. The health routes are the family's. No specification
+//! governs the console's HTTP surface: our own design.
 
 use std::sync::Arc;
 
@@ -24,35 +26,28 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
-use ferrohealth_server::console::{self, ConsoleHeaders, CspNonce};
+use ferrohealth_server::console::{self, ConsoleHeaders};
 use ferrohealth_server::health::Health;
 use ferrohealth_server::same_origin::{self, SameOrigin};
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::Drained;
 use http::header::CONTENT_TYPE;
-use http::{HeaderValue, StatusCode};
-use leptos::config::LeptosOptions;
-use leptos::nonce::Nonce;
-use leptos_axum::LeptosRoutes as _;
-use tower_http::compression::CompressionLayer;
-use tower_http::compression::predicate::{And, Predicate as _, SizeAbove};
+use http::{HeaderValue, Method, StatusCode};
 
 use crate::bridge::{Bridge, BridgeError};
 use crate::config::settings::{OidcSettings, Settings};
 use crate::locale::messages::Msg;
 use crate::locale::{catalog, tr_in};
 use crate::session::Sessions;
+use crate::visit::Visit;
 use ferrohealth_smart::metadata::{Http, ServerMetadata};
 use ferrohealth_smart::oidc::{OidcError, Provider, RelyingParty};
 
 /// The path of the console's summary health route.
 pub const HEALTH: &str = ferrohealth_server::health::SUMMARY;
 
-/// The path the site bundle is served under.
-pub const BUNDLE: &str = "/pkg";
-
-/// The name cargo-leptos gives the site bundle's files under `pkg/`.
-pub const OUTPUT_NAME: &str = "ferrobridge-console";
+/// The largest form body a page takes: a draft, a run's input.
+pub const POST_MAX: usize = 2 * 1024 * 1024;
 
 /// What every request handler shares.
 #[derive(Debug, Clone)]
@@ -187,34 +182,20 @@ fn relying_party(oidc: &OidcSettings, settings: &Settings) -> Result<RelyingPart
     Ok(relying_party)
 }
 
-/// The Leptos options the console renders with: its site bundle under the
-/// configured site root and its listen address.
-#[must_use]
-pub fn leptos_options(settings: &Settings) -> LeptosOptions {
-    LeptosOptions::builder()
-        .output_name(OUTPUT_NAME)
-        .site_root(settings.site_root.to_string_lossy().into_owned())
-        .site_pkg_dir("pkg")
-        .site_addr(settings.listen)
-        .build()
-}
-
 /// Builds the console's whole HTTP service over `state`.
 pub fn router(state: ConsoleState) -> axum::Router {
-    let options = leptos_options(state.settings());
     let form_action = form_action(state.settings());
-    let routes = leptos_axum::generate_route_list(crate::app::App);
-    let context = page_context(state.clone(), options.clone());
     let health = ferrohealth_server::health::routes(state.health().clone());
     let same_origin = same_origin_check(state.settings());
     let pages = axum::Router::new()
-        .route_service(HEALTH, health.clone())
-        .route_service(ferrohealth_server::health::LIVENESS, health.clone())
-        .route_service(ferrohealth_server::health::READINESS, health)
-        .route(crate::app::STYLESHEET, get(stylesheet))
-        .route(crate::app::THEME, get(theme))
+        .merge(health)
+        .nest(
+            ferrohealth_ui::serve::PREFIX,
+            ferrohealth_ui::serve::axum_router::router(),
+        )
         .route(crate::app::MARK_LIGHT, get(mark_light))
         .route(crate::app::MARK_DARK, get(mark_dark))
+        .route(crate::app::FAVICON, get(favicon))
         .route(crate::pages::about::INFO_JSON, get(info_json))
         .route(
             crate::pages::search::ANSWER,
@@ -229,14 +210,7 @@ pub fn router(state: ConsoleState) -> axum::Router {
             crate::oidc::logout::LOGOUT,
             post(crate::oidc::logout::logout),
         )
-        .leptos_routes_with_context(&options, routes, context.clone(), {
-            let options = options.clone();
-            move || crate::app::document(options.clone())
-        })
-        .fallback(leptos_axum::file_and_error_handler_with_context(
-            context,
-            crate::app::document,
-        ))
+        .fallback(page)
         .layer(axum::middleware::from_fn(
             crate::oidc::refresh::refresh_session,
         ))
@@ -246,17 +220,39 @@ pub fn router(state: ConsoleState) -> axum::Router {
             },
         ))
         .layer(Extension(state));
-    let headers = ConsoleHeaders::new(form_action).with_bundle(BUNDLE);
-    ferrohealth_ui::widget::action::draw_answers(
-        pages
-            .layer(bundle_compression())
-            .layer(axum::middleware::from_fn(
-                move |request: Request, next: Next| {
-                    console::headers(headers.clone(), request, next)
-                },
-            ))
-            .with_state(options),
-    )
+    let headers = ConsoleHeaders::server_rendered(form_action);
+    pages.layer(axum::middleware::from_fn(
+        move |request: Request, next: Next| console::headers(headers.clone(), request, next),
+    ))
+}
+
+/// Draws the page the request names: a `GET` reads it, and a `POST` to a
+/// page that takes one draws it with the post's answer.
+async fn page(Extension(state): Extension<ConsoleState>, request: Request) -> Response {
+    let (parts, body) = request.into_parts();
+    let visit = Visit::of(&state, &parts);
+    match parts.method {
+        Method::GET | Method::HEAD => {
+            let drawn = crate::routes::draw(&visit).await;
+            crate::app::render(&visit, drawn).await
+        }
+        Method::POST => {
+            if visit.session != crate::model::SessionState::SignedIn {
+                let drawn = crate::routes::draw(&visit)
+                    .await
+                    .with_status(StatusCode::UNAUTHORIZED);
+                return crate::app::render(&visit, drawn).await;
+            }
+            let Ok(bytes) = axum::body::to_bytes(body, POST_MAX).await else {
+                return StatusCode::PAYLOAD_TOO_LARGE.into_response();
+            };
+            match crate::routes::posted(&visit, &String::from_utf8_lossy(&bytes)).await {
+                Some(answer) => answer,
+                None => StatusCode::METHOD_NOT_ALLOWED.into_response(),
+            }
+        }
+        _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
+    }
 }
 
 /// The same-origin check of every request that is not a safe method, every
@@ -317,28 +313,16 @@ const MARK_LIGHT_SVG: &str = include_str!("../../../assets/brand/ferrobridge-ico
 /// The brand mark the lockup draws in the dark theme.
 const MARK_DARK_SVG: &str = include_str!("../../../assets/brand/ferrobridge-icon-dark.svg");
 
-/// A stylesheet answer of `text`.
-fn css(text: &'static str) -> Response {
+/// The browser's icon the console ships, the brand mark.
+const FAVICON_ICO: &[u8] = include_bytes!("../public/favicon.ico");
+
+/// Serves the browser's icon.
+async fn favicon() -> Response {
     (
-        [(
-            CONTENT_TYPE,
-            HeaderValue::from_static("text/css; charset=utf-8"),
-        )],
-        text,
+        [(CONTENT_TYPE, HeaderValue::from_static("image/x-icon"))],
+        FAVICON_ICO,
     )
         .into_response()
-}
-
-/// Serves the `ferrohealth_ui` stylesheet, the roles and every component
-/// class the console's views paint with.
-async fn stylesheet() -> Response {
-    css(ferrohealth_ui::style::STYLESHEET)
-}
-
-/// Serves the FerroBRIDGE theme of `ferrohealth_ui`: the brand's accents
-/// and the two preview accents of Your preferences.
-async fn theme() -> Response {
-    css(crate::app::BRAND.theme())
 }
 
 /// An SVG image answer of `text`.
@@ -391,95 +375,6 @@ async fn mark_light() -> Response {
 /// Serves the brand mark of the dark theme.
 async fn mark_dark() -> Response {
     svg(MARK_DARK_SVG)
-}
-
-/// The media types of the site bundle: the WebAssembly, its JavaScript glue
-/// and the stylesheet.
-const BUNDLE_TYPES: [&str; 4] = [
-    "application/wasm",
-    "text/javascript",
-    "application/javascript",
-    "text/css",
-];
-
-/// A test of a response, the shape the compression layer's predicate takes.
-type ResponsePredicate = fn(StatusCode, http::Version, &http::HeaderMap, &http::Extensions) -> bool;
-
-/// Whether a response carries a file of the site bundle, by its media type.
-fn is_bundle(
-    _status: StatusCode,
-    _version: http::Version,
-    headers: &http::HeaderMap,
-    _extensions: &http::Extensions,
-) -> bool {
-    headers
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|media| BUNDLE_TYPES.iter().any(|bundle| media.starts_with(bundle)))
-}
-
-/// Compresses the site bundle with brotli or gzip, as the request's
-/// `Accept-Encoding` chooses, and marks it `Vary: Accept-Encoding`.
-///
-/// Only the bundle is compressed. A document, the answer to a form post
-/// among them, can carry what the operator entered beside data an attacker would want,
-/// so it is never compressed, which keeps a compression side channel (BREACH)
-/// shut. The Leptos book (`deployment/binary_size`) has a site serve its
-/// WebAssembly compressed.
-fn bundle_compression() -> CompressionLayer<And<SizeAbove, ResponsePredicate>> {
-    let bundle: ResponsePredicate = is_bundle;
-    CompressionLayer::new()
-        .br(true)
-        .gzip(true)
-        .compress_when(SizeAbove::new(256).and(bundle))
-}
-
-/// What every render of a page provides: the console's state, the Leptos
-/// options, the request's nonce and a fresh set of reads from the bridge.
-fn page_context(
-    state: ConsoleState,
-    options: LeptosOptions,
-) -> impl Fn() + Clone + Send + Sync + 'static {
-    move || {
-        leptos::context::provide_context(state.clone());
-        leptos::context::provide_context(options.clone());
-        leptos::context::provide_context(crate::load::cached::Reads::new());
-        provide_request_nonce();
-    }
-}
-
-/// Draws the page at the address of `parts` with what `extra` provides
-/// beside the page context: the answer of a form post.
-pub async fn render(
-    state: ConsoleState,
-    parts: http::request::Parts,
-    extra: impl Fn() + Clone + Send + Sync + 'static,
-) -> Response {
-    let options = leptos_options(state.settings());
-    let context = page_context(state, options.clone());
-    let handler = leptos_axum::render_app_async_with_context(
-        move || {
-            context();
-            extra();
-        },
-        move || crate::app::document(options.clone()),
-    );
-    handler(Request::from_parts(parts, axum::body::Body::empty())).await
-}
-
-/// Re-provides the request's nonce into the render, so the bootstrap script
-/// carries the nonce the response header authorizes.
-///
-/// `leptos_axum` provides a nonce of its own before this runs, and the
-/// request parts it provides carry the one `ferrohealth_server::console`
-/// minted, which replaces it.
-fn provide_request_nonce() {
-    let Some(parts) = leptos::context::use_context::<http::request::Parts>() else {
-        return;
-    };
-    if let Some(nonce) = parts.extensions.get::<CspNonce>() {
-        leptos::context::provide_context(Nonce::from_value(nonce.as_str()));
-    }
 }
 
 /// Serves `router` on `listener` until `shutdown` resolves, then drains as

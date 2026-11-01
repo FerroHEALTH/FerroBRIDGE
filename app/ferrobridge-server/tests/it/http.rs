@@ -287,9 +287,15 @@ async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_req
     assert_eq!(Some("error"), issue["severity"].as_str());
     assert_eq!(Some("exception"), issue["code"].as_str());
     let diagnostics = issue["diagnostics"].as_str().unwrap_or_default();
+    let server = diagnostics
+        .strip_prefix(
+            "the server failed while handling this request; \
+             request id corr-fhir-panic, server request id ",
+        )
+        .unwrap_or_default();
     assert!(
-        !diagnostics.contains("corr-fhir-panic") && diagnostics.contains("request id "),
-        "the outcome names the server's own request id, never the client's: {issue}"
+        uuid::Uuid::try_parse(server).is_ok(),
+        "the outcome names the id the client sees and the server's own: {issue}"
     );
     assert!(
         !issue.to_string().contains("synthetic-clinical-text"),

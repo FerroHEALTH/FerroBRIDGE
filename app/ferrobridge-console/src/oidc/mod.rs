@@ -157,12 +157,9 @@ async fn stopped_page(
     status: StatusCode,
     arrived: crate::pages::sign_in::Arrived,
 ) -> Response {
-    let mut response = crate::server::render(state, parts, move || {
-        leptos::context::provide_context(arrived.clone());
-    })
-    .await;
-    *response.status_mut() = status;
-    response
+    let visit = crate::visit::Visit::of(&state, &parts);
+    let drawn = crate::pages::sign_in::sign_in_page(&visit, Some(arrived)).with_status(status);
+    crate::app::render(&visit, drawn).await
 }
 
 /// The notice of a stopped sign-in in `locale`: `text`, and `detail` for
