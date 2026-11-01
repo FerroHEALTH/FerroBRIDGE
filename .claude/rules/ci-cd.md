@@ -86,6 +86,11 @@ Fourteen workflows:
   not set the issue type and fields, and the issue then lands with its label
   alone, `issue-workflow.md` §Type, priority and labels), and fails only when
   a release could not be read (`docs/ci-cd.md`).
+- `.github/workflows/ratchet-tighten.yml`: the daily lane that runs the
+  ratchet guards' `--update` on `main` and opens, or moves, one pull request
+  holding only the lowered baselines. A guard fails a rise and passes a fall
+  with a note, so a pull request never rewrites a shared baseline and
+  conflicts with no other one on it (`docs/ci-cd.md`).
 - `.github/workflows/publish-crates.yml`: the between-releases crates.io lane,
   a manual dispatch that is a dry run unless `publish` is set. It shares
   `scripts/release/publish-crates.sh` with the release lane; the rules are

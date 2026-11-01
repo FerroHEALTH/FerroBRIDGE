@@ -239,7 +239,9 @@ particular here:
   `number-decimal` messages.
 - `scripts/checks/stray-literals.sh app/ferrobridge-console/src` runs in CI
   against `scripts/checks/stray-literals.baseline`, which names no file: a
-  console string outside the catalog fails it. A literal no page draws (a
+  console string outside the catalog fails it. A file below its count
+  passes with a note and the pull request leaves the baseline alone; the
+  `Ratchet tighten` workflow lowers the counts on `main` (#1363). A literal no page draws (a
   protocol token, a header value, markup whose words are its placeables) is
   allowed in `scripts/checks/stray-literals.allow` with its reason, and the
   files that speak only to the terminal (`cli.rs`, `command.rs`, `config/`)
