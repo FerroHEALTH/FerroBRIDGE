@@ -276,7 +276,27 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: File-length ratchet self-test
+        run: bash scripts/checks/file-length.sh --self-test
       - run: bash scripts/checks/file-length.sh
+
+  # The duplication ratchet: the duplicated lines of the hand-written Rust may
+  # fall and never rise (`.claude/rules/rust-style.md` §Code is written once,
+  # #1359). jscpd runs from its pinned image; a fall passes with a note.
+  duplication:
+    name: duplication
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Duplication ratchet self-test
+        run: bash scripts/checks/duplication.sh --self-test
+      - name: The duplicated lines have not risen
+        run: bash scripts/checks/duplication.sh
 
   # The stray-literal guard: a string the operator console draws belongs in
   # its catalog under app/ferrobridge-console/locales/, and a file may hold no
@@ -1414,6 +1434,7 @@ jobs:
       - container-config
       - comment-style
       - file-length
+      - duplication
       - stray-literals
       - versions
       - profile-packages

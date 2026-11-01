@@ -38,7 +38,8 @@ the committed guards, so both are live code from day one and both need a gate.
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
 | `usage-report-off` | `scripts/checks/usage-report-off.sh --self-test`, then the guard itself: every launcher of the server in a script, a workflow or a Rust test switches the usage report off |
 | `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` and every issue `Command::pending_issue` names is open |
-| `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines |
+| `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines, after its `--self-test`; a listed breach may shrink and never grow |
+| `duplication` | `scripts/checks/duplication.sh --self-test`, then the guard: jscpd from its pinned image over the hand-written Rust, the duplicated lines held to `scripts/checks/duplication.count`; a rise fails and names both places of each new block, a fall passes with a note (#1359) |
 | `changelog-guard` | `scripts/checks/changelog-guard.sh --self-test`, then the guard on a pull request: a change to `app/`, `crates/`, `docker/`, `compose.yaml` or the root Cargo manifests adds a fragment under `changelog.d/` unless it carries `no-changelog`, and no change writes under `[Unreleased]` |
 | `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, and of `scripts/deploy-probe.sh` against a stub `curl` |
 
@@ -534,6 +535,11 @@ the lane reads a `RATCHET_TIGHTEN_TOKEN` secret (a token with contents and
 pull-requests write) when one is set, and otherwise says in the pull request
 body to close and reopen it (#1363, the rule FerroEHR adopted in
 FerroHEALTH/FerroEHR#4554). No specification governs this: our own design.
+
+The duplication guard (`scripts/checks/duplication.sh`) and the file-length
+allow-list (`scripts/checks/file-length.sh`) are ratchets of the same kind
+(#1359): each fails a rise, passes a fall with a note, and has an `--update`
+that never raises, and the lane lowers all three in its one pull request.
 
 ## Triggers and concurrency
 

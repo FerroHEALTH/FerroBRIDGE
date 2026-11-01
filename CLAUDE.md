@@ -296,7 +296,10 @@ the testkit tool crate. Beside it:
   change and no edit of `[Unreleased]`, beside `scripts/release/changelog.sh`,
   which checks the fragments and assembles them at the cut;
   `pin-freshness.sh`, every pin no ecosystem watches against its newest
-  upstream release; and `conformance.sh`, the pass-list gate over the six
+  upstream release; `duplication.sh`, the jscpd ratchet that holds the
+  duplicated lines of the hand-written Rust to `duplication.count`, and
+  `file-length.sh`, the 1000-line cap with its allow-list, both ratchets
+  that fail a rise, pass a fall and only tighten (#1359); and `conformance.sh`, the pass-list gate over the six
   corpora under `conformance/` (fifteen: the two mapping libraries, the
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
   FHIR examples packages per version, STU3 to R6, the R4 facade, the HL7
