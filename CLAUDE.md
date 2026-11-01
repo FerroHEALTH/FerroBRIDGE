@@ -307,9 +307,10 @@ the testkit tool crate. Beside it:
   CI lanes a pull request runs, and `fast.sh` is the default local gate over
   the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
-  fifteen workflows (CI, PR guards, Docs, Scorecard, CodeQL, SonarQube Cloud,
+  sixteen workflows (CI, PR guards, Docs, Scorecard, CodeQL, SonarQube Cloud,
   Release, Release build, Release image, Release console, Scan and tag images,
-  Published image scan, Publish crates, Pin freshness, Fuzz). `ci.yml` runs
+  Published image scan, Publish crates, Pin freshness, Fuzz, Ratchet
+  tighten). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
   `pr-guards.yml` re-runs the guard a changed label affects
@@ -330,7 +331,9 @@ the testkit tool crate. Beside it:
   applied. `security/vex/rust-advisories.openvex.json` is generated from
   `deny.toml` and checked in the `cargo-deny` job. `pin-freshness.yml` reads
   every pin no Dependabot ecosystem covers against its newest upstream
-  release each week.
+  release each week. `ratchet-tighten.yml` lowers the ratchet baselines on
+  `main` once a day through one pull request, since a pull request that
+  lowers a count passes the guard and leaves the baseline alone.
 - Root markdown: this file, `README.md`, and the community and governance set.
 
 When the workspace lands, each crate carries its own `CLAUDE.md` with

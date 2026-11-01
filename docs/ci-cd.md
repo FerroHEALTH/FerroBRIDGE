@@ -518,6 +518,23 @@ sanitizer flags stable does not carry; the `fuzz/` crate is excluded from the
 workspace so the product stays on the pinned stable toolchain. Its
 `cargo-fuzz` pin is a `docs/VERSIONS.md` row the versions guard checks.
 
+## The ratchet lane beside this one
+
+The stray-literal guard is a ratchet: `scripts/checks/stray-literals.baseline`
+holds the count each file may still hold, a rise fails the `stray-literals`
+job, and a fall passes with a one-line note. A pull request that moves strings
+to the catalogs therefore leaves the baseline alone, and two such pull requests
+never conflict on it. `.github/workflows/ratchet-tighten.yml` writes the fall
+down instead: once a day and on dispatch it checks that nothing rose on `main`,
+runs the guard's `--update`, and opens one pull request that holds only the
+baseline, or moves its open one; when nothing fell it does nothing. It commits
+through the Git Data REST API, so GitHub signs the commit, and it never pushes
+to `main`. A pull request opened with the workflow token starts no checks, so
+the lane reads a `RATCHET_TIGHTEN_TOKEN` secret (a token with contents and
+pull-requests write) when one is set, and otherwise says in the pull request
+body to close and reopen it (#1363, the rule FerroEHR adopted in
+FerroHEALTH/FerroEHR#4554). No specification governs this: our own design.
+
 ## Triggers and concurrency
 
 `push` to `main`, `pull_request` against `main`, `merge_group`, and
