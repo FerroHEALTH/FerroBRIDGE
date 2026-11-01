@@ -2189,7 +2189,7 @@ specification governs process plumbing: our own design.
 `openehr-sdt`, `openehr-query`, `openehr-term` 0.0.109 (re-verified on 2026-10-27); `serde-saphyr` 2.0.0 (the
 maintained serde YAML with anchors, aliases, merge keys and spans;
 `serde_yaml` is archived, `serde-yaml-ng` and `serde_yml` unmaintained);
-`jsonschema` 0.59.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
+`jsonschema` 0.60.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
 0.7.1, `reqwest` 0.13.5 with rustls, `backon` 1.6.0; `sqlx` 0.9.0 for checked
 queries and `tokio-postgres` 0.7.18 for binary `COPY`; `redb` 4.3.0 for the
 identity store; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
