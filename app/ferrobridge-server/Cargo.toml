@@ -24,6 +24,8 @@ path = "src/main.rs"
 anyhow.workspace = true
 # The per-call engine implements the openehr-its client runtime's Transport.
 async-trait.workspace = true
+# The Basic credential of an Audit Record Repository (RFC 7617 §2).
+base64.workspace = true
 axum.workspace = true
 clap.workspace = true
 ferrobridge-term = { workspace = true, features = ["smart"] }
@@ -54,6 +56,10 @@ ferrohealth-secret.workspace = true
 ferrohealth-server.workspace = true
 ferrohealth-telemetry = { workspace = true, features = ["axum"] }
 ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
+# The facade's access record (EHDS Annex II 3.2) and its BALP `AuditEvent`,
+# spooled and sent over the ITI-20 ATX: FHIR Feed. Only this crate links them.
+ehds-logging = { workspace = true, features = ["balp"] }
+ihe-atna = { workspace = true, features = ["balp", "smart"] }
 # The AMQP publisher of the events lane.
 lapin.workspace = true
 # The AOM2 operational template the adl2 route serves, and the HRID parser an

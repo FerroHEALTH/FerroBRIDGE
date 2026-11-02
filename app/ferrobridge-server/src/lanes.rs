@@ -84,6 +84,18 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
     }
+    if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
+        let base = url::Url::parse(&mounted.settings().base_url)
+            .context("reading [facade] base_url as the address the access records name")?;
+        let log = crate::audit::AccessLog::open(audit, &base, mounted.client().base_url())
+            .context("opening the access-record spool")?;
+        tracing::info!(
+            lane = "audit",
+            repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
+            "the facade records every access in the audit trail"
+        );
+        state = state.with_access_log(Arc::new(log));
+    }
     if let Some(operator) = settings.operator.as_ref() {
         let operator = build_operator(
             settings,
@@ -345,7 +357,8 @@ async fn start_hl7v2(
         socket,
         face: Arc::new(
             hl7v2::Face::new(facade, corpus, terminology, lane)
-                .with_usage(Arc::clone(state.usage_window())),
+                .with_usage(Arc::clone(state.usage_window()))
+                .with_access_log(state.access_log().cloned(), lane.listen),
         ),
         listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout()),
         listening: listening.clone(),

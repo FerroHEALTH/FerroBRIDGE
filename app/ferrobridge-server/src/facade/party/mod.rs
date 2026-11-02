@@ -256,6 +256,11 @@ pub(crate) fn accept(
     id: &str,
     held: &Held,
 ) -> Result<CanonicalParty, Refusal> {
+    crate::audit::reach::touched(
+        crate::audit::reach::Touch::Read,
+        None,
+        crate::audit::reach::canonical(&held.value),
+    );
     let template = held
         .value
         .pointer("/archetype_details/template_id/value")

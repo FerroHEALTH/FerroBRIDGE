@@ -37,6 +37,9 @@ pub enum Settled {
     Unkeyed,
     /// MSH-4 names a sending facility the face does not accept.
     Sender,
+    /// The message's import record could not be stored, so its commit is not
+    /// acknowledged.
+    Unrecorded,
 }
 
 /// What one settled message produced, for the log.
@@ -63,6 +66,16 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
                 location: Some(ferrobridge_hl7v2::parse::Location::segment("MSH", 1).with_field(4)),
                 code: ErrorCode::Application,
                 text: String::from("MSH-4 names a sending facility this receiver does not accept"),
+            }],
+        ),
+        // NOTE: HL7 v2.5.1 §2.9.2.2: AR is the answer a reason unrelated to the content earns,
+        // and a resend is safe, since the identity map recognises a committed MSH-10.
+        Settled::Unrecorded => (
+            Code::Reject,
+            vec![Error {
+                location: None,
+                code: ErrorCode::Application,
+                text: String::from("the message could not be recorded in the audit trail"),
             }],
         ),
         Settled::Unkeyed => (

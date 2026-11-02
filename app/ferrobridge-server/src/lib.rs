@@ -12,6 +12,7 @@
 //! to stop. `main.rs` only hands in the arguments and returns the exit code.
 #![doc(test(attr(deny(warnings))))]
 
+pub mod audit;
 pub mod banner;
 pub mod boot;
 pub mod build_info;
@@ -512,7 +513,7 @@ fn clap_exit(error: &clap::Error) -> u8 {
 }
 
 /// Returns `error` and every cause behind it as one line.
-fn chain(error: &dyn std::error::Error) -> String {
+pub(crate) fn chain(error: &dyn std::error::Error) -> String {
     let mut line = error.to_string();
     let mut cause = error.source();
     while let Some(source) = cause {
@@ -532,6 +533,10 @@ fn chain(error: &dyn std::error::Error) -> String {
 /// passes the layer of [`facade::guard::layer`], which checks the credential
 /// of a request under `/fhir` when the state carries a resource server and
 /// leaves the facade open when it does not.
+///
+/// With `[audit]` on, every facade access an authenticated caller makes
+/// passes the layer of [`audit::facade::record`] inside the guard, which
+/// records it and refuses it when its record has no place.
 pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
@@ -566,6 +571,13 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
             state.auth().map(|smart| smart.operator_scope().to_owned()),
         );
         routes = routes.merge(facade::routes(Arc::clone(mounted), shape, operator));
+    }
+    if let (Some(log), Some(mounted)) = (state.access_log(), state.facade()) {
+        let recording = audit::facade::Recording::new(Arc::clone(log), Arc::clone(mounted));
+        routes = routes.layer(axum::middleware::from_fn_with_state(
+            Arc::new(recording),
+            audit::facade::record,
+        ));
     }
     let routes = routes.layer(facade::guard::layer(state.auth().map(AsRef::as_ref)));
     with_middleware(routes, state, server)

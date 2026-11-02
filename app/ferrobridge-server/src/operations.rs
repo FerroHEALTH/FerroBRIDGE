@@ -208,6 +208,17 @@ async fn run_to_fhir(
     settings: &run::Settings,
     request: &ToFhirRequest,
 ) -> Result<fhirconnect::operations::contract::ToFhirResponse, OperationError> {
+    let template = request
+        .template_id()
+        .cloned()
+        .or_else(|| request.composition().template_id());
+    if let Some(template) = template {
+        crate::audit::reach::touched(
+            crate::audit::reach::Touch::Read,
+            None,
+            crate::audit::reach::template(template.as_str()),
+        );
+    }
     // One snapshot for every attempt, so a reload mid-request cannot mix sets.
     let programs = lane.programs();
     lane.translator()
@@ -239,6 +250,22 @@ async fn run_to_openehr(
             run::to_openehr(&programs, &SCHEMAS, &seams, settings, request)
         })
         .await
+        .inspect(|answer| {
+            // NOTE: no specification governs this: our own design; a flat composition names
+            // no template inline, so the template the call pinned classifies it instead.
+            let template = request.template_id().cloned().or_else(|| {
+                CompositionPayload::parse(answer.composition())
+                    .ok()
+                    .and_then(|payload| payload.template_id())
+            });
+            if let Some(template) = template {
+                crate::audit::reach::touched(
+                    crate::audit::reach::Touch::Read,
+                    None,
+                    crate::audit::reach::template(template.as_str()),
+                );
+            }
+        })
 }
 
 /// Runs `$tofhir` over an enveloped request.

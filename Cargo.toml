@@ -164,6 +164,14 @@ ferrohealth-telemetry = { version = "=0.2.2", default-features = false }
 # latency window the request log fills and the start and daily reporter.
 # Verified against crates.io on 2026-10-27 (0.2.0).
 ferrohealth-usage-report = { version = "=0.2.0", default-features = false }
+# The family's audit crates (FerroAUDIT): `ehds-logging` builds the EHDS
+# access record of Regulation (EU) 2025/327 Annex II 3.2 and its BALP
+# `AuditEvent` (`balp`), and `ihe-atna` spools it and sends it over the ITI-20
+# ATX: FHIR Feed (`balp`) with a client credentials bearer (`smart`). Pinned
+# exactly, as a product pins every shared crate; only the server links them.
+# Verified against crates.io on 2026-11-02 (0.3.3, published 2026-10-31).
+ehds-logging = { version = "=0.3.3", default-features = false }
+ihe-atna = { version = "=0.3.3", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off. Verified against crates.io on 2026-10-16 (11.1.0,
@@ -394,6 +402,12 @@ deref_by_slicing = "warn"
 # A clean 500 relies on catch_unwind, which only catches unwinding panics, and
 # tests ignore the panic setting, so abort would be untestable
 # (https://doc.rust-lang.org/cargo/reference/profiles.html#panic).
+# `ihe-atna` writes its BALP `AuditEvent` through the published `fhir-types`,
+# which this workspace builds from source: one model, so the spool's record
+# check and the facade's resources are one crate.
+[patch.crates-io]
+fhir-types = { path = "crates/fhir-types" }
+
 [profile.release]
 panic = "unwind"
 overflow-checks = true

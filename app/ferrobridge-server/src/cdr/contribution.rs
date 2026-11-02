@@ -9,6 +9,7 @@ use openehr_its::rest::client::ClientError;
 use openehr_its::rest::generated::ehr::ContributionCreateParams;
 use openehr_its::rest::generated::ehr::ContributionGetParams;
 use openehr_its::rest::generated::ehr::NewContribution;
+use openehr_its::rest::generated::ehr::Versionable;
 use openehr_its::rest::generated::ehr::client::ContributionCreateOutcome;
 use openehr_its::rest::generated::ehr::client::ContributionGetOutcome;
 use openehr_its::rest::generated::ehr::client::EhrClient;
@@ -43,6 +44,20 @@ impl CdrClient {
         contribution: &NewContribution,
         prefer: Prefer,
     ) -> Result<Answered<ContributionCreateOutcome>, CdrError> {
+        for version in &contribution.versions {
+            if let Some(Versionable::Composition(ref composition)) = version.data {
+                let touch = if version.preceding_version_uid.is_some() {
+                    crate::audit::reach::Touch::Updated
+                } else {
+                    crate::audit::reach::Touch::Created
+                };
+                crate::audit::reach::touched(
+                    touch,
+                    Some(ehr_id),
+                    crate::audit::reach::composition(composition, None),
+                );
+            }
+        }
         let client = self.call(HeaderMap::new())?;
         let params = ContributionCreateParams {
             ehr_id: String::from(ehr_id.as_str()),

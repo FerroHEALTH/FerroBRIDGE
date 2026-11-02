@@ -21,6 +21,7 @@ use crate::facade::stub::Echo;
 use crate::facade::stub::mount_echo;
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::mllp::Timeouts;
+use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::config::Hl7v2Settings;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::ehr::Policy;
@@ -68,7 +69,7 @@ const CONTROL_ID: &str = "MSG-V2-0001";
 /// A laboratory result, ORU^R01 from a 2.5.1 sender with an empty MSH-18: one
 /// patient, one order and one numeric result, every value invented for the
 /// test.
-fn oru_r01(control_id: &str) -> Vec<u8> {
+pub(crate) fn oru_r01(control_id: &str) -> Vec<u8> {
     let segments = [
         format!(
             "MSH|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925143000+0200||ORU^R01^ORU_R01|{control_id}|P|2.5.1"
@@ -214,7 +215,7 @@ fn package() -> PathBuf {
 
 /// Returns the face's settings, claiming [`PROFILE`] for an Observation when
 /// `claim` is set.
-fn face_settings(claim: bool) -> Hl7v2Settings {
+pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
     let profiles = if claim {
         BTreeMap::from([(String::from("Observation"), String::from(PROFILE))])
     } else {
@@ -252,13 +253,20 @@ struct Serving {
 }
 
 impl Serving {
-    /// Starts the face over `facade` under `lane`.
-    async fn start(facade: Arc<Facade>, lane: Hl7v2Settings) -> Result<Self, Box<dyn Error>> {
+    /// Starts the face over `facade` under `lane`, recording each commit
+    /// through `log` when one is given.
+    async fn start(
+        facade: Arc<Facade>,
+        lane: Hl7v2Settings,
+        log: Option<Arc<AccessLog>>,
+    ) -> Result<Self, Box<dyn Error>> {
         let (terminology_server, terminology) = terminology_stub().await;
         let corpus = ferrobridge_server::hl7v2::load_corpus(&lane)?;
         let usage = Arc::new(ferrobridge_server::usage_report::window());
         let face = Arc::new(
-            Face::new(facade, corpus, Some(terminology), &lane).with_usage(Arc::clone(&usage)),
+            Face::new(facade, corpus, Some(terminology), &lane)
+                .with_usage(Arc::clone(&usage))
+                .with_access_log(log, lane.listen),
         );
         let socket = TcpListener::bind("127.0.0.1:0").await?;
         let address = socket.local_addr()?;
@@ -312,7 +320,7 @@ impl Serving {
 }
 
 /// A running face over stub upstreams.
-struct Running {
+pub(crate) struct Running {
     /// The stub CDR.
     cdr: MockServer,
     /// The face.
@@ -334,6 +342,16 @@ impl Running {
     async fn start_with(
         lane: Hl7v2Settings,
         lookup: ResponseTemplate,
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::start_recorded(lane, lookup, None).await
+    }
+
+    /// Starts the face under `lane` over a CDR whose EHR lookup answers
+    /// `lookup`, recording each commit through `log` when one is given.
+    pub(crate) async fn start_recorded(
+        lane: Hl7v2Settings,
+        lookup: ResponseTemplate,
+        log: Option<Arc<AccessLog>>,
     ) -> Result<Self, Box<dyn Error>> {
         let cdr = MockServer::start().await;
         Mock::given(matchers::method("GET"))
@@ -363,17 +381,17 @@ impl Running {
             client(&cdr),
             settings(),
         ));
-        let serving = Serving::start(facade, lane).await?;
+        let serving = Serving::start(facade, lane, log).await?;
         Ok(Self { cdr, serving })
     }
 
     /// Sends one framed message on a new connection and reads the answer.
-    async fn send(&self, message: &[u8]) -> Result<String, Box<dyn Error>> {
+    pub(crate) async fn send(&self, message: &[u8]) -> Result<String, Box<dyn Error>> {
         self.serving.send(message).await
     }
 
     /// Counts the contribution commits the CDR received.
-    async fn contributions(&self) -> usize {
+    pub(crate) async fn contributions(&self) -> usize {
         self.requests("POST", &format!("/ehr/{EHR_ID}/contribution"))
             .await
             .len()
@@ -392,7 +410,7 @@ impl Running {
     }
 
     /// Signals the stop and waits for the listener to end.
-    async fn stop(self) -> Result<(), Box<dyn Error>> {
+    pub(crate) async fn stop(self) -> Result<(), Box<dyn Error>> {
         self.serving.stop().await
     }
 }
@@ -747,7 +765,7 @@ async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<
         client,
         facade_settings,
     ));
-    let serving = Serving::start(facade, face_settings(true)).await?;
+    let serving = Serving::start(facade, face_settings(true), None).await?;
     let control = "MSG-V2-E2E-0001";
     let ack = serving.send(&oru_r01(control)).await?;
     assert_eq!(

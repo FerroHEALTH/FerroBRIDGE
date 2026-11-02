@@ -114,6 +114,12 @@ the testkit tool crate. Beside it:
   `[usage_report]` (#581): its `status`, its request groups by route
   template and its HL7 v2 and mapping counters, validated against the
   vendored schema in the tests.
+  `src/audit/` is the bridge's own access record behind `[audit]` (#1377):
+  the layer inside the guard that writes one Regulation (EU) 2025/327 Annex
+  II 3.2 record per facade access through `ehds-logging`, the `reach` every
+  CDR read and write adds its template ids to, the HL7 v2 face's system
+  import record, and the `ihe-atna` spool and forwarder that send each BALP
+  `AuditEvent` over the ITI-20 ATX: FHIR Feed, failing closed.
   `src/operator/` is the
   read-only operator API behind `[operator]` and `[auth]` (#596): the guard
   that admits only a token carrying `auth.product_scope`, the mapping roots
