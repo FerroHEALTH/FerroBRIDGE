@@ -604,6 +604,11 @@ fn book() -> Result<String, Box<dyn Error>> {
 
 #[test]
 fn every_console_route_has_a_screenshot_in_light_and_dark() -> Result<(), Box<dyn Error>> {
+    // NOTE: no specification governs this: our own design; a capture run rewrites the files
+    // this guard reads, so the guard holds them in every run but the capture's own.
+    if std::env::var(SCREENSHOTS_GATE).is_ok_and(|value| value == "1") {
+        return Ok(());
+    }
     let shown: BTreeSet<&str> = shots().map(|shot| shot.route).collect();
     for route in routes()? {
         assert!(
