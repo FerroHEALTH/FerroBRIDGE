@@ -177,7 +177,8 @@ async fn start_change_feed(
         .as_ref()
         .context("the change feed reads the CDR, and [cdr] is not set")?;
     let client = cdr::CdrClient::new(cdr).context("building the CDR client the feed reads")?;
-    let feed = change_feed::open(feed_settings, client).context("opening the change feed")?;
+    let feed =
+        change_feed::open(feed_settings, client.clone()).context("opening the change feed")?;
     let dead_letters = Arc::new(
         change_feed::dead_letter::DeadLetters::open(&feed_settings.dead_letters)
             .context("opening the dead-letter store of the change feed")?,
@@ -213,6 +214,33 @@ async fn start_change_feed(
             feed: Arc::clone(&feed),
             reader: lane.reader.clone(),
             consumer: Arc::new(publisher),
+            polling: feed_settings.polling,
+            parking: parking.clone(),
+            following,
+        });
+    }
+    if let Some(load) = settings.omop_incremental.as_ref() {
+        let name = crate::etl::incremental::NAME;
+        let following =
+            follower(&feed, feed_settings, &load.reader, name, "omop_incremental").await?;
+        let consumer = crate::etl::incremental::Incremental::start(settings, client)
+            .await
+            .context("starting the incremental OMOP load")?
+            .with_following(following.clone());
+        tracing::info!(
+            lane = name,
+            reader = %load.reader,
+            "the incremental OMOP load commits each changed composition to the CDM database"
+        );
+        report = report.with_follower(change_feed::report::Follower {
+            name,
+            reader: load.reader.clone(),
+            following: following.clone(),
+        });
+        started.push(StartedFeed {
+            feed: Arc::clone(&feed),
+            reader: load.reader.clone(),
+            consumer: Arc::new(consumer),
             polling: feed_settings.polling,
             parking: parking.clone(),
             following,

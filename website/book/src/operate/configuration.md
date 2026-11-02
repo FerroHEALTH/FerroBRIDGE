@@ -933,6 +933,29 @@ twice or with no binding are each a boot error naming the key. Over
 `[change_feed] source = "ferroehr"`, a CDR that answers `404` for the reader
 refuses the start.
 
+### `[omop_incremental]`
+
+The incremental OMOP load: a consumer of the change feed that commits each
+changed composition to the CDM database through the same step `etl run`
+commits it with. It is off until `enabled` is true, and an enabled load is a
+boot error without `[change_feed] enabled`, `[etl]`, `[cdm]` and an OMOCL
+directory (`[mappings] omocl`, or `[operator] mapping_dir`). It reads the
+`[etl]` concepts, visits, derived-table scope and deletion policy, and leaves
+`[etl] aql` unused. The [OMOP ETL](../integrate/omop-etl.md#the-incremental-load)
+page states what it reads and writes. No specification governs the
+incremental load: it is FerroBRIDGE's own design.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the load follows the change feed |
+| `reader` | none, required | The reader name the load follows the change feed under, another than `[events] reader`: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
+
+A missing `reader`, a reader name outside its alphabet or equal to the
+events lane's, and a missing section the load runs over are each a boot error
+naming the key. The OMOCL set that does not load and a CDM database the
+concept resolver cannot reach refuse the start. Over `[change_feed] source =
+"ferroehr"`, a CDR that answers `404` for the reader refuses the start.
+
 ### `[operator]`
 
 The operator API under `/operator`, which an operator console reads the

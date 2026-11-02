@@ -141,20 +141,7 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     };
     let set = read_roots(&roots).map_err(JobError::Mappings)?;
     let client = crate::cdr::CdrClient::new(cdr).map_err(JobError::Client)?;
-    let pool = CdmPool::connect(
-        sqlx::postgres::PgPoolOptions::new().max_connections(2),
-        cdm.connection
-            .pool_options()
-            .map_err(JobError::Connection)?,
-        cdm.schema.clone(),
-    )
-    .await
-    .map_err(JobError::Resolver)?;
-    let mapper = OmoclMapper::new(
-        set,
-        CdmVocabulary::new(ConceptResolver::new(pool.clone())),
-        etl.aliases.clone(),
-    );
+    let (mapper, pool) = mapper(etl, cdm, set).await?;
     let mut writer = CdmWriter::connect_with(
         &cdm.connection,
         cdm.schema.clone(),
@@ -173,6 +160,36 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     foreign_step(&writer, &mut report).await?;
     quality_step(etl, &pool, &mut report).await?;
     Ok(report)
+}
+
+/// Returns the OMOCL mapper over `set`, its concept resolver connected to
+/// the `[cdm]` database over the TLS the configuration settled, and the
+/// resolver's pool.
+///
+/// # Errors
+///
+/// Returns [`JobError::Connection`] and [`JobError::Resolver`] when the
+/// resolver's connection cannot be prepared or opened.
+pub(crate) async fn mapper(
+    etl: &crate::etl::EtlSettings,
+    cdm: &crate::config::CdmSettings,
+    set: omocl::model::load::MappingSet,
+) -> Result<(OmoclMapper<CdmVocabulary>, CdmPool), JobError> {
+    let pool = CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new().max_connections(2),
+        cdm.connection
+            .pool_options()
+            .map_err(JobError::Connection)?,
+        cdm.schema.clone(),
+    )
+    .await
+    .map_err(JobError::Resolver)?;
+    let mapper = OmoclMapper::new(
+        set,
+        CdmVocabulary::new(ConceptResolver::new(pool.clone())),
+        etl.aliases.clone(),
+    );
+    Ok((mapper, pool))
 }
 
 /// Counts the rows of the CDM tables the writer assigns the ids of that no
@@ -257,20 +274,7 @@ pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<Ru
     let programs = crate::mappings::load(mappings).map_err(JobError::FhirMappings)?;
     let set = read_roots(&roots).map_err(JobError::Mappings)?;
     let resources = crate::etl::fhir::read_input(input).map_err(JobError::Input)?;
-    let pool = CdmPool::connect(
-        sqlx::postgres::PgPoolOptions::new().max_connections(2),
-        cdm.connection
-            .pool_options()
-            .map_err(JobError::Connection)?,
-        cdm.schema.clone(),
-    )
-    .await
-    .map_err(JobError::Resolver)?;
-    let mapper = OmoclMapper::new(
-        set,
-        CdmVocabulary::new(ConceptResolver::new(pool.clone())),
-        etl.aliases.clone(),
-    );
+    let (mapper, pool) = mapper(etl, cdm, set).await?;
     let mut writer = CdmWriter::connect_with(
         &cdm.connection,
         cdm.schema.clone(),

@@ -23,9 +23,9 @@ typed CDM rows. It pulls; the CDR does not push.
 
 That follows from the specification surface rather than from taste: change
 notification is not part of openEHR ITS-REST 1.1.0, so there is nothing
-conformant to subscribe to. If FerroBRIDGE later consumes a particular CDR's
-change events, that is a FerroBRIDGE extension, labelled as one, and the batch
-path stays the conformant baseline.
+conformant to subscribe to. The [incremental load](#the-incremental-load)
+follows the [change feed](change-feed.md), which is a FerroBRIDGE
+extension, and the batch path stays the conformant baseline.
 
 ## The tables in play
 
@@ -522,6 +522,41 @@ adds a diagnostic for every literal the vocabulary does not hold and every
 literal whose domain is not one the CDM field definitions name for its column
 (`omocl-unknown-concept`, `omocl-domain-mismatch`). Concept `0` is exempt.
 Without `[cdm]` or `[mappings] omocl` the flag refuses to start.
+
+## The incremental load
+
+`[omop_incremental]` ([configuration](../operate/configuration.md#omop_incremental))
+turns on a consumer of the [change feed](change-feed.md) that keeps the CDM
+database current between batch runs. It runs on either change-feed source
+and commits through the same per-composition step `etl run` uses: the
+template read from the CDR, the validation, the tie to a visit, the OMOCL
+mapping and the one-transaction commit. For each composition an event names,
+the load reads its latest version over ITS-REST 1.1.0 `GET
+/ehr/{ehr_id}/composition/{versioned_object_id}`:
+
+- `200`: the composition is committed as a batch run commits it;
+- `204`: the latest version is a deletion, and the composition's rows go
+  under `[etl] deletions`, as the batch run's [deletion
+  sweep](#deleted-compositions) removes them;
+- `404`: the CDR does not know the composition, and the CDM keeps what it
+  holds.
+
+An erasure from the reference CDR's feed removes the rows of every
+composition it names, or of every composition of an erased EHR. The visits
+are read once per pass, before its first commit or its derivation, and the
+derived tables are rebuilt once per pass, before the pass acknowledges anything, so a pass the
+derivation fails is read again. A composition the mapper or the writer
+refuses is a poisoned event, parked in the [dead-letter
+store](change-feed.md#poisoned-events-and-the-dead-letter-store) after
+`[change_feed] max_attempts` passes; a CDR or CDM database that does not
+answer is transient, and the load reconnects to the database on its next
+event.
+
+The load ignores `[etl] aql`: it commits every composition the feed names.
+A batch run after an incremental run over the same compositions writes the
+same rows, which the container lane checks. The load is degraded on the
+readiness page while it cannot follow, under the name `omop-incremental`,
+and the console's Events page lists it beside the events lane.
 
 ## What you need in place
 

@@ -13,6 +13,7 @@ mod facade;
 mod file;
 mod hl7v2;
 mod oauth;
+mod omop_incremental;
 mod operator;
 mod refusals;
 mod secrets;
