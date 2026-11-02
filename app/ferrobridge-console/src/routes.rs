@@ -36,6 +36,7 @@ pub const ROUTES: &[&str] = &[
     "/hl7v2/:tab",
     "/omop",
     "/omop/:tab",
+    "/events",
     "/connections",
     "/connections/:name",
     "/connections/:name/:tab",
@@ -72,6 +73,8 @@ pub enum Page {
     Hl7v2,
     /// `/omop` and its tabs.
     Omop,
+    /// `/events`.
+    Events,
     /// `/connections`.
     Connections,
     /// `/connections/:name` and its tabs.
@@ -103,6 +106,7 @@ impl Page {
             ["facade"] | ["facade", _] => Self::Facade,
             ["hl7v2"] | ["hl7v2", _] => Self::Hl7v2,
             ["omop"] | ["omop", _] => Self::Omop,
+            ["events"] => Self::Events,
             ["connections"] => Self::Connections,
             ["connections", _] | ["connections", _, _] => Self::Connection,
             ["configuration"] | ["configuration", _] => Self::Configuration,
@@ -148,6 +152,7 @@ pub async fn draw(visit: &Visit) -> Drawn {
         Page::Facade => pages::facade::page(visit).await,
         Page::Hl7v2 => pages::hl7v2::page(visit).await,
         Page::Omop => pages::omop::page(visit).await,
+        Page::Events => pages::events::page(visit).await,
         Page::Connections => pages::connections::page(visit).await,
         Page::Connection => pages::connections::connection_page(visit).await,
         Page::Configuration => pages::configuration::page(visit).await,
@@ -202,6 +207,7 @@ mod tests {
             ("/facade/a", Page::Facade),
             ("/hl7v2/a", Page::Hl7v2),
             ("/omop/a", Page::Omop),
+            ("/events", Page::Events),
             ("/connections", Page::Connections),
             ("/connections/c/a", Page::Connection),
             ("/configuration/a", Page::Configuration),

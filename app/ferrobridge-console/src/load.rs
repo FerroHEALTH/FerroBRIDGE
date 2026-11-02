@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use ferrobridge_operator_api::configuration::Configuration;
+use ferrobridge_operator_api::events::Events;
 use ferrobridge_operator_api::health::Info;
 use ferrobridge_operator_api::operator::{EngineState, Listed};
 use ferrohealth_health::document::Readiness;
@@ -45,6 +46,8 @@ pub struct Reads {
     capability: Arc<OnceCell<Loaded<Capability>>>,
     /// The running configuration.
     configuration: Arc<OnceCell<Loaded<Configuration>>>,
+    /// The change-feed consumers and the AMQP topology.
+    events: Arc<OnceCell<Loaded<Events>>>,
 }
 
 impl Reads {
@@ -61,6 +64,7 @@ impl Reads {
             listing: Arc::default(),
             capability: Arc::default(),
             configuration: Arc::default(),
+            events: Arc::default(),
         }
     }
 
@@ -161,6 +165,21 @@ impl Reads {
         cell.get_or_init(|| async {
             let (state, token) = self.signed_in()?;
             loaded(state.bridge().configuration(token).await)
+        })
+        .await
+        .clone()
+    }
+
+    /// The change-feed consumers and the AMQP topology, `GET
+    /// /operator/events`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn events(&self) -> Loaded<Events> {
+        let cell = &self.events;
+        cell.get_or_init(|| async {
+            let (state, token) = self.signed_in()?;
+            loaded(state.bridge().events(token).await)
         })
         .await
         .clone()

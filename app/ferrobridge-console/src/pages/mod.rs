@@ -18,6 +18,7 @@ pub mod connections;
 pub mod dashboard;
 pub mod editor;
 pub mod errors;
+pub mod events;
 pub mod facade;
 pub mod file;
 pub mod hl7v2;

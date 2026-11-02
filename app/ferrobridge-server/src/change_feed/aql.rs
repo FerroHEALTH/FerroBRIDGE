@@ -189,6 +189,15 @@ impl ChangeFeed for AqlFeed {
         Ok(Page { events })
     }
 
+    async fn positions(&self, reader: &ReaderName) -> Result<Vec<Position>, FeedError> {
+        Ok(self
+            .store
+            .get(reader)?
+            .map(Position::Committed)
+            .into_iter()
+            .collect())
+    }
+
     async fn acknowledge(&self, reader: &ReaderName, last: &Position) -> Result<(), FeedError> {
         match last {
             Position::Committed(watermark) => self.store.set(reader, watermark),

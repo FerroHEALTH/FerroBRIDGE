@@ -42,6 +42,7 @@ use crate::journeys::screenshots::catalogue::EDIT_CHECKED;
 use crate::journeys::screenshots::catalogue::EDIT_CONFIRM;
 use crate::journeys::screenshots::catalogue::EDIT_REFUSED;
 use crate::journeys::screenshots::catalogue::EDIT_SAVED;
+use crate::journeys::screenshots::catalogue::EVENTS_DEGRADED;
 use crate::journeys::screenshots::catalogue::MAPPINGS_RELOADED;
 use crate::journeys::screenshots::catalogue::NOT_FOUND;
 use crate::journeys::screenshots::catalogue::PAGES;
@@ -65,6 +66,9 @@ const BRIDGE_PORT: u16 = 47180;
 
 /// The loopback port of the bridge whose operations lane is off.
 const BRIDGE_PORT_OFF: u16 = 47181;
+
+/// The loopback port of the bridge whose events lane cannot reach its broker.
+const BRIDGE_PORT_EVENTS: u16 = 47182;
 
 /// The book's folder of console screenshots, from the workspace root.
 const IMAGES: &str = "website/book/src/operate/img/console";
@@ -510,6 +514,18 @@ async fn every_page(
     visit(browser, stack, &SIGNED_OUT, (theme, width)).await
 }
 
+/// Captures the Events page of a bridge whose events lane cannot reach its
+/// broker in `theme`, once its consumer has stalled.
+async fn events_degraded(
+    browser: &Browser,
+    stack: &Stack,
+    (theme, width): (Theme, Width),
+) -> Result<(), Box<dyn Error>> {
+    enter(browser, stack, theme).await?;
+    sign_in(browser, stack).await?;
+    visit(browser, stack, &EVENTS_DEGRADED, (theme, width)).await
+}
+
 /// Captures the playground of a bridge whose operations lane is off in
 /// `theme`.
 async fn lane_off(
@@ -535,14 +551,17 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
         for theme in [Theme::Light, Theme::Dark] {
             let stack = Stack::capture(Lanes::All, BRIDGE_PORT).await?;
             let off = Stack::capture(Lanes::WithoutOperations, BRIDGE_PORT_OFF).await?;
+            let events = Stack::capture(Lanes::WithEvents, BRIDGE_PORT_EVENTS).await?;
             with_browser(async |browser| {
                 window(browser, width, HEIGHT).await?;
                 every_page(browser, &stack, (theme, width)).await?;
-                lane_off(browser, &off, (theme, width)).await
+                lane_off(browser, &off, (theme, width)).await?;
+                events_degraded(browser, &events, (theme, width)).await
             })
             .await?;
             stack.stop().await?;
             off.stop().await?;
+            events.stop().await?;
         }
     }
     std::fs::write(

@@ -387,6 +387,15 @@ pub trait ChangeFeed: fmt::Debug + Send + Sync {
     /// # Errors
     /// Returns [`FeedError`] for every answer that did not move the cursor.
     async fn acknowledge(&self, reader: &ReaderName, last: &Position) -> Result<(), FeedError>;
+
+    /// Returns the positions the bridge keeps itself for the reader, none for
+    /// a source that keeps the cursor on the CDR.
+    ///
+    /// # Errors
+    /// Returns [`FeedError`] when the kept positions cannot be read.
+    async fn positions(&self, _reader: &ReaderName) -> Result<Vec<Position>, FeedError> {
+        Ok(Vec::new())
+    }
 }
 
 /// Why a feed call did not answer a page or move a cursor.

@@ -25,6 +25,7 @@ use tower::ServiceExt as _;
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, challenge, ec_key, mint};
 
 mod configuration;
+mod events;
 mod problem;
 mod save;
 
@@ -62,6 +63,22 @@ impl Case {
     /// answering `configuration` as the running configuration when given.
     async fn answering(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::build(configuration, None).await
+    }
+
+    /// Builds the tree, the issuer and the router, the operator API
+    /// reporting the events lane `lane` when given.
+    async fn reporting(
+        lane: ferrobridge_server::events::report::Lane,
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::build(None, Some(lane)).await
+    }
+
+    /// Builds the case over `configuration` and `lane`.
+    async fn build(
+        configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
+        lane: Option<ferrobridge_server::events::report::Lane>,
     ) -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
         let mappings = tree.path().join("mappings");
@@ -106,6 +123,10 @@ impl Case {
         let state = AppState::with_health(Registry::default())
             .with_auth(authority)
             .with_operator(Arc::new(operator));
+        let state = match lane {
+            Some(lane) => state.with_events(lane),
+            None => state,
+        };
         let app = ferrobridge_server::router(Arc::new(state), &crate::support::settings());
         Ok(Self {
             tree,
@@ -155,8 +176,9 @@ fn digest(bytes: &[u8]) -> String {
 }
 
 /// The read-only operator routes, as a client calls them.
-const ROUTES: [&str; 5] = [
+const ROUTES: [&str; 6] = [
     "/operator/state",
+    "/operator/events",
     "/operator/readiness",
     "/operator/configuration",
     "/operator/mappings",

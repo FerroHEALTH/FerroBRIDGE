@@ -98,6 +98,9 @@ pub(crate) enum Lanes {
     /// Every lane but the operations, which `[operations] enabled = false`
     /// turns off.
     WithoutOperations,
+    /// Every lane, and the events lane following the CDR's outbox feed to a
+    /// broker nothing listens on, so its consumer stalls with a cause.
+    WithEvents,
 }
 
 /// The running stack.
@@ -353,7 +356,11 @@ async fn bridge(
         tree.join("console"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
-    let operations = matches!(lanes, Lanes::All);
+    let operations = matches!(lanes, Lanes::All | Lanes::WithEvents);
+    let events = match lanes {
+        Lanes::WithEvents => events_lane(cdr).await?,
+        Lanes::All | Lanes::WithoutOperations => String::new(),
+    };
     let text = format!(
         "[cdr]\nbase_url = \"{cdr}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n\
          [mappings]\ndirectory = {mappings}\ntemplates = {templates}\n\n\
@@ -362,7 +369,7 @@ async fn bridge(
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
-         [usage_report]\nenabled = false\n",
+         [usage_report]\nenabled = false\n{events}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
     );
@@ -424,4 +431,57 @@ async fn ready(
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     Err(format!("the bridge never became ready: {last}").into())
+}
+
+/// The reader the events lane follows the CDR's outbox feed under.
+const EVENTS_READER: &str = "ferrobridge";
+
+/// Mounts the reference CDR's outbox feed on `cdr`, one synthetic event in
+/// the clinical outbox, and returns the `[change_feed]` and `[events]`
+/// sections that follow it to a broker nothing listens on.
+async fn events_lane(cdr: &MockServer) -> Result<String, Box<dyn Error>> {
+    let feed = format!("/ext/admin/outbox/{EVENTS_READER}");
+    for (domain, events) in [
+        (
+            "clinical",
+            serde_json::json!([{
+                "seq": 43,
+                "contribution_id": "0d4a3c52-5b51-4b4b-9e0e-000000000043",
+                "ehr_id": "7d44b88c-4199-4bad-97dc-d78268e01398",
+                "committed_at": "2026-11-02T10:00:00Z",
+                "versions": [{
+                    "vo_id": "8849182c-82ad-4088-a07f-48ead4180515",
+                    "kind": "COMPOSITION",
+                    "sys_version": 3,
+                    "version_tree_id": "3",
+                    "change_type": "251",
+                    "template_id": "ferrobridge.diagnose.v1"
+                }]
+            }]),
+        ),
+        ("party", serde_json::json!([])),
+    ] {
+        Mock::given(method("GET"))
+            .and(path(feed.as_str()))
+            .and(wiremock::matchers::query_param("domain", domain))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(
+                    serde_json::json!({ "reader": EVENTS_READER, "events": events }),
+                ),
+            )
+            .mount(cdr)
+            .await;
+    }
+    let closed = std::net::TcpListener::bind("127.0.0.1:0")?
+        .local_addr()?
+        .port();
+    Ok(format!(
+        "\n[change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\n\
+         poll_interval_ms = 200\nbackoff_ms = 200\nmax_backoff_ms = 1000\n\n\
+         [events]\nenabled = true\nreader = \"{EVENTS_READER}\"\n\
+         url = \"amqp://127.0.0.1:{closed}/%2f\"\nexchange = \"ferroehr.events\"\n\
+         confirm_timeout_ms = 500\n\
+         queues = [{{ name = \"ferroehr.events.analytics\", binding = \"COMPOSITION.*.*\" }}]\n",
+        uri = cdr.uri(),
+    ))
 }

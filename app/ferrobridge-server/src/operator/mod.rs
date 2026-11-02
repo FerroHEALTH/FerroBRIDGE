@@ -11,7 +11,8 @@
 //! owner, `GET /operator/mappings/{path}` one file's verbatim bytes with its
 //! digest as the `ETag`, and `GET /operator/configuration` the configuration
 //! the bridge started on, every secret by reference alone
-//! ([`configuration`]). With `[operator] mapping_dir`, `POST
+//! ([`configuration`]), and `GET /operator/events` the change-feed consumers
+//! and the AMQP topology (`crate::events::report`). With `[operator] mapping_dir`, `POST
 //! /operator/mappings/check` checks a draft over the running set, `PUT
 //! /operator/mappings/{path}` saves one and reloads, and `POST
 //! /operator/reload` reloads the files on disk ([`save`], [`reload`]). No
@@ -187,10 +188,14 @@ pub fn routes(
     smart: &crate::smart::Smart,
     health: Registry,
     lifecycle: Lifecycle,
+    events: Option<Arc<crate::events::report::Lane>>,
 ) -> Router {
     let readiness = Router::new()
         .route("/operator/readiness", get(readiness))
         .with_state((health, lifecycle));
+    let lane = Router::new()
+        .route("/operator/events", get(events_lane))
+        .with_state(events);
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/configuration", get(running_configuration))
@@ -200,6 +205,7 @@ pub fn routes(
         .route("/operator/reload", post(save::reload))
         .with_state(operator)
         .merge(readiness)
+        .merge(lane)
         .route_layer(guard::layer(smart))
 }
 
@@ -214,6 +220,12 @@ async fn readiness(State((health, lifecycle)): State<(Registry, Lifecycle)>) -> 
         StatusCode::SERVICE_UNAVAILABLE
     };
     (status, axum::Json(document)).into_response()
+}
+
+/// `GET /operator/events`: the change-feed consumers and the AMQP topology,
+/// an empty document when the events lane is off.
+async fn events_lane(State(lane): State<Option<Arc<crate::events::report::Lane>>>) -> Response {
+    axum::Json(crate::events::report::document(lane.as_deref())).into_response()
 }
 
 /// `GET /operator/state`: the running load.

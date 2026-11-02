@@ -113,7 +113,13 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         let started = start_events(settings, feed_settings, lane, &state)
             .await
             .context("starting the events lane")?;
-        state = state.with_following(started.following.clone());
+        state = state
+            .with_following(started.following.clone())
+            .with_events(events::report::Lane {
+                settings: lane.clone(),
+                source: feed_settings.source.clone(),
+                following: started.following.clone(),
+            });
         feed = Some(started);
     }
     Ok(Started {
@@ -195,8 +201,18 @@ async fn start_events(
             Ok(_page) => {}
         }
     }
+    let following = change_feed::health::Following::new(events::NAME);
+    match feed.positions(&lane.reader).await {
+        Ok(positions) => following.acknowledged(&positions),
+        Err(error) => tracing::warn!(
+            lane = events::NAME,
+            reason = %crate::indicators::reason(&error),
+            "the kept watermark could not be read; the position shows after the first pass"
+        ),
+    }
     let publisher = events::Publisher::new(Arc::new(events::amqp::AmqpBroker::new(lane.clone())))
-        .with_usage(Arc::clone(state.usage_window()));
+        .with_usage(Arc::clone(state.usage_window()))
+        .with_following(following.clone());
     tracing::info!(
         lane = events::NAME,
         reader = %lane.reader,
@@ -209,7 +225,7 @@ async fn start_events(
         reader: lane.reader.clone(),
         consumer: Arc::new(publisher),
         polling: feed_settings.polling,
-        following: change_feed::health::Following::new(events::NAME),
+        following,
     })
 }
 

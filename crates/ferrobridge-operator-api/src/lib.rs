@@ -8,7 +8,9 @@
 //! [`operator`] holds `GET /operator/state`, the `GET /operator/mappings`
 //! listing, and the report a check, a save and a reload answer with;
 //! [`configuration`] holds `GET /operator/configuration`, the running
-//! configuration with every secret by reference alone; [`capability`] holds
+//! configuration with every secret by reference alone; [`events`] holds
+//! `GET /operator/events`, the change-feed consumers and the AMQP topology;
+//! [`capability`] holds
 //! the facade's `CapabilityStatement` reduced to what the console draws;
 //! [`problem`] holds the RFC 9457 problem details every operator refusal
 //! answers with. A change to a document is a compile error on both sides,
@@ -19,6 +21,7 @@
 
 pub mod capability;
 pub mod configuration;
+pub mod events;
 pub mod health;
 pub mod operator;
 pub mod problem;
