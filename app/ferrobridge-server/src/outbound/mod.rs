@@ -7,7 +7,7 @@
 //!
 //! An event names the compositions a contribution changed. For each one the
 //! lane reads the latest version over ITS-REST 1.1.0 `composition_get` and
-//! maps it as the facade's read does ([`crate::facade::handlers::emit`]),
+//! maps it as the facade's read does (`facade::handlers::emit`),
 //! each resource carrying its `id`, `meta.versionId` and `meta.source`. A
 //! `204` (a deletion) and an erasure retract every resource the composition
 //! was last delivered as, and an update retracts the ones its new version no
@@ -356,49 +356,40 @@ impl Outbound {
 /// Returns the `transaction` Bundle that writes `resources` and retracts
 /// `retracted` (<https://hl7.org/fhir/R4/bundle.html>, `Bundle.entry.request`).
 fn transaction(resources: Vec<Object>, retracted: &[&String]) -> Value {
-    let request = |method: &str, url: String| {
-        let mut request = Object::new();
-        request.insert(String::from("method"), Value::String(method.to_owned()));
-        request.insert(String::from("url"), Value::String(url));
-        Value::Object(request)
+    let text = |value: &str| Value::String(value.to_owned());
+    let entry = |method: &str, url: String, resource: Option<Object>| {
+        let request = Object::from([
+            (String::from("method"), text(method)),
+            (String::from("url"), Value::String(url)),
+        ]);
+        let mut entry = Object::from([(String::from("request"), Value::Object(request))]);
+        if let Some(resource) = resource {
+            entry.insert(String::from("resource"), Value::Object(resource));
+        }
+        Value::Object(entry)
     };
-    let mut entries = Vec::with_capacity(resources.len().saturating_add(retracted.len()));
-    for resource in resources {
-        let reference = format!(
-            "{}/{}",
+    let written = resources.into_iter().map(|resource| {
+        let name = |key: &str| {
             resource
-                .get("resourceType")
-                .and_then(Value::as_str)
-                .unwrap_or_default(),
-            resource
-                .get("id")
+                .get(key)
                 .and_then(Value::as_str)
                 .unwrap_or_default()
-        );
-        let mut entry = Object::new();
-        entry.insert(String::from("resource"), Value::Object(resource));
-        entry.insert(String::from("request"), request("PUT", reference));
-        entries.push(Value::Object(entry));
-    }
-    for reference in retracted {
-        let mut entry = Object::new();
-        entry.insert(
-            String::from("request"),
-            request("DELETE", (*reference).clone()),
-        );
-        entries.push(Value::Object(entry));
-    }
-    let mut bundle = Object::new();
-    bundle.insert(
-        String::from("resourceType"),
-        Value::String(String::from("Bundle")),
-    );
-    bundle.insert(
-        String::from("type"),
-        Value::String(String::from("transaction")),
-    );
-    bundle.insert(String::from("entry"), Value::Array(entries));
-    Value::Object(bundle)
+                .to_owned()
+        };
+        let url = format!("{}/{}", name("resourceType"), name("id"));
+        entry("PUT", url, Some(resource))
+    });
+    let removed = retracted
+        .iter()
+        .map(|reference| entry("DELETE", (*reference).clone(), None));
+    Value::Object(Object::from([
+        (String::from("resourceType"), text("Bundle")),
+        (String::from("type"), text("transaction")),
+        (
+            String::from("entry"),
+            Value::Array(written.chain(removed).collect()),
+        ),
+    ]))
 }
 
 /// Returns the versioned object id `vo_id` names.
@@ -420,10 +411,7 @@ impl Consumer for Outbound {
         if event.erasure {
             self.erase(&mut delivery, event).map_err(failure)?;
         } else if let Some(ehr) = event.ehr_id.as_ref() {
-            for version in &event.versions {
-                let (COMPOSITION, Some(vo_id)) = (version.kind.as_str(), version.vo_id) else {
-                    continue;
-                };
+            for vo_id in event.compositions() {
                 let container = container(vo_id).map_err(failure)?;
                 self.composition(&mut delivery, ehr, &container)
                     .await

@@ -106,15 +106,7 @@ pub(crate) async fn resources_of(
                 program,
                 loaded.index(),
                 &entry.isolate(&canonical),
-                render::Origin {
-                    id: &id,
-                    version,
-                    source: &source,
-                    subject: subject.as_ref(),
-                    store: facade.store(),
-                    usage: facade.usage(),
-                    demographics: facade.demographics(),
-                },
+                render::Origin::of(facade, &id, version, &source, subject.as_ref()),
                 &session,
             )
             .await?;
