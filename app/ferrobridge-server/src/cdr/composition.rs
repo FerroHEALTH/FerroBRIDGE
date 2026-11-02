@@ -50,6 +50,11 @@ impl CdrClient {
         commit: &CommitContext,
         prefer: Prefer,
     ) -> Result<Answered<CompositionCreateOutcome>, CdrError> {
+        crate::audit::reach::touched(
+            crate::audit::reach::Touch::Created,
+            Some(ehr_id),
+            crate::audit::reach::composition(composition, None),
+        );
         let headers = commit.headers()?;
         let client = self.call(HeaderMap::new())?;
         let params = CompositionCreateParams {
@@ -88,6 +93,11 @@ impl CdrClient {
         commit: &CommitContext,
         prefer: Prefer,
     ) -> Result<Answered<CompositionUpdateOutcome>, CdrError> {
+        crate::audit::reach::touched(
+            crate::audit::reach::Touch::Updated,
+            Some(ehr_id),
+            crate::audit::reach::composition(composition, None),
+        );
         let headers = commit.headers()?;
         let client = self.call(HeaderMap::new())?;
         let params = CompositionUpdateParams {

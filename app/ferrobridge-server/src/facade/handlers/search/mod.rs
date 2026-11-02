@@ -511,7 +511,7 @@ fn read_row(
         .and_then(|value| serde_json::to_string(value).ok())
         .and_then(|value| openehr_its::json::from_canonical_json::<Composition>(&value).ok())
         .ok_or_else(|| malformed_row(position, "composition"))?;
-    let canonical = read::canonical(facade, &composition, plan.declared.template_id())?;
+    let canonical = read::canonical(facade, &ehr_id, &composition, plan.declared.template_id())?;
     Ok(Row {
         ehr_id,
         version,

@@ -211,6 +211,8 @@ pub struct AppState {
     /// The one client of the `[terminology]` server, when one is configured,
     /// shared by readiness and every lane that translates.
     terminology: Option<ferrobridge_term::client::Client>,
+    /// The access-record lane, when `[audit]` turns it on.
+    access_log: Option<Arc<crate::audit::AccessLog>>,
     /// The change-feed consumers the operator API reports, when any runs.
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
 }
@@ -312,6 +314,7 @@ impl AppState {
             operator: None,
             terminology,
             change_feed: None,
+            access_log: None,
         })
     }
 
@@ -333,7 +336,22 @@ impl AppState {
             operator: None,
             terminology: None,
             change_feed: None,
+            access_log: None,
         }
+    }
+
+    /// Returns this state recording every facade access and every committed
+    /// HL7 v2 message through `log`.
+    #[must_use]
+    pub fn with_access_log(mut self, log: Arc<crate::audit::AccessLog>) -> Self {
+        self.access_log = Some(log);
+        self
+    }
+
+    /// Returns the access-record lane, when it is on.
+    #[must_use]
+    pub const fn access_log(&self) -> Option<&Arc<crate::audit::AccessLog>> {
+        self.access_log.as_ref()
     }
 
     /// Returns this state with `facade` mounted and its store probed.

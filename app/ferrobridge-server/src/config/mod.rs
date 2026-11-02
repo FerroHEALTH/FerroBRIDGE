@@ -13,6 +13,7 @@
 //! `ferrohealth-usage-report`. No specification governs the configuration:
 //! our own design.
 
+mod audit;
 mod auth;
 mod change_feed;
 mod credentials;
@@ -49,6 +50,7 @@ use section::Mappings;
 use section::Operations;
 use section::Operator;
 use section::Terminology;
+use section::audit::Audit;
 use section::change_feed::ChangeFeed;
 use section::events::Events;
 use section::facade::Facade;
@@ -127,6 +129,9 @@ pub struct Config {
     pub usage_report: UsageReportSection,
     /// The operator API, off until its section turns it on.
     pub operator: Operator,
+    /// The access records of the facade and the HL7 v2 face, off until its
+    /// section turns it on.
+    pub audit: Audit,
     /// Where each key came from, which the load records and no file states.
     #[serde(skip)]
     provenance: Provenance,
@@ -301,6 +306,16 @@ impl Config {
             },
             usage_report: self.usage_report.clone(),
             operator: resolve::resolve_operator(&self.operator, &self.auth)?,
+            audit: if self.audit.enabled {
+                Some(audit::resolve_audit(
+                    &self.audit,
+                    self.facade.enabled,
+                    self.auth.enabled,
+                    &self.facade.system_id,
+                )?)
+            } else {
+                None
+            },
             configuration: if serves && self.operator.enabled {
                 Some(
                     crate::operator::configuration::document(self, jiff::Timestamp::now())
@@ -406,6 +421,8 @@ pub struct Settings {
     pub usage_report: UsageReportSection,
     /// The operator API, when it is mounted.
     pub operator: Option<crate::operator::OperatorSettings>,
+    /// The access-record lane, when it is on.
+    pub audit: Option<crate::audit::Settings>,
     /// The running configuration the operator API answers, when it is
     /// mounted.
     pub configuration: Option<ferrobridge_operator_api::configuration::Configuration>,

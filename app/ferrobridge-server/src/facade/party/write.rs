@@ -248,6 +248,12 @@ async fn commit_party(
     commit: &CommitContext,
     over: Option<(&str, &ObjectVersionId)>,
 ) -> Result<ObjectVersionId, Refusal> {
+    let touch = if over.is_some() {
+        crate::audit::reach::Touch::Updated
+    } else {
+        crate::audit::reach::Touch::Created
+    };
+    crate::audit::reach::touched(touch, None, crate::audit::reach::canonical(party.value()));
     macro_rules! write_as {
         ($typed:ty, $create:ident, $created:ident, $update:ident, $updated:ident) => {{
             use openehr_its::rest::generated::demographic::client::$created;

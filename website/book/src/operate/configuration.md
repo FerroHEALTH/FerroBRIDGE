@@ -956,6 +956,41 @@ naming the key. The OMOCL set that does not load and a CDM database the
 concept resolver cannot reach refuse the start. Over `[change_feed] source =
 "ferroehr"`, a CDR that answers `404` for the reader refuses the start.
 
+### `[audit]`
+
+The bridge's own access records: one Regulation (EU) 2025/327 Annex II 3.2
+record per facade access an authenticated caller makes, and one system import
+record per message the HL7 v2 face commits, each sent as a FHIR R4
+`AuditEvent` over the IHE ITI-20 ATX: FHIR Feed to an Audit Record
+Repository. It is off until `enabled` is true, and an enabled lane needs
+`[facade] enabled` and `[auth]`. The [access record](access-record.md) page
+states what each surface records and where. The section's shape is
+FerroBRIDGE's own design.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the facade and the HL7 v2 face record their accesses |
+| `base_url` | none, required | The repository's FHIR base; each record is created as `[base]/AuditEvent` |
+| `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
+| `timeout_ms` | `10000` | How long one delivery to the repository may take |
+| `retry_max_ms` | `60000` | The longest wait between two delivery attempts |
+| `spool_dir` | none, required | The directory records wait in until the repository takes them; created when absent, and refused when its group or other users can reach it |
+| `max_records` | `10000` | The most records the spool holds at once |
+| `max_bytes` | `67108864` | The most bytes the spool holds at once |
+| `write_timeout_ms` | `2000` | The longest storing one record may take |
+| `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
+| `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
+| `credentials` | none | `user` with `password` or `password_file`, or `[audit.credentials.oauth]`, the same table `[cdr.credentials]` takes |
+| `categories.national` | `[]` | The national categories the map may name, each `<system>\|<code>` |
+| `categories.templates` | `{}` | Each template id to its Art 14(1) categories, such as `["Patient-Summaries"]`, or to `"none"` |
+| `categories.archetypes` | `{}` | Each archetype id to its categories or to `"none"`; a template key wins for the same object |
+
+Template and archetype keys compare without case, as openEHR BASE compares
+every composite identifier. A missing `base_url` or `spool_dir`, an `http`
+base without `cleartext`, a zero bound, a category code that names no
+category, and the lane without the facade or `[auth]` are each a boot error
+naming the key. A spool directory that cannot be opened refuses the start.
+
 ### `[operator]`
 
 The operator API under `/operator`, which an operator console reads the
@@ -1015,6 +1050,8 @@ it carries.
 | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 | `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
+| `FERROBRIDGE__AUDIT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__AUDIT__CREDENTIALS__PASSWORD_FILE` |
+| `FERROBRIDGE__AUDIT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__AUDIT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 
 Prefer the `_file` route: a Docker or Kubernetes secret arrives as a file, and
 a file never shows up in `docker inspect` or a process listing.

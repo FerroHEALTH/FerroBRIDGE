@@ -381,4 +381,22 @@ pub enum Error {
         #[source]
         source: Box<crate::mappings::Error>,
     },
+    /// An Audit Record Repository base the FHIR Feed refuses.
+    #[error("{key} is refused as the base of an Audit Record Repository")]
+    AuditBase {
+        /// The key that holds it.
+        key: String,
+        /// Why it is refused.
+        #[source]
+        source: ihe_atna::atna::feed::FeedAddressError,
+    },
+    /// A category map `ehds-logging` refuses.
+    #[error("{key} is no category map")]
+    Categories {
+        /// The table that holds it.
+        key: String,
+        /// Every defect of the map.
+        #[source]
+        source: ehds_logging::map::MapErrors,
+    },
 }

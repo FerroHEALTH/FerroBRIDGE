@@ -7,6 +7,7 @@
 //! Every signing key is generated when the case runs and lives only in
 //! memory: no key, real or synthetic, is committed.
 
+mod access_record;
 mod audit;
 mod basic;
 mod batch;

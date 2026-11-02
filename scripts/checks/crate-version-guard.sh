@@ -127,6 +127,20 @@ self_test() {
   t_git commit -qam 'above the base'
   expect 0 "a queued change above the version of the queue base" main HEAD
 
+  # A `[patch]` entry naming a workspace dependency renders into no packaged
+  # manifest, so only a change inside `[workspace.dependencies]` counts.
+  printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde = "1"\n' > "$tmp/repo/Cargo.toml"
+  set_version 0.1.4
+  printf '\n[dependencies]\nserde.workspace = true\n' >> "$tmp/repo/crates/demo/Cargo.toml"
+  t_git commit -qam 'a workspace dependency'
+  t_git branch patched
+  printf '\n[patch.crates-io]\nserde = { path = "vendor/serde" }\n' >> "$tmp/repo/Cargo.toml"
+  t_git commit -qam 'a patch entry'
+  expect 0 "a patch entry naming a workspace dependency" patched HEAD
+  printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde = "2"\n' > "$tmp/repo/Cargo.toml"
+  t_git commit -qam 'the requirement moves'
+  expect 1 "a moved workspace dependency without a bump" patched HEAD
+
   if [[ "$failures" -ne 0 ]]; then
     echo "crate-version-guard: self-test: $failures case(s) failed" >&2
     return 1
@@ -159,9 +173,6 @@ base="$(git merge-base "$base_ref" "${head_commits[@]}")" || {
 changed_paths() {
   if [[ "$head" = "WORKTREE" ]]; then git diff --name-only "$base" --; else git diff --name-only "$base" "$head" --; fi
 }
-diff_text() {
-  if [[ "$head" = "WORKTREE" ]]; then git diff "$base" -- "$@"; else git diff "$base" "$head" -- "$@"; fi
-}
 head_file() {
   if [[ "$head" = "WORKTREE" ]]; then cat "$1"; else git show "$head:$1"; fi
 }
@@ -171,22 +182,19 @@ changed="$(changed_paths)"
 # Only the `[workspace.dependencies]` table renders into a packaged manifest;
 # the `[workspace.package]` keys (the product `version`, edition, licence) are
 # read through `key.workspace = true` and change no crate's packaged bytes.
-workspace_dependencies() {
-  awk '/^\[workspace\.dependencies\]/{p=1; next} /^\[/{p=0} p && /^[A-Za-z0-9_-]+[[:space:]]*=/{sub(/[[:space:]]*=.*/, ""); print}'
+workspace_entries() {
+  awk '/^\[workspace\.dependencies\]/{p=1; next} /^\[/{p=0} p && /^[A-Za-z0-9_-]+[[:space:]]*=/{print}'
 }
 
-# The workspace dependency names this change touched, restricted to names the
-# table actually declares on either side.
+# The workspace dependency names this change touched: an entry of the table
+# added, removed or rewritten. A line of another table that names the same
+# crate, such as a `[patch]` entry, renders into no packaged manifest.
 touched_dependencies=""
 if grep -qx 'Cargo.toml' <<<"$changed"; then
-  diff_names="$(diff_text Cargo.toml |
-    grep -E '^[+-][A-Za-z0-9_-]+[[:space:]]*=' |
-    sed -E 's/^[+-]//; s/[[:space:]]*=.*//' | sort -u || true)"
-  dependency_names="$( { head_file Cargo.toml; git show "$base:Cargo.toml"; } | workspace_dependencies)"
-  for name in $diff_names; do
-    grep -qx "$name" <<<"$dependency_names" || continue
-    touched_dependencies="$touched_dependencies $name"
-  done
+  touched_dependencies="$(comm -3 \
+    <(git show "$base:Cargo.toml" | workspace_entries | sort) \
+    <(head_file Cargo.toml | workspace_entries | sort) |
+    sed -E 's/^[[:space:]]+//; s/[[:space:]]*=.*//' | sort -u | tr '\n' ' ')"
 fi
 
 # Whether version $1 sorts strictly above version $2. Equal is not above: a

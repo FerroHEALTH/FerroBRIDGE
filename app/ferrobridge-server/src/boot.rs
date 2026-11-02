@@ -287,6 +287,7 @@ where
         .map(|feed| feed.spawn(&stop))
         .collect();
     let state = Arc::new(started.state.with_lanes(started.lanes));
+    let delivery = state.access_log().map(|log| log.spawn());
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let report =
         crate::usage_report::start(&settings.usage_report, Arc::clone(&state), began, ci).await;
@@ -317,6 +318,17 @@ where
     }
     if let Some(report) = report {
         report.abort();
+    }
+    if let (Some(log), Some(delivery)) = (state.access_log(), delivery) {
+        log.stop();
+        // NOTE: no specification governs this: our own design; a record not yet delivered
+        // stays in the spool on disk and is delivered by the next start.
+        if tokio::time::timeout(settings.server.shutdown_timeout(), delivery)
+            .await
+            .is_err()
+        {
+            tracing::warn!("the access-record delivery did not stop within the drain bound");
+        }
     }
     if !followers.is_empty() {
         stop.send_replace(true);

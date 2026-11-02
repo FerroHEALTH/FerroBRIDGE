@@ -254,7 +254,7 @@ pub(crate) async fn vread(
             )),
         ));
     }
-    let composition = canonical(facade, &body, &binding.template_id)?;
+    let composition = canonical(facade, &ehr_id, &body, &binding.template_id)?;
     let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
     let subject = render::subject_of(facade, &ehr_id)?;
@@ -461,15 +461,25 @@ pub(crate) async fn fetch(
     template_id: &str,
 ) -> Result<(ObjectVersionId, CanonicalComposition), Refusal> {
     let (version, composition) = latest(client, ehr_id, container).await?;
-    Ok((version, canonical(facade, &composition, template_id)?))
+    Ok((
+        version,
+        canonical(facade, ehr_id, &composition, template_id)?,
+    ))
 }
 
-/// Returns the canonical form of one composition the CDR served.
+/// Returns the canonical form of one composition the CDR served from the EHR
+/// `ehr_id`, which the access the request makes reached.
 pub(crate) fn canonical(
     facade: &Facade,
+    ehr_id: &EhrId,
     composition: &Composition,
     template_id: &str,
 ) -> Result<CanonicalComposition, Refusal> {
+    crate::audit::reach::touched(
+        crate::audit::reach::Touch::Read,
+        Some(ehr_id),
+        crate::audit::reach::composition(composition, Some(template_id)),
+    );
     let text = openehr_its::json::to_canonical_json(composition);
     let value = text.parse::<serde_json::Value>().map_err(|error| {
         reply::refusal(

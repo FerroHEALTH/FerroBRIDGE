@@ -26,6 +26,7 @@ mod stamped;
 
 use std::collections::BTreeMap;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -42,6 +43,7 @@ use fhirconnect::engine::origin::{MessageControlId, MessageType, SourceItem};
 use tokio::net::TcpListener;
 use tracing::Instrument;
 
+use crate::audit::AccessLog;
 use crate::config::Hl7v2Settings;
 use crate::facade::Facade;
 use crate::facade::ingest::{Provenance, UnmappedEntries};
@@ -88,6 +90,9 @@ pub struct Face {
     /// The usage report's window each message and acknowledgment is counted
     /// in.
     usage: Arc<Window>,
+    /// The access-record lane each committed message is recorded through,
+    /// with the address the face listens at.
+    access_log: Option<(Arc<AccessLog>, SocketAddr)>,
 }
 
 /// One sending facility the face accepts, matched against MSH-4.
@@ -130,6 +135,16 @@ impl Sender {
     }
 }
 
+/// Returns the namespace id MSH-4 of `message` names, HD.1, when it names one.
+fn sending_facility(message: &Message) -> Option<&str> {
+    message
+        .header()
+        .and_then(|header| header.field(4))
+        .and_then(|field| field.repetitions().first())
+        .and_then(|facility| facility.component(1))
+        .and_then(parse::Component::text)
+}
+
 /// Returns whether `senders` accepts the sending facility of `message`; an
 /// empty list accepts any.
 #[must_use]
@@ -162,6 +177,7 @@ impl Face {
             log_outcomes: settings.log_outcomes,
             senders: settings.senders.clone(),
             usage: Arc::new(crate::usage_report::window()),
+            access_log: None,
         }
     }
 
@@ -170,6 +186,14 @@ impl Face {
     #[must_use]
     pub fn with_usage(mut self, usage: Arc<Window>) -> Self {
         self.usage = usage;
+        self
+    }
+
+    /// Returns the face recording each message it commits through `log`, when
+    /// one is on, naming `listen` as the address the messages arrive at.
+    #[must_use]
+    pub fn with_access_log(mut self, log: Option<Arc<AccessLog>>, listen: SocketAddr) -> Self {
+        self.access_log = log.map(|log| (log, listen));
         self
     }
 
@@ -220,7 +244,7 @@ impl Face {
                             &stamped,
                         );
                     }
-                    self.settle(&inbound, &stamped).await
+                    self.settle(&inbound, &stamped, connection.peer()).await
                 }
             }
         }
@@ -232,8 +256,13 @@ impl Face {
     }
 
     /// Maps and ingests one parsed message and returns its acknowledgment.
-    async fn settle(&self, inbound: &Inbound, stamped: &Stamped) -> Option<(Code, Vec<u8>)> {
-        let (settled, tally) = self.ingest(inbound, stamped).await;
+    async fn settle(
+        &self,
+        inbound: &Inbound,
+        stamped: &Stamped,
+        peer: Option<SocketAddr>,
+    ) -> Option<(Code, Vec<u8>)> {
+        let (settled, tally) = self.ingest(inbound, stamped, peer).await;
         self.acknowledge(inbound, &settled, &tally, stamped)
     }
 
@@ -272,7 +301,12 @@ impl Face {
     }
 
     /// Runs one parsed message through the guide and the ingest service.
-    async fn ingest(&self, inbound: &Inbound, stamped: &Stamped) -> (Settled, Tally) {
+    async fn ingest(
+        &self,
+        inbound: &Inbound,
+        stamped: &Stamped,
+        peer: Option<SocketAddr>,
+    ) -> (Settled, Tally) {
         let mut tally = Tally::default();
         let message = inbound.parsed().message();
         let Some(control) = message
@@ -313,6 +347,16 @@ impl Face {
             Ok(id) => self.facade.client().with_request_id(id),
             Err(_) => self.facade.client().clone(),
         };
+        let place = match self.access_log.as_ref() {
+            Some((log, _)) => match log.recorder().reserve().await {
+                Ok(place) => place,
+                Err(error) => {
+                    tracing::warn!(error = %crate::chain(&error), "a message was refused: its import record has no place");
+                    return (Settled::Unrecorded, tally);
+                }
+            },
+            None => None,
+        };
         let outcome = self
             .facade
             .ingest_under(client, &self.settings)
@@ -322,9 +366,50 @@ impl Face {
             Ok(ingested) => {
                 tally.committed = ingested.committed().count();
                 tally.skipped = ingested.skipped().count();
+                if let Err(error) = self.record(place, message, peer, &ingested).await {
+                    tracing::warn!(error = %crate::chain(&error), "a committed message is not acknowledged: its import record could not be stored");
+                    return (Settled::Unrecorded, tally);
+                }
                 (Settled::Ingested(Box::new(ingested)), tally)
             }
             Err(refused) => (Settled::Refused(refused), tally),
+        }
+    }
+
+    /// Records the import of `message` from `peer`, which committed
+    /// `ingested`, in `place` or, with no place, through the recorder.
+    ///
+    /// A message whose every source an earlier delivery committed commits
+    /// nothing, so it imports nothing and leaves no record.
+    async fn record(
+        &self,
+        place: Option<Box<dyn ihe_atna::balp::Reserved>>,
+        message: &Message,
+        peer: Option<SocketAddr>,
+        ingested: &crate::facade::ingest::Ingested,
+    ) -> Result<(), ihe_atna::balp::AuditError> {
+        let Some((log, listen)) = self.access_log.as_ref() else {
+            return Ok(());
+        };
+        if ingested.contribution().is_none() {
+            return Ok(());
+        }
+        let person = match self.facade.store().person_of(ingested.ehr_id()) {
+            Ok(person) => person,
+            Err(error) => return Err(ihe_atna::balp::AuditError(Box::new(error))),
+        };
+        let exchange = crate::audit::hl7v2::import(
+            crate::audit::hl7v2::Message {
+                sender: sending_facility(message),
+                peer,
+                listen: *listen,
+            },
+            ingested,
+            person.as_ref(),
+        );
+        match place {
+            Some(place) => place.record(exchange).await,
+            None => log.recorder().record(exchange).await,
         }
     }
 }

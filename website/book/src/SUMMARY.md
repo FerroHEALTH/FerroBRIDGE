@@ -23,6 +23,7 @@
 - [What FerroBRIDGE runs beside](operate/deployment-shape.md)
 - [Configuring the server](operate/configuration.md)
 - [The HL7 v2 face](operate/hl7v2-face.md)
+- [The access record](operate/access-record.md)
 - [The operator API](operate/operator-api.md)
 - [Problem types](operate/problems.md)
 - [The operator console](operate/operator-console.md)
