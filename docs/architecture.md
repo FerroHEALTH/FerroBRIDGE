@@ -2445,6 +2445,48 @@ draft upstream change.
   authorization server that issues it and a CDR that reads it, and stays
   open until both exist. The mapping of a caller onto `committer` is no
   specification's: our own design.
+- **The access record** (the owner's decision on #1301; implementation
+  #1377). The facade records every access an authenticated caller makes
+  itself. ITS-REST 1.1.0 carries no end-user identity on a read
+  (§Authentication and authorization mandates no scheme, and
+  `openehr-audit-details` applies to commits only), so the CDR's access log
+  names the bridge's credential. That record cannot meet Regulation (EU)
+  2025/327 Annex II 3.2, which asks for "the specific natural person or
+  persons having accessed" (b), the categories (c), the time (d) and the
+  origin (e) on every access event. The bridge is the one system that knows
+  them for a facade access. For each read, vread, search, history, create,
+  update, delete, transaction, `$tofhir` and `$toopenehr`, the bridge
+  builds the Annex II 3.2 record through the family's `ehds-logging`, with
+  the categories classified from the template and archetype ids the request
+  reached. It sends the record as an IHE BALP `AuditEvent` through
+  `ihe-atna` over the ITI-20 ATX: FHIR Feed to an Audit Record Repository
+  the operator configures. This is BALP §1:52.4.1.1's server-side record
+  (Figure 1:52.4.1.1-1, interaction 3), with the token pattern of
+  §1:52.4.2.2.
+  - **Fail-closed recording.** An access whose record the recorder cannot
+    take is refused before the CDR is reached, the `AuditRecorder`
+    contract of `ihe-atna`. No specification governs this: our own design.
+  - **The other surfaces.** The HL7 v2 face writes a BALP create record per
+    committed message with the system as its agent (ITI-20 Table
+    3.20.4.1.1.1-1, "PHI-import") and no Annex II 3.2 record, since no
+    natural person sits behind an MLLP message. The OMOP ETL reads in batch
+    under the bridge's own CDR credential with no individual behind the
+    read, and the operator API serves mapping files and no health data, so
+    neither writes a record of its own. The CDR's record of an ETL read
+    names the ETL client correctly, and the `ferrohealth-smart` audit line
+    stays the request log of every guarded surface. This scoping is our own
+    design.
+  - **The component boundary.** Art 2(2)(n) and (o) define the
+    interoperability and logging components each as "independent of" the
+    other, and Art 30(1)(b) asks that no other component adversely affects
+    them. Both crates are pinned exactly, and only `app/ferrobridge-server`
+    links them. An architecture test fails when `eehrxf`, `fhirconnect` or
+    `openehr-mapping-core` reaches either crate, the shape FerroFED's
+    decision A58 holds.
+  - **The open complement.** An OAuth 2.0 Token Exchange (RFC 8693) token
+    with an `act` claim, if the CDR accepted it, would let the CDR's own
+    record name the clinician too. That stays open until an authorization
+    server issues the token and a CDR reads it.
 - **Tenancy.** The reference CDR scopes its mapping rows per tenant with
   row-level security and keeps its outbound watermark deliberately unscoped
   (one integer, no tenant data). FerroBRIDGE's mapping set is a file tree per
