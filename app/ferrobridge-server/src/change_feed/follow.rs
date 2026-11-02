@@ -258,7 +258,10 @@ pub async fn follow(
         if *stop.borrow() {
             break;
         }
-        let wait = match pass(feed, reader, consumer, polling.page_size, &mut cursor).await {
+        let passed = pass(feed, reader, consumer, polling.page_size, &mut cursor).await;
+        let positions: Vec<Position> = cursor.acknowledged.values().cloned().collect();
+        following.acknowledged(&positions);
+        let wait = match passed {
             Ok(done) => {
                 following.followed();
                 backoff = polling.backoff;

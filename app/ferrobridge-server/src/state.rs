@@ -211,6 +211,8 @@ pub struct AppState {
     /// The one client of the `[terminology]` server, when one is configured,
     /// shared by readiness and every lane that translates.
     terminology: Option<ferrobridge_term::client::Client>,
+    /// The events lane the operator API reports, when it runs.
+    events: Option<Arc<crate::events::report::Lane>>,
 }
 
 impl AppState {
@@ -309,6 +311,7 @@ impl AppState {
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
             terminology,
+            events: None,
         })
     }
 
@@ -329,6 +332,7 @@ impl AppState {
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
             terminology: None,
+            events: None,
         }
     }
 
@@ -352,6 +356,20 @@ impl AppState {
     pub fn with_following(mut self, following: crate::change_feed::health::Following) -> Self {
         self.health = self.health.and(Arc::new(following));
         self
+    }
+
+    /// Returns this state with the events lane `lane` reported by the operator
+    /// API.
+    #[must_use]
+    pub fn with_events(mut self, lane: crate::events::report::Lane) -> Self {
+        self.events = Some(Arc::new(lane));
+        self
+    }
+
+    /// Returns the events lane, when it runs.
+    #[must_use]
+    pub const fn events(&self) -> Option<&Arc<crate::events::report::Lane>> {
+        self.events.as_ref()
     }
 
     /// Returns this state with the HL7 v2 listener probed and reported.

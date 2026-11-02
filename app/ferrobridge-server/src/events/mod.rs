@@ -16,6 +16,7 @@
 //! names: identifiers and provenance, never clinical content.
 
 pub mod amqp;
+pub mod report;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -164,6 +165,8 @@ pub struct Publisher {
     /// The broker.
     broker: Arc<dyn Publish>,
     /// The window the published messages are counted in, when reported.
+    /// The status the delivered messages are counted in, when reported.
+    following: Option<crate::change_feed::health::Following>,
     usage: Option<Arc<ferrohealth_usage_report::window::Window>>,
 }
 
@@ -174,7 +177,16 @@ impl Publisher {
         Self {
             broker,
             usage: None,
+            following: None,
         }
+    }
+
+    /// Returns this consumer counting each published message in the status
+    /// `following` holds.
+    #[must_use]
+    pub fn with_following(mut self, following: crate::change_feed::health::Following) -> Self {
+        self.following = Some(following);
+        self
     }
 
     /// Returns this consumer counting each published message in `usage`.
@@ -202,6 +214,9 @@ impl Consumer for Publisher {
                 .map_err(ConsumerError::transient)?;
             if let Some(usage) = self.usage.as_ref() {
                 crate::usage_report::record_event_published(usage);
+            }
+            if let Some(following) = self.following.as_ref() {
+                following.delivered();
             }
         }
         Ok(())

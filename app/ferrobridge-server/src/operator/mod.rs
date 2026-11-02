@@ -187,10 +187,14 @@ pub fn routes(
     smart: &crate::smart::Smart,
     health: Registry,
     lifecycle: Lifecycle,
+    events: Option<Arc<crate::events::report::Lane>>,
 ) -> Router {
     let readiness = Router::new()
         .route("/operator/readiness", get(readiness))
         .with_state((health, lifecycle));
+    let lane = Router::new()
+        .route("/operator/events", get(events_lane))
+        .with_state(events);
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/configuration", get(running_configuration))
@@ -200,6 +204,7 @@ pub fn routes(
         .route("/operator/reload", post(save::reload))
         .with_state(operator)
         .merge(readiness)
+        .merge(lane)
         .route_layer(guard::layer(smart))
 }
 
@@ -214,6 +219,12 @@ async fn readiness(State((health, lifecycle)): State<(Registry, Lifecycle)>) -> 
         StatusCode::SERVICE_UNAVAILABLE
     };
     (status, axum::Json(document)).into_response()
+}
+
+/// `GET /operator/events`: the change-feed consumers and the AMQP topology,
+/// an empty document when the events lane is off.
+async fn events_lane(State(lane): State<Option<Arc<crate::events::report::Lane>>>) -> Response {
+    axum::Json(crate::events::report::document(lane.as_deref())).into_response()
 }
 
 /// `GET /operator/state`: the running load.
