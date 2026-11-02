@@ -109,7 +109,10 @@ async fn a_batch_run_after_the_incremental_load_leaves_the_cdm_as_it_was()
     assert_eq!("6", measurements(&postgres).await?);
     let incremental = crate::etl::dump(&postgres).await?;
     let batch = etl_run(&config).await?;
-    assert_eq!(3, batch.compositions.committed, "{batch}");
+    assert_eq!(
+        3, batch.compositions.committed,
+        "the batch run commits every composition"
+    );
     assert_eq!(
         incremental,
         crate::etl::dump(&postgres).await?,
@@ -128,8 +131,15 @@ async fn a_batch_run_after_the_incremental_load_leaves_the_cdm_as_it_was()
     assert_eq!(0, crate::etl::orphans(&postgres).await?);
     let retracted = crate::etl::dump(&postgres).await?;
     let after = etl_run(&config).await?;
-    assert_eq!(2, after.compositions.committed, "{after}");
-    assert!(after.deletions.removed.is_empty(), "{after}");
+    assert_eq!(
+        2, after.compositions.committed,
+        "the batch run commits the compositions that stand"
+    );
+    assert_eq!(
+        0,
+        after.deletions.removed.len(),
+        "the batch run finds no deletion the incremental load left"
+    );
     assert_eq!(
         retracted,
         crate::etl::dump(&postgres).await?,
