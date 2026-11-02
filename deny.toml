@@ -47,9 +47,9 @@ allow = [
 ]
 confidence-threshold = 0.9
 # The project's own crates are BUSL-1.1 (LICENSE). The openEHR model crates
-# join this list as they are added (openehr-sdt, openehr-query and openehr-adl
-# are BUSL-1.1; openehr-its is Apache-2.0 again from 0.0.68, when the engines
-# moved to openehr-sdt).
+# join this list as they are added (openehr-sdt and openehr-adl are BUSL-1.1;
+# openehr-its is Apache-2.0 again from 0.0.68, when the engines moved to
+# openehr-sdt, and openehr-query from 0.0.116).
 #
 # openehr-term arrives transitively under openehr-rm. Its Rust code is
 # Apache-2.0; the CC-BY-SA-3.0 half covers only the official openEHR
@@ -62,8 +62,6 @@ exceptions = [
   # openehr-adl compiles the ADL 2 test fixtures of openehr-mapping-core from
   # their .adls sources, and the server reads an adl2 template ETag with it.
   { allow = ["BUSL-1.1"], crate = "openehr-adl" },
-  # openehr-query is the AQL parser the ETL checks its configured queries with.
-  { allow = ["BUSL-1.1"], crate = "openehr-query" },
   { allow = ["Apache-2.0", "CC-BY-SA-3.0"], crate = "openehr-term" },
   # ferrohealth-ui is the FerroHEALTH component library the operator console
   # draws with, the same Licensor's crate under the same licence.
