@@ -135,7 +135,7 @@ pub enum PositionError {
 /// the value is (Simplified Formats, §Attribute Suffixes). A node with one
 /// unsuffixed value carries no suffix, and a whole canonical value travels
 /// under the `raw` suffix (Simplified Formats, §Raw canonical JSON). The key
-/// is spelled through [`FlatKey`], the FLAT key model of `openehr-sdt`.
+/// is spelled through [`FlatKey`](openehr_sdt::flat::path::FlatKey), the FLAT key model of `openehr-sdt`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeValue {
     /// Where the key starts: a template node or the `ctx/` namespace.
@@ -305,7 +305,7 @@ impl CanonicalComposition {
 /// A canonical document an index reads node values out of.
 ///
 /// A composition and a demographic party are both read through
-/// [`WebTemplateIndex::read`], because both are archetyped trees whose paths
+/// [`WebTemplateIndex::read`](crate::index::WebTemplateIndex::read), because both are archetyped trees whose paths
 /// the template names.
 pub trait CanonicalDocument {
     /// Returns the canonical JSON of the document.
