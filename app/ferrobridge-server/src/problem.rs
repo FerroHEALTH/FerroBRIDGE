@@ -51,6 +51,9 @@ pub enum Kind {
     Unreadable,
     /// `500`: the mapping directory could not be written.
     Unwritable,
+    /// `500`: the dead-letter store of the change feed refused a read or a
+    /// write.
+    DeadLettersUnavailable,
     /// `503`: the mapping set could not be reloaded.
     ReloadUnavailable,
     /// `503`: the access token could not be checked.
@@ -59,7 +62,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
@@ -72,6 +75,7 @@ impl Kind {
         Self::PreconditionRequired,
         Self::Unreadable,
         Self::Unwritable,
+        Self::DeadLettersUnavailable,
         Self::ReloadUnavailable,
         Self::AuthorizationUnavailable,
     ];
@@ -139,6 +143,11 @@ impl Kind {
             Self::Unwritable => (
                 "unwritable",
                 "The mapping directory could not be written",
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+            Self::DeadLettersUnavailable => (
+                "dead-letters-unavailable",
+                "The dead-letter store could not be read or written",
                 StatusCode::INTERNAL_SERVER_ERROR,
             ),
             Self::ReloadUnavailable => (

@@ -71,6 +71,18 @@ pub(super) fn resolve_change_feed(
             reason: "the longest wait is at least change_feed.backoff_ms",
         });
     }
+    let max_attempts = u32::try_from(section.max_attempts)
+        .ok()
+        .filter(|attempts| (1..=1000).contains(attempts))
+        .and_then(std::num::NonZeroU32::new)
+        .ok_or(Error::Bound {
+            key: String::from("change_feed.max_attempts"),
+            value: section.max_attempts,
+            reason: "an event fails 1 to 1000 poisoned passes before it is parked",
+        })?;
+    let dead_letters = section.dead_letters.clone().ok_or_else(|| Error::Missing {
+        key: String::from("change_feed.dead_letters"),
+    })?;
     if consumers == 0 {
         return Err(Error::NoConsumer {
             key: String::from("change_feed.enabled"),
@@ -78,6 +90,8 @@ pub(super) fn resolve_change_feed(
     }
     Ok(Settings {
         source,
+        dead_letters,
+        max_attempts,
         polling: Polling {
             page_size,
             idle: Duration::from_millis(section.poll_interval_ms),

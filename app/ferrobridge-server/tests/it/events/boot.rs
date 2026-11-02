@@ -24,14 +24,20 @@ const BACKOFF: Backoff = Backoff {
 };
 
 /// Returns settings whose events lane follows the reference CDR's feed at
-/// `cdr` and publishes to a broker on `broker_port`, where nothing listens.
-fn settings(cdr: &MockServer, broker_port: u16) -> Result<Settings, Box<dyn Error>> {
+/// `cdr` and publishes to a broker on `broker_port`, where nothing listens,
+/// parking poisoned events in `store`.
+fn settings(
+    cdr: &MockServer,
+    broker_port: u16,
+    store: &tempfile::TempDir,
+) -> Result<Settings, Box<dyn Error>> {
     let text = format!(
         "[usage_report]\nenabled = false\n\n\
          [cdr]\nbase_url = \"{uri}/v1\"\n\n\
-         [change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\npoll_interval_ms = 10\nbackoff_ms = 10\nmax_backoff_ms = 20\n\n\
+         [change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\npoll_interval_ms = 10\nbackoff_ms = 10\nmax_backoff_ms = 20\ndead_letters = \"{dead_letters}\"\n\n\
          [events]\nenabled = true\nreader = \"ferrobridge-test\"\nurl = \"amqp://guest:guest@127.0.0.1:{broker_port}/%2f\"\nexchange = \"ferrobridge.test.events\"\nconfirm_timeout_ms = 500\n",
-        uri = cdr.uri()
+        uri = cdr.uri(),
+        dead_letters = store.path().join("dead-letters.redb").display(),
     );
     Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?)
 }
@@ -47,13 +53,14 @@ fn closed_port() -> Result<u16, Box<dyn Error>> {
 async fn a_cdr_that_serves_no_feed_for_the_reader_refuses_the_start() -> Result<(), Box<dyn Error>>
 {
     let cdr = MockServer::start().await;
+    let store = tempfile::tempdir()?;
     Mock::given(method("GET"))
         .and(path("/ext/admin/outbox/ferrobridge-test"))
         .respond_with(ResponseTemplate::new(404))
         .mount(&cdr)
         .await;
     let outcome = serve_settings(
-        &settings(&cdr, closed_port()?)?,
+        &settings(&cdr, closed_port()?, &store)?,
         || async { Ok(TcpListener::bind("127.0.0.1:0").await?) },
         BACKOFF,
         std::future::pending::<()>(),
@@ -71,6 +78,7 @@ async fn a_cdr_that_serves_no_feed_for_the_reader_refuses_the_start() -> Result<
 async fn a_broker_that_is_down_degrades_the_lane_and_the_process_stays_ready()
 -> Result<(), Box<dyn Error>> {
     let cdr = MockServer::start().await;
+    let store = tempfile::tempdir()?;
     Mock::given(method("GET"))
         .and(path("/ext/admin/outbox/ferrobridge-test"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -97,7 +105,7 @@ async fn a_broker_that_is_down_degrades_the_lane_and_the_process_stays_ready()
         .expect(0)
         .mount(&cdr)
         .await;
-    let settings = settings(&cdr, closed_port()?)?;
+    let settings = settings(&cdr, closed_port()?, &store)?;
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();

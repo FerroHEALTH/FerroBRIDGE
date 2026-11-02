@@ -13,6 +13,8 @@
 //! at least once). No specification governs this: our own design.
 
 use std::collections::BTreeMap;
+use std::num::NonZeroU32;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::watch;
@@ -24,6 +26,8 @@ use crate::change_feed::PageSize;
 use crate::change_feed::Position;
 use crate::change_feed::ReaderName;
 use crate::change_feed::Stream;
+use crate::change_feed::dead_letter::DeadLetterError;
+use crate::change_feed::dead_letter::DeadLetters;
 use crate::change_feed::health::Following;
 
 /// Whether a failed event may succeed when it is offered again unchanged.
@@ -123,16 +127,43 @@ impl Default for Polling {
     }
 }
 
+/// Where a follower parks an event its consumer failed with a poisoned
+/// failure on `max_attempts` passes.
+#[derive(Debug, Clone)]
+pub struct Parking {
+    /// The dead-letter store.
+    pub store: Arc<DeadLetters>,
+    /// The poisoned passes an event fails before it is parked.
+    pub max_attempts: NonZeroU32,
+}
+
 /// The last position this follower acknowledged in each stream, the guard
-/// that keeps every cursor moving forward.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// that keeps every cursor moving forward, and where it parks a poisoned
+/// event.
+#[derive(Debug, Clone, Default)]
 pub struct Cursor {
     /// The last acknowledged event per stream, unknown until the stream's
     /// first acknowledgement.
     acknowledged: BTreeMap<Stream, Position>,
+    /// Where a poisoned event is parked; without it a poisoned event stops
+    /// the pass as a transient one does.
+    parking: Option<Parking>,
+    /// The positions this follower charged a poisoned pass to, forgotten
+    /// once the event finishes.
+    charged: Vec<Position>,
 }
 
 impl Cursor {
+    /// Returns a cursor that parks a poisoned event through `parking`.
+    #[must_use]
+    pub const fn parking(parking: Parking) -> Self {
+        Self {
+            acknowledged: BTreeMap::new(),
+            parking: Some(parking),
+            charged: Vec::new(),
+        }
+    }
+
     /// Returns the last event this follower acknowledged in `stream`.
     #[must_use]
     pub fn acknowledged(&self, stream: Stream) -> Option<&Position> {
@@ -167,6 +198,19 @@ pub enum PassError {
         #[source]
         source: ConsumerError,
     },
+    /// A replayed parked event met a transient failure; it stays parked
+    /// with its replay requested.
+    #[error("the replay of parked event {id} was not finished")]
+    Replay {
+        /// The parked number.
+        id: u64,
+        /// Why.
+        #[source]
+        source: ConsumerError,
+    },
+    /// The dead-letter store refused a read or a write.
+    #[error("the dead-letter store refused the pass")]
+    DeadLetter(#[from] DeadLetterError),
     /// The page holds an event that does not follow the one before it in
     /// its stream, or the cursor this follower moved there.
     #[error("the feed served the event at {position} after {previous}")]
@@ -186,11 +230,18 @@ pub enum PassError {
 /// finished is then acknowledged, the last finished position of each stream,
 /// and nothing after it.
 ///
+/// With [`Parking`], the parked events a replay was requested for are
+/// offered first, and a poisoned failure is charged to its event: on the
+/// bound the event is parked with its cause and counts as finished, below it
+/// the pass stops there. A transient failure is never charged.
+///
 /// # Errors
 /// Returns [`PassError::Feed`] when the page cannot be read or an
 /// acknowledgement is refused, [`PassError::Unordered`] for a page out of
-/// order, and [`PassError::Consumer`] for the first event the consumer did
-/// not finish, after the prefix before it was acknowledged.
+/// order, [`PassError::Replay`] for a replay that met a transient failure,
+/// [`PassError::DeadLetter`] when the store refuses, and
+/// [`PassError::Consumer`] for the first event the consumer did not finish,
+/// after the prefix before it was acknowledged.
 pub async fn pass(
     feed: &dyn ChangeFeed,
     reader: &ReaderName,
@@ -198,6 +249,9 @@ pub async fn pass(
     page_size: PageSize,
     cursor: &mut Cursor,
 ) -> Result<Pass, PassError> {
+    if let Some(parking) = cursor.parking.clone() {
+        replay(&parking.store, reader, consumer).await?;
+    }
     let page = feed.page(reader, page_size).await?;
     let mut previous: BTreeMap<Stream, &Position> = cursor
         .acknowledged
@@ -222,6 +276,10 @@ pub async fn pass(
     for event in &page.events {
         match consumer.process(event).await {
             Ok(()) => {
+                settle(cursor, reader, &event.position)?;
+                finished.insert(event.position.stream(), &event.position);
+            }
+            Err(source) if parked(cursor, reader, event, &source)? => {
                 finished.insert(event.position.stream(), &event.position);
             }
             Err(source) => {
@@ -249,20 +307,101 @@ pub async fn pass(
     }
 }
 
+/// Offers `consumer` every event parked for `reader` with a replay
+/// requested: a finished one leaves the store, a poisoned one is parked
+/// again with its new cause, and a transient failure stops the pass.
+async fn replay(
+    store: &DeadLetters,
+    reader: &ReaderName,
+    consumer: &dyn Consumer,
+) -> Result<(), PassError> {
+    for parked in store.parked(reader)? {
+        if !parked.replay {
+            continue;
+        }
+        match consumer.process(&parked.event).await {
+            Ok(()) => {
+                store.replayed(reader, parked.id)?;
+                tracing::info!(consumer = consumer.name(), reader = %reader, parked = parked.id, "a replayed parked event finished");
+            }
+            Err(error) if error.failure() == Failure::Poisoned => {
+                store.repark(reader, parked.id, &crate::indicators::reason(&error))?;
+                tracing::warn!(consumer = consumer.name(), reader = %reader, parked = parked.id, "a replayed parked event failed again and stays parked");
+            }
+            Err(source) => {
+                return Err(PassError::Replay {
+                    id: parked.id,
+                    source,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Forgets the poisoned passes charged to the finished event at `position`.
+fn settle(cursor: &mut Cursor, reader: &ReaderName, position: &Position) -> Result<(), PassError> {
+    let Some(parking) = cursor.parking.as_ref() else {
+        return Ok(());
+    };
+    let before = cursor.charged.len();
+    cursor.charged.retain(|charged| charged != position);
+    if cursor.charged.len() != before {
+        parking.store.settle(reader, position)?;
+    }
+    Ok(())
+}
+
+/// Charges the poisoned failure `error` of `event` and parks the event on the
+/// bound; returns whether it was parked.
+fn parked(
+    cursor: &mut Cursor,
+    reader: &ReaderName,
+    event: &Event,
+    error: &ConsumerError,
+) -> Result<bool, PassError> {
+    let Some(parking) = cursor.parking.as_ref() else {
+        return Ok(false);
+    };
+    if error.failure() != Failure::Poisoned {
+        return Ok(false);
+    }
+    let attempts = parking.store.charge(reader, &event.position)?;
+    if attempts < parking.max_attempts.get() {
+        if !cursor.charged.contains(&event.position) {
+            cursor.charged.push(event.position.clone());
+        }
+        return Ok(false);
+    }
+    let cause = crate::indicators::reason(error);
+    let id = parking.store.park(reader, event, &cause, attempts)?;
+    cursor.charged.retain(|charged| charged != &event.position);
+    tracing::warn!(
+        reader = %reader,
+        position = %event.position,
+        parked = id,
+        attempts,
+        "an event failed its bound of poisoned passes and is parked in the dead-letter store"
+    );
+    Ok(true)
+}
+
 /// Follows the feed of `reader` with `consumer` until `stop` reads `true`.
 ///
 /// A full page is followed by the next read at once, a short one after
 /// `polling.idle`; a failed pass is logged, recorded on `following` and
-/// retried after a backoff that doubles up to `polling.max_backoff`.
+/// retried after a backoff that doubles up to `polling.max_backoff`. With
+/// `parking`, a poisoned event is parked on its bound (see [`pass`]).
 pub async fn follow(
     feed: &dyn ChangeFeed,
     reader: &ReaderName,
     consumer: &dyn Consumer,
     polling: Polling,
+    parking: Option<Parking>,
     following: &Following,
     mut stop: watch::Receiver<bool>,
 ) {
-    let mut cursor = Cursor::default();
+    let mut cursor = parking.map_or_else(Cursor::default, Cursor::parking);
     let mut backoff = polling.backoff;
     tracing::info!(consumer = consumer.name(), reader = %reader, "following the change feed");
     loop {

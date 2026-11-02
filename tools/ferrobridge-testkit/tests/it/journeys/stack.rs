@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
+use ferrobridge_server::change_feed::{Domain, Event, Position, ReaderName, Seq};
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
@@ -358,7 +359,7 @@ async fn bridge(
     .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents);
     let events = match lanes {
-        Lanes::WithEvents => events_lane(cdr).await?,
+        Lanes::WithEvents => events_lane(cdr, tree).await?,
         Lanes::All | Lanes::WithoutOperations => String::new(),
     };
     let text = format!(
@@ -436,10 +437,46 @@ async fn ready(
 /// The reader the events lane follows the CDR's outbox feed under.
 const EVENTS_READER: &str = "ferrobridge";
 
+/// The number of the event the events lane finds parked at its start.
+pub(crate) const PARKED_ID: u64 = 1;
+
+/// Parks one synthetic event, clinical seq 17, for the events lane in the
+/// dead-letter store at `store`.
+fn park(store: &Path) -> Result<(), Box<dyn Error>> {
+    let event = Event {
+        position: Position::Outbox {
+            domain: Domain::Clinical,
+            seq: Seq::new(17),
+        },
+        erasure: false,
+        contribution_id: Some(ferrobridge_server::cdr::ids::ContributionUid::new(
+            "0d4a3c52-5b51-4b4b-9e0e-000000000017",
+        )?),
+        ehr_id: None,
+        committed_at: None,
+        versions: Vec::new(),
+        envelope: serde_json::Map::new(),
+    };
+    let parked = ferrobridge_server::change_feed::dead_letter::DeadLetters::open(store)?.park(
+        &ReaderName::new(EVENTS_READER)?,
+        &event,
+        "the consumer met a poisoned failure: the event names no template",
+        5,
+    )?;
+    if parked == PARKED_ID {
+        Ok(())
+    } else {
+        Err(format!("the event was parked as {parked}").into())
+    }
+}
+
 /// Mounts the reference CDR's outbox feed on `cdr`, one synthetic event in
-/// the clinical outbox, and returns the `[change_feed]` and `[events]`
-/// sections that follow it to a broker nothing listens on.
-async fn events_lane(cdr: &MockServer) -> Result<String, Box<dyn Error>> {
+/// the clinical outbox, parks one more in a dead-letter store under `tree`,
+/// and returns the `[change_feed]` and `[events]` sections that follow it to
+/// a broker nothing listens on.
+async fn events_lane(cdr: &MockServer, tree: &Path) -> Result<String, Box<dyn Error>> {
+    let store = tree.join("dead-letters.redb");
+    park(&store)?;
     let feed = format!("/ext/admin/outbox/{EVENTS_READER}");
     for (domain, events) in [
         (
@@ -477,11 +514,12 @@ async fn events_lane(cdr: &MockServer) -> Result<String, Box<dyn Error>> {
         .port();
     Ok(format!(
         "\n[change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\n\
-         poll_interval_ms = 200\nbackoff_ms = 200\nmax_backoff_ms = 1000\n\n\
+         poll_interval_ms = 200\nbackoff_ms = 200\nmax_backoff_ms = 1000\ndead_letters = {store}\n\n\
          [events]\nenabled = true\nreader = \"{EVENTS_READER}\"\n\
          url = \"amqp://127.0.0.1:{closed}/%2f\"\nexchange = \"ferroehr.events\"\n\
          confirm_timeout_ms = 500\n\
          queues = [{{ name = \"ferroehr.events.analytics\", binding = \"COMPOSITION.*.*\" }}]\n",
         uri = cdr.uri(),
+        store = toml::Value::String(store.display().to_string()),
     ))
 }

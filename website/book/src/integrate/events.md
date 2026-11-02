@@ -104,6 +104,7 @@ feed, and FerroBRIDGE publishes. To move a deployment:
    enabled = true
    source = "ferroehr"
    url = "https://ehr.example/ferroehr/rest/extensions/v1"
+   dead_letters = "/var/lib/ferrobridge/dead-letters.redb"
 
    [events]
    enabled = true

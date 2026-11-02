@@ -357,6 +357,33 @@ impl Bridge {
         .map(|(_status, events)| events)
     }
 
+    /// Asks for the replay of the event `id` the change-feed consumer
+    /// `consumer` parked, `POST
+    /// {base}operator/events/{consumer}/parked/{id}/replay`.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Path`] when the base takes no path segments,
+    /// [`BridgeError::Refused`] for any status but `202` (a `404` for a
+    /// consumer or an event the bridge does not know), and the transport
+    /// errors of [`Self::capability_statement`].
+    pub async fn replay_parked(
+        &self,
+        consumer: &str,
+        id: u64,
+        token: &AccessToken,
+    ) -> Result<(), BridgeError> {
+        let mut url = self.url("operator/events")?;
+        url.path_segments_mut()
+            .map_err(|()| BridgeError::Path)?
+            .push(consumer)
+            .push("parked")
+            .push(&id.to_string())
+            .push("replay");
+        self.exchange(self.client.post(url), JSON, token, &[StatusCode::ACCEPTED])
+            .await
+            .map(|_answer| ())
+    }
+
     /// Reads the bridge's SMART discovery document, `GET
     /// {base}fhir/.well-known/smart-configuration` (SMART App Launch 2.2.0,
     /// conformance).

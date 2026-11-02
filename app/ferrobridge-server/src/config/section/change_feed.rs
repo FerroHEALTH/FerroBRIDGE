@@ -24,6 +24,11 @@ pub struct ChangeFeed {
     pub url: String,
     /// The `redb` file the `aql` source keeps each reader's watermark in.
     pub watermarks: Option<PathBuf>,
+    /// The `redb` file the consumers park a poisoned event in, and count each
+    /// event's poisoned passes in.
+    pub dead_letters: Option<PathBuf>,
+    /// The poisoned passes an event fails before it is parked, 1 to 1000.
+    pub max_attempts: u64,
     /// Where an `aql` reader with no watermark starts: `now`, `beginning`, or
     /// an RFC 3339 instant.
     pub start: String,
@@ -44,6 +49,8 @@ impl Default for ChangeFeed {
             source: String::from("aql"),
             url: String::new(),
             watermarks: None,
+            dead_letters: None,
+            max_attempts: 5,
             start: String::from("now"),
             page_size: 100,
             poll_interval_ms: 1_000,

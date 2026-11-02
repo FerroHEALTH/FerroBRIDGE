@@ -152,7 +152,7 @@ pub async fn draw(visit: &Visit) -> Drawn {
         Page::Facade => pages::facade::page(visit).await,
         Page::Hl7v2 => pages::hl7v2::page(visit).await,
         Page::Omop => pages::omop::page(visit).await,
-        Page::Events => pages::events::page(visit).await,
+        Page::Events => pages::events::page(visit, None).await,
         Page::Connections => pages::connections::page(visit).await,
         Page::Connection => pages::connections::connection_page(visit).await,
         Page::Configuration => pages::configuration::page(visit).await,
@@ -171,6 +171,7 @@ pub async fn posted(visit: &Visit, body: &str) -> Option<Response> {
         Page::Mappings => Some(pages::mappings::reload(visit).await),
         Page::NewFile | Page::Editor => Some(pages::editor::posted(visit, body).await),
         Page::Playground => Some(pages::playground::posted(visit, body).await),
+        Page::Events => Some(pages::events::posted(visit, body).await),
         _ => None,
     }
 }

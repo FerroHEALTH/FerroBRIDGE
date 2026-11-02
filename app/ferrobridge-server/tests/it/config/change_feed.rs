@@ -19,6 +19,8 @@ fn the_change_feed_is_off_by_default() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!("aql", config.change_feed.source);
     assert_eq!("now", config.change_feed.start);
     assert_eq!(100, config.change_feed.page_size);
+    assert_eq!(5, config.change_feed.max_attempts);
+    assert_eq!(None, config.change_feed.dead_letters);
     let settings = config.resolve()?;
     assert!(settings.change_feed.is_none());
     Ok(())
@@ -38,6 +40,14 @@ fn every_key_reads_from_the_environment() -> Result<(), Box<dyn std::error::Erro
         (
             String::from("FERROBRIDGE__CHANGE_FEED__WATERMARKS"),
             String::from("/var/lib/ferrobridge/feed.redb"),
+        ),
+        (
+            String::from("FERROBRIDGE__CHANGE_FEED__DEAD_LETTERS"),
+            String::from("/var/lib/ferrobridge/dead-letters.redb"),
+        ),
+        (
+            String::from("FERROBRIDGE__CHANGE_FEED__MAX_ATTEMPTS"),
+            String::from("8"),
         ),
         (
             String::from("FERROBRIDGE__CHANGE_FEED__START"),
@@ -71,6 +81,13 @@ fn every_key_reads_from_the_environment() -> Result<(), Box<dyn std::error::Erro
         Some(std::path::PathBuf::from("/var/lib/ferrobridge/feed.redb")),
         section.watermarks
     );
+    assert_eq!(
+        Some(std::path::PathBuf::from(
+            "/var/lib/ferrobridge/dead-letters.redb"
+        )),
+        section.dead_letters
+    );
+    assert_eq!(8, section.max_attempts);
     assert_eq!("beginning", section.start);
     assert_eq!(
         (250, 5000, 200, 30_000),
@@ -97,7 +114,7 @@ fn an_enabled_feed_without_a_cdr_is_refused() -> Result<(), Box<dyn std::error::
 #[test]
 fn an_enabled_feed_no_consumer_follows_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!(
-        "{CDR}[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\n"
+        "{CDR}[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n"
     ))?;
     assert!(
         matches!(&error, Error::NoConsumer { key } if key == "change_feed.enabled"),
@@ -200,4 +217,30 @@ fn a_zero_wait_or_a_ceiling_below_the_backoff_is_refused() -> Result<(), Box<dyn
 fn an_unknown_key_is_refused() {
     let refused = Config::from_sources(Some("[change_feed]\nreader = \"x\"\n"), &BTreeMap::new());
     assert!(matches!(refused, Err(Error::Parse { .. })), "{refused:?}");
+}
+
+#[test]
+fn an_enabled_feed_without_a_dead_letter_store_is_refused() -> Result<(), Box<dyn std::error::Error>>
+{
+    let error = refused_with("watermarks = \"/tmp/feed.redb\"\n")?;
+    assert!(
+        matches!(&error, Error::Missing { key } if key == "change_feed.dead_letters"),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_bound_of_poisoned_passes_outside_one_to_a_thousand_is_refused()
+-> Result<(), Box<dyn std::error::Error>> {
+    for attempts in [0_u64, 1001] {
+        let error = refused_with(&format!(
+            "watermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\nmax_attempts = {attempts}\n"
+        ))?;
+        assert!(
+            matches!(&error, Error::Bound { key, value, .. } if key == "change_feed.max_attempts" && *value == attempts),
+            "{attempts}: {error:?}"
+        );
+    }
+    Ok(())
 }

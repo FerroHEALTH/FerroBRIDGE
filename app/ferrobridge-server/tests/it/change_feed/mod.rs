@@ -8,6 +8,7 @@
 //! Every body is synthetic: identifiers and instants invented for the test.
 
 mod aql;
+mod dead_letter;
 mod ferroehr;
 mod follow;
 

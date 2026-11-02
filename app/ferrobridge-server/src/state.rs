@@ -211,8 +211,8 @@ pub struct AppState {
     /// The one client of the `[terminology]` server, when one is configured,
     /// shared by readiness and every lane that translates.
     terminology: Option<ferrobridge_term::client::Client>,
-    /// The events lane the operator API reports, when it runs.
-    events: Option<Arc<crate::events::report::Lane>>,
+    /// The change-feed consumers the operator API reports, when any runs.
+    change_feed: Option<Arc<crate::change_feed::report::Report>>,
 }
 
 impl AppState {
@@ -311,7 +311,7 @@ impl AppState {
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
             terminology,
-            events: None,
+            change_feed: None,
         })
     }
 
@@ -332,7 +332,7 @@ impl AppState {
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
             terminology: None,
-            events: None,
+            change_feed: None,
         }
     }
 
@@ -358,18 +358,18 @@ impl AppState {
         self
     }
 
-    /// Returns this state with the events lane `lane` reported by the operator
-    /// API.
+    /// Returns this state with the change-feed consumers `report` reported
+    /// by the operator API.
     #[must_use]
-    pub fn with_events(mut self, lane: crate::events::report::Lane) -> Self {
-        self.events = Some(Arc::new(lane));
+    pub fn with_change_feed(mut self, report: crate::change_feed::report::Report) -> Self {
+        self.change_feed = Some(Arc::new(report));
         self
     }
 
-    /// Returns the events lane, when it runs.
+    /// Returns the change-feed consumers, when any runs.
     #[must_use]
-    pub const fn events(&self) -> Option<&Arc<crate::events::report::Lane>> {
-        self.events.as_ref()
+    pub const fn change_feed(&self) -> Option<&Arc<crate::change_feed::report::Report>> {
+        self.change_feed.as_ref()
     }
 
     /// Returns this state with the HL7 v2 listener probed and reported.

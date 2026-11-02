@@ -11,8 +11,10 @@
 //! owner, `GET /operator/mappings/{path}` one file's verbatim bytes with its
 //! digest as the `ETag`, and `GET /operator/configuration` the configuration
 //! the bridge started on, every secret by reference alone
-//! ([`configuration`]), and `GET /operator/events` the change-feed consumers
-//! and the AMQP topology (`crate::events::report`). With `[operator] mapping_dir`, `POST
+//! ([`configuration`]), `GET /operator/events` the change-feed consumers, their
+//! parked events and the AMQP topology, and `POST
+//! /operator/events/{consumer}/parked/{id}/replay` a replay of one
+//! (`crate::change_feed::report`). With `[operator] mapping_dir`, `POST
 //! /operator/mappings/check` checks a draft over the running set, `PUT
 //! /operator/mappings/{path}` saves one and reloads, and `POST
 //! /operator/reload` reloads the files on disk ([`save`], [`reload`]). No
@@ -188,14 +190,18 @@ pub fn routes(
     smart: &crate::smart::Smart,
     health: Registry,
     lifecycle: Lifecycle,
-    events: Option<Arc<crate::events::report::Lane>>,
+    change_feed: Option<Arc<crate::change_feed::report::Report>>,
 ) -> Router {
     let readiness = Router::new()
         .route("/operator/readiness", get(readiness))
         .with_state((health, lifecycle));
     let lane = Router::new()
         .route("/operator/events", get(events_lane))
-        .with_state(events);
+        .route(
+            "/operator/events/{consumer}/parked/{id}/replay",
+            post(replay_parked),
+        )
+        .with_state(change_feed);
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/configuration", get(running_configuration))
@@ -222,10 +228,80 @@ async fn readiness(State((health, lifecycle)): State<(Registry, Lifecycle)>) -> 
     (status, axum::Json(document)).into_response()
 }
 
-/// `GET /operator/events`: the change-feed consumers and the AMQP topology,
-/// an empty document when the events lane is off.
-async fn events_lane(State(lane): State<Option<Arc<crate::events::report::Lane>>>) -> Response {
-    axum::Json(crate::events::report::document(lane.as_deref())).into_response()
+/// `GET /operator/events`: the change-feed consumers with their parked
+/// events and the AMQP topology, an empty document when no consumer runs.
+async fn events_lane(
+    State(report): State<Option<Arc<crate::change_feed::report::Report>>>,
+) -> Response {
+    let Some(report) = report else {
+        return axum::Json(ferrobridge_operator_api::events::Events::default()).into_response();
+    };
+    on_store(move || match report.document() {
+        Ok(document) => axum::Json(document).into_response(),
+        Err(error) => dead_letters_unavailable(&error),
+    })
+    .await
+}
+
+/// `POST /operator/events/{consumer}/parked/{id}/replay`: marks one parked
+/// event for a replay before its consumer's next page; `202` once marked,
+/// `404` when no running consumer or parked event has the name.
+async fn replay_parked(
+    State(report): State<Option<Arc<crate::change_feed::report::Report>>>,
+    Path((consumer, id)): Path<(String, String)>,
+    access: ferrohealth_smart::resource::Access,
+) -> Response {
+    let subject = save::subject_of(&access).to_owned();
+    let (Some(report), Ok(id)) = (report, id.parse::<u64>()) else {
+        return refuse(Kind::NotFound, "no parked event has this number");
+    };
+    on_store(move || match report.replay(&consumer, id) {
+        Ok(crate::change_feed::report::Replay::Requested) => {
+            tracing::info!(
+                target: guard::AUDIT_TARGET,
+                subject = subject.as_str(),
+                action = "replay",
+                consumer = consumer.as_str(),
+                parked = id,
+                status = StatusCode::ACCEPTED.as_u16(),
+                "operator"
+            );
+            StatusCode::ACCEPTED.into_response()
+        }
+        Ok(crate::change_feed::report::Replay::UnknownConsumer) => refuse(
+            Kind::NotFound,
+            "no change-feed consumer runs under this name",
+        ),
+        Ok(crate::change_feed::report::Replay::UnknownEvent) => {
+            refuse(Kind::NotFound, "no parked event has this number")
+        }
+        Err(error) => dead_letters_unavailable(&error),
+    })
+    .await
+}
+
+/// Runs `work`, which reads or writes the dead-letter store, off the async
+/// runtime.
+async fn on_store(work: impl FnOnce() -> Response + Send + 'static) -> Response {
+    match tokio::task::spawn_blocking(work).await {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::error!(%error, "a dead-letter store call did not finish");
+            refuse(
+                Kind::DeadLettersUnavailable,
+                "the dead-letter store could not be read or written",
+            )
+        }
+    }
+}
+
+/// Returns the `500` of a dead-letter store that refused, its cause logged.
+fn dead_letters_unavailable(error: &crate::change_feed::dead_letter::DeadLetterError) -> Response {
+    tracing::error!(reason = %crate::indicators::reason(error), "the dead-letter store refused the call");
+    refuse(
+        Kind::DeadLettersUnavailable,
+        "the dead-letter store could not be read or written",
+    )
 }
 
 /// `GET /operator/state`: the running load.

@@ -19,9 +19,11 @@
 //! consumer to readiness as degraded, never down, while it cannot follow.
 
 pub mod aql;
+pub mod dead_letter;
 pub mod ferroehr;
 pub mod follow;
 pub mod health;
+pub mod report;
 pub mod watermark;
 
 use std::fmt;
@@ -543,6 +545,10 @@ pub struct Settings {
     pub source: Source,
     /// How the followers pace their reads.
     pub polling: follow::Polling,
+    /// The `redb` file of the parked events.
+    pub dead_letters: std::path::PathBuf,
+    /// The poisoned passes an event fails before it is parked.
+    pub max_attempts: std::num::NonZeroU32,
 }
 
 /// Returns the source `settings` names, reached through `cdr`.

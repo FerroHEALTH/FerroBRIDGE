@@ -6,10 +6,10 @@
 //!
 //! Each consumer names the source it follows and the reader it follows it
 //! under, how far it has finished, its health, what it published since the
-//! bridge started and the last failure with its cause. The topology is the
-//! one `[events]` declares. The document carries identifiers, instants and
-//! counts, never an event body. No specification governs this document: our
-//! own design.
+//! bridge started, the last failure with its cause and the events it parked
+//! in the dead-letter store. The topology is the one `[events]` declares. The
+//! document carries identifiers, instants and counts, never an event body.
+//! No specification governs this document: our own design.
 
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +44,49 @@ pub struct Consumer {
     pub last_published: Option<String>,
     /// The last pass that failed, kept after the consumer recovers.
     pub last_error: Option<Failure>,
+    /// The events it parked in the dead-letter store, in the order they were
+    /// first parked.
+    pub parked: Vec<Parked>,
+}
+
+/// One event a consumer parked after its bound of poisoned passes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Parked {
+    /// The number the store parked it under, unique per consumer.
+    pub id: u64,
+    /// Where it sits in the source.
+    pub position: Position,
+    /// The contribution it names, absent on an erasure.
+    pub contribution_id: Option<String>,
+    /// The EHR it names, absent for a demographic contribution.
+    pub ehr_id: Option<String>,
+    /// Whether it is an erasure.
+    pub erasure: bool,
+    /// One entry per changed versioned object.
+    pub versions: Vec<ParkedVersion>,
+    /// The last failure and every cause behind it, in one line with no event
+    /// body.
+    pub cause: String,
+    /// How many poisoned passes it failed, replays included.
+    pub attempts: u32,
+    /// When it was parked, or parked again after a replay failed, RFC 3339
+    /// UTC.
+    pub at: String,
+    /// Whether a replay is requested and has not run yet.
+    pub replay_requested: bool,
+}
+
+/// One changed versioned object of a parked event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ParkedVersion {
+    /// The RM type name, such as `COMPOSITION`.
+    pub kind: String,
+    /// The audit change type, as the source writes it.
+    pub change_type: String,
+    /// The operational template of a composition, when there is one.
+    pub template_id: Option<String>,
 }
 
 /// The source a consumer follows.
