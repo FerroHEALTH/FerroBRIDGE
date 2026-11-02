@@ -207,6 +207,8 @@ daily report:
     code is counted too. A request refused before any program ran (a body
     in the wrong media type, a resource no program maps, a CDR that refused
     the commit) is not.
+  - `events_published`: each message the events lane published and the
+    broker confirmed, one per changed version of a commit event.
 
 ## What a report never contains
 

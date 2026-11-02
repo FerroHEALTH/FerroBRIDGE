@@ -44,6 +44,9 @@ pub const NOTICE: Notice = Notice {
 /// its frame to its acknowledgment.
 pub const HL7V2_MESSAGE: &str = "hl7v2_message";
 
+/// The counter of the event messages the events lane published.
+pub const EVENTS_PUBLISHED: &str = "events_published";
+
 /// The counter of the units a FHIRconnect program refused to map: a facade
 /// or HL7 v2 ingest and an operation call.
 pub const MAPPING_FAILURES: &str = "mapping_failures";
@@ -199,6 +202,14 @@ pub fn record_acknowledgment(window: &Window, code: Code) {
         Code::Reject => "hl7v2_ar",
     };
     if let Some(key) = Key::new(counter) {
+        window.count(key);
+    }
+}
+
+/// Records one event message the events lane published and the broker
+/// confirmed.
+pub fn record_event_published(window: &Window) {
+    if let Some(key) = Key::new(EVENTS_PUBLISHED) {
         window.count(key);
     }
 }

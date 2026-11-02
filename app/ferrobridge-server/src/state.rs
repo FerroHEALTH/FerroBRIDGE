@@ -346,6 +346,14 @@ impl AppState {
         self
     }
 
+    /// Returns this state with the change-feed consumer `following` reported
+    /// to readiness, degraded and never down while it cannot follow.
+    #[must_use]
+    pub fn with_following(mut self, following: crate::change_feed::health::Following) -> Self {
+        self.health = self.health.and(Arc::new(following));
+        self
+    }
+
     /// Returns this state with the HL7 v2 listener probed and reported.
     #[must_use]
     pub fn with_hl7v2(mut self, listening: crate::hl7v2::Listening) -> Self {

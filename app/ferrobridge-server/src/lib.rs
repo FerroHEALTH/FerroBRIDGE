@@ -22,6 +22,7 @@ pub mod cli;
 pub mod config;
 pub mod credentials;
 pub mod etl;
+pub mod events;
 pub mod facade;
 pub mod hl7v2;
 pub mod indicators;

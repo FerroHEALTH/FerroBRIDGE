@@ -904,6 +904,32 @@ to 1000, a wait of `0`, and a `url` that is no http or https base without a
 query or a fragment are each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
 
+### `[events]`
+
+The AMQP publisher of the commit events: a consumer of the change feed that
+republishes each event to a RabbitMQ topic exchange. It is off until
+`enabled` is true, and an enabled lane is a boot error without
+`[change_feed] enabled`. The [events lane](../integrate/events.md) page
+states the message, the routing keys and the delivery guarantees. No
+specification governs the lane: it is FerroBRIDGE's own design.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the lane publishes |
+| `reader` | none, required | The reader name the lane follows the change feed under: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
+| `url` | none, required | Secret. The AMQP 0.9.1 broker URL, `amqp://` or `amqps://` |
+| `tls` | `false` | Whether an `amqp://` URL is upgraded to `amqps://` |
+| `exchange` | none, required | The durable topic exchange the events are published to |
+| `confirm_timeout_ms` | `30000` | How long one publish waits for the broker's confirm |
+| `queues` | `[]` | `{ name, binding }` pairs: the durable queues declared and bound to the exchange with each topic binding key |
+
+A missing `reader`, `url` or `exchange`, a reader name outside its alphabet,
+a URL that is not `amqp://` or `amqps://` (the refusal never repeats the URL,
+which may carry a password), a `confirm_timeout_ms` of `0`, and a queue named
+twice or with no binding are each a boot error naming the key. Over
+`[change_feed] source = "ferroehr"`, a CDR that answers `404` for the reader
+refuses the start.
+
 ### `[operator]`
 
 The operator API under `/operator`, which an operator console reads the
@@ -962,6 +988,7 @@ it carries.
 | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
+| `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
 
 Prefer the `_file` route: a Docker or Kubernetes secret arrives as a file, and
 a file never shows up in `docker inspect` or a process listing.
