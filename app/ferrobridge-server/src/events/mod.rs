@@ -16,7 +16,6 @@
 //! names: identifiers and provenance, never clinical content.
 
 pub mod amqp;
-pub mod report;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,6 +32,9 @@ pub const ABSENT: &str = "-";
 
 /// The name the lane reports to readiness and the logs under.
 pub const NAME: &str = "events";
+
+/// The routing-key grammar every message of the lane carries.
+pub const ROUTING_KEY: &str = "<kind>.<change_type>.<template_id>";
 
 /// The events lane, resolved from `[events]`.
 #[derive(Debug, Clone)]

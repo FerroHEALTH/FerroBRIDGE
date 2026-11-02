@@ -201,7 +201,7 @@ pub async fn reload(State(operator): State<Arc<Operator>>, access: Access) -> Re
 
 /// Returns who the change record names: the caller's subject, or `-` on an
 /// open surface, which the configuration never mounts the operator API on.
-fn subject_of(access: &Access) -> &str {
+pub(crate) fn subject_of(access: &Access) -> &str {
     access
         .caller()
         .map_or("-", ferrohealth_smart::resource::Caller::subject)

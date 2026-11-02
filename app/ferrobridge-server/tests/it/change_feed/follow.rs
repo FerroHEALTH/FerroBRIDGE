@@ -49,7 +49,7 @@ async fn follow_until(
     let (stop, stopped) = tokio::sync::watch::channel(false);
     let watched = following.clone();
     let name = reader();
-    let follower = follow(&feed, &name, &consumer, quick(), &following, stopped);
+    let follower = follow(&feed, &name, &consumer, quick(), None, &following, stopped);
     let waiter = async {
         for _ in 0..500 {
             if until(&watched) {

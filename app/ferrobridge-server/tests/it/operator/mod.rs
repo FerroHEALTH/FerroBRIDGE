@@ -68,17 +68,17 @@ impl Case {
     }
 
     /// Builds the tree, the issuer and the router, the operator API
-    /// reporting the events lane `lane` when given.
+    /// reporting the change-feed consumers `report`.
     async fn reporting(
-        lane: ferrobridge_server::events::report::Lane,
+        report: ferrobridge_server::change_feed::report::Report,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, Some(lane)).await
+        Self::build(None, Some(report)).await
     }
 
-    /// Builds the case over `configuration` and `lane`.
+    /// Builds the case over `configuration` and `consumers`.
     async fn build(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
-        lane: Option<ferrobridge_server::events::report::Lane>,
+        consumers: Option<ferrobridge_server::change_feed::report::Report>,
     ) -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
         let mappings = tree.path().join("mappings");
@@ -123,8 +123,8 @@ impl Case {
         let state = AppState::with_health(Registry::default())
             .with_auth(authority)
             .with_operator(Arc::new(operator));
-        let state = match lane {
-            Some(lane) => state.with_events(lane),
+        let state = match consumers {
+            Some(consumers) => state.with_change_feed(consumers),
             None => state,
         };
         let app = ferrobridge_server::router(Arc::new(state), &crate::support::settings());
@@ -152,6 +152,12 @@ impl Case {
             Some(scope) => bearing(request, &self.token(scope)),
             None => request,
         };
+        Ok(self.app.clone().oneshot(request).await?)
+    }
+
+    /// Sends an empty `POST` of `path` under a token granting `scope`.
+    async fn post(&self, path: &str, scope: &str) -> Result<http::Response<Body>, Box<dyn Error>> {
+        let request = bearing(Request::post(path).body(Body::empty())?, &self.token(scope));
         Ok(self.app.clone().oneshot(request).await?)
     }
 }

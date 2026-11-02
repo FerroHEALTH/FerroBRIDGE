@@ -894,14 +894,17 @@ specification governs the change feed: it is FerroBRIDGE's own design.
 | `url` | none | `ferroehr` only, required: the root of the CDR's extensions, the path `/admin/outbox` lives under |
 | `watermarks` | none | `aql` only, required: the `redb` file each reader's watermark is kept in |
 | `start` | `now` | `aql` only: where a reader with no watermark starts, `now`, `beginning` or an RFC 3339 instant |
+| `dead_letters` | none, required | The `redb` file the consumers park a poisoned event in and count its poisoned passes in; keep it beside `watermarks` |
+| `max_attempts` | `5` | How many passes an event may fail with a poisoned failure before it is parked, 1 to 1000 |
 | `page_size` | `100` | How many events one read asks for, 1 to 1000 |
 | `poll_interval_ms` | `1000` | How long a consumer waits after a read that found no full page |
 | `backoff_ms` | `1000` | How long a consumer waits after its first failed read, doubled per failure |
 | `max_backoff_ms` | `60000` | The longest wait after a failed read, at least `backoff_ms` |
 
-An unknown `source`, a `start` that names no instant, a `page_size` outside 1
-to 1000, a wait of `0`, and a `url` that is no http or https base without a
-query or a fragment are each a boot error naming the key. Both sources call
+A missing `dead_letters`, an unknown `source`, a `start` that names no
+instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `0`,
+and a `url` that is no http or https base without a query or a fragment are
+each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
 
 ### `[events]`

@@ -31,8 +31,8 @@ pub(crate) struct Started {
     pub(crate) lanes: Vec<startup::Lane>,
     /// The HL7 v2 face, when it runs.
     pub(crate) face: Option<StartedFace>,
-    /// The change-feed consumer, when one runs.
-    pub(crate) feed: Option<StartedFeed>,
+    /// The change-feed consumers that run.
+    pub(crate) feeds: Vec<StartedFeed>,
 }
 
 impl Started {
@@ -106,27 +106,22 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_hl7v2(listening);
         face = Some(started);
     }
-    let mut feed = None;
-    if let (Some(lane), Some(feed_settings)) =
-        (settings.events.as_ref(), settings.change_feed.as_ref())
-    {
-        let started = start_events(settings, feed_settings, lane, &state)
+    let mut feeds = Vec::new();
+    if let Some(feed_settings) = settings.change_feed.as_ref() {
+        let (started, report) = start_change_feed(settings, feed_settings, &state)
             .await
-            .context("starting the events lane")?;
-        state = state
-            .with_following(started.following.clone())
-            .with_events(events::report::Lane {
-                settings: lane.clone(),
-                source: feed_settings.source.clone(),
-                following: started.following.clone(),
-            });
-        feed = Some(started);
+            .context("starting the change-feed consumers")?;
+        for consumer in &started {
+            state = state.with_following(consumer.following.clone());
+        }
+        state = state.with_change_feed(report);
+        feeds = started;
     }
     Ok(Started {
         state,
         lanes,
         face,
-        feed,
+        feeds,
     })
 }
 
@@ -140,6 +135,8 @@ pub(crate) struct StartedFeed {
     consumer: Arc<dyn change_feed::follow::Consumer>,
     /// How the follower paces its reads.
     polling: change_feed::follow::Polling,
+    /// Where a poisoned event is parked.
+    parking: change_feed::follow::Parking,
     /// What readiness reports for the consumer.
     following: change_feed::health::Following,
 }
@@ -157,6 +154,7 @@ impl StartedFeed {
                 &self.reader,
                 self.consumer.as_ref(),
                 self.polling,
+                Some(self.parking),
                 &self.following,
                 stopped,
             )
@@ -165,18 +163,13 @@ impl StartedFeed {
     }
 }
 
-/// Opens the change-feed source and the AMQP publisher that follows it.
-///
-/// Over the reference CDR's feed a first read checks the reader: a `404`
-/// means the CDR serves no feed for it, and the start is refused. Any other
-/// failure leaves the lane to report degraded, since the events wait at the
-/// source (no specification governs this: our own design).
-async fn start_events(
+/// Opens the change-feed source and its dead-letter store once, and starts
+/// every consumer section that is on over them, each under its own reader.
+async fn start_change_feed(
     settings: &Settings,
     feed_settings: &change_feed::Settings,
-    lane: &events::Settings,
     state: &AppState,
-) -> anyhow::Result<StartedFeed> {
+) -> anyhow::Result<(Vec<StartedFeed>, change_feed::report::Report)> {
     use anyhow::Context;
 
     let cdr = settings
@@ -185,48 +178,93 @@ async fn start_events(
         .context("the change feed reads the CDR, and [cdr] is not set")?;
     let client = cdr::CdrClient::new(cdr).context("building the CDR client the feed reads")?;
     let feed = change_feed::open(feed_settings, client).context("opening the change feed")?;
+    let dead_letters = Arc::new(
+        change_feed::dead_letter::DeadLetters::open(&feed_settings.dead_letters)
+            .context("opening the dead-letter store of the change feed")?,
+    );
+    let parking = change_feed::follow::Parking {
+        store: Arc::clone(&dead_letters),
+        max_attempts: feed_settings.max_attempts,
+    };
+    let mut report = change_feed::report::Report::new(feed_settings.source.clone(), dead_letters);
+    let mut started = Vec::new();
+    if let Some(lane) = settings.events.as_ref() {
+        let following =
+            follower(&feed, feed_settings, &lane.reader, events::NAME, "events").await?;
+        let publisher =
+            events::Publisher::new(Arc::new(events::amqp::AmqpBroker::new(lane.clone())))
+                .with_usage(Arc::clone(state.usage_window()))
+                .with_following(following.clone());
+        tracing::info!(
+            lane = events::NAME,
+            reader = %lane.reader,
+            exchange = %lane.exchange,
+            queues = lane.queues.len(),
+            "the events lane publishes the change feed to the AMQP broker"
+        );
+        report = report
+            .with_follower(change_feed::report::Follower {
+                name: events::NAME,
+                reader: lane.reader.clone(),
+                following: following.clone(),
+            })
+            .with_events(lane.clone());
+        started.push(StartedFeed {
+            feed: Arc::clone(&feed),
+            reader: lane.reader.clone(),
+            consumer: Arc::new(publisher),
+            polling: feed_settings.polling,
+            parking: parking.clone(),
+            following,
+        });
+    }
+    Ok((started, report))
+}
+
+/// Checks the reader `reader` of the consumer `name`, configured under
+/// `[section]`, and returns its status with the positions kept for it.
+///
+/// Over the reference CDR's feed a first read checks the reader: a `404`
+/// means the CDR serves no feed for it, and the start is refused. Any other
+/// failure leaves the consumer to report degraded, since the events wait at
+/// the source (no specification governs this: our own design).
+async fn follower(
+    feed: &Arc<dyn change_feed::ChangeFeed>,
+    feed_settings: &change_feed::Settings,
+    reader: &change_feed::ReaderName,
+    name: &'static str,
+    section: &str,
+) -> anyhow::Result<change_feed::health::Following> {
+    use anyhow::Context;
+
     if matches!(feed_settings.source, change_feed::Source::FerroEhr { .. }) {
         let probe = change_feed::PageSize::new(1).context("a page of one event")?;
-        match feed.page(&lane.reader, probe).await {
+        match feed.page(reader, probe).await {
             Err(error @ change_feed::FeedError::UnknownReader { .. }) => {
-                return Err(error).context(
-                    "the CDR serves no outbox feed for [events] reader; name the reader in the CDR's configuration",
-                );
+                return Err(error).with_context(|| {
+                    format!(
+                        "the CDR serves no outbox feed for [{section}] reader; name the reader in the CDR's configuration"
+                    )
+                });
             }
             Err(error) => tracing::warn!(
-                lane = events::NAME,
+                lane = name,
                 reason = %crate::indicators::reason(&error),
-                "the change feed did not answer at boot; the lane reports degraded until it does"
+                "the change feed did not answer at boot; the consumer reports degraded until it does"
             ),
             Ok(_page) => {}
         }
     }
-    let following = change_feed::health::Following::new(events::NAME);
-    match feed.positions(&lane.reader).await {
+    let following = change_feed::health::Following::new(name);
+    match feed.positions(reader).await {
         Ok(positions) => following.acknowledged(&positions),
         Err(error) => tracing::warn!(
-            lane = events::NAME,
+            lane = name,
             reason = %crate::indicators::reason(&error),
             "the kept watermark could not be read; the position shows after the first pass"
         ),
     }
-    let publisher = events::Publisher::new(Arc::new(events::amqp::AmqpBroker::new(lane.clone())))
-        .with_usage(Arc::clone(state.usage_window()))
-        .with_following(following.clone());
-    tracing::info!(
-        lane = events::NAME,
-        reader = %lane.reader,
-        exchange = %lane.exchange,
-        queues = lane.queues.len(),
-        "the events lane publishes the change feed to the AMQP broker"
-    );
-    Ok(StartedFeed {
-        feed,
-        reader: lane.reader.clone(),
-        consumer: Arc::new(publisher),
-        polling: feed_settings.polling,
-        following,
-    })
+    Ok(following)
 }
 
 /// The HL7 v2 face, bound and ready to serve.

@@ -138,15 +138,20 @@ console answers with the page it drew.
 - **HL7 v2** (`/hl7v2`, `/hl7v2/settings`) and **OMOP ETL** (`/omop`,
   `/omop/settings`): whether the MLLP listener runs and where, whether an
   ETL is configured, and each face's settings.
-- **Events** (`/events`): the change-feed consumers and the AMQP topology of
-  the [events lane](../integrate/events.md), read-only from `GET
-  /operator/events`: each consumer's source and reader, its position in
-  each stream (an outbox `seq` of the reference CDR, or the watermark the
-  bridge keeps for the AQL source), its state, what it published since the
-  bridge started, and its last failure with the cause, never an event body;
-  then the exchange, the routing-key grammar and the bound queues. The
-  topology changes in the configuration, so the page has no form. A bridge
-  whose lane is off says so in one line.
+- **Events** (`/events`): every change-feed consumer and the AMQP topology
+  of the [events lane](../integrate/events.md), from `GET /operator/events`:
+  each consumer's source and reader, its position in each stream (an outbox
+  `seq` of the reference CDR, or the watermark the bridge keeps for the AQL
+  source), its state, what it published since the bridge started, and its
+  last failure with the cause, never an event body; then the events each
+  consumer parked in the [dead-letter
+  store](../integrate/change-feed.md#poisoned-events-and-the-dead-letter-store)
+  with their cause and passes, each with a Replay button that posts
+  `POST /operator/events/{consumer}/parked/{id}/replay` and comes back to
+  the page, where the event reads "Replay requested" until its consumer
+  offers it again; then the exchange, the routing-key grammar and the bound
+  queues. The topology changes in the configuration. A bridge with no
+  consumer says so in one line.
 - **Connections** (`/connections`, `/connections/{name}`,
   `/connections/{name}/settings`): each upstream with its host, how it
   signs in, the lanes that use it and its state from the bridge's
@@ -384,7 +389,8 @@ The Events page of a bridge whose events lane is off.
 ![A degraded events consumer](img/console/events-degraded.png)
 
 The Events page of a bridge whose broker cannot be reached: the consumer
-reads degraded with its cause, and its cursor stays where it was.
+reads degraded with its cause, its cursor stays where it was, and an event
+it parked waits for a replay.
 [Dark theme](img/console/events-degraded-dark.png).
 
 ![Connections](img/console/connections.png)

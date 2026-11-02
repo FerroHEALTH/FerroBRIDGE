@@ -3,10 +3,11 @@
 
 //! What the posts of `crate::actions` ask the bridge.
 //!
-//! Reload the set, the editor's post, and where a discarded draft goes back
-//! to. No specification governs the console: our own design.
+//! Reload the set, the editor's post, where a discarded draft goes back to,
+//! and the replay of a parked change-feed event. No specification governs
+//! the console: our own design.
 
-use crate::actions::{Edited, EditorPost, Reloaded};
+use crate::actions::{Edited, EditorPost, Reloaded, ReplayAnswer, ReplayPost};
 use crate::bridge::AccessToken;
 use crate::model::{Outcome, loaded};
 use crate::server::ConsoleState;
@@ -19,6 +20,27 @@ pub async fn reloaded(state: &ConsoleState, token: &AccessToken) -> Reloaded {
             Outcome::Refused(refusal) => Outcome::Refused(refusal),
         }),
     )
+}
+
+/// The answer to the replay `post`, as the operator whose token is `token`:
+/// the bridge is asked only for a consumer and a number it can name.
+pub async fn replayed(
+    state: &ConsoleState,
+    token: &AccessToken,
+    post: &ReplayPost,
+) -> ReplayAnswer {
+    let Ok(id) = post.id.trim().parse::<u64>() else {
+        return ReplayAnswer::Invalid;
+    };
+    if post.consumer.is_empty() {
+        return ReplayAnswer::Invalid;
+    }
+    ReplayAnswer::Answered(loaded(
+        state
+            .bridge()
+            .replay_parked(&post.consumer, id, token)
+            .await,
+    ))
 }
 
 /// The answer to the editor's post `post` at `address`, as the operator

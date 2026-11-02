@@ -32,6 +32,42 @@ While a consumer cannot follow (the CDR is down, it refuses the credentials,
 or the consumer's own sink refuses), its health indicator reports `degraded`
 with the reason, and readiness stays up: the events wait at the source.
 
+## Several consumers
+
+Every consumer section that is on follows the one `[change_feed]` source on
+its own task, under its own reader name: its own cursor on the reference
+CDR's feed, or its own row in the `watermarks` file of the AQL source. Each
+consumer acknowledges only the events it finished, so a consumer that stalls
+never holds another one back, and each has its own health indicator. Give
+every consumer a reader name of its own; on FerroEHR, name each one in
+`[outbox] readers`.
+
+## Poisoned events and the dead-letter store
+
+A consumer reports each failure as transient or poisoned. A transient
+failure (the sink is unreachable, a call timed out) leaves the watermark
+where it was, and the event is offered again on the next pass for as long as
+it takes; it never counts towards parking. A poisoned failure is a fault of
+the event itself, which fails the same way every time it is offered.
+FerroBRIDGE counts the poisoned passes of each event in the `redb` file
+`dead_letters` names. On the pass that reaches `max_attempts` (5 by
+default), the event is parked in that file with its cause and the number of
+passes, and the consumer moves past it. A parked event is never dropped: it
+stays in the store until a replay finishes it.
+
+The [Events page](../operate/operator-console.md) of the operator console
+lists the parked events of each consumer with their cause, and its Replay
+button asks for one to be offered again. The same is on the operator API:
+`GET /operator/events` lists every consumer with its parked events, and
+`POST /operator/events/{consumer}/parked/{id}/replay` answers `202` once the
+event is marked. Before its next page the consumer offers each marked event
+again: a finished one leaves the store, one that fails poisoned again is
+parked again with the new cause, and a transient failure keeps the request
+for the next pass. A replay offers the event out of its commit order, so
+replay an event once whatever made it fail is fixed. The store holds the
+event's identifiers and provenance as the feed served them, never clinical
+content.
+
 ## The AQL source (`source = "aql"`)
 
 The AQL source works against any CDR that serves ITS-REST 1.1.0. It polls

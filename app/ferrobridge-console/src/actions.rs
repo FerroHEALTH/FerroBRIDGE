@@ -156,6 +156,35 @@ pub struct Ran {
     pub answer: PlaygroundAnswer,
 }
 
+/// What the Events page's Replay posts: the consumer and the parked event.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReplayPost {
+    /// The consumer's name.
+    pub consumer: String,
+    /// The parked event's number, as the form carried it.
+    pub id: String,
+}
+
+impl ReplayPost {
+    /// The post the Replay form body `body` carried.
+    #[must_use]
+    pub fn from_form(body: &str) -> Self {
+        Self {
+            consumer: field(body, "consumer"),
+            id: field(body, "id"),
+        }
+    }
+}
+
+/// What the bridge answered a replay.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ReplayAnswer {
+    /// The post names no parked event, so the bridge was not asked.
+    Invalid,
+    /// The bridge marked the event, or refused.
+    Answered(Loaded<()>),
+}
+
 /// The last value of the field `name` in the form body `body`
 /// (`application/x-www-form-urlencoded`), empty when it carries none.
 #[must_use]

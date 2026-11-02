@@ -544,7 +544,7 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 smart,
                 state.health().clone(),
                 state.lifecycle().clone(),
-                state.events().cloned(),
+                state.change_feed().cloned(),
             ));
         }
     }

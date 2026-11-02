@@ -62,6 +62,7 @@ the process is not ready.
 | [`precondition-required`](#precondition-required) | `428` | The save sends no precondition. |
 | [`unreadable`](#unreadable) | `500` | A mapping directory could not be read. |
 | [`unwritable`](#unwritable) | `500` | The mapping directory could not be written. |
+| [`dead-letters-unavailable`](#dead-letters-unavailable) | `500` | The dead-letter store could not be read or written. |
 | [`reload-unavailable`](#reload-unavailable) | `503` | The mapping set could not be reloaded. |
 | [`authorization-unavailable`](#authorization-unavailable) | `503` | The token could not be checked. |
 
@@ -130,6 +131,13 @@ directory and the cause.
 
 `500`. The mapping directory could not be written. The server log names the
 cause; check that the server's user owns `mapping_dir`.
+
+## dead-letters-unavailable
+
+`500`. The dead-letter store of the change feed (`[change_feed] dead_letters`)
+refused a read or a write, so the parked events cannot be listed or a replay
+cannot be recorded. The server log names the cause; check that the server's
+user owns the file and that the disk has room.
 
 ## reload-unavailable
 
