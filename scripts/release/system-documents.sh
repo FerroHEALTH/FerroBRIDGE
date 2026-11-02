@@ -134,7 +134,7 @@ version() {
 ehr_version() {
   local v
   v="$(version 'image:FerroEHR CDR image')"
-  [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "the FerroEHR CDR image row of $VERSIONS pins no release ($v)"
+  [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || die "the FerroEHR CDR image row of $VERSIONS pins no release ($v)"
   printf '%s\n' "$v"
 }
 
@@ -272,7 +272,7 @@ self_test() {
     [[ -z "$standard" || "$standard" == \#* ]] && continue
     [[ -n "$(version "$source")" ]] || die "self-test: $standard reads no version"
   done <"$STANDARDS"
-  [[ "$(ehr_version)" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "self-test: no FerroEHR release"
+  [[ "$(ehr_version)" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || die "self-test: no FerroEHR release"
   # The readers, over a fixed matrix.
   printf '%s\n' "| Item | Pin | Repeated in |" "|---|---|---|" \
     "| FHIR | R4 (4.0.1) | x |" \
@@ -288,6 +288,10 @@ self_test() {
   expect "a git tag" "$(version 'tag:UCUM essence')" "v2.2"
   expect "an image tag" "$(version 'image:PostgreSQL image')" "18.6"
   expect "the FerroEHR release" "$(ehr_version)" "5.5.0"
+  sed -i.bak 's/ferroehr:5\.5\.0@/ferroehr:5.6.0-rc10@/' "$tmp/VERSIONS.md"
+  expect "a FerroEHR pre-release" "$(ehr_version)" "5.6.0-rc10"
+  sed -i.bak 's/ferroehr:5\.6\.0-rc10@/ferroehr:latest@/' "$tmp/VERSIONS.md"
+  expect "a FerroEHR tag that names no release" "$(refused ehr_version)" refused
   expect "a missing row" "$(refused version first:Nothing)" refused
   expect "an unknown source" "$(refused version other:FHIR)" refused
   VERSIONS="docs/VERSIONS.md"
