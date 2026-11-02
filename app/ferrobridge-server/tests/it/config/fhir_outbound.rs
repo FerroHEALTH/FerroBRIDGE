@@ -77,10 +77,13 @@ fn the_basic_password_reads_from_a_file() -> Result<(), Box<dyn std::error::Erro
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
     let rendered = format!("{:?}", settings.fhir_outbound.ok_or("the lane is on")?.sink);
-    assert!(rendered.contains("Basic"), "{rendered}");
+    assert!(
+        rendered.contains("Basic"),
+        "the endpoint is reached with the Basic credential"
+    );
     assert!(
         !rendered.contains("synthetic-password"),
-        "the password is redacted: {rendered}"
+        "the password is redacted in the rendering"
     );
     Ok(())
 }
