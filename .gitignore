@@ -38,9 +38,11 @@
 
 # The quickstart's operator-provided directories (compose.yaml): the secret
 # files the services read, and the OHDSI Athena vocabulary export the vocab
-# profile bind-mounts. Neither ever enters this repository.
+# profile bind-mounts. Neither ever enters this repository; the vocabulary
+# folder itself is kept, empty, so the export has a place to land.
 /secrets/
-/vocabulary/
+/vocabulary/*
+!/vocabulary/.gitkeep
 
 # The CycloneDX documents cargo-cyclonedx writes beside each member's
 # Cargo.toml. The release lane renames the one it ships and uploads it as a
