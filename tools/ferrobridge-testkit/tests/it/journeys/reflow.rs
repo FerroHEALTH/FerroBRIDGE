@@ -16,7 +16,7 @@ use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::Stack;
 
 /// Every page the reflow is held on.
-const PAGES: [&str; 24] = [
+const PAGES: [&str; 25] = [
     "/",
     "/search?q=diagnose",
     "/mappings",
@@ -37,6 +37,7 @@ const PAGES: [&str; 24] = [
     "/facade/security",
     "/hl7v2",
     "/omop",
+    "/events",
     "/connections",
     "/connections/cdr",
     "/configuration",

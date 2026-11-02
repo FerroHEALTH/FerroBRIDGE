@@ -11,7 +11,8 @@
 //! owner, `GET /operator/mappings/{path}` one file's verbatim bytes with its
 //! digest as the `ETag`, and `GET /operator/configuration` the configuration
 //! the bridge started on, every secret by reference alone
-//! ([`configuration`]). With `[operator] mapping_dir`, `POST
+//! ([`configuration`]), and `GET /operator/events` the change-feed consumers
+//! and the AMQP topology (`crate::events::report`). With `[operator] mapping_dir`, `POST
 //! /operator/mappings/check` checks a draft over the running set, `PUT
 //! /operator/mappings/{path}` saves one and reloads, and `POST
 //! /operator/reload` reloads the files on disk ([`save`], [`reload`]). No

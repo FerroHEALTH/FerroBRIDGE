@@ -29,7 +29,7 @@ allow ^no-(cache|store)$                    # Cache-Control directives (RFC 9111
 allow ^default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; \\$   # the Content-Security-Policy directive list (CSP Level 3)
 allow ^default-src 'none'$                  # the strictest Content-Security-Policy (CSP Level 3)
 allow ^ selected$                           # the HTML boolean attribute of a chosen option
-allow ^(load report|health info|readiness report|engine state|SMART discovery document|mapping listing|running configuration)$   # the bridge document a log line names
+allow ^(load report|health info|readiness report|engine state|SMART discovery document|mapping listing|running configuration|events document)$   # the bridge document a log line names
 allow ^(FHIRconnect|OMOCL|JSON|FHIR R4)$     # a specification's or a format's name, the same in every language
 allow ^canonical$                           # the $toopenehr format code (FHIRconnect REST API chapter)
 allow ^\$tofhir, \$toopenehr$               # the FHIRconnect operations, by their names

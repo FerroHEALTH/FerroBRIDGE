@@ -28,8 +28,8 @@ use ferrohealth_ui::view::status::{Reach, StatusPill, status_pill};
 use openehr_mapping_core::diagnostic::Severity;
 
 use crate::app::{
-    ABOUT, CONFIGURATION, CONNECTIONS, DASHBOARD, FACADE, HL7V2, MAPPINGS, MARK_DARK, MARK_LIGHT,
-    OMOP, PLAYGROUND, PREFERENCES, PRODUCT, SIGN_OUT, VERSION,
+    ABOUT, CONFIGURATION, CONNECTIONS, DASHBOARD, EVENTS, FACADE, HL7V2, MAPPINGS, MARK_DARK,
+    MARK_LIGHT, OMOP, PLAYGROUND, PREFERENCES, PRODUCT, SIGN_OUT, VERSION,
 };
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
@@ -240,6 +240,7 @@ fn navigation(locale: &Locale, path: &str, rail: bool, state: &Loaded<EngineStat
                 entry(FACADE, Msg::FhirFacade, Glyph::FLAME, false),
                 entry(HL7V2, Msg::Hl7v2, Glyph::MESSAGE_SQUARE, false),
                 entry(OMOP, Msg::OmopEtl, Glyph::TABLE_2, false),
+                entry(EVENTS, Msg::Events, Glyph::ACTIVITY, false),
                 entry(CONNECTIONS, Msg::Connections, Glyph::PLUG, false),
             ],
         },

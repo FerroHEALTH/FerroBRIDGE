@@ -161,3 +161,89 @@ async fn each_upstream_carries_its_indicator_and_the_lanes_that_use_it()
     assert_eq!(StatusCode::NOT_FOUND, response.status());
     Ok(())
 }
+
+/// A synthetic events document: one consumer of the reference CDR's feed,
+/// stalled on the broker after one published message.
+fn stalled_events() -> serde_json::Value {
+    json!({
+        "consumers": [{
+            "name": "events",
+            "source": "ferroehr",
+            "reader": "ferrobridge",
+            "positions": [{"stream": "clinical", "at": "42", "versions_at_instant": null}],
+            "state": "stalled",
+            "published": 1204,
+            "last_published": "2026-11-02T10:00:00Z",
+            "last_error": {
+                "at": "2026-11-02T10:01:00Z",
+                "cause": "the consumer did not finish the event at clinical seq 43: the AMQP broker could not be reached"
+            }
+        }],
+        "topology": {
+            "exchange": "ferroehr.events",
+            "routing_key": "<kind>.<change_type>.<template_id>",
+            "queues": [{"name": "ferroehr.events.analytics", "binding": "COMPOSITION.*.*"}]
+        }
+    })
+}
+
+#[tokio::test]
+async fn the_events_page_draws_a_degraded_consumer_with_its_cause_and_the_topology()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(&bridge, "/operator/events", 200, &stalled_events()).await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, page) = send(&service, get_with("/events", &cookie)?).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    for shown in [
+        "FerroEHR outbox feed",
+        "ferrobridge",
+        "clinical seq 42",
+        "Degraded",
+        "1,204",
+        "the AMQP broker could not be reached",
+        "ferroehr.events.analytics",
+        "COMPOSITION.*.*",
+        "&#60;kind&#62;.&#60;change_type&#62;.&#60;template_id&#62;",
+    ] {
+        assert!(page.contains(shown), "{shown}: {page}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_events_page_says_so_when_no_consumer_runs() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        "/operator/events",
+        200,
+        &json!({"consumers": [], "topology": null}),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/events", &cookie)?).await?;
+    assert!(
+        page.contains("No commit event is published to a broker."),
+        "{page}"
+    );
+    assert!(
+        page.contains("Off, so no consumer follows the change feed."),
+        "{page}"
+    );
+    assert!(!page.contains("Bound queues"), "{page}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_events_page_of_a_bridge_without_the_operator_api_says_it_is_off()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/events", &cookie)?).await?;
+    assert!(
+        page.contains("The operator API is off on this bridge"),
+        "{page}"
+    );
+    Ok(())
+}

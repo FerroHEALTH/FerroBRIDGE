@@ -28,7 +28,7 @@ pub(super) const CONTEXT_FILE: &str =
     "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml";
 
 /// The pages a signed-in operator loads and reads as they are.
-pub(super) const PAGES: [Shot; 33] = [
+pub(super) const PAGES: [Shot; 34] = [
     Shot::page("dashboard", "/", "/", "//h1[. = 'Dashboard']"),
     Shot::page(
         "mappings",
@@ -146,6 +146,12 @@ pub(super) const PAGES: [Shot; 33] = [
         "/omop/:tab",
         "/omop/settings",
         "//h1[. = 'OMOP ETL']",
+    ),
+    Shot::page(
+        "events",
+        "/events",
+        "/events",
+        "//*[contains(., 'No commit event is published to a broker.')]",
     ),
     Shot::page(
         "connections",
@@ -272,12 +278,22 @@ pub(super) const MAPPINGS_RELOADED: Shot = Shot::page(
     "//*[contains(., 'Reloaded: the set compiled and replaced the running one')]",
 );
 
+/// The events lane of a bridge whose broker is down: a degraded consumer
+/// with its cause.
+pub(super) const EVENTS_DEGRADED: Shot = Shot::page(
+    "events-degraded",
+    "/events",
+    "/events",
+    "//*[contains(., 'could not be reached')]",
+);
+
 /// Every shot the capture takes.
 pub(super) fn shots() -> impl Iterator<Item = &'static Shot> {
     [&SIGN_IN].into_iter().chain(PAGES.iter()).chain([
         &PLAYGROUND_ANSWERED,
         &PLAYGROUND_REFUSED,
         &PLAYGROUND_OFF,
+        &EVENTS_DEGRADED,
         &EDIT_CHECKED,
         &EDIT_CONFIRM,
         &EDIT_REFUSED,

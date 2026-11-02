@@ -75,6 +75,9 @@ pub const HL7V2: &str = "/hl7v2";
 /// The OMOP ETL.
 pub const OMOP: &str = "/omop";
 
+/// The change-feed consumers and the AMQP topology.
+pub const EVENTS: &str = "/events";
+
 /// The connections.
 pub const CONNECTIONS: &str = "/connections";
 

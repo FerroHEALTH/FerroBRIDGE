@@ -81,6 +81,27 @@ credential, or clinical content. It answers `200` while the bridge is ready
 and `503` otherwise. The operator console reads it, and falls back to the
 open route, which names no detail, while the operator API is off.
 
+## `GET /operator/events`
+
+The change-feed consumers and the AMQP topology of the
+[events lane](../integrate/events.md), as one JSON document. A bridge whose
+lane is off answers `200` with no consumer and a `null` topology.
+
+- `consumers`: each consumer with its `name` (the readiness indicator it
+  reports as), its `source` (`aql` or `ferroehr`), its `reader`, its
+  `positions` (one per stream: `clinical` or `party` with the last
+  acknowledged `seq` in `at`, or `committed` with the watermark instant in
+  `at` and `versions_at_instant`), its `state` (`starting`, `following` or
+  `stalled`), the messages it `published` since the bridge started, the
+  instant it `last_published`, and its `last_error`, the `at` and `cause` of
+  the last failed pass, kept after it recovers;
+- `topology`: the `exchange`, the `routing_key` grammar
+  (`<kind>.<change_type>.<template_id>`) and the bound `queues`, each a
+  `name` and a `binding`.
+
+The document carries identifiers, instants and counts, never an event body,
+and never the broker URL.
+
 ## `GET /operator/configuration`
 
 The configuration the bridge started on, as one JSON document. The bridge

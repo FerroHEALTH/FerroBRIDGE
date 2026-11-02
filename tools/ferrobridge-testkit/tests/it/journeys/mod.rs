@@ -25,6 +25,7 @@ mod browser;
 mod configuration;
 mod editor;
 mod engine;
+mod events;
 mod navigation;
 mod no_script;
 mod playground;
