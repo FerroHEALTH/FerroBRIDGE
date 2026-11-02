@@ -17,6 +17,7 @@
 mod boot;
 mod cdm;
 mod cdr;
+mod change_feed;
 mod commands;
 mod config;
 mod console;

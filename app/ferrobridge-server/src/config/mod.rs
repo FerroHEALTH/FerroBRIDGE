@@ -14,6 +14,7 @@
 //! our own design.
 
 mod auth;
+mod change_feed;
 mod credentials;
 pub mod error;
 mod resolve;
@@ -46,6 +47,7 @@ use section::Mappings;
 use section::Operations;
 use section::Operator;
 use section::Terminology;
+use section::change_feed::ChangeFeed;
 use section::facade::Facade;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
@@ -110,6 +112,8 @@ pub struct Config {
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
     pub hl7v2: Hl7v2,
+    /// The change-feed source, off until its section turns it on.
+    pub change_feed: ChangeFeed,
     /// The installation report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
     /// The operator API, off until its section turns it on.
@@ -256,6 +260,16 @@ impl Config {
             } else {
                 None
             },
+            change_feed: if self.change_feed.enabled {
+                Some(change_feed::resolve_change_feed(
+                    &self.change_feed,
+                    self.cdr.is_some(),
+                    // TODO(#1367): count the `[events]` publisher once it is a consumer.
+                    0,
+                )?)
+            } else {
+                None
+            },
             hl7v2: if self.hl7v2.enabled {
                 Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
             } else {
@@ -363,6 +377,8 @@ pub struct Settings {
     pub auth: Option<crate::smart::SmartSettings>,
     /// The HL7 v2 face, when it is on.
     pub hl7v2: Option<Hl7v2Settings>,
+    /// The change-feed source, when it is on.
+    pub change_feed: Option<crate::change_feed::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.

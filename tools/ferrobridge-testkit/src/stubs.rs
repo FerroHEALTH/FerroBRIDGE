@@ -40,6 +40,28 @@ pub mod its_rest {
         ResponseTemplate::new(201).insert_header("ETag", format!("W/\"{contribution_uid}\""))
     }
 
+    /// Returns the `200` of `query_execute_adhoc_query_body`: a `ResultSet`
+    /// of `q` whose `columns` name each column and its path and whose `rows`
+    /// hold the cells in column order.
+    ///
+    /// `rows` is the one member the `ResultSet` schema requires
+    /// (`query-codegen.openapi.yaml`, `components.schemas.ResultSet`).
+    #[must_use]
+    pub fn result_set(
+        q: &str,
+        columns: &[(&str, &str)],
+        rows: &[Vec<serde_json::Value>],
+    ) -> ResponseTemplate {
+        let columns: Vec<serde_json::Value> = columns
+            .iter()
+            .map(|(name, path)| serde_json::json!({ "name": name, "path": path }))
+            .collect();
+        let body = serde_json::json!({ "q": q, "columns": columns, "rows": rows });
+        ResponseTemplate::new(200)
+            .insert_header("Content-Type", CANONICAL_JSON)
+            .set_body_string(body.to_string())
+    }
+
     /// Returns the `200` of a read, carrying `body` as canonical JSON.
     #[must_use]
     pub fn retrieved(body: &str) -> ResponseTemplate {
