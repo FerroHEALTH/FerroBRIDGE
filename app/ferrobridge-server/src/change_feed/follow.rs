@@ -12,6 +12,7 @@
 //! failure leaves it where it was, and the event is read again (delivery is
 //! at least once). No specification governs this: our own design.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use tokio::sync::watch;
@@ -22,6 +23,7 @@ use crate::change_feed::FeedError;
 use crate::change_feed::PageSize;
 use crate::change_feed::Position;
 use crate::change_feed::ReaderName;
+use crate::change_feed::Stream;
 use crate::change_feed::health::Following;
 
 /// Whether a failed event may succeed when it is offered again unchanged.
@@ -110,19 +112,20 @@ impl Default for Polling {
     }
 }
 
-/// The last position this follower acknowledged, the guard that keeps its
-/// cursor moving forward.
+/// The last position this follower acknowledged in each stream, the guard
+/// that keeps every cursor moving forward.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Cursor {
-    /// The last acknowledged event, unknown until the first acknowledgement.
-    acknowledged: Option<Position>,
+    /// The last acknowledged event per stream, unknown until the stream's
+    /// first acknowledgement.
+    acknowledged: BTreeMap<Stream, Position>,
 }
 
 impl Cursor {
-    /// Returns the last event this follower acknowledged.
+    /// Returns the last event this follower acknowledged in `stream`.
     #[must_use]
-    pub const fn acknowledged(&self) -> Option<&Position> {
-        self.acknowledged.as_ref()
+    pub fn acknowledged(&self, stream: Stream) -> Option<&Position> {
+        self.acknowledged.get(&stream)
     }
 }
 
@@ -131,8 +134,8 @@ impl Cursor {
 pub struct Pass {
     /// How many events the page held.
     pub read: usize,
-    /// The event the cursor was moved to, when the pass moved it.
-    pub acknowledged: Option<Position>,
+    /// The positions the cursors were moved to, one per stream moved.
+    pub acknowledged: Vec<Position>,
     /// Whether the page was full, so more events may wait.
     pub full: bool,
 }
@@ -153,8 +156,8 @@ pub enum PassError {
         #[source]
         source: ConsumerError,
     },
-    /// The page holds an event that does not follow the one before it, or
-    /// the cursor this follower moved.
+    /// The page holds an event that does not follow the one before it in
+    /// its stream, or the cursor this follower moved there.
     #[error("the feed served the event at {position} after {previous}")]
     Unordered {
         /// The position before it.
@@ -166,13 +169,14 @@ pub enum PassError {
 
 /// Runs one pass of `consumer` over the feed of `reader`.
 ///
-/// The page is checked whole before any event is offered: every event
-/// follows the one before it, and the first follows `cursor`. Each event is
-/// offered in order until one fails; the prefix that finished is then
-/// acknowledged, and nothing after it.
+/// The page is checked whole before any event is offered: in each stream,
+/// every event follows the one before it, and the first follows the cursor.
+/// Each event is offered in page order until one fails; the prefix that
+/// finished is then acknowledged, the last finished position of each stream,
+/// and nothing after it.
 ///
 /// # Errors
-/// Returns [`PassError::Feed`] when the page cannot be read or the
+/// Returns [`PassError::Feed`] when the page cannot be read or an
 /// acknowledgement is refused, [`PassError::Unordered`] for a page out of
 /// order, and [`PassError::Consumer`] for the first event the consumer did
 /// not finish, after the prefix before it was acknowledged.
@@ -184,24 +188,31 @@ pub async fn pass(
     cursor: &mut Cursor,
 ) -> Result<Pass, PassError> {
     let page = feed.page(reader, page_size).await?;
-    let mut previous = cursor.acknowledged.as_ref();
+    let mut previous: BTreeMap<Stream, &Position> = cursor
+        .acknowledged
+        .iter()
+        .map(|(stream, position)| (*stream, position))
+        .collect();
     for event in &page.events {
-        if let Some(before) = previous
+        let stream = event.position.stream();
+        if let Some(before) = previous.get(&stream)
             && !event.position.follows(before)
         {
             return Err(PassError::Unordered {
-                previous: Box::new(before.clone()),
+                previous: Box::new((*before).clone()),
                 position: Box::new(event.position.clone()),
             });
         }
-        previous = Some(&event.position);
+        previous.insert(stream, &event.position);
     }
     let full = page.events.len() >= usize::from(page_size.get());
-    let mut finished = None;
+    let mut finished: BTreeMap<Stream, &Position> = BTreeMap::new();
     let mut failed = None;
     for event in &page.events {
         match consumer.process(event).await {
-            Ok(()) => finished = Some(&event.position),
+            Ok(()) => {
+                finished.insert(event.position.stream(), &event.position);
+            }
             Err(source) => {
                 failed = Some(PassError::Consumer {
                     position: event.position.clone(),
@@ -211,15 +222,17 @@ pub async fn pass(
             }
         }
     }
-    if let Some(last) = finished {
+    let mut acknowledged = Vec::new();
+    for (stream, last) in finished {
         feed.acknowledge(reader, last).await?;
-        cursor.acknowledged = Some(last.clone());
+        cursor.acknowledged.insert(stream, last.clone());
+        acknowledged.push(last.clone());
     }
     match failed {
         Some(error) => Err(error),
         None => Ok(Pass {
             read: page.events.len(),
-            acknowledged: finished.cloned(),
+            acknowledged,
             full,
         }),
     }
@@ -254,7 +267,7 @@ pub async fn follow(
                         consumer = consumer.name(),
                         reader = %reader,
                         read = done.read,
-                        acknowledged = done.acknowledged.as_ref().map(ToString::to_string),
+                        streams = done.acknowledged.len(),
                         "a change-feed pass finished"
                     );
                 }

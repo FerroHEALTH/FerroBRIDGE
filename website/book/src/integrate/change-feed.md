@@ -75,19 +75,32 @@ The AQL source has limits a consumer has to accept:
 
 FerroEHR, the reference CDR, writes each commit into a transactional outbox in
 the commit's own transaction and serves it over a cursor feed outside
-ITS-REST. Any CDR may serve the same contract:
+ITS-REST. It keeps two outboxes, `clinical` and `party`, each with its own
+`seq` and its own cursor per reader, and FerroBRIDGE reads both on every pass
+so neither holds back the CDR's pruning. Any CDR may serve the same contract:
 
-- `GET {url}/admin/outbox/{reader}?limit=<1..1000>` answers `200` with
-  `{"reader": "<name>", "events": [...]}`, the events after the reader's
-  cursor in `seq` order, and `404` for an unknown or inactive reader;
-- `POST {url}/admin/outbox/{reader}/ack` with `{"last_seq": <n>}` answers
-  `204` and moves the cursor, and `409` when `n` lies below the cursor or
-  above the last event.
+- `GET {url}/admin/outbox/{reader}?limit=<1..1000>&domain=<clinical|party>`
+  answers `200` with `{"reader": "<name>", "events": [...]}`, the events
+  after the reader's cursor in `seq` order, and `404` for an unknown or
+  inactive reader;
+- `POST {url}/admin/outbox/{reader}/ack?domain=<clinical|party>` with
+  `{"last_seq": <n>}` answers `204` and moves that outbox's cursor, and `409`
+  when `n` lies below the cursor or above the last event.
 
-Each event carries the contribution, the EHR, the commit instant and one entry
-per changed versioned object (`vo_id`, `kind`, `sys_version`, `change_type`,
-`template_id`), identity and provenance only. Over this source the reader's
-cursor on the CDR is the watermark, so FerroBRIDGE keeps none of its own. The
-feed adds what the AQL source cannot give: one commit order, every kind of
-versioned object, and deletions. The reader names come from the CDR's own
-configuration, and the `[cdr]` credentials need the CDR's outbox scope.
+Each event carries the contribution, the EHR (`null` in the party outbox),
+the commit instant and one entry per changed versioned object (`vo_id`,
+`kind`, `sys_version`, `version_tree_id`, `change_type`, `template_id`),
+identity and provenance only. `change_type` is the openEHR audit change type
+code as text, such as `249` for a creation or `523` for a deletion. An
+erasure arrives as a tombstone, `"event": "erase"`, which names the erased
+EHR or party objects and carries no contribution and no commit instant.
+
+Over this source each outbox cursor on the CDR is the watermark, so
+FerroBRIDGE keeps none of its own, and a consumer acknowledges each outbox
+over the prefix it finished. The feed adds what the AQL source cannot give:
+one commit order per outbox, every kind of versioned object, deletions and
+erasures. The reader names come from the CDR's own configuration
+(`[outbox] readers` on FerroEHR), and the `[cdr]` credentials need the scope
+the CDR names for the outbox routes (`__ferroehr.outbox` on FerroEHR). The
+CDR leaves out the events of an EHR under a restriction and serves them once
+the restriction is lifted, as long as the cursor has not passed them.

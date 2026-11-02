@@ -199,7 +199,7 @@ impl ChangeFeed for AqlFeed {
     async fn acknowledge(&self, reader: &ReaderName, last: &Position) -> Result<(), FeedError> {
         match last {
             Position::Committed(watermark) => self.store.set(reader, watermark),
-            Position::Seq(_) => Err(FeedError::Foreign {
+            Position::Outbox { .. } => Err(FeedError::Foreign {
                 position: last.clone(),
             }),
         }
@@ -222,6 +222,8 @@ struct Row {
     vo_id: uuid::Uuid,
     /// The trunk number of the version tree id.
     sys_version: u64,
+    /// The version tree id.
+    version_tree_id: String,
     /// The contribution.
     contribution_id: ContributionUid,
     /// The commit instant.
@@ -254,6 +256,7 @@ impl Row {
                 "vo_id": self.vo_id.to_string(),
                 "kind": COMPOSITION,
                 "sys_version": self.sys_version,
+                "version_tree_id": self.version_tree_id,
                 "change_type": self.change_type,
             "template_id": self.template_id,
         });
@@ -263,13 +266,15 @@ impl Row {
         );
         Event {
             position,
-            contribution_id: self.contribution_id,
+            erasure: false,
+            contribution_id: Some(self.contribution_id),
             ehr_id: Some(self.ehr_id),
-            committed_at: self.at,
+            committed_at: Some(self.at),
             versions: vec![ChangedVersion {
-                vo_id: self.vo_id,
+                vo_id: Some(self.vo_id),
                 kind: String::from(COMPOSITION),
-                sys_version: self.sys_version,
+                sys_version: Some(self.sys_version),
+                version_tree_id: Some(self.version_tree_id),
                 change_type: self.change_type,
                 template_id: self.template_id,
             }],
@@ -302,11 +307,15 @@ fn read_row(cells: &[serde_json::Value]) -> Result<Row, FeedError> {
         .next()
         .and_then(|object| uuid::Uuid::parse_str(object).ok())
         .ok_or_else(|| malformed("a row carries a version uid that names no UUID"))?;
-    let sys_version = parts
+    let version_tree_id = parts
         .nth(1)
-        .and_then(|tree| tree.split('.').next())
+        .ok_or_else(|| malformed("a row carries a version uid that names no version tree id"))?
+        .to_owned();
+    let sys_version = version_tree_id
+        .split('.')
+        .next()
         .and_then(|trunk| trunk.parse::<u64>().ok())
-        .ok_or_else(|| malformed("a row carries a version uid that names no version tree id"))?;
+        .ok_or_else(|| malformed("a row carries a version tree id with no trunk number"))?;
     let contribution_id = ContributionUid::new(text(cells, 2, "contribution id")?)
         .map_err(|_refused| malformed("a row carries a contribution id that is no identifier"))?;
     let at_text = text(cells, 3, "time_committed")?.to_owned();
@@ -323,6 +332,7 @@ fn read_row(cells: &[serde_json::Value]) -> Result<Row, FeedError> {
         version_uid,
         vo_id,
         sys_version,
+        version_tree_id,
         contribution_id,
         at,
         at_text,

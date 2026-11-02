@@ -62,32 +62,81 @@ impl fmt::Display for Seq {
     }
 }
 
-/// Where one event sits in its source, which the cursor is moved to.
-///
-/// The two sources order their events differently, so a position compares
-/// only with a position of the same source.
+/// One of the two outboxes of the reference CDR, each with its own `seq`
+/// and its own cursor per reader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Domain {
+    /// The commits of EHR content.
+    Clinical,
+    /// The commits of demographic content.
+    Party,
+}
+
+impl Domain {
+    /// Returns the value of the `domain` query parameter.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Clinical => "clinical",
+            Self::Party => "party",
+        }
+    }
+}
+
+/// One ordered stream of a source: the events of one stream are in order,
+/// and two streams are not ordered against each other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Stream {
+    /// One outbox of the reference CDR.
+    Outbox(Domain),
+    /// The composition versions of the AQL source.
+    Committed,
+}
+
+/// Where one event sits in its stream, which the cursor is moved to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Position {
-    /// The delivery sequence number of the reference CDR's outbox.
-    Seq(Seq),
+    /// The delivery sequence number in one outbox of the reference CDR.
+    Outbox {
+        /// The outbox.
+        domain: Domain,
+        /// The sequence number.
+        seq: Seq,
+    },
     /// A commit instant and the versions committed at that instant up to and
     /// including this event.
     Committed(Committed),
 }
 
 impl Position {
+    /// Returns the stream the position orders within.
+    #[must_use]
+    pub const fn stream(&self) -> Stream {
+        match self {
+            Self::Outbox { domain, .. } => Stream::Outbox(*domain),
+            Self::Committed(_) => Stream::Committed,
+        }
+    }
+
     /// Returns whether this position lies strictly after `earlier`.
     ///
-    /// A sequence number follows a smaller one; a commit position follows
-    /// one at an earlier instant, or one at the same instant whose versions
-    /// it holds with at least one more. Positions of two sources never
-    /// follow one another.
+    /// A sequence number follows a smaller one of the same outbox; a commit
+    /// position follows one at an earlier instant, or one at the same
+    /// instant whose versions it holds with at least one more. Positions of
+    /// two streams never follow one another.
     #[must_use]
     pub fn follows(&self, earlier: &Self) -> bool {
         match (self, earlier) {
-            (Self::Seq(seq), Self::Seq(before)) => seq > before,
+            (
+                Self::Outbox { domain, seq },
+                Self::Outbox {
+                    domain: before_domain,
+                    seq: before,
+                },
+            ) => domain == before_domain && seq > before,
             (Self::Committed(at), Self::Committed(before)) => at.follows(before),
-            (Self::Seq(_), Self::Committed(_)) | (Self::Committed(_), Self::Seq(_)) => false,
+            (Self::Outbox { .. }, Self::Committed(_))
+            | (Self::Committed(_), Self::Outbox { .. }) => false,
         }
     }
 }
@@ -95,7 +144,7 @@ impl Position {
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Seq(seq) => write!(f, "seq {seq}"),
+            Self::Outbox { domain, seq } => write!(f, "{} seq {seq}", domain.as_str()),
             Self::Committed(committed) => write!(
                 f,
                 "{} ({} versions at that instant)",
@@ -253,13 +302,17 @@ impl Default for PageSize {
 /// One changed versioned object of an event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangedVersion {
-    /// The versioned object's identifier.
-    pub vo_id: uuid::Uuid,
+    /// The versioned object's identifier, absent on the erasure of a whole
+    /// EHR.
+    pub vo_id: Option<uuid::Uuid>,
     /// The RM type name of the object, such as `COMPOSITION`.
     pub kind: String,
-    /// The version ordinal.
-    pub sys_version: u64,
-    /// The audit change type, as the source writes it.
+    /// The version ordinal, absent on an erasure.
+    pub sys_version: Option<u64>,
+    /// The version tree id, when the source writes it.
+    pub version_tree_id: Option<String>,
+    /// The audit change type, as the source writes it: the openEHR
+    /// `audit_change_type` code such as `251`, or `erase`.
     pub change_type: String,
     /// The operational template of a composition, when there is one.
     pub template_id: Option<String>,
@@ -271,12 +324,15 @@ pub struct ChangedVersion {
 pub struct Event {
     /// Where the event sits in its source.
     pub position: Position,
-    /// The contribution the change belongs to.
-    pub contribution_id: ContributionUid,
+    /// Whether the event is an erasure, which names what was erased and no
+    /// contribution.
+    pub erasure: bool,
+    /// The contribution the change belongs to, absent on an erasure.
+    pub contribution_id: Option<ContributionUid>,
     /// The EHR, absent for a demographic contribution.
     pub ehr_id: Option<EhrId>,
-    /// The commit instant.
-    pub committed_at: jiff::Timestamp,
+    /// The commit instant, absent on an erasure.
+    pub committed_at: Option<jiff::Timestamp>,
     /// One entry per changed versioned object.
     pub versions: Vec<ChangedVersion>,
     /// The event as the source served it, members this type does not read
@@ -302,7 +358,7 @@ impl Event {
     #[must_use]
     pub const fn seq(&self) -> Option<Seq> {
         match &self.position {
-            Position::Seq(seq) => Some(*seq),
+            Position::Outbox { seq, .. } => Some(*seq),
             Position::Committed(_) => None,
         }
     }
@@ -366,8 +422,8 @@ pub enum FeedError {
     Conflict {
         /// The reader acknowledged for.
         reader: ReaderName,
-        /// The sequence number acknowledged.
-        last: Seq,
+        /// The position acknowledged.
+        last: Box<Position>,
         /// The answer.
         upstream: Box<Upstream>,
     },

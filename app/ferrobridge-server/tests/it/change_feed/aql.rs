@@ -10,11 +10,13 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::sync::Arc;
 
+use ferrobridge_server::cdr::ids::ContributionUid;
 use ferrobridge_server::change_feed::ChangeFeed;
 use ferrobridge_server::change_feed::Committed;
 use ferrobridge_server::change_feed::FeedError;
 use ferrobridge_server::change_feed::PageSize;
 use ferrobridge_server::change_feed::Position;
+use ferrobridge_server::change_feed::Stream;
 use ferrobridge_server::change_feed::aql::AqlFeed;
 use ferrobridge_server::change_feed::aql::Start;
 use ferrobridge_server::change_feed::follow::Cursor;
@@ -163,7 +165,8 @@ async fn each_row_is_one_composition_event_with_the_versions_at_its_instant()
     let second = read.events.get(1).ok_or("a second event")?;
     let version = second.versions.first().ok_or("a version")?;
     assert_eq!("COMPOSITION", version.kind);
-    assert_eq!(3, version.sys_version);
+    assert_eq!(Some(3), version.sys_version);
+    assert_eq!(Some("3"), version.version_tree_id.as_deref());
     assert_eq!("251", version.change_type);
     assert_eq!(
         Some("Synthetic vital signs"),
@@ -179,11 +182,11 @@ async fn each_row_is_one_composition_event_with_the_versions_at_its_instant()
                 "both versions of the instant are finished here"
             );
         }
-        Position::Seq(_) => return Err("an AQL event has no seq".into()),
+        Position::Outbox { .. } => return Err("an AQL event has no seq".into()),
     }
     match &read.events.get(2).ok_or("a third event")?.position {
         Position::Committed(at) => assert_eq!(1, at.versions().len()),
-        Position::Seq(_) => return Err("an AQL event has no seq".into()),
+        Position::Outbox { .. } => return Err("an AQL event has no seq".into()),
     }
     Ok(())
 }
@@ -238,7 +241,7 @@ async fn the_watermark_survives_a_restart_and_a_version_sharing_its_instant_is_s
     let event = read.events.first().ok_or("the late version")?;
     assert_eq!(
         late.get(2).and_then(serde_json::Value::as_str),
-        Some(event.contribution_id.as_str())
+        event.contribution_id.as_ref().map(ContributionUid::as_str)
     );
     Ok(())
 }
@@ -312,7 +315,7 @@ async fn each_refusal_of_the_query_leaves_the_watermark_where_it_was() -> Result
         }
         let watermark = store.get(&reader())?.ok_or("the start is recorded")?;
         assert_eq!(START, watermark.text(), "{status}");
-        assert_eq!(None, cursor.acknowledged(), "{status}");
+        assert_eq!(None, cursor.acknowledged(Stream::Committed), "{status}");
     }
     Ok(())
 }
