@@ -16,7 +16,6 @@
 //! identifier-to-EHR resolution: our own design.
 
 use http::StatusCode;
-use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
@@ -55,20 +54,10 @@ pub(super) async fn ehrs_of(
                 .at(name.to_owned()),
         )
     })?;
-    let answered = client
-        .query_aql(&request)
-        .await
-        .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
-    let rows = match answered.outcome {
-        QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => body.rows,
-        QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
-        | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => {
-            return Err(write::refuse(&status::of_extension_refusal(
-                &answered.upstream,
-                "identifier",
-            )));
-        }
-    };
+    let rows = super::rows_of(client, &request, |upstream| {
+        status::of_extension_refusal(upstream, "identifier")
+    })
+    .await?;
     let parties = identifier::uids(&rows).map_err(|error| {
         write::refuse(&status::Answer::new(status::UPSTREAM, error.to_string()))
     })?;

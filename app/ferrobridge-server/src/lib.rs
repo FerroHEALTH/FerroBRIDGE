@@ -16,6 +16,7 @@ pub mod banner;
 pub mod boot;
 pub mod build_info;
 pub mod cdr;
+pub mod change_feed;
 pub mod check;
 pub mod cli;
 pub mod config;

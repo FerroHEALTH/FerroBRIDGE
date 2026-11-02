@@ -146,7 +146,7 @@ pub enum Error {
         #[source]
         source: Box<ferrohealth_smart::config::ConfigError>,
     },
-    /// A reference fetch base is no http or https base.
+    /// A base URL is no http or https base without a query or a fragment.
     #[error("{key} holds `{value}`, which is no http or https base without a query or a fragment")]
     FetchBase {
         /// The key that holds it.
@@ -268,6 +268,38 @@ pub enum Error {
         /// Why the query is refused.
         #[source]
         source: crate::facade::search::identifier::IdentifierQueryError,
+    },
+    /// The change-feed source names neither source.
+    #[error("{key} is `{value}`; the sources are aql and ferroehr")]
+    FeedSource {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
+    /// The change-feed start names no start.
+    #[error("{key} is `{value}`; a start is now, beginning or an RFC 3339 instant")]
+    FeedStart {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
+    /// A count or a duration outside the range its key admits.
+    #[error("{key} is {value}; {reason}")]
+    Bound {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: u64,
+        /// Why it is refused.
+        reason: &'static str,
+    },
+    /// The change feed is on and no consumer follows it.
+    #[error("{key} is set, and no consumer follows the change feed; switch one on or the feed off")]
+    NoConsumer {
+        /// The key that switches the feed on.
+        key: String,
     },
     /// A lane is switched on and a lane it needs is not.
     #[error("{key} is set, and it needs {needs}")]

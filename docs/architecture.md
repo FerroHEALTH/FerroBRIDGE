@@ -1639,16 +1639,24 @@ because no concept exists. The reference engine has not moved since
   default-filled dates as a documented failure mode).
 - **The batch path is the conformant baseline; a change feed is an adapter.**
   ITS-REST 1.1.0 defines no change notification, subscription or bulk export
-  (verified over the five `STABLE` OpenAPI documents). The reference CDR
-  publishes every commit through a transactional outbox to AMQP as its own
-  extension, and its planned secondary-use read model (its issue #3160) names
-  OMOP CDM as a target fed from that stream. FerroBRIDGE's incremental mode is
-  therefore a configured change-feed adapter whose reference source is that
-  stream, built after the batch round trip, labelled as FerroBRIDGE's
-  extension, and never a reason for the batch path to lose exactness: an
-  event names a composition, the adapter fetches it over ITS-REST and runs the
-  same per-composition commit. The same adapter feeds the outbound FHIR lane
-  (section 12).
+  (verified over the five `STABLE` OpenAPI documents). FerroBRIDGE's
+  incremental mode is therefore a configured change-feed adapter, labelled as
+  FerroBRIDGE's extension, and never a reason for the batch path to lose
+  exactness: an event names a composition, the adapter fetches it over
+  ITS-REST and runs the same per-composition commit. No feature depends on one
+  vendor (owner decision 2026-11-02), so the adapter has two sources. The
+  vendor-neutral one polls `/query/aql` over `VERSION v[ALL_VERSIONS]` by
+  `commit_audit/time_committed` past a watermark FerroBRIDGE keeps in `redb`,
+  with the version uids finished at the watermark instant so a tie loses
+  nothing; it gives no commit order across EHRs and sees a deletion only where
+  the CDR answers the deleted version. The reference CDR writes every commit
+  into a transactional outbox and serves it over a cursor feed outside
+  ITS-REST (its issue #4786), where each consumer's reader cursor is its
+  watermark and commit order and deletions come with it; its planned
+  secondary-use read model (its issue #3160) names OMOP CDM as a target fed
+  from that stream. Each consumer acknowledges only the prefix it finished.
+  The same adapter feeds the outbound FHIR lane (section 12) and the AMQP
+  republishing the reference CDR no longer does itself.
 
 ```mermaid
 flowchart TB

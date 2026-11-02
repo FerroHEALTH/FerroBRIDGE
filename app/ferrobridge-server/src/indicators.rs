@@ -193,7 +193,7 @@ impl HealthIndicator for Hl7v2Listener {
 /// The readiness body states why an upstream is down, so the whole chain is
 /// rendered (RFC 0201, `Error::source`); the typed error itself stays in the
 /// client and never becomes a string on any other path.
-fn reason(error: impl std::error::Error) -> String {
+pub(crate) fn reason(error: impl std::error::Error) -> String {
     let mut line = error.to_string();
     let mut cause = std::error::Error::source(&error);
     while let Some(source) = cause {

@@ -215,6 +215,18 @@ impl CdrClient {
         retry: RetryPolicy,
         parties: bool,
     ) -> Result<Client<Scoped<'_>>, CdrError> {
+        self.scoped_at(self.client.base(), headers, retry, parties)
+    }
+
+    /// Returns a runtime for one call under `base` that adds `headers` to
+    /// every attempt and keeps the last answer.
+    fn scoped_at(
+        &self,
+        base: &url::Url,
+        headers: HeaderMap,
+        retry: RetryPolicy,
+        parties: bool,
+    ) -> Result<Client<Scoped<'_>>, CdrError> {
         let mut extra = headers;
         if let Some(request_id) = self.request_id.as_ref() {
             let value = HeaderValue::from_str(request_id.as_str()).map_err(|source| {
@@ -235,10 +247,51 @@ impl CdrClient {
         } else {
             transport
         };
-        let client = Client::new(transport, self.client.base().clone())
+        let client = Client::new(transport, base.clone())
             .map_err(|source| CdrError::client(source, None))?
             .with_retry(retry);
         Ok(authenticated(client, self.auth.as_ref()))
+    }
+
+    /// Sends `request` once under `base`, a root the CDR serves outside
+    /// ITS-REST, with the configured credentials, and returns the answer
+    /// whatever its status.
+    ///
+    /// No specification governs a CDR's own extension routes: our own design.
+    /// The call shares the engine, the credentials, the `X-Request-Id` echo
+    /// and the one renewal of a refused token with every ITS-REST call, and is
+    /// never retried, so the caller decides what each status means.
+    ///
+    /// # Errors
+    /// Returns [`CdrError::Client`] when the request never reached the
+    /// service, the configured timeout included, [`CdrError::Renewal`] when
+    /// the service refused the token and no new one could be obtained, and
+    /// [`CdrError::Unrecorded`] when no answer was kept.
+    pub(crate) async fn extension(
+        &self,
+        base: &url::Url,
+        request: openehr_its::rest::client::Request,
+    ) -> Result<Upstream, CdrError> {
+        let once = RetryPolicy {
+            max_attempts: 1,
+            ..self.client.retry()
+        };
+        let client = self.scoped_at(base, HeaderMap::new(), once, false)?;
+        let answered = client.forward(request).await;
+        let upstream = client.transport().answered();
+        match answered {
+            Err(source) => Err(refusal(&client, source, upstream)),
+            Ok(answer) if answer.status() == StatusCode::UNAUTHORIZED => {
+                match client.transport().renewal_refused() {
+                    Some(source) => Err(CdrError::Renewal {
+                        source,
+                        upstream: upstream.map(Box::new),
+                    }),
+                    None => upstream.ok_or(CdrError::Unrecorded),
+                }
+            }
+            Ok(_answer) => upstream.ok_or(CdrError::Unrecorded),
+        }
     }
 
     /// Returns a runtime for one call under the configured retry budget.

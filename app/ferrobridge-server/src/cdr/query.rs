@@ -26,7 +26,7 @@ use crate::cdr::error::Upstream;
 pub enum QueryPageError {
     /// The service refused a page with a status the operation documents.
     #[error("the openEHR service refused the AQL query with {0}")]
-    Refused(Upstream),
+    Refused(Box<Upstream>),
     /// The call did not reach a documented answer.
     #[error(transparent)]
     Call(#[from] CdrError),
@@ -112,6 +112,30 @@ impl CdrClient {
         crate::cdr::answered_by(&client, answered)
     }
 
+    /// Executes one ad-hoc AQL query and returns the rows of its result set.
+    ///
+    /// The `400` and `408` the operation documents
+    /// (`query-codegen.openapi.yaml`, `query_execute_adhoc_query_body`) are
+    /// its refusal, carrying the answer the service sent.
+    ///
+    /// # Errors
+    /// Returns [`QueryPageError::Refused`] when the service refused the
+    /// query, and [`QueryPageError::Call`] when the call did not reach a
+    /// documented answer.
+    pub async fn query_aql_result(
+        &self,
+        request: &AdhocQueryExecute,
+    ) -> Result<Vec<ResultSetRow>, QueryPageError> {
+        let answered = self.query_aql(request).await?;
+        match answered.outcome {
+            QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => Ok(body.rows),
+            QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
+            | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => {
+                Err(QueryPageError::Refused(Box::new(answered.upstream)))
+            }
+        }
+    }
+
     /// Returns the rows of `request`, one page at a time.
     ///
     /// Each page is one `POST /query/aql` with `offset` advanced by `page`,
@@ -142,14 +166,7 @@ impl CdrClient {
                 let mut request = state.request.clone();
                 request.offset = Some(state.offset);
                 request.fetch = Some(state.page.rows());
-                let answered = self.query_aql(&request).await?;
-                let rows = match answered.outcome {
-                    QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => body.rows,
-                    QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
-                    | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => {
-                        return Err(QueryPageError::Refused(answered.upstream));
-                    }
-                };
+                let rows = self.query_aql_result(&request).await?;
                 let fetched = i64::try_from(rows.len()).unwrap_or(i64::MAX);
                 if fetched < state.page.rows() {
                     state.exhausted = true;

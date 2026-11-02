@@ -25,6 +25,7 @@ use crate::facade::search::criteria::Criteria;
 use crate::facade::search::criteria::Total;
 use crate::facade::search::cursor::Position;
 use crate::facade::search::declaration::Node;
+use crate::facade::status;
 use fhirconnect::resolve::program::hierarchy::Create;
 use fhirconnect::resolve::program::hierarchy::Hierarchy;
 use fhirconnect::resolve::program::hierarchy::Split;
@@ -131,7 +132,12 @@ async fn count_query(
     conditions: &Conditions,
     entry: Option<&Node>,
 ) -> Result<u64, Refusal> {
-    let rows = rows_of(client, &aql::count_request(conditions, entry)).await?;
+    let rows = rows_of(
+        client,
+        &aql::count_request(conditions, entry),
+        status::of_query_refusal,
+    )
+    .await?;
     rows.first()
         .and_then(|row| row.first())
         .and_then(serde_json::Value::as_u64)
@@ -171,7 +177,7 @@ async fn count_entries(
     let mut offset: i64 = 0;
     loop {
         let request = aql::rows_request(conditions, &plan.order, offset, fetch);
-        let rows = rows_of(client, &request).await?;
+        let rows = rows_of(client, &request, status::of_query_refusal).await?;
         for (position, row) in rows.iter().enumerate() {
             let read = read_row(facade, plan, row, position)?;
             for entry in matched(plan, &read, row, position)? {

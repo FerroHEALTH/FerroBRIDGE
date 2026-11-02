@@ -5,6 +5,7 @@
 //! secrets, and every refusal.
 
 mod auth;
+mod change_feed;
 mod environment;
 mod etl;
 mod facade;
