@@ -147,7 +147,7 @@ async fn a_running_lane_reports_its_consumer_and_topology() -> Result<(), Box<dy
 #[tokio::test]
 async fn every_consumer_is_listed_with_its_own_reader_and_parked_events()
 -> Result<(), Box<dyn Error>> {
-    let (_dir, report, id) = report("unused")?;
+    let (_dir, report, id) = report(&uuid::Uuid::new_v4().to_string())?;
     let case = Case::reporting(report).await?;
     let (text, document) = document(&case).await?;
     assert!(!text.contains(ENVELOPE_MARKER), "{text}");
@@ -178,7 +178,7 @@ async fn every_consumer_is_listed_with_its_own_reader_and_parked_events()
 
 #[tokio::test]
 async fn a_replay_marks_the_parked_event() -> Result<(), Box<dyn Error>> {
-    let (_dir, report, id) = report("unused")?;
+    let (_dir, report, id) = report(&uuid::Uuid::new_v4().to_string())?;
     let case = Case::reporting(report).await?;
     let response = case
         .post(
@@ -199,7 +199,7 @@ async fn a_replay_marks_the_parked_event() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn a_replay_of_an_unknown_consumer_or_event_is_not_found() -> Result<(), Box<dyn Error>> {
-    let (_dir, report, id) = report("unused")?;
+    let (_dir, report, id) = report(&uuid::Uuid::new_v4().to_string())?;
     let case = Case::reporting(report).await?;
     for path in [
         format!("/operator/events/nobody/parked/{id}/replay"),
@@ -215,7 +215,7 @@ async fn a_replay_of_an_unknown_consumer_or_event_is_not_found() -> Result<(), B
 
 #[tokio::test]
 async fn a_replay_needs_the_operator_scope() -> Result<(), Box<dyn Error>> {
-    let (_dir, report, id) = report("unused")?;
+    let (_dir, report, id) = report(&uuid::Uuid::new_v4().to_string())?;
     let case = Case::reporting(report).await?;
     let response = case
         .post(
