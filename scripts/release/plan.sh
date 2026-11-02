@@ -256,6 +256,10 @@ check_ehds_documents() {
   bash "$SYSTEM_DOCUMENTS" check-notes "$NOTES"
 }
 
+check_ehds_fresh() {
+  bash "$SYSTEM_DOCUMENTS" fresh
+}
+
 # The list: "<function> <title>", in the order the plan job runs them.
 list() {
   cat <<'EOF'
@@ -267,6 +271,7 @@ check_changelog_fragments No changelog fragment is left unassembled
 check_prev_tag The previous release resolves from the pushed tags
 check_notes The changelog section for this tag becomes the release notes, with the support period, the CRA user information link and the EHDS system documents
 check_ehds_documents The EHDS system documents at the pinned revision, with this release's facts, and the notes naming them
+check_ehds_fresh The EHDS system-documents pin names the newest revision of every page, or says why it keeps an older one
 EOF
 }
 

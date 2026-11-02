@@ -12,7 +12,8 @@ consumer reads the change itself over ITS-REST.
 
 The `[change_feed]` section picks one of two sources
 ([configuration](../operate/configuration.md#change_feed)). Every consumer
-runs on either source.
+runs on either source. The consumers are the [events lane](events.md), the
+incremental OMOP load and the [outbound FHIR lane](fhir-outbound.md).
 
 ## How a consumer follows the feed
 

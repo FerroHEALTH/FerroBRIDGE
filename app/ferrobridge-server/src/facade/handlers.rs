@@ -21,6 +21,7 @@
 mod batch;
 mod complete;
 mod conditional;
+pub(crate) mod emit;
 pub(crate) mod read;
 mod render;
 mod search;

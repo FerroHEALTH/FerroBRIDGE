@@ -16,6 +16,7 @@ pub mod audit;
 pub mod change_feed;
 pub mod events;
 pub mod facade;
+pub mod fhir_outbound;
 pub mod omop_incremental;
 
 /// The mapping set this deployment runs.

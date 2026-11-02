@@ -356,6 +356,15 @@ impl fmt::Debug for Event {
 }
 
 impl Event {
+    /// Returns the versioned object id of every composition the event
+    /// changed, in its order.
+    pub fn compositions(&self) -> impl Iterator<Item = uuid::Uuid> + '_ {
+        self.versions
+            .iter()
+            .filter(|version| version.kind == "COMPOSITION")
+            .filter_map(|version| version.vo_id)
+    }
+
     /// Returns the delivery sequence number, when the source assigns one.
     #[must_use]
     pub const fn seq(&self) -> Option<Seq> {

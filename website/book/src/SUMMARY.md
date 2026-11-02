@@ -40,6 +40,7 @@
 - [The OMOP ETL](integrate/omop-etl.md)
 - [The change feed](integrate/change-feed.md)
   - [The events lane](integrate/events.md)
+  - [The outbound FHIR lane](integrate/fhir-outbound.md)
 - [Writing and loading mappings](integrate/mappings.md)
 
 # Contribute

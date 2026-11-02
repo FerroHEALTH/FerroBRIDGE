@@ -350,7 +350,7 @@ pub fn diagnostics(status: StatusCode, body: &ErrorBody) -> String {
     let problem = crate::cdr::error::ProblemDetails::of(body.raw())
         .map(|problem| problem.words())
         .filter(|words| !words.is_empty());
-    match (body.message(), problem) {
+    match (body.error().map(|error| error.message.as_str()), problem) {
         (Some(message), _) => {
             text.push_str(": ");
             text.push_str(message);

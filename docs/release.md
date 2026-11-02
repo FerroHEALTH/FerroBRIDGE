@@ -297,7 +297,15 @@ before a real cut.
    compares each claim with the workspace version and the date of its
    `CHANGELOG.md` section, so it fails until the pages and the changelog move
    with the version.
-4. **The console screenshots show the release.** After the version moves,
+4. **The EHDS system documents are the newest.** Move
+   `docs/ehds/system-documents.env` to the newest commit of
+   FerroHEALTH/FerroHEALTH that touches `website/book/src/ehds/`, with the
+   four dates read from the pages there. `bash
+   scripts/release/system-documents.sh fresh` reads each page at the head of
+   the book and refuses a pin whose page was revised since; the plan runs it
+   as `check_ehds_fresh`. A release that keeps an older revision on purpose
+   says why in a `KEPT_BECAUSE=` line of the pin file, which the check prints.
+5. **The console screenshots show the release.** After the version moves,
    take the book's operator console screenshots again on the release
    commit's tree: `scripts/release/journey-tools.sh target/journey-tools`,
    then `SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" FERROBRIDGE_JOURNEYS=1
@@ -305,10 +313,12 @@ before a real cut.
    'test(/journeys::(screenshots|states)::/)' --test-threads 1`.
    `SOURCE_DATE_EPOCH` fixes the build instant the About page draws, so a
    second capture of the same commit writes the same bytes. The capture
-   writes the version it ran at to `website/book/src/operate/img/console/captured-version.txt`, and
-   the screenshot guard of the ordinary suite fails until that names the
-   workspace version. Read every image before the bump merges.
-5. **The changelog names the release.** Run
+   writes the version it ran at to `website/book/src/operate/img/console/captured-version.txt`.
+   The screenshot guard stands down in the capture run, which rewrites the
+   files it reads, and holds them in every other run: the ordinary suite fails
+   until the file names the workspace version and every shot has its images.
+   Read every image before the bump merges.
+6. **The changelog names the release.** Run
    `scripts/release/changelog.sh --assemble X.Y.Z YYYY-MM-DD` on the release
    branch: it writes `## [X.Y.Z] - YYYY-MM-DD` under the empty `[Unreleased]`
    from every fragment under `changelog.d/`, section by section in the Keep a
@@ -318,23 +328,23 @@ before a real cut.
    you cut. What sits under the version heading is what the release notes
    say, so read it as the release notes before you tag. The heading carries
    the date, because the support period in the notes counts from it.
-6. **Every Security entry names its advisory.** Each `### Security` entry
+7. **Every Security entry names its advisory.** Each `### Security` entry
    carries the `GHSA-` id of the draft advisory on this repository, or the
    path of a VEX statement under `security/vex/`, and a Security section
    beside other change subsections opens with
    `Shipped with functional changes because: <reason>`
    (`.claude/rules/changelog.md`). The drafted advisories are published in
    the same hour as the release (`post-market.md`).
-7. **The gates pass on the release commit.** The tier-1 set is
+8. **The gates pass on the release commit.** The tier-1 set is
    `zizmor --min-severity=low .github/`, `actionlint`, `shellcheck
    --severity=style` over every tracked shell program, `hadolint` over every
    tracked Dockerfile, `scripts/checks/comment-style.sh --all`,
    `scripts/checks/versions.sh`, and `mdbook build website/book`, beside the
    Rust lanes (`docs/ci-cd.md`).
-8. **A pre-release has rehearsed any change to the lane itself.** Tag
+9. **A pre-release has rehearsed any change to the lane itself.** Tag
    `vX.Y.Z-rc.1`, watch the whole graph run, and read what it produced. A
    pre-release takes the same path and is never marked latest.
-9. **The preflight passes** at the commit you are about to tag
+10. **The preflight passes** at the commit you are about to tag
    (below).
 
 ## Preflight: the plan job, before the tag
@@ -367,6 +377,7 @@ The checks, in the order the plan job runs them:
 | The previous release resolves from the pushed tags | `plan.sh prev-tag` |
 | The changelog section becomes the notes, with the support period, the CRA user information link and the pinned EHDS system documents | `plan.sh notes` |
 | The information sheet and the instructions for use at the pinned FerroHEALTH commit carry the pinned revision, are written with this release's facts, and the notes name the pinned revisions | `plan.sh` (`check_ehds_documents`, with `scripts/release/system-documents.sh`) |
+| The pin names the newest revision of every EHDS system document, or its `KEPT_BECAUSE=` line says why it keeps an older one | `plan.sh` (`check_ehds_fresh`, with `scripts/release/system-documents.sh fresh`) |
 
 The previous release is resolved from `git ls-remote --tags origin 'v*'`, by
 version order. A tag that was pushed but whose release never published still
@@ -397,7 +408,8 @@ against, the FerroEHR CDR image row of `docs/VERSIONS.md`), the release date
 `github-release` job attaches both copies, `finalize-release` refuses a draft
 without them, and the notes name the four pinned revisions. To move the pin,
 set the commit and the four dates together, read from the pages at that
-commit.
+commit. The plan's `check_ehds_fresh` refuses a pin the book has revised
+since, unless its `KEPT_BECAUSE=` line says why (step 4 of the cut).
 
 You need `gh` logged in, because the milestone check reads the tracker. A
 missing tool refuses its check; it is never skipped.
@@ -431,9 +443,9 @@ unsigned tag is refused at push time. `release.yml` takes it from there.
    `docker pull`. The owner sets each one public once, in the package
    settings: `ferrobridge`, and `ferrobridge-console` after the first release
    that carries the console.
-4. **Post the board status update** with what shipped and what the next
+5. **Post the board status update** with what shipped and what the next
    milestone targets (`.claude/rules/project-board.md`).
-5. **The milestone is closed.** The `milestone` job closes it at the end of
+6. **The milestone is closed.** The `milestone` job closes it at the end of
    the run, because a released milestone left open still reads as pending
    work on the board. After a manual or recovery release (a re-run, a
    `publish-crates.yml` dispatch), check that it is closed, and close it with

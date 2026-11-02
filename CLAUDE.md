@@ -87,7 +87,12 @@ the testkit tool crate. Beside it:
   `src/etl/` is the OMOP ETL runner (#91): the `[etl]` queries checked at load,
   the paged read, the `Mapper` the OMOCL engine fills (#90, `etl::mapper`
   compiles one program per template on first sight), the visits, the
-  deletion check (`etl::deletions`, #527) and the run report. `src/facade/`
+  deletion check (`etl::deletions`, #527) and the run report. `src/outbound/`
+  is the outbound FHIR lane behind `[fhir_outbound]` (#1374): a change-feed
+  consumer that maps each changed composition through the facade's programs
+  (`facade::handlers::emit`) and posts one transaction Bundle per event, with
+  the `redb` record of what it delivered that a deletion or an erasure
+  retracts. `src/facade/`
   is the FHIR R4 facade (#85), mounted under `/fhir` behind `[facade]`: the
   six interactions over the CDR and search over the AQL projections a
   `*.search.yml` file declares beside a context (#98),

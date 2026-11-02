@@ -128,9 +128,13 @@ pub const RABBITMQ: PinnedImage = PinnedImage {
 /// The reference openEHR CDR, which speaks ITS-REST 1.1.0.
 pub const CDR: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr",
-    tag: "5.5.0",
-    digest: "sha256:e1b15849a3792481a7f16680081b1ae6a2d7160d66e5cb1657fcef5cccfed0dc",
+    tag: "5.6.0-rc10",
+    digest: "sha256:c8bfd44a5a87c4a4df14ba4f8100e29e9720a5954e9bd792c551dc098f1f13ee",
 };
+
+/// The readers the reference CDR serves its outbox feed to, each named in its
+/// `[outbox] readers` (`FERROEHR__OUTBOX__READERS`, a comma-separated list).
+pub const CDR_READERS: [&str; 2] = ["ferrobridge-feed", "ferrobridge-events"];
 
 /// The PostgreSQL the reference CDR image documents as its database.
 ///
@@ -139,8 +143,8 @@ pub const CDR: PinnedImage = PinnedImage {
 /// rather than against a bare PostgreSQL.
 pub const CDR_POSTGRES: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr-postgres",
-    tag: "5.5.0",
-    digest: "sha256:dfe1d5c1bb95d31d3f6ff00fec03cd76ae20d57d20e6225b31e5bc68adf7fa81",
+    tag: "5.6.0-rc10",
+    digest: "sha256:ab451cd45ffe33ecd3ab140d274c34a003349a41bf7a0ef8221460dd022e29e3",
 };
 
 /// The reference FHIR terminology server.
@@ -220,6 +224,8 @@ pub struct Cdr {
     database: ContainerAsync<GenericImage>,
     /// The openEHR REST API root, the path `/ehr` and `/query` live under.
     base_url: String,
+    /// The root of the CDR's extensions, the outbox feed among them.
+    extensions_url: String,
 }
 
 impl Cdr {
@@ -227,6 +233,13 @@ impl Cdr {
     #[must_use]
     pub fn base_url(&self) -> &str {
         &self.base_url
+    }
+
+    /// Returns the root of the started CDR's extensions, the path
+    /// `/admin/outbox` lives under.
+    #[must_use]
+    pub fn extensions_url(&self) -> &str {
+        &self.extensions_url
     }
 
     /// Returns the CDR container.
@@ -489,6 +502,7 @@ pub async fn cdr() -> Result<Cdr, HarnessError> {
         server: cdr,
         database,
         base_url: format!("{origin}/ferroehr/rest/openehr/v1"),
+        extensions_url: format!("{origin}/ferroehr/rest/extensions/v1"),
     })
 }
 
@@ -526,6 +540,7 @@ fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
         .with_env_var("FERROEHR__AUTH__ENABLED", "false")
         .with_env_var("FERROEHR__EHR_INDEX__PROVIDER", "local")
         .with_env_var("FERROEHR__USAGE_REPORT__ENABLED", "false")
+        .with_env_var("FERROEHR__OUTBOX__READERS", CDR_READERS.join(","))
 }
 
 /// Returns the health check that answers when PostgreSQL accepts TCP

@@ -6,6 +6,7 @@
 //! and a composition deleted after a run loaded it, over the shared support.
 
 mod deletion;
+mod feed;
 mod incremental;
 mod round_trip;
 mod support;

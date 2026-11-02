@@ -89,6 +89,28 @@ pub(crate) struct Origin<'a> {
     pub(crate) demographics: &'a dyn Demographics,
 }
 
+impl<'a> Origin<'a> {
+    /// Returns the origin of the resource `id` rendered from `version`, read at
+    /// `source`, of the subject `subject`, bound in `facade`'s identity map.
+    pub(crate) fn of(
+        facade: &'a Facade,
+        id: &'a FhirResourceId,
+        version: &'a ObjectVersionId,
+        source: &'a Url,
+        subject: Option<&'a Value>,
+    ) -> Self {
+        Self {
+            id,
+            version,
+            source,
+            subject,
+            store: facade.store(),
+            usage: facade.usage(),
+            demographics: facade.demographics(),
+        }
+    }
+}
+
 /// Returns the resource `composition` maps to, decorated with its identity
 /// and checked against the required elements R4 gives its type.
 ///
