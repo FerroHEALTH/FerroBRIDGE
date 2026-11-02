@@ -54,6 +54,8 @@ ferrohealth-secret.workspace = true
 ferrohealth-server.workspace = true
 ferrohealth-telemetry = { workspace = true, features = ["axum"] }
 ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
+# The AMQP publisher of the events lane.
+lapin.workspace = true
 # The AOM2 operational template the adl2 route serves, and the HRID parser an
 # adl2 template ETag is read with.
 openehr-am.workspace = true

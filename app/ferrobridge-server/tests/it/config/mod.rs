@@ -8,6 +8,7 @@ mod auth;
 mod change_feed;
 mod environment;
 mod etl;
+mod events;
 mod facade;
 mod file;
 mod hl7v2;

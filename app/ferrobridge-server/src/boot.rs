@@ -281,6 +281,7 @@ where
         }
         Err(error) => return Err(error),
     };
+    let follower = started.feed.map(|feed| feed.spawn(&stop));
     let state = Arc::new(started.state.with_lanes(started.lanes));
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let report =
@@ -312,6 +313,18 @@ where
     }
     if let Some(report) = report {
         report.abort();
+    }
+    if let Some(follower) = follower {
+        stop.send_replace(true);
+        // NOTE: no specification governs this: our own design; an unacknowledged
+        // event is read again on the next start, so a follower cut short loses nothing.
+        match tokio::time::timeout(settings.server.shutdown_timeout(), follower).await {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => tracing::warn!(%error, "the change-feed follower ended abnormally"),
+            Err(_elapsed) => {
+                tracing::warn!("the change-feed follower did not stop within the drain bound");
+            }
+        }
     }
     signal.abort();
     Ok(())

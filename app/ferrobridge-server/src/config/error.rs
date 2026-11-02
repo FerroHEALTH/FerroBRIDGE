@@ -295,6 +295,22 @@ pub enum Error {
         /// Why it is refused.
         reason: &'static str,
     },
+    /// A reader name the change feed refuses.
+    #[error("{key} is no reader name")]
+    ReaderName {
+        /// The key that holds it.
+        key: String,
+        /// Why it is refused.
+        #[source]
+        source: crate::change_feed::ReaderNameError,
+    },
+    /// A broker URL that is no `amqp` or `amqps` URL; the URL itself is never
+    /// repeated, since it may carry a password.
+    #[error("{key} is no amqp:// or amqps:// URL")]
+    BrokerUrl {
+        /// The key that holds it.
+        key: String,
+    },
     /// The change feed is on and no consumer follows it.
     #[error("{key} is set, and no consumer follows the change feed; switch one on or the feed off")]
     NoConsumer {

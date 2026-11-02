@@ -22,6 +22,7 @@ mod commands;
 mod config;
 mod console;
 mod etl;
+mod events;
 mod facade;
 mod facade_demographic_e2e;
 mod facade_e2e;

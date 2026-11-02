@@ -18,7 +18,7 @@ use crate::config::{self, Settings};
 use crate::serve_until;
 use crate::state::{self, AppState};
 use crate::terminology::Translator;
-use crate::{cdr, check, facade, hl7v2, operator, smart, startup};
+use crate::{cdr, change_feed, check, events, facade, hl7v2, operator, smart, startup};
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_server::section::ServerSection;
 use std::collections::BTreeMap;
@@ -31,6 +31,8 @@ pub(crate) struct Started {
     pub(crate) lanes: Vec<startup::Lane>,
     /// The HL7 v2 face, when it runs.
     pub(crate) face: Option<StartedFace>,
+    /// The change-feed consumer, when one runs.
+    pub(crate) feed: Option<StartedFeed>,
 }
 
 impl Started {
@@ -104,7 +106,111 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_hl7v2(listening);
         face = Some(started);
     }
-    Ok(Started { state, lanes, face })
+    let mut feed = None;
+    if let (Some(lane), Some(feed_settings)) =
+        (settings.events.as_ref(), settings.change_feed.as_ref())
+    {
+        let started = start_events(settings, feed_settings, lane, &state)
+            .await
+            .context("starting the events lane")?;
+        state = state.with_following(started.following.clone());
+        feed = Some(started);
+    }
+    Ok(Started {
+        state,
+        lanes,
+        face,
+        feed,
+    })
+}
+
+/// One change-feed consumer, ready to follow its source.
+pub(crate) struct StartedFeed {
+    /// The source.
+    feed: Arc<dyn change_feed::ChangeFeed>,
+    /// The reader the consumer follows the source under.
+    reader: change_feed::ReaderName,
+    /// The consumer.
+    consumer: Arc<dyn change_feed::follow::Consumer>,
+    /// How the follower paces its reads.
+    polling: change_feed::follow::Polling,
+    /// What readiness reports for the consumer.
+    following: change_feed::health::Following,
+}
+
+impl StartedFeed {
+    /// Follows the source on its own task until `stop` reads `true`.
+    pub(crate) fn spawn(
+        self,
+        stop: &tokio::sync::watch::Sender<bool>,
+    ) -> tokio::task::JoinHandle<()> {
+        let stopped = stop.subscribe();
+        tokio::spawn(async move {
+            change_feed::follow::follow(
+                self.feed.as_ref(),
+                &self.reader,
+                self.consumer.as_ref(),
+                self.polling,
+                &self.following,
+                stopped,
+            )
+            .await;
+        })
+    }
+}
+
+/// Opens the change-feed source and the AMQP publisher that follows it.
+///
+/// Over the reference CDR's feed a first read checks the reader: a `404`
+/// means the CDR serves no feed for it, and the start is refused. Any other
+/// failure leaves the lane to report degraded, since the events wait at the
+/// source (no specification governs this: our own design).
+async fn start_events(
+    settings: &Settings,
+    feed_settings: &change_feed::Settings,
+    lane: &events::Settings,
+    state: &AppState,
+) -> anyhow::Result<StartedFeed> {
+    use anyhow::Context;
+
+    let cdr = settings
+        .cdr
+        .as_ref()
+        .context("the change feed reads the CDR, and [cdr] is not set")?;
+    let client = cdr::CdrClient::new(cdr).context("building the CDR client the feed reads")?;
+    let feed = change_feed::open(feed_settings, client).context("opening the change feed")?;
+    if matches!(feed_settings.source, change_feed::Source::FerroEhr { .. }) {
+        let probe = change_feed::PageSize::new(1).context("a page of one event")?;
+        match feed.page(&lane.reader, probe).await {
+            Err(error @ change_feed::FeedError::UnknownReader { .. }) => {
+                return Err(error).context(
+                    "the CDR serves no outbox feed for [events] reader; name the reader in the CDR's configuration",
+                );
+            }
+            Err(error) => tracing::warn!(
+                lane = events::NAME,
+                reason = %crate::indicators::reason(&error),
+                "the change feed did not answer at boot; the lane reports degraded until it does"
+            ),
+            Ok(_page) => {}
+        }
+    }
+    let publisher = events::Publisher::new(Arc::new(events::amqp::AmqpBroker::new(lane.clone())))
+        .with_usage(Arc::clone(state.usage_window()));
+    tracing::info!(
+        lane = events::NAME,
+        reader = %lane.reader,
+        exchange = %lane.exchange,
+        queues = lane.queues.len(),
+        "the events lane publishes the change feed to the AMQP broker"
+    );
+    Ok(StartedFeed {
+        feed,
+        reader: lane.reader.clone(),
+        consumer: Arc::new(publisher),
+        polling: feed_settings.polling,
+        following: change_feed::health::Following::new(events::NAME),
+    })
 }
 
 /// The HL7 v2 face, bound and ready to serve.

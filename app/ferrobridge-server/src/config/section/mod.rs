@@ -13,6 +13,7 @@ use ferrohealth_smart::config::CredentialsSection;
 use ferrohealth_secret::secret::Secret;
 
 pub mod change_feed;
+pub mod events;
 pub mod facade;
 
 /// The mapping set this deployment runs.

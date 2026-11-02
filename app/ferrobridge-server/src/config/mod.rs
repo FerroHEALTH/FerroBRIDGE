@@ -17,6 +17,7 @@ mod auth;
 mod change_feed;
 mod credentials;
 pub mod error;
+mod events;
 mod resolve;
 pub mod section;
 
@@ -48,6 +49,7 @@ use section::Operations;
 use section::Operator;
 use section::Terminology;
 use section::change_feed::ChangeFeed;
+use section::events::Events;
 use section::facade::Facade;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
@@ -114,6 +116,9 @@ pub struct Config {
     pub hl7v2: Hl7v2,
     /// The change-feed source, off until its section turns it on.
     pub change_feed: ChangeFeed,
+    /// The AMQP publisher of the commit events, off until its section turns it
+    /// on.
+    pub events: Events,
     /// The installation report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
     /// The operator API, off until its section turns it on.
@@ -264,8 +269,15 @@ impl Config {
                 Some(change_feed::resolve_change_feed(
                     &self.change_feed,
                     self.cdr.is_some(),
-                    // TODO(#1367): count the `[events]` publisher once it is a consumer.
-                    0,
+                    usize::from(self.events.enabled),
+                )?)
+            } else {
+                None
+            },
+            events: if self.events.enabled {
+                Some(events::resolve_events(
+                    &self.events,
+                    self.change_feed.enabled,
                 )?)
             } else {
                 None
@@ -379,6 +391,8 @@ pub struct Settings {
     pub hl7v2: Option<Hl7v2Settings>,
     /// The change-feed source, when it is on.
     pub change_feed: Option<crate::change_feed::Settings>,
+    /// The AMQP publisher of the commit events, when it is on.
+    pub events: Option<crate::events::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.

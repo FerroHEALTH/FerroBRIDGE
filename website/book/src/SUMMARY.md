@@ -38,6 +38,7 @@
 - [The FHIRconnect operations](integrate/operations.md)
 - [The OMOP ETL](integrate/omop-etl.md)
 - [The change feed](integrate/change-feed.md)
+  - [The events lane](integrate/events.md)
 - [Writing and loading mappings](integrate/mappings.md)
 
 # Contribute

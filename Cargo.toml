@@ -259,6 +259,12 @@ rustix = { version = "1.1.5", default-features = false, features = ["std", "proc
 # a new capture differs from it only by the antialiasing of a form control.
 # Verified against crates.io on 2026-10-28 (png 0.18.1, MIT OR Apache-2.0).
 png = "0.18.1"
+# The AMQP 0.9.1 client of the events lane (#1367): publisher confirms over
+# tokio, TLS through rustls with the aws-lc-rs provider and the webpki roots
+# the CDM writer already carries. The version the reference CDR pinned before
+# it handed broker delivery to the bridge; verified against crates.io on
+# 2026-11-02 (4.12.3, MIT).
+lapin = { version = "4.12.3", default-features = false, features = ["tokio", "rustls--aws_lc_rs", "rustls-webpki-roots-certs"] }
 # The end-to-end lane's container harness and the PostgreSQL client the CDM
 # catalogue is read with (docs/VERSIONS.md).
 testcontainers = "0.28.0"

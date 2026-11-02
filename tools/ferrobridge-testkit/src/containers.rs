@@ -118,6 +118,13 @@ pub const POSTGRES: PinnedImage = PinnedImage {
     digest: "sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280",
 };
 
+/// The AMQP 0.9.1 broker the events lane publishes to.
+pub const RABBITMQ: PinnedImage = PinnedImage {
+    repository: "rabbitmq",
+    tag: "4.3.7",
+    digest: "sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a",
+};
+
 /// The reference openEHR CDR, which speaks ITS-REST 1.1.0.
 pub const CDR: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr",
@@ -618,4 +625,62 @@ mod tests {
             "a test terminology server must not send a usage report"
         );
     }
+}
+
+/// The AMQP port of the broker image.
+const AMQP_PORT: u16 = 5672;
+
+/// A started `RabbitMQ` broker, torn down when it is dropped.
+#[derive(Debug)]
+pub struct RabbitMq {
+    /// The container, owned so that its lifetime is this value's.
+    container: ContainerAsync<GenericImage>,
+    /// The AMQP URL of the default user and virtual host.
+    url: String,
+}
+
+impl RabbitMq {
+    /// Returns the AMQP URL of the default user and virtual host.
+    #[must_use]
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Returns the container, for a caller that needs to inspect it.
+    #[must_use]
+    pub fn container(&self) -> &ContainerAsync<GenericImage> {
+        &self.container
+    }
+}
+
+/// Starts the pinned `RabbitMQ` and waits until it accepts AMQP connections.
+///
+/// The image's default user, `guest`, may connect from outside the container
+/// only through the mapped port of a test broker.
+///
+/// # Errors
+///
+/// Returns [`HarnessError::Container`] when Docker refuses the container or
+/// the mapped port cannot be read.
+pub async fn rabbitmq() -> Result<RabbitMq, HarnessError> {
+    let failed = |source| HarnessError::Container {
+        image: RABBITMQ.repository,
+        source,
+    };
+    let container = RABBITMQ
+        .image()
+        .with_wait_for(WaitFor::message_on_stdout("Server startup complete"))
+        .with_exposed_port(AMQP_PORT.tcp())
+        .start()
+        .await
+        .map_err(failed)?;
+    let host = container.get_host().await.map_err(failed)?;
+    let port = container
+        .get_host_port_ipv4(AMQP_PORT.tcp())
+        .await
+        .map_err(failed)?;
+    Ok(RabbitMq {
+        url: format!("amqp://guest:guest@{host}:{port}/%2f"),
+        container,
+    })
 }
