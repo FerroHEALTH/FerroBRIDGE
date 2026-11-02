@@ -11,6 +11,7 @@ mod environment;
 mod etl;
 mod events;
 mod facade;
+mod fhir_outbound;
 mod file;
 mod hl7v2;
 mod oauth;

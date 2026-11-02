@@ -313,9 +313,11 @@ before a real cut.
    'test(/journeys::(screenshots|states)::/)' --test-threads 1`.
    `SOURCE_DATE_EPOCH` fixes the build instant the About page draws, so a
    second capture of the same commit writes the same bytes. The capture
-   writes the version it ran at to `website/book/src/operate/img/console/captured-version.txt`, and
-   the screenshot guard of the ordinary suite fails until that names the
-   workspace version. Read every image before the bump merges.
+   writes the version it ran at to `website/book/src/operate/img/console/captured-version.txt`.
+   The screenshot guard stands down in the capture run, which rewrites the
+   files it reads, and holds them in every other run: the ordinary suite fails
+   until the file names the workspace version and every shot has its images.
+   Read every image before the bump merges.
 6. **The changelog names the release.** Run
    `scripts/release/changelog.sh --assemble X.Y.Z YYYY-MM-DD` on the release
    branch: it writes `## [X.Y.Z] - YYYY-MM-DD` under the empty `[Unreleased]`

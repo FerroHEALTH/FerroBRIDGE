@@ -664,15 +664,7 @@ async fn render_entry(
         program.program(),
         program.index(),
         &entry.isolate(composition),
-        render::Origin {
-            id: &id,
-            version,
-            source: &source,
-            subject: subject.as_ref(),
-            store: facade.store(),
-            usage: facade.usage(),
-            demographics: facade.demographics(),
-        },
+        render::Origin::of(facade, &id, version, &source, subject.as_ref()),
         plan.session,
     )
     .await?;

@@ -436,10 +436,7 @@ impl Consumer for Incremental {
         let Some(ehr) = event.ehr_id.as_ref() else {
             return Ok(());
         };
-        for version in &event.versions {
-            let (COMPOSITION, Some(vo_id)) = (version.kind.as_str(), version.vo_id) else {
-                continue;
-            };
+        for vo_id in event.compositions() {
             let container = container(vo_id).map_err(failure)?;
             self.composition(&mut state, ehr, &container)
                 .await

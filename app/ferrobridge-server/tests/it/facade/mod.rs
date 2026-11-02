@@ -20,6 +20,7 @@ mod ehr_status;
 mod examples;
 mod linked;
 mod losses;
+mod outbound;
 mod party;
 mod patient_ehr;
 mod person;

@@ -235,7 +235,7 @@ async fn start_change_feed(
         let name = crate::etl::incremental::NAME;
         let following =
             follower(&feed, feed_settings, &load.reader, name, "omop_incremental").await?;
-        let consumer = crate::etl::incremental::Incremental::start(settings, client)
+        let consumer = crate::etl::incremental::Incremental::start(settings, client.clone())
             .await
             .context("starting the incremental OMOP load")?
             .with_following(following.clone());
@@ -258,7 +258,53 @@ async fn start_change_feed(
             following,
         });
     }
+    if let Some(lane) = settings.fhir_outbound.as_ref() {
+        let outbound = start_outbound(lane, state, &feed, feed_settings, client, parking).await?;
+        report = report.with_follower(change_feed::report::Follower {
+            name: crate::outbound::NAME,
+            reader: lane.reader.clone(),
+            following: outbound.following.clone(),
+        });
+        started.push(outbound);
+    }
     Ok((started, report))
+}
+
+/// Starts the outbound FHIR lane over `feed`, mapping through the facade of
+/// `state`, and warns that it delivers identifiable clinical data.
+async fn start_outbound(
+    lane: &crate::outbound::Settings,
+    state: &AppState,
+    feed: &Arc<dyn change_feed::ChangeFeed>,
+    feed_settings: &change_feed::Settings,
+    client: cdr::CdrClient,
+    parking: change_feed::follow::Parking,
+) -> anyhow::Result<StartedFeed> {
+    use anyhow::Context;
+
+    let name = crate::outbound::NAME;
+    let facade = state
+        .facade()
+        .cloned()
+        .context("the outbound FHIR lane maps through the facade, and the facade is off")?;
+    let following = follower(feed, feed_settings, &lane.reader, name, "fhir_outbound").await?;
+    let consumer = crate::outbound::Outbound::start(lane, facade, client)
+        .with_context(|| format!("opening {}", lane.emitted.display()))?
+        .with_following(following.clone());
+    tracing::warn!(
+        lane = name,
+        reader = %lane.reader,
+        endpoint = startup::host_of(lane.sink.base()).unwrap_or_default(),
+        "the outbound FHIR lane delivers identifiable clinical data to this endpoint"
+    );
+    Ok(StartedFeed {
+        feed: Arc::clone(feed),
+        reader: lane.reader.clone(),
+        consumer: Arc::new(consumer),
+        polling: feed_settings.polling,
+        parking,
+        following,
+    })
 }
 
 /// Checks the reader `reader` of the consumer `name`, configured under

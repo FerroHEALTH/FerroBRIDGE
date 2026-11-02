@@ -19,6 +19,7 @@ mod change_feed;
 mod credentials;
 pub mod error;
 mod events;
+mod fhir_outbound;
 mod omop_incremental;
 mod resolve;
 pub mod section;
@@ -54,6 +55,7 @@ use section::audit::Audit;
 use section::change_feed::ChangeFeed;
 use section::events::Events;
 use section::facade::Facade;
+use section::fhir_outbound::FhirOutbound;
 use section::omop_incremental::OmopIncremental;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
@@ -125,6 +127,8 @@ pub struct Config {
     pub events: Events,
     /// The incremental OMOP load, off until its section turns it on.
     pub omop_incremental: OmopIncremental,
+    /// The outbound FHIR lane, off until its section turns it on.
+    pub fhir_outbound: FhirOutbound,
     /// The installation report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
     /// The operator API, off until its section turns it on.
@@ -278,7 +282,9 @@ impl Config {
                 Some(change_feed::resolve_change_feed(
                     &self.change_feed,
                     self.cdr.is_some(),
-                    usize::from(self.events.enabled) + usize::from(self.omop_incremental.enabled),
+                    usize::from(self.events.enabled)
+                        + usize::from(self.omop_incremental.enabled)
+                        + usize::from(self.fhir_outbound.enabled),
                 )?)
             } else {
                 None
@@ -292,6 +298,7 @@ impl Config {
                 None
             },
             omop_incremental: omop_incremental::resolve(self)?,
+            fhir_outbound: fhir_outbound::resolve(self)?,
             hl7v2: if self.hl7v2.enabled {
                 Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
             } else {
@@ -415,6 +422,8 @@ pub struct Settings {
     pub events: Option<crate::events::Settings>,
     /// The incremental OMOP load, when it is on.
     pub omop_incremental: Option<crate::etl::incremental::Settings>,
+    /// The outbound FHIR lane, when it is on.
+    pub fhir_outbound: Option<crate::outbound::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.
