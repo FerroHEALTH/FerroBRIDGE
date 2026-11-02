@@ -53,7 +53,12 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("DV_IDENTIFIER", &["Identifier"]),
     ("DV_PROPORTION", &["Quantity"]),
     ("DV_QUANTITY", &["Quantity", "decimal", "integer"]),
-    ("DV_COUNT", &["integer", "Quantity", "Count"]),
+    // NOTE: R4 datatypes.html#unsignedInt and #positiveInt are integers from 0 and from 1, and
+    // DV_COUNT.adoc names only integer; no specification governs the pairing: our own design.
+    (
+        "DV_COUNT",
+        &["integer", "unsignedInt", "positiveInt", "Quantity", "Count"],
+    ),
     ("DV_ORDINAL", &["CodeableConcept"]),
     ("DV_TIME", &["time"]),
     ("DV_DURATION", &["Duration"]),
