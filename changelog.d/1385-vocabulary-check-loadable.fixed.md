@@ -1,1 +1,0 @@
-- `ferrobridge mapping check --vocabulary` checks the literal concept ids of every OMOCL file that loads when another file of the set is refused, so one refused file no longer leaves the vocabulary pass empty.

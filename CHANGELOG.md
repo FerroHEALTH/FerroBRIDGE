@@ -25,6 +25,154 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.15] - 2026-11-02
+
+The change-feed release. `[change_feed]` is the adapter the new consumers
+follow, with two sources: `aql`, a vendor-neutral poll of ITS-REST 1.1.0
+`/query/aql` that works against any CDR, and `ferroehr`, FerroEHR's outbox
+cursor feed. `[events]` publishes every commit event to an AMQP 0.9.1 broker
+with publisher confirms. It takes over from the RabbitMQ publisher FerroEHR
+removed in 5.6.0 and keeps its routing keys
+(`<kind>.<change_type>.<template_id>`) and its message body identical, so a
+queue bound to them keeps matching. A FerroEHR 5.6.0 deployment that needs
+RabbitMQ events runs this release beside it. Several consumers follow the
+feed, each under its own reader name, and a poisoned event is parked in a
+dead-letter store and replayed through
+`POST /operator/events/{consumer}/parked/{id}/replay`. The operator console
+gains an Events page over the consumers, their parked events and the AMQP
+topology. `[omop_incremental]` keeps the CDM database current between batch
+runs through the per-composition step `etl run` uses. The run report's JSON
+is pinned over the laboratory round trip, which closes the run report and
+the Rust port of the Data Quality Dashboard checks. `mapping check
+--vocabulary` checks every OMOCL file that loads when another file of the
+set is refused (#1385). The architecture records the access-record
+decision of #1301: the FHIR facade is to write the EHDS Annex II 3.2 access
+record and an IHE BALP `AuditEvent` of every access an authenticated caller
+makes, and to refuse the access when the record cannot be taken, which #1377
+builds. The operator console moves to FerroUI 0.6.2 and draws every page on
+its server, with no WebAssembly.
+
+Two changes break an existing deployment. The console's `[server]
+site_root` key is gone, and a configuration that still sets it is refused
+at load: remove the line. The release no longer publishes the console's
+site bundle (`ferrobridge-console-<tag>-site.tar.gz` and its attestations).
+
+The library crates publish at `fhirconnect` 0.1.207, `ferrobridge-hl7v2`
+0.1.165 and `eehrxf` 0.1.132, and `fhir-types` 0.1.128,
+`ferrobridge-fhirpath` 0.1.128, `hl7v2-types` 0.1.127, `ferrobridge-term`
+0.1.141, `ferrobridge-validator` 0.1.141 and `openehr-mapping-core` 0.1.135
+stay where they are. A crate version an entry below names is the step at
+which that change came in.
+
+### Added
+
+- `[change_feed]` (off by default) is the change-feed adapter the consumers
+  follow, with two sources: `aql`, which polls ITS-REST 1.1.0 `/query/aql`
+  over composition versions by commit instant past a watermark kept in a
+  `redb` file and works against any CDR, and `ferroehr`, the reference CDR's
+  outbox cursor feed. Each consumer reads under its own reader name, moves
+  its watermark only over the events it finished, and reports `degraded`
+  without blocking readiness while it cannot follow. The book's change feed
+  page states the limits of the AQL source (#117).
+- `[server] idle_timeout_ms` (default `120000`) closes a kept-alive HTTP/1.1
+  connection that sends no next request within that time, with a clean end
+  of stream, from `ferrohealth-server` 0.4.0 (#1348).
+- `[events]` (off by default) publishes every commit event the change feed
+  reads to an AMQP 0.9.1 broker (RabbitMQ) with publisher confirms, one
+  persistent message per changed version under the routing keys the
+  reference CDR used (`<kind>.<change_type>.<template_id>`), and moves the
+  feed's watermark only after the broker confirmed an event whole. The
+  exchange and the bound queues come from the configuration, the broker URL
+  has a `url_file` route, an unreachable broker turns the `events` indicator
+  degraded without blocking readiness, and the usage report counts
+  `events_published`. The book's events lane page carries the migration from
+  FerroEHR's own publisher (#1367).
+- The operator console has an Events page (`/events`): each change-feed
+  consumer's source, reader and position, its health, the messages it
+  published since start and its last failure with the cause, then the AMQP
+  exchange, the routing-key grammar and the bound queues, read-only from the
+  bridge's new `GET /operator/events`. A bridge with no events lane says so
+  in one line (#1370).
+- Every change-feed consumer follows the one `[change_feed]` source on its
+  own task under its own reader name, with its own health indicator. A
+  poisoned event is retried up to `[change_feed] max_attempts` passes (5 by
+  default) and then parked with its cause in the dead-letter store
+  `[change_feed] dead_letters` names, which is required; a transient failure
+  never counts towards parking. `GET /operator/events` lists every consumer
+  with its parked events, `POST /operator/events/{consumer}/parked/{id}/replay`
+  offers one again before the consumer's next page, and the console's Events
+  page lists them with a Replay button. The `dead-letters-unavailable`
+  problem type answers a store that refuses (#1372).
+- `[omop_incremental]` (off by default) is a change-feed consumer that keeps
+  the CDM database current between batch runs: for each composition an event
+  names it reads the latest version over ITS-REST and commits it through the
+  per-composition step `etl run` uses, removes the rows of a composition the
+  CDR reports deleted or an erasure names, reads the visits and rebuilds the
+  derived tables once per pass, and reports degraded as `omop-incremental`.
+  A batch run after an incremental run writes the same rows (#1373).
+
+### Changed
+
+- **`jsonschema` 0.60.0.** The FHIRconnect and OMOCL mapping schemas are
+  checked with `jsonschema` 0.60.0, which runs an unfinished regex match once
+  per validation and keeps the error evaluation path linear in the `$ref`
+  depth; what a mapping file passes or fails is unchanged. `fhirconnect`
+  0.1.207, `ferrobridge-hl7v2` 0.1.165 and `eehrxf` 0.1.132 follow their
+  requirements (#1347).
+- The `OperationOutcome` a FHIR route answers when its handler fails names
+  the request id the response echoes in `X-Request-Id`, and the server's own
+  id beside it when the client sent its own, so the client finds the id it
+  sent and the operator the one the log names. It used to name the server's
+  id alone (#1348).
+- FerroBRIDGE runs on `ferrohealth-server` 0.4.1, which keeps a product's
+  own fallback and the layers around it when the stack merges its routes
+  (FerroHEALTH/FerroSYS#199). FerroBRIDGE was not exposed to the regression
+  0.4.1 fixes: no release ran on an affected version, and the facade guard
+  and the operator API guard only the routes they serve, so an anonymous
+  request to a path no route matches answers `404` with no challenge before
+  and after, while a route under `/fhir` answers `401` (#1353).
+- The operator console moves to FerroUI 0.6.0 and draws every page on its
+  server: a link, a search, a tab or an action loads one complete page, and
+  FerroUI's small script modules add the editor's highlighting, the search's
+  suggestions, the menus and the dialogs on top, so every page and every
+  action works with them refused. The console carries no WebAssembly, its
+  Content-Security-Policy is `script-src 'self'; style-src 'self'` with no
+  nonce, and its stylesheet, theme and modules are served by the binary
+  under `/ferrohealth-ui/0.6.0/`. Reload the set, the editor and the
+  playground post to their own page, which draws the bridge's answer beside
+  what you entered (#1355).
+- The operator console moves to FerroUI 0.6.2 and `ferrohealth-server`
+  0.4.2. A select in a dense options row and a long identifier or link in
+  a stacked table no longer scroll the page sideways at 320 px, and the
+  mapping editor keeps its typing speed as a JSON or XML document grows.
+  The console's Content-Security-Policy is unchanged
+  (`script-src 'self'; style-src 'self'`, no nonce) and now comes from the
+  family's server-rendered console headers, and FerroUI's script modules
+  are served under `/ferrohealth-ui/0.6.2/` (#1361).
+
+### Removed
+
+- The operator console's `[server] site_root` key
+  (`FERROBRIDGE_CONSOLE__SERVER__SITE_ROOT`) is gone, and the console image
+  carries no `/site` directory: the binary serves everything the pages load.
+  A configuration that still sets the key is refused at load, naming it;
+  remove the line (#1355).
+- The release no longer publishes the console's site bundle
+  (`ferrobridge-console-<tag>-site.tar.gz` and its attestations) (#1355).
+
+### Fixed
+
+- The operator console's server no longer panics on a disposed router value
+  while it draws a page, which could fail a page with a `500`: the console
+  draws every page in one pass with no router left to dispose (#1355) (#1331).
+- On a kept-alive HTTP/1.1 connection, `[server] header_read_timeout_ms`
+  counts from the first byte of each request head. It used to count from the
+  end of the previous answer, so it also closed an idle connection after
+  30 s, sometimes as a client sent its next request into it (#1348).
+- `ferrobridge mapping check --vocabulary` checks the literal concept ids of
+  every OMOCL file that loads when another file of the set is refused, so one
+  refused file no longer leaves the vocabulary pass empty (#1385).
+
 ## [0.0.14] - 2026-10-29
 
 The EU profile release. FHIRconnect contexts round-trip the HL7 Europe Base
@@ -5366,7 +5514,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.14...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.15...HEAD
+[0.0.15]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.11...v0.0.12

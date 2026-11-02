@@ -29,16 +29,15 @@ has every change of every release.
 | [v0.0.12](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.12) | 2026-10-25 | FHIRconnect and facade outcomes: a write shows the client the losses its mapping declared, a transaction names why it refuses a linked resource, the operations answer `502` on a failed terminology server, a `DV_TEXT` display looked up through `$lookup`, a direct data-type pair over the text fallback, the `DV_ORDINAL` options of a template node, and the XML narrative `div` held to XHTML. The terminology client gains `$expand`, `$subsumes`, the `date` input, mutual TLS and context-aware `$validate-code`. |
 | [v0.0.13](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.13) | 2026-10-25 | Security and OMOP breadth: the authenticated caller stated as the committer of every facade write, and token introspection. FHIR R4 into the CDM with no CDR through `etl fhir`, every row naming its resource, the Athena vocabulary loader, the OMOCL `DEATH`, provider and visit detail targets, pseudonymised identifiers with a per-person date shift, and the Data Quality Dashboard's conformance, completeness and temporal plausibility checks in Rust behind `dq check`. FHIRconnect `DV_ORDINAL` and `ACTION.time`, and the first HL7 Europe profile contexts. |
 | [v0.0.14](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.14) | 2026-10-29 | The EU profile targets: round trips of the HL7 Europe Base and Core `medicalTestResult-eu-core`, the Laboratory Report `Composition-eu-lab` and the Medication Prescription and Dispense profiles, and `Composition/$document` on the facade. The `eehrxf` interoperability component taken in from FerroFED and checked with HL7's FHIR Validator. The server and the console on the FerroSYS crates, with `config check`, `healthcheck` and `GET /operator/readiness`. One deterministic resource id on the facade and `$tofhir`, and RFC 9457 problem details read from the CDR and answered outside the FHIR routes. |
+| [v0.0.15](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.15) | 2026-11-02 | The change feed: the change-feed adapter over a vendor-neutral AQL source for any CDR and FerroEHR's outbox cursor feed, AMQP broker publishing that takes over from FerroEHR 5.6.0's removed publisher with the same routing keys, several consumers with a dead-letter store and replay, the console's Events page, and the incremental OMOP load. The run report and the Data Quality Dashboard checks closed, and the facade's access-record decision recorded in the architecture. |
 
 ## Next
 
-The milestones after v0.0.14, each one theme:
+The milestones after v0.0.15, each one theme:
 
-1. **v0.0.15, the change feed.** The change-feed adapter driving the
-   incremental OMOP load and an outbound FHIR lane.
-2. **v0.0.16, console breadth.** Mapping-set revisions with history and
+1. **v0.0.16, console breadth.** Mapping-set revisions with history and
    rollback, and more of the console.
-3. **v0.0.17, the interoperability component.** The openEHR mappings of the
+2. **v0.0.17, the interoperability component.** The openEHR mappings of the
    medication, laboratory, discharge and imaging categories, and the
    documents received in each.
 
