@@ -37,9 +37,20 @@ pub enum Failure {
     Poisoned,
 }
 
+impl Failure {
+    /// Returns the failure as one word of a sentence.
+    #[must_use]
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Transient => "transient",
+            Self::Poisoned => "poisoned",
+        }
+    }
+}
+
 /// Why a consumer did not finish one event.
 #[derive(Debug, thiserror::Error)]
-#[error("the consumer did not finish the event ({failure:?})")]
+#[error("the consumer met a {} failure", failure.word())]
 pub struct ConsumerError {
     /// Whether offering the event again may succeed.
     failure: Failure,
@@ -148,7 +159,7 @@ pub enum PassError {
     #[error("the change feed refused the pass")]
     Feed(#[from] FeedError),
     /// The consumer did not finish an event.
-    #[error("the consumer did not finish the event at {position}")]
+    #[error("the event at {position} was not finished")]
     Consumer {
         /// The event's position.
         position: Position,

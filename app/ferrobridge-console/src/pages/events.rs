@@ -263,7 +263,7 @@ fn failures(l: &Locale, consumers: &[Consumer]) -> Html {
             definitions(vec![
                 (tr(l, Msg::ColConsumer), t(&consumer.name)),
                 (tr(l, Msg::FactFailedAt), code(&failure.at)),
-                (tr(l, Msg::FactCause), code(&failure.cause)),
+                (tr(l, Msg::FactCause), t(&failure.cause)),
             ])
         })
         .collect()
