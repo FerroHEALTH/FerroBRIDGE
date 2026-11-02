@@ -30,8 +30,10 @@
 #   system-documents.sh attach <tag> <out-dir>  write the two attached copies
 #   system-documents.sh notes-section           the release notes section
 #   system-documents.sh check-notes <file>      refuse notes without it
+#   system-documents.sh fresh                   refuse a pin behind the book
 #   system-documents.sh --self-test             prove the readers offline
-# <page> is information-sheet or instructions-for-use. EHDS_PAGES_DIR names a
+# <page> is information-sheet or instructions-for-use. `fresh` reads the four
+# pages at the head of the book's default branch. EHDS_PAGES_DIR names a
 # directory to read the pages from in place of the network, for a test.
 set -euo pipefail
 # shellcheck source=scripts/lib/guard-args.sh
@@ -44,7 +46,7 @@ STANDARDS="docs/ehds/standards.tsv"
 VERSIONS="docs/VERSIONS.md"
 CHANGELOG="CHANGELOG.md"
 readonly FAMILY="https://ferrohealth.eu/docs"
-readonly GRAMMAR="pin <KEY> | fetch <page> <file> | facts <tag> <page> | attach <tag> <out-dir> | notes-section | check-notes <file> | --self-test"
+readonly GRAMMAR="pin <KEY> | fetch <page> <file> | facts <tag> <page> | attach <tag> <out-dir> | notes-section | check-notes <file> | fresh | --self-test"
 readonly TAG_RE='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
 
 die() {
@@ -87,6 +89,47 @@ fetch() {
   [[ "$got" == "$want" ]] ||
     die "ehds/$page.md at FerroHEALTH $commit is revised ${got:-<no Revised line>}, and $PIN pins $want"
   grep -qx '## This copy' "$file" || die "ehds/$page.md at FerroHEALTH $commit has no '## This copy' heading"
+}
+
+# fresh: refuse a pin behind the book. Each of the four pages is read at the
+# head of the FerroHEALTH default branch, or from EHDS_PAGES_DIR, and a page
+# revised after its pinned date fails the check, naming both dates, unless
+# the pin file states why the release keeps the older revision
+# (KEPT_BECAUSE).
+fresh() {
+  local page key want got file kept stale=0
+  file="$(mktemp)"
+  kept="$(sed -n 's/^KEPT_BECAUSE=//p' "$PIN" | sed -n 1p)"
+  for page in information-sheet instructions-for-use readiness technical-documentation; do
+    key="$(printf '%s_REVISED' "$page" | tr 'a-z-' 'A-Z_')"
+    want="$(pin "$key")"
+    if [[ -n "${EHDS_PAGES_DIR:-}" ]]; then
+      cp "$EHDS_PAGES_DIR/$page.md" "$file"
+    else
+      curl --proto =https --fail --silent --show-error --location \
+        "https://raw.githubusercontent.com/FerroHEALTH/FerroHEALTH/HEAD/website/book/src/ehds/$page.md" \
+        -o "$file" || {
+        rm -f "$file"
+        die "ehds/$page.md could not be fetched at the head of FerroHEALTH"
+      }
+    fi
+    got="$(sed -n '3s/^Revised \([0-9-]*\)\.$/\1/p' "$file")"
+    [[ -n "$got" ]] || {
+      rm -f "$file"
+      die "ehds/$page.md at the head of FerroHEALTH has no Revised line"
+    }
+    if [[ "$got" > "$want" ]]; then
+      echo "system-documents: ehds/$page.md is revised $got at the head of FerroHEALTH, and $PIN pins $want" >&2
+      stale=$((stale + 1))
+    fi
+  done
+  rm -f "$file"
+  if [[ "$stale" -gt 0 ]]; then
+    [[ -n "$kept" ]] || die "$stale page(s) are revised after the pin: move FERROHEALTH_COMMIT and the dates together, or set KEPT_BECAUSE in $PIN"
+    echo "system-documents: $PIN keeps the older revision: $kept"
+    return 0
+  fi
+  echo "system-documents: $PIN names the newest revision of every page"
 }
 
 # cell ITEM: the Pin cell of the docs/VERSIONS.md row whose first cell is
@@ -310,6 +353,18 @@ self_test() {
   expect "a page at another revision" "$(EHDS_PAGES_DIR="$tmp/other" refused fetch information-sheet "$tmp/f.md")" refused
   printf '# A\n\nRevised %s.\n' "$revised_sheet" >"$tmp/other/information-sheet.md"
   expect "a page without 'This copy'" "$(EHDS_PAGES_DIR="$tmp/other" refused fetch information-sheet "$tmp/f.md")" refused
+  # The freshness: the pinned revisions pass, a page revised later is
+  # refused, and a pin that states why it keeps the older revision passes.
+  mkdir -p "$tmp/head"
+  for page in information-sheet instructions-for-use readiness technical-documentation; do
+    printf '# P\n\nRevised %s.\n' "$(pin "$(printf '%s_REVISED' "$page" | tr 'a-z-' 'A-Z_')")" >"$tmp/head/$page.md"
+  done
+  expect "a pin at the newest revisions" "$(EHDS_PAGES_DIR="$tmp/head" refused fresh)" accepted
+  printf '# P\n\nRevised 2999-01-01.\n' >"$tmp/head/readiness.md"
+  expect "a page revised after the pin" "$(EHDS_PAGES_DIR="$tmp/head" refused fresh)" refused
+  cp "$PIN" "$tmp/pin.env"
+  printf 'KEPT_BECAUSE=the readiness revision lands after this release\n' >>"$tmp/pin.env"
+  expect "a pin that keeps the older revision" "$(PIN="$tmp/pin.env" EHDS_PAGES_DIR="$tmp/head" refused fresh)" accepted
   # The copies, for the newest dated changelog heading as the tag.
   tag="v$(grep -m 1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\] - [0-9-]+$' "$CHANGELOG" | sed -E 's/^## \[([^]]+)\].*/\1/')"
   EHDS_PAGES_DIR="$tmp/pages" attach "$tag" "$tmp/out" >/dev/null
@@ -339,7 +394,7 @@ self_test() {
     echo "system-documents: self-test FAILED ($fails case(s))" >&2
     exit 1
   fi
-  echo "system-documents: self-test OK (the pins read, a pinned page fetched, another revision and a page without 'This copy' refused, the copies stamped with absolute links and the facts, the notes section checked)."
+  echo "system-documents: self-test OK (the pins read, a pinned page fetched, another revision and a page without 'This copy' refused, the copies stamped with absolute links and the facts, the notes section checked, a pin behind the book refused unless it says why)."
 }
 
 # A relative path argument is the caller's, so it is resolved against the
@@ -373,6 +428,11 @@ case "${1:-}" in
   check-notes)
     [[ "$#" -eq 2 ]] || guard_usage "$GRAMMAR"
     check_notes "$(absolute "$2")"
+    ;;
+  fresh)
+    shift
+    guard_no_args "$@"
+    fresh
     ;;
   --self-test)
     shift
