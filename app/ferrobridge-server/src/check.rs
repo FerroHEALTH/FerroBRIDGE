@@ -419,8 +419,10 @@ fn read_error(crate::walk::Error { path, source }: crate::walk::Error) -> Error 
 /// Checks every literal concept id the OMOCL files `files` write against the
 /// vocabulary `resolver` reads, and returns a diagnostic per disagreement.
 ///
-/// A file set that does not load yields no diagnostic here: its load
-/// diagnostics are [`check_files`]'s. The rule is
+/// A file a load diagnostic names is left out and the rest is loaded again,
+/// until the set loads or no file is left, so one refused file never hides
+/// the literals of the others; the load diagnostics are [`check_files`]'s.
+/// The rule is
 /// [`omocl::model::semantic::check_concept_domains`]'s: a literal must be a
 /// concept of the vocabulary and, where the CDM field definitions name a
 /// domain for its column, a concept of that domain.
@@ -433,11 +435,7 @@ pub async fn concept_domains(
     files: &[PathBuf],
     resolver: &omop_cdm::vocabulary::ConceptResolver,
 ) -> Result<Vec<Diagnostic>, omop_cdm::vocabulary::LookupError> {
-    // NOTE: no specification governs this: our own design; a set that does not load is
-    // reported by `check_files`, so the vocabulary pass has nothing of it to check.
-    let Ok(set) =
-        omocl::model::load::load_set(files, &omocl::model::semantic::FirstPartyConverters)
-    else {
+    let Some(set) = loadable_set(files) else {
         return Ok(Vec::new());
     };
     let literals: Vec<i32> = omocl::model::semantic::concept_literals(&set)
@@ -453,4 +451,30 @@ pub async fn concept_domains(
     Ok(omocl::model::semantic::check_concept_domains(
         &set, &domain_of,
     ))
+}
+
+/// Loads the part of `files` that loads: each pass leaves out every file a
+/// load diagnostic names, and `None` means no file is left.
+fn loadable_set(files: &[PathBuf]) -> Option<omocl::model::load::MappingSet> {
+    // NOTE: no specification governs this: our own design; the refused files are
+    // reported by `check_files`, and the vocabulary pass checks every other file.
+    let mut remaining = files.to_vec();
+    while !remaining.is_empty() {
+        match omocl::model::load::load_set(
+            &remaining,
+            &omocl::model::semantic::FirstPartyConverters,
+        ) {
+            Ok(set) => return Some(set),
+            Err(diagnostics) => {
+                let refused: std::collections::BTreeSet<&Path> =
+                    diagnostics.iter().map(Diagnostic::file).collect();
+                let before = remaining.len();
+                remaining.retain(|file| !refused.contains(file.as_path()));
+                if remaining.len() == before {
+                    return None;
+                }
+            }
+        }
+    }
+    None
 }

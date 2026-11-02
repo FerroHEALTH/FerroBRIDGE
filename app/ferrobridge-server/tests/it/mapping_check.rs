@@ -471,16 +471,7 @@ async fn the_literals_are_checked_against_the_loaded_vocabulary()
     if !ferrobridge_testkit::containers::e2e_enabled() {
         return Ok(());
     }
-    let postgres = ferrobridge_testkit::containers::postgres().await?;
-    let pool = omop_cdm::database::CdmPool::connect(
-        sqlx::postgres::PgPoolOptions::new().max_connections(1),
-        postgres.url().parse()?,
-        omop_cdm::ddl::SchemaName::new("cdm")?,
-    )
-    .await?;
-    omop_cdm::database::init(&pool).await?;
-    let download = omop_cdm::athena::Export::read(&ferrobridge_testkit::vocabulary::directory())?;
-    omop_cdm::athena::load(&pool, &download).await?;
+    let (_postgres, resolver) = synthetic_vocabulary().await?;
     let directory = tempfile::tempdir()?;
     let file = directory.path().join("Vocabulary_v1.yml");
     // 1001 is the synthetic standard Measurement concept, 1002 a Condition
@@ -494,7 +485,6 @@ async fn the_literals_are_checked_against_the_loaded_vocabulary()
             literal_record("Observation", 424_242)
         ),
     )?;
-    let resolver = omop_cdm::vocabulary::ConceptResolver::new(pool.clone());
     let diagnostics = check::concept_domains(&[file], &resolver).await?;
     let codes: Vec<String> = diagnostics
         .iter()
@@ -512,6 +502,53 @@ async fn the_literals_are_checked_against_the_loaded_vocabulary()
             .contains("condition_occurrence.condition_concept_id"),
         "{mismatch}"
     );
+    Ok(())
+}
+
+/// Starts a PostgreSQL with the CDM schema and the synthetic vocabulary
+/// loaded, and returns it with a resolver over it.
+async fn synthetic_vocabulary() -> Result<
+    (
+        ferrobridge_testkit::containers::Postgres,
+        omop_cdm::vocabulary::ConceptResolver,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+    let pool = omop_cdm::database::CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new().max_connections(1),
+        postgres.url().parse()?,
+        omop_cdm::ddl::SchemaName::new("cdm")?,
+    )
+    .await?;
+    omop_cdm::database::init(&pool).await?;
+    let download = omop_cdm::athena::Export::read(&ferrobridge_testkit::vocabulary::directory())?;
+    omop_cdm::athena::load(&pool, &download).await?;
+    Ok((postgres, omop_cdm::vocabulary::ConceptResolver::new(pool)))
+}
+
+#[tokio::test]
+async fn a_file_that_does_not_load_leaves_the_literals_of_the_others_checked()
+-> Result<(), Box<dyn std::error::Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
+    let (_postgres, resolver) = synthetic_vocabulary().await?;
+    let directory = tempfile::tempdir()?;
+    let refused = directory.path().join("Refused_v1.yml");
+    std::fs::write(&refused, "grammar: OMOCL/v1.0.0\ntype: [\n")?;
+    let file = directory.path().join("Vocabulary_v1.yml");
+    // 424242 is no concept of the synthetic vocabulary.
+    std::fs::write(
+        &file,
+        format!("{OMOCL_HEADER}{}", literal_record("Observation", 424_242)),
+    )?;
+    let diagnostics = check::concept_domains(&[refused, file], &resolver).await?;
+    let codes: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code().to_string())
+        .collect();
+    assert_eq!(vec!["omocl-unknown-concept"], codes, "{diagnostics:?}");
     Ok(())
 }
 
