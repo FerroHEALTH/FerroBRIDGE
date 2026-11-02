@@ -136,6 +136,39 @@ async fn projection(
     ))
 }
 
+/// Renders the JSON form of `report`, the run's id replaced and every
+/// identifier of `names` replaced by its name, so the snapshot holds only
+/// what the laboratory fixtures decide.
+fn report_json(report: &RunReport, names: &BTreeMap<String, String>) -> serde_json::Value {
+    fn rename(value: &mut serde_json::Value, names: &BTreeMap<String, String>) {
+        match value {
+            serde_json::Value::String(text) => {
+                for (id, name) in names {
+                    *text = text.replace(id.as_str(), name);
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for item in items {
+                    rename(item, names);
+                }
+            }
+            serde_json::Value::Object(members) => {
+                members
+                    .values_mut()
+                    .for_each(|member| rename(member, names));
+            }
+            serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {
+            }
+        }
+    }
+    let mut json = serde_json::json!(report);
+    if let Some(run_id) = json.get_mut("run_id") {
+        *run_id = serde_json::Value::String(String::from("[run_id]"));
+    }
+    rename(&mut json, names);
+    json
+}
+
 /// Returns the data of the CDM and bridge schemas as `pg_dump` writes it,
 /// each table's rows sorted and the watermark's run columns cut.
 async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
@@ -274,6 +307,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
         });
     assert_eq!(Some(&1), zero, "the unmapped analyte is counted: {first}");
     assert_quality_agrees(&postgres, &first).await?;
+    insta::assert_json_snapshot!("laboratory_run_report", report_json(&first, &names));
     assert_eq!(
         vec![vec![String::from("0")]],
         rows(

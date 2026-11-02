@@ -1,0 +1,65 @@
+---
+source: app/ferrobridge-server/tests/it/omop/round_trip.rs
+expression: "report_json(&first, &names)"
+---
+{
+  "run_id": "[run_id]",
+  "compositions": {
+    "read": 3,
+    "committed": 3,
+    "skipped": 0,
+    "refused": 0,
+    "with_visit": 3,
+    "without_visit": 0,
+    "ambiguous_visit": 0
+  },
+  "rows": {
+    "measurement": 6,
+    "specimen": 1
+  },
+  "concept_zero": 1,
+  "zero_relationship_links": 4,
+  "mappings": {
+    "Laboratory_test_analyte_v1": {
+      "rows": {
+        "measurement": 6
+      },
+      "concept_zero": {
+        "measurement.measurement_concept_id": 1
+      },
+      "unmapped_fields": 0,
+      "refusals": 0
+    },
+    "Specimen_v1": {
+      "rows": {
+        "specimen": 1
+      },
+      "concept_zero": {},
+      "unmapped_fields": 0,
+      "refusals": 0
+    }
+  },
+  "derived": {
+    "visit_occurrence": 2,
+    "visit_occurrence_removed": 0,
+    "visit_occurrence_referenced": 0,
+    "observation_period": 2,
+    "condition_era": 0,
+    "drug_era": 0
+  },
+  "persons": {
+    "total": 2,
+    "placeholders": 2
+  },
+  "deletions": {
+    "checked": 0,
+    "extant": 0,
+    "removed": [],
+    "kept": [],
+    "unknown": [],
+    "superseded": 0,
+    "rows": {}
+  },
+  "refusals": [],
+  "unmapped_fields": []
+}
