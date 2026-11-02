@@ -35,7 +35,14 @@ with publisher confirms. It takes over from the RabbitMQ publisher FerroEHR
 removed in 5.6.0 and keeps its routing keys
 (`<kind>.<change_type>.<template_id>`) and its message body identical, so a
 queue bound to them keeps matching. A FerroEHR 5.6.0 deployment that needs
-RabbitMQ events runs this release beside it. Several consumers follow the
+RabbitMQ events runs this release beside it. The FerroEHR cursor-feed source
+needs FerroEHR 5.6.0-rc10 or later, and the `wiremock` contract tests cover
+it against the feed contract posted on FerroHEALTH/FerroEHR#4786. The
+vendor-neutral AQL source works against any CDR, and its `wiremock` tests
+cover the ITS-REST 1.1.0 `/query/aql` exchange. The end-to-end lane runs
+against FerroEHR 5.5.0, which has no outbox feed: it runs the incremental
+OMOP load against that CDR with the events handed to the consumer, and runs
+neither feed source. Several consumers follow the
 feed, each under its own reader name, and a poisoned event is parked in a
 dead-letter store and replayed through
 `POST /operator/events/{consumer}/parked/{id}/replay`. The operator console
