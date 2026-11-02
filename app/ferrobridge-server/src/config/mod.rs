@@ -18,6 +18,7 @@ mod change_feed;
 mod credentials;
 pub mod error;
 mod events;
+mod omop_incremental;
 mod resolve;
 pub mod section;
 
@@ -51,6 +52,7 @@ use section::Terminology;
 use section::change_feed::ChangeFeed;
 use section::events::Events;
 use section::facade::Facade;
+use section::omop_incremental::OmopIncremental;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
 /// `[server] listen`, and `FERROBRIDGE_CONFIG` names the file.
@@ -119,6 +121,8 @@ pub struct Config {
     /// The AMQP publisher of the commit events, off until its section turns it
     /// on.
     pub events: Events,
+    /// The incremental OMOP load, off until its section turns it on.
+    pub omop_incremental: OmopIncremental,
     /// The installation report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
     /// The operator API, off until its section turns it on.
@@ -269,7 +273,7 @@ impl Config {
                 Some(change_feed::resolve_change_feed(
                     &self.change_feed,
                     self.cdr.is_some(),
-                    usize::from(self.events.enabled),
+                    usize::from(self.events.enabled) + usize::from(self.omop_incremental.enabled),
                 )?)
             } else {
                 None
@@ -282,6 +286,7 @@ impl Config {
             } else {
                 None
             },
+            omop_incremental: omop_incremental::resolve(self)?,
             hl7v2: if self.hl7v2.enabled {
                 Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
             } else {
@@ -393,6 +398,8 @@ pub struct Settings {
     pub change_feed: Option<crate::change_feed::Settings>,
     /// The AMQP publisher of the commit events, when it is on.
     pub events: Option<crate::events::Settings>,
+    /// The incremental OMOP load, when it is on.
+    pub omop_incremental: Option<crate::etl::incremental::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.

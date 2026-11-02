@@ -96,23 +96,54 @@ impl CdmWriter {
             )
             .await
             .map_err(database(Step::Read))?;
-        let mut committed = Vec::with_capacity(rows.len());
-        for row in rows {
-            let versioned: String = row.try_get(0).map_err(database(Step::Read))?;
-            let ehr: String = row.try_get(1).map_err(database(Step::Read))?;
-            let version: String = row.try_get(2).map_err(database(Step::Read))?;
-            committed.push(Committed {
-                versioned_object_uid: object_id(versioned)?,
-                ehr_id: object_id(ehr)?,
-                version_uid: ObjectVersionId::new(version.as_str()).map_err(|source| {
-                    WriteError::Version {
-                        value: version.clone(),
-                        source,
-                    }
-                })?,
-            });
-        }
-        Ok(committed)
+        rows.iter().map(committed).collect()
+    }
+
+    /// Returns the watermark of the composition `versioned_object_uid`, or
+    /// `None` when no commit names it.
+    ///
+    /// # Errors
+    ///
+    /// Returns what [`CdmWriter::watermarks_after`] returns.
+    pub async fn committed(
+        &self,
+        versioned_object_uid: &HierObjectId,
+    ) -> Result<Option<Committed>, WriteError> {
+        let row = self
+            .client
+            .query_opt(
+                &format!(
+                    "SELECT versioned_object_uid, ehr_id, version_uid FROM {}.watermark
+                     WHERE versioned_object_uid = $1",
+                    self.bridge
+                ),
+                &[&versioned_object_uid.value()],
+            )
+            .await
+            .map_err(database(Step::Read))?;
+        row.as_ref().map(committed).transpose()
+    }
+
+    /// Returns the watermark of every composition of the EHR `ehr_id`,
+    /// ordered by versioned composition.
+    ///
+    /// # Errors
+    ///
+    /// Returns what [`CdmWriter::watermarks_after`] returns.
+    pub async fn committed_in(&self, ehr_id: &HierObjectId) -> Result<Vec<Committed>, WriteError> {
+        let rows = self
+            .client
+            .query(
+                &format!(
+                    "SELECT versioned_object_uid, ehr_id, version_uid FROM {}.watermark
+                     WHERE ehr_id = $1 ORDER BY versioned_object_uid",
+                    self.bridge
+                ),
+                &[&ehr_id.value()],
+            )
+            .await
+            .map_err(database(Step::Read))?;
+        rows.iter().map(committed).collect()
     }
 
     /// Removes the rows, the links and the watermark of the composition
@@ -301,4 +332,22 @@ impl CdmWriter {
 /// Returns the `HIER_OBJECT_ID` the side table holds as `value`.
 fn object_id(value: String) -> Result<HierObjectId, WriteError> {
     HierObjectId::new(value.as_str()).map_err(|source| WriteError::ObjectId { value, source })
+}
+
+/// Returns the watermark one `versioned_object_uid, ehr_id, version_uid` row
+/// holds.
+fn committed(row: &tokio_postgres::Row) -> Result<Committed, WriteError> {
+    let versioned: String = row.try_get(0).map_err(database(Step::Read))?;
+    let ehr: String = row.try_get(1).map_err(database(Step::Read))?;
+    let version: String = row.try_get(2).map_err(database(Step::Read))?;
+    Ok(Committed {
+        versioned_object_uid: object_id(versioned)?,
+        ehr_id: object_id(ehr)?,
+        version_uid: ObjectVersionId::new(version.as_str()).map_err(|source| {
+            WriteError::Version {
+                value: version.clone(),
+                source,
+            }
+        })?,
+    })
 }

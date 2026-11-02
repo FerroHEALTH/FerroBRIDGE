@@ -411,3 +411,65 @@ async fn two_consumers_of_one_cdr_each_acknowledge_their_own_finished_prefix()
     assert_eq!(Some(&clinical(7)), first.acknowledged(clinical(7).stream()));
     Ok(())
 }
+
+/// A consumer that finishes every event and records each settle, failing
+/// it while `refuse` holds.
+#[derive(Debug, Default)]
+struct Settling {
+    /// Whether the settle fails.
+    refuse: Mutex<bool>,
+    /// How many settles ran.
+    settled: Mutex<usize>,
+}
+
+#[async_trait::async_trait]
+impl Consumer for Settling {
+    fn name(&self) -> &'static str {
+        "change-feed-settling"
+    }
+
+    async fn process(&self, _event: &Event) -> Result<(), ConsumerError> {
+        Ok(())
+    }
+
+    async fn settle(&self) -> Result<(), ConsumerError> {
+        *self.settled.lock().unwrap_or_else(PoisonError::into_inner) += 1;
+        if *self.refuse.lock().unwrap_or_else(PoisonError::into_inner) {
+            return Err(ConsumerError::transient("the synthetic derivation failed"));
+        }
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn a_pass_settles_before_it_acknowledges_and_a_failed_settle_acknowledges_nothing()
+-> Result<(), Box<dyn Error>> {
+    let outbox = Outbox::new(&[1, 2]);
+    let consumer = Settling {
+        refuse: Mutex::new(true),
+        ..Settling::default()
+    };
+    let mut cursor = Cursor::default();
+    let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await;
+    assert!(
+        matches!(failed, Err(PassError::Settle { .. })),
+        "{failed:?}"
+    );
+    assert_eq!(None, outbox.cursor(&reader()), "nothing was acknowledged");
+    *consumer
+        .refuse
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner) = false;
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    assert_eq!(Some(2), outbox.cursor(&reader()));
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    assert_eq!(
+        2,
+        *consumer
+            .settled
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner),
+        "an empty page settles nothing"
+    );
+    Ok(())
+}

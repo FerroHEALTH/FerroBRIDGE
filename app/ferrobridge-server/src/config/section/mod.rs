@@ -15,6 +15,7 @@ use ferrohealth_secret::secret::Secret;
 pub mod change_feed;
 pub mod events;
 pub mod facade;
+pub mod omop_incremental;
 
 /// The mapping set this deployment runs.
 ///

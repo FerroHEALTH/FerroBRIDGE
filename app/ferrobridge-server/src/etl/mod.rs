@@ -24,6 +24,7 @@
 pub mod aql;
 pub mod deletions;
 pub mod fhir;
+pub mod incremental;
 pub mod job;
 pub mod ledger;
 pub mod mapper;
@@ -248,7 +249,7 @@ fn source(query: &CheckedQuery, row: &[serde_json::Value]) -> Result<Source, Ref
 }
 
 /// The templates one run has read from the CDR, by identifier.
-type Templates = BTreeMap<String, Arc<WebTemplateIndex>>;
+pub(crate) type Templates = BTreeMap<String, Arc<WebTemplateIndex>>;
 
 /// Returns the index of the template `composition` names, reading it from
 /// the CDR on first use.
@@ -378,31 +379,24 @@ pub async fn run<M: Mapper>(
             report.compositions.skipped = report.compositions.skipped.saturating_add(1);
             continue;
         }
-        let read = Read {
-            query,
-            row: &row,
-            source: &source,
-            context,
-            windows,
-        };
-        let (graph, tie) = match composition(cdr, &mut templates, &read, mapper).await? {
-            Ok(outcome) => outcome,
+        let value = match cell(query, &row, "composition") {
+            Ok(value) => value.clone(),
             Err(refusal) => {
                 report.composition_refused(Some(&source), &refusal);
                 continue;
             }
         };
-        match writer.commit(&graph, run_id).await {
-            Ok(written) => {
-                report.committed(&source, &written);
-                report.tied(tie.as_ref());
-            }
-            Err(error) if writer.is_closed() => return Err(RunError::Database(error)),
-            Err(error) => {
-                report.engine_outcomes(Some(&source), graph.report());
-                report.composition_refused(Some(&source), &Refusal::new(crate::chain(&error)));
-            }
-        }
+        let read = Read {
+            source: &source,
+            context,
+            windows,
+        };
+        let step = Step {
+            cdr,
+            mapper,
+            run_id,
+        };
+        commit_one(&step, &mut templates, &read, value, writer, &mut report).await?;
     }
 
     let sweep = Sweep {
@@ -419,16 +413,17 @@ pub async fn run<M: Mapper>(
 }
 
 /// The visits a run derived.
-struct Visited {
+#[derive(Debug)]
+pub(crate) struct Visited {
     /// Their windows, for tying compositions.
-    windows: Windows,
+    pub(crate) windows: Windows,
     /// The key of every visit the visit query answered, or nothing when it
     /// refused a row, since a refused row may belong to a visit it answered.
-    answered: Option<Vec<VisitKey>>,
+    pub(crate) answered: Option<Vec<VisitKey>>,
 }
 
 /// Reads the visit query, when configured, and writes the visits it derives.
-async fn read_visits(
+pub(crate) async fn read_visits(
     settings: &EtlSettings,
     cdr: &CdrClient,
     writer: &mut CdmWriter,
@@ -501,38 +496,82 @@ pub(crate) async fn derive(
     Ok(())
 }
 
-/// One composition row and what the run knows when it maps it.
-struct Read<'r> {
-    /// The checked composition query, which `etl run` needs and `etl fhir`
-    /// does not read.
-    query: &'r CheckedQuery,
-    /// The row.
-    row: &'r [serde_json::Value],
-    /// The composition version the row names.
-    source: &'r Source,
+/// One composition version and what the run knows when it maps it.
+pub(crate) struct Read<'r> {
+    /// The composition version.
+    pub(crate) source: &'r Source,
     /// The configured context.
-    context: MappingContext,
+    pub(crate) context: MappingContext,
     /// The derived visits, when the run derives them.
-    windows: Option<&'r Windows>,
+    pub(crate) windows: Option<&'r Windows>,
 }
 
-/// Reads, validates and maps the composition of one row, tied to its visit
+/// What one commit reads through and writes under.
+pub(crate) struct Step<'s, M> {
+    /// The CDR the templates come from.
+    pub(crate) cdr: &'s CdrClient,
+    /// The mapper.
+    pub(crate) mapper: &'s M,
+    /// The run the watermark names.
+    pub(crate) run_id: &'s RunId,
+}
+
+/// Validates, maps and commits the canonical composition `value` of the
+/// version `read` names, recording the outcome in `report`; answers the
+/// refusal of a composition the mapper or the writer refused.
+///
+/// The batch run and the incremental load (`crate::etl::incremental`) commit
+/// each composition through this one step.
+///
+/// # Errors
+///
+/// Returns [`RunError::Template`] when the CDR does not answer a template
+/// fetch and [`RunError::Database`] when the writer's connection closed.
+pub(crate) async fn commit_one<M: Mapper>(
+    step: &Step<'_, M>,
+    templates: &mut Templates,
+    read: &Read<'_>,
+    value: serde_json::Value,
+    writer: &mut CdmWriter,
+    report: &mut RunReport,
+) -> Result<Option<Refusal>, RunError> {
+    let (graph, tie) = match composition(step.cdr, templates, read, value, step.mapper).await? {
+        Ok(outcome) => outcome,
+        Err(refusal) => {
+            report.composition_refused(Some(read.source), &refusal);
+            return Ok(Some(refusal));
+        }
+    };
+    match writer.commit(&graph, step.run_id).await {
+        Ok(written) => {
+            report.committed(read.source, &written);
+            report.tied(tie.as_ref());
+            Ok(None)
+        }
+        Err(error) if writer.is_closed() => Err(RunError::Database(error)),
+        Err(error) => {
+            let refusal = Refusal::new(crate::chain(&error));
+            report.engine_outcomes(Some(read.source), graph.report());
+            report.composition_refused(Some(read.source), &refusal);
+            Ok(Some(refusal))
+        }
+    }
+}
+
+/// Validates and maps the canonical composition `value`, tied to its visit
 /// when the run derives visits.
 async fn composition<M: Mapper>(
     cdr: &CdrClient,
     templates: &mut Templates,
     read: &Read<'_>,
+    value: serde_json::Value,
     mapper: &M,
 ) -> Result<Result<(RecordGraph, Option<Tie>), Refusal>, RunError> {
-    let value = match cell(read.query, read.row, "composition") {
-        Ok(value) if value.is_object() => value.clone(),
-        Ok(_) => {
-            return Ok(Err(Refusal::new(
-                "the composition row's `composition` is no canonical JSON object",
-            )));
-        }
-        Err(refusal) => return Ok(Err(refusal)),
-    };
+    if !value.is_object() {
+        return Ok(Err(Refusal::new(
+            "the composition row's `composition` is no canonical JSON object",
+        )));
+    }
     let index = match template_of(cdr, templates, &value).await? {
         Ok(index) => index,
         Err(refusal) => return Ok(Err(refusal)),

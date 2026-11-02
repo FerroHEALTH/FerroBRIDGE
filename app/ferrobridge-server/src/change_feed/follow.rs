@@ -101,6 +101,16 @@ pub trait Consumer: std::fmt::Debug + Send + Sync {
     /// # Errors
     /// Returns [`ConsumerError`] when the event is not finished.
     async fn process(&self, event: &Event) -> Result<(), ConsumerError>;
+
+    /// Finishes the work a pass shares across its events, once the pass
+    /// offered its page and before it acknowledges any of it.
+    ///
+    /// # Errors
+    /// Returns [`ConsumerError`] when the shared work did not finish; the
+    /// pass then acknowledges nothing, so its events are offered again.
+    async fn settle(&self) -> Result<(), ConsumerError> {
+        Ok(())
+    }
 }
 
 /// How a follower paces its reads.
@@ -198,6 +208,14 @@ pub enum PassError {
         #[source]
         source: ConsumerError,
     },
+    /// The consumer did not finish the work its events share, so nothing of
+    /// the page was acknowledged.
+    #[error("the consumer did not settle the pass")]
+    Settle {
+        /// Why.
+        #[source]
+        source: ConsumerError,
+    },
     /// A replayed parked event met a transient failure; it stays parked
     /// with its replay requested.
     #[error("the replay of parked event {id} was not finished")]
@@ -249,9 +267,10 @@ pub async fn pass(
     page_size: PageSize,
     cursor: &mut Cursor,
 ) -> Result<Pass, PassError> {
-    if let Some(parking) = cursor.parking.clone() {
-        replay(&parking.store, reader, consumer).await?;
-    }
+    let replayed = match cursor.parking.clone() {
+        Some(parking) => replay(&parking.store, reader, consumer).await?,
+        None => 0,
+    };
     let page = feed.page(reader, page_size).await?;
     let mut previous: BTreeMap<Stream, &Position> = cursor
         .acknowledged
@@ -291,6 +310,11 @@ pub async fn pass(
             }
         }
     }
+    if (replayed > 0 || !finished.is_empty())
+        && let Err(source) = consumer.settle().await
+    {
+        return Err(PassError::Settle { source });
+    }
     let mut acknowledged = Vec::new();
     for (stream, last) in finished {
         feed.acknowledge(reader, last).await?;
@@ -309,16 +333,19 @@ pub async fn pass(
 
 /// Offers `consumer` every event parked for `reader` with a replay
 /// requested: a finished one leaves the store, a poisoned one is parked
-/// again with its new cause, and a transient failure stops the pass.
+/// again with its new cause, and a transient failure stops the pass; returns
+/// how many it offered.
 async fn replay(
     store: &DeadLetters,
     reader: &ReaderName,
     consumer: &dyn Consumer,
-) -> Result<(), PassError> {
+) -> Result<usize, PassError> {
+    let mut offered = 0_usize;
     for parked in store.parked(reader)? {
         if !parked.replay {
             continue;
         }
+        offered = offered.saturating_add(1);
         match consumer.process(&parked.event).await {
             Ok(()) => {
                 store.replayed(reader, parked.id)?;
@@ -336,7 +363,7 @@ async fn replay(
             }
         }
     }
-    Ok(())
+    Ok(offered)
 }
 
 /// Forgets the poisoned passes charged to the finished event at `position`.
