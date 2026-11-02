@@ -1,5 +1,5 @@
 ---
-source: tools/fhir-codegen/tests/it/xml.rs
+source: tools/fhir-codegen/tests/it/xml/round_trip.rs
 expression: xml
 ---
 <CodeSystem xmlns="http://hl7.org/fhir"><id value="administrative-gender"/><meta><lastUpdated value="2022-05-28T12:47:40.239+10:00"/></meta><text><status value="extensions"/><div xmlns="http://www.w3.org/1999/xhtml">

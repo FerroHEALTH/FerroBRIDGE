@@ -1,0 +1,212 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! Every root-set resource and generated `Parameters` round-trip JSON to XML
+//! to JSON, and a few examples are pinned as golden XML.
+
+use std::path::Path;
+
+use fhir_types::codec::Json;
+use fhir_types::codec::Value;
+use fhir_types::schema::Schemas;
+use fhir_types::xml::{from_xml, to_xml};
+use proptest::prelude::*;
+
+use crate::codec::{decode_file, root_set_files};
+use crate::vendor_dir;
+
+/// The canonical JSON of one file of `package`, `None` only for a refusal
+/// `codec.rs` lists, and an error naming the path for any other failure.
+fn canonical<T: Json>(package: &str, path: &Path) -> Result<Option<Value>, String> {
+    let Some(decoded) = decode_file::<T>(package, path)? else {
+        return Ok(None);
+    };
+    let object = decoded
+        .to_json()
+        .map_err(|e| format!("{}: to JSON: {e}", path.display()))?;
+    Ok(Some(Value::Object(object)))
+}
+
+/// JSON to XML to JSON, equal to the canonical JSON.
+fn round_trip(schemas: &Schemas, canonical: &Value, name: &str) -> Result<(), String> {
+    let object = canonical.as_object().ok_or("not an object")?;
+    let xml = to_xml(schemas, object).map_err(|e| format!("{name}: to XML: {e}"))?;
+    let back = from_xml(schemas, &xml).map_err(|e| format!("{name}: from XML: {e}"))?;
+    if Value::Object(back) != *canonical {
+        return Err(format!("{name}: the XML round trip differs"));
+    }
+    Ok(())
+}
+
+/// Every root-set file the JSON codec accepts round-trips through XML, except
+/// a Bundle that carries a resource outside the root set, which has no schema
+/// (the XML codec covers the same closure the typed model does).
+fn round_trip_all<T: Json>(package: &str, schemas: &Schemas) {
+    let files = root_set_files(package);
+    assert!(files.len() > 1000, "{package}: {} files", files.len());
+    let mut failures = Vec::new();
+    let mut passed = 0;
+    let mut unknown_resources = 0;
+    for file in &files {
+        let name = file
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .unwrap_or("");
+        let canonical = match canonical::<T>(package, file) {
+            Ok(Some(canonical)) => canonical,
+            Ok(None) => continue,
+            Err(e) => {
+                failures.push(e);
+                continue;
+            }
+        };
+        match round_trip(schemas, &canonical, name) {
+            Ok(()) => passed += 1,
+            Err(e) if e.contains("no schema for the resource type") => unknown_resources += 1,
+            Err(e) => failures.push(e),
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{package}: {} of {} files failed:\n{}",
+        failures.len(),
+        files.len(),
+        failures
+            .iter()
+            .take(8)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    assert!(passed > 1000, "{package}: {passed} round trips");
+    assert!(
+        unknown_resources < 20,
+        "{package}: {unknown_resources} bundles carry resources outside the root set"
+    );
+}
+
+#[test]
+fn every_stu3_root_set_resource_round_trips_through_xml() {
+    round_trip_all::<fhir_types::stu3::resource::Resource>(
+        "hl7.fhir.r3.core",
+        &fhir_types::stu3::schema::SCHEMAS,
+    );
+}
+
+#[test]
+fn every_r4_root_set_resource_round_trips_through_xml() {
+    round_trip_all::<fhir_types::r4::resource::Resource>(
+        "hl7.fhir.r4.core",
+        &fhir_types::r4::schema::SCHEMAS,
+    );
+}
+
+#[test]
+fn every_r4b_root_set_resource_round_trips_through_xml() {
+    round_trip_all::<fhir_types::r4b::resource::Resource>(
+        "hl7.fhir.r4b.core",
+        &fhir_types::r4b::schema::SCHEMAS,
+    );
+}
+
+#[test]
+fn every_r5_root_set_resource_round_trips_through_xml() {
+    round_trip_all::<fhir_types::r5::resource::Resource>(
+        "hl7.fhir.r5.core",
+        &fhir_types::r5::schema::SCHEMAS,
+    );
+}
+
+#[test]
+fn every_r6_root_set_resource_round_trips_through_xml() {
+    round_trip_all::<fhir_types::r6::resource::Resource>(
+        "hl7.fhir.r6.core",
+        &fhir_types::r6::schema::SCHEMAS,
+    );
+}
+
+#[test]
+fn the_xml_of_examples_is_pinned() {
+    let schemas = &fhir_types::r4b::schema::SCHEMAS;
+    let first_concept_map = root_set_files("hl7.fhir.r4b.core")
+        .into_iter()
+        .find(|p| {
+            p.file_name()
+                .and_then(std::ffi::OsStr::to_str)
+                .is_some_and(|n| n.starts_with("ConceptMap-"))
+        })
+        .and_then(|p| {
+            p.file_name()
+                .and_then(std::ffi::OsStr::to_str)
+                .map(str::to_owned)
+        })
+        .expect("a ConceptMap example");
+    for file in [
+        "ValueSet-administrative-gender.json",
+        "CodeSystem-administrative-gender.json",
+        first_concept_map.as_str(),
+    ] {
+        let path = vendor_dir()
+            .join("hl7.fhir.r4b.core")
+            .join("package")
+            .join(file);
+        let canonical =
+            canonical::<fhir_types::r4b::resource::Resource>("hl7.fhir.r4b.core", &path)
+                .expect("the file reads")
+                .expect("the codec accepts it");
+        let xml = to_xml(schemas, canonical.as_object().expect("object")).expect("XML");
+        insta::assert_snapshot!(file, xml);
+    }
+}
+
+fn coding(system: &str, code: &str, display: Option<String>) -> Value {
+    let mut object = fhir_types::codec::Object::new();
+    object.insert("system".into(), Value::String(system.into()));
+    object.insert("code".into(), Value::String(code.into()));
+    if let Some(display) = display {
+        object.insert("display".into(), Value::String(display));
+    }
+    Value::Object(object)
+}
+
+proptest! {
+    /// A `Parameters` of every primitive kind, strings with markup, a nested
+    /// coding, and a decimal's lexical form round-trips through XML.
+    #[test]
+    fn generated_parameters_round_trip_through_xml(
+        // A FHIR string holds at least one character: its lexical form is
+        // `[ \r\n\t\S]+` in 4.0.1 and `^[\s\S]+$` in 5.0.0
+        // (<https://hl7.org/fhir/R5/datatypes.html#primitive>).
+        text in "[a-zA-Z0-9 <>&\"'\u{e9}]{1,24}",
+        flag in any::<bool>(),
+        number in any::<i32>(),
+        decimal in prop_oneof![Just("1.50"), Just("0.001"), Just("-3"), Just("100"), Just("2.0"), Just("0.1234567890123456789012345678")],
+        code in "[a-z][a-z0-9-]{0,10}",
+        display in proptest::option::of("[A-Za-z ]{1,12}"),
+    ) {
+        let mut parameters = Vec::new();
+        let named = |name: &str, key: &str, value: Value| {
+            let mut object = fhir_types::codec::Object::new();
+            object.insert("name".into(), Value::String(name.into()));
+            object.insert(key.into(), value);
+            Value::Object(object)
+        };
+        parameters.push(named("text", "valueString", Value::String(text)));
+        parameters.push(named("flag", "valueBoolean", Value::Bool(flag)));
+        parameters.push(named("number", "valueInteger", Value::from(number)));
+        parameters.push(named(
+            "decimal",
+            "valueDecimal",
+            Value::Number(decimal.parse().expect("a number")),
+        ));
+        parameters.push(named("coding", "valueCoding", coding("http://example.org/s", &code, display)));
+        let mut object = fhir_types::codec::Object::new();
+        object.insert("resourceType".into(), Value::String("Parameters".into()));
+        object.insert("parameter".into(), Value::Array(parameters));
+        let mut path = fhir_types::codec::Path::root("Parameters");
+        let typed = fhir_types::r5::parameters::Parameters::from_json(&object, &mut path)
+            .expect("the JSON codec accepts the generated resource");
+        let canonical = Value::Object(typed.to_json().expect("encodes"));
+        round_trip(&fhir_types::r5::schema::SCHEMAS, &canonical, "generated").expect("round trips");
+    }
+}
