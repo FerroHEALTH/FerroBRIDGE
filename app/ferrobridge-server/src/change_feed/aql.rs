@@ -24,8 +24,9 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use crate::cdr::error::CdrError;
+use crate::cdr::query::QueryPageError;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
-use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::ContributionUid;
@@ -134,30 +135,22 @@ impl ChangeFeed for AqlFeed {
             }),
             additional_properties: BTreeMap::new(),
         };
-        let answered = self
+        let rows = self
             .cdr
-            .query_aql(&request)
+            .query_aql_result(&request)
             .await
-            .map_err(|source| match source {
-                crate::cdr::error::CdrError::Client {
+            .map_err(|error| match error {
+                QueryPageError::Refused(upstream) => FeedError::Query { upstream },
+                QueryPageError::Call(CdrError::Client {
                     upstream: Some(upstream),
                     ..
-                } if is_refusal(upstream.status()) => FeedError::Refused { upstream },
-                crate::cdr::error::CdrError::Client {
+                }) if is_refusal(upstream.status()) => FeedError::Refused { upstream },
+                QueryPageError::Call(CdrError::Client {
                     upstream: Some(upstream),
                     ..
-                } if upstream.status().is_server_error() => FeedError::Unavailable { upstream },
-                source => FeedError::Cdr { source },
+                }) if upstream.status().is_server_error() => FeedError::Unavailable { upstream },
+                QueryPageError::Call(source) => FeedError::Cdr { source },
             })?;
-        let rows = match answered.outcome {
-            QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => body.rows,
-            QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
-            | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => {
-                return Err(FeedError::Query {
-                    upstream: Box::new(answered.upstream),
-                });
-            }
-        };
         let mut events = Vec::new();
         let mut position = watermark;
         for row in rows {

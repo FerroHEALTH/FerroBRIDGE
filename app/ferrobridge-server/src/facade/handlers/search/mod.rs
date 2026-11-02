@@ -30,13 +30,13 @@ use http::StatusCode;
 use http::Uri;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::ResultSetRow;
-use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::versioned_object_uid;
+use crate::cdr::query::QueryPageError;
 use crate::facade::Facade;
 use crate::facade::engine;
 use crate::facade::engine::entry::Entry;
@@ -422,7 +422,7 @@ async fn page(
         loop {
             let fetch = i64::try_from(room.saturating_add(1)).unwrap_or(i64::MAX);
             let request = aql::rows_request(conditions, &plan.order, offset, fetch);
-            let rows = rows_of(client, &request).await?;
+            let rows = rows_of(client, &request, status::of_query_refusal).await?;
             for (position, row) in rows.iter().enumerate() {
                 let at = offset.saturating_add(i64::try_from(position).unwrap_or(i64::MAX));
                 let read = read_row(facade, plan, row, position)?;
@@ -617,22 +617,20 @@ fn program_of(facade: &Facade, declared: &Declared) -> Result<Loaded, Refusal> {
 }
 
 /// Runs one query and returns its rows, or the refusal the status table
-/// gives its failure.
+/// gives its failure: `refused` reads a `400` or `408` the service answered,
+/// and every other failure is a client error.
 async fn rows_of(
     client: &CdrClient,
     request: &openehr_its::rest::generated::query::AdhocQueryExecute,
+    refused: impl FnOnce(&crate::cdr::error::Upstream) -> status::Answer,
 ) -> Result<Vec<ResultSetRow>, Refusal> {
-    let answered = client
-        .query_aql(request)
+    client
+        .query_aql_result(request)
         .await
-        .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
-    match answered.outcome {
-        QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => Ok(body.rows),
-        QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
-        | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => {
-            Err(write::refuse(&status::of_query_refusal(&answered.upstream)))
-        }
-    }
+        .map_err(|error| match error {
+            QueryPageError::Refused(upstream) => write::refuse(&refused(&upstream)),
+            QueryPageError::Call(error) => write::refuse(&status::of_client_error(&error)),
+        })
 }
 
 /// Maps one entry of a row back to the resources it answers, with the ids

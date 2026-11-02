@@ -28,7 +28,6 @@ use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::ResultSetRow;
-use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
 
 use crate::cdr::CdrClient;
 use crate::facade::Facade;
@@ -314,17 +313,10 @@ fn uids(rows: &[ResultSetRow]) -> Result<Vec<String>, Refusal> {
 
 /// Runs one query and returns its rows.
 async fn run(client: &CdrClient, aql: &AdhocQueryExecute) -> Result<Vec<ResultSetRow>, Refusal> {
-    let answered = client
-        .query_aql(aql)
-        .await
-        .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
-    match answered.outcome {
-        QueryExecuteAdhocQueryBodyOutcome::Ok { body, .. } => Ok(body.rows),
-        QueryExecuteAdhocQueryBodyOutcome::BadRequest { .. }
-        | QueryExecuteAdhocQueryBodyOutcome::RequestTimeout { .. } => Err(write::refuse(
-            &status::of_extension_refusal(&answered.upstream, "party"),
-        )),
-    }
+    super::rows_of(client, aql, |upstream| {
+        status::of_extension_refusal(upstream, "party")
+    })
+    .await
 }
 
 /// Returns a `400` with `not-supported` diagnosing `text`.
