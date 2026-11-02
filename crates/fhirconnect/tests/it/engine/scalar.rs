@@ -24,11 +24,11 @@ use crate::engine::defaults;
 use crate::support::compiled_against;
 
 /// The archetype path of the problem name value the test retypes.
-const PROBLEM: &str =
+pub(super) const PROBLEM: &str =
     "/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data[at0001]/items[at0002]/value";
 
 /// Returns the diagnosis template with the problem name value a `class`.
-fn retyped_template(class: &str) -> Result<WebTemplateIndex, Box<dyn Error>> {
+pub(super) fn retyped_template(class: &str) -> Result<WebTemplateIndex, Box<dyn Error>> {
     let source = ferrobridge_testkit::fixtures::DIAGNOSE_OPT;
     let (head, rest) = source
         .split_once("<node_id>at0002</node_id>")

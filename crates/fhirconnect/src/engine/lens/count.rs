@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! `DV_COUNT` against FHIR `integer`, `Quantity` and `Count`.
+//! `DV_COUNT` against FHIR `integer`, `unsignedInt`, `positiveInt`, `Quantity`
+//! and `Count`.
 //!
 //! The rows are
 //! `docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/data-type/DV_COUNT.adoc`
@@ -16,11 +17,20 @@
 //! `magnitude_status`, so a count whose status is not a point value is
 //! refused rather than written as one, and a `comparator` coming in is
 //! refused rather than dropped.
+//!
+//! The `DV_COUNT` page names only `integer` among the primitives, and R4
+//! defines `unsignedInt` and `positiveInt` as integers from 0 and from 1
+//! (<https://hl7.org/fhir/R4/datatypes.html#unsignedInt>). Pairing a count
+//! with them carries it as the integer it is, and a count below the least
+//! value is refused going out, never clamped: no specification governs the
+//! pairing, our own design.
 
 use fhir_types::r4::count::Count;
 use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Integer;
+use fhir_types::r4::primitives::PositiveInt;
+use fhir_types::r4::primitives::UnsignedInt;
 use fhir_types::r4::primitives::Uri;
 use fhir_types::r4::quantity::Quantity;
 use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
@@ -39,6 +49,12 @@ use crate::model::ast::keyword::Direction;
 /// The name the `integer` cell carries in a diagnostic.
 pub const INTEGER_CELL: &str = "DV_COUNT against integer";
 
+/// The name the `unsignedInt` cell carries in a diagnostic.
+pub const UNSIGNED_INT_CELL: &str = "DV_COUNT against unsignedInt";
+
+/// The name the `positiveInt` cell carries in a diagnostic.
+pub const POSITIVE_INT_CELL: &str = "DV_COUNT against positiveInt";
+
 /// The name the `Quantity` cell carries in a diagnostic.
 pub const QUANTITY_CELL: &str = "DV_COUNT against Quantity";
 
@@ -48,7 +64,8 @@ pub const COUNT_CELL: &str = "DV_COUNT against Count";
 /// The UCUM unit of a count, "for Count code = 1" (`DV_COUNT.adoc` §Count).
 pub const UNITY: &str = "1";
 
-/// `DV_COUNT` against `integer`, `Quantity` and `Count`.
+/// `DV_COUNT` against `integer`, `unsignedInt`, `positiveInt`, `Quantity` and
+/// `Count`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CountLens;
 
@@ -139,6 +156,89 @@ impl Lens<DvCount, Count> for CountLens {
     }
 }
 
+impl Lens<DvCount, UnsignedInt> for CountLens {
+    fn cell(&self) -> &'static str {
+        UNSIGNED_INT_CELL
+    }
+
+    fn get(&self, source: &DvCount) -> Result<UnsignedInt, LensError> {
+        point(source.magnitude_status.as_deref(), UNSIGNED_INT_CELL)?;
+        restricted(
+            source.magnitude,
+            0,
+            UNSIGNED_INT_CELL,
+            "a FHIR unsignedInt is an integer from 0",
+        )
+        .map(UnsignedInt::from)
+    }
+
+    fn put(&self, view: &UnsignedInt, existing: Option<&DvCount>) -> Result<DvCount, LensError> {
+        let value = view.value.ok_or(LensError::Missing {
+            cell: UNSIGNED_INT_CELL,
+            attribute: "DV_COUNT.magnitude",
+            direction: Direction::FhirToOpenehr,
+        })?;
+        Ok(counted(i64::from(value), existing))
+    }
+
+    fn fallbacks(&self, _view: &UnsignedInt) -> Vec<Fallback> {
+        Vec::new()
+    }
+}
+
+impl Lens<DvCount, PositiveInt> for CountLens {
+    fn cell(&self) -> &'static str {
+        POSITIVE_INT_CELL
+    }
+
+    fn get(&self, source: &DvCount) -> Result<PositiveInt, LensError> {
+        point(source.magnitude_status.as_deref(), POSITIVE_INT_CELL)?;
+        restricted(
+            source.magnitude,
+            1,
+            POSITIVE_INT_CELL,
+            "a FHIR positiveInt is an integer from 1",
+        )
+        .map(PositiveInt::from)
+    }
+
+    fn put(&self, view: &PositiveInt, existing: Option<&DvCount>) -> Result<DvCount, LensError> {
+        let value = view.value.ok_or(LensError::Missing {
+            cell: POSITIVE_INT_CELL,
+            attribute: "DV_COUNT.magnitude",
+            direction: Direction::FhirToOpenehr,
+        })?;
+        Ok(counted(i64::from(value), existing))
+    }
+
+    fn fallbacks(&self, _view: &PositiveInt) -> Vec<Fallback> {
+        Vec::new()
+    }
+}
+
+/// Returns `magnitude` as a restricted R4 integer whose least value is
+/// `least`, refusing a count outside `least..=2,147,483,647` and never
+/// clamping it (<https://hl7.org/fhir/R4/datatypes.html#unsignedInt>,
+/// <https://hl7.org/fhir/R4/datatypes.html#positiveInt>).
+fn restricted(
+    magnitude: i64,
+    least: u32,
+    cell: &'static str,
+    reason: &'static str,
+) -> Result<u32, LensError> {
+    let integer = narrow(magnitude, cell, "DV_COUNT.magnitude")?;
+    u32::try_from(integer)
+        .ok()
+        .filter(|value| *value >= least)
+        .ok_or_else(|| LensError::Shape {
+            cell,
+            attribute: "DV_COUNT.magnitude",
+            found: magnitude.to_string(),
+            reason,
+            direction: Direction::OpenehrToFhir,
+        })
+}
+
 /// Refuses a comparator, which none of the tables gives an openEHR row, so
 /// writing the count without it would state a bounded value as exact.
 fn unbounded(comparator: Option<&Code>, cell: &'static str) -> Result<(), LensError> {
@@ -178,6 +278,8 @@ mod tests {
     use fhir_types::r4::primitives::Code;
     use fhir_types::r4::primitives::Decimal;
     use fhir_types::r4::primitives::Integer;
+    use fhir_types::r4::primitives::PositiveInt;
+    use fhir_types::r4::primitives::UnsignedInt;
     use fhir_types::r4::quantity::Quantity;
     use openehr_rm::v1_2::data_types::quantity::dv_count::DvCount;
     use proptest::option;
@@ -223,6 +325,38 @@ mod tests {
             let view = Integer::from(value);
             let back: DvCount = CountLens.put(&view, None).expect("the view is complete");
             let again: Integer = CountLens.get(&back).expect("the count travels");
+            assert_eq!(again, view, "PutGet failed for {view:?}");
+        }
+
+        #[test]
+        fn unsigned_int_get_put(magnitude in 0..=i64::from(i32::MAX)) {
+            let source = count(magnitude);
+            let view: UnsignedInt = CountLens.get(&source).expect("the count travels");
+            let back = CountLens.put(&view, Some(&source)).expect("the view is complete");
+            assert_eq!(back, source, "GetPut failed for {source:?}");
+        }
+
+        #[test]
+        fn unsigned_int_put_get(value in 0..=i32::MAX.unsigned_abs()) {
+            let view = UnsignedInt::from(value);
+            let back: DvCount = CountLens.put(&view, None).expect("the view is complete");
+            let again: UnsignedInt = CountLens.get(&back).expect("the count travels");
+            assert_eq!(again, view, "PutGet failed for {view:?}");
+        }
+
+        #[test]
+        fn positive_int_get_put(magnitude in 1..=i64::from(i32::MAX)) {
+            let source = count(magnitude);
+            let view: PositiveInt = CountLens.get(&source).expect("the count travels");
+            let back = CountLens.put(&view, Some(&source)).expect("the view is complete");
+            assert_eq!(back, source, "GetPut failed for {source:?}");
+        }
+
+        #[test]
+        fn positive_int_put_get(value in 1..=i32::MAX.unsigned_abs()) {
+            let view = PositiveInt::from(value);
+            let back: DvCount = CountLens.put(&view, None).expect("the view is complete");
+            let again: PositiveInt = CountLens.get(&back).expect("the count travels");
             assert_eq!(again, view, "PutGet failed for {view:?}");
         }
 
@@ -283,6 +417,37 @@ mod tests {
             matches!(error, LensError::Shape { attribute, .. } if attribute == "DV_COUNT.magnitude"),
             "the refusal names the magnitude: {error}"
         );
+    }
+
+    #[test]
+    fn a_negative_count_is_no_unsigned_int() {
+        // R4 datatypes.html#unsignedInt: an integer from 0; the count is refused, never clamped.
+        let error = Lens::<DvCount, UnsignedInt>::get(&CountLens, &count(-1))
+            .expect_err("an unsignedInt is from 0");
+        assert!(
+            matches!(error, LensError::Shape { attribute, ref found, .. } if attribute == "DV_COUNT.magnitude" && found == "-1"),
+            "the refusal names the magnitude: {error}"
+        );
+    }
+
+    #[test]
+    fn a_zero_count_is_an_unsigned_int_and_no_positive_int() {
+        // R4 datatypes.html#positiveInt: an integer from 1.
+        let zero: UnsignedInt = CountLens.get(&count(0)).expect("0 is an unsignedInt");
+        assert_eq!(zero.value, Some(0));
+        let error = Lens::<DvCount, PositiveInt>::get(&CountLens, &count(0))
+            .expect_err("a positiveInt is from 1");
+        assert!(
+            matches!(error, LensError::Shape { attribute, ref found, .. } if attribute == "DV_COUNT.magnitude" && found == "0"),
+            "the refusal names the magnitude: {error}"
+        );
+    }
+
+    #[test]
+    fn a_count_beyond_the_fhir_integer_range_is_no_unsigned_int() {
+        let error = Lens::<DvCount, UnsignedInt>::get(&CountLens, &count(i64::from(i32::MAX) + 1))
+            .expect_err("an unsignedInt ends at 2,147,483,647");
+        assert!(matches!(error, LensError::Shape { .. }), "{error}");
     }
 
     #[test]
