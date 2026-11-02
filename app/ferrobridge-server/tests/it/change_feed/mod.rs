@@ -31,7 +31,8 @@ pub(crate) fn reader() -> ReaderName {
     ReaderName::new("ferrobridge-test").expect("a valid reader name")
 }
 
-/// Returns a CDR client against `server`, with basic credentials and one
+/// Returns a CDR client against `server`, with basic credentials (a password
+/// drawn per run, so no credential is written down) and one
 /// attempt per call.
 pub(crate) fn client(server: &MockServer) -> Result<CdrClient, Box<dyn Error>> {
     let config = CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
@@ -41,7 +42,7 @@ pub(crate) fn client(server: &MockServer) -> Result<CdrClient, Box<dyn Error>> {
             initial_backoff: Duration::from_millis(1),
             max_backoff: Duration::from_millis(1),
         })
-        .with_basic("bridge", "synthetic-password");
+        .with_basic("bridge", uuid::Uuid::new_v4().to_string());
     Ok(CdrClient::new(&config)?)
 }
 
