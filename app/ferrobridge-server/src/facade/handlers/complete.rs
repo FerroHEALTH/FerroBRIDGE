@@ -63,17 +63,30 @@ pub(crate) fn fill_subject(
     subject: Option<&Value>,
 ) -> Option<&'static str> {
     let subject = subject?;
-    let schema = resource_schema(resource_type)?;
-    let field = SUBJECT_ELEMENTS.iter().find_map(|name| {
-        schema.fields.iter().find(|field| {
-            field.name == *name && !field.many && matches!(field.kind, Kind::Complex("Reference"))
-        })
-    })?;
+    let field = subject_field(resource_type)?;
     if present(body, field) {
         return None;
     }
     body.insert(String::from(field.name), subject.clone());
     Some(field.path)
+}
+
+/// Returns whether `body` is of a type that names its subject, by `subject`
+/// or `patient`, and carries none.
+pub(crate) fn lacks_subject(body: &Object, resource_type: &str) -> bool {
+    subject_field(resource_type).is_some_and(|field| !present(body, field))
+}
+
+/// Returns the element `resource_type` names its subject by: the first of
+/// `subject` and `patient` the element table gives the type as one
+/// `Reference`.
+fn subject_field(resource_type: &str) -> Option<&'static FieldSchema> {
+    let schema = resource_schema(resource_type)?;
+    SUBJECT_ELEMENTS.iter().find_map(|name| {
+        schema.fields.iter().find(|field| {
+            field.name == *name && !field.many && matches!(field.kind, Kind::Complex("Reference"))
+        })
+    })
 }
 
 /// Returns the location of every required element `body` lacks, in document

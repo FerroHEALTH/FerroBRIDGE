@@ -32,6 +32,7 @@ mod lanes;
 pub mod mappings;
 pub mod operations;
 pub mod operator;
+pub mod outbound;
 pub mod panic;
 pub mod problem;
 pub mod quality;

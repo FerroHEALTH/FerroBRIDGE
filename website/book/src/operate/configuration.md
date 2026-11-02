@@ -933,6 +933,33 @@ twice or with no binding are each a boot error naming the key. Over
 `[change_feed] source = "ferroehr"`, a CDR that answers `404` for the reader
 refuses the start.
 
+### `[fhir_outbound]`
+
+The outbound FHIR lane: a consumer of the change feed that maps each changed
+composition to FHIR R4 through the facade's programs and delivers it to a FHIR
+endpoint as one `transaction` Bundle per event. It is off until `enabled` is
+true, and an enabled lane needs `[change_feed] enabled` and `[facade]
+enabled`. It carries identifiable clinical data: the start logs a warning
+naming the endpoint host. The [outbound FHIR lane](../integrate/fhir-outbound.md)
+page states what an event delivers and the delivery guarantees. No
+specification governs the lane: it is FerroBRIDGE's own design.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the lane delivers |
+| `reader` | none, required | The reader name the lane follows the change feed under, another than `[events] reader` and `[omop_incremental] reader`: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
+| `base_url` | none, required | The FHIR service base each Bundle is posted to, `https` without a query or a fragment, never the facade's own `base_url` |
+| `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
+| `timeout_ms` | `30000` | How long one delivery may take |
+| `emitted` | none, required | The `redb` file the record of what was delivered for each composition is kept in, identifiers only |
+| `credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.credentials.oauth]`, the same table `[cdr.credentials]` takes |
+
+A missing `reader`, `base_url` or `emitted`, a reader name outside its
+alphabet or another consumer's, an `http` base without `cleartext`, the
+facade's own base, a `timeout_ms` of `0`, and the lane without the change
+feed or the facade are each a boot error naming the key. A record file that
+cannot be opened refuses the start.
+
 ### `[omop_incremental]`
 
 The incremental OMOP load: a consumer of the change feed that commits each
@@ -1050,6 +1077,8 @@ it carries.
 | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 | `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
+| `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__PASSWORD` | `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__PASSWORD_FILE` |
+| `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__AUDIT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__AUDIT__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__AUDIT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__AUDIT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 
