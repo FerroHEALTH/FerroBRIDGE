@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that writes the positiveInt
+# alternative of Immunization.protocolApplied.doseNumber[x] into the problem
+# name value, which the test turns into a DV_COUNT.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_count_positive
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Immunization
+
+mappings:
+  - name: "dose"
+    with:
+      fhir: "$resource.protocolApplied.doseNumber.as(PositiveInt)"
+      openehr: "$archetype/data[at0001]/items[at0002]"

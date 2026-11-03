@@ -41,7 +41,7 @@ fails when it names a different commit, tag or pin-set digest.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| FHIRconnect specification source | `SevKohler/FHIRconnect-spec` commit `e587164102921c73eea262a18f3457b18e4a2a40` (carries the REST API chapter, pull request #93, and the sub-contexts, pull request #100) | `docs/architecture.md` §2 and §4.7, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/PROVENANCE.md`, `crates/fhirconnect/tests/fixtures/rest-api/PROVENANCE.md` |
+| FHIRconnect specification source | `SevKohler/FHIRconnect-spec` commit `5046a6dd9ee34f5a1de152301778f302c55e3b7b` (carries the REST API chapter, pull request #93, the sub-contexts, pull request #100, and `openehr` moved inside `properties` in the source `split` definition, pull request #106) | `docs/architecture.md` §2 and §4.7, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/PROVENANCE.md`, `crates/fhirconnect/tests/fixtures/rest-api/PROVENANCE.md` |
 | FHIRconnect mapping library (corpus, never an oracle) | `SevKohler/FHIRconnect-mapping-lib` commit `6bd4c19a2f96821c04fbeed3c6f6c190fd85825b` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect-mapping-lib.sh`, `docs/specs/fhirconnect-mapping-lib/PROVENANCE.md` |
 | OMOCL corpus | `SevKohler/OMOCL` commit `cfb26bad3ad035f975736299b53a494696b2e604` (grammar `OMOCL/v1.0.0`; the git tag `v1.0.0` carries pre-grammar files) | `docs/architecture.md` §2, `scripts/vendor/omocl.sh`, `docs/specs/omocl/PROVENANCE.md` |
 | OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.4.3` | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
