@@ -4,7 +4,7 @@
 //! The HL7 Europe Medication Prescription and Dispense 1.0.0 round trip over
 //! FerroBRIDGE's medication template.
 //!
-//! The template specialises seven published CKM archetypes, and its overlays
+//! The template is over nine published CKM archetypes, and its overlays
 //! fill the nested medication, direction, dosage and timing slots; the suite
 //! builds its ADL 2 operational template at test time. A prescription is a
 //! `MedicationRequest-eu-mpd` over the medication order, a dispense a
@@ -170,7 +170,9 @@ fn medication() -> serde_json::Value {
 
 /// A synthetic prescription in the shape `MedicationRequest-eu-mpd`
 /// constrains: the required authoring time and prescriber, the referenced
-/// product, the reason, a note, one dosage and the validity period.
+/// product, the reason, a note, one dosage, the validity period, the repeats
+/// and their interval, the remaining dispensations and the amount and
+/// duration of one fill.
 fn request() -> serde_json::Value {
     serde_json::json!({
         "resourceType": "MedicationRequest",
@@ -202,10 +204,34 @@ fn request() -> serde_json::Value {
                 "code": "{tbl}"
             }}]
         }],
-        "dispenseRequest": {"validityPeriod": {
-            "start": "2026-03-02T00:00:00+01:00",
-            "end": "2026-06-02T00:00:00+02:00"
-        }}
+        // DV_DURATION.adoc gives a Duration's `unit` no openEHR row, so a duration carries none.
+        "dispenseRequest": {
+            "extension": [{
+                "url": "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations",
+                "valueUnsignedInt": 1
+            }],
+            "validityPeriod": {
+                "start": "2026-03-02T00:00:00+01:00",
+                "end": "2026-06-02T00:00:00+02:00"
+            },
+            "numberOfRepeatsAllowed": 2,
+            "dispenseInterval": {
+                "value": 28,
+                "system": "http://unitsofmeasure.org",
+                "code": "d"
+            },
+            "quantity": {
+                "value": 56,
+                "unit": "tablet",
+                "system": "http://unitsofmeasure.org",
+                "code": "{tbl}"
+            },
+            "expectedSupplyDuration": {
+                "value": 28,
+                "system": "http://unitsofmeasure.org",
+                "code": "d"
+            }
+        }
     })
 }
 
@@ -285,6 +311,11 @@ fn the_profile_elements_of_the_prescription_survive_the_round_trip() -> Result<(
         "/note/0/text",
         "/dispenseRequest/validityPeriod/start",
         "/dispenseRequest/validityPeriod/end",
+        "/dispenseRequest/numberOfRepeatsAllowed",
+        "/dispenseRequest/dispenseInterval",
+        "/dispenseRequest/extension",
+        "/dispenseRequest/quantity",
+        "/dispenseRequest/expectedSupplyDuration",
     ] {
         assert_eq!(
             resource.pointer(pointer),

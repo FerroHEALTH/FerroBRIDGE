@@ -106,6 +106,11 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         .await
         .context("starting the operator API")?;
         state = state.with_operator(Arc::new(operator));
+        if let Some(cdm) = settings.cdm.as_ref() {
+            let history = crate::etl::history::Store::new(cdm)
+                .context("preparing the connection the run history is read through")?;
+            state = state.with_etl_history(Arc::new(history));
+        }
     }
     if let Some(operations) = state.operations() {
         set_counts(&mut lanes, "operations", operation_counts(operations));
@@ -115,7 +120,9 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         let (started, listening) = start_hl7v2(settings, lane, &state)
             .await
             .context("starting the HL7 v2 face")?;
-        state = state.with_hl7v2(listening);
+        state = state
+            .with_hl7v2(listening)
+            .with_concept_maps(Arc::clone(started.face.directory()));
         face = Some(started);
     }
     let mut feeds = Vec::new();

@@ -135,3 +135,21 @@ async fn an_stu3_terminology_client_is_refused_before_any_translation_is_sent() 
     let received = server.received_requests().await.unwrap_or_default();
     assert!(received.is_empty(), "nothing is sent");
 }
+
+#[tokio::test]
+async fn the_run_names_every_map_it_applied() {
+    let (mapped, _) = mapped(&fixtures::oru_r01()).await;
+    let applied = mapped.applied();
+    for id in [
+        "message-oru-r01-to-bundle",
+        "segment-pid-to-patient",
+        "segment-obx-to-observation",
+        "table-hl70001-to-administrative-gender",
+    ] {
+        assert!(applied.contains(id), "{id} ran: {applied:?}");
+    }
+    assert!(
+        !applied.contains("message-adt-a01-to-bundle"),
+        "a map the message never reached is not named"
+    );
+}

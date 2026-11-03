@@ -77,7 +77,26 @@ impl Mapping {
         let source = TemplateSource::opt14(opt).map_err(|source| MappingError::Template {
             source: Box::new(source),
         })?;
-        let index = WebTemplateIndex::build(&source).map_err(|source| MappingError::Template {
+        Self::compile_template(&source, files, contexts)
+    }
+
+    /// Compiles the context mappings `contexts` names from the mapping
+    /// `files`, against the operational template `source`, as
+    /// [`Mapping::compile`] does for an OPT 1.4 text.
+    ///
+    /// `source` is an OPT 1.4 template or an ADL 2 operational template, so a
+    /// template authored in ADL 2 compiles as one authored in ADL 1.4 does.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Mapping::compile`], [`MappingError::Template`] when the
+    /// index cannot be built over `source`.
+    pub fn compile_template<P: AsRef<Path>>(
+        source: &TemplateSource,
+        files: &[P],
+        contexts: &[&str],
+    ) -> Result<Self, MappingError> {
+        let index = WebTemplateIndex::build(source).map_err(|source| MappingError::Template {
             source: Box::new(source),
         })?;
         let codes = StaticMappingCodes::default();

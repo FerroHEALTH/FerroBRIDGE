@@ -428,6 +428,9 @@ impl<'a> Run<'a> {
         let Some(code) = datum.text() else {
             return;
         };
+        if !self.applied.contains(&map.id) {
+            self.applied.insert(map.id.clone());
+        }
         let request = self.requests.len();
         self.requests.push(Request {
             code: String::from(code),

@@ -246,6 +246,8 @@ struct Serving {
     listening: Listening,
     /// The usage report's window the face counts its messages in.
     usage: Arc<Window>,
+    /// The face's `ConceptMap` directory.
+    directory: Arc<ferrobridge_server::hl7v2::directory::Directory>,
     /// The switch that stops it.
     stop: Option<oneshot::Sender<()>>,
     /// The listener task.
@@ -268,6 +270,7 @@ impl Serving {
                 .with_usage(Arc::clone(&usage))
                 .with_access_log(log, lane.listen),
         );
+        let directory = Arc::clone(face.directory());
         let socket = TcpListener::bind("127.0.0.1:0").await?;
         let address = socket.local_addr()?;
         let listening = Listening::default();
@@ -286,6 +289,7 @@ impl Serving {
             address,
             listening,
             usage,
+            directory,
             stop: Some(stop),
             task,
         })
@@ -780,4 +784,23 @@ async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<
         "a replay answers as the commit did: {again}"
     );
     serving.stop().await
+}
+
+#[tokio::test]
+async fn each_map_a_message_ran_through_counts_it_once() -> Result<(), Box<dyn Error>> {
+    let running = Running::start(true, Duration::ZERO).await?;
+    running.send(&oru_r01(CONTROL_ID)).await?;
+    running.send(&oru_r01("MSG00002")).await?;
+    let document = running.serving.directory.document();
+    let messages = |id: &str| {
+        document
+            .maps
+            .iter()
+            .find(|map| map.id == id)
+            .map(|map| map.messages)
+    };
+    assert_eq!(Some(2), messages("message-oru-r01-to-bundle"));
+    assert_eq!(Some(2), messages("segment-pid-to-patient"));
+    assert_eq!(Some(0), messages("message-adt-a01-to-bundle"));
+    running.stop().await
 }
