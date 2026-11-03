@@ -13,7 +13,7 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
 
 - A row type per CDM table, all 39 across the `CDM`, `VOCAB` and `RESULTS`
   schemas, with every column in definition order. The types are generated from
-  the OHDSI `CommonDataModel` field and table definitions at tag `v5.4.3`, so
+  the OHDSI `CommonDataModel` field and table definitions at tag `v5.5.0` (the v5.4 files), so
   they say what the model says.
 - The column metadata of every table: name, CDM datatype, Rust type, whether
   the column is required, the primary key, and the foreign key it follows.

@@ -51,4 +51,4 @@ pub const CDM_VERSION: &str = "5.4";
 ///
 /// The definitions and the DDL are vendored at this tag
 /// (`docs/specs/omop-cdm/PROVENANCE.md`).
-pub const CDM_DEFINITIONS_TAG: &str = "v5.4.3";
+pub const CDM_DEFINITIONS_TAG: &str = "v5.5.0";
