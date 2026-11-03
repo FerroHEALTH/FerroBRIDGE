@@ -276,6 +276,65 @@ Each replica reloads on its own. With `mapping_dir` on a shared volume, a
 file one replica saved reaches another at that replica's next reload or
 restart; the console reloads the replica behind its configured URL.
 
+## Mapping-set revisions
+
+With `[operator] mapping_dir` set, the bridge keeps every state of the
+console's files it ran as a revision, under `mapping_dir/..revisions`. A
+revision holds the whole set of console files, each by its wire path and
+SHA-256 digest, with who recorded it, when and why. The bridge records one
+at start-up, after each save, after a reload that finds the console files
+changed on disk, and after each apply. The provisioned files belong to the
+deployment: they are in no revision, and an apply leaves them as they are.
+Without `mapping_dir` the routes below answer `409`.
+
+### `GET /operator/revisions`
+
+Answers `running`, the id of the revision the bridge runs, and `revisions`,
+newest first. Each names its `id` (a number that grows by one), its
+`parent` (the revision that ran when it was recorded), the `author` (the
+token's subject, `-` for the bridge), the `time`, the `reason`, the
+`origin` (`baseline`, `save`, `reload`, `apply` or `import`), whether it was
+`applied`, and how many `files` it holds.
+
+### `GET /operator/revisions/{id}`
+
+One revision whole, with `files`, every wire path and its digest, and
+`source`, the revision an apply restored. An id no revision has answers
+`404`.
+
+### `GET /operator/revisions/{id}/diff`
+
+How the revision differs from the running one: `from` (the running id),
+`to`, and `files`, each changed file with its `change` (`added`, `removed`
+or `changed`), its two digests and `unified`, a unified diff of its lines
+with three lines of context. A file both revisions hold unchanged is left
+out.
+
+### `POST /operator/revisions/{id}/apply`
+
+Replaces the console files by the revision's and reloads. A rollback is the
+apply of an earlier revision. The request carries:
+
+| Header | Meaning |
+|---|---|
+| `If-Match` | The id of the running revision, in quotes, such as `"3"` |
+| `Ferrobridge-Reason` | Why: one line of at most 200 characters |
+
+| Answer | When |
+|---|---|
+| `200` | The set compiled with the revision's files; they replaced the console's and the set reloaded. The body is the new set's report and the `ETag` the id of the revision the apply recorded |
+| `400` | No reason |
+| `404` | No revision has the id |
+| `409` | No `mapping_dir` is configured |
+| `412` | The running revision is not the one `If-Match` names |
+| `422` | The set does not compile with the revision's files; the body names every diagnostic, and nothing changes |
+| `428` | No `If-Match` |
+| `503` | The CDR did not serve a template, so the set could not be compiled |
+
+The revision's files are written to a staging tree and compiled with the
+provisioned files first. Only a set that compiles replaces the console's
+directories, one rename for each language, and then runs.
+
 ## What the log records
 
 Every operator request leaves one audit line on the
@@ -287,4 +346,7 @@ duration and the request id, beside the ordinary request line. A save adds
 one more line on the `ferrobridge::audit` target with the caller's `subject`,
 `action` `save`, the `file` it wrote, `old_sha256` (`-` for a new file),
 `new_sha256`, the `reason` and the status; a reload adds `action` `reload`.
+An apply adds `action` `apply` with the `revision` it applied, the
+`running` revision it replaced, the revision it `recorded` and the
+`reason`.
 No line carries a token or any mapping content.

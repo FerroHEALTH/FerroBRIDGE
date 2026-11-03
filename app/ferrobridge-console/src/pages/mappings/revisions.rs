@@ -43,7 +43,9 @@ use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
-use crate::pages::parts::{by_file, faulted, owner_tag, quiet, refused, section, tally};
+use crate::pages::parts::{
+    by_file, faulted, file_href, owner_tag, quiet, refused, section, short, tally,
+};
 use crate::visit::Visit;
 
 /// The id of the form the dock's Apply submits.
@@ -354,13 +356,31 @@ fn provisioned(l: &Locale, listing: &Loaded<Vec<Listed>>) -> Html {
         quiet(tr(l, Msg::RevisionNoProvisioned), None)
     } else {
         let note = section_intro(tr(l, Msg::RevisionProvisionedNote));
-        let rows = definitions(
-            files
-                .iter()
-                .map(|file| (file.path.clone(), owner_tag(l, Owner::Provisioned)))
-                .collect(),
-        );
-        note.then(rows)
+        let columns = [
+            Column::text("file", tr(l, Msg::ColFile)).role(Role::Title),
+            Column::text("owner", tr(l, Msg::ColOwner)).role(Role::Wide),
+        ];
+        let [_, owner] = &columns;
+        let rows = files
+            .iter()
+            .map(|file| {
+                h(format!(
+                    "<tr>{}{}</tr>",
+                    title_cell(
+                        Some(&file_href(&file.path)),
+                        t(short(&file.path)),
+                        Some(code(&file.path)),
+                    ),
+                    cell(owner, owner_tag(l, Owner::Provisioned)),
+                ))
+            })
+            .collect::<Html>();
+        note.then(data_table(DataTable {
+            caption: &tr(l, Msg::RevisionProvisioned),
+            columns: &columns,
+            sorting: Sorting::default(),
+            body: Body::Rows(rows),
+        }))
     };
     section(
         l,

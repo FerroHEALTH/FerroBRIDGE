@@ -112,11 +112,14 @@ console answers with the page it drew.
   upstreams (`GET /health/info`, `GET /operator/readiness` or, with the
   operator API off, `GET /health/readiness`,
   `GET /operator/state`).
-- **Mapping set** (`/mappings`): the load report and five tabs. Contexts
+- **Mapping set** (`/mappings`): the load report and six tabs. Contexts
   lists each context with its resource type, template, models, search
-  declaration, owner and state; OMOCL, Templates, Files and Diagnostics
-  live at `/mappings/omocl`, `/mappings/templates`, `/mappings/files` and
-  `/mappings/diagnostics`. The Files tab filters by path, language and
+  declaration, owner and state; OMOCL, Templates, Files, Diagnostics and
+  Revisions live at `/mappings/omocl`, `/mappings/templates`,
+  `/mappings/files`, `/mappings/diagnostics` and `/mappings/revisions`.
+  Revisions lists every recorded state of the console's files, newest
+  first, with what recorded it, when, who and why
+  (`GET /operator/revisions`). The Files tab filters by path, language and
   owner, and pages its rows. More holds Reload the set, which asks first,
   then compiles the files on disk and replaces the running set when they
   compile.
@@ -126,6 +129,14 @@ console answers with the page it drew.
   Program tab (`?tab=program`) shows what the context compiled to.
 - **A template** (`/mappings/templates/{id}`): where the template came
   from and the contexts that name it.
+- **A revision** (`/mappings/revisions/{id}`): who recorded it, when and
+  why, every file that differs from the running revision with its lines as
+  a unified diff, and the provisioned files, which are in no revision and
+  read-only. A revision that does not run docks Roll back to this revision
+  (Apply this revision for an imported one) with its reason; the bridge
+  compiles the set with its files first, changes nothing when it does not
+  compile, and refuses the apply when another one ran since the page drew
+  (`POST /operator/revisions/{id}/apply`).
 - **The editor** (`/mappings/edit/{path}`, or `/mappings/new` for a new
   file): see below.
 - **Playground** (`/playground`, `/playground/toopenehr`,
@@ -274,6 +285,15 @@ The Diagnostics tab. [Dark theme](img/console/mappings-diagnostics-dark.png).
 ![A reload of the set](img/console/mappings-reloaded.png)
 
 The set after a reload. [Dark theme](img/console/mappings-reloaded-dark.png).
+
+![The Revisions tab](img/console/mappings-revisions.png)
+
+The Revisions tab after a save. [Dark theme](img/console/mappings-revisions-dark.png).
+
+![A revision](img/console/revision.png)
+
+The baseline revision with its diff against the running one and the
+rollback docked. [Dark theme](img/console/revision-dark.png).
 
 ![A context mapping file](img/console/file-context.png)
 

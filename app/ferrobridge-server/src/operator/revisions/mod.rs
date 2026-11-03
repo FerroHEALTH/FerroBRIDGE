@@ -357,6 +357,10 @@ impl Operator {
                 .record(
                     Entry {
                         origin: Origin::Baseline,
+                        author: String::from(BRIDGE),
+                        reason: String::from(
+                            "the console files the bridge found before its first revision",
+                        ),
                         ..entry
                     },
                     &files,
