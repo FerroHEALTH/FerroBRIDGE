@@ -19,7 +19,6 @@ use fhirconnect::resolve::program::binding::TemplateId;
 use fhirconnect::resolve::program::mapping::Mapping;
 use fhirconnect::resolve::select::SelectError;
 use fhirconnect::resolve::select::select_by_profile;
-use fhirconnect::resolve::select::select_by_profile_pinned;
 use fhirconnect::resolve::select::select_by_template;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -104,7 +103,7 @@ fn compiling_the_same_set_twice_yields_the_same_program() -> Result<(), Box<dyn 
 /// never reaches the compiler. This is the seam that can genuinely see an
 /// order: the registry the compiler reads.
 fn inserted(paths: &[String]) -> Result<MappingSet, String> {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     for path in paths {
         if path.ends_with(".context.yml") {
             let file = load_context_file(path).map_err(|diagnostics| render(&diagnostics))?;
@@ -332,7 +331,7 @@ fn two_programs_sharing_a_profile_are_refused_without_a_pin() -> Result<(), Box<
     let claimed = vec![String::from(
         "http://example.org/fhir/StructureDefinition/synthetic",
     )];
-    let error = select_by_profile(&programs, &claimed)
+    let error = select_by_profile(&programs, &claimed, None)
         .err()
         .ok_or("two programs share the profile")?;
     match error {
@@ -342,7 +341,7 @@ fn two_programs_sharing_a_profile_are_refused_without_a_pin() -> Result<(), Box<
         other => return Err(format!("{other}").into()),
     }
     let pin = TemplateId::new("another.template.v1");
-    let selected = select_by_profile_pinned(&programs, &claimed, Some(&pin))?;
+    let selected = select_by_profile(&programs, &claimed, Some(&pin))?;
     assert_eq!(selected.template().id(), &pin);
     Ok(())
 }

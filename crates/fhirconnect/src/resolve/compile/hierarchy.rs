@@ -73,7 +73,8 @@ impl<'a> Compiler<'a> {
         let hierarchy = preprocessor.hierarchy.as_ref().map(|hierarchy| {
             let at = path.field("hierarchy");
             let with = hierarchy.with.as_ref();
-            let fhir_side = with.and_then(|with| self.fhir_side(model, with, scope, &at));
+            let fhir_side =
+                with.and_then(|with| self.fhir_side(model, with, scope, &at, Site::ReadOnly));
             let openehr_side = with.and_then(|with| self.openehr_side(model, with, scope, &at));
             let inner = Scope {
                 fhir: fhir_side

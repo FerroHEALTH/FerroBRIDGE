@@ -64,11 +64,11 @@ async fn a_drug_exposure_names_its_provider_and_every_commit_shares_the_row()
     graph.push_row(drug_exposure(analyte(2)?, "synthetic-prescriber-1", None)?)?;
     database
         .writer
-        .commit(&graph, &RunId::new("run-1")?)
+        .commit(&graph, &RunId::new("run-1")?, None)
         .await?;
     database
         .writer
-        .commit(&graph, &RunId::new("run-2")?)
+        .commit(&graph, &RunId::new("run-2")?, None)
         .await?;
     let client = reader(&database.postgres).await?;
     let providers = client
@@ -137,7 +137,7 @@ async fn a_visit_detail_is_created_from_its_visit_once() -> Result<(), Box<dyn E
     )?)?;
     database
         .writer
-        .commit(&graph, &RunId::new("run-1")?)
+        .commit(&graph, &RunId::new("run-1")?, None)
         .await?;
     let client = reader(&database.postgres).await?;
     let details = client
@@ -184,7 +184,7 @@ async fn a_visit_detail_of_an_unknown_visit_writes_nothing() -> Result<(), Box<d
     )?)?;
     let refused = database
         .writer
-        .commit(&graph, &RunId::new("run-1")?)
+        .commit(&graph, &RunId::new("run-1")?, None)
         .await
         .expect_err("the visit is unknown");
     assert!(

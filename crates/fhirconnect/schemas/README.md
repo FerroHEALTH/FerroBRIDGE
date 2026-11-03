@@ -11,8 +11,8 @@ published schemas stay where `scripts/vendor/fhirconnect.sh` put them, under
 
 `model-mapping.schema.json` covers a `type: model` and a `type: extension`
 file; `contextual-mapping.schema.json` covers a `type: context` file. The
-loader runs these; `fhirconnect::model::schema::published` runs the published
-pair over caller-supplied bytes, which is how the corpus test pins where the
+loader runs these; `fhirconnect::model::schema::Schemas::compile` compiles the
+published pair from caller-supplied bytes, which is how the corpus test pins where the
 published schemas and the prose disagree.
 
 ## What these add over the published schemas

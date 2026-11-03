@@ -368,16 +368,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok(tuple)
     }
 
-    /// Returns the openEHR pin of one axis, when a split pinned it.
-    pub(super) fn pin(&self, axis: &FlatId) -> Option<RmPosition> {
-        self.pin_named(axis.as_str())
-    }
-
     /// Returns the openEHR pin of one axis, by its flat id.
     ///
     /// Only an openEHR axis takes a pin; a FHIR output axis is a FHIR path,
     /// which no flat id equals.
-    pub(super) fn pin_named(&self, axis: &str) -> Option<RmPosition> {
+    pub(super) fn pin(&self, axis: &str) -> Option<RmPosition> {
         self.pins
             .iter()
             .find(|pinned| pinned.0.as_str() == axis)
