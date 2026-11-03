@@ -71,7 +71,7 @@ pub(crate) async fn vread(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!(
                 "{resource_type}/{id} has no version {vid}: {}",
-                crate::facade::outcome::chain(&error)
+                crate::cause::chain(&error)
             )),
         )
     })?;

@@ -18,9 +18,7 @@
 //! `ihe-atna` (no specification governs this: our own design). The OMOP ETL
 //! and the operator API record nothing of their own.
 
-pub mod facade;
 pub mod hl7v2;
-pub mod reach;
 mod spool;
 
 use std::path::PathBuf;
@@ -173,5 +171,36 @@ impl AccessLog {
     #[must_use]
     pub const fn endpoint(&self) -> &NetworkAddress {
         &self.endpoint
+    }
+
+    /// Returns the sink that writes an access record as a BALP `AuditEvent`.
+    #[must_use]
+    pub const fn sink(&self) -> &BalpSink {
+        &self.sink
+    }
+
+    /// Returns the deployment's category map.
+    #[must_use]
+    pub const fn categories(&self) -> &CategoryMap {
+        &self.categories
+    }
+
+    /// Returns how long a record is kept.
+    #[must_use]
+    pub const fn retention(&self) -> &RetentionPolicy {
+        &self.retention
+    }
+
+    /// Returns the security labels a record carries.
+    #[must_use]
+    pub const fn labels(&self) -> &LabelPolicy {
+        &self.labels
+    }
+
+    /// Returns the CDR the facade's data come from, the origin of Annex II
+    /// 3.2(e).
+    #[must_use]
+    pub fn origin(&self) -> &str {
+        &self.origin
     }
 }

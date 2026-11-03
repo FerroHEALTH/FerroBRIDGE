@@ -218,7 +218,7 @@ pub(crate) async fn vread(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!(
                 "{resource_type}/{id} has no version {vid}: {}",
-                crate::facade::outcome::chain(&error)
+                crate::cause::chain(&error)
             )),
         )
     })?;
@@ -401,7 +401,7 @@ pub(crate) fn parse(body: &[u8], resource_type: &str) -> Result<Inbound, Refusal
             }
             _ => (StatusCode::BAD_REQUEST, IssueType::Invalid, None),
         };
-        let mut issue = Issue::error(code).diagnosing(crate::facade::outcome::chain(&error));
+        let mut issue = Issue::error(code).diagnosing(crate::cause::chain(&error));
         if let Some(path) = location {
             issue = issue.at(path);
         }
@@ -418,7 +418,7 @@ pub(crate) fn internal_id(id: &str) -> Result<FhirResourceId, Refusal> {
     FhirResourceId::new(id).map_err(|error| {
         reply::refusal(
             StatusCode::NOT_FOUND,
-            Issue::error(IssueType::NotFound).diagnosing(crate::facade::outcome::chain(&error)),
+            Issue::error(IssueType::NotFound).diagnosing(crate::cause::chain(&error)),
         )
     })
 }
@@ -475,10 +475,10 @@ pub(crate) fn canonical(
     composition: &Composition,
     template_id: &str,
 ) -> Result<CanonicalComposition, Refusal> {
-    crate::audit::reach::touched(
-        crate::audit::reach::Touch::Read,
+    crate::cdr::reach::touched(
+        crate::cdr::reach::Touch::Read,
         Some(ehr_id),
-        crate::audit::reach::composition(composition, Some(template_id)),
+        crate::cdr::reach::composition(composition, Some(template_id)),
     );
     let text = openehr_its::json::to_canonical_json(composition);
     let value = text.parse::<serde_json::Value>().map_err(|error| {
@@ -630,7 +630,7 @@ pub(crate) async fn version_of_etag(
             StatusCode::BAD_REQUEST,
             Issue::error(IssueType::Invalid).diagnosing(format!(
                 "If-Match carries `{bare}`, which is neither a versionId nor an openEHR version id: {}",
-                crate::facade::outcome::chain(&error)
+                crate::cause::chain(&error)
             )),
         )
     })?;

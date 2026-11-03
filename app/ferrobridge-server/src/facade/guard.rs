@@ -36,10 +36,10 @@ use http::StatusCode;
 use http::Uri;
 use http::request::Parts;
 
-use crate::facade::BASE_PATH;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::mount::BASE_PATH;
 use crate::smart::Smart;
 
 /// One FHIR interaction the facade serves.

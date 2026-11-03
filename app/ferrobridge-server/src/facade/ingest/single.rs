@@ -11,6 +11,7 @@ use openehr_its::rest::generated::ehr::client::CompositionUpdateOutcome;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
+use crate::cause::chain;
 use crate::cdr::Prefer;
 use crate::cdr::ids::EhrId;
 use crate::facade::commit;
@@ -19,7 +20,6 @@ use crate::facade::engine;
 use crate::facade::identity::claims::Claim;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::outcome::chain;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;

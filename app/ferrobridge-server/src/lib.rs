@@ -16,6 +16,7 @@ pub mod audit;
 pub mod banner;
 pub mod boot;
 pub mod build_info;
+pub mod cause;
 pub mod cdr;
 pub mod change_feed;
 pub mod check;
@@ -30,6 +31,7 @@ pub mod indicators;
 mod jobs;
 mod lanes;
 pub mod mappings;
+pub mod mount;
 pub mod operations;
 pub mod operator;
 pub mod outbound;
@@ -536,7 +538,7 @@ pub(crate) fn chain(error: &dyn std::error::Error) -> String {
 /// leaves the facade open when it does not.
 ///
 /// With `[audit]` on, every facade access an authenticated caller makes
-/// passes the layer of [`audit::facade::record`] inside the guard, which
+/// passes the layer of [`facade::audit::record`] inside the guard, which
 /// records it and refuses it when its record has no place.
 pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
     let mut routes = Router::new()
@@ -576,10 +578,10 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
         routes = routes.merge(facade::routes(Arc::clone(mounted), shape, operator));
     }
     if let (Some(log), Some(mounted)) = (state.access_log(), state.facade()) {
-        let recording = audit::facade::Recording::new(Arc::clone(log), Arc::clone(mounted));
+        let recording = facade::audit::Recording::new(Arc::clone(log), Arc::clone(mounted));
         routes = routes.layer(axum::middleware::from_fn_with_state(
             Arc::new(recording),
-            audit::facade::record,
+            facade::audit::record,
         ));
     }
     let routes = routes.layer(facade::guard::layer(state.auth().map(AsRef::as_ref)));

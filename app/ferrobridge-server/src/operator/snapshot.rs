@@ -183,7 +183,7 @@ impl Snapshot {
                 .any(|file| file == path)
                 .then_some("mapping"),
             Language::Fhirconnect => {
-                if crate::facade::search::declaration::is_declaration(path) {
+                if crate::walk::is_declaration(path) {
                     return Some("search");
                 }
                 let set = self.report.fhirconnect_set()?;

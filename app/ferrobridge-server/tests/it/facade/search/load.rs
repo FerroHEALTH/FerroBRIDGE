@@ -64,7 +64,7 @@ async fn the_fixture_declaration_loads_and_the_mapping_loader_skips_it() {
     assert!(
         files
             .iter()
-            .all(|file| !search::declaration::is_declaration(file)),
+            .all(|file| !ferrobridge_server::walk::is_declaration(file)),
         "the FHIRconnect loader reads a search declaration: {files:?}"
     );
 }

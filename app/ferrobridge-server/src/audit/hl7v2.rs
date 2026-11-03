@@ -26,9 +26,6 @@ use ihe_atna::balp::What;
 use ihe_atna::user::OnBehalfOf;
 use secrecy::SecretString;
 
-use crate::facade::identity::PersonId;
-use crate::facade::ingest::Ingested;
-
 /// The namespace the openEHR version uids a record names its data by.
 // NOTE: no specification governs this: our own design; an openEHR version uid is no FHIR
 // resource, so it is an identifier (FHIR R4 references.html §2.3.0.3) in a namespace we name.
@@ -45,27 +42,49 @@ pub struct Message<'a> {
     pub listen: std::net::SocketAddr,
 }
 
-/// Returns the import record of `message`, which committed `ingested` into
+/// The person whose EHR an import wrote into, as the identity map names them.
+#[derive(Debug, Clone, Copy)]
+pub struct Person<'a> {
+    /// The person's id.
+    pub id: &'a str,
+    /// The namespace the id is issued in.
+    pub namespace: &'a str,
+}
+
+/// One composition version an import committed.
+#[derive(Debug, Clone, Copy)]
+pub struct Imported<'a> {
+    /// The openEHR version uid.
+    pub version: &'a str,
+    /// The template the composition conforms to.
+    pub template_id: &'a str,
+}
+
+/// Returns the import record of `message`, which committed `imported` into
 /// the EHR of `person`, when the identity map names one.
 #[must_use]
-pub fn import(message: Message<'_>, ingested: &Ingested, person: Option<&PersonId>) -> Exchange {
+pub fn import<'a>(
+    message: Message<'_>,
+    imported: impl IntoIterator<Item = Imported<'a>>,
+    person: Option<Person<'_>>,
+) -> Exchange {
     let mut entities: Vec<Entity> = person
         .map(|person| Entity::Patient {
             system: None,
-            value: SecretString::from(person.id().to_owned()),
-            namespace: Some(person.namespace().to_owned()),
+            value: SecretString::from(person.id.to_owned()),
+            namespace: Some(person.namespace.to_owned()),
         })
         .into_iter()
         .collect();
-    entities.extend(ingested.committed().map(|committed| {
+    entities.extend(imported.into_iter().map(|committed| {
         Entity::Described(Described {
             what: Some(What::Identifier {
                 system: Some(OBJECT_ID_SYSTEM.to_owned()),
-                value: committed.version.value().to_owned(),
+                value: committed.version.to_owned(),
             }),
             kind: SYSTEM_OBJECT,
             role: Some(DOMAIN_RESOURCE),
-            name: Some(committed.template_id.clone()),
+            name: Some(committed.template_id.to_owned()),
             description: None,
             details: Vec::new(),
             security_labels: Vec::new(),

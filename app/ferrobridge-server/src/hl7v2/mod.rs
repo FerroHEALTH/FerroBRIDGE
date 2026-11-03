@@ -421,8 +421,16 @@ impl Face {
                 peer,
                 listen: *listen,
             },
-            ingested,
-            person.as_ref(),
+            ingested
+                .committed()
+                .map(|committed| crate::audit::hl7v2::Imported {
+                    version: committed.version.value(),
+                    template_id: &committed.template_id,
+                }),
+            person.as_ref().map(|person| crate::audit::hl7v2::Person {
+                id: person.id(),
+                namespace: person.namespace(),
+            }),
         );
         match place {
             Some(place) => place.record(exchange).await,

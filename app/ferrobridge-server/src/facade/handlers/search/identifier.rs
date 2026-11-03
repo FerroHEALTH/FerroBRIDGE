@@ -93,7 +93,7 @@ async fn ehr_of_party(
         }
         Err(error) => Err(reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(crate::facade::outcome::chain(&error)),
+            Issue::error(IssueType::Exception).diagnosing(crate::cause::chain(&error)),
         )),
     }
 }

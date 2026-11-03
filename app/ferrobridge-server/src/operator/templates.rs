@@ -39,7 +39,7 @@ pub async fn example(State(operator): State<Arc<Operator>>, Path(id): Path<Strin
         Ok(Err(error)) => {
             if !matches!(error, PathError::NotComposition { .. }) {
                 tracing::warn!(
-                    error = crate::facade::outcome::chain(&error),
+                    error = crate::cause::chain(&error),
                     "a template's example composition did not build"
                 );
             }
