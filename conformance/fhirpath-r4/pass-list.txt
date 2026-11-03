@@ -65,6 +65,7 @@ testAll/testAllTrue2
 testAll/testAllTrue3
 testAll/testAllTrue4
 testBasics/testEscapedIdentifier
+testBasics/testEscapedIdentifierUnicode
 testBasics/testSimple
 testBasics/testSimpleBackTick1
 testBasics/testSimpleFail
@@ -159,12 +160,14 @@ testDiv/testDiv2
 testDiv/testDiv3
 testDiv/testDiv4
 testDiv/testDiv5
+testDiv/testDiv6
 testDivide/testDivide1
 testDivide/testDivide2
 testDivide/testDivide3
 testDivide/testDivide4
 testDivide/testDivide5
 testDivide/testDivide6
+testDivide/testDivide7
 testDollar/testDollarOrderAllowed
 testDollar/testDollarOrderAllowedA
 testDollar/testDollarOrderNotAllowed
@@ -209,7 +212,11 @@ testEquality/testEquality32
 testEquality/testEquality33
 testEquality/testEquality34
 testEquality/testEquality35
+testEquality/testEquality37
+testEquality/testEquality38
+testEquality/testEquality39
 testEquality/testEquality4
+testEquality/testEquality40
 testEquality/testEquality5
 testEquality/testEquality6
 testEquality/testEquality7
@@ -232,7 +239,14 @@ testEquivalent/testEquivalent21
 testEquivalent/testEquivalent22
 testEquivalent/testEquivalent23
 testEquivalent/testEquivalent23#2
+testEquivalent/testEquivalent24
+testEquivalent/testEquivalent25
+testEquivalent/testEquivalent26
+testEquivalent/testEquivalent27
+testEquivalent/testEquivalent28
+testEquivalent/testEquivalent29
 testEquivalent/testEquivalent3
+testEquivalent/testEquivalent30
 testEquivalent/testEquivalent4
 testEquivalent/testEquivalent5
 testEquivalent/testEquivalent6
@@ -279,6 +293,7 @@ testGreaterThan/testGreaterThan24
 testGreaterThan/testGreaterThan25
 testGreaterThan/testGreaterThan26
 testGreaterThan/testGreaterThan27
+testGreaterThan/testGreaterThan28
 testGreaterThan/testGreaterThan3
 testGreaterThan/testGreaterThan4
 testGreaterThan/testGreaterThan5
@@ -306,6 +321,8 @@ testGreatorOrEqual/testGreatorOrEqual24
 testGreatorOrEqual/testGreatorOrEqual25
 testGreatorOrEqual/testGreatorOrEqual26
 testGreatorOrEqual/testGreatorOrEqual27
+testGreatorOrEqual/testGreatorOrEqual28
+testGreatorOrEqual/testGreatorOrEqual29
 testGreatorOrEqual/testGreatorOrEqual3
 testGreatorOrEqual/testGreatorOrEqual4
 testGreatorOrEqual/testGreatorOrEqual5
@@ -313,9 +330,9 @@ testGreatorOrEqual/testGreatorOrEqual6
 testGreatorOrEqual/testGreatorOrEqual7
 testGreatorOrEqual/testGreatorOrEqual8
 testGreatorOrEqual/testGreatorOrEqual9
-testHasValue/testHasValue1
-testHasValue/testHasValue2
-testHasValue/testHasValue3
+testHasValue/testHasCodingValue1
+testHasValue/testHasCodingValue2
+testHasValue/testHasCodingValue3
 testIif/testIif1
 testIif/testIif10
 testIif/testIif11
@@ -339,6 +356,7 @@ testIndexOf/testIndexOf5
 testIndexOf/testIndexOf6
 testIndexer/testIndexer1
 testIndexer/testIndexer2
+testIndexer/testIndexer3
 testInheritance/testFHIRPathAsFunction11
 testInheritance/testFHIRPathAsFunction12
 testInheritance/testFHIRPathAsFunction13
@@ -393,6 +411,7 @@ testLessOrEqual/testLessOrEqual24
 testLessOrEqual/testLessOrEqual25
 testLessOrEqual/testLessOrEqual26
 testLessOrEqual/testLessOrEqual27
+testLessOrEqual/testLessOrEqual29
 testLessOrEqual/testLessOrEqual3
 testLessOrEqual/testLessOrEqual4
 testLessOrEqual/testLessOrEqual5
@@ -420,7 +439,11 @@ testLessThan/testLessThan24
 testLessThan/testLessThan25
 testLessThan/testLessThan26
 testLessThan/testLessThan27
+testLessThan/testLessThan28
 testLessThan/testLessThan3
+testLessThan/testLessThan30
+testLessThan/testLessThan31
+testLessThan/testLessThan32
 testLessThan/testLessThan4
 testLessThan/testLessThan5
 testLessThan/testLessThan6
@@ -530,6 +553,7 @@ testMinus/testMinus3
 testMinus/testMinus4
 testMinus/testMinus5
 testMinus/testMinus6
+testMinus/testMinus7
 testMiscellaneousAccessorTests/testExtractBirthDate
 testMiscellaneousAccessorTests/testPatientHasBirthDate
 testMiscellaneousAccessorTests/testPatientTelecomTypes
@@ -538,6 +562,9 @@ testMod/testMod2
 testMod/testMod3
 testMod/testMod4
 testMod/testMod5
+testMod/testMod6
+testMod/testMod7
+testMod/testMod8
 testMultiply/testMultiply1
 testMultiply/testMultiply2
 testMultiply/testMultiply3
@@ -560,6 +587,7 @@ testNEquality/testNEquality23
 testNEquality/testNEquality24
 testNEquality/testNEquality25
 testNEquality/testNEquality26
+testNEquality/testNEquality27
 testNEquality/testNEquality3
 testNEquality/testNEquality4
 testNEquality/testNEquality5
@@ -582,6 +610,8 @@ testNotEquivalent/testNotEquivalent2
 testNotEquivalent/testNotEquivalent20
 testNotEquivalent/testNotEquivalent21
 testNotEquivalent/testNotEquivalent22
+testNotEquivalent/testNotEquivalent23
+testNotEquivalent/testNotEquivalent24
 testNotEquivalent/testNotEquivalent3
 testNotEquivalent/testNotEquivalent4
 testNotEquivalent/testNotEquivalent5
@@ -620,6 +650,8 @@ testPlus/testPlusDate2
 testPlus/testPlusDate20
 testPlus/testPlusDate21
 testPlus/testPlusDate22
+testPlus/testPlusDate23
+testPlus/testPlusDate24
 testPlus/testPlusDate3
 testPlus/testPlusDate4
 testPlus/testPlusDate5
@@ -646,6 +678,12 @@ testQuantity/testQuantity5
 testQuantity/testQuantity7
 testQuantity/testQuantity8
 testQuantity/testQuantity9
+testQuantityUnitComparison/testQuantityNoUnitEqual
+testQuantityUnitComparison/testQuantityNoUnitEquivalent
+testQuantityUnitComparison/testQuantityNoUnitVsUnitEquivalent
+testQuantityUnitComparison/testQuantityUnitTextEqual
+testQuantityUnitComparison/testQuantityUnitTextEquivalent
+testQuantityUnitComparison/testQuantityUnitVsNoUnitEquivalent
 testRepeat/testRepeat1
 testRepeat/testRepeat2
 testRepeat/testRepeat3
@@ -675,6 +713,10 @@ testSkip/testSkip1
 testSkip/testSkip2
 testSkip/testSkip3
 testSkip/testSkip4
+testSkip/testSkip5
+testSkip/testSkip6
+testSkip/testSkip7
+testSkip/testSkip8
 testSqrt/testSqrt1
 testSqrt/testSqrt2
 testStartsWith/testStartsWith1
@@ -693,6 +735,14 @@ testSubSetOf/testSubSetOf1
 testSubSetOf/testSubSetOf2
 testSubSetOf/testSubSetOf3
 testSubstring/testSubstring1
+testSubstring/testSubstring11
+testSubstring/testSubstring12
+testSubstring/testSubstring13
+testSubstring/testSubstring14
+testSubstring/testSubstring15
+testSubstring/testSubstring16
+testSubstring/testSubstring17
+testSubstring/testSubstring18
 testSubstring/testSubstring2
 testSubstring/testSubstring3
 testSubstring/testSubstring4
@@ -711,6 +761,8 @@ testTake/testTake4
 testTake/testTake5
 testTake/testTake6
 testTake/testTake7
+testTake/testTake8
+testTake/testTake9
 testToChars/testToChars1
 testToDecimal/testToDecimal1
 testToDecimal/testToDecimal2
@@ -842,8 +894,10 @@ testTypes/testStringMonthConvertsToDate
 testTypes/testStringMonthConvertsToDateTime
 testTypes/testStringQuantityLiteralConvertsToQuantity
 testTypes/testStringQuantityLiteralToQuantity
+testTypes/testStringQuantityMonthToQuantityEquivalent
 testTypes/testStringQuantityWeekConvertsToQuantity
 testTypes/testStringQuantityWeekConvertsToQuantityFalse
+testTypes/testStringQuantityYearToQuantityEquivalent
 testTypes/testStringSecondConvertsToDateTime
 testTypes/testStringSecondConvertsToTime
 testTypes/testStringTZConvertsToDateTime
@@ -856,6 +910,7 @@ testTypes/testTrueLiteralConvertsToBoolean
 testUnion/testUnion1
 testUnion/testUnion10
 testUnion/testUnion11
+testUnion/testUnion12
 testUnion/testUnion2
 testUnion/testUnion3
 testUnion/testUnion4
@@ -872,4 +927,4 @@ testWhere/testWhere1
 testWhere/testWhere2
 testWhere/testWhere3
 testWhere/testWhere4
-total 886
+total 951
