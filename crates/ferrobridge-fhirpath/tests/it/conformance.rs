@@ -315,6 +315,33 @@ fn calls_stu3_function(expression: &str) -> bool {
     CALL.is_match(expression)
 }
 
+/// The group `mode` the suite gives functions outside FHIRPath and outside
+/// the FHIR specification's additions to it.
+///
+/// The suite's `documentFunctions` group carries it and states that its
+/// functions "are not part of FHIRPath, nor of the FHIR specification's
+/// additional FHIRPath functions", so neither corpus runs such a group.
+const CUSTOM_MODE: &str = "custom";
+
+#[test]
+fn the_only_custom_group_of_the_suite_is_the_document_functions() {
+    let text = std::fs::read_to_string(suite_dir().join("fhirpath/tests-fhir-r4.xml"))
+        .expect("the suite should be vendored");
+    let tests = read(&text).expect("the suite should read");
+    let custom: BTreeMap<&str, usize> = tests
+        .iter()
+        .filter(|test| test.group_mode.as_deref() == Some(CUSTOM_MODE))
+        .fold(BTreeMap::new(), |mut groups, test| {
+            *groups.entry(test.group.as_str()).or_default() += 1;
+            groups
+        });
+    assert_eq!(
+        custom.keys().copied().collect::<Vec<_>>(),
+        ["documentFunctions"],
+        "the suite's custom groups moved"
+    );
+}
+
 #[test]
 fn conformance_fhirpath_r4() {
     run(Corpus::FhirpathR4);
@@ -363,7 +390,9 @@ fn run(corpus: Corpus) {
         } else {
             format!("{base}#{count}")
         };
-        if calls_stu3_function(&test.expression) != stu3 {
+        if test.group_mode.as_deref() == Some(CUSTOM_MODE)
+            || calls_stu3_function(&test.expression) != stu3
+        {
             continue;
         }
         let case = match verdict(test, &inputs, stu3) {

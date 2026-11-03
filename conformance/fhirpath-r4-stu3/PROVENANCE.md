@@ -23,4 +23,7 @@ describes.
   undefined, and every failing test records its reason in the result the gate
   reads.
 - A test passes on the same rules as in `fhirpath-r4`.
+- A group the suite marks `mode="custom"` is in neither corpus: the suite
+  states that its `documentFunctions` group exercises functions "not part of
+  FHIRPath, nor of the FHIR specification's additional FHIRPath functions".
 - Never edit the list by hand.
