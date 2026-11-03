@@ -411,6 +411,11 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         specimen.pointer("/type/coding/0/code"),
         only(&input, "Specimen")?.pointer("/type/coding/0/code")
     );
+    assert_eq!(
+        of_type(&output, "OperationOutcome").len(),
+        0,
+        "the run's outcome reports the run and stays out of the document"
+    );
     let composition = only(&output, "Composition")?;
     let section = &composition["section"][0];
     let result_url = output["entry"]

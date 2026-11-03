@@ -15,6 +15,8 @@ impl Document {
     /// the composition, and returns the `fullUrl` of each result the report
     /// names, in its order, the entries of the section that lists them.
     ///
+    /// The run's `OperationOutcome`, the losses it declared, reports the run
+    /// and stays out of the document; read them from the run itself.
     /// Every other resource of the run, its `Provenance` included, is added
     /// as [`Document::add`] adds the output of one run, and the report takes
     /// the same renaming, so its references keep naming the run's results.
@@ -37,10 +39,13 @@ impl Document {
                 expected: "takes one",
             });
         }
+        // NOTE: FHIR R4 documents.html: every resource of a document is reached from its
+        // Composition; the run's OperationOutcome reports the run and is no document content.
         let resources: Vec<Resource> = run
             .entry
             .iter()
             .filter_map(|entry| entry.resource.clone())
+            .filter(|resource| !matches!(resource, Resource::OperationOutcome(_)))
             .collect();
         let found = resources
             .iter()
