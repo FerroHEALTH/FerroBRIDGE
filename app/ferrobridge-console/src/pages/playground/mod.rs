@@ -20,6 +20,7 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu, labelled_menu};
 use ferrohealth_ui::view::code::{Code, Gravity, LineDiagnostic, code_viewer};
 use ferrohealth_ui::view::form::{ERROR, Field, error_id};
 use ferrohealth_ui::view::load_report;
@@ -79,10 +80,13 @@ pub async fn page(visit: &Visit, ran: Option<Ran>) -> Drawn {
     } else {
         template_ids(&visit.reads.running().await)
     };
+    let example = match (tab.as_str(), visit.param("example"), ran.is_none()) {
+        ("tofhir", Some(id), true) => Some((id.to_owned(), visit.reads.template_example(id).await)),
+        _ => None,
+    };
     let body = drawn(
         &visit.locale,
-        &tab,
-        ran.as_ref(),
+        (&tab, ran.as_ref(), example.as_ref()),
         &info,
         capability.as_ref(),
         templates.as_deref(),
@@ -143,8 +147,7 @@ fn validate_types(capability: &Capability) -> Vec<String> {
 /// The page over the tab `tab`, after the run `ran` when one was posted.
 fn drawn(
     l: &Locale,
-    tab: &str,
-    ran: Option<&Ran>,
+    (tab, ran, example): (&str, Option<&Ran>, Option<&Example>),
     info: &Loaded<Info>,
     capability: Option<&Loaded<Capability>>,
     templates: Option<&[String]>,
@@ -159,7 +162,22 @@ fn drawn(
         ActionGroup::none(),
     );
     let off = operations_off(l, info);
-    let post = ran.map(|ran| ran.post.clone()).unwrap_or_default();
+    let (post, notice) = match (ran, example) {
+        (Some(ran), _) => (ran.post.clone(), Html::empty()),
+        (None, Some((id, Ok(Outcome::Shown(composition))))) => (
+            PlaygroundPost {
+                input: format!("{composition:#}"),
+                template: id.clone(),
+                ..PlaygroundPost::default()
+            },
+            Html::empty(),
+        ),
+        (None, Some((_, Ok(Outcome::Refused(refusal))))) => {
+            (PlaygroundPost::default(), refused(l, refusal))
+        }
+        (None, Some((_, Err(fault)))) => (PlaygroundPost::default(), faulted(l, fault, PLAYGROUND)),
+        (None, None) => (PlaygroundPost::default(), Html::empty()),
+    };
     let types = match capability {
         Some(Ok(Outcome::Shown(capability))) => validate_types(capability),
         Some(Ok(Outcome::Refused(refusal))) => {
@@ -185,7 +203,7 @@ fn drawn(
         .map(|(key, words)| Tab::new(*key, tab_href(key), tr(l, *words)))
         .collect();
     header.then(h(format!(
-        r#"<div class="fui-stack">{}</div>"#,
+        r#"<div class="fui-stack">{notice}{}</div>"#,
         binder(l, tr(l, Msg::Playground), tabs, tab, panel)
     )))
 }
@@ -272,6 +290,7 @@ fn input_pane(
     label: Msg,
     text: &str,
     invalid: Option<String>,
+    actions: Option<Html>,
 ) -> TransformPane {
     let error = invalid.map_or_else(Html::empty, |said| {
         h(format!(
@@ -283,7 +302,7 @@ fn input_pane(
         title: tr(l, title),
         tags: vec![tag.to_owned()],
         state: None,
-        actions: None,
+        actions,
         body: json_input(&tr(l, label), text.to_owned()).then(error),
     }
 }
@@ -371,6 +390,38 @@ fn invalid_of(l: &Locale, ran: Option<&Ran>) -> Option<String> {
     }
 }
 
+/// The example a link asked for: the template's id and what the bridge
+/// answered.
+type Example = (String, Loaded<serde_json::Value>);
+
+/// The Example menu of the composition pane: one synthetic example per
+/// template of the running set, each a link that loads it into the pane.
+fn example_menu(l: &Locale, templates: Option<&[String]>) -> Html {
+    let items = templates
+        .unwrap_or_default()
+        .iter()
+        .map(|id| {
+            let mut href = url::form_urlencoded::Serializer::new(String::new());
+            href.append_pair("example", id);
+            Item::new(Action::new(
+                Some(Glyph::FILE_CODE),
+                tr_with(l, Msg::ExampleFrom, &[("template", id.clone().into())]),
+                Act::Link(format!("{PLAYGROUND}?{}", href.finish())),
+            ))
+            .note(tr(l, Msg::ExampleNote))
+        })
+        .collect::<Vec<_>>();
+    if items.is_empty() {
+        return Html::empty();
+    }
+    labelled_menu(
+        l,
+        Glyph::FILE_CODE,
+        tr(l, Msg::Example).into(),
+        &Menu::new("pg-example", tr(l, Msg::ExampleLabel), items),
+    )
+}
+
 /// The `$tofhir` tab.
 fn to_fhir(
     l: &Locale,
@@ -415,6 +466,7 @@ fn to_fhir(
             Msg::CompositionLabel,
             &post.input,
             invalid_of(l, ran),
+            Some(example_menu(l, templates)),
         ),
         answer_pane(
             l,
@@ -481,6 +533,7 @@ fn to_openehr(
             Msg::BundleLabel,
             &post.input,
             invalid_of(l, ran),
+            None,
         ),
         answer_pane(
             l,
@@ -537,6 +590,7 @@ fn validate(
             Msg::ResourceLabel,
             &post.input,
             invalid_of(l, ran),
+            None,
         ),
         answer_pane(
             l,

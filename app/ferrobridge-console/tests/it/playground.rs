@@ -361,3 +361,61 @@ async fn the_template_is_a_choice_of_the_running_sets_templates() -> Result<(), 
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn the_example_menu_offers_one_composition_per_template() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/playground", &cookie)?).await?;
+    assert!(
+        page.contains("/playground?example=synthetic.vital_signs.v1"),
+        "{page}"
+    );
+    assert!(page.contains("From synthetic.vital_signs.v1"), "{page}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_example_fills_the_composition_and_its_template() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        "/operator/templates/synthetic.vital_signs.v1/example",
+        200,
+        &json!({"_type": "COMPOSITION", "name": {"value": "Synthetic example marker"}}),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, page) = send(
+        &service,
+        get_with("/playground?example=synthetic.vital_signs.v1", &cookie)?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, response.status());
+    assert!(page.contains("Synthetic example marker"), "{page}");
+    assert!(
+        page.contains(r#"<option value="synthetic.vital_signs.v1" selected"#),
+        "{page}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_template_with_no_example_draws_the_refusal() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        "/operator/templates/synthetic.vital_signs.v1/example",
+        422,
+        &json!({"type": "https://ferrobridge.eu/docs/operate/problems.html#no-example", "title": "The template has no example composition", "status": 422}),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(
+        &service,
+        get_with("/playground?example=synthetic.vital_signs.v1", &cookie)?,
+    )
+    .await?;
+    assert!(page.contains("422"), "{page}");
+    Ok(())
+}

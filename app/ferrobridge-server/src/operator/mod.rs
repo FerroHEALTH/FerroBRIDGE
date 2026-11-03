@@ -13,6 +13,8 @@
 //! the bridge started on, every secret by reference alone
 //! ([`configuration`]), `GET /operator/etl/runs` the OMOP ETL runs the bridge
 //! schema keeps and `GET /operator/etl/runs/{run_id}` one of them,
+//! `GET /operator/templates/{id}/example` a synthetic example composition
+//! of a template ([`templates`]),
 //! `GET /operator/hl7v2/concept-maps` the HL7 v2 face's `ConceptMap`
 //! directory, `GET /operator/events` the change-feed consumers, their
 //! parked events and the AMQP topology, and `POST
@@ -33,6 +35,7 @@ pub mod reload;
 pub mod revisions;
 pub mod save;
 pub mod snapshot;
+pub mod templates;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -240,6 +243,7 @@ pub fn routes(
         .route("/operator/mappings/check", post(save::check))
         .route("/operator/mappings/{*path}", get(mapping).put(save::save))
         .route("/operator/reload", post(save::reload))
+        .route("/operator/templates/{id}/example", get(templates::example))
         .route("/operator/revisions", get(revisions::routes::list))
         .route(
             "/operator/revisions/import",

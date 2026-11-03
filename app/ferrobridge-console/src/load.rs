@@ -234,6 +234,16 @@ impl Reads {
         loaded(state.bridge().revision_diff(id, token).await)
     }
 
+    /// The synthetic example composition of the template `id`, `GET
+    /// /operator/templates/{id}/example`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn template_example(&self, id: &str) -> Loaded<serde_json::Value> {
+        let (state, token) = self.signed_in()?;
+        loaded(state.bridge().template_example(id, token).await)
+    }
+
     /// The HL7 v2 face's `ConceptMap` directory, `GET
     /// /operator/hl7v2/concept-maps`.
     ///

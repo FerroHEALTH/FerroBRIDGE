@@ -49,6 +49,8 @@ pub enum Kind {
     PreconditionFailed,
     /// `428`: a save or an apply sends no `If-Match` or `If-None-Match`.
     PreconditionRequired,
+    /// `422`: the template has no example composition.
+    NoExample,
     /// `500`: a mapping directory could not be read.
     Unreadable,
     /// `500`: the mapping directory could not be written.
@@ -66,7 +68,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
@@ -78,6 +80,7 @@ impl Kind {
         Self::NotConfigured,
         Self::PreconditionFailed,
         Self::PreconditionRequired,
+        Self::NoExample,
         Self::Unreadable,
         Self::Unwritable,
         Self::DeadLettersUnavailable,
@@ -145,6 +148,11 @@ impl Kind {
                 "precondition-required",
                 "The write sends no precondition",
                 StatusCode::PRECONDITION_REQUIRED,
+            ),
+            Self::NoExample => (
+                "no-example",
+                "The template has no example composition",
+                StatusCode::UNPROCESSABLE_ENTITY,
             ),
             Self::Unreadable => (
                 "unreadable",
