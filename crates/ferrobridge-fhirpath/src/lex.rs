@@ -312,8 +312,9 @@ mod tests {
 
     #[test]
     fn a_unicode_escape_takes_four_hex_digits_and_no_sign() {
-        // FHIRPath N1 §4.1.2 and its grammar (`UNICODE: 'u' HEX HEX HEX HEX`): `\u0041` is
-        // `A`, and a `\` before anything else is dropped, `'\u005'` reading `u005`.
+        // FHIRPath N1 grammar, `STRING: '\'' (ESC | .)*? '\''` and `UNICODE: 'u' HEX HEX HEX
+        // HEX`: `\u0041` is `A` and `\u+041` no escape; N1 §4.1.2 drops a `\` before a
+        // non-escape, `'\u005'` reading `u005`, so `'\u+041'` reads `u+041` (#1470).
         for (literal, text) in [
             (r"'\u0041'", "A"),
             (r"'\u005'", "u005"),
