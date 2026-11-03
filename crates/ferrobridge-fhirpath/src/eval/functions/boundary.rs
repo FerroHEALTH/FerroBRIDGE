@@ -79,6 +79,8 @@ pub(super) fn call<'a>(call: &Call<'_, '_, 'a>) -> Result<Option<Collection<'a>>
 /// not take.
 fn precision(item: &Item<'_>) -> Option<u8> {
     match item {
+        // NOTE: FHIRPath 3.0.0 precision() counts the digits after the decimal place, which
+        // is silent above the units: our own design answers 0 for `9.5e2`, as for `100`.
         Item::Decimal(value) => u8::try_from(value.scale()).ok(),
         Item::Integer(_) => Some(0),
         Item::Date(date) => Some(date.digits()),
