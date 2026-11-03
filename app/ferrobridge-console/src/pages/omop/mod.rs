@@ -29,10 +29,11 @@ use crate::locale::tr;
 use crate::markup::{code, link, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::facade::{indicator, lane_on};
-use crate::pages::parts::{faulted, quiet, refused, section};
+use crate::pages::parts::{faulted, refused, section};
 use crate::pages::settings::rows;
 use crate::visit::Visit;
 use ferrohealth_health::document::Readiness;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The tabs, each its key and its words.
 const TABS: [(&str, Msg); 3] = [
@@ -156,7 +157,7 @@ fn drawn(
             l,
             tab,
             header,
-            quiet(
+            list_empty(
                 tr(l, Msg::OmopOff),
                 Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
             ),
