@@ -3,7 +3,7 @@
 
 //! JSON Schema validation of a FHIRconnect mapping file, in two layers.
 //!
-//! [`published`] compiles the two schemas FHIRconnect ships
+//! [`Schemas::compile`] compiles the two schemas FHIRconnect ships
 //! (`docs/specs/fhirconnect/modules/ROOT/pages/schema/schema.adoc`) from bytes
 //! the caller supplies, so the vendored copies stay the one copy in the tree.
 //! [`strict`] compiles the two schemas this crate ships beside its source,
@@ -105,27 +105,6 @@ impl Schemas {
             &ModelCode::SchemaViolation.into(),
             kind.file_name(),
         )
-    }
-}
-
-/// The two schemas FHIRconnect publishes.
-///
-/// The published schemas are vendored under `docs/specs/fhirconnect/`, outside
-/// this crate's packaged content, so the compiler here takes their bytes from
-/// the caller. That keeps one copy of a vendored file in the tree
-/// (`.claude/rules/vendored-inputs.md` forbids a second) and lets the corpus
-/// test validate against the exact published bytes.
-pub mod published {
-    use crate::model::schema::Schemas;
-    use openehr_mapping_core::schema::SchemaError;
-
-    /// Compiles the published model and context schemas from their JSON text.
-    ///
-    /// # Errors
-    ///
-    /// Returns whatever [`Schemas::compile`] returns.
-    pub fn compile(model: &str, context: &str) -> Result<Schemas, SchemaError> {
-        Schemas::compile(model, context)
     }
 }
 

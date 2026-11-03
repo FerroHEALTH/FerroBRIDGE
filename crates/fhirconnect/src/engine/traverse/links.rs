@@ -347,7 +347,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 bound
                     .get(depth)
                     .copied()
-                    .or_else(|| self.pin(axis))
+                    .or_else(|| self.pin(axis.as_str()))
                     .unwrap_or_else(RmPosition::first)
             })
             .collect()

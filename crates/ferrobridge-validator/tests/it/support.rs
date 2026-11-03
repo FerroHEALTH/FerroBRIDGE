@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use ferrobridge_validator::issue::Issue;
 use ferrobridge_validator::issue::MessageId;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::report::Report;
 use ferrobridge_validator::set::PackageSet;
 use ferrobridge_validator::validate::Validator;
@@ -113,7 +114,7 @@ pub(crate) fn set_with(definitions: &[serde_json::Value]) -> TestResult<(Synthet
         &[("hl7.fhir.r4.core", "4.0.1")],
         definitions,
     )?;
-    let set = PackageSet::load([core(), synthetic.path().to_owned()])?;
+    let set = PackageSet::<R4>::load([core(), synthetic.path().to_owned()])?;
     Ok((synthetic, set))
 }
 

@@ -19,6 +19,8 @@ use ferrobridge_console::config::Config;
 use ferrobridge_console::config::settings::Settings;
 use ferrobridge_console::server::{ConsoleState, router};
 use ferrobridge_testkit::oidc::{IdTokenClaims, Provider, TokenAnswer};
+use ferrohealth_session::record::{Credential, Held};
+use ferrohealth_session::sessions::Occupancy;
 
 /// The settings a console with its bridge at `bridge` runs on.
 pub(crate) fn settings(bridge: &str) -> Settings {
@@ -78,8 +80,8 @@ pub(crate) fn resolve(text: &str) -> Result<Settings, Box<dyn Error>> {
 }
 
 /// The state and the service for the configuration `text` writes.
-pub(crate) fn console(text: &str) -> Result<(ConsoleState, axum::Router), Box<dyn Error>> {
-    let state = ConsoleState::new(resolve(text)?)?;
+pub(crate) async fn console(text: &str) -> Result<(ConsoleState, axum::Router), Box<dyn Error>> {
+    let state = ConsoleState::new(resolve(text)?).await?;
     let service = router(state.clone());
     Ok((state, service))
 }
@@ -161,7 +163,13 @@ impl Begun {
 
 /// Begins a sign-in at `service` with `GET /login`.
 pub(crate) async fn begin(service: &axum::Router) -> Result<Begun, Box<dyn Error>> {
-    let (response, _body) = send(service, get("/login")?).await?;
+    begin_at(service, "/login").await
+}
+
+/// Begins a sign-in at `service` with a `GET` of `login`, the sign-in route
+/// with its query.
+pub(crate) async fn begin_at(service: &axum::Router, login: &str) -> Result<Begun, Box<dyn Error>> {
+    let (response, _body) = send(service, get(login)?).await?;
     assert_eq!(
         StatusCode::SEE_OTHER,
         response.status(),
@@ -221,10 +229,43 @@ pub(crate) async fn sign_in(
         ..answer
     };
     provider.reset().await?;
-    provider.answer_code(&answer).await?;
+    provider
+        .answer_grant("grant_type=authorization_code", &answer)
+        .await?;
     let (response, body) = complete(service, &begun).await?;
     assert_eq!(StatusCode::SEE_OTHER, response.status(), "{body}");
     session_cookie(&response)
+}
+
+/// What the live session the `name=value` pair `cookie` names holds now,
+/// read through `ferrohealth-session`'s store as a request reads it.
+pub(crate) fn held(state: &ConsoleState, cookie: &str) -> Result<Held, Box<dyn Error>> {
+    let mut headers = http::HeaderMap::new();
+    headers.insert(http::header::COOKIE, http::HeaderValue::from_str(cookie)?);
+    Ok(state.sessions().held(&headers)?.value)
+}
+
+/// The access token the session `cookie` names holds, `None` once it has
+/// none that is valid.
+pub(crate) fn held_token(
+    state: &ConsoleState,
+    cookie: &str,
+) -> Result<Option<String>, Box<dyn Error>> {
+    Ok(match held(state, cookie)? {
+        Held::SignedIn(session) => match session.credential() {
+            Credential::Bearer(token) => Some(token.expose().to_owned()),
+            Credential::Basic { .. } => None,
+        },
+        Held::TokenExpired | Held::Ended | Held::Absent => None,
+    })
+}
+
+/// How many pending sign-ins and sessions the console's memory store holds.
+pub(crate) fn occupancy(state: &ConsoleState) -> Result<Occupancy, Box<dyn Error>> {
+    state
+        .sessions()
+        .occupancy()?
+        .ok_or_else(|| "a memory store".into())
 }
 
 /// Every line the console logs while it is captured.

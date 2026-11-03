@@ -182,7 +182,10 @@ async fn a_graph_commits_its_rows_links_and_watermark() -> Result<(), Box<dyn Er
     }
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     let run = RunId::new("run-1")?;
-    let report = database.writer.commit(&laboratory(1, 2)?, &run).await?;
+    let report = database
+        .writer
+        .commit(&laboratory(1, 2)?, &run, None)
+        .await?;
     let client = reader(&database.postgres).await?;
 
     assert_eq!(
@@ -245,13 +248,13 @@ async fn committing_the_same_graph_again_keeps_every_id() -> Result<(), Box<dyn 
     let graph = laboratory(1, 2)?;
     database
         .writer
-        .commit(&graph, &RunId::new("run-1")?)
+        .commit(&graph, &RunId::new("run-1")?, None)
         .await?;
     let client = reader(&database.postgres).await?;
     let first = measurements(&client).await?;
     database
         .writer
-        .commit(&graph, &RunId::new("run-2")?)
+        .commit(&graph, &RunId::new("run-2")?, None)
         .await?;
     assert_eq!(first, measurements(&client).await?);
     assert_eq!(4, count(&client, "cdm.fact_relationship").await?);
@@ -267,11 +270,11 @@ async fn a_later_version_replaces_the_rows_of_the_earlier_one() -> Result<(), Bo
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?, None)
         .await?;
     database
         .writer
-        .commit(&laboratory(2, 1)?, &RunId::new("run-2")?)
+        .commit(&laboratory(2, 1)?, &RunId::new("run-2")?, None)
         .await?;
     let client = reader(&database.postgres).await?;
     assert_eq!(
@@ -302,7 +305,7 @@ async fn an_unresolved_reference_writes_nothing_of_the_composition() -> Result<(
     )?;
     let error = database
         .writer
-        .commit(&graph, &RunId::new("run-1")?)
+        .commit(&graph, &RunId::new("run-1")?, None)
         .await
         .expect_err("no visit was derived");
     assert!(
@@ -332,7 +335,7 @@ async fn an_exhausted_sequence_is_a_typed_error_and_rolls_back() -> Result<(), B
         .await?;
     let error = database
         .writer
-        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?, None)
         .await
         .expect_err("three rows need three ids and two are left");
     assert!(
@@ -358,7 +361,7 @@ async fn the_existing_policy_refuses_an_ehr_without_a_person() -> Result<(), Box
     let mut database = database(PersonPolicy::Existing).await?;
     let error = database
         .writer
-        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?, None)
         .await
         .expect_err("no PERSON row names the EHR");
     assert!(
@@ -416,7 +419,7 @@ async fn visits_keep_their_ids_and_resolve_references() -> Result<(), Box<dyn Er
     )?;
     database
         .writer
-        .commit(&graph, &RunId::new("run-1")?)
+        .commit(&graph, &RunId::new("run-1")?, None)
         .await?;
     let linked: Option<i32> = client
         .query_one(

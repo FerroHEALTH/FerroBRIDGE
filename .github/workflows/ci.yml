@@ -298,6 +298,28 @@ jobs:
       - name: The duplicated lines have not risen
         run: bash scripts/checks/duplication.sh
 
+  # The forwarder ratchet: the functions whose whole body forwards to one
+  # other call may fall and never rise (`.claude/rules/rust-style.md` §No
+  # function only forwards to another, #1414). tools/forwarders builds
+  # proc-macro2, quote and syn alone, so no build cache.
+  forwarders:
+    name: forwarders
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache: "false"
+      - name: Forwarder ratchet self-test
+        run: bash scripts/checks/forwarders.sh --self-test
+      - name: The forwarders have not risen
+        run: bash scripts/checks/forwarders.sh
+
   # The stray-literal guard: a string the operator console draws belongs in
   # its catalog under app/ferrobridge-console/locales/, and a file may hold no
   # more stray literals than its baseline while the strings move (#956).
@@ -725,7 +747,9 @@ jobs:
       # One package at a time, as the clippy and msrv lanes do: a workspace-wide
       # test build schedules the generated giants side by side and the runner
       # kills it with exit 143 (docs/ci-cd.md). nextest does not run doctests,
-      # so they get their own compile.
+      # so they get their own compile, over the packages with a library
+      # target: `cargo test --doc` refuses a binary-only one (tools/forwarders),
+      # the filter scripts/checks/fast.sh applies.
       - env:
           PACKAGES: ${{ matrix.packages }}
         run: |
@@ -734,7 +758,15 @@ jobs:
           args=()
           for package in "${packages[@]}"; do args+=(-p "$package"); done
           cargo hack nextest run "${args[@]}" --locked --no-tests=pass
-          cargo hack test --doc "${args[@]}" --locked
+          libraries="$(cargo metadata --no-deps --format-version 1 --locked |
+            jq -r '.packages[] | select(any(.targets[]; any(.kind[]; . == "lib" or . == "rlib"))) | .name')"
+          docs=()
+          for package in "${packages[@]}"; do
+            if grep -qxF "$package" <<<"$libraries"; then docs+=(-p "$package"); fi
+          done
+          if [ "${#docs[@]}" -gt 0 ]; then
+            cargo hack test --doc "${docs[@]}" --locked
+          fi
       # eehrxf has no default feature, so its suites run with every feature on.
       # The suites that hold a patient summary or a laboratory report
       # document to the vendored profiles also write it under
@@ -1418,6 +1450,22 @@ jobs:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
 
+  # No tracked file keeps an unresolved merge conflict (#1464; no
+  # specification governs the guard: our own design).
+  conflict-markers:
+    name: conflict-markers
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The guard refuses each marker and skips the vendored trees
+        run: bash scripts/checks/conflict-markers.sh --self-test
+      - run: bash scripts/checks/conflict-markers.sh
+
   # ---- The single required check -------------------------------------------
   # conclusion is the one status check the branch ruleset requires. It `needs`
   # every other job and runs on always(), so it reports even when every gated
@@ -1435,6 +1483,7 @@ jobs:
       - comment-style
       - file-length
       - duplication
+      - forwarders
       - stray-literals
       - versions
       - profile-packages
@@ -1463,6 +1512,7 @@ jobs:
       - publish-dry-run
       - dependency-review
       - journeys
+      - conflict-markers
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

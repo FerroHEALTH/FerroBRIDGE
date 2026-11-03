@@ -152,10 +152,7 @@ async fn every_read_refuses_a_caller_without_a_live_session_before_the_bridge()
                 None => get(route)?,
             };
             let (response, answer) = send(&service, request).await?;
-            assert!(
-                response.headers().get("set-cookie").is_none(),
-                "{route} {cookie:?} set a cookie"
-            );
+            assert!(sets_no_cookie(&response), "{route} {cookie:?} set a cookie");
             if route.starts_with("/search/answer") {
                 assert_eq!(StatusCode::UNAUTHORIZED, response.status(), "{route}");
             } else {
@@ -244,10 +241,7 @@ async fn every_post_refuses_a_caller_without_a_live_session_before_the_bridge()
             let (response, _body) =
                 send(&service, posted(&route, &form, "same-origin", cookie)?).await?;
             assert_ne!(StatusCode::OK, response.status(), "{route} {cookie:?}");
-            assert!(
-                response.headers().get("set-cookie").is_none(),
-                "{route} {cookie:?} set a cookie"
-            );
+            assert!(sets_no_cookie(&response), "{route} {cookie:?} set a cookie");
         }
     }
     let after = bridge.received_requests().await.ok_or("recorded")?.len();
@@ -289,10 +283,7 @@ async fn a_plain_answer_post_without_a_live_session_draws_the_sign_in_and_asks_n
     {
         let request = crate::stub::post(&route, &form, "ferrobridge_console_session=forged")?;
         let (response, body) = send(&service, request).await?;
-        assert!(
-            response.headers().get("set-cookie").is_none(),
-            "{route} set a cookie"
-        );
+        assert!(sets_no_cookie(&response), "{route} set a cookie");
         assert!(body.contains("Sign in"), "{route}: {body}");
         assert!(
             !body.contains("synthetic"),
@@ -302,4 +293,12 @@ async fn a_plain_answer_post_without_a_live_session_draws_the_sign_in_and_asks_n
     let after = bridge.received_requests().await.ok_or("recorded")?.len();
     assert_eq!(before, after, "a post without a session asked the bridge");
     Ok(())
+}
+
+/// Whether `response` sets no cookie: the one `Set-Cookie` it may carry
+/// removes a session cookie that names no live session.
+fn sets_no_cookie(response: &http::Response<()>) -> bool {
+    crate::support::set_cookies(response)
+        .iter()
+        .all(|set| set.starts_with("ferrobridge_console_session=;") && set.contains("Max-Age=0"))
 }

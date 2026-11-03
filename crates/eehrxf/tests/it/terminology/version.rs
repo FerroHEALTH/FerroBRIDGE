@@ -38,7 +38,7 @@ fn written(terminology: &str) -> Result<(String, Option<String>), Box<dyn Error>
     let text: DvText = serde_json::from_str(&format!(
         r#"{{ "_type": "DV_CODED_TEXT", "value": "Synthetic finding", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "{terminology}" }}, "code_string": "1001" }} }}"#
     ))?;
-    let transcoded = transcode(&text, &PreferredSystems::default())?;
+    let transcoded = transcode(&text, &PreferredSystems::default(), None)?;
     let [coding] = transcoded.codings() else {
         return Err(format!("{terminology} is not one coding").into());
     };

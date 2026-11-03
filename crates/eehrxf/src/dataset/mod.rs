@@ -20,7 +20,6 @@ mod read;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io;
-use std::io::Read;
 
 use crate::category::Root;
 use crate::dataset::constraint::Binding;
@@ -429,26 +428,6 @@ pub struct DatasetModel {
 }
 
 impl DatasetModel {
-    /// Reads the dataset model from a FHIR package archive, the gzip-compressed
-    /// tarball a FHIR package registry serves.
-    ///
-    /// Every `StructureDefinition` of kind `logical` directly under `package/`
-    /// is read: a `specialization` as a logical model, a `constraint` as an
-    /// obligations profile over the model its `baseDefinition` names. Every
-    /// other resource of the package is left out.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`DatasetError`] when the archive cannot be read, carries no
-    /// manifest, holds a JSON file that does not parse, or holds a logical
-    /// definition that is defective: no snapshot, an element with no
-    /// cardinality, a duplicate canonical URL or element path, a profile over
-    /// a model the package lacks or whose snapshot drops one of its elements,
-    /// or an obligation with no single code or with an empty actor.
-    pub fn read(archive: impl Read) -> Result<Self, DatasetError> {
-        read::package(archive)
-    }
-
     /// Returns the package the model was read from.
     #[must_use]
     pub const fn package(&self) -> &PackageId {
@@ -516,20 +495,6 @@ pub struct ResourceProfile {
 }
 
 impl ResourceProfile {
-    /// Reads the profile at the canonical `url` from a FHIR package archive,
-    /// the gzip-compressed tarball a FHIR package registry serves.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`DatasetError`] when the archive cannot be read, carries no
-    /// manifest, holds a JSON file that does not parse, holds no
-    /// `StructureDefinition` at `url` ([`DatasetError::MissingProfile`]) or
-    /// two of them, or holds one with no snapshot, an element with no
-    /// cardinality, or an element id given twice.
-    pub fn read(archive: impl Read, url: &str) -> Result<Self, DatasetError> {
-        read::resource_profile(archive, url)
-    }
-
     /// Returns the package the profile was read from.
     #[must_use]
     pub const fn package(&self) -> &PackageId {

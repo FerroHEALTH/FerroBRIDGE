@@ -46,7 +46,7 @@ impl<'m> Datum<'m> {
     pub(super) fn text(self) -> Option<&'m str> {
         match self {
             Self::Repetition(repetition) => repetition.text(),
-            Self::Component(component) => component.text(),
+            Self::Component(component) => component.subcomponent(1),
             Self::Text(text) => Some(text).filter(|text| crate::parse::valued(text)),
             Self::Segment | Self::Absent => None,
         }

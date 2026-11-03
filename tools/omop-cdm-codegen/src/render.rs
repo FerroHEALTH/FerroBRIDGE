@@ -177,7 +177,7 @@ pub fn render_table(table: &Table) -> Result<String, std::fmt::Error> {
         ("User guidance", table.user_guidance.as_deref()),
         ("ETL conventions", table.etl_conventions.as_deref()),
     ];
-    write_prose(&mut out, "OMOP_CDMv5.4_Table_Level.csv", &table_prose)?;
+    write_prose(&mut out, "", "OMOP_CDMv5.4_Table_Level.csv", &table_prose)?;
     out.push_str("#[derive(Debug, Clone, PartialEq)]\n");
     writeln!(out, "pub struct {} {{", table.type_name)?;
     for column in &table.columns {
@@ -202,7 +202,12 @@ pub fn render_table(table: &Table) -> Result<String, std::fmt::Error> {
             ("User guidance", column.user_guidance.as_deref()),
             ("ETL conventions", column.etl_conventions.as_deref()),
         ];
-        write_indented_prose(&mut out, "OMOP_CDMv5.4_Field_Level.csv", &column_prose)?;
+        write_prose(
+            &mut out,
+            "    ",
+            "OMOP_CDMv5.4_Field_Level.csv",
+            &column_prose,
+        )?;
         let rust_type = column.rust_type.name();
         let rust_type = if column.required {
             rust_type
@@ -278,30 +283,12 @@ fn metadata_type_name(rust_type: RustType) -> String {
         .map_or_else(|| rust_type.name(), str::to_owned)
 }
 
-/// Writes the definitions' prose as a doc comment, at no indentation.
-fn write_prose(
-    out: &mut String,
-    source: &str,
-    sections: &[(&str, Option<&str>)],
-) -> Result<(), std::fmt::Error> {
-    write_prose_at(out, "", source, sections)
-}
-
-/// Writes the definitions' prose as a doc comment, indented one level for a
-/// struct field.
-fn write_indented_prose(
-    out: &mut String,
-    source: &str,
-    sections: &[(&str, Option<&str>)],
-) -> Result<(), std::fmt::Error> {
-    write_prose_at(out, "    ", source, sections)
-}
-
-/// Writes the quoted sections of the definitions as a `text` code block.
+/// Writes the quoted sections of the definitions as a `text` code block, a
+/// doc comment at `indent` (none for a table, one level for a struct field).
 ///
 /// The block keeps the specification's own wording, and rustdoc reads none of
 /// it as markup.
-fn write_prose_at(
+fn write_prose(
     out: &mut String,
     indent: &str,
     source: &str,

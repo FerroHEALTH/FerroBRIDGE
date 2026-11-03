@@ -6,7 +6,7 @@
 
 use ferrobridge_hl7v2::map::condition::{
     AssignmentError, Check, Compare, ConditionError, Expr, Operand, Part, Probe, Unevaluable,
-    assignment, evaluate, parse, parse_for, requires_absent, source_operand,
+    assignment, evaluate, parse, requires_absent, source_operand,
 };
 
 fn component(datatype: &str, path: &[usize]) -> Operand {
@@ -42,7 +42,7 @@ fn the_guideline_forms_parse() {
         "IF HD.2 NOT VALUED AND (HD-3 NOT IN (\"ISO\", \"UUID\", \"DNS\", \"URI\"))",
         "IF HD.1 NOT VALUED AND IF HD-3 NOT IN (\"ISO\", \"UUID\")",
     ] {
-        assert!(parse(text).is_ok(), "{text}: {:?}", parse(text));
+        assert!(parse(text, None).is_ok(), "{text}: {:?}", parse(text, None));
     }
 }
 
@@ -58,14 +58,14 @@ fn corpus_forms_outside_the_list_are_refused() {
         "IF IN1-17 IS 'patient'",
         "IF XYZ-3 = \"ISO\"",
     ] {
-        assert!(parse(text).is_err(), "{text}");
+        assert!(parse(text, None).is_err(), "{text}");
     }
 }
 
 #[test]
 fn a_shared_check_applies_to_each_operand() {
     assert_eq!(
-        parse("IF PID-33 AND PID-34 VALUED"),
+        parse("IF PID-33 AND PID-34 VALUED", None),
         Ok(Expr::And(
             Box::new(Expr::Test(field("PID", &[33]), Check::Valued)),
             Box::new(Expr::Test(field("PID", &[34]), Check::Valued)),
@@ -75,7 +75,7 @@ fn a_shared_check_applies_to_each_operand() {
 
 #[test]
 fn and_binds_tighter_than_or() {
-    let parsed = parse("IF PID-3 VALUED OR PID-4 VALUED AND PID-5 VALUED");
+    let parsed = parse("IF PID-3 VALUED OR PID-4 VALUED AND PID-5 VALUED", None);
     let test = |position| Box::new(Expr::Test(field("PID", &[position]), Check::Valued));
     assert_eq!(
         parsed,
@@ -86,7 +86,7 @@ fn and_binds_tighter_than_or() {
 #[test]
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 fn a_count_comparison_reads_the_repetitions() -> Result<(), Unevaluable> {
-    let expr = parse("IF OBX-5 LST.COUNT GREATER THAN OR EQUALS 2").expect("a condition");
+    let expr = parse("IF OBX-5 LST.COUNT GREATER THAN OR EQUALS 2", None).expect("a condition");
     assert!(
         matches!(
             expr,
@@ -107,7 +107,7 @@ fn a_count_comparison_reads_the_repetitions() -> Result<(), Unevaluable> {
 
 #[test]
 fn not_valued_error_stops_the_mapper_when_it_holds() {
-    let expr = parse("IF PID-3 NOT VALUED ERROR").expect("a condition");
+    let expr = parse("IF PID-3 NOT VALUED ERROR", None).expect("a condition");
     let mut probe = |_: &Operand| Some(Probe::default());
     assert!(matches!(
         evaluate(&expr, &mut probe),
@@ -118,7 +118,7 @@ fn not_valued_error_stops_the_mapper_when_it_holds() {
 #[test]
 fn only_a_conjunct_not_valued_check_requires_the_operand_absent() {
     let own = field("MSH", &[24]);
-    let holds = |text: &str| requires_absent(&parse(text).expect("it parses"), &own);
+    let holds = |text: &str| requires_absent(&parse(text, None).expect("it parses"), &own);
     assert!(holds("IF MSH-24 NOT VALUED AND MSH-3 NOT VALUED"));
     assert!(holds("IF MSH-3 NOT VALUED AND MSH-24 NOT VALUED"));
     assert!(!holds("IF MSH-3 NOT VALUED"));
@@ -130,21 +130,21 @@ fn only_a_conjunct_not_valued_check_requires_the_operand_absent() {
 #[test]
 fn a_dashed_data_type_name_is_a_component_and_a_dashed_segment_a_field() {
     assert_eq!(
-        parse("IF HD-3 = \"ISO\""),
+        parse("IF HD-3 = \"ISO\"", None),
         Ok(Expr::Test(
             component("HD", &[3]),
             Check::Equals(String::from("ISO"))
         ))
     );
     assert_eq!(
-        parse("IF XON-10 NOT VALUED"),
+        parse("IF XON-10 NOT VALUED", None),
         Ok(Expr::Test(
             component("XON", &[10]),
             Check::NotValued { error: false }
         ))
     );
     assert_eq!(
-        parse("IF PID-3 VALUED"),
+        parse("IF PID-3 VALUED", None),
         Ok(Expr::Test(field("PID", &[3]), Check::Valued))
     );
 }
@@ -152,7 +152,7 @@ fn a_dashed_data_type_name_is_a_component_and_a_dashed_segment_a_field() {
 #[test]
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 fn a_dashed_component_comparison_reads_the_component() -> Result<(), Unevaluable> {
-    let expr = parse("IF HD-3 NOT IN (\"ISO\", \"UUID\")").expect("a condition");
+    let expr = parse("IF HD-3 NOT IN (\"ISO\", \"UUID\")", None).expect("a condition");
     let probe = |text: &'static str| {
         move |operand: &Operand| {
             (operand == &component("HD", &[3])).then(|| Probe {
@@ -179,12 +179,15 @@ fn a_check_with_no_operand_is_refused_as_such() {
         ("IF PID-3 VALUED AND IN (\"A\")", 4),
     ] {
         assert_eq!(
-            parse(text),
+            parse(text, None),
             Err(ConditionError::NoOperand { token }),
             "{text}"
         );
     }
-    assert!(matches!(parse("IF NOT (PID-3 VALUED)"), Ok(Expr::Not(_))));
+    assert!(matches!(
+        parse("IF NOT (PID-3 VALUED)", None),
+        Ok(Expr::Not(_))
+    ));
 }
 
 #[test]
@@ -192,15 +195,15 @@ fn an_operand_less_in_reads_the_row_source() {
     let own = component("HD", &[3]);
     let list = || vec![String::from("ISO"), String::from("UUID")];
     assert_eq!(
-        parse_for("IF IN (\"ISO\", \"UUID\")", Some(&own)),
+        parse("IF IN (\"ISO\", \"UUID\")", Some(&own)),
         Ok(Expr::Test(own.clone(), Check::In(list())))
     );
     assert_eq!(
-        parse_for("IF NOT IN (\"ISO\", \"UUID\")", Some(&own)),
+        parse("IF NOT IN (\"ISO\", \"UUID\")", Some(&own)),
         Ok(Expr::Test(own.clone(), Check::NotIn(list())))
     );
     assert_eq!(
-        parse_for("IF HD.2 VALUED AND NOT IN (\"ISO\", \"UUID\")", Some(&own)),
+        parse("IF HD.2 VALUED AND NOT IN (\"ISO\", \"UUID\")", Some(&own)),
         Ok(Expr::And(
             Box::new(Expr::Test(component("HD", &[2]), Check::Valued)),
             Box::new(Expr::Test(own.clone(), Check::NotIn(list())))
@@ -217,13 +220,13 @@ fn an_operand_less_check_with_no_row_source_or_a_bare_literal_stays_refused() {
         "IF NOT VALUED",
     ] {
         assert_eq!(
-            parse_for(text, None),
+            parse(text, None),
             Err(ConditionError::NoOperand { token: 1 }),
             "{text}"
         );
     }
     assert_eq!(
-        parse_for(
+        parse(
             "IF IAM-15 VALUED AND NOT \"SEL\"",
             Some(&field("IAM", &[15]))
         ),
@@ -235,11 +238,11 @@ fn an_operand_less_check_with_no_row_source_or_a_bare_literal_stays_refused() {
 fn an_operand_less_valued_reads_the_row_source() {
     let own = component("HD", &[3]);
     assert_eq!(
-        parse_for("IF VALUED", Some(&own)),
+        parse("IF VALUED", Some(&own)),
         Ok(Expr::Test(own.clone(), Check::Valued))
     );
     assert_eq!(
-        parse_for("IF IS VALUED", Some(&own)),
+        parse("IF IS VALUED", Some(&own)),
         Ok(Expr::Test(own.clone(), Check::Valued))
     );
 }
@@ -248,9 +251,9 @@ fn an_operand_less_valued_reads_the_row_source() {
 fn an_operand_less_not_valued_reads_the_row_source() {
     let own = component("HD", &[3]);
     let absent = || Expr::Test(own.clone(), Check::NotValued { error: false });
-    assert_eq!(parse_for("IF NOT VALUED", Some(&own)), Ok(absent()));
+    assert_eq!(parse("IF NOT VALUED", Some(&own)), Ok(absent()));
     assert_eq!(
-        parse_for(
+        parse(
             "IF NOT VALUED OR NOT IN (\"ISO\", \"UUID\", \"DNS\", \"URI\")",
             Some(&own)
         ),
@@ -263,7 +266,7 @@ fn an_operand_less_not_valued_reads_the_row_source() {
         ))
     );
     assert_eq!(
-        parse_for("IF NOT VALUED AND RXA-21 NOT EQUALS \"D\"", Some(&own)),
+        parse("IF NOT VALUED AND RXA-21 NOT EQUALS \"D\"", Some(&own)),
         Ok(Expr::And(
             Box::new(absent()),
             Box::new(Expr::Test(

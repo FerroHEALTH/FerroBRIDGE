@@ -46,12 +46,6 @@ pub struct MappingSet {
 }
 
 impl MappingSet {
-    /// Creates an empty set.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds one model or extension mapping file.
     ///
     /// # Errors
@@ -246,7 +240,7 @@ fn load_documents<I>(
 where
     I: Iterator<Item = Result<MappingDocument, Vec<Diagnostic>>>,
 {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     let mut diagnostics = Vec::new();
     for document in documents {
         let document = match document {
@@ -324,7 +318,7 @@ mod tests {
     fn a_duplicate_mapping_name_is_refused_naming_both_files() {
         let first = load_str("a.yml", &model("KDS_composition")).expect("a header");
         let second = load_str("b.yml", &model("KDS_composition")).expect("a header");
-        let mut set = MappingSet::new();
+        let mut set = MappingSet::default();
         set.insert_model(lower_model(&first).expect("a model file"))
             .expect("the first file loads");
         let diagnostic = set
@@ -339,7 +333,7 @@ mod tests {
 
     #[test]
     fn an_empty_set_validates() {
-        let set = MappingSet::new();
+        let set = MappingSet::default();
         assert!(set.is_empty());
         assert_eq!(
             validate(&set, &StaticMappingCodes::default()),

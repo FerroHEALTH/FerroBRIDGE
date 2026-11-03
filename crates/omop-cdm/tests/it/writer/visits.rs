@@ -58,7 +58,7 @@ async fn an_unanswered_visit_no_row_names_is_removed_and_a_named_one_kept()
     )?;
     database
         .writer
-        .commit(&graph, &RunId::new("run-1")?)
+        .commit(&graph, &RunId::new("run-1")?, None)
         .await?;
 
     let retired = database

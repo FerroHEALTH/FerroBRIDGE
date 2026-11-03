@@ -7,6 +7,7 @@
 use std::fs;
 
 use ferrobridge_validator::package::Package;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::LoadError;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
@@ -52,7 +53,7 @@ fn a_tgz_package_reads_the_same_as_its_directory() -> TestResult {
             .map(String::as_str),
         Some("4.0.1")
     );
-    let set = PackageSet::load([core(), archive])?;
+    let set = PackageSet::<R4>::load([core(), archive])?;
     let definition = set.structure_definition(&format!("{BASE}flag"))?;
     assert_eq!(definition.r#type.value.as_deref(), Some("Extension"));
     Ok(())
@@ -72,7 +73,7 @@ fn the_vendored_core_package_reads_through_its_index() -> TestResult {
 #[test]
 fn a_missing_dependency_is_refused_by_name() -> TestResult {
     let synthetic = package("example.a", "1.0.0", &[("example.base", "2.0.1")], &[])?;
-    let error = PackageSet::load([synthetic.path()]).expect_err("example.base is absent");
+    let error = PackageSet::<R4>::load([synthetic.path()]).expect_err("example.base is absent");
     match error {
         LoadError::MissingDependency {
             package,
@@ -93,7 +94,8 @@ fn a_missing_dependency_is_refused_by_name() -> TestResult {
 fn a_dependency_at_another_version_is_missing() -> TestResult {
     let base = package("example.base", "2.0.0", &[], &[])?;
     let dependent = package("example.a", "1.0.0", &[("example.base", "2.0.1")], &[])?;
-    let error = PackageSet::load([base.path(), dependent.path()]).expect_err("2.0.1 is absent");
+    let error =
+        PackageSet::<R4>::load([base.path(), dependent.path()]).expect_err("2.0.1 is absent");
     assert!(
         matches!(error, LoadError::MissingDependency { .. }),
         "got {error}"
@@ -105,7 +107,7 @@ fn a_dependency_at_another_version_is_missing() -> TestResult {
 fn a_patch_wildcard_dependency_accepts_any_patch() -> TestResult {
     let base = package("example.base", "2.0.3", &[], &[])?;
     let dependent = package("example.a", "1.0.0", &[("example.base", "2.0.x")], &[])?;
-    let set = PackageSet::load([base.path(), dependent.path()])?;
+    let set = PackageSet::<R4>::load([base.path(), dependent.path()])?;
     assert_eq!(set.packages().len(), 2);
     Ok(())
 }
@@ -114,7 +116,7 @@ fn a_patch_wildcard_dependency_accepts_any_patch() -> TestResult {
 fn the_same_package_twice_is_refused() -> TestResult {
     let first = package("example.a", "1.0.0", &[], &[])?;
     let second = package("example.a", "1.0.0", &[], &[])?;
-    let error = PackageSet::load([first.path(), second.path()]).expect_err("given twice");
+    let error = PackageSet::<R4>::load([first.path(), second.path()]).expect_err("given twice");
     assert!(
         matches!(error, LoadError::DuplicatePackage { .. }),
         "got {error}"
@@ -135,7 +137,7 @@ fn a_byte_order_mark_before_the_json_is_stripped() -> TestResult {
     let mut bytes = b"\xEF\xBB\xBF".to_vec();
     bytes.extend(serde_json::to_vec(&extension("flag", "boolean", false))?);
     fs::write(&definition, bytes)?;
-    let set = PackageSet::load([synthetic.path()])?;
+    let set = PackageSet::<R4>::load([synthetic.path()])?;
     set.structure_definition(&format!("{BASE}flag"))?;
     Ok(())
 }

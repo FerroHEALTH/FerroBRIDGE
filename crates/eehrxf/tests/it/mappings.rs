@@ -88,3 +88,10 @@ fn the_laboratory_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
     embeds_its_directory(&eehrxf::mappings::LABORATORY)?;
     writes_its_files(&eehrxf::mappings::LABORATORY)
 }
+
+#[cfg(feature = "patient-summary")]
+#[test]
+fn the_eps_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
+    embeds_its_directory(&eehrxf::mappings::EPS)?;
+    writes_its_files(&eehrxf::mappings::EPS)
+}

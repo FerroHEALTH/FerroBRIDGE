@@ -297,7 +297,7 @@ pub(crate) async fn signed_in(
 ) -> Result<(axum::Router, String), Box<dyn Error>> {
     let provider = Provider::start().await?;
     let base = format!("{}/", bridge.uri());
-    let (_state, service) = console(&configuration(&provider, &base, "", ""))?;
+    let (_state, service) = console(&configuration(&provider, &base, "", "")).await?;
     let cookie = sign_in(&service, &provider, TokenAnswer::bearer(OPERATOR_TOKEN)).await?;
     Ok((service, cookie))
 }

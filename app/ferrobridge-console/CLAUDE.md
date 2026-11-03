@@ -25,9 +25,13 @@ crate.
   bridge's status and body (`BridgeError::Refused`).
 - **Every configuration default lives inline in its struct's `Default`
   impl**, with container-level `#[serde(default, deny_unknown_fields)]`. A
-  refusal names the key, never the value; a secret goes through
-  `config::secret::resolve`.
-- **The session is the server's** (`session`, `oidc`): the browser holds
+  refusal names the key, never the value; every secret is read by
+  `ferrohealth-session`'s sections through `ferrohealth-secret`.
+- **The session is `ferrohealth-session`'s**: its `[oidc]` and
+  `[session]` sections, its routes and its `keep_session` middleware, which
+  hands each request its `Held`; the console draws a stopped sign-in
+  (`stopped`) and reads `Held` in `visit` and `server::session_token`, and
+  keeps no session code of its own. The browser holds
   one opaque cookie, and a token, a code, a PKCE verifier or a client
   secret never reaches a page, a cookie, a `Debug` rendering or a log
   line; `tests/it/sign_in.rs` and `tests/it/refresh.rs` read the captured

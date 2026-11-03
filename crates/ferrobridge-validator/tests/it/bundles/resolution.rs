@@ -6,6 +6,7 @@
 //! reference that resolves is held to them, one that does not is listed.
 
 use ferrobridge_validator::issue::MessageId;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::report::Reason;
 use ferrobridge_validator::report::Report;
 use ferrobridge_validator::set::PackageSet;
@@ -26,7 +27,7 @@ const OBSERVATION: &str = "http://example.org/fhir/Observation/o1";
 
 /// Validates `resource` against the core definitions.
 fn core_report(resource: &serde_json::Value) -> TestResult<Report> {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     validate(&set, resource, None)
 }
 

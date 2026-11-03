@@ -28,6 +28,9 @@ mod discharge_document;
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod document;
 #[cfg(test)]
+#[cfg(all(feature = "openehr", feature = "patient-summary"))]
+mod eps_mapped;
+#[cfg(test)]
 #[cfg(feature = "imaging")]
 mod imaging;
 #[cfg(test)]
@@ -51,7 +54,8 @@ mod mapping;
     any(
         feature = "prescription",
         feature = "dispensation",
-        feature = "laboratory"
+        feature = "laboratory",
+        feature = "patient-summary"
     )
 ))]
 mod mappings;
