@@ -4,7 +4,7 @@
 # projects/org.highmed/KDS/person/KDS_structured_name.v1.person_name-structured_name.yml,
 # a derivative of it under its licence, with an overwrite of a method of
 # model/cluster/org.openehr/structured_name.v1.yml.
-# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
 # under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
 # files carry no copyright line to keep.
 # Changed: the metadata name and version are FerroBRIDGE's. The published

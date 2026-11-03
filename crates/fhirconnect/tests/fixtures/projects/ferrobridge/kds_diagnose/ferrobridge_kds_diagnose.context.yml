@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # A modified copy of projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml,
 # a derivative of it under its licence.
-# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
 # under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
 # file carries no copyright line to keep.
 # Changed: the metadata name and version are FerroBRIDGE's; the profile, the
