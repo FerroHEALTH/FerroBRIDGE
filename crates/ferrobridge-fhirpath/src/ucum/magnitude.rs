@@ -65,11 +65,6 @@ impl Magnitude {
         Self::new(Decimal::from_str(mantissa).ok()?, exponent)
     }
 
-    /// The magnitude of a decimal.
-    pub(crate) fn from_decimal(value: Decimal) -> Option<Self> {
-        Self::new(value, 0)
-    }
-
     /// The product, `None` on overflow.
     pub(crate) fn mul(self, other: Self) -> Option<Self> {
         let mantissa = self.mantissa.checked_mul(other.mantissa)?;
@@ -214,7 +209,7 @@ impl Ratio {
     /// `value × self`, multiplying before the one division; `None` when the
     /// result leaves the decimal range or rounds to zero.
     pub(crate) fn apply(self, value: Decimal) -> Option<Decimal> {
-        Magnitude::from_decimal(value)?
+        Magnitude::new(value, 0)?
             .mul(self.numerator)?
             .div(self.denominator)?
             .to_decimal()

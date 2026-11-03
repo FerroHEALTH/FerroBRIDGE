@@ -229,7 +229,9 @@ pub(crate) async fn sign_in(
         ..answer
     };
     provider.reset().await?;
-    provider.answer_code(&answer).await?;
+    provider
+        .answer_grant("grant_type=authorization_code", &answer)
+        .await?;
     let (response, body) = complete(service, &begun).await?;
     assert_eq!(StatusCode::SEE_OTHER, response.status(), "{body}");
     session_cookie(&response)

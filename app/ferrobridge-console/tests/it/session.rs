@@ -150,7 +150,9 @@ async fn led_to(
         ..TokenAnswer::bearer(OPERATOR_TOKEN)
     };
     provider.reset().await?;
-    provider.answer_code(&answer).await?;
+    provider
+        .answer_grant("grant_type=authorization_code", &answer)
+        .await?;
     let (response, body) = complete(service, &begun).await?;
     assert_eq!(StatusCode::SEE_OTHER, response.status(), "{body}");
     Ok(header(&response, "location").to_owned())

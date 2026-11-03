@@ -276,45 +276,9 @@ pub enum TranscodeError {
     Terminology(#[from] TerminologyError),
 }
 
-/// Transcodes `text` under `preferred`, with no template context, so a
-/// `local` code is unmapped and follows Art 10(7).
-///
-/// # Errors
-///
-/// [`TranscodeError::InvalidMatch`] for a mapping whose `match` the RM does
-/// not admit, and [`TranscodeError::Uncoded`] for a code phrase with no
-/// terminology or no code.
-pub fn transcode(
-    text: &DvText,
-    preferred: &PreferredSystems,
-) -> Result<Transcoded, TranscodeError> {
-    rules(text, preferred, None)
-}
-
-/// Transcodes `text` under `preferred`, rendering a `local` code from the
-/// template context `local`.
-///
-/// A `local` code the archetype defines in the language asked is displayed
-/// with the term's text and is not untranscoded; one it defines in another
-/// language only is a coding under the archetype's system, displayed as
-/// recorded, and follows Art 10(7).
-///
-/// # Errors
-///
-/// The errors of [`transcode`], [`TranscodeError::UndefinedLocalCode`] for a
-/// `local` code the archetype does not define in any language, and
-/// [`TranscodeError::ArchetypeId`] for a context whose archetype id is not
-/// one.
-pub fn transcode_local(
-    text: &DvText,
-    preferred: &PreferredSystems,
-    local: &Local<'_>,
-) -> Result<Transcoded, TranscodeError> {
-    rules(text, preferred, Some(local))
-}
-
-/// Transcodes `text` under `preferred`, asking `terminology` to translate an
-/// item no coding of which is in a preferred system.
+/// Transcodes `text` under `preferred` and the template context `local`, as
+/// [`transcode`] does, asking `terminology` to translate an item no coding
+/// of which is in a preferred system or rendered from the template.
 ///
 /// Each original coding is asked of `$translate` into each preferred
 /// system, and every `equivalent` or `equal` match is added after the
@@ -329,36 +293,30 @@ pub fn transcode_local(
 pub async fn transcode_with(
     text: &DvText,
     preferred: &PreferredSystems,
+    local: Option<&Local<'_>>,
     terminology: &Terminology,
 ) -> Result<Transcoded, TranscodeError> {
-    translated(transcode(text, preferred)?, preferred, terminology).await
+    translated(transcode(text, preferred, local)?, preferred, terminology).await
 }
 
-/// Transcodes `text` under `preferred` and the template context `local`,
-/// asking `terminology` to translate an item no coding of which is in a
-/// preferred system or rendered from the template.
+/// Transcodes `text` under `preferred`, rendering a `local` code from the
+/// template context `local` when one is given.
+///
+/// With no template context a `local` code is unmapped and follows Art
+/// 10(7). With one, a `local` code the archetype defines in the language
+/// asked is displayed with the term's text and is not untranscoded; one it
+/// defines in another language only is a coding under the archetype's
+/// system, displayed as recorded, and follows Art 10(7).
 ///
 /// # Errors
 ///
-/// The errors of [`transcode_local`], and [`TranscodeError::Terminology`]
-/// for a `$translate` that gives no answer.
-pub async fn transcode_local_with(
-    text: &DvText,
-    preferred: &PreferredSystems,
-    local: &Local<'_>,
-    terminology: &Terminology,
-) -> Result<Transcoded, TranscodeError> {
-    translated(
-        transcode_local(text, preferred, local)?,
-        preferred,
-        terminology,
-    )
-    .await
-}
-
-/// Applies the rules to `text`, reading a `local` code in `local` when
-/// given.
-fn rules(
+/// [`TranscodeError::InvalidMatch`] for a mapping whose `match` the RM does
+/// not admit, [`TranscodeError::Uncoded`] for a code phrase with no
+/// terminology or no code, [`TranscodeError::UndefinedLocalCode`] for a
+/// `local` code the archetype of the template context does not define in
+/// any language, and [`TranscodeError::ArchetypeId`] for a context whose
+/// archetype id is not one.
+pub fn transcode(
     text: &DvText,
     preferred: &PreferredSystems,
     local: Option<&Local<'_>>,

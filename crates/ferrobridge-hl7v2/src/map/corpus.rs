@@ -644,7 +644,7 @@ fn condition(source: &str, target: &ConceptMapGroupElementTarget) -> Condition {
     }
     if let Some(text) = property("Computable-ANTLR") {
         let own = condition::source_operand(source);
-        return match condition::parse_for(&text, own.as_ref()) {
+        return match condition::parse(&text, own.as_ref()) {
             Ok(expr) => Condition::Computable(expr),
             Err(ConditionError::NoOperand { .. }) => Condition::Defective { text },
             Err(ConditionError::Lex { .. } | ConditionError::Syntax { .. }) => {

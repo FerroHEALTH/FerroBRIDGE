@@ -11,10 +11,10 @@ use fhir_codegen::closure::TypeClosure;
 use fhir_codegen::lower::VersionModule;
 use fhir_codegen::operations::OperationContract;
 use fhir_codegen::package::Package;
-use fhir_codegen::roots::RootSet;
+use fhir_codegen::roots::{RootScope, RootSet};
 
 fn contracts(package: &Package, module: &str) -> Vec<OperationContract> {
-    let roots = RootSet::select(package).expect("root set selects");
+    let roots = RootSet::select(package, RootScope::Terminology).expect("root set selects");
     let closure = TypeClosure::compute(package, &roots).expect("closure computes");
     let model = VersionModule::lower(&closure, module, "pkg", "0").expect("model lowers");
     let mut contracts: Vec<OperationContract> = roots

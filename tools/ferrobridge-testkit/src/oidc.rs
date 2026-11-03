@@ -194,16 +194,6 @@ impl Provider {
         jsonwebtoken::encode(header, payload, &self.encoding).map_err(ProviderError::Sign)
     }
 
-    /// Answers every authorization code grant at the token endpoint with
-    /// `answer`.
-    ///
-    /// # Errors
-    /// Returns [`ProviderError::Json`] when the answer cannot be written.
-    pub async fn answer_code(&self, answer: &TokenAnswer) -> Result<(), ProviderError> {
-        self.answer_grant("grant_type=authorization_code", answer)
-            .await
-    }
-
     /// Answers a refresh token grant that sends `refresh_token` with
     /// `answer`.
     ///
@@ -363,8 +353,16 @@ impl Provider {
         )
     }
 
-    /// Mounts `answer` for a token request whose form carries `grant`.
-    async fn answer_grant(&self, grant: &str, answer: &TokenAnswer) -> Result<(), ProviderError> {
+    /// Answers every token request whose form carries `grant` with `answer`;
+    /// an authorization code grant is `grant_type=authorization_code`.
+    ///
+    /// # Errors
+    /// Returns [`ProviderError::Json`] when the answer cannot be written.
+    pub async fn answer_grant(
+        &self,
+        grant: &str,
+        answer: &TokenAnswer,
+    ) -> Result<(), ProviderError> {
         let body = serde_json::to_string(answer).map_err(ProviderError::Json)?;
         Mock::given(method("POST"))
             .and(path(TOKEN_PATH))

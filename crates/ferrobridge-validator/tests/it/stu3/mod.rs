@@ -45,7 +45,7 @@ pub(crate) fn stu3_set(
         &[("hl7.fhir.r3.core", "3.0.2")],
         definitions,
     )?;
-    let set = PackageSet::<Stu3>::load_release([stu3_core(), synthetic.path().to_owned()])?;
+    let set = PackageSet::<Stu3>::load([stu3_core(), synthetic.path().to_owned()])?;
     Ok((synthetic, set))
 }
 

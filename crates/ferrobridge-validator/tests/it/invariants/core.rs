@@ -8,6 +8,7 @@
 use ferrobridge_validator::issue::IssueType;
 use ferrobridge_validator::issue::Rule;
 use ferrobridge_validator::issue::Severity;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::report::InvariantStage;
 use ferrobridge_validator::report::Reason;
 use ferrobridge_validator::set::PackageSet;
@@ -255,7 +256,7 @@ fn rng_2_is_listed_when_incommensurable_units_leave_the_comparison_empty() -> Te
 
 #[test]
 fn dom_6_is_a_best_practice_warning_and_an_error_when_asked() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let patient = instance(&json!({"resourceType": "Patient", "name": [{"family": "Doe"}]}))?;
     let report = Validator::new(&set).validate(&patient)?;
     let found = failures(&report, "dom-6");

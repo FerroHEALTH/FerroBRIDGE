@@ -66,7 +66,7 @@ fn dosage_set() -> Result<MappingSet, Box<dyn Error>> {
 
 /// Loads the dosage fixture into one set, each file's text through `edit`.
 fn dosage_set_edited(edit: impl Fn(&str, String) -> String) -> Result<MappingSet, Box<dyn Error>> {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     for name in DOSAGE_FILES {
         let text = edit(name, std::fs::read_to_string(format!("{FIXTURES}/{name}"))?);
         let document = openehr_mapping_core::loader::load_str(name, &text)?;

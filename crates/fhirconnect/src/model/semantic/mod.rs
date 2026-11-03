@@ -499,7 +499,7 @@ mod tests {
     }
 
     fn set_of(sources: &[(&str, String)]) -> MappingSet {
-        let mut set = MappingSet::new();
+        let mut set = MappingSet::default();
         for (file, source) in sources {
             let document = load_str(*file, source).expect("a well-formed header");
             let parsed =

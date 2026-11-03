@@ -203,7 +203,9 @@ fn unescape_json(text: &str) -> Result<String, EvalError> {
     let mut chars = text.chars();
     let code_unit = |chars: &mut std::str::Chars<'_>| -> Result<u16, EvalError> {
         let digits: String = chars.by_ref().take(4).collect();
-        if digits.len() != 4 {
+        // NOTE: RFC 8259 §7: an escape is `\u` and four HEXDIG, so a sign `from_str_radix`
+        // would read is refused.
+        if digits.len() != 4 || !digits.chars().all(|digit| digit.is_ascii_hexdigit()) {
             return Err(bad("a \\u escape needs four hexadecimal digits"));
         }
         u16::from_str_radix(&digits, 16)

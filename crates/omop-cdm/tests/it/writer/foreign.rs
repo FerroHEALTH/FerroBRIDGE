@@ -23,7 +23,7 @@ async fn the_rows_the_writer_wrote_are_all_owned() -> Result<(), Box<dyn Error>>
     );
     database
         .writer
-        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?, None)
         .await?;
     assert_eq!(
         Vec::<ForeignRows>::new(),
@@ -40,7 +40,7 @@ async fn a_row_another_load_wrote_is_counted_by_table() -> Result<(), Box<dyn Er
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?, None)
         .await?;
     let client = reader(&database.postgres).await?;
     client

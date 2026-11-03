@@ -110,7 +110,7 @@ pub(crate) fn first_quantity(composition: &mut Value) -> Option<&mut Value> {
 
 /// Loads the named corpus files and the inline synthetic files into one set.
 pub(crate) fn set(corpus: &[&str], inline: &[(&str, &str)]) -> Result<MappingSet, Box<dyn Error>> {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     for relative in corpus {
         let path = corpus_path(relative);
         let document = openehr_mapping_core::loader::load_file(&path)?;

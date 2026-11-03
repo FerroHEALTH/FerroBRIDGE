@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM ACTION.medication.v1 (revision
+# 1.6.0) to a FHIR R4 Immunization, the entry of a patient summary's
+# immunisations. A dose administered (careflow step at0006) is `completed`
+# and a dose administration aborted (at0158) `not-done`; every other step
+# records no administration, so no Immunization is written for it (no
+# specification governs the pairing: our own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ACTION.medication.v1.Immunization
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ACTION.medication.v1
+    revision: 1.6.0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Immunization
+
+preprocessor:
+  openehrCondition:
+    targetRoot: "$archetype"
+    targetAttribute: "ism_transition/careflow_step/defining_code/code_string"
+    operator: "one of"
+    criteria:
+      - "at0006"
+      - "at0158"
+
+mappings:
+  - name: "statusCompleted"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype"
+    openehrCondition:
+      targetRoot: "$archetype"
+      targetAttribute: "ism_transition/careflow_step/defining_code/code_string"
+      operator: "one of"
+      criteria: "at0006"
+    manual:
+      - name: "completed"
+        fhir:
+          - path: "status"
+            value: "completed"
+
+  - name: "statusNotDone"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype"
+    openehrCondition:
+      targetRoot: "$archetype"
+      targetAttribute: "ism_transition/careflow_step/defining_code/code_string"
+      operator: "one of"
+      criteria: "at0158"
+    manual:
+      - name: "notDone"
+        fhir:
+          - path: "status"
+            value: "not-done"
+
+  - name: "vaccineCode"
+    with:
+      fhir: "$resource.vaccineCode"
+      openehr: "$archetype/description[at0017]/items[at0020]"
+
+  - name: "occurrence"
+    with:
+      fhir: "$resource.occurrence.as(DateTime)"
+      openehr: "$archetype/time"
+
+  - name: "route"
+    with:
+      fhir: "$resource.route"
+      openehr: "$archetype/description[at0017]/items[at0140]/items[at0147]"
+
+  - name: "note"
+    with:
+      fhir: "$resource.note.text"
+      openehr: "$archetype/description[at0017]/items[at0024]"

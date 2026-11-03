@@ -485,7 +485,7 @@ async fn load_one<M: Mapper>(
     let Some(origin) = origin_of(resource, kind) else {
         return Ok(refused(report, Some(&source), "the resource carries no id"));
     };
-    match writer.commit_from(&graph, run_id, Some(&origin)).await {
+    match writer.commit(&graph, run_id, Some(&origin)).await {
         Ok(written) => {
             report.committed(&source, &written);
             Ok(ledger::of(

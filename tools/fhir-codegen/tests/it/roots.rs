@@ -51,8 +51,7 @@ fn concrete_resources(dir: &Path) -> BTreeSet<String> {
 #[test]
 fn the_wide_root_set_is_every_concrete_resource_the_package_defines() {
     for (module, dir, package) in packages() {
-        let roots =
-            RootSet::select_scoped(package, RootScope::Resources).expect("root set selects");
+        let roots = RootSet::select(package, RootScope::Resources).expect("root set selects");
         let selected: BTreeSet<String> = roots.resources.keys().map(|n| (*n).to_owned()).collect();
         assert_eq!(selected, concrete_resources(&dir), "{module}");
         for name in root_resources(package).iter().copied() {
@@ -76,9 +75,9 @@ fn the_wide_root_set_is_every_concrete_resource_the_package_defines() {
 #[test]
 fn the_terminology_root_set_is_a_subset_of_the_wide_one() {
     for (module, _, package) in packages() {
-        let narrow = RootSet::select(package).expect("terminology root set selects");
-        let wide =
-            RootSet::select_scoped(package, RootScope::Resources).expect("wide root set selects");
+        let narrow =
+            RootSet::select(package, RootScope::Terminology).expect("terminology root set selects");
+        let wide = RootSet::select(package, RootScope::Resources).expect("wide root set selects");
         assert_eq!(
             narrow.resources.keys().copied().collect::<Vec<_>>(),
             root_resources(package).to_vec(),
@@ -99,7 +98,7 @@ fn the_terminology_root_set_is_a_subset_of_the_wide_one() {
 
 #[test]
 fn the_eight_root_resources_are_found() {
-    let roots = RootSet::select(&R4B).expect("root set selects");
+    let roots = RootSet::select(&R4B, RootScope::Terminology).expect("root set selects");
     assert_eq!(
         roots.resources.keys().copied().collect::<Vec<_>>(),
         ROOT_RESOURCES.to_vec()
@@ -112,7 +111,7 @@ fn the_eight_root_resources_are_found() {
 
 #[test]
 fn exactly_the_terminology_operations_are_selected() {
-    let roots = RootSet::select(&R4B).expect("root set selects");
+    let roots = RootSet::select(&R4B, RootScope::Terminology).expect("root set selects");
     let ids = roots
         .operations
         .values()
@@ -142,7 +141,7 @@ fn exactly_the_terminology_operations_are_selected() {
 
 #[test]
 fn operations_are_looked_up_by_resource_and_code() {
-    let roots = RootSet::select(&R4B).expect("root set selects");
+    let roots = RootSet::select(&R4B, RootScope::Terminology).expect("root set selects");
     let lookup = roots
         .operation("CodeSystem", "lookup")
         .expect("$lookup exists");
@@ -190,7 +189,8 @@ fn the_root_set_is_declared_per_version() {
         STU3.structure_definition_named("TerminologyCapabilities")
             .is_none()
     );
-    let roots = RootSet::select(&STU3).expect("the STU3 terminology root set selects");
+    let roots = RootSet::select(&STU3, RootScope::Terminology)
+        .expect("the STU3 terminology root set selects");
     assert_eq!(
         roots.resources.keys().copied().collect::<Vec<_>>(),
         STU3_ROOT_RESOURCES.to_vec()
@@ -205,7 +205,8 @@ fn the_root_set_is_declared_per_version() {
 
 #[test]
 fn the_stu3_terminology_operations_are_selected() {
-    let roots = RootSet::select(&STU3).expect("the STU3 terminology root set selects");
+    let roots = RootSet::select(&STU3, RootScope::Terminology)
+        .expect("the STU3 terminology root set selects");
     let ids = roots
         .operations
         .values()
