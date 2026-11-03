@@ -19,23 +19,21 @@ use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_base::v1_3::base_types::identification::uid_based_id::UidBasedId;
 use openehr_base::v1_3::base_types::identification::version_tree_id::VersionTreeId;
-use openehr_its::rest::generated::ehr::client::CompositionGetOutcome;
 use openehr_its::rest::generated::ehr::client::VersionedCompositionRevisionHistoryOutcome;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::common::generic::audit_details::AuditDetails;
 use openehr_rm::v1_2::common::generic::revision_history::RevisionHistory;
 use openehr_rm::v1_2::common::generic::revision_history_item::RevisionHistoryItem;
-use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
-use crate::cdr::ids::entity_tag;
 use crate::facade::Facade;
 use crate::facade::engine;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::render;
 use crate::facade::handlers::write;
+use crate::facade::handlers::{readable, supported};
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::record::CompositionBinding;
 use crate::facade::ingest::Refused;
@@ -46,6 +44,10 @@ use crate::facade::reply;
 use crate::facade::request::Inbound;
 use crate::facade::status;
 
+pub(crate) mod version;
+
+use version::{answered_version, canonical, fetch};
+
 /// `GET [base]/{type}/{id}`.
 pub(crate) async fn read(
     facade: &Facade,
@@ -55,47 +57,21 @@ pub(crate) async fn read(
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    crate::facade::handlers::readable(facade, resource_type)?;
-    let internal = internal_id(id)?;
-    let binding =
-        binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
-    let program = &program_of(facade, &binding)?;
-    let ehr_id = binding
-        .ehr(&internal)
-        .map_err(|error| stored_identifier(&error))?;
-    let container = binding
-        .container(&internal)
-        .map_err(|error| stored_identifier(&error))?;
-    let (version, composition) =
-        fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
-    let history = history(client, &ehr_id, &container).await?;
+    let (internal, binding) = bound(facade, (headers, uri), (resource_type, id), readable)?;
+    let placed = Placed::of(facade, &binding, &internal)?;
+    let (version, composition) = placed.fetch(facade, client, &binding).await?;
+    let history = history(client, &placed.ehr_id, &placed.container).await?;
     let modified = last_modified(revision_of(&history, &version)?)?;
-    let composition = entry_view(program, &composition, &binding, &internal)?;
-    let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
-    let subject = render::subject_of(facade, &ehr_id)?;
-    let rendered = render_bound(
-        facade,
-        program,
-        &composition,
-        (resource_type, &internal, &binding),
-        render::Origin {
-            id: &internal,
-            version: &version,
-            source: &source,
-            subject: subject.as_ref(),
-            store: facade.store(),
-            usage: facade.usage(),
-            demographics: facade.demographics(),
-        },
-    )
-    .await?;
-    render::log_outcome(&rendered);
-    Ok(reply::resource(
-        StatusCode::OK,
-        &rendered.body,
-        &answer_headers(&version, modified),
-    ))
+    let rendered = placed
+        .render(
+            facade,
+            client,
+            &composition,
+            (resource_type, &internal, &binding),
+            &version,
+        )
+        .await?;
+    Ok(answer(&rendered, &version, modified))
 }
 
 /// `GET [base]/Composition/[id]/$document`: the document Bundle of one
@@ -111,15 +87,10 @@ pub(crate) async fn document(
     facade: &Facade,
     access: &ferrohealth_smart::resource::Access,
     client: &CdrClient,
+    (headers, uri): (&HeaderMap, &Uri),
     id: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    crate::facade::handlers::supported(facade, COMPOSITION)?;
-    let internal = internal_id(id)?;
-    let binding =
-        binding(facade, COMPOSITION, &internal)?.ok_or_else(|| unknown(COMPOSITION, id))?;
+    let (internal, binding) = bound(facade, (headers, uri), (COMPOSITION, id), supported)?;
     if binding.created.is_some() {
         return Err(reply::refusal(
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -128,31 +99,17 @@ pub(crate) async fn document(
             )),
         ));
     }
-    let program = &program_of(facade, &binding)?;
-    let ehr_id = binding
-        .ehr(&internal)
-        .map_err(|error| stored_identifier(&error))?;
-    let container = binding
-        .container(&internal)
-        .map_err(|error| stored_identifier(&error))?;
-    let (version, composition) =
-        fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
+    let placed = Placed::of(facade, &binding, &internal)?;
+    let (program, ehr_id) = (&placed.program, &placed.ehr_id);
+    let (version, composition) = placed.fetch(facade, client, &binding).await?;
     let composition = entry_view(program, &composition, &binding, &internal)?;
-    let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
-    let subject = render::subject_of(facade, &ehr_id)?;
+    let source = render::composition_url(client.base_url(), ehr_id, &version)?;
+    let subject = render::subject_of(facade, ehr_id)?;
     let (own, created) = render::render_document(
         program.program(),
         program.index(),
         &composition,
-        render::Origin {
-            id: &internal,
-            version: &version,
-            source: &source,
-            subject: subject.as_ref(),
-            store: facade.store(),
-            usage: facade.usage(),
-            demographics: facade.demographics(),
-        },
+        render::Origin::new(facade, &internal, &version, &source, subject.as_ref()),
         &facade.translator().session(),
     )
     .await?;
@@ -167,7 +124,7 @@ pub(crate) async fn document(
             access,
             ferrohealth_smart::scope::Permission::Read,
             kind,
-            &ehr_id,
+            ehr_id,
         )?;
     }
     let base = url::Url::parse(&facade.settings().base_url).map_err(|error| {
@@ -207,28 +164,10 @@ pub(crate) async fn vread(
     uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
     let (resource_type, id, vid) = target;
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    crate::facade::handlers::readable(facade, resource_type)?;
-    let internal = internal_id(id)?;
-    let binding =
-        binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
-    let program = &program_of(facade, &binding)?;
-    let tree = VersionTreeId::new(vid).map_err(|error| {
-        reply::refusal(
-            StatusCode::NOT_FOUND,
-            Issue::error(IssueType::NotFound).diagnosing(format!(
-                "{resource_type}/{id} has no version {vid}: {}",
-                crate::facade::outcome::chain(&error)
-            )),
-        )
-    })?;
-    let ehr_id = binding
-        .ehr(&internal)
-        .map_err(|error| stored_identifier(&error))?;
-    let container = binding
-        .container(&internal)
-        .map_err(|error| stored_identifier(&error))?;
-    let history = history(client, &ehr_id, &container).await?;
+    let (internal, binding) = bound(facade, (headers, uri), (resource_type, id), readable)?;
+    let placed = Placed::of(facade, &binding, &internal)?;
+    let tree = version_tree(resource_type, id, vid)?;
+    let history = history(client, &placed.ehr_id, &placed.container).await?;
     let revision = history
         .items
         .iter()
@@ -238,7 +177,7 @@ pub(crate) async fn vread(
     let modified = last_modified(revision)?;
     let (named, body) = answered_version(
         client,
-        &ehr_id,
+        &placed.ehr_id,
         &UidBasedId::ObjectVersionId(version.clone()),
     )
     .await?;
@@ -254,32 +193,17 @@ pub(crate) async fn vread(
             )),
         ));
     }
-    let composition = canonical(facade, &ehr_id, &body, &binding.template_id)?;
-    let composition = entry_view(program, &composition, &binding, &internal)?;
-    let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
-    let subject = render::subject_of(facade, &ehr_id)?;
-    let rendered = render_bound(
-        facade,
-        program,
-        &composition,
-        (resource_type, &internal, &binding),
-        render::Origin {
-            id: &internal,
-            version: &version,
-            source: &source,
-            subject: subject.as_ref(),
-            store: facade.store(),
-            usage: facade.usage(),
-            demographics: facade.demographics(),
-        },
-    )
-    .await?;
-    render::log_outcome(&rendered);
-    Ok(reply::resource(
-        StatusCode::OK,
-        &rendered.body,
-        &answer_headers(&version, modified),
-    ))
+    let composition = canonical(facade, &placed.ehr_id, &body, &binding.template_id)?;
+    let rendered = placed
+        .render(
+            facade,
+            client,
+            &composition,
+            (resource_type, &internal, &binding),
+            &version,
+        )
+        .await?;
+    Ok(answer(&rendered, &version, modified))
 }
 
 /// Returns the current resource `resource_type/id` names, as a read answers
@@ -301,33 +225,103 @@ pub(crate) async fn current(
     let Some(binding) = binding(facade, resource_type, id)? else {
         return Ok(None);
     };
-    let program = &program_of(facade, &binding)?;
-    let ehr_id = binding.ehr(id).map_err(|error| stored_identifier(&error))?;
-    let container = binding
-        .container(id)
-        .map_err(|error| stored_identifier(&error))?;
-    let (version, composition) =
-        fetch(facade, client, &ehr_id, &container, &binding.template_id).await?;
-    let composition = entry_view(program, &composition, &binding, id)?;
-    let source = render::composition_url(client.base_url(), &ehr_id, &version)?;
-    let subject = render::subject_of(facade, &ehr_id)?;
-    let rendered = render_bound(
-        facade,
-        program,
-        &composition,
-        (resource_type, id, &binding),
-        render::Origin {
-            id,
-            version: &version,
-            source: &source,
-            subject: subject.as_ref(),
-            store: facade.store(),
-            usage: facade.usage(),
-            demographics: facade.demographics(),
-        },
-    )
-    .await?;
+    let placed = Placed::of(facade, &binding, id)?;
+    let (version, composition) = placed.fetch(facade, client, &binding).await?;
+    let rendered = placed
+        .render(
+            facade,
+            client,
+            &composition,
+            (resource_type, id, &binding),
+            &version,
+        )
+        .await?;
     Ok(Some(rendered.body))
+}
+
+/// Where the identity map places one bound resource: the program that maps
+/// it, and the EHR and versioned composition that hold it.
+struct Placed {
+    /// The loaded program of the binding's context.
+    program: Loaded,
+    /// The EHR the composition is in.
+    ehr_id: EhrId,
+    /// The versioned composition that holds the resource.
+    container: HierObjectId,
+}
+
+impl Placed {
+    /// Returns where `binding` places the resource `id`.
+    fn of(
+        facade: &Facade,
+        binding: &CompositionBinding,
+        id: &FhirResourceId,
+    ) -> Result<Self, Refusal> {
+        Ok(Self {
+            program: program_of(facade, binding)?,
+            ehr_id: binding.ehr(id).map_err(|error| stored_identifier(&error))?,
+            container: binding
+                .container(id)
+                .map_err(|error| stored_identifier(&error))?,
+        })
+    }
+
+    /// Returns the latest version of the placed composition, read against
+    /// the template `binding` names.
+    async fn fetch(
+        &self,
+        facade: &Facade,
+        client: &CdrClient,
+        binding: &CompositionBinding,
+    ) -> Result<(ObjectVersionId, CanonicalComposition), Refusal> {
+        fetch(
+            facade,
+            client,
+            &self.ehr_id,
+            &self.container,
+            &binding.template_id,
+        )
+        .await
+    }
+
+    /// Renders the resource `bound` names from `composition`, version
+    /// `version` of the placed composition, as a read answers it.
+    async fn render(
+        &self,
+        facade: &Facade,
+        client: &CdrClient,
+        composition: &CanonicalComposition,
+        bound: (&str, &FhirResourceId, &CompositionBinding),
+        version: &ObjectVersionId,
+    ) -> Result<render::Rendered, Refusal> {
+        let (_, id, binding) = bound;
+        let composition = entry_view(&self.program, composition, binding, id)?;
+        let source = render::composition_url(client.base_url(), &self.ehr_id, version)?;
+        let subject = render::subject_of(facade, &self.ehr_id)?;
+        render_bound(
+            facade,
+            &self.program,
+            &composition,
+            bound,
+            render::Origin::new(facade, id, version, &source, subject.as_ref()),
+        )
+        .await
+    }
+}
+
+/// Returns the `200` of a read of `rendered`, version `version`, last
+/// modified at `modified`, with its losses logged.
+fn answer(
+    rendered: &render::Rendered,
+    version: &ObjectVersionId,
+    modified: Option<String>,
+) -> axum::response::Response {
+    render::log_outcome(rendered);
+    reply::resource(
+        StatusCode::OK,
+        &rendered.body,
+        &answer_headers(version, modified),
+    )
 }
 
 /// Renders the resource `bound` names in `composition`, narrowed to the entry
@@ -384,6 +378,45 @@ pub(crate) async fn render_bound(
         &facade.translator().session(),
     )
     .await
+}
+
+/// Returns the internal id and the binding of `target`, a read's first
+/// steps: the request guard, the check `typed` makes of the type, and the
+/// identity lookup, which answers `404` for a resource the map does not bind.
+fn bound(
+    facade: &Facade,
+    (headers, uri): (&HeaderMap, &Uri),
+    (resource_type, id): (&str, &str),
+    typed: fn(&Facade, &str) -> Result<(), Refusal>,
+) -> Result<(FhirResourceId, CompositionBinding), Refusal> {
+    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
+    typed(facade, resource_type)?;
+    let internal = internal_id(id)?;
+    let binding =
+        binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
+    Ok((internal, binding))
+}
+
+/// Reads the version tree id `vid` of `resource_type/id`; a `[vid]` that is
+/// no version tree id names no version, so it is `404`.
+///
+/// # Errors
+///
+/// The `404` of a `[vid]` that does not parse.
+pub(crate) fn version_tree(
+    resource_type: &str,
+    id: &str,
+    vid: &str,
+) -> Result<VersionTreeId, Refusal> {
+    VersionTreeId::new(vid).map_err(|error| {
+        reply::refusal(
+            StatusCode::NOT_FOUND,
+            Issue::error(IssueType::NotFound).diagnosing(format!(
+                "{resource_type}/{id} has no version {vid}: {}",
+                crate::facade::outcome::chain(&error)
+            )),
+        )
+    })
 }
 
 /// Reads one request body as a resource of `resource_type`.
@@ -450,206 +483,6 @@ pub(crate) fn program_of(facade: &Facade, binding: &CompositionBinding) -> Resul
                 )),
             )
         })
-}
-
-/// Fetches the latest version of one composition.
-pub(crate) async fn fetch(
-    facade: &Facade,
-    client: &CdrClient,
-    ehr_id: &EhrId,
-    container: &HierObjectId,
-    template_id: &str,
-) -> Result<(ObjectVersionId, CanonicalComposition), Refusal> {
-    let (version, composition) = latest(client, ehr_id, container).await?;
-    Ok((
-        version,
-        canonical(facade, ehr_id, &composition, template_id)?,
-    ))
-}
-
-/// Returns the canonical form of one composition the CDR served from the EHR
-/// `ehr_id`, which the access the request makes reached.
-pub(crate) fn canonical(
-    facade: &Facade,
-    ehr_id: &EhrId,
-    composition: &Composition,
-    template_id: &str,
-) -> Result<CanonicalComposition, Refusal> {
-    crate::audit::reach::touched(
-        crate::audit::reach::Touch::Read,
-        Some(ehr_id),
-        crate::audit::reach::composition(composition, Some(template_id)),
-    );
-    let text = openehr_its::json::to_canonical_json(composition);
-    let value = text.parse::<serde_json::Value>().map_err(|error| {
-        reply::refusal(
-            StatusCode::BAD_GATEWAY,
-            Issue::error(IssueType::Exception).diagnosing(format!(
-                "the composition the CDR served could not be read back: {error}"
-            )),
-        )
-    })?;
-    let generation = facade
-        .programs()
-        .loaded()
-        .iter()
-        .find(|entry| entry.index().template_id() == template_id)
-        .map_or(openehr_mapping_core::template::Generation::Adl14, |entry| {
-            entry.index().generation()
-        });
-    Ok(CanonicalComposition::new(value, template_id, generation))
-}
-
-/// Reads the latest version of the composition `container` holds, with the
-/// version its `ETag` names.
-pub(crate) async fn latest(
-    client: &CdrClient,
-    ehr_id: &EhrId,
-    container: &HierObjectId,
-) -> Result<(ObjectVersionId, Composition), Refusal> {
-    let (version, body) =
-        answered_version(client, ehr_id, &UidBasedId::HierObjectId(container.clone())).await?;
-    let version = version.ok_or_else(|| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception)
-                .diagnosing("the CDR answered a composition with no ETag"),
-        )
-    })?;
-    Ok((version, body))
-}
-
-/// Reads the composition version `uid_based_id` names, with the version its
-/// `ETag` names when the CDR sent one.
-///
-/// A `204` is the CDR reporting the version deleted, which is `410`
-/// (`ehr-codegen.openapi.yaml`, `composition_get`).
-async fn answered_version(
-    client: &CdrClient,
-    ehr_id: &EhrId,
-    uid_based_id: &UidBasedId,
-) -> Result<(Option<ObjectVersionId>, Composition), Refusal> {
-    let answered = client
-        .composition(ehr_id, uid_based_id, None)
-        .await
-        .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
-    match answered.outcome {
-        CompositionGetOutcome::Ok { body, headers } => {
-            let version =
-                crate::cdr::optional_version_from_etag("composition_get", headers.etag.as_deref())
-                    .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
-            Ok((version, body))
-        }
-        CompositionGetOutcome::NoContent => Err(write::refuse(&status::Answer::new(
-            status::GONE,
-            String::from("the CDR reports this composition deleted"),
-        ))),
-        CompositionGetOutcome::NotFound { body } => Err(write::refuse(&status::Answer::new(
-            status::NOT_FOUND,
-            status::diagnostics(StatusCode::NOT_FOUND, &body),
-        ))),
-    }
-}
-
-/// Reads the composition version an update follows, which the CDR must hold.
-///
-/// A version the CDR does not hold is no version the write can follow, so it
-/// is `412` as a stale `If-Match` is
-/// (<https://hl7.org/fhir/R4/http.html#concurrency>).
-///
-/// # Errors
-///
-/// A `412` for a version the CDR does not hold, a `410` for one it reports
-/// deleted, and every client failure through the status table.
-pub(crate) async fn followed_version(
-    client: &CdrClient,
-    ehr_id: &EhrId,
-    version: &ObjectVersionId,
-) -> Result<Composition, Refusal> {
-    let answered = client
-        .composition(ehr_id, &UidBasedId::ObjectVersionId(version.clone()), None)
-        .await
-        .map_err(|error| write::refuse(&status::of_client_error(&error)))?;
-    match answered.outcome {
-        CompositionGetOutcome::Ok { body, .. } => Ok(body),
-        CompositionGetOutcome::NoContent => Err(write::refuse(&status::Answer::new(
-            status::GONE,
-            String::from("the CDR reports this composition deleted"),
-        ))),
-        CompositionGetOutcome::NotFound { body } => Err(write::refuse(&status::Answer::new(
-            status::PRECONDITION_FAILED,
-            format!(
-                "If-Match names version {}, which the CDR does not hold: {}",
-                version.value(),
-                status::diagnostics(StatusCode::NOT_FOUND, &body)
-            ),
-        ))),
-    }
-}
-
-/// Returns the openEHR version an `If-Match` names, checked against the latest
-/// version `container` holds, with that version's composition when the check
-/// read it.
-///
-/// R4 sends the `versionId` as a weak entity tag ("`If-Match: W/"2"`",
-/// <https://hl7.org/fhir/R4/http.html#concurrency>), and ITS-REST takes the
-/// whole `OBJECT_VERSION_ID`. A version tree id (`W/"N"`, `"N"` or `N`) that
-/// names the latest version completes to it, as vread completes its `[vid]`;
-/// one that names any other version is `412` carrying the current `ETag`. The
-/// CDR's own `uid::system::N` of `container` passes through for the CDR to
-/// check, and one of another container is `412`.
-///
-/// # Errors
-///
-/// A `400` for a value that names no version at all, a `412` for a stale or
-/// foreign version, and the refusal the read of the latest version answers.
-pub(crate) async fn version_of_etag(
-    client: &CdrClient,
-    ehr_id: &EhrId,
-    container: &HierObjectId,
-    value: &str,
-) -> Result<(ObjectVersionId, Option<Composition>), Refusal> {
-    let bare = entity_tag(value);
-    if let Ok(full) = ObjectVersionId::new(bare) {
-        if full.object_id().value() != container.value() {
-            return Err(write::refuse(&status::Answer::new(
-                status::PRECONDITION_FAILED,
-                format!(
-                    "If-Match carries `{bare}`, a version of another composition than {}",
-                    container.value()
-                ),
-            )));
-        }
-        return Ok((full, None));
-    }
-    // NOTE: a parse failure IS the answer here: a value that is no
-    // OBJECT_VERSION_ID is the R4 spelling, which names the version tree id
-    // alone (<https://hl7.org/fhir/R4/http.html#concurrency>).
-    let tree = VersionTreeId::new(bare).map_err(|error| {
-        reply::refusal(
-            StatusCode::BAD_REQUEST,
-            Issue::error(IssueType::Invalid).diagnosing(format!(
-                "If-Match carries `{bare}`, which is neither a versionId nor an openEHR version id: {}",
-                crate::facade::outcome::chain(&error)
-            )),
-        )
-    })?;
-    let (current, composition) = latest(client, ehr_id, container).await?;
-    let current_tree = current.version_tree_id();
-    if current_tree.value() == tree.value() {
-        return Ok((current, Some(composition)));
-    }
-    Err(write::refuse(
-        &status::Answer::new(
-            status::PRECONDITION_FAILED,
-            format!(
-                "If-Match names version {}, and the current version is {}",
-                tree.value(),
-                current_tree.value()
-            ),
-        )
-        .with_entity_tag(current_tree.value()),
-    ))
 }
 
 /// Returns the composition narrowed to the one entry `binding` names, so the

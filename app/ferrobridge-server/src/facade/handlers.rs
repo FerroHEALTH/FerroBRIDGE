@@ -257,9 +257,8 @@ async fn document(
         facade,
         access,
         &facade.client_for(headers),
+        (headers, uri),
         &id,
-        headers,
-        uri,
     )
     .await
 }

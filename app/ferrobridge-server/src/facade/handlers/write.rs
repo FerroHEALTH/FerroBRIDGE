@@ -326,15 +326,13 @@ async fn answer(
                 program.program(),
                 program.index(),
                 &written.composition,
-                render::Origin {
-                    id: &written.id,
-                    version: &written.version,
-                    source: &source,
-                    subject: subject.as_ref(),
-                    store: facade.store(),
-                    usage: facade.usage(),
-                    demographics: facade.demographics(),
-                },
+                render::Origin::new(
+                    facade,
+                    &written.id,
+                    &written.version,
+                    &source,
+                    subject.as_ref(),
+                ),
                 &facade.translator().session(),
             )
             .await?;
@@ -358,7 +356,7 @@ async fn precondition(
     container: &HierObjectId,
 ) -> Result<(ObjectVersionId, Composition), Refusal> {
     let Some(value) = headers.get(header::IF_MATCH) else {
-        return read::latest(client, ehr_id, container).await;
+        return read::version::latest(client, ehr_id, container).await;
     };
     let text = value.to_str().map_err(|_unreadable| {
         reply::refusal(
@@ -366,10 +364,10 @@ async fn precondition(
             Issue::error(IssueType::Invalid).diagnosing("the If-Match header is not text"),
         )
     })?;
-    let (version, held) = read::version_of_etag(client, ehr_id, container, text).await?;
+    let (version, held) = read::version::version_of_etag(client, ehr_id, container, text).await?;
     let composition = match held {
         Some(composition) => composition,
-        None => read::followed_version(client, ehr_id, &version).await?,
+        None => read::version::followed_version(client, ehr_id, &version).await?,
     };
     Ok((version, composition))
 }

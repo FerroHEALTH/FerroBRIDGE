@@ -78,7 +78,7 @@ pub(crate) async fn resources_of(
     else {
         return Ok(Vec::new());
     };
-    let canonical = read::canonical(facade, ehr_id, composition, &template_id)?;
+    let canonical = read::version::canonical(facade, ehr_id, composition, &template_id)?;
     let source = render::composition_url(client.base_url(), ehr_id, version)?;
     let subject = render::subject_of(facade, ehr_id)?;
     let programs = facade.programs();
