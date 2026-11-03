@@ -84,3 +84,18 @@ fn an_example_holds_synthetic_content_beside_its_context() -> Result<(), Box<dyn
     );
     Ok(())
 }
+
+#[test]
+fn an_example_is_the_same_at_every_build() -> Result<(), Box<dyn Error>> {
+    let index = index(&Path::new(OPTS).join("diagnose.opt"))?;
+    let first = index.example_composition(NOW)?.into_value();
+    let second = index
+        .example_composition("2027-01-01T00:00:00Z")?
+        .into_value();
+    assert_eq!(first, second);
+    assert_eq!(
+        "0b6c5a3e-1d3f-4c7e-9a43-00000000e1a0::ferrobridge.example::1",
+        first["uid"]["value"]
+    );
+    Ok(())
+}

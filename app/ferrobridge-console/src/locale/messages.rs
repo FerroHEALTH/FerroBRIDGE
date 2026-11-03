@@ -717,4 +717,8 @@ messages! {
     #[doc = "The answer to an apply that ran."] ApplyDone = "apply-done",
     #[doc = "The answer to an apply that did not compile."] ApplyRefused = "apply-refused",
     #[doc = "The diagnostics of a refused apply."] ApplyDiagnostics = "apply-diagnostics",
+    #[doc = "The playground's Example menu button."] Example = "example",
+    #[doc = "The accessible name of the Example menu."] ExampleLabel = "example-label",
+    #[doc = "An item of the Example menu."] ExampleFrom = "example-from",
+    #[doc = "The note under an Example item."] ExampleNote = "example-note",
 }

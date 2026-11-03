@@ -801,3 +801,9 @@ apply-reason-placeholder = Why you apply it
 apply-done = Applied: the set compiled and runs as revision { $id }
 apply-refused = Not applied: the set does not compile with this revision, so the running set is unchanged
 apply-diagnostics = Diagnostics of the apply
+
+## Example compositions
+example = Example
+example-label = Example compositions
+example-from = From { $template }
+example-note = A synthetic composition generated from the template

@@ -29,6 +29,10 @@ const TEXT: &str = "Synthetic example text";
 /// The instant every date and time leaf of an example names.
 const DATE_TIME: &str = "2026-01-01T09:00:00Z";
 
+/// The version id every example names: a synthetic `OBJECT_VERSION_ID`
+/// (openEHR BASE, `OBJECT_VERSION_ID`, `uuid::system::version`).
+const UID: &str = "0b6c5a3e-1d3f-4c7e-9a43-00000000e1a0::ferrobridge.example::1";
+
 /// Which leaves an example fills.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Reach {
@@ -41,8 +45,10 @@ enum Reach {
 impl WebTemplateIndex {
     /// Builds a synthetic example composition of this template.
     ///
-    /// `now` is the caller's current timestamp, which the builder uses for
-    /// the `ctx/time` default alone; this crate reads no clock.
+    /// The example names one fixed instant as its `ctx/time`, so the same
+    /// template gives the same example at every build; `now` is the
+    /// caller's current timestamp, which the builder takes for any other
+    /// default, and this crate reads no clock.
     ///
     /// # Errors
     ///
@@ -72,6 +78,7 @@ impl WebTemplateIndex {
             ("language", template.default_language.as_str()),
             ("territory", "NL"),
             ("composer_name", "Synthetic Composer"),
+            ("time", DATE_TIME),
         ] {
             let key = FlatKey {
                 segments: vec![segment("ctx", None), segment(field, None)],
@@ -79,6 +86,13 @@ impl WebTemplateIndex {
             };
             flat.insert(key.to_string(), Value::String(value.to_owned()));
         }
+        // NOTE: Simplified Formats master04 §RM Attributes prefix: `_uid` sets
+        // the LOCATABLE uid, which `$tofhir` reads as the composition's id.
+        let uid = FlatKey {
+            segments: vec![segment(&template.tree.id, None), segment("_uid", None)],
+            suffixes: Vec::new(),
+        };
+        flat.insert(uid.to_string(), Value::String(String::from(UID)));
         let mut path = Vec::new();
         fill(&template.tree, reach, &mut path, &mut flat);
         flat

@@ -27,6 +27,7 @@ mod editor;
 mod engine;
 mod etl;
 mod events;
+mod example;
 mod hl7v2;
 mod navigation;
 mod no_script;
