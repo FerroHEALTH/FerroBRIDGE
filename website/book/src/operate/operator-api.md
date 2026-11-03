@@ -147,6 +147,18 @@ A message counts once for each map its mapping applied, whether or not its
 ingest then committed, and the counts start again at zero when the bridge
 restarts. The document carries no message content.
 
+## `GET /operator/templates/{id}/example`
+
+A synthetic example composition of the template `id`, one the running set
+compiled against, in canonical JSON. The bridge generates it from the
+template's Web Template: each leaf holds a value its constraint admits,
+such as the first entry of a coded list or the lower bound of a range, and
+the composition is validated against the template before it is answered.
+When not every leaf can be filled together, the example holds the mandatory
+leaves alone. Every value is synthetic. A template the set does not hold
+answers `404`, and one with no example, such as a party template,
+`no-example` (`422`).
+
 ## `GET /operator/configuration`
 
 The configuration the bridge started on, as one JSON document. The bridge
