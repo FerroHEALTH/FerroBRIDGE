@@ -12,8 +12,7 @@
 # (#101); `performer` walks `$composition/perfomer`, which COMPOSITION does
 # not define; `participations` names `function` and `performer` below the
 # EVENT_CONTEXT, which the engine cannot carry as one value
-# (fc-uncarried-tail); `context` reads `effective.ofType(DateTimeType)`, and
-# `DiagnosticReport.effective[x]` admits `dateTime` and `Period`.
+# (fc-uncarried-tail).
 # `composer` and `healthCareFacility` both write `DiagnosticReport.performer`
 # and the engine cannot place the second one (an occurrence gap at index 1),
 # so out of openEHR neither runs, and the composer stays the one the engine

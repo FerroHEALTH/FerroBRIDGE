@@ -33,10 +33,12 @@ corpus_require curl tar shasum jq
 
 dest="docs/specs/fhirconnect-mapping-lib"
 
-# The operational templates a test of this repository reads from the library
-# itself; every other template a context names comes from the testkit fixtures.
+# The templates a test reads: the operational templates a test of this
+# repository reads from the library itself. Every other template a context
+# names comes from the testkit fixtures, so it is left out.
 templates=(
   "projects/org.openehr/EEHRxF/lab/resources/openehr/templates/EHDS - Laboratory report.opt"
+  "projects/org.openehr/IPS/resources/openehr/templates/International Patient Summary.opt"
 )
 
 pin="$(corpus_pin_cell "FHIRconnect mapping library (corpus, never an oracle)")"
@@ -70,8 +72,8 @@ cat > "$dest/PROVENANCE.md" << PROV
 
 # Provenance: the FHIRconnect mapping library
 
-Every YAML mapping file, the upstream licence and the one template a test
-reads, vendored verbatim by
+Every YAML mapping file, the upstream licence and the templates a test reads,
+vendored verbatim by
 \`scripts/vendor/fhirconnect-mapping-lib.sh\`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -82,8 +84,8 @@ docs/VERSIONS.md and re-run the script.
 - Upstream licence: Apache License 2.0, the repository's \`LICENSE\` file,
   vendored beside this file
 - Layout: the upstream paths, unchanged; the example resources, the
-  third-party IG packages and the two documents saved from HL7 Confluence
-  (no stated licence) are left out
+  third-party IG packages, the templates no test reads and the two documents
+  saved from HL7 Confluence (no stated licence) are left out
 - Files: $files, of which $yaml are YAML mapping files
 - Tree digest (sha256 over the sorted per-file \`sha256  path\` listing,
   \`PROVENANCE.md\` excluded): \`$digest\`
