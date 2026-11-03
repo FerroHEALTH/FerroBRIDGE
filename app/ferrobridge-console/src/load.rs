@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use ferrobridge_operator_api::configuration::Configuration;
+use ferrobridge_operator_api::etl::{Run, Runs};
 use ferrobridge_operator_api::events::Events;
 use ferrobridge_operator_api::health::Info;
 use ferrobridge_operator_api::hl7v2::ConceptMaps;
@@ -184,6 +185,24 @@ impl Reads {
         })
         .await
         .clone()
+    }
+
+    /// The newest OMOP ETL runs, `GET /operator/etl/runs`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn etl_runs(&self) -> Loaded<Runs> {
+        let (state, token) = self.signed_in()?;
+        loaded(state.bridge().etl_runs(token).await)
+    }
+
+    /// One OMOP ETL run, `GET /operator/etl/runs/{run_id}`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn etl_run(&self, run_id: &str) -> Loaded<Run> {
+        let (state, token) = self.signed_in()?;
+        loaded(state.bridge().etl_run(run_id, token).await)
     }
 
     /// The HL7 v2 face's `ConceptMap` directory, `GET

@@ -4,12 +4,15 @@
 //! The OMOP ETL: a detail page (T2) of what a run does.
 //!
 //! Overview says what a run reads, maps and writes, and how runs are
-//! started; Settings shows the ETL's running configuration. The
-//! ETL is a batch of its own process
-//! (`ferrobridge etl run`), so the page says how it runs rather than what
-//! a run did; the run reports are planned work (#612).
+//! started; Runs lists the runs the bridge schema keeps, each linked to its
+//! report ([`run`]); Settings shows the ETL's running configuration. The ETL
+//! is a batch of its own process (`ferrobridge etl run`), which keeps each
+//! finished run's report for this page to read.
+
+pub mod run;
 
 use ferrobridge_operator_api::configuration::Configuration;
+use ferrobridge_operator_api::etl::Runs;
 use ferrobridge_operator_api::health::Info;
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
@@ -32,13 +35,14 @@ use crate::visit::Visit;
 use ferrohealth_health::document::Readiness;
 
 /// The tabs, each its key and its words.
-const TABS: [(&str, Msg); 2] = [
+const TABS: [(&str, Msg); 3] = [
     ("overview", Msg::TabOverview),
+    ("runs", Msg::TabRuns),
     ("settings", Msg::TabSettings),
 ];
 
 /// The page of the tab `key`.
-fn tab_href(key: &str) -> String {
+pub(crate) fn tab_href(key: &str) -> String {
     if key == "overview" {
         String::from(OMOP)
     } else {
@@ -59,6 +63,12 @@ pub async fn page(visit: &Visit) -> Drawn {
     } else {
         None
     };
+    let runs = match &info {
+        Ok(Outcome::Shown(shown)) if tab == "runs" && lane_on(shown, "etl") => {
+            Some(visit.reads.etl_runs().await)
+        }
+        _ => None,
+    };
     Drawn::shell(
         visit.tr(Msg::OmopEtl),
         drawn(
@@ -66,8 +76,22 @@ pub async fn page(visit: &Visit) -> Drawn {
             &tab,
             &info,
             &readiness,
-            configuration.as_ref(),
+            (configuration.as_ref(), runs.as_ref()),
         ),
+    )
+}
+
+/// The detail page of the tab `tab` under `header` around `body`.
+fn framed(l: &Locale, tab: &str, header: Header, body: Html) -> Html {
+    detail_page(
+        l,
+        DetailPage {
+            header,
+            actions: ActionGroup::none(),
+            stepper: None,
+            tabs: Some(tabs(l, tab)),
+            body,
+        },
     )
 }
 
@@ -84,13 +108,13 @@ fn tabs(l: &Locale, tab: &str) -> TabRow {
 }
 
 /// The page over the lane, the CDM database's readiness and, on Settings,
-/// the running configuration.
+/// the running configuration, and on Runs the runs the bridge keeps.
 fn drawn(
     l: &Locale,
     tab: &str,
     info: &Loaded<Info>,
     readiness: &Loaded<Readiness>,
-    configuration: Option<&Loaded<Configuration>>,
+    (configuration, runs): (Option<&Loaded<Configuration>>, Option<&Loaded<Runs>>),
 ) -> Html {
     let info = match info {
         Ok(Outcome::Shown(info)) => info,
@@ -117,30 +141,25 @@ fn drawn(
         )),
     };
     if let Some(configuration) = configuration.filter(|_| tab == "settings") {
-        return detail_page(
+        return framed(
             l,
-            DetailPage {
-                header,
-                actions: ActionGroup::none(),
-                stepper: None,
-                tabs: Some(tabs(l, tab)),
-                body: crate::pages::settings::tab(l, configuration, &rows::OMOP, &tab_href(tab)),
-            },
+            tab,
+            header,
+            crate::pages::settings::tab(l, configuration, &rows::OMOP, &tab_href(tab)),
         );
     }
+    if let Some(runs) = runs.filter(|_| on && tab == "runs") {
+        return framed(l, tab, header, run::listing(l, runs));
+    }
     if !on {
-        return detail_page(
+        return framed(
             l,
-            DetailPage {
-                header,
-                actions: ActionGroup::none(),
-                stepper: None,
-                tabs: Some(tabs(l, tab)),
-                body: quiet(
-                    tr(l, Msg::OmopOff),
-                    Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
-                ),
-            },
+            tab,
+            header,
+            quiet(
+                tr(l, Msg::OmopOff),
+                Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
+            ),
         );
     }
     let database = match readiness {
@@ -164,7 +183,10 @@ fn drawn(
     ]);
     let runs = definitions(vec![
         (tr(l, Msg::HowItRuns), code("ferrobridge etl run")),
-        (tr(l, Msg::RunReports), t(tr(l, Msg::RunReportsValue))),
+        (
+            tr(l, Msg::RunReports),
+            link(tab_href("runs"), tr(l, Msg::RunReportsValue)),
+        ),
     ]);
     detail_page(
         l,

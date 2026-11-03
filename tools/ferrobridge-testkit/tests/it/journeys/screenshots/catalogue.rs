@@ -293,6 +293,22 @@ pub(super) const EVENTS_DEGRADED: Shot = Shot::page(
     "//*[contains(., 'could not be reached')]",
 );
 
+/// The OMOP ETL's runs, on a bridge whose ETL keeps a run history.
+pub(super) const OMOP_RUNS: Shot = Shot::page(
+    "omop-runs",
+    "/omop/:tab",
+    "/omop/runs",
+    "//*[contains(., '0b6c5a3e-1d3f-4c7e-9a43-000000000001')]",
+);
+
+/// The report of one run, with the record it refused.
+pub(super) const OMOP_RUN: Shot = Shot::page(
+    "omop-run",
+    "/omop/runs/:id",
+    "/omop/runs/0b6c5a3e-1d3f-4c7e-9a43-000000000001",
+    "//*[contains(., 'the composition names a template the CDR does not hold')]",
+);
+
 /// Every shot the capture takes.
 pub(super) fn shots() -> impl Iterator<Item = &'static Shot> {
     [&SIGN_IN].into_iter().chain(PAGES.iter()).chain([
@@ -300,6 +316,8 @@ pub(super) fn shots() -> impl Iterator<Item = &'static Shot> {
         &PLAYGROUND_REFUSED,
         &PLAYGROUND_OFF,
         &EVENTS_DEGRADED,
+        &OMOP_RUNS,
+        &OMOP_RUN,
         &EDIT_CHECKED,
         &EDIT_CONFIRM,
         &EDIT_REFUSED,

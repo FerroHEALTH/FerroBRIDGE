@@ -254,6 +254,19 @@ impl CdmWriter {
         foreign::count(&self.client, &self.cdm, &self.bridge).await
     }
 
+    /// Records the finished run `run` in the run history of the bridge
+    /// schema, replacing an earlier record of the same run.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::Database`] with [`Step::RecordRun`] when
+    /// PostgreSQL refuses the record, as it does before [`CdmWriter::init`]
+    /// has created the run table or for a timestamp that is no RFC 3339
+    /// instant.
+    pub async fn record_run(&self, run: &crate::runs::RunRecord<'_>) -> Result<(), WriteError> {
+        crate::runs::record(&self.client, &self.bridge, run).await
+    }
+
     /// Returns the client and the CDM schema, for the derivations.
     pub(crate) fn parts(&mut self) -> (&mut Client, &SchemaName) {
         (&mut self.client, &self.cdm)

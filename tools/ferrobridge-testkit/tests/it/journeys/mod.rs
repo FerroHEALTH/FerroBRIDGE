@@ -25,6 +25,7 @@ mod browser;
 mod configuration;
 mod editor;
 mod engine;
+mod etl;
 mod events;
 mod hl7v2;
 mod navigation;
