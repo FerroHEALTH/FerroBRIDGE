@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's extension of CLUSTER.laboratory_test_analyte.v1 for the
 # Laboratory Report 2.0.0 Observation-resultslab-eu-lab profile: the
-# canonical, and the `laboratory` category slice the profile fixes by
-# pattern (min 1, max 1), written out of openEHR, where a laboratory
-# analyte is a laboratory result by its archetype.
+# canonical, the `laboratory` category slice the profile fixes by pattern
+# (min 1, max 1), written out of openEHR, where a laboratory analyte is a
+# laboratory result by its archetype, and the effective time and performer
+# the profile requires.
 grammar: FHIRConnect/v1.0.0
 type: extension
 metadata:
@@ -39,3 +40,29 @@ mappings:
             value: "http://terminology.hl7.org/CodeSystem/observation-category"
           - path: "code"
             value: "laboratory"
+
+  # Observation-resultslab-eu-lab requires effective[x] (min 1); an analyte is
+  # observed at the time of the laboratory test result's event, which the
+  # report's effective time carries too, so it is written out of openEHR only.
+  - name: "resultTime"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.effective.as(DateTime)"
+      openehr: "$archetype/../../time"
+
+
+  # NOTE: FHIR R4 extension-data-absent-reason.html: KDS_Laborbericht holds no party for the
+  # performing laboratory, so the performer Observation-resultslab-eu-lab requires is written absent.
+  - name: "performerAbsent"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.performer.extension"
+    manual:
+      - name: "unknown"
+        fhir:
+          - path: "url"
+            value: "http://hl7.org/fhir/StructureDefinition/data-absent-reason"
+          - path: "valueCode"
+            value: "unknown"

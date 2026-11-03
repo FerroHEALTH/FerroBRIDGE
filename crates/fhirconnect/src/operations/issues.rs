@@ -80,14 +80,16 @@ pub fn of_warning(warning: &Warning) -> OperationOutcomeIssue {
         Loss::Skipped { .. }
         | Loss::LastOfMany { .. }
         | Loss::OneWayFallback { .. }
-        | Loss::UnmappedOccurrences { .. } => WARNING,
+        | Loss::UnmappedOccurrences { .. }
+        | Loss::Absent { .. } => WARNING,
     };
     let code = match *warning.loss() {
         Loss::Defaulted { .. } | Loss::InapplicableOccurrences { .. } => "informational",
         Loss::Skipped { .. }
         | Loss::LastOfMany { .. }
         | Loss::OneWayFallback { .. }
-        | Loss::UnmappedOccurrences { .. } => "incomplete",
+        | Loss::UnmappedOccurrences { .. }
+        | Loss::Absent { .. } => "incomplete",
     };
     let mut rendered = issue(severity, code, &warning.to_string());
     let location = warning.location();

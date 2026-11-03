@@ -736,9 +736,9 @@ jobs:
           cargo hack nextest run "${args[@]}" --locked --no-tests=pass
           cargo hack test --doc "${args[@]}" --locked
       # eehrxf has no default feature, so its suites run with every feature on.
-      # The suites that hold a patient summary document to the vendored
-      # profiles also write it under EEHRXF_EMIT_DIR, for the fhir-validator
-      # job.
+      # The suites that hold a patient summary or a laboratory report
+      # document to the vendored profiles also write it under
+      # EEHRXF_EMIT_DIR, for the fhir-validator job.
       - if: contains(matrix.packages, 'eehrxf')
         env:
           EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
@@ -755,11 +755,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # HL7's FHIR Validator over the patient summary documents the eehrxf suites
-  # write (#1318; no specification governs the lane: our own design), the
-  # evidence the component's page cites for the exchange format. It runs
-  # offline, the jar and the packages pinned in the "HL7 FHIR Validator"
-  # table of docs/VERSIONS.md, and fails on an error, a fatal issue or a
+  # HL7's FHIR Validator over the patient summary and laboratory report
+  # documents the eehrxf suites write (#1318; no specification governs the
+  # lane: our own design), the evidence the component's page cites for the
+  # exchange format. It runs offline, the jar and the packages pinned in the
+  # "HL7 FHIR Validator" table of docs/VERSIONS.md, and fails on an error, a fatal issue or a
   # claimed profile it could not find (scripts/checks/fhir-validator.sh). Its
   # results are the eehrxf-fhir-validation artifact; the validator is never
   # shipped.

@@ -800,6 +800,11 @@ apply-done = Applied: the set compiled and runs as revision { $id }
 apply-refused = Not applied: the set does not compile with this revision, so the running set is unchanged
 apply-diagnostics = Diagnostics of the apply
 
+## Example compositions
+example = Example
+example-label = Example compositions
+example-from = From { $template }
+example-note = A synthetic composition generated from the template
 ## Mapping-set archives
 import-title = Import a mapping set
 import-subtitle = Check a ZIP of mapping files and save it as a revision that does not run until you apply it

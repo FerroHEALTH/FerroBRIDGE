@@ -30,6 +30,7 @@ mod etl_runs;
 mod events;
 mod problem;
 mod save;
+mod templates;
 
 /// The clean mapping set the facade suite runs.
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures");

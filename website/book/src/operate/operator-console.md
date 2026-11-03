@@ -171,7 +171,10 @@ console answers with the page it drew.
   file): see below.
 - **Playground** (`/playground`, `/playground/toopenehr`,
   `/playground/validate`): runs `$tofhir`, `$toopenehr` and `$validate` as
-  the operator, and keeps nothing.
+  the operator, and keeps nothing. On the `$tofhir` tab, Example holds one
+  synthetic composition per template of the running set, generated from
+  its Web Template (`GET /operator/templates/{id}/example`); choosing one
+  loads it into the composition with its template chosen.
 - **FHIR facade** (`/facade`, `/facade/capability`, `/facade/security`,
   `/facade/settings`): the facade's state, the resource types its
   `CapabilityStatement` serves, the SMART discovery document, and its
@@ -384,6 +387,11 @@ A draft the bridge saved and reloaded the set with.
 [Dark theme](img/console/edit-saved-dark.png).
 
 ### Playground
+
+![An example composition](img/console/playground-example.png)
+
+The playground with an example composition of the template.
+[Dark theme](img/console/playground-example-dark.png).
 
 ![The playground](img/console/playground.png)
 
