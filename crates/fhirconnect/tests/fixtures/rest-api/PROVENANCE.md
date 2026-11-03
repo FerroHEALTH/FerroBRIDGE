@@ -14,9 +14,9 @@ extracted on 2026-09-15.
 
 - Source: `docs/specs/fhirconnect/modules/ROOT/pages/engine/rest-api.adoc`
 - Upstream: <https://github.com/SevKohler/FHIRconnect-spec>
-- Pin: commit `e587164102921c73eea262a18f3457b18e4a2a40`, the "FHIRconnect
+- Pin: commit `5046a6dd9ee34f5a1de152301778f302c55e3b7b`, the "FHIRconnect
   specification source" row of `docs/VERSIONS.md`
-- Re-checked: 2026-10-18
+- Re-checked: 2026-11-03
 - Upstream licence: Apache License 2.0, the `LICENSE` file of the same
   repository, vendored at `../../../../../docs/specs/fhirconnect/LICENSE`
 
