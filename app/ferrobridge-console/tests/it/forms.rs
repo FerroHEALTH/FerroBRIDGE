@@ -21,6 +21,10 @@ fn posts() -> Vec<(String, String)> {
     vec![
         (String::from("/mappings"), String::new()),
         (
+            String::from("/mappings/revisions/2"),
+            String::from("running=3&reason=r&decision=apply"),
+        ),
+        (
             String::from("/events"),
             String::from("consumer=events&id=3"),
         ),

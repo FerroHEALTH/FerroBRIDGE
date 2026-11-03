@@ -164,7 +164,7 @@ fn plain(path: &str) -> Result<(), BridgeError> {
 
 /// The report `body` holds, read into its `ferrobridge_operator_api`
 /// document.
-fn report(body: &[u8]) -> Result<LoadReport, BridgeError> {
+pub(super) fn report(body: &[u8]) -> Result<LoadReport, BridgeError> {
     serde_json::from_slice(body).map_err(|source| BridgeError::Document {
         expected: "load report",
         source,

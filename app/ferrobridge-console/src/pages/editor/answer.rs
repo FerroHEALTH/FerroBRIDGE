@@ -15,7 +15,7 @@ use crate::server::ConsoleState;
 
 /// Why `reason` cannot go with a save, or `None` when it can: one line of
 /// printable ASCII, at most [`MAX_REASON`] characters.
-fn reason_fault(reason: &str) -> Option<Msg> {
+pub(crate) fn reason_fault(reason: &str) -> Option<Msg> {
     let reason = reason.trim();
     if reason.is_empty() {
         Some(Msg::ReasonMissing)

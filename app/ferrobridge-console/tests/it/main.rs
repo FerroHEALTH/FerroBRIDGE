@@ -24,6 +24,7 @@ mod mappings;
 mod pages;
 mod playground;
 mod refresh;
+mod revisions;
 mod run;
 mod server;
 mod shell;
