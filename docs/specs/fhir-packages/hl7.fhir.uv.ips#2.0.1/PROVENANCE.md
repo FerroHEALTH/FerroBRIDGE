@@ -31,7 +31,7 @@ except `hl7.fhir.r4.core` 4.0.1, which is read from the committed
 
 ## Why build time
 
-The package set unpacks to about 570 MB, five versions of
+The package set unpacks to about 650 MB, six versions of
 `hl7.terminology.r4` and `hl7.fhir.uv.xver-r5.r4` among it, for input only
 the validator and its tests read. The licences would permit vendoring; the
 size decides. CI restores the trees from a cache keyed on

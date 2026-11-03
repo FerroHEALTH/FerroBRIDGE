@@ -12,7 +12,7 @@
 # registry, verifies the tarball against the registry's recorded shasum,
 # extracts it verbatim into the ignored
 # docs/specs/fhir-packages/<package>#<version>/package/, and checks the count
-# and digest against the pin. At about 570 MB unpacked the trees are fetched at
+# and digest against the pin. At about 650 MB unpacked the trees are fetched at
 # build time and never committed; only each PROVENANCE.md beside them is. A
 # tree already on disk at its pinned count and digest is kept without a
 # download, so a re-run or a cache-restored tree changes nothing. Its count and
@@ -265,7 +265,7 @@ except \`hl7.fhir.r4.core\` 4.0.1, which is read from the committed
 
 ## Why build time
 
-The package set unpacks to about 570 MB, five versions of
+The package set unpacks to about 650 MB, six versions of
 \`hl7.terminology.r4\` and \`hl7.fhir.uv.xver-r5.r4\` among it, for input only
 the validator and its tests read. The licences would permit vendoring; the
 size decides. CI restores the trees from a cache keyed on
