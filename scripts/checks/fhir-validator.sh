@@ -24,7 +24,9 @@
 # A run fails on an issue of severity error or fatal, on a document the
 # output names no outcome for, and on a claimed profile the validator could
 # not find (VALIDATION_VAL_PROFILE_UNKNOWN and its kin, whatever severity it
-# reports them at), so a claim is never left unchecked. Warnings and
+# reports them at), so a claim is never left unchecked. The one exception is
+# the known upstream defect KNOWN_DEFECT_ID names (#1454), admitted for that
+# one profile only and required to appear on every laboratory report. Warnings and
 # information never fail a run: among them are the terminology messages of an
 # offline run, a code or value set no loaded package defines, which the
 # validator cannot check without a terminology server. Every issue is listed
@@ -87,11 +89,24 @@ outcome_files() {
     | split("/") | last' "$output"
 }
 
+# The one known upstream defect the lane admits (#1454; no specification
+# governs this: our own design over an upstream defect). HL7 Europe
+# Laboratory Report 2.0.0 DiagnosticReport-eu-lab names the subject target
+# profile below, which no package of its closure defines, so the validator
+# reports this message id naming it on every laboratory report. Only that id
+# naming exactly that profile is admitted; it must appear for every
+# laboratory report document, so the entry fails the lane once upstream
+# fixes the package and is then removed.
+readonly KNOWN_DEFECT_ID="Reference_REF_CantResolveProfile"
+readonly KNOWN_DEFECT_PROFILE="http://hl7.eu/fhir/base/StructureDefinition/patient-animal-eu-core"
+readonly LAB_BUNDLE="http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab"
+
 # judge OUTPUT DOCUMENTS OUT: holds the validator output OUTPUT for the
 # documents in DOCUMENTS to the rules in the header, writes summary.tsv and
 # summary.md to OUT, and returns 1 when a run fails.
 judge() {
   local output="$1" documents="$2" out="$3" status=0 doc base n=0 outcomes failing
+  local file severity id where text
   mkdir -p "$out"
   if ! jq -e '.resourceType == "Bundle" or .resourceType == "OperationOutcome"' "$output" > /dev/null 2>&1; then
     echo "::error::$output is no OperationOutcome and no Bundle of them" >&2
@@ -120,12 +135,24 @@ judge() {
     echo "::error::$documents holds no document: did the tests run with EEHRXF_EMIT_DIR set?" >&2
     status=1
   fi
-  failing="$(awk -F '\t' '
+  failing="$(awk -F '\t' -v id="$KNOWN_DEFECT_ID" -v profile="'$KNOWN_DEFECT_PROFILE'" '
     NR > 1 {
       unknown = ($3 ~ /^(VALIDATION_VAL_PROFILE_UNKNOWN|Validation_VAL_Profile_Unknown|Validation_VAL_Unknown_Profile|VALIDATION_VAL_GLOBAL_PROFILE_UNKNOWN)/) \
         || ($5 ~ /has not been checked because it could not be found/)
-      if ($2 == "error" || $2 == "fatal" || unknown) print
+      known = ($3 == id && index($5, profile) > 0)
+      if (($2 == "error" || $2 == "fatal" || unknown) && !known) print
     }' "$out/summary.tsv")"
+  for doc in "$documents"/*.json; do
+    [[ -f "$doc" ]] || continue
+    jq -e --arg lab "$LAB_BUNDLE" '(.meta.profile // []) | index($lab) != null' "$doc" > /dev/null 2>&1 || continue
+    base="${doc##*/}"
+    if ! awk -F '\t' -v file="$base" -v id="$KNOWN_DEFECT_ID" -v profile="'$KNOWN_DEFECT_PROFILE'" \
+      'NR > 1 && $1 == file && $3 == id && index($5, profile) > 0 { found = 1 } END { exit !found }' \
+      "$out/summary.tsv"; then
+      echo "::error::$base: the known upstream defect (#1454) no longer appears; remove its entry" >&2
+      status=1
+    fi
+  done
   if [[ -n "$failing" ]]; then
     while IFS=$'\t' read -r file severity id where text; do
       echo "::error::$file: $severity ${id:+[$id] }at ${where:-?}: $text" >&2
@@ -223,9 +250,9 @@ self_test() {
   local file='http://hl7.org/fhir/StructureDefinition/operationoutcome-file'
   local mid='http://hl7.org/fhir/StructureDefinition/operationoutcome-message-id'
   outcome() {
-    local name="$1" severity="$2" id="$3"
-    printf '{"resourceType":"OperationOutcome","extension":[{"url":"%s","valueString":"/x/%s"}],"issue":[{"extension":[{"url":"%s","valueString":"%s"}],"severity":"%s","code":"processing","details":{"text":"t"},"expression":["Bundle"]}]}' \
-      "$file" "$name" "$mid" "$id" "$severity"
+    local name="$1" severity="$2" id="$3" text="${4:-t}"
+    printf '{"resourceType":"OperationOutcome","extension":[{"url":"%s","valueString":"/x/%s"}],"issue":[{"extension":[{"url":"%s","valueString":"%s"}],"severity":"%s","code":"processing","details":{"text":"%s"},"expression":["Bundle"]}]}' \
+      "$file" "$name" "$mid" "$id" "$severity" "$text"
   }
   bundle() {
     printf '{"resourceType":"Bundle","type":"collection","entry":[{"resource":%s},{"resource":%s}]}' "$1" "$2"
@@ -254,6 +281,18 @@ self_test() {
   check "a document with no outcome fails" 1 \
     "$(bundle "$(outcome a.json information All_OK)" "$(outcome c.json information All_OK)")"
   check "no validator output fails" 1 '{"resourceType":"Parameters"}'
+  local known="Unable to resolve the profile reference '$KNOWN_DEFECT_PROFILE'"
+  check "the known upstream defect passes" 0 \
+    "$(bundle "$(outcome a.json error "$KNOWN_DEFECT_ID" "$known")" "$(outcome b.json information All_OK)")"
+  check "the same message naming another profile fails" 1 \
+    "$(bundle "$(outcome a.json error "$KNOWN_DEFECT_ID" "Unable to resolve the profile reference 'http://example.org/other'")" "$(outcome b.json information All_OK)")"
+  check "another message naming the known profile fails" 1 \
+    "$(bundle "$(outcome a.json error Reference_REF_CantMatchChoice "$known")" "$(outcome b.json information All_OK)")"
+  printf '{"resourceType":"Bundle","meta":{"profile":["%s"]}}' "$LAB_BUNDLE" > "$scratch/docs/a.json"
+  check "a laboratory report the known defect stopped naming fails" 1 \
+    "$(bundle "$(outcome a.json information All_OK)" "$(outcome b.json information All_OK)")"
+  check "a laboratory report with the known defect passes" 0 \
+    "$(bundle "$(outcome a.json error "$KNOWN_DEFECT_ID" "$known")" "$(outcome b.json information All_OK)")"
   rm -f "$scratch/docs/"*.json
   check "no document fails" 1 '{"resourceType":"OperationOutcome","issue":[]}'
   if [[ "$wrong" -ne 0 ]]; then

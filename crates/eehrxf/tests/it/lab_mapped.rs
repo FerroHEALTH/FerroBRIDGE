@@ -37,6 +37,7 @@ use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::operations::run::Settings;
 use serde_json::Value;
@@ -511,5 +512,51 @@ fn the_report_identifier_the_template_holds_one_of_is_declared_lost() -> Result<
                 && issue["expression"][0] == "DiagnosticReport.identifier.value"
         });
     assert!(declared, "the dropped identifier is declared: {outcome}");
+    Ok(())
+}
+
+// NOTE: FHIR R4 extension-data-absent-reason.html: KDS_Laborbericht holds no performing
+// laboratory, so the result's required performer is written absent and the run declares it.
+#[test]
+fn the_performer_the_template_holds_none_of_is_written_absent_and_declared()
+-> Result<(), Box<dyn Error>> {
+    let mapping = mapping()?;
+    let document = ReceivedDocument::read(&received_text()?)?;
+    let composition = mapping.to_openehr(&document, &settings())?;
+    let (run, warnings) = mapping.to_fhir_with_warnings(
+        &committed(composition.composition())?,
+        &Settings::new("Device/ferrobridge-eehrxf-test", NOW),
+        CallContext::new(),
+    )?;
+    let bundle = serde_json::to_value(run.bundle())?;
+    let result = only(&bundle, "Observation")?;
+    assert_eq!(
+        result.pointer("/performer/0"),
+        Some(&serde_json::json!({"extension": [{
+            "url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+            "valueCode": "unknown"
+        }]})),
+        "{result}"
+    );
+    let declared = warnings.iter().any(|warning| {
+        warning.loss()
+            == &Loss::Absent {
+                reason: String::from("unknown"),
+            }
+            && warning.location().fhir() == Some("Observation.performer[0]")
+    });
+    assert!(
+        declared,
+        "the absent performer is a declared loss: {warnings:?}"
+    );
+    let outcome = only(&bundle, "OperationOutcome")?;
+    assert!(
+        outcome["issue"]
+            .as_array()
+            .ok_or("the outcome's issues")?
+            .iter()
+            .any(|issue| issue["expression"][0] == "Observation.performer[0]"),
+        "the Bundle's outcome names it: {outcome}"
+    );
     Ok(())
 }

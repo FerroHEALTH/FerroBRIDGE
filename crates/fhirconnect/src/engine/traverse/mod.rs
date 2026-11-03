@@ -52,6 +52,7 @@ use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::index::paths::FlatId;
 
+use crate::engine::absent;
 use crate::engine::context::CallContext;
 use crate::engine::family;
 use crate::engine::invariant;
@@ -588,6 +589,7 @@ fn read_out<T: Table + ?Sized>(
             context: String::from(program.context().as_str()),
             breach,
         })?;
+        run.warnings.extend(absent::declared(document));
     }
     Ok(Outcome::new(run.fhir, run.warnings).with_created(created))
 }

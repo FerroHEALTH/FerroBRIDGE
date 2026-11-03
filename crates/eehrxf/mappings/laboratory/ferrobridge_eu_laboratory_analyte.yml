@@ -4,8 +4,8 @@
 # Laboratory Report 2.0.0 Observation-resultslab-eu-lab profile: the
 # canonical, the `laboratory` category slice the profile fixes by pattern
 # (min 1, max 1), written out of openEHR, where a laboratory analyte is a
-# laboratory result by its archetype, and the effective time the profile
-# requires.
+# laboratory result by its archetype, and the effective time and performer
+# the profile requires.
 grammar: FHIRConnect/v1.0.0
 type: extension
 metadata:
@@ -51,3 +51,18 @@ mappings:
       fhir: "$resource.effective.as(DateTime)"
       openehr: "$archetype/../../time"
 
+
+  # NOTE: FHIR R4 extension-data-absent-reason.html: KDS_Laborbericht holds no party for the
+  # performing laboratory, so the performer Observation-resultslab-eu-lab requires is written absent.
+  - name: "performerAbsent"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.performer.extension"
+    manual:
+      - name: "unknown"
+        fhir:
+          - path: "url"
+            value: "http://hl7.org/fhir/StructureDefinition/data-absent-reason"
+          - path: "valueCode"
+            value: "unknown"
