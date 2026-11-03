@@ -5,11 +5,11 @@ edit a file under `package/`; change the pin in docs/VERSIONS.md and re-run
 `scripts/vendor/fhir-packages.sh hl7.terminology`.
 
 - Package: hl7.terminology
-- Version: 7.3.0
-- Source: the FHIR package registry, https://packages.fhir.org/hl7.terminology/7.3.0
-- Tarball: https://packages.simplifier.net/hl7.terminology/7.3.0
-- SHA-1 (registry shasum): ce07791ab9cc00cee4635d023354dfd016c461d1
-- SHA-256 (tarball): 8318f87cdcb44a6dfc5c197ca569c9b0499b06f45522324bfc4b4b810d51d4b9
-- Fetched: 2026-09-02
+- Version: 7.5.0
+- Source: the FHIR package registry, https://packages.fhir.org/hl7.terminology
+- Tarball: https://packages.simplifier.net/hl7.terminology/7.5.0
+- SHA-1 (registry shasum): e8027c185e9309c737476969154eb10f8ff4128d
+- SHA-256 (tarball): c54ebe534cd3f2474459eaed68e54c34f09b003766605b19e5552db376f2cc42
+- Fetched: 2026-11-03
 - Upstream license: CC0-1.0 (the `license` field of `package/package.json`)
 - Layout: the tarball's `package/` directory, extracted unchanged
