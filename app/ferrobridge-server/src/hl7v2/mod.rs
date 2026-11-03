@@ -21,6 +21,7 @@
 //! acknowledgment code, nothing of its content.
 
 pub mod answer;
+pub mod directory;
 mod envelope;
 mod stamped;
 
@@ -73,6 +74,8 @@ pub struct Face {
     facade: Arc<Facade>,
     /// The v2-to-FHIR `ConceptMaps`.
     corpus: Corpus,
+    /// The directory of the maps, with the messages each one served.
+    directory: Arc<directory::Directory>,
     /// The terminology server the table maps are translated on.
     terminology: Option<ferrobridge_term::client::Client>,
     /// The facade's settings, under the face's EHR policy.
@@ -166,9 +169,15 @@ impl Face {
         if let Some(policy) = settings.ehr_policy {
             ingest.ehr_policy = policy;
         }
+        let directory = Arc::new(directory::Directory::new(
+            &corpus,
+            settings,
+            jiff::Timestamp::now(),
+        ));
         Self {
             facade,
             corpus,
+            directory,
             terminology,
             settings: ingest,
             charset: settings.default_charset,
@@ -179,6 +188,13 @@ impl Face {
             usage: Arc::new(crate::usage_report::window()),
             access_log: None,
         }
+    }
+
+    /// Returns the directory of the face's maps, with the messages each one
+    /// served.
+    #[must_use]
+    pub const fn directory(&self) -> &Arc<directory::Directory> {
+        &self.directory
     }
 
     /// Returns the face counting its messages in `usage`, the window the
@@ -325,6 +341,7 @@ impl Face {
             Ok(mapped) => mapped,
             Err(error) => return (Settled::Unmapped(error), tally),
         };
+        self.directory.served(mapped.applied());
         tally.outcomes = mapped.counts();
         let type_code = [message.message_type(1), message.message_type(2)]
             .into_iter()

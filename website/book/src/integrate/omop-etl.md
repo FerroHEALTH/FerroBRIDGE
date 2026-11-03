@@ -161,6 +161,19 @@ deletion checks below and lists each composition they removed, kept or could
 not find, by its versioned object id, never with a clinical value. `etl run`
 prints it as text and as JSON.
 
+### The run history
+
+Once a run of `etl run` or `etl fhir` finished, it keeps its report in the
+run table of the bridge schema (`[cdm] bridge_schema`), with when it started
+and finished, so `ferrobridge serve` can show past runs: the operator API
+answers them at [`GET /operator/etl/runs`](../operate/operator-api.md#get-operatoretlruns),
+and the operator console lists them on the OMOP ETL page's Runs tab. A
+bridge schema an earlier release created gets the run table from
+`ferrobridge cdm init`, which leaves every other table as it is. When the
+record is refused, the job still prints its report and then exits with the
+refusal, so the load it committed is never hidden. No specification governs
+the history: it is FerroBRIDGE's own design.
+
 ## Deleted compositions
 
 A deletion in openEHR is a new version whose data is Void (openEHR RM Common

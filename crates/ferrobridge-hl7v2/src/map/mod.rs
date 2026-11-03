@@ -39,7 +39,7 @@ pub mod notation;
 mod run;
 pub mod supplement;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use fhir_types::codec::{DecodeError, DecodeErrorKind, Value};
 use fhirconnect::tree::error::{ParseError, ResolveError, WriteError};
@@ -658,6 +658,7 @@ pub struct Mapped {
     bundle: Value,
     outcomes: Vec<Outcome>,
     translations: usize,
+    applied: BTreeSet<String>,
 }
 
 impl Mapped {
@@ -699,6 +700,14 @@ impl Mapped {
     pub const fn translations(&self) -> usize {
         self.translations
     }
+
+    /// Returns the id of every `ConceptMap` the run applied: the message
+    /// map, each segment and data type map it ran rows of, and each table
+    /// map it asked a translation through.
+    #[must_use]
+    pub const fn applied(&self) -> &BTreeSet<String> {
+        &self.applied
+    }
 }
 
 /// Maps `parsed` through `corpus`, translating table values on
@@ -727,10 +736,12 @@ pub async fn map(
     let mut run = run::Run::new(corpus, parsed);
     run.message()?;
     let translations = run.translate(terminology).await?;
+    let applied = run.take_applied();
     let (bundle, outcomes) = run.finish()?;
     Ok(Mapped {
         bundle,
         outcomes,
         translations,
+        applied,
     })
 }

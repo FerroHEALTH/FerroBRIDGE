@@ -102,6 +102,51 @@ lane is off answers `200` with no consumer and a `null` topology.
 The document carries identifiers, instants and counts, never an event body,
 and never the broker URL.
 
+## `GET /operator/etl/runs`
+
+The newest 50 [OMOP ETL](../integrate/omop-etl.md#the-run-history) runs the
+bridge schema keeps, newest first, as `{"runs": [...]}`. Each run names its
+`id`, its `kind` (`compositions` for `etl run`, `fhir` for `etl fhir`), when
+it `started` and `finished` (RFC 3339 UTC), its `compositions` (`read`,
+`committed`, `skipped` and `refused`), the `rows` it wrote over every table,
+its `refusals`, and the compositions it `removed` because the CDR reports
+them deleted. A bridge with no `[cdm]` answers `404`, and one whose CDM
+database does not answer, or holds no run table yet, answers `503`
+([`run-history-unavailable`](problems.md#run-history-unavailable)).
+
+### `GET /operator/etl/runs/{run_id}`
+
+One run whole: the facts of the listing, the `rows` it wrote by CDM table,
+its `concept_zero` assignments, every refused record in `refusals` (its
+`composition`, `mapping`, `table`, `column`, openEHR `element` and
+`reason`), and its `deletions` (`checked`, `extant`, the `removed`, `kept`
+and `unknown` compositions by versioned object id, and the `rows` removed by
+table). A run the history does not hold answers `404`. A run names
+compositions by their versioned object id and never carries a clinical
+value.
+
+## `GET /operator/hl7v2/concept-maps`
+
+The [HL7 v2 face](hl7v2-face.md)'s ConceptMap directory, as one JSON
+document. A bridge whose face is off answers `404`.
+
+- `directory`: the `concept_maps` directory the guide's maps were read
+  from, and `supplements`, the `supplements` directories in load order;
+- `counted_since`: the instant the face started, RFC 3339 UTC, since when
+  the `messages` counts run;
+- `maps`: every map the face runs, by id, each with its `id`, canonical
+  `url` and `title`, its `kind` (`message`, `segment`, `datatype`, `table`
+  or `other`, from the first word of the id), its `origin` (`guide`,
+  `supplement` for a supplement that adds a map, or `override` for one that
+  replaces a map of the guide), its `ends`, what it maps from and to (each
+  group's source and target code system for a table map, else the
+  `source` and `target` the id names before and after `-to-`), the `rows`
+  the face reads from it, and the `messages` whose mapping applied it.
+
+A message counts once for each map its mapping applied, whether or not its
+ingest then committed, and the counts start again at zero when the bridge
+restarts. The document carries no message content.
+
 ## `GET /operator/configuration`
 
 The configuration the bridge started on, as one JSON document. The bridge

@@ -11,7 +11,10 @@
 //! owner, `GET /operator/mappings/{path}` one file's verbatim bytes with its
 //! digest as the `ETag`, and `GET /operator/configuration` the configuration
 //! the bridge started on, every secret by reference alone
-//! ([`configuration`]), `GET /operator/events` the change-feed consumers, their
+//! ([`configuration`]), `GET /operator/etl/runs` the OMOP ETL runs the bridge
+//! schema keeps and `GET /operator/etl/runs/{run_id}` one of them,
+//! `GET /operator/hl7v2/concept-maps` the HL7 v2 face's `ConceptMap`
+//! directory, `GET /operator/events` the change-feed consumers, their
 //! parked events and the AMQP topology, and `POST
 //! /operator/events/{consumer}/parked/{id}/replay` a replay of one
 //! (`crate::change_feed::report`). With `[operator] mapping_dir`, `POST
@@ -191,6 +194,8 @@ pub fn routes(
     health: Registry,
     lifecycle: Lifecycle,
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
+    etl_history: Option<Arc<crate::etl::history::Store>>,
+    concept_maps: Option<Arc<crate::hl7v2::directory::Directory>>,
 ) -> Router {
     let readiness = Router::new()
         .route("/operator/readiness", get(readiness))
@@ -202,6 +207,13 @@ pub fn routes(
             post(replay_parked),
         )
         .with_state(change_feed);
+    let history = Router::new()
+        .route("/operator/etl/runs", get(etl_runs))
+        .route("/operator/etl/runs/{run_id}", get(etl_run))
+        .with_state(etl_history);
+    let face = Router::new()
+        .route("/operator/hl7v2/concept-maps", get(concept_map_directory))
+        .with_state(concept_maps);
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/configuration", get(running_configuration))
@@ -212,6 +224,8 @@ pub fn routes(
         .with_state(operator)
         .merge(readiness)
         .merge(lane)
+        .merge(history)
+        .merge(face)
         .route_layer(guard::layer(smart))
 }
 
@@ -278,6 +292,72 @@ async fn replay_parked(
         Err(error) => dead_letters_unavailable(&error),
     })
     .await
+}
+
+/// `GET /operator/etl/runs`: the newest OMOP ETL runs the bridge schema
+/// keeps, newest first; `404` when the bridge has no `[cdm]`.
+async fn etl_runs(State(history): State<Option<Arc<crate::etl::history::Store>>>) -> Response {
+    let Some(history) = history else {
+        return no_history();
+    };
+    match history.runs().await {
+        Ok(runs) => axum::Json(runs).into_response(),
+        Err(error) => history_unavailable(&error),
+    }
+}
+
+/// `GET /operator/etl/runs/{run_id}`: one OMOP ETL run whole; `404` for a
+/// run the history does not hold.
+async fn etl_run(
+    State(history): State<Option<Arc<crate::etl::history::Store>>>,
+    Path(run_id): Path<String>,
+) -> Response {
+    let Some(history) = history else {
+        return no_history();
+    };
+    // NOTE: no specification governs this: our own design; a run id is a UUID the job
+    // formed, so any other path segment names no run and never reaches the database.
+    if run_id.is_empty()
+        || !run_id
+            .chars()
+            .all(|character| character.is_ascii_hexdigit() || character == '-')
+    {
+        return refuse(Kind::NotFound, "no ETL run has this id");
+    }
+    match history.run(&run_id).await {
+        Ok(Some(run)) => axum::Json(run).into_response(),
+        Ok(None) => refuse(Kind::NotFound, "no ETL run has this id"),
+        Err(error) => history_unavailable(&error),
+    }
+}
+
+/// Returns the `404` of a bridge that keeps no run history.
+fn no_history() -> Response {
+    refuse(
+        Kind::NotFound,
+        "this bridge has no CDM database to keep a run history in",
+    )
+}
+
+/// Returns the `503` of a run history that could not be read, its cause
+/// logged.
+fn history_unavailable(error: &crate::etl::history::ReadError) -> Response {
+    tracing::error!(reason = %crate::indicators::reason(error), "the run history could not be read");
+    refuse(
+        Kind::RunHistoryUnavailable,
+        "the run history could not be read",
+    )
+}
+
+/// `GET /operator/hl7v2/concept-maps`: the HL7 v2 face's `ConceptMap`
+/// directory with the messages each map served, `404` when the face is off.
+async fn concept_map_directory(
+    State(directory): State<Option<Arc<crate::hl7v2::directory::Directory>>>,
+) -> Response {
+    match directory {
+        Some(directory) => axum::Json(directory.document()).into_response(),
+        None => refuse(Kind::NotFound, "this bridge runs no HL7 v2 face"),
+    }
 }
 
 /// Runs `work`, which reads or writes the dead-letter store, off the async

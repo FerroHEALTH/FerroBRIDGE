@@ -82,7 +82,7 @@ impl<'a> Run<'a> {
         let Some(segment) = scope.segment() else {
             return Ok(());
         };
-        self.supplemented(map, &scope.at);
+        self.applied(map, &scope.at);
         for row in &map.rows {
             let reference = row_ref(map, row);
             let (id, path) = split_source(&row.source, '-');

@@ -135,9 +135,18 @@ console answers with the page it drew.
   `/facade/settings`): the facade's state, the resource types its
   `CapabilityStatement` serves, the SMART discovery document, and its
   settings.
-- **HL7 v2** (`/hl7v2`, `/hl7v2/settings`) and **OMOP ETL** (`/omop`,
-  `/omop/settings`): whether the MLLP listener runs and where, whether an
-  ETL is configured, and each face's settings.
+- **HL7 v2** (`/hl7v2`, `/hl7v2/concept-maps`, `/hl7v2/settings`) and
+  **OMOP ETL** (`/omop`, `/omop/runs`, `/omop/settings`): whether the MLLP
+  listener runs and where, whether an ETL is configured, and each face's
+  settings. The ConceptMaps tab lists every map the HL7 v2 face runs, from
+  `GET /operator/hl7v2/concept-maps`: its title and id, its kind, what it
+  maps from and to, whether it is the guide's or a supplement's, its rows
+  and the messages it served since the bridge started. The OMOP ETL's Runs
+  tab lists the runs the bridge schema keeps, from `GET /operator/etl/runs`,
+  each with its job, when it ran and its counts, and links each to its
+  report (`/omop/runs/{id}`): the compositions it read, the rows it wrote by
+  table, what its deletion check found, and every record it refused with
+  the reason.
 - **Events** (`/events`): every change-feed consumer and the AMQP topology
   of the [events lane](../integrate/events.md), from `GET /operator/events`:
   each consumer's source and reader, its position in each stream (an outbox
@@ -365,8 +374,13 @@ The facade's settings. [Dark theme](img/console/facade-settings-dark.png).
 
 ![HL7 v2](img/console/hl7v2.png)
 
-The HL7 v2 face of a bridge that runs no listener.
+The HL7 v2 face and its MLLP listener.
 [Dark theme](img/console/hl7v2-dark.png).
+
+![The HL7 v2 ConceptMaps](img/console/hl7v2-concept-maps.png)
+
+The ConceptMaps the HL7 v2 face runs, with the messages each served.
+[Dark theme](img/console/hl7v2-concept-maps-dark.png).
 
 ![The HL7 v2 settings](img/console/hl7v2-settings.png)
 
@@ -380,6 +394,15 @@ The OMOP ETL of a bridge with no ETL configured.
 ![The OMOP ETL settings](img/console/omop-settings.png)
 
 The OMOP ETL's settings. [Dark theme](img/console/omop-settings-dark.png).
+
+![The OMOP ETL runs](img/console/omop-runs.png)
+
+The runs the bridge schema keeps. [Dark theme](img/console/omop-runs-dark.png).
+
+![One OMOP ETL run](img/console/omop-run.png)
+
+The report of one run, with the record it refused.
+[Dark theme](img/console/omop-run-dark.png).
 
 ![Events](img/console/events.png)
 

@@ -14,6 +14,7 @@ use crate::etl::mapper::{CdmVocabulary, MapperError, OmoclMapper, read_roots};
 use crate::etl::report::RunReport;
 use crate::etl::{RunError, RunOptions};
 use crate::operator::files::{Language, Root};
+use ferrobridge_operator_api::etl::RunKind;
 use omop_cdm::database::{CdmPool, ConnectError};
 use omop_cdm::graph::key::EmptyIdentifier;
 use omop_cdm::vocabulary::ConceptResolver;
@@ -63,6 +64,16 @@ pub enum JobError {
     /// The FHIR input does not read.
     #[error("reading the FHIR input")]
     Input(#[source] crate::etl::fhir::InputError),
+    /// The run finished and its report could not be kept in the run history;
+    /// the report is carried so it is still shown.
+    #[error("keeping the report of run {} in the run history", .report.run_id)]
+    Record {
+        /// The finished run's report.
+        report: Box<RunReport>,
+        /// Why it could not be recorded.
+        #[source]
+        source: crate::etl::history::RecordError,
+    },
 }
 
 /// Returns the section `etl run` needs and `settings` lacks, the first
@@ -154,12 +165,36 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
         writer = writer.pseudonymise(pseudonymiser.clone());
     }
     let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
+    let started = jiff::Timestamp::now();
     let mut report = crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
         .await
         .map_err(JobError::Run)?;
     foreign_step(&writer, &mut report).await?;
     quality_step(etl, &pool, &mut report).await?;
-    Ok(report)
+    keep(&writer, report, RunKind::Compositions, started).await
+}
+
+/// Records the finished run `report`, of `kind` and started at `started`,
+/// in the run history of the bridge schema `writer` writes, and returns it.
+///
+/// # Errors
+///
+/// Returns [`JobError::Record`], carrying the report, when the record is
+/// refused.
+async fn keep(
+    writer: &CdmWriter,
+    report: RunReport,
+    kind: RunKind,
+    started: jiff::Timestamp,
+) -> Result<RunReport, JobError> {
+    let run = crate::etl::history::document(&report, kind, started, jiff::Timestamp::now());
+    match crate::etl::history::record(writer, &run).await {
+        Ok(()) => Ok(report),
+        Err(source) => Err(JobError::Record {
+            report: Box::new(report),
+            source,
+        }),
+    }
 }
 
 /// Returns the OMOCL mapper over `set`, its concept resolver connected to
@@ -287,6 +322,7 @@ pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<Ru
         writer = writer.pseudonymise(pseudonymiser.clone());
     }
     let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
+    let started = jiff::Timestamp::now();
     let operations = &settings.operations;
     let now = jiff::Timestamp::now().to_string();
     let side = crate::etl::fhir::FhirSide {
@@ -302,5 +338,5 @@ pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<Ru
         .map_err(JobError::Run)?;
     foreign_step(&writer, &mut report).await?;
     quality_step(etl, &pool, &mut report).await?;
-    Ok(report)
+    keep(&writer, report, RunKind::Fhir, started).await
 }

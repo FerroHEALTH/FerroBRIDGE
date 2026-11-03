@@ -182,10 +182,6 @@ pub(crate) fn vocab_load_command(
 ///
 /// The job itself is [`etl::job::run`], which a test drives with a
 /// configuration of its own.
-#[expect(
-    clippy::print_stdout,
-    reason = "the run report is the job's output, written to stdout for the operator"
-)]
 pub(crate) fn etl_run_command(
     settings: &Settings,
     options: &etl::RunOptions,
@@ -193,10 +189,30 @@ pub(crate) fn etl_run_command(
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    let report = runtime.block_on(etl::job::run(settings, options))?;
+    shown(runtime.block_on(etl::job::run(settings, options)))
+}
+
+/// Prints the report of a finished run as text and as JSON, also when its
+/// record in the run history was refused, and returns the job's outcome.
+#[expect(
+    clippy::print_stdout,
+    reason = "the run report is the job's output, written to stdout for the operator"
+)]
+fn shown(outcome: Result<etl::report::RunReport, etl::job::JobError>) -> anyhow::Result<()> {
+    let (report, refused) = match outcome {
+        Ok(report) => (report, None),
+        Err(etl::job::JobError::Record { report, source }) => (*report, Some(source)),
+        Err(error) => return Err(error.into()),
+    };
     println!("{report}");
     println!("{}", serde_json::to_string_pretty(&report)?);
-    Ok(())
+    match refused {
+        None => Ok(()),
+        Some(source) => Err(anyhow::Error::new(source).context(format!(
+            "keeping the report of run {} in the run history",
+            report.run_id
+        ))),
+    }
 }
 
 /// Runs every ported Data Quality Dashboard check against the configured
@@ -242,18 +258,11 @@ pub(crate) fn dq_check_command(
 /// report as text and as JSON.
 ///
 /// The job itself is [`etl::job::run_fhir`].
-#[expect(
-    clippy::print_stdout,
-    reason = "the run report is the job's output, written to stdout for the operator"
-)]
 pub(crate) fn etl_fhir_command(settings: &Settings, input: &std::path::Path) -> anyhow::Result<()> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    let report = runtime.block_on(etl::job::run_fhir(settings, input))?;
-    println!("{report}");
-    println!("{}", serde_json::to_string_pretty(&report)?);
-    Ok(())
+    shown(runtime.block_on(etl::job::run_fhir(settings, input)))
 }
 
 /// Checks the OMOCL literals of `files` against the vocabulary of the `cdm`
