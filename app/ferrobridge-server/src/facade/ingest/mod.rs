@@ -22,10 +22,13 @@ mod ehr_status;
 mod entries;
 pub(crate) mod linked;
 mod pairing;
+mod plan;
 mod reconcile;
 pub(crate) mod refusal;
 mod single;
 mod transaction;
+
+use plan::{Mapped, Mapping, Partition, Pending, Placed, Recorded, Scope, Standing};
 
 use fhir_types::codec::Value;
 use fhirconnect::engine::demographics::Demographics;
@@ -34,7 +37,6 @@ use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
-use fhirconnect::engine::subject::SubjectIdentifier;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
@@ -50,9 +52,7 @@ use crate::facade::Settings;
 use crate::facade::commit;
 use crate::facade::commit::Committer;
 use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::PersonId;
 use crate::facade::identity::claims::Claims;
-use crate::facade::identity::record::CommittedSource;
 use crate::facade::identity::record::ConsumedSource;
 use crate::facade::identity::store::Store;
 use crate::facade::outcome::Issue;
@@ -63,8 +63,6 @@ use crate::facade::request::Inbound;
 use crate::facade::status;
 use crate::terminology::Translator;
 use ferrohealth_usage_report::window::Window;
-
-use binding::canonical_of;
 
 /// What a Bundle entry no loaded program maps does to the Bundle.
 ///
@@ -441,137 +439,6 @@ pub struct Ingest<'a> {
 /// The translator of an ingest built with none: no server, so a
 /// `conceptmap` refuses.
 static NO_TRANSLATOR: Translator = Translator::new(None);
-
-/// One Bundle entry that mapped, ready to commit.
-#[derive(Debug)]
-struct Mapped {
-    /// The `fullUrl` the Bundle gave the entry, for a refusal that names it.
-    full_url: String,
-    /// The entry's position in the Bundle.
-    position: usize,
-    /// The resource the entry carries.
-    inbound: Inbound,
-    /// The program the entry ran.
-    program: Loaded,
-    /// The template of the composition the entry produced.
-    template_id: String,
-    /// The composition as the engine built it.
-    built: CanonicalComposition,
-    /// The composition as the strict reader read it back.
-    composition: Box<Composition>,
-    /// The instant the engine defaulted every clock-derived time from.
-    instant: String,
-    /// The literal references whose resources a `slotContext` consumed.
-    consumed: Vec<String>,
-    /// The identifiers the entry offers as the subject of the EHR.
-    offered: Vec<SubjectIdentifier>,
-    /// The losses the entry's mapping declared.
-    losses: Vec<Warning>,
-}
-
-/// Which versions of a committed contribution the entries being bound
-/// account for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Scope {
-    /// Every version is the composition of one of the entries.
-    Whole,
-    /// The entries are some of the versions, as one resource of a
-    /// transaction is; a version no entry matches is passed over.
-    Part,
-}
-
-/// What mapping one Bundle entry produced.
-#[derive(Debug)]
-enum Mapping {
-    /// The entry mapped, for the subject it names.
-    Mapped(Box<Mapped>, PersonId),
-    /// No program ran: the skip, and the issue that refuses the Bundle.
-    Unmapped(Skipped, Issue),
-}
-
-/// Where one entry of a Bundle stands before the commit.
-#[derive(Debug)]
-enum Pending {
-    /// The entry mapped: its index among the mapped entries.
-    Mapped(usize),
-    /// No program ran over the entry.
-    Skipped(Skipped),
-    /// Another entry's mapping consumed the entry.
-    Consumed(Consumed),
-}
-
-/// Every entry of a Bundle, mapped and partitioned.
-#[derive(Debug, Default)]
-struct Partition {
-    /// The entries that mapped, in Bundle order.
-    mapped: Vec<Mapped>,
-    /// One slot per entry that mapped or was skipped, in Bundle order.
-    pending: Vec<Pending>,
-    /// The issues that refuse the Bundle.
-    failures: Vec<Issue>,
-    /// The one subject every mapped entry names.
-    subject: Option<PersonId>,
-}
-
-/// Where one committed entry stands.
-#[derive(Debug)]
-struct Placed {
-    /// The logical id the entry's resource has.
-    id: FhirResourceId,
-    /// The composition version the entry stands at.
-    version: ObjectVersionId,
-    /// The change this delivery committed for the entry, when it committed
-    /// one.
-    change: Option<commit::Change>,
-}
-
-/// What the identity map records of one Bundle entry's source.
-#[derive(Debug, Default)]
-struct Recorded {
-    /// What consumed the exact source.
-    consumed: Option<ConsumedSource>,
-    /// The contribution that committed the exact source.
-    committed: Option<CommittedSource>,
-    /// What consumed another version of the source's `id`, whose composition
-    /// the entry revises.
-    revised: Option<ConsumedSource>,
-}
-
-/// Where the composition a consumed source produced stands now.
-#[derive(Debug)]
-struct Standing {
-    /// The EHR the composition lives in.
-    ehr_id: EhrId,
-    /// The logical id the resource has.
-    id: FhirResourceId,
-    /// The version the composition stands at.
-    version: ObjectVersionId,
-    /// The composition the CDR holds at that version.
-    composition: Composition,
-}
-
-impl Standing {
-    /// Returns the answer of a write that found this composition and
-    /// committed nothing, with `built` as the mapping the answer renders
-    /// through.
-    fn written(self, built: &CanonicalComposition) -> Result<Written, Refused> {
-        let composition = canonical_of(&self.composition, built)?;
-        Ok(self.replayed(composition))
-    }
-
-    /// Returns the answer of a write that found this composition and
-    /// committed nothing, rendering `composition`.
-    fn replayed(self, composition: CanonicalComposition) -> Written {
-        Written {
-            id: self.id,
-            ehr_id: self.ehr_id,
-            version: self.version,
-            composition,
-            delivery: Delivery::Replayed,
-            losses: Vec::new(),
-        }
-    }
-}
 
 impl<'a> Ingest<'a> {
     /// Returns an ingest over `programs`, `store`, `client` and `settings`.
