@@ -4,8 +4,7 @@
 //! The EHDS readiness matrix, generated from `docs/ehds/readiness.toml`.
 //!
 //! Every template file, context and round-trip test a row names must exist,
-//! and a claimed profile must be named in the context's project directory or
-//! in the shipped directory it also loads, so
+//! and a claimed profile must be named in the context's project directory, so
 //! a row whose evidence is gone fails here rather than being skipped. The
 //! matrix is rendered into the book page between its markers, and a page that
 //! differs fails; `FERROBRIDGE_UPDATE_READINESS=1` writes the page instead.
@@ -72,8 +71,6 @@ struct Row {
     template_file: Option<String>,
     /// The context that maps the profile.
     context: Option<String>,
-    /// The shipped mapping directory whose models the context also loads.
-    shared: Option<String>,
     /// The round-trip test, `<file>::<function>`.
     test: Option<String>,
     /// Whether the produced resource claims the profile.
@@ -123,10 +120,8 @@ fn defects(row: &Row) -> Vec<String> {
     if row.claimed != Some(false) {
         match (row.profile.as_ref(), context_path.parent()) {
             (Some(profile), Some(directory)) => {
-                let shared = row.shared.as_deref().map(rooted);
-                let named = std::iter::once(directory.to_path_buf())
-                    .chain(shared)
-                    .flat_map(std::fs::read_dir)
+                let named = std::fs::read_dir(directory)
+                    .into_iter()
                     .flatten()
                     .flatten()
                     .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())

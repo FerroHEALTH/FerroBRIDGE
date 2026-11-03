@@ -90,9 +90,10 @@ macro_rules! shipped {
 
 /// The HL7 Europe Medication Prescription and Dispense 1.0.0 project.
 ///
-/// It maps over FerroBRIDGE's medication template: `MedicationRequest-eu-mpd` from the
-/// medication order and `MedicationDispense-eu-mpd` from the medication
-/// action at its dispensed careflow step, each with its `Medication-eu-mpd`.
+/// It maps over FerroBRIDGE's medication template: `MedicationRequest-eu-mpd`
+/// from the medication order and `MedicationDispense-eu-mpd` from the
+/// medication action at its dispensed careflow step, each with its
+/// `Medication-eu-mpd`.
 #[cfg(any(feature = "prescription", feature = "dispensation"))]
 pub const MPD: Project = Project {
     directory: "mpd",
@@ -113,25 +114,30 @@ pub const MPD: Project = Project {
     ],
 };
 
-/// The HL7 Europe Laboratory Report 2.0.0 document project.
+/// The HL7 Europe Laboratory Report 2.0.0 project.
 ///
-/// It maps over the published `KDS_Laborbericht` template: the report composition as the
-/// `Composition-eu-lab`, whose section references the
-/// `DiagnosticReport-eu-lab`, which references its
-/// `Observation-resultslab-eu-lab` results and `Specimen-eu-lab` specimens.
+/// It maps over the published `KDS_Laborbericht` template. Its context maps
+/// the laboratory test result to the `DiagnosticReport-eu-lab` the document
+/// holds beside its composition, each analyte to an
+/// `Observation-resultslab-eu-lab` and each specimen to a `Specimen-eu-lab`.
+/// The directory also holds `ferrobridge_eu_lab_composition.context`, which
+/// maps the report composition to a `Composition-eu-lab` over the same
+/// template and is compiled on its own.
 #[cfg(feature = "laboratory")]
 pub const LABORATORY: Project = Project {
     directory: "laboratory",
-    contexts: &["ferrobridge_eu_lab_composition.context"],
+    contexts: &["ferrobridge_eu_laboratory.context"],
     files: &[
+        shipped!("laboratory", "ferrobridge_eu_laboratory.context.yml"),
+        shipped!("laboratory", "ferrobridge_laboratory_test_result.v1.yml"),
+        shipped!("laboratory", "ferrobridge_laboratory_test_analyte.v1.yml"),
+        shipped!("laboratory", "ferrobridge_specimen.v1.yml"),
+        shipped!("laboratory", "ferrobridge_eu_laboratory_result.yml"),
+        shipped!("laboratory", "ferrobridge_eu_laboratory_analyte.yml"),
+        shipped!("laboratory", "ferrobridge_eu_laboratory_specimen.yml"),
         shipped!("laboratory", "ferrobridge_eu_lab_composition.context.yml"),
         shipped!("laboratory", "ferrobridge_report_result.v1.Composition.yml"),
         shipped!("laboratory", "ferrobridge_eu_lab_composition.yml"),
         shipped!("laboratory", "ferrobridge_eu_lab_composition_report.yml"),
-        shipped!("laboratory", "ferrobridge_laboratory_test_result.v1.yml"),
-        shipped!("laboratory", "ferrobridge_laboratory_test_analyte.v1.yml"),
-        shipped!("laboratory", "ferrobridge_specimen.v1.yml"),
-        shipped!("laboratory", "ferrobridge_eu_laboratory_analyte.yml"),
-        shipped!("laboratory", "ferrobridge_eu_laboratory_specimen.yml"),
     ],
 };

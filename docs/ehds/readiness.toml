@@ -12,9 +12,8 @@
 #
 # Paths are relative to the workspace root. A test is `<file>::<function>`.
 # `target` is what the matrix shows; `profile` is the canonical the context's
-# project directory, or the shipped directory `shared` names whose models the
-# context also loads, must name, unless `claimed = false` says the resource
-# is produced without claiming it.
+# project directory must name, unless `claimed = false` says the resource is
+# produced without claiming it.
 
 [[category]]
 article = "14(1)(a)"
@@ -119,8 +118,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
-shared = "crates/eehrxf/mappings/laboratory"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
 test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_report_survive_the_round_trip"
 
 [[category.row]]
@@ -129,8 +127,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-results
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
-shared = "crates/eehrxf/mappings/laboratory"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
 test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_result_survive_the_round_trip"
 
 [[category.row]]
@@ -139,8 +136,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab"
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
-shared = "crates/eehrxf/mappings/laboratory"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
 test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_specimen_survive_the_round_trip"
 
 [[category.row]]

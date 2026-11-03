@@ -50,8 +50,8 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   under `mappings/` in its package, each embedded as text with the context
   mappings it compiles: `MPD` (features `prescription` or `dispensation`),
   the HL7 Europe MPD 1.0.0 request and dispense, and `LABORATORY` (feature
-  `laboratory`), the HL7 Europe Laboratory Report 2.0.0 document over the
-  published `KDS_Laborbericht` template. `Project::write_to` writes a
+  `laboratory`), the HL7 Europe Laboratory Report 2.0.0 report with its
+  results and specimens over the published `KDS_Laborbericht` template. `Project::write_to` writes a
   project's files where a system keeps its mappings, the paths
   `Mapping::compile` takes.
 - `medication` (feature `fhir-r4` with `prescription` or `dispensation`):

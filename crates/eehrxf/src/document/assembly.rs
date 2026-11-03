@@ -98,11 +98,13 @@ impl Document {
     ) -> (String, DiagnosticReport) {
         let id = report.id.clone().unwrap_or_else(|| String::from("report"));
         report.id = Some(id.clone());
-        report
-            .meta
-            .get_or_insert_with(Meta::default)
-            .profile
-            .push(companion.profile.into());
+        let profiles = &mut report.meta.get_or_insert_with(Meta::default).profile;
+        if !profiles
+            .iter()
+            .any(|claimed| claimed.value.as_deref() == Some(companion.profile))
+        {
+            profiles.push(companion.profile.into());
+        }
         let identifier = Identifier {
             system: Some(URN_SYSTEM.into()),
             value: Some(self.identifier.as_str().into()),
