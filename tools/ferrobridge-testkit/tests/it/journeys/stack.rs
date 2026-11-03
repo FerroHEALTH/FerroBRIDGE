@@ -3,13 +3,14 @@
 
 //! The stack a journey runs against, each part on loopback: a `wiremock`
 //! CDR, the test OpenID Provider, a running bridge over a synthetic mapping
-//! tree with its FHIR facade, operations lane and operator API, and a
-//! running console that draws every page and calls that bridge.
+//! tree with its FHIR facade, operations lane, HL7 v2 face and operator API,
+//! and a running console that draws every page and calls that bridge.
 //!
 //! The bridge runs `ferrobridge serve`'s own run path,
 //! `ferrobridge_server::boot::serve_settings`. Its mapping tree holds one
-//! provisioned context and model over the testkit's diagnosis template, and
-//! an empty directory the console saves into.
+//! provisioned context and model over the testkit's diagnosis template, an
+//! empty directory the console saves into, and a few of the v2-to-FHIR
+//! guide's maps for the HL7 v2 face.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -102,6 +103,85 @@ pub(crate) enum Lanes {
     /// Every lane, and the events lane following the CDR's outbox feed to a
     /// broker nothing listens on, so its consumer stalls with a cause.
     WithEvents,
+    /// Every lane, and the OMOP ETL over a PostgreSQL started for the stack
+    /// whose run history holds two synthetic runs ([`RUN_ID`] refused one
+    /// record).
+    WithEtl,
+}
+
+/// The run the history of a [`Lanes::WithEtl`] stack holds with one refused
+/// record.
+pub(crate) const RUN_ID: &str = "0b6c5a3e-1d3f-4c7e-9a43-000000000001";
+
+/// The composition query of a [`Lanes::WithEtl`] stack's `[etl]`.
+const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, \
+    c AS composition FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
+    ORDER BY c/context/start_time/value, v/uid/value";
+
+/// Starts the PostgreSQL of a [`Lanes::WithEtl`] stack, creates its bridge
+/// schema and records two synthetic runs in its history.
+async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box<dyn Error>> {
+    use ferrobridge_operator_api::etl::RunKind;
+    use ferrobridge_server::etl::history;
+    use ferrobridge_server::etl::report::{RefusalEntry, RunReport};
+
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+    let mut writer = omop_cdm::writer::CdmWriter::connect(
+        postgres.url(),
+        omop_cdm::ddl::SchemaName::new("cdm")?,
+        omop_cdm::ddl::SchemaName::new("ferrobridge")?,
+        omop_cdm::writer::input::PersonPolicy::CreateOnFirstSight,
+    )
+    .await?;
+    writer.init().await?;
+    let mut refused = RunReport::new(RUN_ID);
+    refused.compositions.read = 3;
+    refused.compositions.committed = 2;
+    refused.compositions.refused = 1;
+    refused.rows.insert(String::from("measurement"), 6);
+    refused.rows.insert(String::from("person"), 2);
+    refused.rows.insert(String::from("specimen"), 1);
+    refused.refusals.push(RefusalEntry {
+        composition: Some(String::from("8849182c-82ad-4088-a07f-48ead4180515")),
+        version: Some(String::from(
+            "8849182c-82ad-4088-a07f-48ead4180515::ferrobridge.journey::1",
+        )),
+        mapping: None,
+        table: None,
+        column: None,
+        element: None,
+        reason: String::from("the composition names a template the CDR does not hold"),
+    });
+    refused.deletions.checked = 1;
+    refused
+        .deletions
+        .removed
+        .push(String::from("7d44b88c-4199-4bad-97dc-d78268e01398"));
+    refused
+        .deletions
+        .rows
+        .insert(String::from("measurement"), 3);
+    let mut clean = RunReport::new("0b6c5a3e-1d3f-4c7e-9a43-000000000002");
+    clean.compositions.read = 2;
+    clean.compositions.skipped = 2;
+    for (report, kind, started, finished) in [
+        (
+            &refused,
+            RunKind::Compositions,
+            "2026-11-03T09:00:00Z",
+            "2026-11-03T09:01:30Z",
+        ),
+        (
+            &clean,
+            RunKind::Compositions,
+            "2026-11-03T10:00:00Z",
+            "2026-11-03T10:00:04Z",
+        ),
+    ] {
+        let run = history::document(report, kind, started.parse()?, finished.parse()?);
+        history::record(&writer, &run).await?;
+    }
+    Ok(postgres)
 }
 
 /// The running stack.
@@ -121,6 +201,9 @@ pub(crate) struct Stack {
     access_token: String,
     /// The bridge's own thread and the sender that stops it.
     bridge: Running,
+    /// The PostgreSQL of a [`Lanes::WithEtl`] stack, kept so it outlives the
+    /// bridge.
+    _postgres: Option<ferrobridge_testkit::containers::Postgres>,
 }
 
 /// A bridge serving on a thread of its own, and the way to stop it.
@@ -164,7 +247,13 @@ impl Stack {
             fixed => Provider::start_on(listen(fixed)?).await?,
         };
         provider.publish_metadata().await;
-        let (bridge, running) = bridge(tree.path(), &cdr, &provider, lanes, port).await?;
+        let postgres = match lanes {
+            Lanes::WithEtl => Some(etl_database().await?),
+            Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => None,
+        };
+        let cdm = postgres.as_ref().map(|postgres| postgres.url().to_owned());
+        let (bridge, running) =
+            bridge(tree.path(), &cdr, &provider, (lanes, cdm.as_deref()), port).await?;
 
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let console = format!("http://{}", listener.local_addr()?);
@@ -205,6 +294,7 @@ impl Stack {
             cookie,
             access_token,
             bridge: running,
+            _postgres: postgres,
         })
     }
 
@@ -334,8 +424,31 @@ fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
         templates.join("diagnose.opt"),
         ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
     )?;
+    let v2mappings = tree.path().join("v2mappings");
+    std::fs::create_dir_all(&v2mappings)?;
+    for id in CONCEPT_MAPS {
+        let name = format!("ConceptMap-{id}.json");
+        std::fs::copy(Path::new(V2_PACKAGE).join(&name), v2mappings.join(name))?;
+    }
     Ok(tree)
 }
+
+/// The vendored v2-to-FHIR package the HL7 v2 face's maps are copied from.
+const V2_PACKAGE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
+);
+
+/// The guide's maps of an `ORU^R01` the HL7 v2 face loads: a few, so its
+/// `ConceptMaps` page fits one screenshot.
+const CONCEPT_MAPS: [&str; 6] = [
+    "message-oru-r01-to-bundle",
+    "segment-msh-to-messageheader",
+    "segment-pid-to-patient",
+    "segment-obx-to-observation",
+    "datatype-cwe-to-codeableconcept",
+    "table-hl70001-to-administrative-gender",
+];
 
 /// Starts the bridge over the tree at `tree` and the CDR `cdr` on the
 /// loopback port `port` (`0` for one the system chooses), trusting the
@@ -344,24 +457,32 @@ async fn bridge(
     tree: &Path,
     cdr: &MockServer,
     provider: &Provider,
-    lanes: Lanes,
+    (lanes, cdm): (Lanes, Option<&str>),
     port: u16,
 ) -> Result<(String, Running), Box<dyn Error>> {
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, identity, console] = [
+    let [mappings, templates, identity, console, v2mappings] = [
         tree.join("mappings"),
         tree.join("templates"),
         tree.join("identity.redb"),
         tree.join("console"),
+        tree.join("v2mappings"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
-    let operations = matches!(lanes, Lanes::All | Lanes::WithEvents);
+    let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
     let events = match lanes {
         Lanes::WithEvents => events_lane(cdr, tree).await?,
-        Lanes::All | Lanes::WithoutOperations => String::new(),
+        Lanes::All | Lanes::WithoutOperations | Lanes::WithEtl => String::new(),
     };
+    let etl = cdm.map_or_else(String::new, |cdm| {
+        format!(
+            "\n[cdm]\nurl = \"{cdm}\"\n\n\
+             [etl]\naql = \"{COMPOSITIONS}\"\ntype_concept_id = 32817\n\
+             observation_period_type_concept_id = 32817\n"
+        )
+    });
     let text = format!(
         "[cdr]\nbase_url = \"{cdr}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n\
          [mappings]\ndirectory = {mappings}\ntemplates = {templates}\n\n\
@@ -370,9 +491,11 @@ async fn bridge(
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
-         [usage_report]\nenabled = false\n{events}",
+         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\nconcept_maps = {v2mappings}\n\n\
+         [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
+        mllp = neighbour(port, 30)?,
     );
     let settings = ferrobridge_server::config::Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve()?;

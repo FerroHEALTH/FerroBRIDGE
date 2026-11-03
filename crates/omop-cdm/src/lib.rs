@@ -18,7 +18,8 @@
 //! With the `database` feature, on by default, `database` binds a PostgreSQL
 //! pool to a CDM schema and applies the DDL to it, the `vocabulary` resolver
 //! resolves source codes to standard concepts over the loaded vocabulary tables,
-//! `writer` commits one record graph at a time, `derived` rebuilds the
+//! `writer` commits one record graph at a time, `runs` keeps the history of
+//! the ETL runs, `derived` rebuilds the
 //! tables the CDM leaves to the ETL, `athena` loads an Athena vocabulary
 //! download, and `quality::run` runs the checks. The
 //! model is documented at <https://ohdsi.github.io/CommonDataModel/cdm54.html>.
@@ -37,6 +38,8 @@ pub mod generated;
 pub mod graph;
 pub mod meta;
 pub mod quality;
+#[cfg(feature = "database")]
+pub mod runs;
 pub mod value;
 pub mod vocabulary;
 #[cfg(feature = "database")]

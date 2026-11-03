@@ -103,27 +103,7 @@ impl ReceivedDocument {
     /// Returns [`ReceiveError`] naming the first rule the text breaks. No
     /// refusal's message quotes a value of the document.
     pub fn read(text: &str) -> Result<Self, ReceiveError> {
-        strict::unique_names(text).map_err(|source| {
-            if source.is_data() {
-                ReceiveError::RepeatedName { source }
-            } else {
-                ReceiveError::Json { source }
-            }
-        })?;
-        let value: Value =
-            serde_json::from_str(text).map_err(|source| ReceiveError::Json { source })?;
-        let Value::Object(read) = value else {
-            return Err(ReceiveError::NotAnObject);
-        };
-        if read.get("resourceType").and_then(Value::as_str) != Some("Bundle") {
-            return Err(ReceiveError::NotABundle);
-        }
-        let bundle = Bundle::from_json(&read, &mut Path::root("Bundle"))
-            .map_err(|source| ReceiveError::Decode { source })?;
-        let tree = Json::to_json(&bundle).map_err(|source| ReceiveError::Encode { source })?;
-        if tree != read {
-            return Err(ReceiveError::Unfaithful);
-        }
+        let (bundle, tree) = read_bundle(text)?;
         if bundle.r#type.value.as_deref() != Some(DOCUMENT) {
             return Err(ReceiveError::NotADocument {
                 found: bundle.r#type.value.clone(),
@@ -224,6 +204,92 @@ impl ReceivedDocument {
     }
 }
 
+/// Reads `text` as one R4 `Bundle`, refusing a repeated name, anything the
+/// R4 model does not hold and a text that reads differently through it, and
+/// answers the decoded Bundle with the JSON it encodes to.
+fn read_bundle(text: &str) -> Result<(Bundle, Object), ReceiveError> {
+    strict::unique_names(text).map_err(|source| {
+        if source.is_data() {
+            ReceiveError::RepeatedName { source }
+        } else {
+            ReceiveError::Json { source }
+        }
+    })?;
+    let value: Value =
+        serde_json::from_str(text).map_err(|source| ReceiveError::Json { source })?;
+    let Value::Object(read) = value else {
+        return Err(ReceiveError::NotAnObject);
+    };
+    if read.get("resourceType").and_then(Value::as_str) != Some("Bundle") {
+        return Err(ReceiveError::NotABundle);
+    }
+    let bundle = Bundle::from_json(&read, &mut Path::root("Bundle"))
+        .map_err(|source| ReceiveError::Decode { source })?;
+    let tree = Json::to_json(&bundle).map_err(|source| ReceiveError::Encode { source })?;
+    if tree != read {
+        return Err(ReceiveError::Unfaithful);
+    }
+    Ok((bundle, tree))
+}
+
+/// Resources received in the exchange format outside a document: a FHIR R4
+/// `collection` Bundle, read as strictly as a document.
+///
+/// HL7 Europe MPD 1.0.0 defines no document profile, and its prescription
+/// and dispense examples are `collection` Bundles, so a dispense arrives as
+/// one with the resources it references. The collection keeps the text it
+/// was read from, the original a mapping into openEHR keeps beside its
+/// content.
+#[derive(Debug, Clone)]
+pub struct ReceivedResources {
+    original: String,
+    bundle: Bundle,
+}
+
+impl ReceivedResources {
+    /// Reads a collection from its FHIR JSON text.
+    ///
+    /// The text is read as [`ReceivedDocument::read`] reads a document: a
+    /// repeated name, a property R4 does not define, a resource of a type R4
+    /// does not define and a text that reads differently through the R4
+    /// model are refused. The `Bundle` must then be of type `collection`
+    /// (<https://hl7.org/fhir/R4/valueset-bundle-type.html>).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReceiveError`] naming the first rule the text breaks, and
+    /// [`ReceiveError::NotACollection`] for a Bundle of another type.
+    pub fn read(text: &str) -> Result<Self, ReceiveError> {
+        let (bundle, tree) = read_bundle(text)?;
+        if bundle.r#type.value.as_deref() != Some(COLLECTION) {
+            return Err(ReceiveError::NotACollection {
+                found: bundle.r#type.value.clone(),
+            });
+        }
+        entries::known_resources(&tree, "Bundle")?;
+        Ok(Self {
+            original: text.to_owned(),
+            bundle,
+        })
+    }
+
+    /// Returns the text the collection was read from.
+    #[must_use]
+    pub fn original(&self) -> &str {
+        &self.original
+    }
+
+    /// Returns the decoded collection.
+    #[must_use]
+    pub const fn bundle(&self) -> &Bundle {
+        &self.bundle
+    }
+}
+
+/// The `Bundle.type` of a collection
+/// (<https://hl7.org/fhir/R4/valueset-bundle-type.html>).
+pub const COLLECTION: &str = "collection";
+
 /// Why a received text is not a document this component reads.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -270,6 +336,13 @@ pub enum ReceiveError {
     /// The Bundle's type is not `document`.
     #[error("the Bundle is of type {found:?}, not a document")]
     NotADocument {
+        /// The type the Bundle carries, a code of the R4 value set.
+        found: Option<String>,
+    },
+    /// The Bundle's type is not `collection`, the form resources outside a
+    /// document are received in.
+    #[error("the Bundle is of type {found:?}, not a collection")]
+    NotACollection {
         /// The type the Bundle carries, a code of the R4 value set.
         found: Option<String>,
     },

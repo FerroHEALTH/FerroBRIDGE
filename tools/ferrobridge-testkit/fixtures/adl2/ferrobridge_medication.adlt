@@ -1,11 +1,12 @@
 -- SPDX-FileCopyrightText: Cadasto B.V.
 -- SPDX-License-Identifier: BUSL-1.1
--- FerroBRIDGE's medication template over seven published CKM archetypes
+-- FerroBRIDGE's medication template over nine published CKM archetypes
 -- (fixtures/ckm/medication): an encounter COMPOSITION holding one
 -- INSTRUCTION.medication_order.v3 and one ACTION.medication.v1, with the
--- medication, therapeutic direction, dosage and daily timing clusters
--- filled by template overlays. No specification governs this template: our
--- own design for the HL7 Europe MPD 1.0.0 round trip. Node identifiers are
+-- medication, therapeutic direction, dosage, daily timing, authorisation
+-- and supply amount clusters filled by template overlays. No specification
+-- governs this template: our own design for the HL7 Europe MPD 1.0.0 round
+-- trip. Node identifiers are
 -- at-coded, the ADL 1.4 codes of the CKM sources.
 template (adl_version=2.4.0; rm_release=1.1.0)
     openEHR-EHR-COMPOSITION.ferrobridge_medication.v1.0.0
@@ -81,6 +82,10 @@ definition
         /activities[at0001]/description[at0002]/items matches {
             use_archetype CLUSTER[at0143.1, openEHR-EHR-CLUSTER.medication.v2]
             use_archetype CLUSTER[at0177.1, openEHR-EHR-CLUSTER.therapeutic_direction-ferrobridge.v1]
+            use_archetype CLUSTER[at0069.1, openEHR-EHR-CLUSTER.medication_authorisation.v0]
+        }
+        /activities[at0001]/description[at0002]/items[at0129]/items matches {
+            use_archetype CLUSTER[at0065.1, openEHR-EHR-CLUSTER.medication_supply_amount.v0]
         }
     }
 
@@ -98,6 +103,14 @@ terminology
             ["at0177.1"] = <
                 text = <"Therapeutic direction">
                 description = <"Therapeutic direction">
+            >
+            ["at0069.1"] = <
+                text = <"Authorisation directions">
+                description = <"Authorisation directions">
+            >
+            ["at0065.1"] = <
+                text = <"Dispense amount">
+                description = <"Dispense amount">
             >
         >
     >

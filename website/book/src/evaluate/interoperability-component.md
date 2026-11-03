@@ -122,7 +122,8 @@ the crate's tests:
 The patient summary is the most complete category: the crosswalk, the
 document `Bundle`, its mapping from openEHR, the terminology rules and the
 receipt are built. The prescription and dispensation records are read and
-written in the MPD form. The laboratory, imaging and discharge reports have
+written in the MPD form, and [mapped from and into openEHR](prescription-mapping.md)
+through FerroBRIDGE's MPD contexts. The laboratory, imaging and discharge reports have
 their crosswalks and their document assembly; building each report from
 openEHR content waits on the mapping contexts for their profiles. The open
 work is on the [tracker](https://github.com/FerroHEALTH/FerroBRIDGE/issues).

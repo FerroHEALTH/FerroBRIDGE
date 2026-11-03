@@ -64,6 +64,7 @@ the process is not ready.
 | [`unwritable`](#unwritable) | `500` | The mapping directory could not be written. |
 | [`dead-letters-unavailable`](#dead-letters-unavailable) | `500` | The dead-letter store could not be read or written. |
 | [`reload-unavailable`](#reload-unavailable) | `503` | The mapping set could not be reloaded. |
+| [`run-history-unavailable`](#run-history-unavailable) | `503` | The run history could not be read. |
 | [`authorization-unavailable`](#authorization-unavailable) | `503` | The token could not be checked. |
 
 ## invalid-request
@@ -146,6 +147,14 @@ a template or another upstream did not answer. The running set is
 unchanged, and the server log names the cause. Send the request again once
 the upstream answers.
 
+
+## run-history-unavailable
+
+`503`. The run history in the bridge schema (`[cdm] bridge_schema`) could
+not be read, because the CDM database did not answer or holds no run table.
+The server log names the cause. A bridge schema an earlier release created
+gets its run table from `ferrobridge cdm init`, which leaves every other
+table as it is.
 ## authorization-unavailable
 
 `503`. The server could not check the access token, because the

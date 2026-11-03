@@ -50,6 +50,9 @@ tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time
 # drive both as the shipped binaries serve them.
 ferrobridge-server = { path = "../../app/ferrobridge-server" }
 ferrobridge-console = { path = "../../app/ferrobridge-console" }
+# The ETL journeys' stack records its synthetic runs through the writer.
+ferrobridge-operator-api.workspace = true
+omop-cdm = { workspace = true, features = ["database"] }
 # The journeys wait for FerroUI's loader by the mark it sets and refuse its
 # script modules by the path they are served under.
 ferrohealth-ui.workspace = true
