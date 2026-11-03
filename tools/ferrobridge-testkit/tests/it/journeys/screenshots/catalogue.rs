@@ -284,6 +284,23 @@ pub(super) const MAPPINGS_RELOADED: Shot = Shot::page(
     "//*[contains(., 'Reloaded: the set compiled and replaced the running one')]",
 );
 
+/// The mapping set's revisions, once the editor saved a file.
+pub(super) const MAPPINGS_REVISIONS: Shot = Shot::page(
+    "mappings-revisions",
+    "/mappings/:tab",
+    "/mappings/revisions",
+    "//table//a[contains(@href, '/mappings/revisions/2')]",
+);
+
+/// The baseline revision with its diff against the running one and the
+/// rollback docked.
+pub(super) const REVISION: Shot = Shot::page(
+    "revision",
+    "/mappings/revisions/:id",
+    "/mappings/revisions/1",
+    "//button[@name = 'decision' and @value = 'apply']",
+);
+
 /// The events lane of a bridge whose broker is down: a degraded consumer
 /// with its cause.
 pub(super) const EVENTS_DEGRADED: Shot = Shot::page(
@@ -323,6 +340,8 @@ pub(super) fn shots() -> impl Iterator<Item = &'static Shot> {
         &EDIT_REFUSED,
         &EDIT_SAVED,
         &MAPPINGS_RELOADED,
+        &MAPPINGS_REVISIONS,
+        &REVISION,
         &NOT_FOUND,
         &SIGNED_OUT,
     ])

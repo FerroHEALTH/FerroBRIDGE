@@ -43,9 +43,9 @@ pub enum Kind {
     Provisioned,
     /// `409`: no `[operator] mapping_dir` is configured.
     NotConfigured,
-    /// `412`: the file changed since the `ETag` the save names.
+    /// `412`: what the request replaces changed since the `ETag` it names.
     PreconditionFailed,
-    /// `428`: a save sends no `If-Match` or `If-None-Match`.
+    /// `428`: a save or an apply sends no `If-Match` or `If-None-Match`.
     PreconditionRequired,
     /// `500`: a mapping directory could not be read.
     Unreadable,
@@ -130,12 +130,12 @@ impl Kind {
             ),
             Self::PreconditionFailed => (
                 "precondition-failed",
-                "The file changed since the ETag the save names",
+                "What the request replaces changed since the ETag it names",
                 StatusCode::PRECONDITION_FAILED,
             ),
             Self::PreconditionRequired => (
                 "precondition-required",
-                "The save sends no precondition",
+                "The write sends no precondition",
                 StatusCode::PRECONDITION_REQUIRED,
             ),
             Self::Unreadable => (

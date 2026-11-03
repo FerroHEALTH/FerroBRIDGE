@@ -30,6 +30,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 use super::{FIXTURES, OMOCL_FILE, OPERATOR, bytes, digest};
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, ec_key, mint};
 
+mod revisions;
 mod search;
 mod unprovisioned;
 
@@ -271,7 +272,8 @@ impl Case {
             .collect())
     }
 
-    /// Returns every `..`-prefixed staging entry left under the console tree.
+    /// Returns every `..`-prefixed staging entry left under the console tree,
+    /// the revision store aside.
     fn staging_left(&self) -> Vec<PathBuf> {
         let mut left = Vec::new();
         let mut stack = vec![self.tree.path().join("console")];
@@ -281,6 +283,9 @@ impl Case {
             };
             for entry in entries.flatten() {
                 let path = entry.path();
+                if entry.file_name() == "..revisions" {
+                    continue;
+                }
                 if entry.file_name().to_string_lossy().starts_with("..") {
                     let empty_drafts = path.is_dir()
                         && std::fs::read_dir(&path).is_ok_and(|mut inner| inner.next().is_none());
