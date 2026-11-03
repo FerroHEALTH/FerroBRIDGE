@@ -19,7 +19,7 @@ use ferrohealth_ui::view::diagnostics::{FileFindings, Finding, Position};
 use ferrohealth_ui::view::refusal::fault;
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
-use ferrohealth_ui::view::tag::{Tag, tag};
+use ferrohealth_ui::view::tag::Tag;
 use ferrohealth_ui::view::template::list::{HeadingCount, list_empty};
 use openehr_mapping_core::diagnostic::{Diagnostic, Severity};
 
@@ -142,12 +142,6 @@ pub const fn language_name(language: Language) -> &'static str {
         Language::Fhirconnect => "FHIRconnect",
         Language::Omocl => "OMOCL",
     }
-}
-
-/// Returns the tag of a mapping `language`.
-#[must_use]
-pub fn language_tag(language: Language) -> Html {
-    tag(language_name(language))
 }
 
 /// The gravity of a diagnostic of `severity`.

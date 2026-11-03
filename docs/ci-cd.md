@@ -37,7 +37,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too |
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
 | `usage-report-off` | `scripts/checks/usage-report-off.sh --self-test`, then the guard itself: every launcher of the server in a script, a workflow or a Rust test switches the usage report off |
-| `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` and every issue `Command::pending_issue` names is open |
+| `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` names an open issue |
 | `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines, after its `--self-test`; a listed breach may shrink and never grow |
 | `duplication` | `scripts/checks/duplication.sh --self-test`, then the guard: jscpd from its pinned image over the hand-written Rust, the duplicated lines held to `scripts/checks/duplication.count`; a rise fails and names both places of each new block, a fall passes with a note (#1359) |
 | `changelog-guard` | `scripts/checks/changelog-guard.sh --self-test`, then the guard on a pull request: a change to `app/`, `crates/`, `docker/`, `compose.yaml` or the root Cargo manifests adds a fragment under `changelog.d/` unless it carries `no-changelog`, and no change writes under `[Unreleased]` |

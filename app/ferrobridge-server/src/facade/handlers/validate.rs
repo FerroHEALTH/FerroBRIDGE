@@ -35,13 +35,13 @@ use crate::facade::compartment;
 use crate::facade::ehr::Policy;
 use crate::facade::engine;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
 use crate::facade::handlers::write;
 use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::terminology::Direction;
 
 /// What the outcome names as the validator that ran.

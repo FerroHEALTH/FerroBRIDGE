@@ -296,7 +296,7 @@ the testkit tool crate. Beside it:
   claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate
   bump rule; `favicon-sync.sh`, the book theme favicon against the brand mark;
   `usage-report-off.sh`, every launcher of the server in a test lane with the
-  usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
+  usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)`
   that the tracker reports closed;
   `changelog-released.sh`, every released changelog section against its tag;
   `changelog-structure.sh` and `changelog-security.sh`, the Keep a Changelog

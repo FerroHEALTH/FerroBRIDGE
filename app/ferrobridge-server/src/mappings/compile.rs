@@ -135,14 +135,6 @@ pub struct Compiled {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-impl Compiled {
-    /// Whether no context was refused.
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.refusals.is_empty()
-    }
-}
-
 /// Loads and validates the FHIRconnect files `files` names as one set.
 ///
 /// # Errors
