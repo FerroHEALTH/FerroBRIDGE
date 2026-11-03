@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 
 use fhir_types::codec::Value;
 
+use crate::engine::absent::DATA_ABSENT_REASON;
+use crate::engine::absent::absent_element;
 use crate::engine::condition;
 use crate::engine::outcome::Location;
 use crate::engine::outcome::Loss;
@@ -207,6 +209,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         binding: &Binding,
     ) -> Result<(), EngineError> {
         let mut shared: BTreeMap<String, usize> = BTreeMap::new();
+        let mut absent: Option<&FhirTarget> = None;
+        let mut reason = String::new();
         for path in entry.fhir() {
             let Target::Fhir(ref target) = *path.target() else {
                 continue;
@@ -214,11 +218,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let scoped = self.scoped(Some(target), binding);
             let occurrence = self.entry_occurrence(target, &scoped, &mut shared);
             let element = String::from(target.resolved().leaf());
-            let text = Value::String(String::from(self.manual_text(
-                mapping,
-                entry,
-                path.value(),
-            )?));
+            let written = String::from(self.manual_text(mapping, entry, path.value())?);
+            let leaf = element.rsplit('.').next().unwrap_or(&element);
+            if leaf == "url" && written == DATA_ABSENT_REASON {
+                absent = Some(target);
+            } else if leaf == "valueCode" || leaf == "value[x]" {
+                reason.clone_from(&written);
+            }
+            let text = Value::String(written);
             let table = self.table;
             write(
                 table,
@@ -232,6 +239,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 element,
                 source: Box::new(source),
             })?;
+        }
+        if let Some(url) = absent {
+            let location = self.locate_targets(Some(url), &binding.fhir, None);
+            let location = match location.fhir() {
+                Some(path) => Location::default().with_fhir(absent_element(path)),
+                None => location,
+            };
+            self.warnings
+                .push(Warning::new(Loss::Absent { reason }, location));
         }
         Ok(())
     }

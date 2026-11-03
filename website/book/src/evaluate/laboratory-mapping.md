@@ -42,6 +42,16 @@ them. The document's `Composition` is the system's own, as for every form
 of the component; the caller chooses the section by the study type of the
 report, one of the `LAB_SLOTS`.
 
+Each result is an `Observation-resultslab-eu-lab`, which requires an
+`effective[x]` and a `performer`. The result takes the time of its
+laboratory test result's event. `KDS_Laborbericht` holds no party for the
+performing laboratory, so the mapping writes `performer` absent: a
+`Reference` carrying only the FHIR R4 `data-absent-reason` extension with
+the code `unknown`. The run declares that element as a loss in its
+`OperationOutcome`, so the gap stays visible. A template that carries the
+performing laboratory as a party would let the mapping write the real
+performer and remove the absent one.
+
 ## Receiving a laboratory report
 
 `ReceivedDocument::category` names a document whose `Composition.type`
