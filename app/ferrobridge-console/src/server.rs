@@ -198,6 +198,10 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .route(crate::app::FAVICON, get(favicon))
         .route(crate::pages::about::INFO_JSON, get(info_json))
         .route(
+            crate::pages::mappings::archive::EXPORT,
+            get(crate::pages::mappings::archive::export),
+        )
+        .route(
             crate::pages::search::ANSWER,
             get(crate::pages::search::answer_route),
         )
@@ -246,7 +250,11 @@ async fn page(Extension(state): Extension<ConsoleState>, request: Request) -> Re
             let Ok(bytes) = axum::body::to_bytes(body, POST_MAX).await else {
                 return StatusCode::PAYLOAD_TOO_LARGE.into_response();
             };
-            match crate::routes::posted(&visit, &String::from_utf8_lossy(&bytes)).await {
+            let content_type = parts
+                .headers
+                .get(CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok());
+            match crate::routes::posted(&visit, &bytes, content_type).await {
                 Some(answer) => answer,
                 None => StatusCode::METHOD_NOT_ALLOWED.into_response(),
             }
@@ -336,22 +344,27 @@ fn svg(text: &'static str) -> Response {
 
 /// Serves the bridge's `GET /health/info` document as a download, for a
 /// signed-in operator: the About page's self-description.
+/// The access token of the session the request's cookie names, for a
+/// route outside the pages that reads the bridge, such as a download.
+pub(crate) fn session_token(
+    state: &ConsoleState,
+    headers: &http::HeaderMap,
+) -> Option<crate::bridge::AccessToken> {
+    state
+        .sessions()
+        .cookie_in(headers, crate::session::COOKIE)
+        .and_then(|id| state.sessions().access_token(&id).ok().flatten())
+        .map(crate::bridge::AccessToken::new)
+}
+
 async fn info_json(
     Extension(state): Extension<ConsoleState>,
     headers: http::HeaderMap,
 ) -> Response {
-    let token = state
-        .sessions()
-        .cookie_in(&headers, crate::session::COOKIE)
-        .and_then(|id| state.sessions().access_token(&id).ok().flatten());
-    let Some(token) = token else {
+    let Some(token) = session_token(&state, &headers) else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
-    match state
-        .bridge()
-        .health_info(&crate::bridge::AccessToken::new(token))
-        .await
-    {
+    match state.bridge().health_info(&token).await {
         Ok(info) => (
             [(
                 http::header::CONTENT_DISPOSITION,

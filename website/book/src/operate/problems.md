@@ -53,6 +53,7 @@ the process is not ready.
 | [`invalid-request`](#invalid-request) | `400` | The `Authorization` header carries no single credential. |
 | [`reason-required`](#reason-required) | `400` | A save names no reason. |
 | [`bad-path`](#bad-path) | `400` | The path names no mapping file the console can write. |
+| [`bad-archive`](#bad-archive) | `400` | The body is no mapping-set archive the bridge reads. |
 | [`unauthenticated`](#unauthenticated) | `401` | The request carries no valid access token. |
 | [`not-permitted`](#not-permitted) | `403` | The token does not carry the operator scope. |
 | [`not-found`](#not-found) | `404` | The mapping file, the revision or the configuration does not exist. |
@@ -83,6 +84,13 @@ of at most 200 characters. Add the header and send the save again.
 `400`. The path of a save or a check names no FHIRconnect or OMOCL mapping
 file the console can write: it is under no mapping root, or the file is not
 `.yml` or `.yaml`.
+
+## bad-archive
+
+`400`. The body of an import is no ZIP, is not sent as `application/zip`,
+holds more than 4096 entries or more than 64 MiB of content, names a file
+outside `fhirconnect/` and `omocl/` or one that is not `.yml` or `.yaml`, or
+names one file twice. Export a revision to see the shape an import reads.
 
 ## unauthenticated
 

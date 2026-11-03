@@ -23,7 +23,8 @@
 //! /operator/reload` reloads the files on disk ([`save`], [`reload`]), and
 //! `GET /operator/revisions`, one revision, its `/diff` and `POST
 //! /operator/revisions/{id}/apply` read and apply the history of the console
-//! files ([`revisions`]). No specification governs the operator surface: our own design.
+//! files ([`revisions`]), with the export of a revision as a ZIP and the
+//! import of one as an unapplied revision. No specification governs the operator surface: our own design.
 
 pub mod configuration;
 pub mod files;
@@ -240,6 +241,14 @@ pub fn routes(
         .route("/operator/mappings/{*path}", get(mapping).put(save::save))
         .route("/operator/reload", post(save::reload))
         .route("/operator/revisions", get(revisions::routes::list))
+        .route(
+            "/operator/revisions/import",
+            post(revisions::exchange::import),
+        )
+        .route(
+            "/operator/revisions/{id}/export",
+            get(revisions::exchange::export),
+        )
         .route("/operator/revisions/{id}", get(revisions::routes::one))
         .route(
             "/operator/revisions/{id}/diff",

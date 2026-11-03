@@ -16,7 +16,7 @@ use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::Stack;
 
 /// Every page the reflow is held on.
-const PAGES: [&str; 28] = [
+const PAGES: [&str; 29] = [
     "/",
     "/search?q=diagnose",
     "/mappings",
@@ -30,6 +30,7 @@ const PAGES: [&str; 28] = [
     "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml?tab=program",
     "/mappings/templates/ferrobridge.diagnose.v1",
     "/mappings/new",
+    "/mappings/import",
     "/mappings/edit/fhirconnect/ferrobridge_journey_diagnose.yml",
     "/playground",
     "/playground/toopenehr",

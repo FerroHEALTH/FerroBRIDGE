@@ -28,7 +28,7 @@ pub(super) const CONTEXT_FILE: &str =
     "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml";
 
 /// The pages a signed-in operator loads and reads as they are.
-pub(super) const PAGES: [Shot; 35] = [
+pub(super) const PAGES: [Shot; 36] = [
     Shot::page("dashboard", "/", "/", "//h1[. = 'Dashboard']"),
     Shot::page(
         "mappings",
@@ -89,6 +89,12 @@ pub(super) const PAGES: [Shot; 35] = [
         "/mappings/new",
         "/mappings/new",
         "//*[@id = 'draft']",
+    ),
+    Shot::page(
+        "mappings-import",
+        "/mappings/import",
+        "/mappings/import",
+        "//*[@id = 'import-archive']",
     ),
     Shot::page(
         "edit-provisioned",
@@ -301,6 +307,14 @@ pub(super) const REVISION: Shot = Shot::page(
     "//button[@name = 'decision' and @value = 'apply']",
 );
 
+/// An archive the import page checked and saved as a revision.
+pub(super) const MAPPINGS_IMPORTED: Shot = Shot::page(
+    "mappings-imported",
+    "/mappings/import",
+    "/mappings/import",
+    "//*[contains(., 'Open the revision to apply it')]",
+);
+
 /// The events lane of a bridge whose broker is down: a degraded consumer
 /// with its cause.
 pub(super) const EVENTS_DEGRADED: Shot = Shot::page(
@@ -342,6 +356,7 @@ pub(super) fn shots() -> impl Iterator<Item = &'static Shot> {
         &MAPPINGS_RELOADED,
         &MAPPINGS_REVISIONS,
         &REVISION,
+        &MAPPINGS_IMPORTED,
         &NOT_FOUND,
         &SIGNED_OUT,
     ])
