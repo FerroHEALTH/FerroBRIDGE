@@ -343,7 +343,7 @@ impl Quantity {
     }
 
     /// The product (N1 §6.6.1), its unit the UCUM product of the operands'
-    /// with identical units merged ([`algebra::combine`]), or the two
+    /// with identical units merged (`algebra::combine`), or the two
     /// expressions joined by `.` where that has no written form.
     #[must_use]
     pub fn multiply(&self, other: &Self) -> Option<Self> {
@@ -360,7 +360,7 @@ impl Quantity {
     }
 
     /// The quotient (N1 §6.6.2), its unit the UCUM quotient of the operands'
-    /// with identical units merged ([`algebra::combine`]), or the two
+    /// with identical units merged (`algebra::combine`), or the two
     /// expressions joined by `/` where that has no written form; `None` on a
     /// zero divisor.
     #[must_use]
