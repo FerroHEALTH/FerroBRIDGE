@@ -7,6 +7,7 @@
 
 use ferrobridge_validator::issue::MessageId;
 use ferrobridge_validator::issue::Severity;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
 
@@ -176,7 +177,7 @@ fn two_forms_of_one_choice_are_refused() -> TestResult {
 
 #[test]
 fn an_unknown_resource_type_is_fatal() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let report = validate(&set, &json!({"resourceType": "Patience"}), None)?;
     let issue = report
         .with_message(MessageId::UnknownResourceType)
@@ -201,7 +202,7 @@ fn a_profile_for_another_type_is_reported() -> TestResult {
 fn a_content_reference_walks_the_target_definition() -> TestResult {
     // Questionnaire.item.item carries contentReference #Questionnaire.item
     // (elementdefinition.html#ElementDefinition.contentReference).
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let questionnaire = json!({
         "resourceType": "Questionnaire",
         "status": "draft",
@@ -307,7 +308,7 @@ fn an_element_typed_domain_resource_refuses_a_resource_that_does_not_specialize_
 
 #[test]
 fn an_element_typed_resource_accepts_any_resource() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let report = validate(&set, &bundle_of(&json!({"resourceType": "Patient"})), None)?;
     assert_eq!(
         locations(&report, MessageId::ResourceTypeNotAllowed),

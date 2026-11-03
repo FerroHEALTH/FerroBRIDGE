@@ -14,17 +14,6 @@ use crate::map::{ElementError, Outcome, RowRef};
 use crate::parse::Location;
 
 impl Run<'_> {
-    /// Records one write against the leaf's resource.
-    pub(super) fn record(
-        &mut self,
-        leaf: &Base,
-        value: Pending,
-        at: &Location,
-        reference: &RowRef,
-    ) {
-        self.write(leaf, value, at, reference, false);
-    }
-
     /// Records one write, a fallback when `fallback` holds.
     ///
     /// No specification governs this: our own design. A row of the guide

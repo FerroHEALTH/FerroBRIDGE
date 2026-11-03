@@ -17,24 +17,6 @@
 use super::parse::{self, Component, Operator, Term};
 use super::{ESSENCE, UcumError, simple_unit};
 
-/// The UCUM unit of the product of a quantity in `left` and one in `right`.
-///
-/// `None` when the two do not flatten into simple units this module can
-/// write back: a unit UCUM's syntax refuses, an annotation, or a number
-/// factor raised to a power. The caller then composes the two expressions.
-#[must_use]
-pub fn product(left: &str, right: &str) -> Option<String> {
-    combine(left, right, Operator::Multiply)
-}
-
-/// The UCUM unit of the quotient of a quantity in `left` by one in `right`.
-///
-/// `None` as for [`product`].
-#[must_use]
-pub fn quotient(left: &str, right: &str) -> Option<String> {
-    combine(left, right, Operator::Divide)
-}
-
 /// A simple unit and its exponent, or a number factor (UCUM §8).
 #[derive(Debug)]
 struct Power {
@@ -43,7 +25,15 @@ struct Power {
     exponent: i32,
 }
 
-fn combine(left: &str, right: &str, operator: Operator) -> Option<String> {
+/// The UCUM unit of the product (`Operator::Multiply`) of a quantity in
+/// `left` and one in `right`, or of the quotient (`Operator::Divide`) of the
+/// first by the second.
+///
+/// `None` when the two do not flatten into simple units this module can
+/// write back: a unit UCUM's syntax refuses, an annotation, or a number
+/// factor raised to a power. The caller then composes the two expressions.
+#[must_use]
+pub(crate) fn combine(left: &str, right: &str, operator: Operator) -> Option<String> {
     let mut powers = Vec::new();
     flatten(left, 1, &mut powers)?;
     let sign = match operator {
@@ -157,42 +147,76 @@ fn written(power: &Power, exponent: i32) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{product, quotient};
+    use super::combine;
+    use crate::ucum::parse::Operator;
 
     #[test]
     fn identical_symbols_merge_their_exponents() {
-        assert_eq!(product("cm", "cm").as_deref(), Some("cm2"));
-        assert_eq!(product("cm", "cm2").as_deref(), Some("cm3"));
-        assert_eq!(quotient("cm2", "cm").as_deref(), Some("cm"));
-        assert_eq!(product("10*3", "10*3").as_deref(), Some("10*6"));
+        assert_eq!(
+            combine("cm", "cm", Operator::Multiply).as_deref(),
+            Some("cm2")
+        );
+        assert_eq!(
+            combine("cm", "cm2", Operator::Multiply).as_deref(),
+            Some("cm3")
+        );
+        assert_eq!(
+            combine("cm2", "cm", Operator::Divide).as_deref(),
+            Some("cm")
+        );
+        assert_eq!(
+            combine("10*3", "10*3", Operator::Multiply).as_deref(),
+            Some("10*6")
+        );
     }
 
     #[test]
     fn a_prefix_keeps_its_symbol_apart() {
-        assert_eq!(product("cm", "m").as_deref(), Some("cm.m"));
-        assert_eq!(quotient("cm", "m").as_deref(), Some("cm/m"));
+        assert_eq!(
+            combine("cm", "m", Operator::Multiply).as_deref(),
+            Some("cm.m")
+        );
+        assert_eq!(
+            combine("cm", "m", Operator::Divide).as_deref(),
+            Some("cm/m")
+        );
     }
 
     #[test]
     fn negative_exponents_follow_a_solidus() {
-        assert_eq!(quotient("g", "m").as_deref(), Some("g/m"));
-        assert_eq!(quotient("kg", "m.s2").as_deref(), Some("kg/m/s2"));
-        assert_eq!(product("kg.m/s2", "s").as_deref(), Some("kg.m/s"));
-        assert_eq!(quotient("1", "min").as_deref(), Some("/min"));
-        assert_eq!(product("/s", "m").as_deref(), Some("m/s"));
+        assert_eq!(combine("g", "m", Operator::Divide).as_deref(), Some("g/m"));
+        assert_eq!(
+            combine("kg", "m.s2", Operator::Divide).as_deref(),
+            Some("kg/m/s2")
+        );
+        assert_eq!(
+            combine("kg.m/s2", "s", Operator::Multiply).as_deref(),
+            Some("kg.m/s")
+        );
+        assert_eq!(
+            combine("1", "min", Operator::Divide).as_deref(),
+            Some("/min")
+        );
+        assert_eq!(
+            combine("/s", "m", Operator::Multiply).as_deref(),
+            Some("m/s")
+        );
     }
 
     #[test]
     fn units_that_cancel_are_the_unity() {
-        assert_eq!(quotient("m", "m").as_deref(), Some("1"));
-        assert_eq!(product("/s", "s").as_deref(), Some("1"));
-        assert_eq!(quotient("mg/dL", "mg/dL").as_deref(), Some("1"));
+        assert_eq!(combine("m", "m", Operator::Divide).as_deref(), Some("1"));
+        assert_eq!(combine("/s", "s", Operator::Multiply).as_deref(), Some("1"));
+        assert_eq!(
+            combine("mg/dL", "mg/dL", Operator::Divide).as_deref(),
+            Some("1")
+        );
     }
 
     #[test]
     fn what_has_no_written_form_is_left_to_the_caller() {
-        assert_eq!(product("mg{total}", "mg"), None);
-        assert_eq!(product("(m", "m"), None);
-        assert_eq!(product("mmol/(24.h)", "/(24.h)"), None);
+        assert_eq!(combine("mg{total}", "mg", Operator::Multiply), None);
+        assert_eq!(combine("(m", "m", Operator::Multiply), None);
+        assert_eq!(combine("mmol/(24.h)", "/(24.h)", Operator::Multiply), None);
     }
 }

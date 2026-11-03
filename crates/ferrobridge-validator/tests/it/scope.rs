@@ -7,6 +7,7 @@
 //! and in the whole set only when the closure does not carry it.
 
 use ferrobridge_validator::issue::MessageId;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
 
@@ -60,7 +61,7 @@ fn set_depending_on(dependencies: &[(&str, &str)]) -> TestResult<(Vec<Synthetic>
         dependencies,
         &[flagged_patient()],
     )?;
-    let set = PackageSet::load([
+    let set = PackageSet::<R4>::load([
         core(),
         old.path().to_owned(),
         new.path().to_owned(),
@@ -151,7 +152,7 @@ fn one_canonical_in_two_versions_of_one_package_resolves_to_the_higher_package()
         ],
         &[flagged_patient()],
     )?;
-    let set = PackageSet::load([
+    let set = PackageSet::<R4>::load([
         core(),
         old.path().to_owned(),
         new.path().to_owned(),

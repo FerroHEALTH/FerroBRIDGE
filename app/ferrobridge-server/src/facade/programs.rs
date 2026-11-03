@@ -27,7 +27,7 @@ use fhirconnect::resolve::program::binding::TemplateId;
 use fhirconnect::resolve::program::mapping::Mapping;
 use fhirconnect::resolve::program::mapping::Method;
 use fhirconnect::resolve::select::SelectError;
-use fhirconnect::resolve::select::select_by_profile_pinned;
+use fhirconnect::resolve::select::select_by_profile;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::Severity;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -311,7 +311,7 @@ impl Programs {
         claimed: &[String],
         template: Option<&TemplateId>,
     ) -> Result<&Loaded, SelectError> {
-        let chosen = select_by_profile_pinned(&self.selectable, claimed, template)?;
+        let chosen = select_by_profile(&self.selectable, claimed, template)?;
         self.loaded
             .iter()
             .find(|entry| Arc::ptr_eq(&entry.program, chosen))

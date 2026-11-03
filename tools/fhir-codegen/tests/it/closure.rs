@@ -15,8 +15,7 @@ use crate::{R4, R4B, R5, crate_dir, packages};
 
 /// The wide closure and model of `package`, the emitter's own inputs.
 fn wide(module: &str, package: &Package) -> (TypeClosure, VersionModule) {
-    let roots =
-        RootSet::select_scoped(package, RootScope::Resources).expect("the wide root set selects");
+    let roots = RootSet::select(package, RootScope::Resources).expect("the wide root set selects");
     let closure = TypeClosure::compute(package, &roots).expect("the wide closure computes");
     let model = VersionModule::lower(&closure, module, "package", "version")
         .expect("the wide model lowers");
@@ -60,7 +59,8 @@ fn the_emitted_tree_is_exactly_the_wide_closure() {
 #[test]
 fn a_type_is_behind_terminology_exactly_when_the_terminology_closure_holds_it() {
     for (module, _, package) in packages() {
-        let roots = RootSet::select(package).expect("the terminology root set selects");
+        let roots = RootSet::select(package, RootScope::Terminology)
+            .expect("the terminology root set selects");
         let terminology: BTreeSet<String> = TypeClosure::compute(package, &roots)
             .expect("the terminology closure computes")
             .structures()
@@ -119,8 +119,7 @@ fn the_r4_wide_closure_holds_the_clinical_resources() {
 #[test]
 fn the_resource_enum_covers_every_concrete_resource() {
     for (module, _, package) in packages() {
-        let roots =
-            RootSet::select_scoped(package, RootScope::Resources).expect("the root set selects");
+        let roots = RootSet::select(package, RootScope::Resources).expect("the root set selects");
         let (_, model) = wide(module, package);
         let TypeKind::ResourceEnum { resources } = &model
             .types
@@ -157,7 +156,7 @@ fn the_resource_enum_covers_every_concrete_resource() {
 }
 
 fn closure() -> TypeClosure {
-    let roots = RootSet::select(&R4B).expect("root set selects");
+    let roots = RootSet::select(&R4B, RootScope::Terminology).expect("root set selects");
     TypeClosure::compute(&R4B, &roots).expect("closure computes")
 }
 
@@ -411,14 +410,14 @@ fn the_resource_enum_covers_the_root_set() {
 }
 
 fn r5_model() -> VersionModule {
-    let roots = RootSet::select(&R5).expect("R5 root set selects");
+    let roots = RootSet::select(&R5, RootScope::Terminology).expect("R5 root set selects");
     let closure = TypeClosure::compute(&R5, &roots).expect("R5 closure computes");
     VersionModule::lower(&closure, "r5", "hl7.fhir.r5.core", "5.0.0").expect("R5 model lowers")
 }
 
 #[test]
 fn r5_closes_over_its_own_datatypes() {
-    let roots = RootSet::select(&R5).expect("R5 root set selects");
+    let roots = RootSet::select(&R5, RootScope::Terminology).expect("R5 root set selects");
     let closure = TypeClosure::compute(&R5, &roots).expect("R5 closure computes");
     assert_eq!(closure.roots().len(), 8);
     // R5 adds integer64 and new datatypes to the open type set
@@ -477,7 +476,8 @@ fn every_content_reference_targets_a_type_in_a_scope_at_least_as_wide() {
         // The scopes are recomputed from the narrow root set here rather than
         // read off the model, so the assertion does not rest on the value the
         // emitter itself wrote.
-        let roots = RootSet::select(package).expect("the terminology root set selects");
+        let roots = RootSet::select(package, RootScope::Terminology)
+            .expect("the terminology root set selects");
         let narrow =
             TypeClosure::compute(package, &roots).expect("the terminology closure computes");
         let terminology: BTreeSet<String> =

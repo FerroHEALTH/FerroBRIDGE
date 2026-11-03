@@ -78,7 +78,7 @@ pub const TEXT: &str = "string";
 /// `PATHABLE` is the root of the classes a path can step through
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html#_pathable_class>),
 /// and no data value is one.
-const STRUCTURAL: &str = "PATHABLE";
+pub const STRUCTURAL: &str = "PATHABLE";
 
 /// Returns the class a Web Template type name names, without the generic
 /// parameter a `DV_INTERVAL<T>` node carries (`DV_INTERVAL<DV_DATE_TIME>`).
@@ -153,13 +153,6 @@ pub fn pairs(class: &str) -> &'static [&'static str] {
                 .flatten()
         })
         .unwrap_or(&[])
-}
-
-/// Returns whether `class` is a structural node, which holds other nodes and
-/// carries no data value of its own.
-#[must_use]
-pub fn is_structural(class: &str) -> bool {
-    model::is_a(class, STRUCTURAL)
 }
 
 /// Returns the FHIR type code an element of type `code` converts through
@@ -255,11 +248,11 @@ mod tests {
     use fhir_types::schema::Kind;
     use fhir_types::schema::ValueKind;
 
+    use super::STRUCTURAL;
     use super::alternative;
     use super::attribute_class;
     use super::carried;
     use super::element;
-    use super::is_structural;
     use super::type_argument;
     use openehr_rm::v1_2::model;
 
@@ -287,7 +280,7 @@ mod tests {
             "SECTION",
             "EVENT_CONTEXT",
         ] {
-            assert!(is_structural(class), "{class} holds other nodes");
+            assert!(model::is_a(class, STRUCTURAL), "{class} holds other nodes");
         }
         for class in [
             "DV_CODED_TEXT",
@@ -295,7 +288,7 @@ mod tests {
             "PARTY_PROXY",
             "DV_DATE_TIME",
         ] {
-            assert!(!is_structural(class), "{class} is a value");
+            assert!(!model::is_a(class, STRUCTURAL), "{class} is a value");
         }
     }
 

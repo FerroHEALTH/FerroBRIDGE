@@ -55,11 +55,12 @@ impl Run<'_> {
             self.resolve(&leaf, at, reference)?;
             let index = self.create(&target.resource, identity);
             let full_url = self.resources.get(index)?.full_url.clone();
-            self.record(
+            self.write(
                 &leaf,
                 Pending::Ready(Value::String(full_url)),
                 at,
                 reference,
+                false,
             );
             index
         };

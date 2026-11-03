@@ -15,6 +15,7 @@ mod seams;
 
 use ferrobridge_validator::issue::Issue;
 use ferrobridge_validator::issue::Rule;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::report::Constraint;
 use ferrobridge_validator::report::Report;
 use ferrobridge_validator::report::Unevaluated;
@@ -52,6 +53,6 @@ pub(crate) fn listed<'r>(report: &'r Report, key: &str) -> Vec<&'r Unevaluated> 
 
 /// Validates `resource` against the core definition of its type.
 pub(crate) fn against_core(resource: &serde_json::Value) -> TestResult<Report> {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     validate(&set, resource, None)
 }

@@ -14,7 +14,7 @@ use super::magnitude::{Magnitude, Ratio};
 use super::{DIMENSIONS, Meaning, Proper, UcumError, evaluate, parse};
 
 /// The essence, embedded whole and unmodified as the UCUM licence requires.
-const TEXT: &str = include_str!("../../vendor/ucum/ucum-essence.xml");
+pub(super) const TEXT: &str = include_str!("../../vendor/ucum/ucum-essence.xml");
 
 /// The dimension letters of the essence's base units, in the order of a
 /// [`Proper`] dimension vector (UCUM §28).
@@ -74,13 +74,8 @@ struct Definition {
 }
 
 impl Essence {
-    /// Reads and resolves the embedded essence.
-    pub(super) fn load() -> Result<Self, EssenceError> {
-        Self::parse(TEXT)
-    }
-
     /// Reads and resolves an essence document.
-    fn parse(text: &str) -> Result<Self, EssenceError> {
+    pub(super) fn parse(text: &str) -> Result<Self, EssenceError> {
         let mut reader = Reader::from_str(text);
         let mut prefixes = BTreeMap::new();
         let mut atoms = BTreeMap::new();
@@ -299,11 +294,11 @@ fn flag(start: &BytesStart<'_>, name: &'static str) -> Result<bool, EssenceError
 
 #[cfg(test)]
 mod tests {
-    use super::{Essence, Meaning};
+    use super::{Essence, Meaning, TEXT};
 
     #[test]
     fn the_embedded_essence_loads_and_every_atom_resolves() {
-        let essence = Essence::load().expect("the essence loads");
+        let essence = Essence::parse(TEXT).expect("the essence loads");
         assert_eq!(essence.prefixes.len(), 24);
         assert_eq!(essence.atoms.len(), 312);
         assert!(essence.atoms.values().all(|atom| atom.meaning.is_some()));
