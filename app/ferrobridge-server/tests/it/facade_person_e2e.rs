@@ -40,7 +40,7 @@ async fn the_facade_round_trips_the_kds_patient_through_a_real_cdr() -> Result<(
     let set = programs::read_set(directory.path())?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let facade = Arc::new(Facade::new(
         programs,
         store,

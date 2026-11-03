@@ -107,7 +107,7 @@ impl Ingest<'_> {
         let known = if let Some(known) = exact {
             if source.version_id().is_some() {
                 let built = self
-                    .run_linking(program, inbound, provenance, Some(&Linker::probing()))
+                    .run_linking(program, inbound, provenance, Some(&Linker::default()))
                     .await
                     .map_err(|error| engine_refusal(&error))?
                     .composition;
@@ -147,7 +147,7 @@ impl Ingest<'_> {
             instant,
             ..
         } = self
-            .run_linking(program, inbound, provenance, Some(&Linker::probing()))
+            .run_linking(program, inbound, provenance, Some(&Linker::default()))
             .await
             .map_err(|error| engine_refusal(&error))?;
         let sent = strict_read(&built)?;
@@ -217,7 +217,9 @@ impl Ingest<'_> {
     /// `claim` is the one [`Ingest::claim_resource`] took for `inbound`,
     /// held by the caller from before its identity lookup until the answer,
     /// so a concurrent delivery of the same source cannot commit beside this
-    /// one.
+    /// one. `linking` says whether its `link` mappings are followed
+    /// ([`Linking::Commit`]) or refused, as for a resource that is itself a
+    /// linked one ([`Linking::Refuse`]).
     ///
     /// # Errors
     ///
@@ -230,34 +232,7 @@ impl Ingest<'_> {
     /// store that cannot be read or written.
     ///
     /// [`Delivery::Reconciled`]: super::Delivery::Reconciled
-    pub async fn ingest_resource(
-        &self,
-        claim: &Claim<'_>,
-        inbound: &Inbound,
-        program: &Loaded,
-        provenance: &Provenance,
-    ) -> Result<Written, Refused> {
-        self.ingest_linking(claim, inbound, program, provenance, Linking::Commit)
-            .await
-    }
-
-    /// Commits the first version of a composition for a linked resource, as
-    /// [`Ingest::ingest_resource`] does with its own `link` mappings left
-    /// unfollowed.
-    pub(super) async fn ingest_unlinked(
-        &self,
-        claim: &Claim<'_>,
-        inbound: &Inbound,
-        program: &Loaded,
-        provenance: &Provenance,
-    ) -> Result<Written, Refused> {
-        self.ingest_linking(claim, inbound, program, provenance, Linking::Refuse)
-            .await
-    }
-
-    /// Commits the first version of a composition for `inbound`, following
-    /// its `link` mappings as `linking` says.
-    async fn ingest_linking(
+    pub(crate) async fn ingest_resource(
         &self,
         claim: &Claim<'_>,
         inbound: &Inbound,
@@ -595,7 +570,7 @@ fn would_commit(
 
 /// Whether a create follows the `link` mappings of the resource it maps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Linking {
+pub(crate) enum Linking {
     /// Each linked resource is committed first and its URI written.
     Commit,
     /// A `link` that names a resource refuses: the resource is itself a

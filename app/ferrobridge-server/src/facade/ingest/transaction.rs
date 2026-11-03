@@ -16,6 +16,7 @@ use openehr_its::rest::generated::ehr::NewContribution;
 use openehr_its::rest::generated::ehr::Versionable;
 use openehr_its::rest::generated::ehr::client::ContributionCreateOutcome;
 use openehr_rm::v1_2::common::change_control::contribution::Contribution;
+use openehr_term::codes::VersionLifecycleState;
 
 use crate::cdr::Prefer;
 use crate::cdr::Returned;
@@ -475,7 +476,7 @@ impl Ingest<'_> {
             .map(|(entry, prior)| UpdateVersion {
                 preceding_version_uid: prior.clone(),
                 signature: None,
-                lifecycle_state: commit::lifecycle(),
+                lifecycle_state: commit::lifecycle_state(VersionLifecycleState::Complete),
                 attestations: None,
                 data: Some(Versionable::Composition(entry.composition.as_ref().clone())),
                 commit_audit: commit::audit(change_of(prior.as_ref()), system_id, &self.committer),

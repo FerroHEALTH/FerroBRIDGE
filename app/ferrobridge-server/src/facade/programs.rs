@@ -469,7 +469,8 @@ pub fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, LoadError> {
 /// [`LoadError::Mappings`] when a file is not valid FHIRconnect.
 pub fn read_set(directory: &Path) -> Result<MappingSet, LoadError> {
     let files = mapping_files(directory)?;
-    crate::mappings::compile::read(&files).map_err(|diagnostics| mappings_error(&diagnostics))
+    fhirconnect::model::load::load_set(&files, &fhirconnect::engine::library::Library)
+        .map_err(|diagnostics| mappings_error(&diagnostics))
 }
 
 /// Compiles every context of `set` against the templates in `indexes`.

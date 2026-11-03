@@ -24,7 +24,7 @@ pub(crate) mod linked;
 mod pairing;
 mod reconcile;
 pub(crate) mod refusal;
-mod single;
+pub(crate) mod single;
 mod transaction;
 
 use fhir_types::codec::Value;

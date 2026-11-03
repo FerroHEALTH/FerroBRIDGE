@@ -647,7 +647,7 @@ async fn map<M: Mapper>(
 #[cfg(test)]
 mod tests {
     use super::source;
-    use crate::etl::aql::CheckedQuery;
+    use crate::etl::aql::{CheckedQuery, Query};
     use serde_json::json;
 
     /// The version every case reads.
@@ -655,7 +655,7 @@ mod tests {
 
     #[test]
     fn the_versioned_object_is_read_from_the_version_when_the_query_selects_none() {
-        let query = CheckedQuery::compositions(
+        let query = CheckedQuery::new(Query::Compositions,
             "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition \
              FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY v/uid/value",
         )
@@ -670,7 +670,7 @@ mod tests {
 
     #[test]
     fn a_selected_versioned_object_of_another_version_is_refused() {
-        let query = CheckedQuery::compositions(
+        let query = CheckedQuery::new(Query::Compositions,
             "SELECT e/ehr_id/value AS ehr_id, vo/uid/value AS versioned_object_uid, \
              v/uid/value AS version_uid, c AS composition \
              FROM EHR e CONTAINS VERSIONED_OBJECT vo CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \

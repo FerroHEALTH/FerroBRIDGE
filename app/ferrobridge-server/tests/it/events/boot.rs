@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::Settings;
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -39,7 +40,7 @@ fn settings(
         uri = cdr.uri(),
         dead_letters = store.path().join("dead-letters.redb").display(),
     );
-    Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?)
+    Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?)
 }
 
 /// Returns a local port nothing listens on.
