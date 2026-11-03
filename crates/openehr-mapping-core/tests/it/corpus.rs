@@ -24,17 +24,10 @@ const CORPORA: &[&str] = &["docs/specs/fhirconnect-mapping-lib", "docs/specs/omo
 ///
 /// `lab_composition.yml` is commented out from its first byte to its last, so
 /// the YAML document it holds is null and carries no header at all.
-/// `KDS_problem_diagnose.yml` writes `"extensionValue"#TODO` with no space
-/// before the `#`, and YAML 1.2.2 §6.6 requires that "comments must be
-/// separated from other tokens by white space characters".
 /// `Menstrual_diary_v1.yml` writes the key `at0005` five times inside one
 /// `conceptMap` `mapping` block, so four of its five concept mappings would be
-/// discarded silently. The other 312 files load.
+/// discarded silently. The other 335 files load.
 const EXPECTED_FAILURES: &[(&str, DiagnosticCode)] = &[
-    (
-        "docs/specs/fhirconnect-mapping-lib/projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml",
-        DiagnosticCode::YamlSyntax,
-    ),
     (
         "docs/specs/fhirconnect-mapping-lib/projects/org.openehr/EEHRxF/lab/bundle/lab_composition.yml",
         DiagnosticCode::EmptyDocument,
@@ -108,7 +101,7 @@ fn every_corpus_file_loads_or_fails_with_the_pinned_diagnostic() -> Result<(), B
         .map(|(file, code)| ((*file).to_owned(), code.clone()))
         .collect();
     assert_eq!(failures, expected, "the corpus failure set moved");
-    assert_eq!(loaded, 312, "the corpus size moved");
+    assert_eq!(loaded, 335, "the corpus size moved");
     Ok(())
 }
 

@@ -108,8 +108,9 @@ impl Bridge {
     /// and the `ETag` of what it wrote.
     ///
     /// # Errors
-    /// Returns [`BridgeError::Refused`] for any status but `200` and `422`,
-    /// and the transport and body errors of [`Self::capability_statement`].
+    /// Returns [`BridgeError::Refused`] for any status but `200`, `201` and
+    /// `422`, and the transport and body errors of
+    /// [`Self::capability_statement`].
     pub(super) async fn write(
         &self,
         request: reqwest::RequestBuilder,
@@ -120,7 +121,11 @@ impl Bridge {
                 request,
                 JSON,
                 token,
-                &[StatusCode::OK, StatusCode::UNPROCESSABLE_ENTITY],
+                &[
+                    StatusCode::OK,
+                    StatusCode::CREATED,
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                ],
             )
             .await?;
         let etag = headers

@@ -320,6 +320,9 @@ pub enum Failure {
     /// A revision or an archive names a path that is no console mapping file.
     #[error("an entry names no console mapping file")]
     BadEntry,
+    /// An import's body is no archive the bridge reads.
+    #[error("the body is no mapping-set archive the bridge reads")]
+    Archive(#[source] crate::operator::revisions::archive::ArchiveError),
     /// The revision store could not be read or written.
     #[error("the revision store could not be read or written")]
     Store(#[source] crate::operator::revisions::StoreError),
@@ -343,6 +346,10 @@ impl IntoResponse for Failure {
             Self::Unconfigured => unconfigured(),
             Self::UnknownRevision => refuse(Kind::NotFound, "no revision has this id"),
             Self::BadEntry => bad_path(),
+            Self::Archive(_) => refuse(
+                Kind::BadArchive,
+                "the body is no mapping-set archive the bridge reads",
+            ),
             Self::Write(_) | Self::Read(_) | Self::Task(_) | Self::Store(_) => {
                 tracing::error!(
                     error = crate::facade::outcome::chain(&self),

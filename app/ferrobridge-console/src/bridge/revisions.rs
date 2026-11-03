@@ -117,3 +117,56 @@ impl Bridge {
         self.write(request, token).await
     }
 }
+
+/// The media type of a mapping-set archive.
+pub const ZIP: &str = "application/zip";
+
+impl Bridge {
+    /// Reads the revision `id` as a ZIP, `GET
+    /// {base}operator/revisions/{id}/export`.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Path`] when the base takes no path segments,
+    /// [`BridgeError::Refused`] for any status but `200`, and the transport
+    /// errors of [`Self::capability_statement`].
+    pub async fn export_revision(
+        &self,
+        id: &str,
+        token: &AccessToken,
+    ) -> Result<Vec<u8>, BridgeError> {
+        let mut url = self.url("operator/revisions")?;
+        url.path_segments_mut()
+            .map_err(|()| BridgeError::Path)?
+            .push(id)
+            .push("export");
+        let (_status, _headers, body) = self.fetch(url, ZIP, token, &[StatusCode::OK]).await?;
+        Ok(body)
+    }
+
+    /// Imports the ZIP `archive` with `reason` as an unapplied revision,
+    /// `POST {base}operator/revisions/import`; the bridge checks its files
+    /// first and records nothing when the set does not compile with them.
+    ///
+    /// A `201` (the `ETag` names the new revision) and a `422` are answers
+    /// with the check's report; a `400` (no archive the bridge reads) or a
+    /// `409` is a refusal.
+    ///
+    /// # Errors
+    /// As [`Self::apply_revision`].
+    pub async fn import_revision(
+        &self,
+        archive: Vec<u8>,
+        reason: &str,
+        token: &AccessToken,
+    ) -> Result<Answered, BridgeError> {
+        let reason = reason_header(reason)?;
+        let url = self.url("operator/revisions/import")?;
+        let request = self
+            .client
+            .post(url)
+            .header(http::header::CONTENT_TYPE, ZIP)
+            .header(REASON, reason)
+            .body(archive);
+        self.write(request, token).await
+    }
+}

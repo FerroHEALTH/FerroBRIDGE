@@ -347,6 +347,33 @@ The revision's files are written to a staging tree and compiled with the
 provisioned files first. Only a set that compiles replaces the console's
 directories, one rename for each language, and then runs.
 
+### `GET /operator/revisions/{id}/export`
+
+The revision's console files as one ZIP (`application/zip`), each entry
+named by its wire path, such as `fhirconnect/condition.context.yml`. The
+entries are in path order, deflated at one level, with the ZIP epoch as
+their time and fixed permissions, so the same files always give the same
+bytes: an import of an export, exported again, answers the archive it read.
+Provisioned files stay out.
+
+### `POST /operator/revisions/import`
+
+The body is a ZIP, sent as it is with `Content-Type: application/zip` and a
+`Ferrobridge-Reason`. The bridge reads at most 4096 entries and 64 MiB of
+content, inside the `[server]` body ceiling, and every entry names a
+`.yml` or `.yaml` file under `fhirconnect/` or `omocl/`. It compiles the
+set with the archive's files standing in for the console's, as a dry run,
+and records them as a revision with `origin` `import` that does not run
+until an apply.
+
+| Answer | When |
+|---|---|
+| `201` | The set compiles with the archive's files. The body is the check's report, `Location` the new revision and the `ETag` its id |
+| `400` | No reason, or a body that is no archive the bridge reads (`bad-archive`) |
+| `409` | No `mapping_dir` is configured |
+| `422` | The set does not compile with the archive's files; the body names every diagnostic, and nothing is recorded |
+| `503` | The CDR did not serve a template, so the set could not be checked |
+
 ## What the log records
 
 Every operator request leaves one audit line on the
@@ -360,5 +387,7 @@ one more line on the `ferrobridge::audit` target with the caller's `subject`,
 `new_sha256`, the `reason` and the status; a reload adds `action` `reload`.
 An apply adds `action` `apply` with the `revision` it applied, the
 `running` revision it replaced, the revision it `recorded` and the
+`reason`. An import adds `action` `import` with the archive's
+`archive_sha256`, the number of `files`, the revision it `recorded` and the
 `reason`.
 No line carries a token or any mapping content.

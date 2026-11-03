@@ -490,10 +490,10 @@ fn a_manual_path_no_flat_part_carries_is_refused_at_load() -> Result<(), Box<dyn
 /// resource" (`docs/specs/fhirconnect/modules/ROOT/pages/basics/Variables.adoc`),
 /// so its condition reads `Condition.coding`, an element FHIR R4 does not
 /// define (<https://hl7.org/fhir/R4/condition.html>). Reported as #173. The
-/// two warnings beside the refusals are `problem_diagnosis.v1.yml` lines 73
-/// and 100, mappings with no `type` onto a structural node and no child, and
-/// the three `fc-uncarried-tail` rows are its lines 45, 47 and 100, tails no
-/// FLAT part of `EVENT_CONTEXT` or `EVALUATION` carries.
+/// warning beside the refusals is `problem_diagnosis.v1.yml` line 103, the
+/// `bodySite` node the template excludes, and the four `fc-uncarried-tail`
+/// rows are its lines 45, 47, 71 and 73, tails no FLAT part of
+/// `EVENT_CONTEXT` or `EVALUATION` carries.
 #[test]
 fn the_published_anatomical_location_slot_is_refused_naming_the_element()
 -> Result<(), Box<dyn Error>> {
@@ -509,14 +509,12 @@ fn the_published_anatomical_location_slot_is_refused_naming_the_element()
     assert_eq!(
         codes(&diagnostics),
         vec![
-            "fc-anchor-without-children",
-            "fc-anchor-without-children",
+            "fc-excluded-template-node",
             "fc-uncarried-tail",
             "fc-uncarried-tail",
             "fc-uncarried-tail",
-            "fc-unknown-fhir-element",
-            "fc-unknown-template-node",
-            "fc-unknown-template-node"
+            "fc-uncarried-tail",
+            "fc-unknown-fhir-element"
         ]
     );
     let named = diagnostics
@@ -528,13 +526,13 @@ fn the_published_anatomical_location_slot_is_refused_naming_the_element()
 }
 
 /// The published `other_participations` method writes
-/// `$archetype/diagnose/other_participations`, and the openEHR reference model
-/// gives `EVALUATION` no `diagnose` attribute
-/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html>).
-/// Recorded on #101; the context this crate ships overwrites the method.
+/// `$archetype/other_participations`, an attribute the openEHR reference model
+/// gives `EVALUATION`
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html>),
+/// so no refusal names the `diagnose` step its earlier path carried. Recorded
+/// on #101.
 #[test]
-fn the_published_evaluation_tail_outside_the_reference_model_is_refused()
--> Result<(), Box<dyn Error>> {
+fn the_published_evaluation_tail_stays_inside_the_reference_model() -> Result<(), Box<dyn Error>> {
     let set = chain(&[
         CONTEXT,
         EXTENSION,
@@ -543,16 +541,13 @@ fn the_published_evaluation_tail_outside_the_reference_model_is_refused()
     .map_err(|diagnostics| render(&diagnostics))?;
     let diagnostics = program_of(&set, "ferrobridge_anatomical.context")
         .err()
-        .ok_or("the published tail walks outside the reference model")?;
-    let message = diagnostics
+        .ok_or("the published cluster resolves under a Condition")?;
+    let named: Vec<&str> = diagnostics
         .iter()
         .map(Diagnostic::message)
-        .find(|message| message.contains("diagnose"))
-        .ok_or("a refusal naming the tail")?;
-    assert!(
-        message.contains("`diagnose` is no attribute of `EVALUATION`"),
-        "{message}"
-    );
+        .filter(|message| message.contains("`diagnose`"))
+        .collect();
+    assert!(named.is_empty(), "{named:?}");
     Ok(())
 }
 
