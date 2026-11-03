@@ -83,6 +83,7 @@ medical_data/evaluation/Exclusion_specific_v1.yml
 medical_data/evaluation/Financial_summary_v1.yml
 medical_data/evaluation/Gender_v1.yml
 medical_data/evaluation/Goal_v1.yml
+medical_data/evaluation/Hand_dominance_v1.yml
 medical_data/evaluation/Health_risk_v1.yml
 medical_data/evaluation/Housing_summary_v1.yml
 medical_data/evaluation/Last_menstrual_period_v1.yml
