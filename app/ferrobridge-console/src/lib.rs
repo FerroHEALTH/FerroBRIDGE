@@ -8,9 +8,9 @@
 //! The console is one more client of the bridge's public HTTP surface: its
 //! server reaches the bridge through [`bridge`], server to server, with the
 //! signed-in operator's own access token, and never compiles or runs a
-//! mapping itself. It holds the operator's sign-in session on the server
-//! ([`session`], [`oidc`]), so the browser carries an opaque cookie and never
-//! a token.
+//! mapping itself. It signs the operator in and keeps the session on the
+//! server through `ferrohealth-session`, whose stopped sign-ins it draws
+//! ([`stopped`]), so the browser carries an opaque cookie and never a token.
 //!
 //! A request is read once into a [`visit::Visit`]: its path and query, its
 //! session, its preferences and locale ([`locale`]), and the reads it makes
@@ -40,12 +40,11 @@ pub mod load;
 pub mod locale;
 pub mod markup;
 pub mod model;
-pub mod oidc;
 pub mod pages;
 pub mod posts;
 pub mod prefs;
 pub mod routes;
 pub mod server;
-pub mod session;
 pub mod shell;
+pub mod stopped;
 pub mod visit;

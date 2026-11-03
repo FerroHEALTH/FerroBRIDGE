@@ -149,17 +149,24 @@ fn a_complete_oidc_section_resolves_and_reads_its_secret_file() {
         .resolve()
         .expect("the section resolves");
     let oidc = settings.oidc.expect("sign-in is configured");
-    assert_eq!("http://127.0.0.1:8081/realm", oidc.issuer);
+    assert_eq!("http://127.0.0.1:8081/realm", oidc.issuer());
     assert_eq!("https://console.example.org", oidc.origin());
-    assert_eq!(
-        Some("s3cret"),
-        oidc.client_secret
-            .as_ref()
-            .map(secrecy::ExposeSecret::expose_secret)
-    );
-    assert!(settings.session.secure_cookie);
+    assert!(oidc.endpoints_given(), "no discovery for written endpoints");
+    assert!(settings.session.secure_cookie());
     let shown = format!("{oidc:?}");
     assert!(!shown.contains("s3cret"), "{shown}");
+    let missing = format!(
+        "{OIDC}client_secret_file = {:?}\n",
+        dir.path().join("absent")
+    );
+    let error = Config::from_sources(Some(&missing), &BTreeMap::new())
+        .expect("the tree reads")
+        .resolve()
+        .expect_err("the secret file is read when the section resolves");
+    assert!(
+        matches!(&error, Error::SecretFile { source: SecretError::Read { key, .. } } if key == "oidc.client_secret"),
+        "{error:?}"
+    );
 }
 
 #[test]

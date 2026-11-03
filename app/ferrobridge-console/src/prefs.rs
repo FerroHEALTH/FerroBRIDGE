@@ -19,7 +19,8 @@ use axum::Extension;
 use axum::extract::Form;
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Redirect, Response};
-use cookie::Cookie;
+use ferrohealth_session::record::Held;
+use ferrohealth_session::sessions::SessionError;
 use ferrohealth_ui::theme::{
     Density, Hints, Language, Motion, Preference as _, Preferences, Theme, WeekStart,
 };
@@ -87,23 +88,22 @@ pub fn preference_return(back: &str, name: &str) -> String {
     }
 }
 
+/// How long a preference cookie lives: one year (FerroUI family rule 9).
+const KEPT: std::time::Duration = std::time::Duration::from_hours(365 * 24);
+
 /// The cookie that keeps `value` under the preference `name`.
-fn kept_cookie(state: &ConsoleState, name: &str, value: &str) -> Cookie<'static> {
-    state.sessions().preference_cookie(name, value)
+fn kept_cookie(state: &ConsoleState, name: &str, value: &str) -> Result<HeaderValue, SessionError> {
+    state.sessions().preference(name, value, KEPT)
 }
 
 /// The cookie that clears the preference `name`.
-fn cleared_cookie(state: &ConsoleState, name: &str) -> Cookie<'static> {
-    state.sessions().preference_cookie_removal(name)
+fn cleared_cookie(state: &ConsoleState, name: &str) -> Result<HeaderValue, SessionError> {
+    state.sessions().preference_removal(name)
 }
 
-/// Whether `headers` carry a live signed-in session.
-fn signed_in(state: &ConsoleState, headers: &HeaderMap) -> bool {
-    state
-        .sessions()
-        .cookie_in(headers, crate::session::COOKIE)
-        .and_then(|id| state.sessions().access_token(&id).ok().flatten())
-        .is_some()
+/// Whether the request holds a live signed-in session.
+fn signed_in(held: &Held) -> bool {
+    crate::server::session_token(held).is_some()
 }
 
 /// The plain answer `status` with the message `msg` in the request's
@@ -119,14 +119,17 @@ fn refused(state: &ConsoleState, headers: &HeaderMap, status: StatusCode, msg: M
 }
 
 /// The redirect to `location` that sets each of `cookies`.
-fn redirect_with(location: &str, cookies: &[Cookie<'static>]) -> Response {
+fn redirect_with(location: &str, cookies: Vec<Result<HeaderValue, SessionError>>) -> Response {
     let mut response = Redirect::to(location).into_response();
     for kept in cookies {
-        match HeaderValue::from_str(&kept.to_string()) {
+        match kept {
             Ok(value) => {
                 response.headers_mut().append(SET_COOKIE, value);
             }
-            Err(_invalid) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Err(error) => {
+                tracing::error!(%error, "a preference cookie could not be written");
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
         }
     }
     response
@@ -140,10 +143,11 @@ fn redirect_with(location: &str, cookies: &[Cookie<'static>]) -> Response {
 /// switch posts `off` before its `on`, and the last value wins.
 pub async fn choose(
     Extension(state): Extension<ConsoleState>,
+    Extension(held): Extension<Held>,
     headers: HeaderMap,
     Form(fields): Form<Vec<(String, String)>>,
 ) -> Response {
-    if !signed_in(&state, &headers) {
+    if !signed_in(&held) {
         return refused(
             &state,
             &headers,
@@ -186,7 +190,7 @@ pub async fn choose(
     };
     redirect_with(
         &preference_return(back, name),
-        &[kept_cookie(&state, name, &value)],
+        vec![kept_cookie(&state, name, &value)],
     )
 }
 
@@ -204,10 +208,11 @@ pub struct Back {
 /// so it stays.
 pub async fn reset(
     Extension(state): Extension<ConsoleState>,
+    Extension(held): Extension<Held>,
     headers: HeaderMap,
     Form(reset): Form<Back>,
 ) -> Response {
-    if !signed_in(&state, &headers) {
+    if !signed_in(&held) {
         return refused(
             &state,
             &headers,
@@ -219,7 +224,7 @@ pub async fn reset(
         .into_iter()
         .map(|name| cleared_cookie(&state, name))
         .collect::<Vec<_>>();
-    redirect_with(return_path(&reset.back), &cleared)
+    redirect_with(return_path(&reset.back), cleared)
 }
 
 /// What the sidebar's Collapse or Expand posts.
@@ -236,10 +241,11 @@ pub struct RailChoice {
 /// operator.
 pub async fn rail(
     Extension(state): Extension<ConsoleState>,
+    Extension(held): Extension<Held>,
     headers: HeaderMap,
     Form(choice): Form<RailChoice>,
 ) -> Response {
-    if !signed_in(&state, &headers) {
+    if !signed_in(&held) {
         return refused(
             &state,
             &headers,
@@ -257,7 +263,7 @@ pub async fn rail(
     }
     redirect_with(
         return_path(&choice.back),
-        &[kept_cookie(&state, crate::visit::RAIL, &choice.sidebar)],
+        vec![kept_cookie(&state, crate::visit::RAIL, &choice.sidebar)],
     )
 }
 

@@ -27,7 +27,7 @@ fn root_attribute<'a>(page: &'a str, name: &str) -> &'a str {
 #[tokio::test]
 async fn a_page_without_a_preference_cookie_follows_the_system_and_the_defaults()
 -> Result<(), Box<dyn Error>> {
-    let (_state, service) = console("")?;
+    let (_state, service) = console("").await?;
     let (_response, page) = send(&service, get("/")?).await?;
     assert_eq!("system", root_attribute(&page, "data-theme"));
     assert_eq!("comfortable", root_attribute(&page, "data-density"));

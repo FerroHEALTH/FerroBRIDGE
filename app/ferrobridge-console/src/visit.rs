@@ -9,20 +9,21 @@
 //!
 //! Every page is drawn from one [`Visit`], once, whole, with the state the
 //! server read (FerroUI `docs/consoles.md`, "How a console builds", step
-//! 3). The visit reads the preference cookies and never hands the session
-//! cookie or the operator's token to a page. No specification governs the
+//! 3). The visit reads the preference cookies and the session
+//! `ferrohealth-session`'s middleware left on the request as its `Held`, and
+//! never hands the session cookie or the operator's token to a page. No specification governs the
 //! console: our own design.
 
+use ferrohealth_session::record::Held;
 use ferrohealth_ui::i18n::{Arg, Locale};
 use ferrohealth_ui::query::Query;
 use ferrohealth_ui::theme::{Preferences, cookie};
+use ferrohealth_ui::view::session::Left;
 
-use crate::bridge::AccessToken;
 use crate::load::Reads;
 use crate::locale::messages::Msg;
 use crate::model::{SessionState, ViewError};
-use crate::server::ConsoleState;
-use crate::session::COOKIE;
+use crate::server::{ConsoleState, PREFERENCE_PREFIX};
 
 /// The name of the sidebar's cookie after the preference prefix.
 pub const RAIL: &str = "sidebar";
@@ -79,6 +80,9 @@ pub struct Visit {
     pub sign_in: bool,
     /// Whether the request's session cookie names a session that has ended.
     pub ended: bool,
+    /// What the live session had left as the request arrived, which the
+    /// shell's session watch counts down from.
+    pub left: Option<Left>,
     /// What the page reads from the bridge, each document once.
     pub reads: Reads,
 }
@@ -87,32 +91,26 @@ impl Visit {
     /// The visit of the request `parts` to the console `state`.
     #[must_use]
     pub fn of(state: &ConsoleState, parts: &http::request::Parts) -> Self {
-        let prefix = state
-            .sessions()
-            .cookie_name(crate::session::PREFERENCE_PREFIX);
+        let prefix = state.cookie_name(PREFERENCE_PREFIX);
         let cookies = preference_cookies(&parts.headers, &prefix);
         let chosen = chosen_in(&cookies, &prefix);
         let browser = crate::locale::negotiated(&parts.headers, state.settings().locale.clone());
         let locale = crate::locale::requested(&chosen.preferences.language, &browser);
-        let id = state.sessions().cookie_in(&parts.headers, COOKIE);
-        let token = id.as_ref().map(|id| state.sessions().access_token(id));
-        let ended = matches!(token, Some(Ok(None)));
-        let (session, signed) = match token {
-            Some(Ok(Some(token))) => (SessionState::SignedIn, Ok(AccessToken::new(token))),
-            None | Some(Ok(None)) => (SessionState::SignedOut, Err(ViewError::SignedOut)),
-            Some(Err(error)) => {
-                tracing::error!(%error, "the session store could not be read");
-                (SessionState::Unreadable, Err(ViewError::Unavailable))
-            }
+        let held = parts.extensions.get::<Held>();
+        let token = held.and_then(crate::server::session_token);
+        let live = match held {
+            Some(Held::SignedIn(live)) if token.is_some() => Some(live),
+            _ => None,
         };
-        // NOTE: no specification governs this: our own design; a store that cannot
-        // be read names no operator, and the session's state reports that fault itself.
-        let operator = (session == SessionState::SignedIn)
-            .then(|| {
-                id.as_ref()
-                    .and_then(|id| state.sessions().operator(id).ok().flatten())
-            })
-            .flatten();
+        let (session, signed) = match token {
+            Some(token) => (SessionState::SignedIn, Ok(token)),
+            None => (SessionState::SignedOut, Err(ViewError::SignedOut)),
+        };
+        // NOTE: no specification governs this: our own design; an access token that could not
+        // be renewed asks for a sign-in as a session that ended does.
+        let ended = matches!(held, Some(Held::Ended | Held::TokenExpired));
+        let operator = live.and_then(|live| live.operator().map(str::to_owned));
+        let left = live.map(ferrohealth_session::record::Session::left);
         let settings = (session == SessionState::SignedIn).then(|| Settings {
             bridge: state.settings().bridge.base.to_string(),
             locale: state.settings().locale.tag(),
@@ -128,6 +126,7 @@ impl Visit {
             settings,
             sign_in: state.settings().oidc.is_some(),
             ended,
+            left,
             reads: Reads::new(state.clone(), signed),
         }
     }

@@ -52,6 +52,15 @@ end_session_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/open
 post_logout_redirect_uri = "https://console.example.org/"
 ```
 
+With `issuer` alone the console discovers the provider's endpoints when it
+starts (OpenID Connect Discovery 1.0), and each endpoint you write takes the
+place of the discovered one. `config check` never contacts the provider: it
+checks the written keys, and builds the sign-in only when the authorization,
+token and key-set endpoints are all written. `revocation_endpoint` names
+where a sign-out revokes the operator's token (RFC 7009), `ca_file` adds PEM
+trust roots for a provider behind a private certificate authority, and
+`timeout_s` (default `10`) bounds one call to the provider.
+
 The access token the provider issues is the one the bridge receives, so its
 audience and scopes must be ones the bridge's `[auth]` accepts, and the
 operator API needs the operator scope (see
@@ -59,26 +68,39 @@ operator API needs the operator scope (see
 
 ## Sessions
 
-The session lives on the console's server. The browser holds one opaque
-`HttpOnly`, `SameSite=Lax` cookie, under the `__Host-` prefix, and never a
-token. With `offline_access = true` the provider issues a refresh token,
-and the console refreshes the access token on its server shortly before it
-expires. A refresh the provider refuses ends the session, and the operator
-signs in again; a provider that does not answer leaves the session for the
-next request to try again. `[session]` bounds the pools and sets the
+The sign-in and the session are those of `ferrohealth-session`, the crate
+every FerroHEALTH console signs in with. The browser holds one `HttpOnly`,
+`SameSite=Lax` cookie, under the `__Host-` prefix, and never a token. With
+`offline_access = true` the provider issues a refresh token, and the console
+refreshes the access token on its server shortly before it expires. A
+refresh the provider refuses ends the session, and the operator signs in
+again; a provider that does not answer leaves the session for the next
+request to try again. Without a refresh token the session ends when its
+access token expires. `[session]` sets the store, the bounds and the
 timeouts:
 
 | Key | Default | Meaning |
 |---|---|---|
+| `store` | `"memory"` | `memory` keeps sessions in the console's process; `sealed` keeps each in one encrypted cookie |
+| `key`, `key_file` | none | The sealing key of a `sealed` store: base64 of at least 64 bytes, the same on every replica; refused beside `memory` |
 | `secure_cookie` | `true` | Cookies carry `Secure` and the `__Host-` prefix; `false` only for a console on `http` loopback |
 | `sign_in_timeout_s` | `300` | How long a started sign-in waits for the provider |
-| `max_sign_ins` | `1000` | Pending sign-ins held at once; a new one drops the oldest |
-| `idle_timeout_s` | `1800` | How long a session lives without a request |
-| `absolute_timeout_s` | `43200` | How long a session lives at most |
-| `max_sessions` | `10000` | Sessions held at once; a sign-in past it is refused |
+| `max_sign_ins` | `1000` | Pending sign-ins a `memory` store holds; a new one drops the oldest |
+| `idle_timeout_s` | `1800` | How long a session lives without activity |
+| `absolute_timeout_s` | `43200` | How long a session lives from its sign-in; at least `idle_timeout_s` |
+| `max_sessions` | `10000` | Sessions a `memory` store holds; a sign-in past it is refused |
 
-Sessions are held in the console's memory, so a restart signs every
-operator out, and replicas behind a load balancer need sticky sessions.
+A `memory` store loses its sessions on a restart, so every operator signs in
+again, and replicas behind a load balancer need sticky sessions. A `sealed`
+store needs neither, and refuses `offline_access`, which would put a refresh
+token in a browser cookie.
+
+A signed-in page carries FerroUI's session watch. It asks `GET /session`,
+which reads what the session has left and never counts as activity, and
+warns two minutes before the idle timeout with Stay signed in, which posts
+to `/session` to extend it. When the session ends, every tab of the console
+leaves for the sign-in, which signs in and comes back to the page the
+operator was on (`/login?return=<page>`).
 
 ## The console's pages
 
@@ -517,7 +539,10 @@ The page for a path the console does not serve.
 Sign out, in the user menu, is a `POST` to `/logout`. It ends the session
 and, when `end_session_endpoint` is set, sends the browser to the provider
 with the ID Token hint (OpenID Connect RP-Initiated Logout 1.0); without
-one it lands on `/signed-out`. The console takes a `POST` only from its
+one it lands on `/signed-out`, whether or not the console has a provider.
+When the provider has a revocation endpoint, the sign-out revokes the
+operator's refresh token, or its access token when it has none (RFC 7009).
+The console takes a `POST` only from its
 own pages, by the browser's `Sec-Fetch-Site` header, or by `Origin` when
 the browser sends no fetch metadata.
 

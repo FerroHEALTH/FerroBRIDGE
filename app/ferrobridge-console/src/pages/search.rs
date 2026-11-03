@@ -175,24 +175,16 @@ pub struct Asked {
 /// answer, which the panel shows as a row.
 pub async fn answer_route(
     Extension(state): Extension<crate::server::ConsoleState>,
+    Extension(held): Extension<ferrohealth_session::record::Held>,
     headers: http::HeaderMap,
     Query(asked): Query<Asked>,
 ) -> Response {
     let l = crate::locale::negotiated(&headers, state.settings().locale.clone());
-    let token = state
-        .sessions()
-        .cookie_in(&headers, crate::session::COOKIE)
-        .and_then(|id| state.sessions().access_token(&id).ok().flatten());
-    let Some(token) = token else {
+    let Some(token) = crate::server::session_token(&held) else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
     let words = asked.q.trim();
-    match crate::model::loaded(
-        state
-            .bridge()
-            .operator_state(&crate::bridge::AccessToken::new(token))
-            .await,
-    ) {
+    match crate::model::loaded(state.bridge().operator_state(&token).await) {
         Ok(Outcome::Shown(running)) => axum::Json(answer(&l, words, &running)).into_response(),
         Ok(Outcome::Refused(_)) => StatusCode::FORBIDDEN.into_response(),
         Err(_) => StatusCode::BAD_GATEWAY.into_response(),
