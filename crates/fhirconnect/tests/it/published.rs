@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The 13 published contexts of the FHIRconnect mapping library, each
-//! compiled verbatim against the operational template it names.
+//! The 14 published root contexts of the FHIRconnect mapping library, each
+//! compiled verbatim against the operational template it names, with the
+//! `scope: sub` contexts it enters.
 //!
 //! A context loads beside every model file of the library and the files of
 //! its own project directory. A file the loader refuses is left out of the
@@ -54,7 +55,7 @@ enum Opt {
     Library(&'static str),
 }
 
-/// Every published context, by path relative to the library, with the
+/// Every published root context, by path relative to the library, with the
 /// template that carries the `template.id` it names.
 const CONTEXTS: &[(&str, Opt)] = &[
     (
@@ -107,7 +108,15 @@ const CONTEXTS: &[(&str, Opt)] = &[
     ),
     (
         "projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml",
-        Opt::Library("projects/org.openehr/EEHRxF/lab/resources/EHDS - Laboratory report.opt"),
+        Opt::Library(
+            "projects/org.openehr/EEHRxF/lab/resources/openehr/templates/EHDS - Laboratory report.opt",
+        ),
+    ),
+    (
+        "projects/org.openehr/IPS/IPS.context.yml",
+        Opt::Library(
+            "projects/org.openehr/IPS/resources/openehr/templates/International Patient Summary.opt",
+        ),
     ),
 ];
 
@@ -369,15 +378,31 @@ fn every_vendored_kds_template_builds_a_web_template() -> Result<(), Box<dyn Err
     Ok(())
 }
 
+/// Whether a context declares `scope: sub`, which the specification enters
+/// only through the `contexts` of another context
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/sub-contexts.adoc`),
+/// so its root compiles it.
+fn is_sub_context(context: &str) -> Result<bool, Box<dyn Error>> {
+    let source = fs::read_to_string(library(context))?;
+    let document = load_str(context, &source)?;
+    Ok(document
+        .document()
+        .get("context")
+        .and_then(|context| context.get("scope"))
+        .and_then(|scope| scope.as_text())
+        .is_some_and(|scope| scope == "sub"))
+}
+
 #[test]
 fn the_published_contexts_hold_their_pinned_verdicts() -> Result<(), Box<dyn Error>> {
     let mut files = Vec::new();
     yaml_under(&library("projects"), &mut files)?;
-    let contexts: BTreeSet<&str> = files
-        .iter()
-        .map(String::as_str)
-        .filter(|file| file.contains(".context."))
-        .collect();
+    let mut contexts: BTreeSet<&str> = BTreeSet::new();
+    for file in files.iter().filter(|file| file.contains(".context.")) {
+        if !is_sub_context(file)? {
+            contexts.insert(file.as_str());
+        }
+    }
     let listed: BTreeSet<&str> = CONTEXTS.iter().map(|(context, _)| *context).collect();
     assert_eq!(
         contexts, listed,
