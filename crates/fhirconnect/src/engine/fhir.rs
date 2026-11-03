@@ -28,7 +28,9 @@ use fhir_types::r4::primitives::Date;
 use fhir_types::r4::primitives::DateTime;
 use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Integer;
+use fhir_types::r4::primitives::PositiveInt;
 use fhir_types::r4::primitives::Time;
+use fhir_types::r4::primitives::UnsignedInt;
 use fhir_types::r4::primitives::Url;
 use fhir_types::r4::quantity::Quantity;
 use fhir_types::r4::range::Range;
@@ -67,6 +69,10 @@ pub enum FhirKind {
     Quantity,
     /// An `integer`.
     Integer,
+    /// An `unsignedInt`.
+    UnsignedInt,
+    /// A `positiveInt`.
+    PositiveInt,
     /// A `decimal`.
     Decimal,
     /// A `Count`.
@@ -120,6 +126,8 @@ impl FhirKind {
             "Identifier" => Some(Self::Identifier),
             "Quantity" => Some(Self::Quantity),
             "integer" => Some(Self::Integer),
+            "unsignedInt" => Some(Self::UnsignedInt),
+            "positiveInt" => Some(Self::PositiveInt),
             "decimal" => Some(Self::Decimal),
             "Count" => Some(Self::Count),
             "time" => Some(Self::Time),
@@ -176,6 +184,8 @@ impl FhirKind {
             Self::Identifier => "Identifier",
             Self::Quantity => "Quantity",
             Self::Integer => "integer",
+            Self::UnsignedInt => "unsignedInt",
+            Self::PositiveInt => "positiveInt",
             Self::Decimal => "decimal",
             Self::Count => "Count",
             Self::Time => "time",
@@ -212,6 +222,10 @@ pub enum FhirValue {
     Quantity(Box<Quantity>),
     /// An `integer`.
     Integer(Integer),
+    /// An `unsignedInt`.
+    UnsignedInt(UnsignedInt),
+    /// A `positiveInt`.
+    PositiveInt(PositiveInt),
     /// A `decimal`.
     Decimal(Decimal),
     /// A `Count`.
@@ -277,6 +291,8 @@ impl FhirValue {
             Self::Identifier(_) => FhirKind::Identifier,
             Self::Quantity(_) => FhirKind::Quantity,
             Self::Integer(_) => FhirKind::Integer,
+            Self::UnsignedInt(_) => FhirKind::UnsignedInt,
+            Self::PositiveInt(_) => FhirKind::PositiveInt,
             Self::Decimal(_) => FhirKind::Decimal,
             Self::Count(_) => FhirKind::Count,
             Self::Time(_) => FhirKind::Time,
@@ -333,6 +349,12 @@ impl FhirValue {
                 .map(|quantity| Self::Quantity(Box::new(quantity))),
             FhirKind::Integer => Integer::from_json_parts(Some(value), None, &mut path)
                 .map(Self::Integer)
+                .map_err(refuse),
+            FhirKind::UnsignedInt => UnsignedInt::from_json_parts(Some(value), None, &mut path)
+                .map(Self::UnsignedInt)
+                .map_err(refuse),
+            FhirKind::PositiveInt => PositiveInt::from_json_parts(Some(value), None, &mut path)
+                .map(Self::PositiveInt)
                 .map_err(refuse),
             FhirKind::Decimal => Decimal::from_json_parts(Some(value), None, &mut path)
                 .map(Self::Decimal)
@@ -392,6 +414,8 @@ impl FhirValue {
             Self::Identifier(ref identifier) => complex(identifier.to_json()),
             Self::Quantity(ref quantity) => complex(quantity.to_json()),
             Self::Integer(ref integer) => primitive(integer.value_json()),
+            Self::UnsignedInt(ref integer) => primitive(integer.value_json()),
+            Self::PositiveInt(ref integer) => primitive(integer.value_json()),
             Self::Decimal(ref decimal) => primitive(decimal.value_json()),
             Self::Count(ref count) => complex(count.to_json()),
             Self::Time(ref time) => primitive(time.value_json()),

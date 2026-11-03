@@ -17,8 +17,10 @@ use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
 use ferrobridge_operator_api::configuration::Configuration;
+use ferrobridge_operator_api::etl::{Run, Runs};
 use ferrobridge_operator_api::events::Events;
 use ferrobridge_operator_api::health::Info;
+use ferrobridge_operator_api::hl7v2::ConceptMaps;
 use ferrobridge_operator_api::operator::{EngineState, Listed};
 use ferrohealth_health::document::Readiness;
 use fhir_types::codec::{Json as _, Path, Value};
@@ -355,6 +357,64 @@ impl Bridge {
         )
         .await
         .map(|(_status, events)| events)
+    }
+
+    /// Reads the HL7 v2 face's `ConceptMap` directory from the operator API,
+    /// `GET {base}operator/hl7v2/concept-maps`, with the messages each map
+    /// served.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200` (a `404`
+    /// where the operator API or the face is off, a `403` without the
+    /// operator scope), and the body errors of [`Self::health_info`].
+    pub async fn concept_maps(&self, token: &AccessToken) -> Result<ConceptMaps, BridgeError> {
+        self.document(
+            "operator/hl7v2/concept-maps",
+            "ConceptMap directory",
+            token,
+            &[StatusCode::OK],
+        )
+        .await
+        .map(|(_status, directory)| directory)
+    }
+
+    /// Reads the newest OMOP ETL runs from the operator API,
+    /// `GET {base}operator/etl/runs`, newest first.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200` (a `404`
+    /// where the operator API is off or the bridge has no CDM database, a
+    /// `503` when the history cannot be read), and the body errors of
+    /// [`Self::health_info`].
+    pub async fn etl_runs(&self, token: &AccessToken) -> Result<Runs, BridgeError> {
+        self.document(
+            "operator/etl/runs",
+            "ETL run history",
+            token,
+            &[StatusCode::OK],
+        )
+        .await
+        .map(|(_status, runs)| runs)
+    }
+
+    /// Reads one OMOP ETL run from the operator API,
+    /// `GET {base}operator/etl/runs/{run_id}`.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Path`] when the base takes no path segments,
+    /// [`BridgeError::Refused`] for any status but `200` (a `404` for a run
+    /// the history does not hold), and the body errors of
+    /// [`Self::health_info`].
+    pub async fn etl_run(&self, run_id: &str, token: &AccessToken) -> Result<Run, BridgeError> {
+        let mut url = self.url("operator/etl/runs")?;
+        url.path_segments_mut()
+            .map_err(|()| BridgeError::Path)?
+            .push(run_id);
+        let (_status, _headers, body) = self.fetch(url, JSON, token, &[StatusCode::OK]).await?;
+        serde_json::from_slice(&body).map_err(|source| BridgeError::Document {
+            expected: "ETL run",
+            source,
+        })
     }
 
     /// Asks for the replay of the event `id` the change-feed consumer

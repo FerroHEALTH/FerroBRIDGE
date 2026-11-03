@@ -44,6 +44,8 @@ pub enum Step {
     Survey(&'static str),
     /// Committing the transaction.
     Commit,
+    /// Recording a finished run in the run history.
+    RecordRun,
 }
 
 impl fmt::Display for Step {
@@ -64,6 +66,7 @@ impl fmt::Display for Step {
                 write!(f, "counting the rows of `{table}` the bridge does not own")
             }
             Self::Commit => f.write_str("committing the transaction"),
+            Self::RecordRun => f.write_str("recording the run in the run history"),
         }
     }
 }

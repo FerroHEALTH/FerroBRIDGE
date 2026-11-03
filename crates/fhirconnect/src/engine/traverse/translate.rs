@@ -114,6 +114,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirValue::Identifier(_)
             | FhirValue::Quantity(_)
             | FhirValue::Integer(_)
+            | FhirValue::UnsignedInt(_)
+            | FhirValue::PositiveInt(_)
             | FhirValue::Decimal(_)
             | FhirValue::Count(_)
             | FhirValue::Time(_)

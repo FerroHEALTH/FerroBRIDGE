@@ -330,7 +330,8 @@ fn settings(visits: bool) -> Result<EtlSettings, Box<dyn Error>> {
 
 /// Returns the data of the CDM and bridge schemas as `pg_dump` writes it,
 /// with each table's rows sorted and the watermark's run columns cut, since
-/// a re-run records its own run id and commit time. `pg_dump` runs inside
+/// a re-run records its own run id and commit time, and with no row of the
+/// run history, where every run keeps a row of its own. `pg_dump` runs inside
 /// the PostgreSQL container through the container engine's exec API, so the
 /// host needs no `docker` binary and a Podman socket serves as well.
 pub(crate) async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
@@ -343,6 +344,7 @@ pub(crate) async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> 
                 "--data-only",
                 "--schema=cdm",
                 "--schema=ferrobridge",
+                "--exclude-table-data=ferrobridge.run",
                 "ferrobridge",
             ])
             .with_cmd_ready_condition(CmdWaitFor::exit()),

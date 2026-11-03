@@ -198,13 +198,16 @@ pub const FERROBRIDGE_MEDICATION_TEMPLATE: &str =
 pub const FERROBRIDGE_MEDICATION_TEMPLATE_ID: &str =
     "openEHR-EHR-COMPOSITION.ferrobridge_medication.v1.0.0";
 
-/// The seven published CKM archetypes [`FERROBRIDGE_MEDICATION_TEMPLATE`]
-/// specialises, as `(file name, ADL 1.4 source)`.
+/// The ten published CKM archetypes of [`FERROBRIDGE_MEDICATION_TEMPLATE`].
+///
+/// Each is `(file name, ADL 1.4 source)`: the seven the template specialises
+/// and the three clusters the medication order's authorisation, order
+/// summary and dispense amount slots admit.
 ///
 /// `scripts/vendor/ckm-medication.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 7] = [
+pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 10] = [
     ckm_medication!("openEHR-EHR-COMPOSITION.encounter.v1.adl"),
     ckm_medication!("openEHR-EHR-INSTRUCTION.medication_order.v3.adl"),
     ckm_medication!("openEHR-EHR-ACTION.medication.v1.adl"),
@@ -212,6 +215,9 @@ pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 7] = [
     ckm_medication!("openEHR-EHR-CLUSTER.therapeutic_direction.v1.adl"),
     ckm_medication!("openEHR-EHR-CLUSTER.dosage.v2.adl"),
     ckm_medication!("openEHR-EHR-CLUSTER.timing_daily.v1.adl"),
+    ckm_medication!("openEHR-EHR-CLUSTER.medication_authorisation.v0.adl"),
+    ckm_medication!("openEHR-EHR-CLUSTER.medication_order_summary.v0.adl"),
+    ckm_medication!("openEHR-EHR-CLUSTER.medication_supply_amount.v0.adl"),
 ];
 
 /// A synthetic FLAT composition of [`KDS_PERSON_OPT`]: one person with a

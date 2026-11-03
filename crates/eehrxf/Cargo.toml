@@ -5,7 +5,7 @@ name = "eehrxf"
 description = "The European interoperability software component of an EHR system under Regulation (EU) 2025/327: the format-neutral dataset model of the priority categories read from the Xt-EHR EHDS logical models, and the European electronic health record exchange format in FHIR R4, mapped from openEHR by FHIRconnect"
 # On the crate line, the fhir-types line, since it moved here from FerroFED at
 # 0.0.40 (docs/VERSIONS.md).
-version = "0.1.134"
+version = "0.1.136"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -94,6 +94,11 @@ thiserror.workspace = true
 url = { workspace = true, optional = true }
 
 [dev-dependencies]
+# The CKM medication archetypes and FerroBRIDGE's ADL 2 medication template
+# the HL7 Europe MPD mapping runs over.
+ferrobridge-testkit.workspace = true
+# Builds the ADL 2 operational template of that medication template.
+openehr-adl.workspace = true
 # The property that a package read twice gives the same model, over shuffled
 # archive orders.
 proptest.workspace = true

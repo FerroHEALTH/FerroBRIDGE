@@ -359,6 +359,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             | FhirKind::Identifier
             | FhirKind::Quantity
             | FhirKind::Integer
+            | FhirKind::UnsignedInt
+            | FhirKind::PositiveInt
             | FhirKind::Decimal
             | FhirKind::Count
             | FhirKind::Duration

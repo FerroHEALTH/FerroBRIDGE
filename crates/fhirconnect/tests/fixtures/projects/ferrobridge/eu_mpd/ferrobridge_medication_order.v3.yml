@@ -23,6 +23,9 @@ spec:
     structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationRequest
 
 mappings:
+  # NOTE: CKM INSTRUCTION.medication_order.v3 at0112 holds the order status "generally used in
+  # non-prescription contexts", and no published crosswalk pairs it with the R4
+  # medicationrequest-status codes, so the status stays `unknown`.
   - name: "status"
     unidirectional: "openEHR->fhir"
     with:
@@ -117,3 +120,59 @@ mappings:
           with:
             fhir: "dispenseRequest.validityPeriod.end"
             openehr: "description[at0002]/items[at0129]/items[at0161]"
+
+        # The authorisation directions slot holds the CKM
+        # CLUSTER.medication_authorisation.v0 (revision 0.0.1-alpha): the
+        # refills authorised after the first dispense, the least interval
+        # between two, and the refills the holder states are left, which
+        # no element of R4 carries and the remaining-dispensations extension
+        # of the eehrxf crate does.
+        - name: "numberOfRepeatsAllowed"
+          with:
+            fhir: "dispenseRequest.numberOfRepeatsAllowed"
+            openehr: "description[at0002]/items[openEHR-EHR-CLUSTER.medication_authorisation.v0]/items[at0025]"
+
+        - name: "dispenseInterval"
+          with:
+            fhir: "dispenseRequest.dispenseInterval"
+            openehr: "description[at0002]/items[openEHR-EHR-CLUSTER.medication_authorisation.v0]/items[at0046]"
+
+        - name: "remainingDispensations"
+          with:
+            fhir: "dispenseRequest.extension"
+            openehr: "description[at0002]/items[openEHR-EHR-CLUSTER.medication_authorisation.v0]"
+          fhirCondition:
+            targetRoot: "dispenseRequest.extension"
+            targetAttribute: "url"
+            operator: "one of"
+            criteria: "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations"
+          followedBy:
+            mappings:
+              - name: "remainingValue"
+                with:
+                  fhir: "value.as(UnsignedInt)"
+                  openehr: "items[at0079]"
+
+              - name: "remainingUrl"
+                with:
+                  fhir: "$fhirRoot"
+                manual:
+                  - name: "url"
+                    fhir:
+                      - path: "url"
+                        value: "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations"
+
+        # The dispense amount slot of the dispense directions holds the CKM
+        # CLUSTER.medication_supply_amount.v0 (revision 0.0.1-alpha).
+        # NOTE: CKM INSTRUCTION.medication_order.v3 at0065 is "the amount of the ordered item to be
+        # dispensed", the R4 dispenseRequest.quantity "for one fill", never the MPD prescribedQuantity
+        # extension, which is the overall amount "independent from the number of repeats".
+        - name: "dispenseQuantity"
+          with:
+            fhir: "dispenseRequest.quantity"
+            openehr: "description[at0002]/items[at0129]/items[openEHR-EHR-CLUSTER.medication_supply_amount.v0]/items[at0131]"
+
+        - name: "expectedSupplyDuration"
+          with:
+            fhir: "dispenseRequest.expectedSupplyDuration"
+            openehr: "description[at0002]/items[at0129]/items[openEHR-EHR-CLUSTER.medication_supply_amount.v0]/items[at0142]"

@@ -45,6 +45,8 @@ use crate::journeys::screenshots::catalogue::EDIT_SAVED;
 use crate::journeys::screenshots::catalogue::EVENTS_DEGRADED;
 use crate::journeys::screenshots::catalogue::MAPPINGS_RELOADED;
 use crate::journeys::screenshots::catalogue::NOT_FOUND;
+use crate::journeys::screenshots::catalogue::OMOP_RUN;
+use crate::journeys::screenshots::catalogue::OMOP_RUNS;
 use crate::journeys::screenshots::catalogue::PAGES;
 use crate::journeys::screenshots::catalogue::PLAYGROUND_ANSWERED;
 use crate::journeys::screenshots::catalogue::PLAYGROUND_OFF;
@@ -69,6 +71,9 @@ const BRIDGE_PORT_OFF: u16 = 47181;
 
 /// The loopback port of the bridge whose events lane cannot reach its broker.
 const BRIDGE_PORT_EVENTS: u16 = 47182;
+
+/// The loopback port of the bridge whose ETL keeps a run history.
+const BRIDGE_PORT_ETL: u16 = 47183;
 
 /// The book's folder of console screenshots, from the workspace root.
 const IMAGES: &str = "website/book/src/operate/img/console";
@@ -526,6 +531,19 @@ async fn events_degraded(
     visit(browser, stack, &EVENTS_DEGRADED, (theme, width)).await
 }
 
+/// Captures the OMOP ETL's runs and the report of one in `theme`, on a
+/// bridge whose ETL keeps a run history.
+async fn etl_runs(
+    browser: &Browser,
+    stack: &Stack,
+    (theme, width): (Theme, Width),
+) -> Result<(), Box<dyn Error>> {
+    enter(browser, stack, theme).await?;
+    sign_in(browser, stack).await?;
+    visit(browser, stack, &OMOP_RUNS, (theme, width)).await?;
+    visit(browser, stack, &OMOP_RUN, (theme, width)).await
+}
+
 /// Captures the playground of a bridge whose operations lane is off in
 /// `theme`.
 async fn lane_off(
@@ -552,16 +570,19 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
             let stack = Stack::capture(Lanes::All, BRIDGE_PORT).await?;
             let off = Stack::capture(Lanes::WithoutOperations, BRIDGE_PORT_OFF).await?;
             let events = Stack::capture(Lanes::WithEvents, BRIDGE_PORT_EVENTS).await?;
+            let etl = Stack::capture(Lanes::WithEtl, BRIDGE_PORT_ETL).await?;
             with_browser(async |browser| {
                 window(browser, width, HEIGHT).await?;
                 every_page(browser, &stack, (theme, width)).await?;
                 lane_off(browser, &off, (theme, width)).await?;
-                events_degraded(browser, &events, (theme, width)).await
+                events_degraded(browser, &events, (theme, width)).await?;
+                etl_runs(browser, &etl, (theme, width)).await
             })
             .await?;
             stack.stop().await?;
             off.stop().await?;
             events.stop().await?;
+            etl.stop().await?;
         }
     }
     std::fs::write(
