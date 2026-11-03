@@ -26,4 +26,7 @@ resources, at the pin `docs/VERSIONS.md` records and
   with the rule it breaks: `parameters-example-types.xml` declares the XML
   Schema instance namespace and `xsi:schemaLocation` on its root, which R4
   xml.html §2.6.1.1 forbids in a resource.
+- A group the suite marks `mode="custom"` is in neither corpus: the suite
+  states that its `documentFunctions` group exercises functions "not part of
+  FHIRPath, nor of the FHIR specification's additional FHIRPath functions".
 - Never edit the list by hand.
