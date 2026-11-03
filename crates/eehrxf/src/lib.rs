@@ -27,6 +27,8 @@
 //!   1.0.0 mapping, compiled once against an operational template and run in
 //!   process over a canonical-JSON composition, answering FHIR R4 resources
 //!   with their `Provenance`;
+//! - `mappings` (feature `openehr`): the FHIRconnect projects the crate
+//!   ships under `mappings/` in its package, embedded as text;
 //! - `medication` (feature `fhir-r4` with `prescription` or
 //!   `dispensation`): the electronic prescription and dispensation datasets,
 //!   read from and written as the HL7 Europe Medication Prescription and
@@ -84,6 +86,8 @@ pub mod dataset;
 pub mod document;
 #[cfg(feature = "openehr")]
 pub mod mapping;
+#[cfg(feature = "openehr")]
+pub mod mappings;
 #[cfg(all(
     feature = "fhir-r4",
     any(feature = "prescription", feature = "dispensation")

@@ -46,6 +46,16 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   run in process, through the `fhirconnect` engine, over a
   canonical-JSON composition. The answer is a FHIR R4 `Bundle` of the mapped
   resources with one `Provenance` covering them.
+- `mappings` (feature `openehr`): the FHIRconnect projects the crate ships
+  under `mappings/` in its package, each embedded as text with the context
+  mappings it compiles: `MPD` (features `prescription` or `dispensation`),
+  the HL7 Europe MPD 1.0.0 request and dispense, and `LABORATORY` (feature
+  `laboratory`), the HL7 Europe Laboratory Report 2.0.0 report with its
+  results and specimens over the published `KDS_Laborbericht` template. `Project::write_to` writes a
+  project's files where a system keeps its mappings, the paths
+  `Mapping::compile` takes. Three model mappings of the laboratory project are
+  modified copies of FHIRconnect mapping library files and keep its Apache
+  License 2.0, which `mappings/laboratory/PROVENANCE.md` records beside them.
 - `medication` (feature `fhir-r4` with `prescription` or `dispensation`):
   the electronic prescription and dispensation datasets as Rust records.
   `Prescription::read` reads a member's `MedicationRequest`s, one per item,

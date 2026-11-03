@@ -30,8 +30,12 @@ conformance-relevant decision.
   `receive` holds a document to the document rules and its profiles'
   cardinalities, fixed and pattern values and slices, and names every
   constraint it does not evaluate.
-- No mapping language and no profile mapping are authored here: FHIRconnect
-  files are the input, run through `fhirconnect`.
+- No mapping language and no per-category mapping code are authored here:
+  FHIRconnect files are the input, run through `fhirconnect`. The
+  FHIRconnect projects the component ships live under `mappings/<project>/`,
+  packaged with the crate and embedded by `mappings`, so a system that
+  depends on the published crate runs the files the tests run.
+  `fhirconnect`'s round trips read the same directories.
 
 ## Tests
 

@@ -24,10 +24,8 @@ context:
     - "OBSERVATION.laboratory_test_result.v1"
     - "CLUSTER.laboratory_test_analyte.v1"
     - "CLUSTER.specimen.v1"
-    - "COMPOSITION.report_result.v1.DiagnosticReport"
   extensions:
     - "ferrobridge_eu_laboratory_result"
     - "ferrobridge_eu_laboratory_analyte"
     - "ferrobridge_eu_laboratory_specimen"
-    - "ferrobridge_eu_composition.DiagnosticReport"
   start: "OBSERVATION.laboratory_test_result.v1"

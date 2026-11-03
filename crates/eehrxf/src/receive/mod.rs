@@ -132,6 +132,19 @@ impl ReceivedDocument {
         }
         entries::known_resources(&tree, "Bundle")?;
         entries::full_urls(&tree)?;
+        Self::from_parts(text.to_owned(), tree, bundle)
+    }
+
+    /// Returns the document `bundle`, decoded from `tree` and read from
+    /// `original`, with its first entry's `Composition` and the `Patient`
+    /// its subject names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReceiveError::NoComposition`] when the first entry is no
+    /// `Composition`, and the refusal of a subject that names no one
+    /// `Patient` entry.
+    fn from_parts(original: String, tree: Object, bundle: Bundle) -> Result<Self, ReceiveError> {
         let Some(Resource::Composition(composition)) = bundle
             .entry
             .first()
@@ -150,7 +163,7 @@ impl ReceivedDocument {
         };
         let patient = patient.clone();
         Ok(Self {
-            original: text.to_owned(),
+            original,
             tree,
             bundle,
             composition,

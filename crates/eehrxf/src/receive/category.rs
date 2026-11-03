@@ -5,9 +5,11 @@
 //! checked against.
 //!
 //! Each HL7 Europe document profile fixes the `Composition.type` of its
-//! category with a `patternCodeableConcept`, such as LOINC `60591-5` in
-//! `composition-eu-eps`, so a document says its category in the element its
-//! profile constrains (<https://hl7.org/fhir/R4/profiling.html>).
+//! category, by a `patternCodeableConcept` such as LOINC `60591-5` in
+//! `composition-eu-eps` or by a binding to a value set of one concept such
+//! as LOINC `11502-2` in `Composition-eu-lab`, so a document says its
+//! category in the element its profile constrains
+//! (<https://hl7.org/fhir/R4/profiling.html>).
 //! [`ReceivedDocument::category`] reads that element against the categories
 //! this build receives, and [`Category::profiles`] names the `Bundle` and
 //! `Composition` profiles [`ReceivedDocument::check`] holds it to.
@@ -53,18 +55,24 @@ impl Category {
                 system: LOINC,
                 code: "60591-5",
             }),
+            // NOTE: HL7 Europe Laboratory Report 2.0.0, Composition-eu-lab binds Composition.type to
+            // lab-reportType-eu-lab, whose one concept is LOINC 11502-2.
+            #[cfg(feature = "laboratory")]
+            Self::Laboratory => Some(DocumentType {
+                system: LOINC,
+                code: "11502-2",
+            }),
             #[cfg_attr(
                 not(any(
                     feature = "prescription",
                     feature = "dispensation",
                     feature = "imaging",
-                    feature = "laboratory",
                     feature = "discharge",
                 )),
                 expect(
                     unreachable_patterns,
-                    reason = "a build with none of these features carries at most the patient summary, \
-                              which its own arm receives"
+                    reason = "a build with none of these features carries at most the patient summary \
+                              and the laboratory report, which their own arms receive"
                 )
             )]
             _ => None,
@@ -84,18 +92,22 @@ impl Category {
                 bundle: "http://hl7.eu/fhir/eps/StructureDefinition/bundle-eu-eps",
                 composition: "http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps",
             }),
+            #[cfg(feature = "laboratory")]
+            Self::Laboratory => Some(Profiles {
+                bundle: "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab",
+                composition: "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab",
+            }),
             #[cfg_attr(
                 not(any(
                     feature = "prescription",
                     feature = "dispensation",
                     feature = "imaging",
-                    feature = "laboratory",
                     feature = "discharge",
                 )),
                 expect(
                     unreachable_patterns,
-                    reason = "a build with none of these features carries at most the patient summary, \
-                              which its own arm receives"
+                    reason = "a build with none of these features carries at most the patient summary \
+                              and the laboratory report, which their own arms receive"
                 )
             )]
             _ => None,

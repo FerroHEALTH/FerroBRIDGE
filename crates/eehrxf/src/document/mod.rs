@@ -46,6 +46,7 @@ pub mod discharge;
 pub mod imaging;
 #[cfg(feature = "laboratory")]
 pub mod laboratory;
+mod mapped;
 
 /// The canonical URL of the HL7 Europe Patient Summary `Bundle` profile.
 #[cfg(feature = "patient-summary")]
@@ -342,8 +343,15 @@ pub enum DocumentError {
     /// or it holds none and one was.
     #[error("the document's form and its report disagree: the form {expected} one")]
     Report {
-        /// What the form expects: `requires` or `holds no`.
+        /// What the form expects: `requires`, `holds no` or `takes one`.
         expected: &'static str,
+    },
+    /// A mapping run whose report the document takes holds no
+    /// `DiagnosticReport` or more than one.
+    #[error("the mapping run holds {found} DiagnosticReport resources, not one")]
+    Unmapped {
+        /// How many the run holds.
+        found: usize,
     },
 }
 

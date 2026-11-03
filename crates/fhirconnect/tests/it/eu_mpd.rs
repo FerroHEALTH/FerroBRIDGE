@@ -37,11 +37,11 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
-use crate::support::FIXTURES;
+use crate::support::SHIPPED;
 use crate::support::render;
 
-/// The project directory this crate authored for the profiles.
-const PROJECT_DIR: &str = "projects/ferrobridge/eu_mpd";
+/// The shipped project directory FerroBRIDGE authored for the profiles.
+const PROJECT_DIR: &str = "mpd";
 
 /// The files of the project directory.
 const PROJECT: &[&str] = &[
@@ -113,7 +113,7 @@ fn program(context: &str) -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Er
     let index = medication_template()?;
     let files: Vec<String> = PROJECT
         .iter()
-        .map(|file| format!("{FIXTURES}/{PROJECT_DIR}/{file}"))
+        .map(|file| format!("{SHIPPED}/{PROJECT_DIR}/{file}"))
         .collect();
     let set = load_set(files, &StaticMappingCodes::default())
         .map_err(|diagnostics| render(&diagnostics))?;
