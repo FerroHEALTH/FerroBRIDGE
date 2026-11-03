@@ -28,7 +28,6 @@
 //! files ([`revisions`]), with the export of a revision as a ZIP and the
 //! import of one as an unapplied revision. No specification governs the operator surface: our own design.
 
-pub mod configuration;
 pub mod files;
 pub mod guard;
 pub mod reload;
@@ -60,13 +59,6 @@ use crate::problem::{Kind, refuse};
 
 /// The media type a mapping file is served with.
 const YAML: &str = "application/yaml";
-
-/// The operator API, resolved from `[operator]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OperatorSettings {
-    /// The writable directory console saves go to, when one is configured.
-    pub mapping_dir: Option<PathBuf>,
-}
 
 /// What the operator routes read and write.
 #[derive(Debug)]

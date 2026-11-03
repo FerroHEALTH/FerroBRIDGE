@@ -33,16 +33,15 @@ use crate::cdr::CdrClient;
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::EhrId;
 use crate::change_feed::Event;
-use crate::change_feed::ReaderName;
 use crate::change_feed::follow::Consumer;
 use crate::change_feed::follow::ConsumerError;
 use crate::change_feed::health::Following;
 use crate::config::CdmSettings;
-use crate::etl::deletions::DeletionPolicy;
+use crate::config::{DeletionPolicy, EtlSettings};
 use crate::etl::job::JobError;
 use crate::etl::mapper::{CdmVocabulary, OmoclMapper, read_roots};
 use crate::etl::report::RunReport;
-use crate::etl::{EtlSettings, MappingContext, Read, RunError, Step, Templates, Visited};
+use crate::etl::{MappingContext, Read, RunError, Step, Templates, Visited};
 
 /// The name the load reports to readiness and the logs under.
 pub const NAME: &str = "omop-incremental";
@@ -52,13 +51,6 @@ const COMPOSITION: &str = "COMPOSITION";
 
 /// The RM type name of an erased EHR in an erasure.
 const EHR: &str = "EHR";
-
-/// The incremental load, resolved from `[omop_incremental]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Settings {
-    /// The reader name the load follows the change feed under.
-    pub reader: ReaderName,
-}
 
 /// Why the load did not finish an event.
 #[derive(Debug, thiserror::Error)]

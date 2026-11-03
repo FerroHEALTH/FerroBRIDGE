@@ -6,8 +6,8 @@
 use std::collections::BTreeMap;
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::OperatorSettings;
 use ferrobridge_server::config::error::Error;
-use ferrobridge_server::operator::OperatorSettings;
 
 /// The smallest `[auth]` section that boots.
 const AUTH: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n";

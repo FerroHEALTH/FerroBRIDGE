@@ -76,8 +76,8 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
     assert!(face.log_outcomes);
     assert_eq!(
         vec![
-            ferrobridge_server::hl7v2::Sender::Namespace(String::from("NORTHLAB")),
-            ferrobridge_server::hl7v2::Sender::Universal {
+            ferrobridge_server::config::hl7v2::Sender::Namespace(String::from("NORTHLAB")),
+            ferrobridge_server::config::hl7v2::Sender::Universal {
                 id: String::from("1.2.3.4"),
                 kind: String::from("ISO"),
             },

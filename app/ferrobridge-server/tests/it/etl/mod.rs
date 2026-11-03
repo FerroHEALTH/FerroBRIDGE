@@ -17,11 +17,11 @@ mod run;
 mod sources;
 mod visit;
 
+use ferrobridge_server::aql::CheckedQuery;
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::etl::aql::CheckedQuery;
-use ferrobridge_server::etl::deletions::DeletionPolicy;
-use ferrobridge_server::etl::{EtlSettings, Mapper, SourceComposition, VisitSettings};
+use ferrobridge_server::config::{DeletionPolicy, EtlSettings, VisitSettings};
+use ferrobridge_server::etl::{Mapper, SourceComposition};
 use ferrobridge_testkit::containers::{self, Postgres};
 use ferrobridge_testkit::fixtures::{MINIMAL_EVALUATION_COMPOSITION, MINIMAL_EVALUATION_OPT};
 use omop_cdm::database::{self, CdmPool};

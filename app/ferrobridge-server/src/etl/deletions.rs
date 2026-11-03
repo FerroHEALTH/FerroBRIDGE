@@ -19,6 +19,7 @@
 use crate::cdr::CdrClient;
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::{EhrId, IdError};
+use crate::config::DeletionPolicy;
 use crate::etl::RunError;
 use crate::etl::report::RunReport;
 use futures_util::StreamExt;
@@ -33,16 +34,6 @@ use std::collections::BTreeSet;
 // NOTE: no specification governs this: our own design; a bound keeps a sweep over a
 // large CDM from opening one CDR call per composition at once.
 const CHECKS_IN_FLIGHT: usize = 8;
-
-/// What a run does with a composition the CDR reports deleted.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum DeletionPolicy {
-    /// Removes the composition's rows, links and watermark.
-    #[default]
-    Remove,
-    /// Lists the composition in the run report and keeps its rows.
-    Report,
-}
 
 /// What the CDR answers for the latest version of one composition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -208,7 +199,8 @@ pub(super) async fn sweep(
 
 #[cfg(test)]
 mod tests {
-    use super::{Action, DeletionPolicy, Presence, decide};
+    use super::{Action, Presence, decide};
+    use crate::config::DeletionPolicy;
 
     #[test]
     fn a_confirmed_deletion_removes_the_rows_under_the_remove_policy() {

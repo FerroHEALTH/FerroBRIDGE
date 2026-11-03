@@ -107,11 +107,7 @@ fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused_at_resolve()
         panic!("the refusal is a mapping-set refusal: {error}");
     };
     assert!(
-        matches!(
-            **source,
-            ferrobridge_server::mappings::Error::NoTemplateSource { ref directory }
-                if directory == std::path::Path::new("/srv/mappings")
-        ),
+        source.directory == std::path::Path::new("/srv/mappings"),
         "{source}"
     );
     assert_eq!("the mapping set could not be loaded", error.to_string());
@@ -119,6 +115,13 @@ fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused_at_resolve()
     assert!(
         rendered.contains("[mappings] templates") && rendered.contains("[cdr]"),
         "the refusal names both sources: {rendered}"
+    );
+    assert_eq!(
+        "the mapping set could not be loaded: [mappings] directory /srv/mappings is set with \
+         no [mappings] templates and no [cdr]: the FHIRconnect operations have no template to \
+         compile against",
+        format!("{error}: {source}"),
+        "the rendered refusal chain stands as config check prints it"
     );
     Ok(())
 }

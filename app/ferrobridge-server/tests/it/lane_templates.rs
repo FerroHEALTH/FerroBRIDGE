@@ -57,8 +57,8 @@ async fn serve_template(cdr: &MockServer) {
 }
 
 /// Returns the mapping-set refusal inside a boot refusal.
-fn refusal(error: &ferrobridge_server::config::error::Error) -> Option<&mappings::Error> {
-    let mut cause = std::error::Error::source(error);
+fn refusal<'e>(error: &'e (dyn std::error::Error + 'static)) -> Option<&'e mappings::Error> {
+    let mut cause = error.source();
     while let Some(current) = cause {
         if let Some(found) = current.downcast_ref::<mappings::Error>() {
             return Some(found);
@@ -215,15 +215,10 @@ async fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused()
         .resolve()
         .err()
         .ok_or("the operations lane has no template source")?;
-    assert!(
-        matches!(
-            refusal(&error),
-            Some(mappings::Error::NoTemplateSource { .. })
-        ),
-        "{error}: {:?}",
-        refusal(&error)
-    );
-    let rendered = refusal(&error).map(ToString::to_string).unwrap_or_default();
+    let ferrobridge_server::config::error::Error::Mappings { ref source } = error else {
+        panic!("the refusal is a mapping-set refusal: {error}");
+    };
+    let rendered = source.to_string();
     assert!(
         rendered.contains("[mappings] templates") && rendered.contains("[cdr]"),
         "the refusal names both sources: {rendered}"

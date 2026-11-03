@@ -261,15 +261,15 @@ fn search_limits(facade: &Facade) -> Result<crate::facade::search::Limits, Error
 }
 
 /// Returns the sender `sender` names under `key`.
-fn sender_of(key: &str, sender: &Hl7v2Sender) -> Result<crate::hl7v2::Sender, Error> {
+fn sender_of(key: &str, sender: &Hl7v2Sender) -> Result<super::hl7v2::Sender, Error> {
     let named = |text: &str| !text.is_empty();
     match (
         named(&sender.namespace_id),
         named(&sender.universal_id),
         named(&sender.universal_id_type),
     ) {
-        (true, false, false) => Ok(crate::hl7v2::Sender::Namespace(sender.namespace_id.clone())),
-        (false, true, true) => Ok(crate::hl7v2::Sender::Universal {
+        (true, false, false) => Ok(super::hl7v2::Sender::Namespace(sender.namespace_id.clone())),
+        (false, true, true) => Ok(super::hl7v2::Sender::Universal {
             id: sender.universal_id.clone(),
             kind: sender.universal_id_type.clone(),
         }),
@@ -537,8 +537,8 @@ pub(super) fn required(key: &str, value: Option<i32>) -> Result<i32, Error> {
 fn query_of(
     key: &str,
     text: &str,
-    check: fn(&str) -> Result<crate::etl::aql::CheckedQuery, crate::etl::aql::AqlError>,
-) -> Result<crate::etl::aql::CheckedQuery, Error> {
+    check: fn(&str) -> Result<crate::aql::CheckedQuery, crate::aql::AqlError>,
+) -> Result<crate::aql::CheckedQuery, Error> {
     if text.is_empty() {
         return Err(Error::Missing {
             key: key.to_owned(),
@@ -582,7 +582,7 @@ fn resolve_aliases(aliases: &BTreeMap<String, String>) -> Result<VocabularyAlias
 }
 
 /// Returns the ETL job `etl` describes, with both queries checked.
-pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
+pub(super) fn resolve_etl(etl: &Etl) -> Result<super::EtlSettings, Error> {
     // NOTE: no specification governs this: our own design; `etl fhir` reads no CDR, so
     // the composition query is optional here and `etl run` refuses a run without one.
     let compositions = if etl.aql.is_empty() {
@@ -591,7 +591,7 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
         Some(query_of(
             "etl.aql",
             &etl.aql,
-            crate::etl::aql::CheckedQuery::compositions,
+            crate::aql::CheckedQuery::compositions,
         )?)
     };
     let page_size =
@@ -603,11 +603,11 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
         .visits
         .as_ref()
         .map(|visits| {
-            Ok::<_, Error>(crate::etl::VisitSettings {
+            Ok::<_, Error>(super::VisitSettings {
                 query: query_of(
                     "etl.visits.aql",
                     &visits.aql,
-                    crate::etl::aql::CheckedQuery::visits,
+                    crate::aql::CheckedQuery::visits,
                 )?,
                 concepts: omop_cdm::writer::input::VisitConcepts {
                     visit_concept_id: required(
@@ -623,8 +623,8 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
         })
         .transpose()?;
     let deletions = match etl.deletions.as_str() {
-        "remove" => crate::etl::deletions::DeletionPolicy::Remove,
-        "report" => crate::etl::deletions::DeletionPolicy::Report,
+        "remove" => super::DeletionPolicy::Remove,
+        "report" => super::DeletionPolicy::Report,
         _ => {
             return Err(Error::Deletions {
                 key: String::from("etl.deletions"),
@@ -642,7 +642,7 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<crate::etl::EtlSettings, Error> {
             });
         }
     };
-    Ok(crate::etl::EtlSettings {
+    Ok(super::EtlSettings {
         compositions,
         page_size,
         type_concept_id: required("etl.type_concept_id", etl.type_concept_id)?,
@@ -676,14 +676,14 @@ pub(super) fn url_of(key: &str, value: &str) -> Result<url::Url, Error> {
 pub(super) fn resolve_operator(
     operator: &Operator,
     auth: &ferrohealth_smart::config::AuthSection,
-) -> Result<Option<crate::operator::OperatorSettings>, Error> {
+) -> Result<Option<super::OperatorSettings>, Error> {
     if operator.enabled && !auth.enabled {
         return Err(Error::Needs {
             key: String::from("operator.enabled"),
             needs: String::from("auth.enabled"),
         });
     }
-    Ok(operator.enabled.then(|| crate::operator::OperatorSettings {
+    Ok(operator.enabled.then(|| super::OperatorSettings {
         mapping_dir: operator.mapping_dir.clone(),
     }))
 }
