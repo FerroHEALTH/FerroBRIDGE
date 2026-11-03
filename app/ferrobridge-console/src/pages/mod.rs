@@ -22,6 +22,7 @@ pub mod events;
 pub mod facade;
 pub mod file;
 pub mod hl7v2;
+pub mod lane;
 pub mod mappings;
 pub mod omop;
 pub mod parts;

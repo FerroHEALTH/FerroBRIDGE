@@ -245,13 +245,7 @@ pub async fn connection_page(visit: &Visit) -> Drawn {
     if !UPSTREAMS.contains(&name.as_str()) || !TABS.iter().any(|(key, _)| *key == tab) {
         return crate::pages::errors::not_found(visit);
     }
-    let info = visit.reads.info().await;
-    let readiness = visit.reads.readiness().await;
-    let configuration = if tab == "settings" {
-        Some(visit.reads.configuration().await)
-    } else {
-        None
-    };
+    let (info, readiness, configuration) = crate::pages::lane::opening(visit, &tab).await;
     let l = &visit.locale;
     Drawn::shell(
         indicator_name(l, &name),

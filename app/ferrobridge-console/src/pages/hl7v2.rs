@@ -18,12 +18,9 @@ use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
-use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::state::{Mark, state};
-use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{Header, definitions, facts_row, panel_sections};
-use ferrohealth_ui::view::tabs::{Tab, TabRow};
+use ferrohealth_ui::view::surface::{definitions, facts_row, panel_sections};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
 use crate::app::{Drawn, HL7V2};
@@ -32,7 +29,8 @@ use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::facade::indicator;
-use crate::pages::parts::{faulted, quiet, refused, refused_operator, section};
+use crate::pages::lane::Lane;
+use crate::pages::parts::{faulted, quiet, refused_operator, section};
 use crate::pages::settings::rows;
 use crate::visit::Visit;
 use ferrohealth_health::document::Readiness;
@@ -44,27 +42,19 @@ const TABS: [(&str, Msg); 3] = [
     ("settings", Msg::TabSettings),
 ];
 
-/// The page of the tab `key`.
-fn tab_href(key: &str) -> String {
-    if key == "overview" {
-        String::from(HL7V2)
-    } else {
-        format!("{HL7V2}/{key}")
-    }
-}
+/// The page.
+const LANE: Lane = Lane {
+    path: HL7V2,
+    title: Msg::Hl7v2,
+    tabs: &TABS,
+    on: Msg::Hl7v2OnSubtitle,
+    off: Msg::Hl7v2OffSubtitle,
+};
 
 /// The HL7 v2 face, on the tab the route names.
 pub async fn page(visit: &Visit) -> Drawn {
-    let tab = visit.segment(1).unwrap_or("overview").to_owned();
-    if !TABS.iter().any(|(key, _)| *key == tab) {
+    let Some((tab, info, readiness, configuration)) = LANE.open(visit).await else {
         return crate::pages::errors::not_found(visit);
-    }
-    let info = visit.reads.info().await;
-    let readiness = visit.reads.readiness().await;
-    let configuration = if tab == "settings" {
-        Some(visit.reads.configuration().await)
-    } else {
-        None
     };
     let directory = if tab == "concept-maps" && lane_on(&info) {
         Some(visit.reads.concept_maps().await)
@@ -88,18 +78,6 @@ fn lane_on(info: &Loaded<Info>) -> bool {
     matches!(info, Ok(Outcome::Shown(info)) if info.lanes.iter().any(|lane| lane.name == "hl7v2" && lane.enabled))
 }
 
-/// The tab row with `tab` current.
-fn tabs(l: &Locale, tab: &str) -> TabRow {
-    TabRow {
-        label: tr(l, Msg::Hl7v2),
-        tabs: TABS
-            .iter()
-            .map(|(key, words)| Tab::new(*key, tab_href(key), tr(l, *words)))
-            .collect(),
-        current: tab.to_owned(),
-    }
-}
-
 /// The page over the lane, the listener's readiness and, on Settings, the
 /// running configuration, and on `ConceptMaps` the face's directory.
 fn drawn(
@@ -109,62 +87,40 @@ fn drawn(
     readiness: &Loaded<Readiness>,
     (configuration, directory): (Option<&Loaded<Configuration>>, Option<&Loaded<ConceptMaps>>),
 ) -> Html {
-    let info = match info {
-        Ok(Outcome::Shown(info)) => info,
-        Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
-        Err(fault) => return faulted(l, fault, &tab_href(tab)),
+    let info = match LANE.shown(l, info, tab) {
+        Ok(info) => info,
+        Err(page) => return page,
     };
     let lane = info
         .lanes
         .iter()
         .find(|lane| lane.name == "hl7v2" && lane.enabled);
-    let header = |on: bool| Header {
-        title: tr(l, Msg::Hl7v2).into(),
-        subtitle: Some(
-            tr(
-                l,
-                if on {
-                    Msg::Hl7v2OnSubtitle
-                } else {
-                    Msg::Hl7v2OffSubtitle
-                },
-            )
-            .into(),
-        ),
-        subtitle_view: None,
-        crumbs: Vec::new(),
-        mono: false,
-        badge: Some(if on {
-            state(Mark::Ok, tr(l, Msg::StateOn), None)
-        } else {
-            badge(Tone::Neutral, tr(l, Msg::StateOff))
-        }),
-    };
+    let header = |on: bool| LANE.header(l, on);
     if let Some(configuration) = configuration.filter(|_| tab == "settings") {
-        return framed(
+        return LANE.framed(
             l,
             tab,
             header(lane.is_some()),
-            crate::pages::settings::tab(l, configuration, &rows::HL7V2, &tab_href(tab)),
+            crate::pages::settings::tab(l, configuration, &rows::HL7V2, &LANE.href(tab)),
         );
     }
     let Some(lane) = lane else {
-        return framed(
+        return LANE.framed(
             l,
             tab,
             header(false),
             quiet(
                 tr(l, Msg::Hl7v2Off),
-                Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
+                Some((tr(l, Msg::SeeItsSettings), LANE.href("settings"))),
             ),
         );
     };
     if let Some(directory) = directory.filter(|_| tab == "concept-maps") {
-        return framed(
+        return LANE.framed(
             l,
             tab,
             header(true),
-            concept_maps(l, directory, &tab_href(tab)),
+            concept_maps(l, directory, &LANE.href(tab)),
         );
     }
     let listening = match readiness {
@@ -190,27 +146,13 @@ fn drawn(
             header: header(true),
             actions: ActionGroup::none(),
             stepper: None,
-            tabs: Some(tabs(l, tab)),
+            tabs: Some(LANE.tab_row(l, tab, |_, drawn| Some(drawn))),
             body: panel_sections(section(l, tr(l, Msg::Listener), None, facts).then(section(
                 l,
                 tr(l, Msg::Mapping),
                 None,
                 mapping,
             ))),
-        },
-    )
-}
-
-/// The detail page of the tab `tab` under `header` around `body`.
-fn framed(l: &Locale, tab: &str, header: Header, body: Html) -> Html {
-    detail_page(
-        l,
-        DetailPage {
-            header,
-            actions: ActionGroup::none(),
-            stepper: None,
-            tabs: Some(tabs(l, tab)),
-            body,
         },
     )
 }

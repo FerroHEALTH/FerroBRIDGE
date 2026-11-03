@@ -20,7 +20,6 @@ use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::{Header, definitions, panel_sections};
-use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
 use crate::app::{CONNECTIONS, Drawn, MAPPINGS, OMOP};
@@ -29,7 +28,8 @@ use crate::locale::tr;
 use crate::markup::{code, link, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::facade::{indicator, lane_on};
-use crate::pages::parts::{faulted, quiet, refused, section};
+use crate::pages::lane::Lane;
+use crate::pages::parts::{quiet, section};
 use crate::pages::settings::rows;
 use crate::visit::Visit;
 use ferrohealth_health::document::Readiness;
@@ -41,27 +41,19 @@ const TABS: [(&str, Msg); 3] = [
     ("settings", Msg::TabSettings),
 ];
 
-/// The page of the tab `key`.
-pub(crate) fn tab_href(key: &str) -> String {
-    if key == "overview" {
-        String::from(OMOP)
-    } else {
-        format!("{OMOP}/{key}")
-    }
-}
+/// The page; its header says whether the ETL is configured.
+pub(crate) const LANE: Lane = Lane {
+    path: OMOP,
+    title: Msg::OmopEtl,
+    tabs: &TABS,
+    on: Msg::OmopSubtitle,
+    off: Msg::OmopSubtitle,
+};
 
 /// The OMOP ETL, on the tab the route names.
 pub async fn page(visit: &Visit) -> Drawn {
-    let tab = visit.segment(1).unwrap_or("overview").to_owned();
-    if !TABS.iter().any(|(key, _)| *key == tab) {
+    let Some((tab, info, readiness, configuration)) = LANE.open(visit).await else {
         return crate::pages::errors::not_found(visit);
-    }
-    let info = visit.reads.info().await;
-    let readiness = visit.reads.readiness().await;
-    let configuration = if tab == "settings" {
-        Some(visit.reads.configuration().await)
-    } else {
-        None
     };
     let runs = match &info {
         Ok(Outcome::Shown(shown)) if tab == "runs" && lane_on(shown, "etl") => {
@@ -81,32 +73,6 @@ pub async fn page(visit: &Visit) -> Drawn {
     )
 }
 
-/// The detail page of the tab `tab` under `header` around `body`.
-fn framed(l: &Locale, tab: &str, header: Header, body: Html) -> Html {
-    detail_page(
-        l,
-        DetailPage {
-            header,
-            actions: ActionGroup::none(),
-            stepper: None,
-            tabs: Some(tabs(l, tab)),
-            body,
-        },
-    )
-}
-
-/// The tab row with `tab` current.
-fn tabs(l: &Locale, tab: &str) -> TabRow {
-    TabRow {
-        label: tr(l, Msg::OmopEtl),
-        tabs: TABS
-            .iter()
-            .map(|(key, words)| Tab::new(*key, tab_href(key), tr(l, *words)))
-            .collect(),
-        current: tab.to_owned(),
-    }
-}
-
 /// The page over the lane, the CDM database's readiness and, on Settings,
 /// the running configuration, and on Runs the runs the bridge keeps.
 fn drawn(
@@ -116,10 +82,9 @@ fn drawn(
     readiness: &Loaded<Readiness>,
     (configuration, runs): (Option<&Loaded<Configuration>>, Option<&Loaded<Runs>>),
 ) -> Html {
-    let info = match info {
-        Ok(Outcome::Shown(info)) => info,
-        Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
-        Err(fault) => return faulted(l, fault, &tab_href(tab)),
+    let info = match LANE.shown(l, info, tab) {
+        Ok(info) => info,
+        Err(page) => return page,
     };
     let on = lane_on(info, "etl");
     let header = Header {
@@ -141,24 +106,24 @@ fn drawn(
         )),
     };
     if let Some(configuration) = configuration.filter(|_| tab == "settings") {
-        return framed(
+        return LANE.framed(
             l,
             tab,
             header,
-            crate::pages::settings::tab(l, configuration, &rows::OMOP, &tab_href(tab)),
+            crate::pages::settings::tab(l, configuration, &rows::OMOP, &LANE.href(tab)),
         );
     }
     if let Some(runs) = runs.filter(|_| on && tab == "runs") {
-        return framed(l, tab, header, run::listing(l, runs));
+        return LANE.framed(l, tab, header, run::listing(l, runs));
     }
     if !on {
-        return framed(
+        return LANE.framed(
             l,
             tab,
             header,
             quiet(
                 tr(l, Msg::OmopOff),
-                Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
+                Some((tr(l, Msg::SeeItsSettings), LANE.href("settings"))),
             ),
         );
     }
@@ -185,7 +150,7 @@ fn drawn(
         (tr(l, Msg::HowItRuns), code("ferrobridge etl run")),
         (
             tr(l, Msg::RunReports),
-            link(tab_href("runs"), tr(l, Msg::RunReportsValue)),
+            link(LANE.href("runs"), tr(l, Msg::RunReportsValue)),
         ),
     ]);
     detail_page(
@@ -194,7 +159,7 @@ fn drawn(
             header,
             actions: ActionGroup::none(),
             stepper: None,
-            tabs: Some(tabs(l, tab)),
+            tabs: Some(LANE.tab_row(l, tab, |_, drawn| Some(drawn))),
             body: panel_sections(
                 section(l, tr(l, Msg::WhatARunDoes), None, flow).then(section(
                     l,
