@@ -39,7 +39,8 @@
 #
 # A path reaches a package in three ways. A path under a member's directory
 # reaches that member and every member whose Rust source names that
-# directory in a string literal (`"tools/fhir-codegen/vendor"`), because those
+# directory in a string literal (`"tools/fhir-codegen/vendor"`, or
+# `"../fhirconnect/tests"` one step from the reader's own), because those
 # read its files. A member reached so reaches its normal and build dependants,
 # transitively, and their dev-dependants. A path outside every
 # member reaches everything unless it is listed as inert below or mapped to
@@ -229,12 +230,20 @@ reads_in() {
   # repository at $1 that names a member directory, as `file<TAB>dir`:
   # tracked and untracked files alike, ignored files left out, so a file not
   # yet committed reads as it will once it is. The generated trees name none
-  # and are large, so they are left out too.
-  git -C "$1" grep --untracked -oE '"[^"]*(crates|tools|app)/[A-Za-z0-9_-]+' -- '*.rs' \
-    ':(exclude)crates/fhir-types/src' ':(exclude)crates/hl7v2-types/src' \
-    ':(exclude)crates/omop-cdm/src/generated' |
-    sed -E 's#^([^:]*):.*[^A-Za-z0-9_-]((crates|tools|app)/[A-Za-z0-9_-]+)$#\1'$'\t''\2#' |
-    sort -u || true
+  # and are large, so they are left out too. A literal that opens with one
+  # `../` step from a member directory (`"../fhirconnect/tests"`, or
+  # `"/../fhirconnect"` after `CARGO_MANIFEST_DIR`) names a sibling member
+  # under the same top directory, and resolves against the reading file's.
+  local excluded=(':(exclude)crates/fhir-types/src' ':(exclude)crates/hl7v2-types/src'
+    ':(exclude)crates/omop-cdm/src/generated')
+  {
+    git -C "$1" grep --untracked -oE '"[^"]*(crates|tools|app)/[A-Za-z0-9_-]+' -- '*.rs' \
+      "${excluded[@]}" |
+      sed -E 's#^([^:]*):.*[^A-Za-z0-9_-]((crates|tools|app)/[A-Za-z0-9_-]+)$#\1'$'\t''\2#'
+    git -C "$1" grep --untracked -oE '"/?\.\./[A-Za-z0-9_-]+' -- \
+      'crates/*.rs' 'tools/*.rs' 'app/*.rs' "${excluded[@]}" |
+      sed -nE 's#^((crates|tools|app)/[^:]*):"/?\.\./([A-Za-z0-9_-]+)$#\1'$'\t''\2/\3#p'
+  } | sort -u || true
 }
 
 graph() {
@@ -433,7 +442,10 @@ everything() {
 
 # The affected members of a list of changed paths (stdin), or the word ALL.
 affected_of() {
-  local graph="$1" local_mode="$2" path class seeds="" only="" members="" effect
+  local graph="$1" local_mode="$2" path class seeds="" only="" members="" effect paths
+  # The whole list is read first: an early answer of ALL would otherwise close
+  # the pipe on a long list and fail its writer with SIGPIPE under pipefail.
+  paths="$(cat)"
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     class="$(classify "$path")"
@@ -450,7 +462,7 @@ affected_of() {
       only\ *) only+=" ${class#only }" ;;
       member) members+="$path"$'\n' ;;
     esac
-  done
+  done <<<"$paths"
   if [ -n "$members" ]; then
     local owner
     while IFS= read -r owner; do
@@ -531,6 +543,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+fhirconnect +ferrobridge-server -fhir-types -fhir-codegen"
   lock_new="${lock_old/8.8.8/8.8.9}"
   check "a third-party move in the lock reaches everything" "Cargo.lock" false ALL
+  check "a long list that opens with a global path reaches everything" \
+    "$(printf 'scripts/vendor/fhir-packages.sh\n'; seq -f 'tools/fhir-codegen/vendor/p/%g.json' 1 20000)" \
+    false ALL
   check "the design record reaches the testkit's own tests" "docs/architecture.md" false \
     "+ferrobridge-testkit -fhirconnect -ferrobridge-server"
   check "a doc page is inert" "docs/ci-cd.md" false ""
@@ -653,15 +668,25 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   printf 'const B: &str = "../../crates/untracked";\n' > "$scratch/tools/reader/src/untracked.rs"
   printf 'const C: &str = "../../crates/ignored";\n' > "$scratch/tools/reader/src/ignored.rs"
   printf 'ignored.rs\n' > "$scratch/.gitignore"
+  # A relative literal names a sibling member under the reader's top directory.
+  printf 'const D: &str = "../sibling/tests/fixtures";\n' > "$scratch/tools/reader/src/relative.rs"
+  printf 'const E: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../joined");\n' \
+    > "$scratch/tools/reader/src/joined.rs"
+  printf 'const F: &str = "../../README.md";\n' > "$scratch/tools/reader/src/root.rs"
   git -C "$scratch" add .gitignore tools/reader/src/tracked.rs
   read_lines="$(reads_in "$scratch")"
   rm -rf "$scratch"
-  for want in tracked untracked; do
-    if ! grep -qx "tools/reader/src/$want.rs"$'\t'"crates/$want" <<<"$read_lines"; then
-      echo "self-test: the $want file's read is missing: '$read_lines'" >&2
+  for want in tracked:crates/tracked untracked:crates/untracked relative:tools/sibling \
+    joined:tools/joined; do
+    if ! grep -qx "tools/reader/src/${want%%:*}.rs"$'\t'"${want#*:}" <<<"$read_lines"; then
+      echo "self-test: the ${want%%:*} file's read is missing: '$read_lines'" >&2
       failures=$((failures + 1))
     fi
   done
+  if grep -q "root.rs" <<<"$read_lines"; then
+    echo "self-test: a read outside every member was taken for one: '$read_lines'" >&2
+    failures=$((failures + 1))
+  fi
   if grep -q "crates/ignored" <<<"$read_lines"; then
     echo "self-test: an ignored file was read: '$read_lines'" >&2
     failures=$((failures + 1))

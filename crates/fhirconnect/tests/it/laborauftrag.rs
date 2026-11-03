@@ -470,9 +470,8 @@ fn a_requester_of_another_type_is_refused() -> Result<(), Box<dyn Error>> {
 /// Compiling the chain as the library publishes it refuses exactly the rows
 /// the snapshot pins:
 ///
-/// - `service_request.v1.yml:19`: `context` below the INSTRUCTION, and line
-///   `34`: `provider` below the COMPOSITION, neither of which the reference
-///   model defines.
+/// - `service_request.v1.yml:34`: `provider` below the COMPOSITION, which the
+///   reference model does not define.
 /// - `request.v1.ServiceRequest.yml:41, 43, 45, 64, 66, 68`: `null_flavour`
 ///   below a `DV_DATE_TIME` and a `PARTY_PROXY`, which carry none.
 /// - `KDS_laborauftrag.yml:17`: the composition model names the archetype

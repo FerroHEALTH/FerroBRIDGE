@@ -28,6 +28,7 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
 use crate::support::FIXTURES;
+use crate::support::SHIPPED;
 use crate::support::render;
 
 /// The files this context loads, the context first, each under the
@@ -36,8 +37,13 @@ const FILES: &[&str] = &[
     "projects/ferrobridge/eu_test_result/ferrobridge_eu_test_result.context.yml",
     "projects/ferrobridge/eu_test_result/ferrobridge_laboratory_test_result.v1.Observation.yml",
     "projects/ferrobridge/eu_test_result/ferrobridge_eu_test_result.yml",
-    "projects/ferrobridge/eu_laboratory/ferrobridge_laboratory_test_analyte.v1.yml",
-    "projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory_analyte.yml",
+];
+
+/// The analyte model and extension the context loads from the shipped
+/// laboratory project.
+const SHIPPED_LABORATORY: &[&str] = &[
+    "ferrobridge_laboratory_test_analyte.v1.yml",
+    "ferrobridge_eu_laboratory_analyte.yml",
 ];
 
 /// The context this crate authored for the profile.
@@ -58,6 +64,11 @@ fn program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     let files: Vec<String> = FILES
         .iter()
         .map(|file| format!("{FIXTURES}/{file}"))
+        .chain(
+            SHIPPED_LABORATORY
+                .iter()
+                .map(|file| format!("{SHIPPED}/laboratory/{file}")),
+        )
         .collect();
     let set = load_set(files, &StaticMappingCodes::default())
         .map_err(|diagnostics| render(&diagnostics))?;

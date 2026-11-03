@@ -46,6 +46,10 @@ pub mod discharge;
 pub mod imaging;
 #[cfg(feature = "laboratory")]
 pub mod laboratory;
+mod mapped;
+
+/// The `id` a report that carries none is written under.
+const REPORT_ID: &str = "report";
 
 /// The canonical URL of the HL7 Europe Patient Summary `Bundle` profile.
 #[cfg(feature = "patient-summary")]
@@ -342,8 +346,22 @@ pub enum DocumentError {
     /// or it holds none and one was.
     #[error("the document's form and its report disagree: the form {expected} one")]
     Report {
-        /// What the form expects: `requires` or `holds no`.
+        /// What the form expects: `requires`, `holds no` or `takes one`.
         expected: &'static str,
+    },
+    /// A mapping run whose report the document takes holds no
+    /// `DiagnosticReport` or more than one.
+    #[error("the mapping run holds {found} DiagnosticReport resources, not one")]
+    Unmapped {
+        /// How many the run holds.
+        found: usize,
+    },
+    /// The report's `fullUrl` is an entry's already, which FHIR R4 `bdl-7`
+    /// forbids.
+    #[error("the report's fullUrl is an entry's already")]
+    Collision {
+        /// The `fullUrl` both would take.
+        full_url: String,
     },
 }
 
@@ -532,17 +550,36 @@ impl Document {
     /// category the report carries is written on the composition too
     /// (`dr-comp-category`).
     ///
+    /// The report takes the `fullUrl` `DiagnosticReport/{id}` under the
+    /// document's base, which no entry may hold (FHIR R4 `bdl-7`); a
+    /// resource [`Document::add`] adds later under it is renamed as a
+    /// repeated `Type/id` is.
+    ///
     /// # Errors
     ///
-    /// [`DocumentError::Report`] when the form holds no report.
+    /// [`DocumentError::Report`] when the form holds no report, and
+    /// [`DocumentError::Collision`] when an entry holds the report's
+    /// `fullUrl` already.
     pub fn with_report(&mut self, report: DiagnosticReport) -> Result<(), DocumentError> {
         if self.form.report.is_none() {
             return Err(DocumentError::Report {
                 expected: "holds no",
             });
         }
+        let full_url = self.report_url(&report);
+        if self.entries.iter().any(|(url, _)| *url == full_url) {
+            return Err(DocumentError::Collision { full_url });
+        }
         self.report = Some(report);
         Ok(())
+    }
+
+    /// Returns the `fullUrl` the document writes `report` under.
+    fn report_url(&self, report: &DiagnosticReport) -> String {
+        self.full_url(
+            "DiagnosticReport",
+            report.id.as_deref().unwrap_or(REPORT_ID),
+        )
     }
 
     /// Adds `resources`, the output of one mapping run that reference one
@@ -564,6 +601,9 @@ impl Document {
             objects.push(Json::to_json(resource).map_err(codec)?);
         }
         let mut taken: BTreeSet<String> = self.entries.iter().map(|(url, _)| url.clone()).collect();
+        if let Some(ref report) = self.report {
+            taken.insert(self.report_url(report));
+        }
         let mut renamed: Vec<(String, String)> = Vec::new();
         let mut keys = Vec::with_capacity(objects.len());
         for object in &mut objects {

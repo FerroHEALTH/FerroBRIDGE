@@ -32,6 +32,7 @@ mod navigation;
 mod no_script;
 mod playground;
 mod reflow;
+mod revisions;
 mod screenshots;
 mod shell;
 mod sign_in;

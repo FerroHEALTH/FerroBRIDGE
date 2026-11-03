@@ -30,6 +30,7 @@ use crate::config::settings::BridgeSettings;
 
 pub mod editing;
 pub mod operations;
+pub mod revisions;
 
 /// The FHIR JSON media type (FHIR R4 REST API, `http.html`, content types
 /// and encodings).

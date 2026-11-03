@@ -73,7 +73,7 @@ const PROJECT: &[&str] = &[
 /// The context this crate authored over the chain.
 const CONTEXT: &str = "ferrobridge_kds_diagnose.context";
 
-/// The published diagnosis extension the strict loader refuses.
+/// The published diagnosis extension of the chain.
 const KDS_PROBLEM_DIAGNOSE: &str = "projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml";
 
 /// Returns the absolute path of a file of the vendored library.
@@ -208,14 +208,25 @@ fn the_published_files_the_context_reaches_load_strictly() -> Result<(), Box<dyn
     Ok(())
 }
 
-/// `KDS_problem_diagnose.yml` line 100 writes `"extensionValue"#TODO` with no
-/// white space before the `#`, which YAML 1.2.2 §6.6 does not admit as a
-/// comment. Recorded on #101.
+/// `KDS_problem_diagnose.yml` line 100 separates its `#TODO` comment from the
+/// token with white space, as YAML 1.2.2 §6.6 requires of a comment, so the
+/// file loads beside the published files it names. Recorded on #101.
 #[test]
-fn the_published_kds_problem_diagnose_is_refused_at_its_line_100() -> Result<(), Box<dyn Error>> {
-    assert_eq!(
-        refusals(&[published(KDS_PROBLEM_DIAGNOSE)])?,
-        vec!["KDS_problem_diagnose.yml:100 error yaml-syntax"]
+fn the_published_kds_problem_diagnose_loads_beside_the_files_it_names() -> Result<(), Box<dyn Error>>
+{
+    let files: Vec<String> = PUBLISHED
+        .iter()
+        .map(|file| published(file))
+        .chain([
+            project("ferrobridge_lebensphase.v0.yml"),
+            published(KDS_PROBLEM_DIAGNOSE),
+        ])
+        .collect();
+    let set = load_set(files, &StaticMappingCodes::default()).map_err(|d| render(&d))?;
+    assert!(
+        set.model(&MappingName::new("KDS_problem_diagnose")?)
+            .is_some(),
+        "KDS_problem_diagnose loaded"
     );
     Ok(())
 }
@@ -263,9 +274,8 @@ fn the_published_kds_composition_extends_a_name_no_model_carries() -> Result<(),
     Ok(())
 }
 
-/// Compiling the chain as the library publishes it, with only the comment of
-/// `KDS_problem_diagnose.yml` line 100 separated from its token, refuses
-/// exactly the rows below. The published context itself cannot be used,
+/// Compiling the chain as the library publishes it refuses exactly the rows
+/// below. The published context itself cannot be used,
 /// because its composition extension does not load, so the project context
 /// lists the four published extensions and this crate's composition
 /// extension in its place.
@@ -278,9 +288,11 @@ fn the_published_kds_composition_extends_a_name_no_model_carries() -> Result<(),
 /// - `anatomical_location.v1.yml:33`: `Condition.coding` (#173).
 /// - `multiple_coding_icd10gm.v1.yml:30, 56, 95`: `value` read on a `Coding`
 ///   (#101).
-/// - `problem_diagnosis.v1.yml:60, 71`: `$archetype/diagnose/...` (#101).
-/// - `problem_diagnosis.v1.yml:103`: `data[at0012]`, which `KDS_Diagnose`
-///   does not carry and the archetype's data structure is not.
+/// - `problem_diagnosis.v1.yml:71, 73`: `other_participations` names
+///   `function` and `performer` below the EVALUATION, which the engine cannot
+///   carry as one value.
+/// - `problem_diagnosis.v1.yml:103` (a warning): `data[at0001]/items[at0012]`,
+///   which `KDS_Diagnose` excludes.
 /// - `report.v1.Condition.yml:92, 94, 96`: `null_flavour` below the
 ///   `DV_DATE_TIME` of `context/start_time`, in the second of two methods
 ///   named `contextStartTimeEmpty`, which no overwrite can reach (#101).
@@ -289,11 +301,6 @@ fn the_published_kds_composition_extends_a_name_no_model_carries() -> Result<(),
 #[test]
 fn the_kds_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
-    let original = std::fs::read_to_string(published(KDS_PROBLEM_DIAGNOSE))?;
-    let separated = original.replacen("\"extensionValue\"#TODO", "\"extensionValue\" #TODO", 1);
-    assert_ne!(original, separated, "the line 100 comment is where it was");
-    let diagnose = directory.path().join("KDS_problem_diagnose.yml");
-    std::fs::write(&diagnose, separated)?;
     let context = std::fs::read_to_string(project("ferrobridge_kds_diagnose.context.yml"))?
         .replace(
             "    - \"ferrobridge_kds_problem_diagnose\"\n",
@@ -315,7 +322,7 @@ fn the_kds_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Error>>
         .chain([
             project("ferrobridge_lebensphase.v0.yml"),
             project("ferrobridge_kds_composition.Condition.yml"),
-            diagnose.to_string_lossy().into_owned(),
+            published(KDS_PROBLEM_DIAGNOSE),
             context_file.to_string_lossy().into_owned(),
         ])
         .collect();

@@ -28,6 +28,8 @@ pub const ROUTES: &[&str] = &[
     "/mappings/files/*path",
     "/mappings/templates/:id",
     "/mappings/edit/*path",
+    "/mappings/revisions/:id",
+    "/mappings/revisions/:id",
     "/playground",
     "/playground/:tab",
     "/facade",
@@ -66,6 +68,8 @@ pub enum Page {
     NewFile,
     /// `/mappings/edit/*path`.
     Editor,
+    /// `/mappings/revisions/:id`.
+    Revision,
     /// `/playground` and its tabs.
     Playground,
     /// `/facade` and its tabs.
@@ -104,6 +108,7 @@ impl Page {
             ["mappings", "files", _, ..] => Self::File,
             ["mappings", "templates", _] => Self::Template,
             ["mappings", "edit", _, ..] => Self::Editor,
+            ["mappings", "revisions", _] => Self::Revision,
             ["mappings"] | ["mappings", _] => Self::Mappings,
             ["playground"] | ["playground", _] => Self::Playground,
             ["facade"] | ["facade", _] => Self::Facade,
@@ -152,6 +157,7 @@ pub async fn draw(visit: &Visit) -> Drawn {
         Page::File => pages::file::page(visit).await,
         Page::Template => pages::template::page(visit).await,
         Page::NewFile | Page::Editor => pages::editor::page(visit, None).await,
+        Page::Revision => pages::mappings::revisions::page(visit, None).await,
         Page::Playground => pages::playground::page(visit, None).await,
         Page::Facade => pages::facade::page(visit).await,
         Page::Hl7v2 => pages::hl7v2::page(visit).await,
@@ -175,6 +181,7 @@ pub async fn posted(visit: &Visit, body: &str) -> Option<Response> {
     match Page::of(&visit.path)? {
         Page::Mappings => Some(pages::mappings::reload(visit).await),
         Page::NewFile | Page::Editor => Some(pages::editor::posted(visit, body).await),
+        Page::Revision => Some(pages::mappings::revisions::posted(visit, body).await),
         Page::Playground => Some(pages::playground::posted(visit, body).await),
         Page::Events => Some(pages::events::posted(visit, body).await),
         _ => None,
@@ -209,6 +216,7 @@ mod tests {
             ("/mappings/templates/d", Page::Template),
             ("/mappings/new", Page::NewFile),
             ("/mappings/edit/e/f.yml", Page::Editor),
+            ("/mappings/revisions/d", Page::Revision),
             ("/playground/a", Page::Playground),
             ("/facade/a", Page::Facade),
             ("/hl7v2/a", Page::Hl7v2),

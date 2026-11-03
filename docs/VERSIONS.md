@@ -42,9 +42,9 @@ fails when it names a different commit, tag or pin-set digest.
 | Item | Pin | Repeated in |
 |---|---|---|
 | FHIRconnect specification source | `SevKohler/FHIRconnect-spec` commit `5046a6dd9ee34f5a1de152301778f302c55e3b7b` (carries the REST API chapter, pull request #93, the sub-contexts, pull request #100, and `openehr` moved inside `properties` in the source `split` definition, pull request #106) | `docs/architecture.md` §2 and §4.7, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/PROVENANCE.md`, `crates/fhirconnect/tests/fixtures/rest-api/PROVENANCE.md` |
-| FHIRconnect mapping library (corpus, never an oracle) | `SevKohler/FHIRconnect-mapping-lib` commit `6bd4c19a2f96821c04fbeed3c6f6c190fd85825b` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect-mapping-lib.sh`, `docs/specs/fhirconnect-mapping-lib/PROVENANCE.md` |
+| FHIRconnect mapping library (corpus, never an oracle) | `SevKohler/FHIRconnect-mapping-lib` commit `2ba7cf5dc9c37d135e06571ae0a8e58b702b3471` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect-mapping-lib.sh`, `docs/specs/fhirconnect-mapping-lib/PROVENANCE.md` |
 | OMOCL corpus | `SevKohler/OMOCL` commit `cfb26bad3ad035f975736299b53a494696b2e604` (grammar `OMOCL/v1.0.0`; the git tag `v1.0.0` carries pre-grammar files) | `docs/architecture.md` §2, `scripts/vendor/omocl.sh`, `docs/specs/omocl/PROVENANCE.md` |
-| OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.4.3` | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
+| OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.5.0` (the v5.4 definitions and DDL only: the tag carries the v5.4 CSV corrections made after `v5.4.3`, and the CDM stays on v5.4 while OMOCL declares 5.4) | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
 | OHDSI Data Quality Dashboard | `OHDSI/DataQualityDashboard` tag `v2.9.0` | `docs/architecture.md` §2 and §11, `scripts/vendor/dqd.sh`, `docs/specs/dqd/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of the `dqd` module it emits, the `DQD_TAG` constant of `omop-cdm` |
 | OHDSI Athena vocabulary download | `OHDSI/Athena` commit `2aab8cac738d407211d9f5582827262899dc7603` (the application that writes the download; read from code, never a specification) | `docs/architecture.md` §5.3, `scripts/vendor/athena.sh`, `docs/specs/athena/PROVENANCE.md` |
 | openEHR ITS-REST OpenAPI | `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, modules Overview, System, EHR, Query, Definition (`STABLE`) and Demographic (`DEVELOPMENT`), and the Simplified Formats and Simplified Data Template sources | `docs/architecture.md` §2, `scripts/vendor/its-rest.sh`, `docs/specs/its-rest/PROVENANCE.md` |
@@ -217,7 +217,7 @@ of every `PROVENANCE.md` below back against its row.
 | `hl7.fhir.r4b.core` | 4.3.0 | `tools/fhir-codegen/vendor/hl7.fhir.r4b.core/PROVENANCE.md` |
 | `hl7.fhir.r5.core` | 5.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.r5.core/PROVENANCE.md` |
 | `hl7.fhir.r6.core` | 6.0.0-ballot5 | `tools/fhir-codegen/vendor/hl7.fhir.r6.core/PROVENANCE.md` |
-| `hl7.terminology` (THO) | 7.3.0 | `tools/fhir-codegen/vendor/hl7.terminology/PROVENANCE.md` |
+| `hl7.terminology` (THO) | 7.5.0 | `tools/fhir-codegen/vendor/hl7.terminology/PROVENANCE.md` |
 | `hl7.fhir.uv.v2mappings` (the v2-to-FHIR IG) | 1.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md` (FHIR 4.0.1; the package declares CC0-1.0, its source repository `HL7/v2-to-fhir` Apache-2.0) |
 
 ## FHIR examples packages (the conformance corpora, build time, never committed)

@@ -33,7 +33,9 @@ use crate::operator::reload::Draft;
 use crate::operator::reload::Prepared;
 use crate::operator::reload::ReloadError;
 use crate::operator::reload::Reloader;
+use crate::operator::revisions::{BRIDGE, Entry};
 use crate::problem::{Kind, refuse};
+use ferrobridge_operator_api::revisions::Origin;
 
 /// The header a save names its reason in.
 pub const REASON: &str = "ferrobridge-reason";
@@ -44,7 +46,7 @@ const MAX_REASON: usize = 200;
 /// The directory under `mapping_dir` a checked draft is staged in.
 ///
 /// The `..` prefix keeps it out of every mapping walk.
-const DRAFTS: &str = "..drafts";
+pub(crate) const DRAFTS: &str = "..drafts";
 
 /// The query of a draft check: the wire path the draft stands for.
 #[derive(Debug, serde::Deserialize)]
@@ -130,7 +132,8 @@ pub async fn save(
     let new_digest = files::sha256(&body);
     let saved = blocking(Arc::clone(&operator), {
         let wire = wire.clone();
-        move |operator| operator.save_blocking(&wire, &target, &body, &precondition)
+        let change = (subject.clone(), reason.clone());
+        move |operator| operator.save_blocking(&wire, &target, &body, &precondition, &change)
     })
     .await;
     let (status, old_digest, response) = match saved {
@@ -174,9 +177,13 @@ pub async fn save(
 /// `POST /operator/reload`: compiles the files on disk and swaps them in.
 pub async fn reload(State(operator): State<Arc<Operator>>, access: Access) -> Response {
     let reloaded = blocking(Arc::clone(&operator), |operator| {
-        Ok(operator
+        let reloaded = operator
             .prepare(None)
-            .map(|prepared| operator.apply(prepared)))
+            .map(|prepared| operator.apply(prepared));
+        if reloaded.is_ok() {
+            operator.settle(on_disk()).map_err(Failure::Store)?;
+        }
+        Ok(reloaded)
     })
     .await;
     let response = match reloaded {
@@ -304,6 +311,18 @@ pub enum Failure {
     /// The blocking task did not finish.
     #[error("the operator task did not finish")]
     Task(#[source] tokio::task::JoinError),
+    /// No `[operator] mapping_dir` is configured.
+    #[error("no [operator] mapping_dir is configured")]
+    Unconfigured,
+    /// No revision has the id.
+    #[error("no revision has this id")]
+    UnknownRevision,
+    /// A revision or an archive names a path that is no console mapping file.
+    #[error("an entry names no console mapping file")]
+    BadEntry,
+    /// The revision store could not be read or written.
+    #[error("the revision store could not be read or written")]
+    Store(#[source] crate::operator::revisions::StoreError),
 }
 
 impl IntoResponse for Failure {
@@ -311,17 +330,20 @@ impl IntoResponse for Failure {
         match self {
             Self::PreconditionRequired => refuse(
                 Kind::PreconditionRequired,
-                "send If-Match with the file's ETag, or If-None-Match: * for a new file",
+                "send If-Match with the ETag of what the request replaces, or If-None-Match: * for a new file",
             ),
             Self::PreconditionFailed { .. } => refuse(
                 Kind::PreconditionFailed,
-                "the file changed since the ETag the save names",
+                "what the request replaces changed since the ETag it names",
             ),
             Self::Provisioned => refuse(
                 Kind::Provisioned,
                 "a provisioned file holds this path, and the console never writes one",
             ),
-            Self::Write(_) | Self::Read(_) | Self::Task(_) => {
+            Self::Unconfigured => unconfigured(),
+            Self::UnknownRevision => refuse(Kind::NotFound, "no revision has this id"),
+            Self::BadEntry => bad_path(),
+            Self::Write(_) | Self::Read(_) | Self::Task(_) | Self::Store(_) => {
                 tracing::error!(
                     error = crate::facade::outcome::chain(&self),
                     "an operator save could not reach the file system"
@@ -343,6 +365,20 @@ impl Operator {
     /// Returns what [`Reloader::prepare`] returns, and [`ReloadError::Read`]
     /// when a directory cannot be listed.
     pub fn prepare(&self, draft: Option<&Draft>) -> Result<Prepared, ReloadError> {
+        self.prepare_over(&self.roots, draft)
+    }
+
+    /// Checks and compiles the set the files under `roots` make, `draft`
+    /// standing in for one file.
+    ///
+    /// # Errors
+    ///
+    /// Returns what [`Operator::prepare`] returns.
+    pub fn prepare_over(
+        &self,
+        roots: &[files::Root],
+        draft: Option<&Draft>,
+    ) -> Result<Prepared, ReloadError> {
         let reloader = self
             .reloader
             .as_ref()
@@ -350,7 +386,7 @@ impl Operator {
                 path: PathBuf::new(),
                 source: std::io::Error::other("the operator API has no reload configured"),
             }))?;
-        let sources = Reloader::sources(&self.roots, draft)?;
+        let sources = Reloader::sources(roots, draft)?;
         tokio::runtime::Handle::current().block_on(reloader.prepare(&sources))
     }
 
@@ -374,10 +410,12 @@ impl Operator {
         target: &Path,
         body: &[u8],
         precondition: &Precondition,
+        (author, reason): &(String, String),
     ) -> Result<Saved, Failure> {
         if files::resolve(&self.provisioned_roots(), wire).is_ok() {
             return Err(Failure::Provisioned);
         }
+        self.settle(on_disk()).map_err(Failure::Store)?;
         let old = match std::fs::read(target) {
             Ok(bytes) => Some(files::sha256(&bytes)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -415,12 +453,32 @@ impl Operator {
         })?;
         sync_directory(target).map_err(Failure::Write)?;
         match self.prepare(None) {
-            Ok(prepared) => Ok(Saved::Done {
-                old,
-                report: self.apply(prepared),
-            }),
+            Ok(prepared) => {
+                let report = self.apply(prepared);
+                self.settle(Entry {
+                    origin: Origin::Save,
+                    author: author.clone(),
+                    reason: reason.clone(),
+                    applied: true,
+                    source: None,
+                })
+                .map_err(Failure::Store)?;
+                Ok(Saved::Done { old, report })
+            }
             Err(error) => Ok(Saved::Unreloaded { old, error }),
         }
+    }
+}
+
+/// Returns the entry of a revision the bridge records for console files it
+/// finds changed on disk.
+pub(crate) fn on_disk() -> Entry {
+    Entry {
+        origin: Origin::Reload,
+        author: String::from(BRIDGE),
+        reason: String::from("the console files changed on disk"),
+        applied: true,
+        source: None,
     }
 }
 
@@ -435,7 +493,7 @@ fn staging_path(target: &Path) -> PathBuf {
 }
 
 /// Writes `bytes` to `path`, creating its directories, and syncs the file.
-fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -445,7 +503,7 @@ fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 /// Syncs the directory holding `path`, so a rename into it survives a crash.
-fn sync_directory(path: &Path) -> std::io::Result<()> {
+pub(crate) fn sync_directory(path: &Path) -> std::io::Result<()> {
     match path.parent() {
         Some(parent) => std::fs::File::open(parent)?.sync_all(),
         None => Ok(()),
@@ -465,7 +523,7 @@ fn remove_quietly(path: &Path) {
 }
 
 /// Returns the reason `headers` name, or `None` for a missing or unusable one.
-fn reason(headers: &HeaderMap) -> Option<String> {
+pub(crate) fn reason(headers: &HeaderMap) -> Option<String> {
     let reason = headers
         .get(REASON)
         .and_then(|value| value.to_str().ok())
@@ -482,7 +540,7 @@ fn reason(headers: &HeaderMap) -> Option<String> {
 
 /// Runs `work` on a blocking thread, where the load path reads the file
 /// system.
-async fn blocking<T, F>(operator: Arc<Operator>, work: F) -> Result<T, Failure>
+pub(crate) async fn blocking<T, F>(operator: Arc<Operator>, work: F) -> Result<T, Failure>
 where
     F: FnOnce(&Operator) -> Result<T, Failure> + Send + 'static,
     T: Send + 'static,
@@ -511,7 +569,7 @@ fn bad_path() -> Response {
 }
 
 /// Returns the `503` of a reload an upstream or the file system stopped.
-fn unavailable(error: &ReloadError) -> Response {
+pub(crate) fn unavailable(error: &ReloadError) -> Response {
     tracing::error!(
         error = crate::facade::outcome::chain(error),
         "the mapping set could not be reloaded"

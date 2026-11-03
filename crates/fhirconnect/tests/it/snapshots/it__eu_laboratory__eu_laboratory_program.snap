@@ -13,8 +13,6 @@ program ferrobridge_eu_laboratory.context
     extension ferrobridge_eu_laboratory_specimen
   model CLUSTER.laboratory_test_analyte.v1 version 0.0.1-alpha archetype openEHR-EHR-CLUSTER.laboratory_test_analyte.v1 revision 1.1.8
     extension ferrobridge_eu_laboratory_analyte
-  model COMPOSITION.report_result.v1.DiagnosticReport version 0.0.1-alpha archetype openEHR-EHR-COMPOSITION.report-result.v1 revision 1.0.6
-    extension ferrobridge_eu_composition.DiagnosticReport
   mapping eventParent from OBSERVATION.laboratory_test_result.v1
     fhir $resource -> DiagnosticReport complex writable
     openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002] EVENT occurrences [laborbericht/laborbefund/any_event]
@@ -213,38 +211,6 @@ program ferrobridge_eu_laboratory.context
                 manual laboratory
                   fhir $resource.category.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/observation-category
                   fhir $resource.category.coding.code -> Coding.code primitive writable = laboratory
-  mapping compositionMapping from ferrobridge_eu_laboratory_result
-    fhir $resource -> DiagnosticReport complex writable
-    openehr / ->  COMPOSITION
-    slotArchetype COMPOSITION.report_result.v1.DiagnosticReport
-      mapping healthCareFacility from ferrobridge_eu_composition.DiagnosticReport
-        fhir $resource -> DiagnosticReport complex writable
-        openehr / ->  COMPOSITION
-        type NONE
-      mapping participations from ferrobridge_eu_composition.DiagnosticReport
-        fhir $resource -> DiagnosticReport complex writable
-        openehr / ->  COMPOSITION
-        type NONE
-      mapping composer from ferrobridge_eu_composition.DiagnosticReport
-        fhir $resource -> DiagnosticReport complex writable
-        openehr / ->  COMPOSITION
-        type NONE
-      mapping composerEmpty from ferrobridge_eu_composition.DiagnosticReport
-        fhir $resource -> DiagnosticReport complex writable
-        openehr / ->  COMPOSITION
-        type NONE
-      mapping performer from ferrobridge_eu_composition.DiagnosticReport
-        fhir $resource -> DiagnosticReport complex writable
-        openehr / ->  COMPOSITION
-        type NONE
-      mapping context from ferrobridge_eu_composition.DiagnosticReport
-        fhir $resource -> DiagnosticReport complex writable
-        openehr / ->  COMPOSITION
-        type NONE
-      mapping contextStartTimeEmpty from ferrobridge_eu_composition.DiagnosticReport
-        fhir $resource -> DiagnosticReport complex writable
-        openehr /context -> /context EVENT_CONTEXT
-        type NONE
   mapping metaURL from ferrobridge_eu_laboratory_result
     fhir $resource.meta -> DiagnosticReport.meta complex writable
     unidirectional openehr->fhir

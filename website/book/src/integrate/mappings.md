@@ -116,6 +116,20 @@ follows those defaults and records every defaulted value in the composition's
 `FEEDER_AUDIT`, so a later reader can tell which values came from the source
 and which came from a default.
 
+## Repeated values into a single-valued node
+
+FHIRconnect governs a repeating element written into an element that holds
+one value: "if we transform from a `0..n` to a `0..1` field, only the last
+entry of `0..n` is mapped" (FHIRconnect 1.0.0, Recurrence, Transforming a
+list). FerroBRIDGE keeps the last occurrence, in both directions, and
+declares the earlier ones lost. The run's `OperationOutcome` carries a
+`warning` naming the node and how many occurrences the write dropped, for
+example `/context/other_context[at0001]/items[at0002,'ID']/value holds one
+value, so the write dropped 1 earlier occurrences`, with the FHIR element
+as its `expression`. A received document is still kept whole in the
+composition's `FEEDER_AUDIT.original_content`, so the dropped values stay
+in the record.
+
 ## Code translation
 
 FHIRconnect's `conceptmap` and OMOCL's `conceptMap` both translate codes, and
