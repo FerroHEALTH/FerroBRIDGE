@@ -16,6 +16,7 @@ use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::archetype::ArchetypeId;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::loader::MappingDocument;
+use openehr_mapping_core::loader::in_path_order;
 use openehr_mapping_core::registry::MappingRegistry;
 
 use crate::model::ast::MappingFile;
@@ -146,11 +147,7 @@ where
     I: IntoIterator<Item = P>,
     P: AsRef<Path>,
 {
-    let mut paths: Vec<PathBuf> = files
-        .into_iter()
-        .map(|file| file.as_ref().to_path_buf())
-        .collect();
-    paths.sort_unstable();
+    let paths = in_path_order(files);
 
     let mut set = MappingSet::new();
     let mut diagnostics = Vec::new();

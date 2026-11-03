@@ -22,12 +22,11 @@ use std::sync::LazyLock;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingType;
 use openehr_mapping_core::loader::MappingDocument;
-use openehr_mapping_core::schema::locate;
-use openehr_mapping_core::schema::to_json;
+use openehr_mapping_core::schema;
+use openehr_mapping_core::schema::SchemaError;
 use openehr_mapping_core::value::PositionedValue;
 
 use crate::model::error::ModelCode;
-use crate::model::error::SchemaError;
 use crate::model::error::SchemaKind;
 
 /// One compiled pair of FHIRconnect mapping schemas.
@@ -57,8 +56,8 @@ impl Schemas {
     /// [`SchemaError::Compile`] when either is not a usable draft-07 schema.
     pub fn compile(model: &str, context: &str) -> Result<Self, SchemaError> {
         Ok(Self {
-            model: compile_one(model, SchemaKind::Model)?,
-            context: compile_one(context, SchemaKind::Context)?,
+            model: schema::compile(model, SchemaKind::Model.file_name())?,
+            context: schema::compile(context, SchemaKind::Context.file_name())?,
         })
     }
 
@@ -99,51 +98,14 @@ impl Schemas {
         kind: SchemaKind,
         document: &PositionedValue,
     ) -> Vec<Diagnostic> {
-        let file = file.to_path_buf();
-        let instance = match to_json(document) {
-            Ok(instance) => instance,
-            Err(position) => {
-                return vec![
-                    Diagnostic::error(
-                        file,
-                        ModelCode::SchemaViolation.into(),
-                        "the document holds a number JSON cannot represent, so it cannot be \
-                         validated against a JSON Schema",
-                    )
-                    .with_position(position),
-                ];
-            }
-        };
-        self.validator(kind)
-            .iter_errors(&instance)
-            .map(|error| {
-                let pointer = error.instance_path().to_string();
-                let (path, position) = locate(document, &pointer);
-                Diagnostic::error(
-                    file.clone(),
-                    ModelCode::SchemaViolation.into(),
-                    format!("{kind}: {error}"),
-                )
-                .with_position(position)
-                .with_model_path(path)
-            })
-            .collect()
+        schema::validate(
+            self.validator(kind),
+            file,
+            document,
+            &ModelCode::SchemaViolation.into(),
+            kind.file_name(),
+        )
     }
-}
-
-/// Compiles one schema document as draft-07.
-fn compile_one(source: &str, kind: SchemaKind) -> Result<jsonschema::Validator, SchemaError> {
-    let document: serde_json::Value =
-        serde_json::from_str(source).map_err(|source| SchemaError::Json {
-            schema: kind,
-            source,
-        })?;
-    jsonschema::draft7::options()
-        .build(&document)
-        .map_err(|source| SchemaError::Compile {
-            schema: kind,
-            source: Box::new(source),
-        })
 }
 
 /// The two schemas FHIRconnect publishes.
@@ -154,8 +116,8 @@ fn compile_one(source: &str, kind: SchemaKind) -> Result<jsonschema::Validator, 
 /// (`.claude/rules/vendored-inputs.md` forbids a second) and lets the corpus
 /// test validate against the exact published bytes.
 pub mod published {
-    use crate::model::error::SchemaError;
     use crate::model::schema::Schemas;
+    use openehr_mapping_core::schema::SchemaError;
 
     /// Compiles the published model and context schemas from their JSON text.
     ///
@@ -179,8 +141,8 @@ pub mod published {
 pub mod strict {
     use std::sync::LazyLock;
 
-    use crate::model::error::SchemaError;
     use crate::model::schema::Schemas;
+    use openehr_mapping_core::schema::SchemaError;
 
     /// The strict model and extension mapping schema, as JSON text.
     pub const MODEL_SCHEMA: &str = include_str!("../../schemas/model-mapping.schema.json");
