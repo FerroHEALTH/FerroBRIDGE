@@ -56,7 +56,10 @@ committed composition to a FHIR R4 `collection` Bundle: the request or the
 dispense, the product it references, and one `Provenance` covering them.
 The mapped request reads as the `Prescription` record and the mapped
 dispense as the `Dispense` record, and both conform to the vendored MPD
-profiles.
+profiles. The suite also writes each `collection` Bundle the mapping answers
+for HL7's FHIR Validator, which the CI `fhir-validator` job runs over them
+against `hl7.fhir.eu.mpd` 1.0.0 and the remaining-dispensations extension
+([The profile checks](interoperability-component.md#the-profile-checks)).
 
 ## Receiving a dispensation
 
