@@ -20,6 +20,7 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use eehrxf::mapping::Mapping;
+use eehrxf::mapping::identified;
 use eehrxf::mappings::MPD;
 use eehrxf::medication::Medicinal;
 use eehrxf::medication::dispensation::Dispense;
@@ -51,6 +52,10 @@ const REQUEST: &str = "ferrobridge_eu_mpd_request.context";
 
 /// The dispense context of FerroBRIDGE's MPD project.
 const DISPENSE: &str = "ferrobridge_eu_mpd_dispense.context";
+
+/// The base the written collections name their entries under, in the
+/// `example.org` domain RFC 6761 §6.5 reserves.
+const BASE: &str = "https://ehr.example.org/fhir";
 
 /// The remaining-dispensations extension of `eehrxf`.
 const REMAINING: &str = "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations";
@@ -247,7 +252,15 @@ fn emit_mapped(
         ..Reference::default()
     });
     let answer = mapping.to_fhir_with(&committed, &settings(), context)?;
-    emit(name, &serde_json::to_string(answer.bundle())?)
+    let collection = identified(answer.bundle(), BASE)?;
+    assert!(
+        collection
+            .entry
+            .iter()
+            .all(|entry| entry.full_url.is_some()),
+        "R4 Bundle.entry.fullUrl: every entry of an exchanged collection is named"
+    );
+    emit(name, &serde_json::to_string(&collection)?)
 }
 
 /// Returns `composition` as a CDR serves it once committed, with the version
