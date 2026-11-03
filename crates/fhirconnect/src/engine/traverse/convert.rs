@@ -119,8 +119,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<(FhirValue, Dropped), LensError> {
         let (value, reference) = self.minted(value);
         let dropped = Dropped {
-            code: cell::uncarried_code(&value, kind).cloned(),
-            mappings: cell::withheld(&value, kind, terminology),
+            code: cell::withheld::uncarried_code(&value, kind).cloned(),
+            mappings: cell::withheld::withheld(&value, kind, terminology),
             reason: false,
         };
         let mut view = cell::get(&value, kind, terminology)?;

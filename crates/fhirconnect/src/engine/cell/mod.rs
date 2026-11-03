@@ -10,11 +10,8 @@
 //! lives in [`crate::engine::lens`] and runs both ways there.
 
 use fhir_types::r4::attachment::Attachment;
-use fhir_types::r4::codeable_concept::CodeableConcept;
-use fhir_types::r4::coding::Coding;
 use openehr_mapping_core::index::ordinals::OrdinalOption;
 use openehr_rm::v1_2::data_types::encapsulated::dv_multimedia::DvMultimedia;
-use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
 
@@ -40,7 +37,6 @@ use crate::engine::lens::proportion::PercentLens;
 use crate::engine::lens::quantity::QuantityLens;
 use crate::engine::lens::range::QuantityIntervalLens;
 use crate::engine::lens::string::StringLens;
-use crate::engine::lens::term_mapping::Withheld;
 use crate::engine::lens::text::TextLens;
 use crate::engine::lens::time::TimeLens;
 use crate::engine::lens::uri::UriLens;
@@ -69,6 +65,7 @@ use crate::engine::cell::held::held_time;
 use crate::engine::cell::held::held_uri;
 
 mod held;
+pub mod withheld;
 
 /// What a cell produced, with the one-way rows it took.
 #[derive(Debug, Clone, PartialEq)]
@@ -233,60 +230,6 @@ pub fn put_string(view: &FhirValue) -> Option<Result<Produced<String>, LensError
         _ => return None,
     };
     Some(value.map(|value| Produced { value, fallbacks }))
-}
-
-/// Returns the term mappings [`get`] leaves out of the FHIR element `kind`
-/// names, in the order the value holds them.
-///
-/// The cells that carry `mappings` (`DV_TEXT` against `Coding` and
-/// `CodeableConcept`, `DV_CODED_TEXT` against `CodeableConcept`) withhold
-/// the ones whose `match` is not `=`. The cells whose FHIR element has no
-/// coding (`DV_TEXT` and `DV_CODED_TEXT` against `string`, `DV_CODED_TEXT`
-/// against `Coding`) withhold every one.
-#[must_use]
-pub fn withheld(source: &RmValue, kind: FhirKind, binding: Option<&str>) -> Vec<Withheld> {
-    match (source, kind) {
-        (RmValue::Text(text), FhirKind::String) => {
-            Lens::<DvTextData, fhir_types::r4::primitives::String>::withheld(&TextLens, text)
-        }
-        (RmValue::CodedText(text), FhirKind::String) => {
-            Lens::<DvTextData, fhir_types::r4::primitives::String>::withheld(
-                &TextLens,
-                &plain(text.as_ref()),
-            )
-        }
-        (RmValue::CodedText(text), FhirKind::Coding) => {
-            Lens::<DvCodedText, Coding>::withheld(&coded_lens(binding), text.as_ref())
-        }
-        (RmValue::Text(text), FhirKind::Coding) => {
-            Lens::<DvTextData, Coding>::withheld(&TextLens, text)
-        }
-        (RmValue::Text(text), FhirKind::CodeableConcept) => {
-            Lens::<DvTextData, CodeableConcept>::withheld(&TextLens, text)
-        }
-        (RmValue::CodedText(text), FhirKind::CodeableConcept) => {
-            Lens::<DvCodedText, CodeableConcept>::withheld(&coded_lens(binding), text.as_ref())
-        }
-        (RmValue::Ordinal(ordinal), FhirKind::CodeableConcept) => {
-            OrdinalLens::new(coded_lens(binding), &[]).withheld(ordinal.as_ref())
-        }
-        (_source, _kind) => Vec::new(),
-    }
-}
-
-/// Returns the `defining_code` [`get`] leaves out of the FHIR element `kind`
-/// names, `None` when the cell carries it.
-///
-/// Only `DV_CODED_TEXT` against `string` drops it. The chapter writes no
-/// `string` row for `DV_CODED_TEXT` (`DV_CODED_TEXT.adoc` §STRING calls the
-/// pairing not possible), so the cell is the `DV_TEXT` one of its supertype,
-/// whose table has no `defining_code` row, and the engine declares the code.
-#[must_use]
-pub fn uncarried_code(source: &RmValue, kind: FhirKind) -> Option<&CodePhrase> {
-    match (source, kind) {
-        (RmValue::CodedText(text), FhirKind::String) => Some(&text.defining_code),
-        (_source, _kind) => None,
-    }
 }
 
 /// Writes a FHIR element back into the openEHR class `rm_type` names.
@@ -517,7 +460,7 @@ fn plain(coded: &DvCodedText) -> DvTextData {
 mod tests {
     use super::get;
     use super::put;
-    use super::withheld;
+    use super::withheld::withheld;
     use crate::engine::fhir::FhirKind;
     use crate::engine::fhir::FhirValue;
     use crate::engine::lens::term_mapping::Cause;
@@ -738,7 +681,7 @@ mod tests {
         // DV_CODED_TEXT.adoc §STRING: the chapter writes no string row, so the
         // DV_TEXT cell carries the rubric and the code is declared.
         let source = coded_text();
-        let dropped = super::uncarried_code(&source, FhirKind::String).map(|code| {
+        let dropped = super::withheld::uncarried_code(&source, FhirKind::String).map(|code| {
             (
                 code.terminology_id.value.as_str(),
                 code.code_string.as_str(),
@@ -752,9 +695,12 @@ mod tests {
     #[test]
     fn a_cell_with_a_coding_drops_no_defining_code() {
         for kind in [FhirKind::Coding, FhirKind::CodeableConcept] {
-            assert_eq!(super::uncarried_code(&coded_text(), kind), None);
+            assert_eq!(super::withheld::uncarried_code(&coded_text(), kind), None);
         }
-        assert_eq!(super::uncarried_code(&text(), FhirKind::String), None);
+        assert_eq!(
+            super::withheld::uncarried_code(&text(), FhirKind::String),
+            None
+        );
     }
 
     #[test]
