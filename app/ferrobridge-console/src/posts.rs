@@ -8,9 +8,11 @@
 //! specification governs the console: our own design.
 
 use crate::actions::{
-    ApplyAnswer, ApplyPost, Edited, EditorPost, Reloaded, ReplayAnswer, ReplayPost,
+    ApplyAnswer, ApplyPost, Edited, EditorPost, ImportAnswer, ImportPost, Reloaded, ReplayAnswer,
+    ReplayPost,
 };
 use crate::bridge::AccessToken;
+use crate::locale::messages::Msg;
 use crate::model::{Outcome, loaded};
 use crate::server::ConsoleState;
 
@@ -102,6 +104,52 @@ pub async fn applied(
         state
             .bridge()
             .apply_revision(id, post.running.trim(), &post.reason, token)
+            .await,
+    ))
+}
+
+/// The import page's post read from its multipart body `raw` in
+/// `content_type`, or `None` for a body that is no multipart form.
+pub async fn import_form(raw: &[u8], content_type: Option<&str>) -> Option<ImportPost> {
+    use axum::extract::FromRequest as _;
+    let request = http::Request::builder()
+        .header(http::header::CONTENT_TYPE, content_type?)
+        .body(axum::body::Body::from(raw.to_vec()))
+        .ok()?;
+    // NOTE: no specification governs this: our own design; a body that is no
+    // multipart form carries no archive, which the page asks for again.
+    let mut form = axum::extract::Multipart::from_request(request, &())
+        .await
+        .ok()?;
+    let mut post = ImportPost::default();
+    while let Some(field) = form.next_field().await.ok()? {
+        match field.name() {
+            Some("archive") => post.archive = field.bytes().await.ok()?.to_vec(),
+            Some("reason") => post.reason = field.text().await.ok()?,
+            Some("decision") => post.decision = field.text().await.ok()?,
+            _ => {}
+        }
+    }
+    Some(post)
+}
+
+/// The answer to the import `post`, as the operator whose token is
+/// `token`: the bridge is asked only with an archive and a reason it takes.
+pub async fn imported(
+    state: &ConsoleState,
+    token: &AccessToken,
+    post: &ImportPost,
+) -> ImportAnswer {
+    if post.archive.is_empty() {
+        return ImportAnswer::Invalid(Msg::ImportNoArchive);
+    }
+    if let Some(fault) = crate::pages::editor::answer::reason_fault(&post.reason) {
+        return ImportAnswer::Invalid(fault);
+    }
+    ImportAnswer::Answered(loaded(
+        state
+            .bridge()
+            .import_revision(post.archive.clone(), &post.reason, token)
             .await,
     ))
 }

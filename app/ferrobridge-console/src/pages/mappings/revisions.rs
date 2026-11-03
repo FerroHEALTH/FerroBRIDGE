@@ -26,6 +26,7 @@ use ferrohealth_ui::table::view::{
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::change::{Change, change_table};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
@@ -239,7 +240,13 @@ fn frame(l: &Locale, title: &str, revision: Option<&Revision>, body: Html) -> Ht
                 mono: false,
                 badge: None,
             },
-            actions: ActionGroup::none(),
+            actions: revision.map_or_else(ActionGroup::none, |revision| {
+                ActionGroup::primary(Action::new(
+                    Some(Glyph::DOWNLOAD),
+                    tr(l, Msg::ExportRevision),
+                    Act::Download(super::archive::export_href(&revision.id)),
+                ))
+            }),
             stepper: None,
             tabs: None,
             body,

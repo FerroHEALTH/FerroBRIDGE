@@ -45,6 +45,7 @@ use crate::pages::parts::{
 };
 use crate::visit::Visit;
 
+pub mod archive;
 mod files;
 pub mod revisions;
 
@@ -103,19 +104,32 @@ pub async fn reload(visit: &Visit) -> Response {
 
 /// The title row: New file and More with Reload the set…, whose dialog's
 /// form posts to the page.
-fn heading(l: &Locale, here: &str) -> Html {
-    let more = Menu::new(
-        "set-more",
-        tr(l, Msg::SetMoreLabel),
-        vec![
+fn heading(l: &Locale, here: &str, running: Option<&str>) -> Html {
+    let mut items = vec![
+        Item::new(Action::new(
+            Some(Glyph::REFRESH_CW),
+            tr(l, Msg::ReloadSet),
+            Act::Dialog(String::from(RELOAD_DIALOG)),
+        ))
+        .note(tr(l, Msg::ReloadSetNote)),
+        Item::new(Action::new(
+            Some(Glyph::UPLOAD),
+            tr(l, Msg::ImportSet),
+            Act::Link(String::from(archive::IMPORT)),
+        ))
+        .note(tr(l, Msg::ImportSetNote)),
+    ];
+    if let Some(running) = running {
+        items.push(
             Item::new(Action::new(
-                Some(Glyph::REFRESH_CW),
-                tr(l, Msg::ReloadSet),
-                Act::Dialog(String::from(RELOAD_DIALOG)),
+                Some(Glyph::DOWNLOAD),
+                tr(l, Msg::ExportRunning),
+                Act::Download(archive::export_href(running)),
             ))
-            .note(tr(l, Msg::ReloadSetNote)),
-        ],
-    );
+            .note(tr(l, Msg::ExportRunningNote)),
+        );
+    }
+    let more = Menu::new("set-more", tr(l, Msg::SetMoreLabel), items);
     let actions = ActionGroup::primary(Action::new(
         Some(Glyph::FILE_PLUS),
         tr(l, Msg::NewFile),
@@ -227,7 +241,11 @@ fn drawn(
     ),
 ) -> Html {
     let here = tab_href(tab);
-    let heading = heading(l, &here);
+    let running = match revisions {
+        Ok(Outcome::Shown(revisions)) => revisions.running.as_deref(),
+        _ => None,
+    };
+    let heading = heading(l, &here, running);
     let (state, listing) = match (state, listing) {
         (Ok(Outcome::Shown(state)), Ok(Outcome::Shown(listing))) => (state, listing),
         (Err(fault), _) | (_, Err(fault)) => {

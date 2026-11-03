@@ -137,6 +137,14 @@ console answers with the page it drew.
   compiles the set with its files first, changes nothing when it does not
   compile, and refuses the apply when another one ran since the page drew
   (`POST /operator/revisions/{id}/apply`).
+  Export as ZIP downloads the revision's console files
+  (`GET /operator/revisions/{id}/export`).
+- **Import a mapping set** (`/mappings/import`, from the Mapping set's More
+  menu): a ZIP as an export wrote it, at most 2 MB, with the reason. The
+  bridge checks the set with its files as a dry run and saves them as a
+  revision that does not run, linked to its page, where Apply this
+  revision runs it; a set that does not compile shows its diagnostics and
+  nothing is saved. More also holds Export the running set.
 - **The editor** (`/mappings/edit/{path}`, or `/mappings/new` for a new
   file): see below.
 - **Playground** (`/playground`, `/playground/toopenehr`,
@@ -294,6 +302,15 @@ The Revisions tab after a save. [Dark theme](img/console/mappings-revisions-dark
 
 The baseline revision with its diff against the running one and the
 rollback docked. [Dark theme](img/console/revision-dark.png).
+
+![The import page](img/console/mappings-import.png)
+
+The import page. [Dark theme](img/console/mappings-import-dark.png).
+
+![An imported archive](img/console/mappings-imported.png)
+
+An archive checked and saved as a revision.
+[Dark theme](img/console/mappings-imported-dark.png).
 
 ![A context mapping file](img/console/file-context.png)
 

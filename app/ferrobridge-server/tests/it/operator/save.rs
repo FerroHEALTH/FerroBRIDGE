@@ -30,6 +30,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 use super::{FIXTURES, OMOCL_FILE, OPERATOR, bytes, digest};
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, ec_key, mint};
 
+mod archive;
 mod revisions;
 mod search;
 mod unprovisioned;

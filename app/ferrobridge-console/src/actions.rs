@@ -215,6 +215,28 @@ pub enum ApplyAnswer {
     Answered(Loaded<Answered>),
 }
 
+/// What the import page posts: the archive, its file name, the reason and
+/// the decision.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ImportPost {
+    /// The archive's bytes, as the browser sent them.
+    pub archive: Vec<u8>,
+    /// The reason, as typed.
+    pub reason: String,
+    /// The decision: `import`, or `discard` to leave.
+    pub decision: String,
+}
+
+/// What the bridge answered an import.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportAnswer {
+    /// The post carries no archive or no usable reason, so the bridge was
+    /// not asked.
+    Invalid(Msg),
+    /// The bridge recorded the archive, refused it, or could not be asked.
+    Answered(Loaded<Answered>),
+}
+
 /// The last value of the field `name` in the form body `body`
 /// (`application/x-www-form-urlencoded`), empty when it carries none.
 #[must_use]

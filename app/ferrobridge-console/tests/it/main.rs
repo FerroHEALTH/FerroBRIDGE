@@ -12,6 +12,7 @@
     reason = "test assertions"
 )]
 
+mod archive;
 mod boundary;
 mod bridge;
 mod config;
