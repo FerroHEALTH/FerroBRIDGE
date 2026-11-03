@@ -7,7 +7,7 @@
 corpus pass, one case id (the file name without `.json`) per line, and the
 number of cases on its `total` line. The cases are the synthetic resources
 under `crates/ferrobridge-validator/tests/agreement/cases/`, and the outcomes
-they are compared with are the HL7 FHIR Validator 6.10.4's, recorded under
+they are compared with are the HL7 FHIR Validator 7.0.4's, recorded under
 `crates/ferrobridge-validator/tests/agreement/reference/` by
 `scripts/vendor/hl7-validator-agreement.sh` at the pins of the "HL7 FHIR
 Validator" table of `docs/VERSIONS.md`.

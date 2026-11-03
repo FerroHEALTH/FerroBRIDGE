@@ -328,9 +328,9 @@ No build reads anything here.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `validator_cli.jar` | 6.10.4 sha256 `1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `validator_cli.jar` | 7.0.4 sha256 `43e29fa8822d670740a909c395ca5b70a3d07fbaa8936f8dedc6a98b007f555b` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.xver-extensions` | 0.1.0 sha256 `f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a` | read by `scripts/vendor/hl7-validator-agreement.sh` |
-| `hl7.terminology` | 7.4.0 sha256 `b321ad4ee1c18798abd8692f45bc86550cffac72ae97413125cfb82f0112c72d` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology` | 7.5.0 sha256 `c54ebe534cd3f2474459eaed68e54c34f09b003766605b19e5552db376f2cc42` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.extensions` | 5.3.0 sha256 `6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.terminology.r5` | 7.1.0 sha256 `473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.extensions.r5` | 5.2.0 sha256 `e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170` | read by `scripts/vendor/hl7-validator-agreement.sh` |
