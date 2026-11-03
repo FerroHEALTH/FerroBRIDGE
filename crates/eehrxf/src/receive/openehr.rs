@@ -20,6 +20,7 @@
 
 use std::fmt;
 
+use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::seam::Seams;
@@ -28,6 +29,7 @@ use fhirconnect::operations::error::OperationError;
 use fhirconnect::operations::run;
 use fhirconnect::operations::run::Settings;
 use openehr_base::containers::NonEmptyVec;
+use openehr_base::v1_3::base_types::identification::locatable_ref::LocatableRef;
 use openehr_rm::v1_2::common::archetyped::feeder_audit::FeederAudit;
 use openehr_rm::v1_2::common::archetyped::feeder_audit_details::FeederAuditDetails;
 use openehr_rm::v1_2::common::generic::party_identified::{PartyIdentified, PartyIdentifiedData};
@@ -35,12 +37,14 @@ use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
 use openehr_rm::v1_2::common::generic::party_self::PartySelf;
 use openehr_rm::v1_2::composition::composition::Composition;
 use openehr_rm::v1_2::composition::content::content_item::ContentItem;
+use openehr_rm::v1_2::composition::content::entry::instruction_details::InstructionDetails;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
 use openehr_rm::v1_2::data_types::encapsulated::dv_encapsulated::DvEncapsulated;
 use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
 
 use crate::mapping::Mapping;
 use crate::receive::ReceivedDocument;
+use crate::receive::ReceivedResources;
 
 /// The media type of FHIR JSON (<https://hl7.org/fhir/R4/json.html>), the
 /// `DV_PARSABLE.formalism` the original document is kept under.
@@ -120,7 +124,40 @@ impl Mapping {
         document: &ReceivedDocument,
         settings: &Settings,
     ) -> Result<ReceivedComposition, ReceiveMappingError> {
-        let request = ToOpenehrRequest::new(document.bundle().clone());
+        self.compose(document.bundle(), document.original(), settings)
+    }
+
+    /// Maps resources received outside a document into one openEHR
+    /// composition, the collection itself kept in the composition's
+    /// `FEEDER_AUDIT.original_content`, as [`Mapping::to_openehr`] keeps a
+    /// document.
+    ///
+    /// The whole collection is the `$toopenehr` input, so the context that
+    /// maps it is the one whose profile its resources claim, and a mapping
+    /// follows a reference into the collection's other entries: a
+    /// `MedicationDispense-eu-mpd` and the `Medication-eu-mpd` it
+    /// references give one composition of the dispense.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Mapping::to_openehr`].
+    pub fn resources_to_openehr(
+        &self,
+        resources: &ReceivedResources,
+        settings: &Settings,
+    ) -> Result<ReceivedComposition, ReceiveMappingError> {
+        self.compose(resources.bundle(), resources.original(), settings)
+    }
+
+    /// Maps `bundle` into one composition, `original` kept as its original
+    /// content.
+    fn compose(
+        &self,
+        bundle: &Bundle,
+        original: &str,
+        settings: &Settings,
+    ) -> Result<ReceivedComposition, ReceiveMappingError> {
+        let request = ToOpenehrRequest::new(bundle.clone());
         let response = run::to_openehr(
             self.programs(),
             &SCHEMAS,
@@ -160,7 +197,7 @@ impl Mapping {
         audit.original_content = Some(DvEncapsulated::DvParsable(DvParsable {
             charset: None,
             language: None,
-            value: document.original().to_owned(),
+            value: original.to_owned(),
             formalism: FHIR_JSON.to_owned(),
         }));
         let canonical = serde_json::to_string(&composition)
@@ -413,6 +450,102 @@ mod tests {
         );
         Ok(())
     }
+}
+
+impl ReceivedComposition {
+    /// Returns this composition with every `ACTION` it holds naming the
+    /// `INSTRUCTION` that caused it, for a received dispense of an order the
+    /// caller holds.
+    ///
+    /// The openEHR RM gives an `ACTION` the `instruction_details` of "the
+    /// Instruction that caused this Action to be performed", whose
+    /// `instruction_id` is a `LOCATABLE_REF` to that instruction and whose
+    /// `activity_id` names the activity by its archetype path (RM Release
+    /// 1.1.0, EHR IM, §`INSTRUCTION_DETAILS`,
+    /// <https://specifications.openehr.org/releases/RM/Release-1.1.0/ehr.html#_instruction_details_class>).
+    /// The caller resolves the instruction, so `instruction` names its
+    /// versioned composition; no specification governs how a received
+    /// dispense finds its order: our own design.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InstructionError::NoAction`] when the composition holds no
+    /// `ACTION`, [`InstructionError::Taken`] when an `ACTION` already names an
+    /// instruction, and [`InstructionError::Encode`] when the composition
+    /// cannot be written out.
+    pub fn instructed_by(
+        mut self,
+        instruction: &LocatableRef,
+        activity_id: &str,
+    ) -> Result<Self, InstructionError> {
+        let details = InstructionDetails {
+            instruction_id: instruction.clone(),
+            activity_id: activity_id.to_owned(),
+            wf_details: None,
+        };
+        let named = match self.model.content.as_mut() {
+            Some(content) => instruct(content, &details)?,
+            None => 0,
+        };
+        if named == 0 {
+            return Err(InstructionError::NoAction);
+        }
+        self.composition = serde_json::to_string(&self.model)
+            .map_err(|source| InstructionError::Encode { source })?;
+        Ok(self)
+    }
+}
+
+/// Names `details` on every `ACTION` of `items` and of the sections below
+/// them, answering how many it named.
+fn instruct(
+    items: &mut [ContentItem],
+    details: &InstructionDetails,
+) -> Result<usize, InstructionError> {
+    let mut named = 0_usize;
+    for item in items {
+        match item {
+            ContentItem::Section(section) => {
+                let within = match section.items.as_mut() {
+                    Some(items) => instruct(items, details)?,
+                    None => 0,
+                };
+                named = named.saturating_add(within);
+            }
+            ContentItem::Action(action) => {
+                if action.instruction_details.is_some() {
+                    return Err(InstructionError::Taken);
+                }
+                action.instruction_details = Some(details.clone());
+                named = named.saturating_add(1);
+            }
+            ContentItem::AdminEntry(_)
+            | ContentItem::Evaluation(_)
+            | ContentItem::GenericEntry(_)
+            | ContentItem::Instruction(_)
+            | ContentItem::Observation(_) => {}
+        }
+    }
+    Ok(named)
+}
+
+/// Why a composition cannot name the instruction its actions carry out.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum InstructionError {
+    /// The composition holds no `ACTION`.
+    #[error("the composition holds no ACTION")]
+    NoAction,
+    /// An `ACTION` of the composition already names an instruction.
+    #[error("an ACTION of the composition already names an instruction")]
+    Taken,
+    /// The composition cannot be written as canonical JSON.
+    #[error("the composition cannot be written as canonical JSON")]
+    Encode {
+        /// The write failure.
+        #[source]
+        source: serde_json::Error,
+    },
 }
 
 /// Why a received document gives no composition.
