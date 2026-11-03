@@ -193,6 +193,7 @@ fn lab_document(identifier: &str) -> Result<(Document, String, String), Box<dyn 
             family: Some("Synthetic".into()),
             ..HumanName::default()
         }],
+        birth_date: Some("1970-01-01".into()),
         ..Patient::default()
     })?;
     let device = document.with_author(&Resource::Device(Box::new(Device {
@@ -390,6 +391,13 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
     let result = only(&output, "Observation")?;
     assert_eq!(
         result["meta"]["profile"][0], OBSERVATION_RESULTSLAB_EU_LAB,
+        "{result}"
+    );
+    // NOTE: HL7 Europe Laboratory Report 2.0.0 Observation-resultslab-eu-lab requires
+    // effective[x]; an analyte takes the time of its laboratory test result's event.
+    assert_eq!(
+        result.pointer("/effectiveDateTime"),
+        after.pointer("/effectiveDateTime"),
         "{result}"
     );
     assert_eq!(
