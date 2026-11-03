@@ -84,14 +84,7 @@ impl Bridge {
         token: &AccessToken,
     ) -> Result<Answered, BridgeError> {
         plain(path)?;
-        let reason = reason.trim();
-        if reason.is_empty()
-            || reason.chars().count() > MAX_REASON
-            || !reason.chars().all(|c| c.is_ascii_graphic() || c == ' ')
-        {
-            return Err(BridgeError::Reason);
-        }
-        let reason = HeaderValue::from_str(reason).map_err(|_invalid| BridgeError::Reason)?;
+        let reason = reason_header(reason)?;
         let mut url = self.url("operator/mappings/")?;
         url.path_segments_mut()
             .map_err(|()| BridgeError::Path)?
@@ -108,9 +101,23 @@ impl Bridge {
             }
             Precondition::Absent => request.header(http::header::IF_NONE_MATCH, "*"),
         };
+        self.write(request.body(draft), token).await
+    }
+
+    /// Sends the write `request` and reads its answer: the set's report,
+    /// and the `ETag` of what it wrote.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200` and `422`,
+    /// and the transport and body errors of [`Self::capability_statement`].
+    pub(super) async fn write(
+        &self,
+        request: reqwest::RequestBuilder,
+        token: &AccessToken,
+    ) -> Result<Answered, BridgeError> {
         let (status, headers, body) = self
             .exchange(
-                request.body(draft),
+                request,
                 JSON,
                 token,
                 &[StatusCode::OK, StatusCode::UNPROCESSABLE_ENTITY],
@@ -148,6 +155,22 @@ impl Bridge {
             etag: None,
         })
     }
+}
+
+/// Returns `reason` as the header a write names it in: one line of printable
+/// ASCII, at most [`MAX_REASON`] characters.
+///
+/// # Errors
+/// Returns [`BridgeError::Reason`] for any other reason.
+pub(super) fn reason_header(reason: &str) -> Result<HeaderValue, BridgeError> {
+    let reason = reason.trim();
+    if reason.is_empty()
+        || reason.chars().count() > MAX_REASON
+        || !reason.chars().all(|c| c.is_ascii_graphic() || c == ' ')
+    {
+        return Err(BridgeError::Reason);
+    }
+    HeaderValue::from_str(reason).map_err(|_invalid| BridgeError::Reason)
 }
 
 /// Refuses a wire path with an empty, `.` or `..` segment.

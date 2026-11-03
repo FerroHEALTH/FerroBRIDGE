@@ -8,9 +8,9 @@
 //! No specification governs the operator surface: our own design.
 
 use ferrobridge_operator_api::revisions::{Revision, RevisionDiff, Revisions};
-use http::{HeaderValue, StatusCode};
+use http::StatusCode;
 
-use crate::bridge::editing::{MAX_REASON, REASON, report};
+use crate::bridge::editing::{REASON, reason_header};
 use crate::bridge::{AccessToken, Bridge, BridgeError, JSON};
 use crate::model::Answered;
 
@@ -93,7 +93,7 @@ impl Bridge {
     ///
     /// # Errors
     /// Returns [`BridgeError::Reason`] for a reason that is empty, over
-    /// [`MAX_REASON`] characters or not printable ASCII on one line,
+    /// [`crate::bridge::editing::MAX_REASON`] characters or not printable ASCII on one line,
     /// [`BridgeError::Refused`] for any other status, and the transport and
     /// body errors of [`Self::capability_statement`].
     pub async fn apply_revision(
@@ -103,14 +103,7 @@ impl Bridge {
         reason: &str,
         token: &AccessToken,
     ) -> Result<Answered, BridgeError> {
-        let reason = reason.trim();
-        if reason.is_empty()
-            || reason.chars().count() > MAX_REASON
-            || !reason.chars().all(|c| c.is_ascii_graphic() || c == ' ')
-        {
-            return Err(BridgeError::Reason);
-        }
-        let reason = HeaderValue::from_str(reason).map_err(|_invalid| BridgeError::Reason)?;
+        let reason = reason_header(reason)?;
         let mut url = self.url("operator/revisions")?;
         url.path_segments_mut()
             .map_err(|()| BridgeError::Path)?
@@ -121,22 +114,6 @@ impl Bridge {
             .post(url)
             .header(REASON, reason)
             .header(http::header::IF_MATCH, format!("\"{running}\""));
-        let (status, headers, body) = self
-            .exchange(
-                request,
-                JSON,
-                token,
-                &[StatusCode::OK, StatusCode::UNPROCESSABLE_ENTITY],
-            )
-            .await?;
-        let etag = headers
-            .get(http::header::ETAG)
-            .and_then(|value| value.to_str().ok())
-            .map(|value| value.trim_matches('"').to_owned());
-        Ok(Answered {
-            status,
-            report: report(&body)?,
-            etag,
-        })
+        self.write(request, token).await
     }
 }
