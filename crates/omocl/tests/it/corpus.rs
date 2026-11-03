@@ -40,14 +40,6 @@ const SKIPS: &[(&str, &str, u64, usize, &str)] = &[
          railroad's CONVERSION clause opens with `alternatives`",
     ),
     (
-        "medical_data/evaluation/Hand_dominance_v1.yml",
-        "yaml-syntax",
-        22,
-        1,
-        "line 22 indents with a tab; YAML 1.2.2 §6.1: tab characters must not be used in \
-         indentation",
-    ),
-    (
         "medical_data/observation/Demo_v1.yml",
         "malformed-path",
         23,
@@ -141,7 +133,7 @@ const NAME_MISMATCHES: &[(&str, &str)] = &[
 /// loads.
 const REFRESH_FILES: &[(&str, bool)] = &[
     ("medical_data/admin_entry/Citizenship_v1.yml", true),
-    ("medical_data/evaluation/Hand_dominance_v1.yml", false),
+    ("medical_data/evaluation/Hand_dominance_v1.yml", true),
     ("medical_data/observation/Berg_balance_scale_v1.yml", true),
     ("medical_data/observation/Guss_icu_v1.yml", true),
     ("medical_data/observation/Guss_v1.yml", true),
@@ -156,7 +148,7 @@ const STRUCTURAL_KEYS: &[&str] = &["type", "base_path", "archetype_id", "name"];
 
 /// Every YAML-readable corpus file the authored schema refuses on its own.
 ///
-/// It is the skip set less the two YAML refusals, which never reach the
+/// It is the skip set less the YAML refusal, which never reaches the
 /// schema, and less the two malformed paths, whose openEHR path grammar a JSON
 /// Schema string type does not carry.
 const SCHEMA_REJECTIONS: &[&str] = &[
