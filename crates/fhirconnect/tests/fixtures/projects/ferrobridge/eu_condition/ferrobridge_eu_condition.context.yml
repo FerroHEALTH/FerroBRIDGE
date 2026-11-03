@@ -4,7 +4,7 @@
 # condition-eu-core profile over the published KDS_Diagnose template, whose
 # EVALUATION.problem_diagnosis.v1 and CLUSTER.problem_qualifier.v2 are CKM
 # archetypes. The model mappings load verbatim from SevKohler/FHIRconnect-
-# mapping-lib at commit 6bd4c19a (vendored under
+# mapping-lib at commit 2ba7cf5d (vendored under
 # docs/specs/fhirconnect-mapping-lib, Apache License 2.0); the three
 # extensions are this directory's.
 grammar: FHIRConnect/v1.0.0
