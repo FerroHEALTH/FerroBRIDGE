@@ -433,7 +433,10 @@ everything() {
 
 # The affected members of a list of changed paths (stdin), or the word ALL.
 affected_of() {
-  local graph="$1" local_mode="$2" path class seeds="" only="" members="" effect
+  local graph="$1" local_mode="$2" path class seeds="" only="" members="" effect paths
+  # The whole list is read first: an early answer of ALL would otherwise close
+  # the pipe on a long list and fail its writer with SIGPIPE under pipefail.
+  paths="$(cat)"
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     class="$(classify "$path")"
@@ -450,7 +453,7 @@ affected_of() {
       only\ *) only+=" ${class#only }" ;;
       member) members+="$path"$'\n' ;;
     esac
-  done
+  done <<<"$paths"
   if [ -n "$members" ]; then
     local owner
     while IFS= read -r owner; do
@@ -531,6 +534,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+fhirconnect +ferrobridge-server -fhir-types -fhir-codegen"
   lock_new="${lock_old/8.8.8/8.8.9}"
   check "a third-party move in the lock reaches everything" "Cargo.lock" false ALL
+  check "a long list that opens with a global path reaches everything" \
+    "$(printf 'scripts/vendor/fhir-packages.sh\n'; seq -f 'tools/fhir-codegen/vendor/p/%g.json' 1 20000)" \
+    false ALL
   check "the design record reaches the testkit's own tests" "docs/architecture.md" false \
     "+ferrobridge-testkit -fhirconnect -ferrobridge-server"
   check "a doc page is inert" "docs/ci-cd.md" false ""
