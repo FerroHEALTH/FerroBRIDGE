@@ -425,6 +425,13 @@ pub enum PathError {
         #[source]
         source: Box<FlatError>,
     },
+    /// The template's root is no `COMPOSITION`, so it has no example
+    /// composition.
+    #[error("`{template_id}` is no composition template")]
+    NotComposition {
+        /// The template.
+        template_id: String,
+    },
     /// The built composition does not validate against its template.
     #[error("the composition does not validate against `{template_id}`: {}", messages.join("; "))]
     InvalidComposition {
@@ -495,6 +502,7 @@ impl PathError {
             | Self::InstanceIndex { .. }
             | Self::CompositionFlatten { .. }
             | Self::InvalidComposition { .. }
+            | Self::NotComposition { .. }
             | Self::UntypedAlternative { .. }
             | Self::TemplateMismatch { .. } => DiagnosticCode::InvalidComposition,
         }

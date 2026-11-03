@@ -13,6 +13,7 @@ mod archetype_id;
 mod corpus;
 mod diagnostic;
 mod embedded;
+mod example;
 mod header;
 mod malformed;
 mod ordinals;

@@ -61,6 +61,7 @@ the process is not ready.
 | [`not-configured`](#not-configured) | `409` | No `[operator] mapping_dir` is configured. |
 | [`precondition-failed`](#precondition-failed) | `412` | What the request replaces changed since the `ETag` it names. |
 | [`precondition-required`](#precondition-required) | `428` | The write sends no precondition. |
+| [`no-example`](#no-example) | `422` | The template has no example composition. |
 | [`unreadable`](#unreadable) | `500` | A mapping directory could not be read. |
 | [`unwritable`](#unwritable) | `500` | The mapping directory could not be written. |
 | [`dead-letters-unavailable`](#dead-letters-unavailable) | `500` | The dead-letter store could not be read or written. |
@@ -132,6 +133,11 @@ again and send the new `ETag`.
 `428`. A save sends `If-Match` with the file's `ETag`, or
 `If-None-Match: *` for a new file, and an apply sends `If-Match` with the
 running revision's id. Add the header.
+
+## no-example
+
+`422`. The template is no composition template, such as a party's, or no
+synthetic example of it builds. The server log names the cause.
 
 ## unreadable
 

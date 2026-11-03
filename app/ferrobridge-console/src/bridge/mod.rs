@@ -418,6 +418,31 @@ impl Bridge {
         })
     }
 
+    /// Reads the synthetic example composition of the template `id`, `GET
+    /// {base}operator/templates/{id}/example`, as canonical JSON.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Path`] when the base takes no path segments,
+    /// [`BridgeError::Refused`] for any status but `200` (a `404` for a
+    /// template the running set does not hold, a `422` for one with no
+    /// example), and the body errors of [`Self::health_info`].
+    pub async fn template_example(
+        &self,
+        id: &str,
+        token: &AccessToken,
+    ) -> Result<serde_json::Value, BridgeError> {
+        let mut url = self.url("operator/templates")?;
+        url.path_segments_mut()
+            .map_err(|()| BridgeError::Path)?
+            .push(id)
+            .push("example");
+        let (_status, _headers, body) = self.fetch(url, JSON, token, &[StatusCode::OK]).await?;
+        serde_json::from_slice(&body).map_err(|source| BridgeError::Document {
+            expected: "example composition",
+            source,
+        })
+    }
+
     /// Asks for the replay of the event `id` the change-feed consumer
     /// `consumer` parked, `POST
     /// {base}operator/events/{consumer}/parked/{id}/replay`.

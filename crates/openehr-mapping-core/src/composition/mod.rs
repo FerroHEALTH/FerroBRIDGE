@@ -325,6 +325,7 @@ impl CanonicalDocument for CanonicalComposition {
     }
 }
 
+mod example;
 mod read;
 
 #[cfg(test)]

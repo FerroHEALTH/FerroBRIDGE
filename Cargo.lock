@@ -3860,7 +3860,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.137"
+version = "0.1.138"
 dependencies = [
  "ferrobridge-testkit",
  "insta",
