@@ -211,10 +211,16 @@ impl<'a> Run<'a> {
                     },
                     _ => Value::String(text.clone()),
                 };
-                self.record(leaf, Pending::Ready(value), at, reference);
+                self.write(leaf, Pending::Ready(value), at, reference, false);
             }
             Assignment::Concat(parts) => match concatenate(scope, parts) {
-                Ok(text) => self.record(leaf, Pending::Ready(Value::String(text)), at, reference),
+                Ok(text) => self.write(
+                    leaf,
+                    Pending::Ready(Value::String(text)),
+                    at,
+                    reference,
+                    false,
+                ),
                 Err(operand) => self.outcomes.push(Outcome::UnevaluableAssignment {
                     at: at.clone(),
                     row: row(),
@@ -303,7 +309,7 @@ impl<'a> Run<'a> {
             });
         }
         match convert::primitive(&target_type, text) {
-            Ok(value) => self.record(leaf, Pending::Ready(value), at, reference),
+            Ok(value) => self.write(leaf, Pending::Ready(value), at, reference, false),
             Err(error) => self.outcomes.push(Outcome::Unconvertible {
                 at: at.clone(),
                 row: reference.clone(),
@@ -448,7 +454,7 @@ impl<'a> Run<'a> {
                     ("code", Part::Code),
                     ("display", Part::Display),
                 ] {
-                    self.record(&leaf.child(name, ""), pending(part), at, reference);
+                    self.write(&leaf.child(name, ""), pending(part), at, reference, false);
                 }
             }
             fhirconnect::tree::element::Location::Complex(schema)
@@ -460,10 +466,10 @@ impl<'a> Run<'a> {
                     ("code", Part::Code),
                     ("display", Part::Display),
                 ] {
-                    self.record(&coding.child(name, ""), pending(part), at, reference);
+                    self.write(&coding.child(name, ""), pending(part), at, reference, false);
                 }
             }
-            _ => self.record(leaf, pending(Part::Code), at, reference),
+            _ => self.write(leaf, pending(Part::Code), at, reference, false),
         }
     }
 }

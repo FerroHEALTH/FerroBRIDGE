@@ -285,10 +285,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let parent = &self.scoped(mapping.fhir(), parent);
         let axes = self.output_axes(mapping);
         let mut bound = parent_depth(parent, self.direction);
-        while axes
-            .get(bound)
-            .is_some_and(|axis| self.pin_named(axis).is_some())
-        {
+        while axes.get(bound).is_some_and(|axis| self.pin(axis).is_some()) {
             bound = bound.saturating_add(1);
         }
         let cardinality = Cardinality::of(axes.len() > bound);
@@ -345,7 +342,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if taken.is_some() {
             let mut fresh = false;
             for axis in axes.iter().skip(bound) {
-                let index = if let Some(pinned) = self.pin_named(axis) {
+                let index = if let Some(pinned) = self.pin(axis) {
                     usize::try_from(FlatIndex::from(pinned).get()).map_err(|_refused| {
                         EngineError::Position {
                             mapping: String::from(mapping.name()),

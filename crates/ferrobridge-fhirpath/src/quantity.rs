@@ -19,6 +19,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use rust_decimal::{Decimal, RoundingStrategy};
 
+use crate::ucum::parse::Operator;
 use crate::ucum::{Canonical, algebra};
 
 /// A calendar duration keyword (N1 §4.1.8).
@@ -342,7 +343,7 @@ impl Quantity {
     }
 
     /// The product (N1 §6.6.1), its unit the UCUM product of the operands'
-    /// with identical units merged ([`algebra::product`]), or the two
+    /// with identical units merged ([`algebra::combine`]), or the two
     /// expressions joined by `.` where that has no written form.
     #[must_use]
     pub fn multiply(&self, other: &Self) -> Option<Self> {
@@ -350,7 +351,8 @@ impl Quantity {
         let unit = match (&self.unit, &other.unit) {
             (Unit::Ucum(one), unit) | (unit, Unit::Ucum(one)) if one == "1" => unit.clone(),
             (Unit::Ucum(a), Unit::Ucum(b)) => Unit::Ucum(
-                algebra::product(a, b).unwrap_or_else(|| format!("{}.{}", group(a), group(b))),
+                algebra::combine(a, b, Operator::Multiply)
+                    .unwrap_or_else(|| format!("{}.{}", group(a), group(b))),
             ),
             _ => return None,
         };
@@ -358,7 +360,7 @@ impl Quantity {
     }
 
     /// The quotient (N1 §6.6.2), its unit the UCUM quotient of the operands'
-    /// with identical units merged ([`algebra::quotient`]), or the two
+    /// with identical units merged ([`algebra::combine`]), or the two
     /// expressions joined by `/` where that has no written form; `None` on a
     /// zero divisor.
     #[must_use]
@@ -368,7 +370,8 @@ impl Quantity {
             (a, b) if a == b => Unit::one(),
             (unit, Unit::Ucum(one)) if one == "1" => unit.clone(),
             (Unit::Ucum(a), Unit::Ucum(b)) => Unit::Ucum(
-                algebra::quotient(a, b).unwrap_or_else(|| format!("{}/{}", group(a), group(b))),
+                algebra::combine(a, b, Operator::Divide)
+                    .unwrap_or_else(|| format!("{}/{}", group(a), group(b))),
             ),
             _ => return None,
         };

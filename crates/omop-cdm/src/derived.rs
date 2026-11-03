@@ -237,23 +237,40 @@ pub async fn observation_period(
     .await
 }
 
-/// Rebuilds the rows of `CONDITION_ERA` that `scope` names with
-/// [`CONDITION_ERA_SQL`].
-///
-/// # Errors
-///
-/// Returns [`WriteError::Database`] naming the table when PostgreSQL refuses
-/// the rebuild; the earlier rows stay.
-pub async fn condition_era(writer: &mut CdmWriter, scope: Scope) -> Result<u64, WriteError> {
-    rebuild(writer, "condition_era", CONDITION_ERA_SQL, None, scope).await
+/// One of the two era tables the CDM's scripts derive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Era {
+    /// `CONDITION_ERA`, from [`CONDITION_ERA_SQL`].
+    Condition,
+    /// `DRUG_ERA`, from [`DRUG_ERA_SQL`].
+    Drug,
 }
 
-/// Rebuilds the rows of `DRUG_ERA` that `scope` names with [`DRUG_ERA_SQL`].
+impl Era {
+    /// The table the era's script fills.
+    const fn table(self) -> &'static str {
+        match self {
+            Self::Condition => "condition_era",
+            Self::Drug => "drug_era",
+        }
+    }
+
+    /// The CDM's script that derives the era.
+    const fn script(self) -> &'static str {
+        match self {
+            Self::Condition => CONDITION_ERA_SQL,
+            Self::Drug => DRUG_ERA_SQL,
+        }
+    }
+}
+
+/// Rebuilds the rows of the table of `era` that `scope` names with the era's
+/// script.
 ///
 /// # Errors
 ///
 /// Returns [`WriteError::Database`] naming the table when PostgreSQL refuses
 /// the rebuild; the earlier rows stay.
-pub async fn drug_era(writer: &mut CdmWriter, scope: Scope) -> Result<u64, WriteError> {
-    rebuild(writer, "drug_era", DRUG_ERA_SQL, None, scope).await
+pub async fn era(writer: &mut CdmWriter, era: Era, scope: Scope) -> Result<u64, WriteError> {
+    rebuild(writer, era.table(), era.script(), None, scope).await
 }

@@ -99,7 +99,7 @@ silence.
 
 ## STU3
 
-`PackageSet::<Stu3>::load_release` reads a package set as FHIR STU3, and a
+`PackageSet::<Stu3>::load` reads a package set as FHIR STU3, and a
 `Validator` over it walks STU3 resources over the STU3 element table. Each
 definition decodes into the generated `fhir_types::stu3` model, and the checks
 read it through the release-neutral `fhir_types::definition` read: STU3's

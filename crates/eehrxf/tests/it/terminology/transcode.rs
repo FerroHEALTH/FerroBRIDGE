@@ -95,7 +95,7 @@ fn pair(system: &str, code: &str) -> (String, String) {
 
 #[test]
 fn a_code_in_a_preferred_system_passes_as_recorded() -> TestResult {
-    let transcoded = transcode(&coded(PREFERRED, "1001", &[])?, &preferred())?;
+    let transcoded = transcode(&coded(PREFERRED, "1001", &[])?, &preferred(), None)?;
     assert_eq!(codes(&transcoded), vec![pair(PREFERRED, "1001")]);
     let display = transcoded
         .codings()
@@ -115,7 +115,7 @@ fn a_code_in_a_preferred_system_passes_as_recorded() -> TestResult {
 #[test]
 fn an_equivalent_mapping_adds_a_coding_after_the_original() -> TestResult {
     let equivalent = mapping('=', &phrase(PREFERRED, "2002", Some("Synthetic term")));
-    let transcoded = transcode(&coded(LOCAL, "L-1", &[equivalent])?, &preferred())?;
+    let transcoded = transcode(&coded(LOCAL, "L-1", &[equivalent])?, &preferred(), None)?;
     assert_eq!(
         codes(&transcoded),
         vec![pair(LOCAL, "L-1"), pair(PREFERRED, "2002")],
@@ -130,7 +130,7 @@ fn an_equivalent_mapping_adds_a_coding_after_the_original() -> TestResult {
 /// it adds no coding and one narrative line naming `words`.
 fn narrative_only(relation: char, words: &str) -> TestResult {
     let related = mapping(relation, &phrase(PREFERRED, "3003", Some("Related term")));
-    let transcoded = transcode(&coded(LOCAL, "L-1", &[related])?, &preferred())?;
+    let transcoded = transcode(&coded(LOCAL, "L-1", &[related])?, &preferred(), None)?;
     assert_eq!(
         codes(&transcoded),
         vec![pair(LOCAL, "L-1")],
@@ -167,7 +167,7 @@ fn an_unknown_mapping_produces_no_coding_and_appears_in_the_narrative() -> TestR
 
 #[test]
 fn an_untranscodable_code_is_transferred_encoded_with_its_narrative() -> TestResult {
-    let transcoded = transcode(&coded(LOCAL, "L-1", &[])?, &preferred())?;
+    let transcoded = transcode(&coded(LOCAL, "L-1", &[])?, &preferred(), None)?;
     assert_eq!(
         codes(&transcoded),
         vec![pair(LOCAL, "L-1")],
@@ -191,7 +191,7 @@ fn an_untranscodable_code_is_transferred_encoded_with_its_narrative() -> TestRes
 #[test]
 fn a_match_the_rm_does_not_admit_is_refused() -> TestResult {
     let invalid = mapping('~', &phrase(PREFERRED, "3003", None));
-    let refused = transcode(&coded(LOCAL, "L-1", &[invalid])?, &preferred());
+    let refused = transcode(&coded(LOCAL, "L-1", &[invalid])?, &preferred(), None);
     assert!(matches!(refused, Err(TranscodeError::InvalidMatch)));
     Ok(())
 }
@@ -202,7 +202,7 @@ fn a_plain_text_carries_only_its_equivalent_mappings() -> TestResult {
         r#"{{ "_type": "DV_TEXT", "value": "Synthetic note", "mappings": [{}] }}"#,
         mapping('=', &phrase(PREFERRED, "4004", None))
     );
-    let transcoded = transcode(&serde_json::from_str(&text)?, &preferred())?;
+    let transcoded = transcode(&serde_json::from_str(&text)?, &preferred(), None)?;
     assert_eq!(codes(&transcoded), vec![pair(PREFERRED, "4004")]);
     assert_eq!(transcoded.narrative(), ["Synthetic note"]);
     assert!(!transcoded.untranscoded());
@@ -221,8 +221,8 @@ async fn translation_without_a_server_fails_closed() {
 #[tokio::test]
 async fn with_no_server_an_untranscodable_code_follows_article_10_7() -> TestResult {
     let text = coded(LOCAL, "L-1", &[])?;
-    let transcoded = transcode_with(&text, &preferred(), &Terminology::none()).await?;
-    assert_eq!(transcoded, transcode(&text, &preferred())?);
+    let transcoded = transcode_with(&text, &preferred(), None, &Terminology::none()).await?;
+    assert_eq!(transcoded, transcode(&text, &preferred(), None)?);
     assert!(transcoded.untranscoded());
     Ok(())
 }
@@ -237,7 +237,8 @@ async fn a_translation_adds_only_equivalent_and_equal_matches() -> TestResult {
         ("equal", PREFERRED, "5009"),
     ]));
     let terminology = Terminology::server(Arc::new(server));
-    let transcoded = transcode_with(&coded(LOCAL, "L-1", &[])?, &preferred(), &terminology).await?;
+    let transcoded =
+        transcode_with(&coded(LOCAL, "L-1", &[])?, &preferred(), None, &terminology).await?;
     assert_eq!(
         codes(&transcoded),
         vec![
@@ -255,7 +256,8 @@ async fn a_refused_translation_is_an_error_carrying_the_status() -> TestResult {
     let terminology = Terminology::server(Arc::new(Scripted(Script::Refuse(
         StatusCode::SERVICE_UNAVAILABLE,
     ))));
-    let refused = transcode_with(&coded(LOCAL, "L-1", &[])?, &preferred(), &terminology).await;
+    let refused =
+        transcode_with(&coded(LOCAL, "L-1", &[])?, &preferred(), None, &terminology).await;
     assert!(
         matches!(
             refused,
@@ -274,8 +276,13 @@ async fn a_preferred_code_asks_no_server() -> TestResult {
     let terminology = Terminology::server(Arc::new(Scripted(Script::Refuse(
         StatusCode::INTERNAL_SERVER_ERROR,
     ))));
-    let transcoded =
-        transcode_with(&coded(PREFERRED, "1001", &[])?, &preferred(), &terminology).await?;
+    let transcoded = transcode_with(
+        &coded(PREFERRED, "1001", &[])?,
+        &preferred(),
+        None,
+        &terminology,
+    )
+    .await?;
     assert_eq!(codes(&transcoded), vec![pair(PREFERRED, "1001")]);
     Ok(())
 }

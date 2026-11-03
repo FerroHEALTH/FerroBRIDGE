@@ -69,7 +69,7 @@ pub(crate) fn compiled_models(
     index: &WebTemplateIndex,
     codes: &dyn MappingCodeRegistry,
 ) -> Result<Arc<Program>, Box<dyn Error>> {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     let mut files = vec![(
         format!("contexts/{fixture}.context.yml"),
         std::fs::read_to_string(format!("{FIXTURES}/contexts/{fixture}.context.yml"))?,

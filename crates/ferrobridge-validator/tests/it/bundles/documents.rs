@@ -6,6 +6,7 @@
 //! `scripts/vendor/profile-packages.sh` has fetched the packages.
 
 use ferrobridge_validator::issue::MessageId;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::report::Report;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
@@ -71,7 +72,7 @@ fn complete() -> Vec<(&'static str, serde_json::Value)> {
 /// The Bundle carries the identifier and the timestamp R4 `bdl-9` and
 /// `bdl-10` require of a document.
 fn document(entries: &[(&str, serde_json::Value)]) -> TestResult<Report> {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let mut document = bundle("document", entries);
     document["identifier"] = json!({"system": "urn:ietf:rfc:3986", "value": "urn:uuid:4a1e8f9e-0000-4000-8000-00000000003b"});
     document["timestamp"] = json!("2026-01-01T00:00:00Z");
