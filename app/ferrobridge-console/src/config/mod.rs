@@ -46,7 +46,6 @@
 
 pub mod error;
 pub mod load;
-pub mod secret;
 pub mod settings;
 
 use ferrohealth_config::loader::Loader;
