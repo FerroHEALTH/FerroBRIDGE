@@ -39,7 +39,9 @@ async fn the_etl_lists_its_runs_and_opens_the_report_of_one() -> Result<(), Box<
             .await?
             .click()
             .await?;
-        browser.at(&stack.url(&format!("/omop/runs/{RUN_ID}"))).await?;
+        browser
+            .at(&stack.url(&format!("/omop/runs/{RUN_ID}")))
+            .await?;
         browser
             .element(By::XPath(
                 "//table//*[contains(., 'the composition names a template the CDR does not hold')]",

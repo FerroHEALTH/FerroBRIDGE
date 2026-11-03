@@ -11,7 +11,8 @@
 //! configuration with every secret by reference alone; [`events`] holds
 //! `GET /operator/events`, the change-feed consumers and the AMQP topology;
 //! [`etl`] holds `GET /operator/etl/runs` and one run of it, the OMOP ETL
-//! runs the bridge schema keeps; [`capability`] holds
+//! runs the bridge schema keeps; [`hl7v2`] holds `GET /operator/hl7v2/concept-maps`, the HL7 v2 face's
+//! `ConceptMap` directory; [`capability`] holds
 //! the facade's `CapabilityStatement` reduced to what the console draws;
 //! [`problem`] holds the RFC 9457 problem details every operator refusal
 //! answers with. A change to a document is a compile error on both sides,
@@ -25,5 +26,6 @@ pub mod configuration;
 pub mod etl;
 pub mod events;
 pub mod health;
+pub mod hl7v2;
 pub mod operator;
 pub mod problem;

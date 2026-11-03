@@ -3,13 +3,14 @@
 
 //! The stack a journey runs against, each part on loopback: a `wiremock`
 //! CDR, the test OpenID Provider, a running bridge over a synthetic mapping
-//! tree with its FHIR facade, operations lane and operator API, and a
-//! running console that draws every page and calls that bridge.
+//! tree with its FHIR facade, operations lane, HL7 v2 face and operator API,
+//! and a running console that draws every page and calls that bridge.
 //!
 //! The bridge runs `ferrobridge serve`'s own run path,
 //! `ferrobridge_server::boot::serve_settings`. Its mapping tree holds one
-//! provisioned context and model over the testkit's diagnosis template, and
-//! an empty directory the console saves into.
+//! provisioned context and model over the testkit's diagnosis template, an
+//! empty directory the console saves into, and a few of the v2-to-FHIR
+//! guide's maps for the HL7 v2 face.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -156,7 +157,10 @@ async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box
         .deletions
         .removed
         .push(String::from("7d44b88c-4199-4bad-97dc-d78268e01398"));
-    refused.deletions.rows.insert(String::from("measurement"), 3);
+    refused
+        .deletions
+        .rows
+        .insert(String::from("measurement"), 3);
     let mut clean = RunReport::new("0b6c5a3e-1d3f-4c7e-9a43-000000000002");
     clean.compositions.read = 2;
     clean.compositions.skipped = 2;
@@ -247,9 +251,7 @@ impl Stack {
             Lanes::WithEtl => Some(etl_database().await?),
             Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => None,
         };
-        let cdm = postgres
-            .as_ref()
-            .map(|postgres| postgres.url().to_owned());
+        let cdm = postgres.as_ref().map(|postgres| postgres.url().to_owned());
         let (bridge, running) =
             bridge(tree.path(), &cdr, &provider, (lanes, cdm.as_deref()), port).await?;
 
@@ -422,8 +424,31 @@ fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
         templates.join("diagnose.opt"),
         ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
     )?;
+    let v2mappings = tree.path().join("v2mappings");
+    std::fs::create_dir_all(&v2mappings)?;
+    for id in CONCEPT_MAPS {
+        let name = format!("ConceptMap-{id}.json");
+        std::fs::copy(Path::new(V2_PACKAGE).join(&name), v2mappings.join(name))?;
+    }
     Ok(tree)
 }
+
+/// The vendored v2-to-FHIR package the HL7 v2 face's maps are copied from.
+const V2_PACKAGE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
+);
+
+/// The guide's maps of an `ORU^R01` the HL7 v2 face loads: a few, so its
+/// `ConceptMaps` page fits one screenshot.
+const CONCEPT_MAPS: [&str; 6] = [
+    "message-oru-r01-to-bundle",
+    "segment-msh-to-messageheader",
+    "segment-pid-to-patient",
+    "segment-obx-to-observation",
+    "datatype-cwe-to-codeableconcept",
+    "table-hl70001-to-administrative-gender",
+];
 
 /// Starts the bridge over the tree at `tree` and the CDR `cdr` on the
 /// loopback port `port` (`0` for one the system chooses), trusting the
@@ -438,11 +463,12 @@ async fn bridge(
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, identity, console] = [
+    let [mappings, templates, identity, console, v2mappings] = [
         tree.join("mappings"),
         tree.join("templates"),
         tree.join("identity.redb"),
         tree.join("console"),
+        tree.join("v2mappings"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
@@ -465,9 +491,11 @@ async fn bridge(
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
+         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\nconcept_maps = {v2mappings}\n\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
+        mllp = neighbour(port, 30)?,
     );
     let settings = ferrobridge_server::config::Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve()?;

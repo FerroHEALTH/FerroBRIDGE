@@ -13,6 +13,7 @@ mod audit;
 mod chain;
 mod composer;
 mod conditions;
+mod count;
 mod demographics;
 mod display;
 mod display_text;

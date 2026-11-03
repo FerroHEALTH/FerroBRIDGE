@@ -20,6 +20,7 @@ use ferrobridge_operator_api::configuration::Configuration;
 use ferrobridge_operator_api::etl::{Run, Runs};
 use ferrobridge_operator_api::events::Events;
 use ferrobridge_operator_api::health::Info;
+use ferrobridge_operator_api::hl7v2::ConceptMaps;
 use ferrobridge_operator_api::operator::{EngineState, Listed};
 use ferrohealth_health::document::Readiness;
 use fhir_types::codec::{Json as _, Path, Value};
@@ -356,6 +357,25 @@ impl Bridge {
         )
         .await
         .map(|(_status, events)| events)
+    }
+
+    /// Reads the HL7 v2 face's `ConceptMap` directory from the operator API,
+    /// `GET {base}operator/hl7v2/concept-maps`, with the messages each map
+    /// served.
+    ///
+    /// # Errors
+    /// Returns [`BridgeError::Refused`] for any status but `200` (a `404`
+    /// where the operator API or the face is off, a `403` without the
+    /// operator scope), and the body errors of [`Self::health_info`].
+    pub async fn concept_maps(&self, token: &AccessToken) -> Result<ConceptMaps, BridgeError> {
+        self.document(
+            "operator/hl7v2/concept-maps",
+            "ConceptMap directory",
+            token,
+            &[StatusCode::OK],
+        )
+        .await
+        .map(|(_status, directory)| directory)
     }
 
     /// Reads the newest OMOP ETL runs from the operator API,

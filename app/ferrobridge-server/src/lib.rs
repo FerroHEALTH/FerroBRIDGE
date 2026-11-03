@@ -552,6 +552,7 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 state.lifecycle().clone(),
                 state.change_feed().cloned(),
                 state.etl_history().cloned(),
+                state.concept_maps().cloned(),
             ));
         }
     }

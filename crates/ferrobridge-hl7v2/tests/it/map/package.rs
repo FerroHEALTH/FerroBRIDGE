@@ -59,3 +59,42 @@ fn the_corpus_conditions_parse_or_are_refused_as_counted_forms() {
         )
     );
 }
+
+#[test]
+fn each_map_names_its_title_and_what_it_maps_from_and_to() {
+    let corpus = support::corpus();
+    let map = |id: &str| corpus.get(id).expect("a vendored map");
+    let segment = map("segment-pid-to-patient");
+    assert_eq!(segment.title.as_deref(), Some("Segment PID to Patient Map"));
+    assert_eq!(
+        segment.ends(),
+        [(String::from("pid"), String::from("patient"))]
+    );
+    assert_eq!(
+        map("message-adt-a01-to-bundle").ends(),
+        [(String::from("adt-a01"), String::from("bundle"))]
+    );
+    assert_eq!(
+        map("datatype-hd-name-to-messageheader-destination").ends(),
+        [(
+            String::from("hd"),
+            String::from("messageheader-destination")
+        )],
+        "the qualifier is no part of the source"
+    );
+    assert_eq!(
+        map("table-hl70277-to-v2-0277").ends(),
+        [(
+            String::from("http://terminology.hl7.org/CodeSystem/v2-0277"),
+            String::from("http://terminology.hl7.org/CodeSystem/v2-0277")
+        )],
+        "a table map names its group's code systems"
+    );
+    assert!(
+        corpus
+            .maps()
+            .filter(|map| map.kind != Kind::Other)
+            .all(|map| !map.ends().is_empty()),
+        "every map of the four kinds names what it maps from and to"
+    );
+}

@@ -141,16 +141,26 @@ fn drawn(
         )),
     };
     if let Some(configuration) = configuration.filter(|_| tab == "settings") {
-        return framed(l, tab, header, crate::pages::settings::tab(l, configuration, &rows::OMOP, &tab_href(tab)));
+        return framed(
+            l,
+            tab,
+            header,
+            crate::pages::settings::tab(l, configuration, &rows::OMOP, &tab_href(tab)),
+        );
     }
     if let Some(runs) = runs.filter(|_| on && tab == "runs") {
         return framed(l, tab, header, run::listing(l, runs));
     }
     if !on {
-        return framed(l, tab, header, quiet(
-                    tr(l, Msg::OmopOff),
-                    Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
-                ));
+        return framed(
+            l,
+            tab,
+            header,
+            quiet(
+                tr(l, Msg::OmopOff),
+                Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
+            ),
+        );
     }
     let database = match readiness {
         Ok(Outcome::Shown(readiness)) => indicator(l, readiness, "cdm"),

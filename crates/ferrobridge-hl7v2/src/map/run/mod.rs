@@ -336,6 +336,8 @@ pub(super) struct Run<'a> {
     resources: Vec<Resource>,
     requests: Vec<Request>,
     outcomes: Vec<Outcome>,
+    /// The id of every map the run applied.
+    applied: BTreeSet<String>,
     /// The count of writes recorded over the run, which a rollback leaves as
     /// it is, so its growth shows that a row wrote.
     pushed: usize,
@@ -355,10 +357,16 @@ impl<'a> Run<'a> {
                 .cloned()
                 .map(Outcome::Parse)
                 .collect(),
+            applied: BTreeSet::new(),
             pushed: 0,
         };
         run.create("Bundle", Identity::Envelope);
         run
+    }
+
+    /// Takes the id of every map the run applied so far.
+    pub(in crate::map) fn take_applied(&mut self) -> BTreeSet<String> {
+        core::mem::take(&mut self.applied)
     }
 
     /// Walks the message through its message map.

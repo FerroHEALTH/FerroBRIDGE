@@ -570,3 +570,34 @@ fn conformance_the_fhirconnect_corpus_holds_its_pass_list() -> Result<(), Box<dy
     );
     Ok(())
 }
+
+#[test]
+fn only_the_repository_source_schema_types_hierarchy_split_openehr() -> Result<(), Box<dyn Error>> {
+    // HierarchyMappings.adoc §split gives `openehr` the shape of `fhir`; the
+    // source schema types it inside `properties` since specification pull
+    // request #106, the rendered v1.0.0 copy still writes it outside.
+    let text = "grammar: FHIRConnect/v1.0.0\ntype: model\nmetadata:\n  name: CLUSTER.a.v1\n  \
+                version: 1.0.0\nspec:\n  system: FHIR\n  version: R4\n  openEhrConfig:\n    \
+                archetype: openEHR-EHR-CLUSTER.a.v1\n  fhirConfig:\n    structureDefinition: \
+                http://hl7.org/fhir/StructureDefinition/Condition\npreprocessor:\n  hierarchy:\n    \
+                with:\n      fhir: \"$resource.category\"\n      openehr: \
+                \"$archetype/data[at0001]\"\n    split:\n      openehr: \"event\"\nmappings: []\n";
+    let document = load_str("split.yml", text)?;
+    let source = schemas_from("modules/ROOT/attachments")?;
+    let rendered = schemas_from("build/site/FHIRconnect/v1.0.0/_attachments")?;
+    let refusals = source.validate_document(&document);
+    assert_eq!(
+        refusals.len(),
+        1,
+        "the source schema refuses a string `split.openehr`"
+    );
+    assert!(
+        rendered.validate_document(&document).is_empty(),
+        "the rendered v1.0.0 schema leaves `split.openehr` unvalidated"
+    );
+    assert!(
+        !strict_schemas()?.validate_document(&document).is_empty(),
+        "the strict schema types `split.openehr` as `split.fhir` is"
+    );
+    Ok(())
+}

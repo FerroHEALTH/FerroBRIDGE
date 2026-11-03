@@ -24,6 +24,7 @@ use tower::ServiceExt as _;
 
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, challenge, ec_key, mint};
 
+mod concept_maps;
 mod configuration;
 mod etl_runs;
 mod events;
@@ -65,7 +66,7 @@ impl Case {
     async fn answering(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(configuration, None, None).await
+        Self::build(configuration, None, (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -73,7 +74,7 @@ impl Case {
     async fn reporting(
         report: ferrobridge_server::change_feed::report::Report,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, Some(report), None).await
+        Self::build(None, Some(report), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -81,15 +82,26 @@ impl Case {
     async fn keeping(
         history: Arc<ferrobridge_server::etl::history::Store>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, Some(history)).await
+        Self::build(None, None, (Some(history), None)).await
     }
 
-    /// Builds the case over `configuration`, `consumers` and the run
-    /// history `history`.
+    /// Builds the tree, the issuer and the router, the operator API
+    /// answering the HL7 v2 face's `ConceptMap` directory `directory`.
+    async fn listing(
+        directory: Arc<ferrobridge_server::hl7v2::directory::Directory>,
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::build(None, None, (None, Some(directory))).await
+    }
+
+    /// Builds the case over `configuration`, `consumers`, the run history
+    /// `history` and the HL7 v2 face's `concept_maps`.
     async fn build(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
         consumers: Option<ferrobridge_server::change_feed::report::Report>,
-        history: Option<Arc<ferrobridge_server::etl::history::Store>>,
+        (history, concept_maps): (
+            Option<Arc<ferrobridge_server::etl::history::Store>>,
+            Option<Arc<ferrobridge_server::hl7v2::directory::Directory>>,
+        ),
     ) -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
         let mappings = tree.path().join("mappings");
@@ -140,6 +152,10 @@ impl Case {
         };
         let state = match history {
             Some(history) => state.with_etl_history(history),
+            None => state,
+        };
+        let state = match concept_maps {
+            Some(directory) => state.with_concept_maps(directory),
             None => state,
         };
         let app = ferrobridge_server::router(Arc::new(state), &crate::support::settings());
@@ -197,10 +213,11 @@ fn digest(bytes: &[u8]) -> String {
 }
 
 /// The read-only operator routes, as a client calls them.
-const ROUTES: [&str; 7] = [
+const ROUTES: [&str; 8] = [
     "/operator/state",
     "/operator/etl/runs",
     "/operator/events",
+    "/operator/hl7v2/concept-maps",
     "/operator/readiness",
     "/operator/configuration",
     "/operator/mappings",

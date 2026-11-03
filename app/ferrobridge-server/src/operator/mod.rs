@@ -13,7 +13,8 @@
 //! the bridge started on, every secret by reference alone
 //! ([`configuration`]), `GET /operator/etl/runs` the OMOP ETL runs the bridge
 //! schema keeps and `GET /operator/etl/runs/{run_id}` one of them,
-//! `GET /operator/events` the change-feed consumers, their
+//! `GET /operator/hl7v2/concept-maps` the HL7 v2 face's `ConceptMap`
+//! directory, `GET /operator/events` the change-feed consumers, their
 //! parked events and the AMQP topology, and `POST
 //! /operator/events/{consumer}/parked/{id}/replay` a replay of one
 //! (`crate::change_feed::report`). With `[operator] mapping_dir`, `POST
@@ -194,6 +195,7 @@ pub fn routes(
     lifecycle: Lifecycle,
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
     etl_history: Option<Arc<crate::etl::history::Store>>,
+    concept_maps: Option<Arc<crate::hl7v2::directory::Directory>>,
 ) -> Router {
     let readiness = Router::new()
         .route("/operator/readiness", get(readiness))
@@ -209,6 +211,9 @@ pub fn routes(
         .route("/operator/etl/runs", get(etl_runs))
         .route("/operator/etl/runs/{run_id}", get(etl_run))
         .with_state(etl_history);
+    let face = Router::new()
+        .route("/operator/hl7v2/concept-maps", get(concept_map_directory))
+        .with_state(concept_maps);
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/configuration", get(running_configuration))
@@ -220,6 +225,7 @@ pub fn routes(
         .merge(readiness)
         .merge(lane)
         .merge(history)
+        .merge(face)
         .route_layer(guard::layer(smart))
 }
 
@@ -341,6 +347,17 @@ fn history_unavailable(error: &crate::etl::history::ReadError) -> Response {
         Kind::RunHistoryUnavailable,
         "the run history could not be read",
     )
+}
+
+/// `GET /operator/hl7v2/concept-maps`: the HL7 v2 face's `ConceptMap`
+/// directory with the messages each map served, `404` when the face is off.
+async fn concept_map_directory(
+    State(directory): State<Option<Arc<crate::hl7v2::directory::Directory>>>,
+) -> Response {
+    match directory {
+        Some(directory) => axum::Json(directory.document()).into_response(),
+        None => refuse(Kind::NotFound, "this bridge runs no HL7 v2 face"),
+    }
 }
 
 /// Runs `work`, which reads or writes the dead-letter store, off the async
