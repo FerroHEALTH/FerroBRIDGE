@@ -433,8 +433,6 @@ messages! {
     #[doc = "The full notice."] SignInFull = "sign-in-full",
     #[doc = "A sign-in route without `[oidc]`."] SignInNotConfigured = "sign-in-not-configured",
     #[doc = "A sign-out that failed."] SessionNotEnded = "session-not-ended",
-    #[doc = "A sign-out redirect that failed."] SignOutRedirectUnwritten = "sign-out-redirect-unwritten",
-    #[doc = "A sign-in redirect that failed."] SignInRedirectUnwritten = "sign-in-redirect-unwritten",
     #[doc = "A callback with no pending sign-in."] NoSignInPending = "no-sign-in-pending",
     #[doc = "A callback with the wrong state."] SignInStateMismatch = "sign-in-state-mismatch",
     #[doc = "A callback carrying an error."] ProviderDidNotSignIn = "provider-did-not-sign-in",

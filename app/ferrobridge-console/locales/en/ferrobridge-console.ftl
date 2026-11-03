@@ -509,8 +509,6 @@ sign-in-full = The console has reached its session limit, so it cannot start you
 
 sign-in-not-configured = sign-in is not configured on this console
 session-not-ended = the session could not be ended
-sign-out-redirect-unwritten = the sign-out redirect could not be written
-sign-in-redirect-unwritten = the sign-in redirect could not be written
 no-sign-in-pending = no sign-in is pending
 sign-in-state-mismatch = the sign-in state does not match this session
 provider-did-not-sign-in = For the administrator: the identity provider refused the sign-in (401).

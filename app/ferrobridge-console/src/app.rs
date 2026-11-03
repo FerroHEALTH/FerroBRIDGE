@@ -15,6 +15,7 @@ use axum::response::{IntoResponse, Response};
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::serve::Assets;
 use ferrohealth_ui::style::Brand;
+use ferrohealth_ui::view::session::{Watch, session_watch};
 use ferrohealth_ui::view::shell::{Document, centred, document};
 use ferrohealth_ui::view::toast::{Flash, toast_region};
 
@@ -37,10 +38,17 @@ pub const MARK_LIGHT: &str = "/brand/ferrobridge-icon.svg";
 pub const MARK_DARK: &str = "/brand/ferrobridge-icon-dark.svg";
 
 /// The path of the sign-in route the server serves.
-pub const SIGN_IN: &str = "/login";
+pub const SIGN_IN: &str = ferrohealth_session::paths::LOGIN;
 
 /// The path of the sign-out route the server serves.
-pub const SIGN_OUT: &str = "/logout";
+pub const SIGN_OUT: &str = ferrohealth_session::paths::LOGOUT;
+
+/// The query parameter of the sign-in page that says the session ended.
+pub const ENDED: &str = "session";
+
+/// The sign-in page saying the session ended, which FerroUI's session watch
+/// loads with the page left as its return address.
+pub const SESSION_ENDED: &str = "/?session=ended";
 
 /// The page a signed-out operator lands on.
 pub const SIGNED_OUT: &str = "/signed-out";
@@ -192,7 +200,9 @@ pub async fn render(visit: &Visit, drawn: Drawn) -> Response {
     let body = match (drawn.frame, visit.session) {
         (Frame::Shell, SessionState::SignedIn) => {
             let toasts = toast_region(locale, drawn.flash);
-            crate::shell::shell(visit, drawn.content, drawn.dock, toasts).await
+            crate::shell::shell(visit, drawn.content, drawn.dock, toasts)
+                .await
+                .then(watch(visit))
         }
         (Frame::Shell | Frame::Centred, _) => centred(
             locale,
@@ -217,6 +227,21 @@ pub async fn render(visit: &Visit, drawn: Drawn) -> Response {
     let mut response = axum::response::Html(String::from(page)).into_response();
     *response.status_mut() = drawn.status;
     response
+}
+
+/// FerroUI's watch over the operator's session, from what it had left as
+/// the request arrived (FerroUI `docs/consoles.md`, "The session's end");
+/// nothing for a page drawn with no live session.
+fn watch(visit: &Visit) -> Html {
+    visit.left.map_or_else(Html::empty, |left| {
+        session_watch(&Watch::new(
+            &visit.locale,
+            ferrohealth_session::paths::SESSION,
+            SESSION_ENDED,
+            SIGN_OUT,
+            left,
+        ))
+    })
 }
 
 /// The word an unnamed operator is shown as.

@@ -45,16 +45,9 @@ http.workspace = true
 thiserror.workspace = true
 # The bridge's address a page names, and the words of a search link.
 url.workspace = true
-# The random session ids, PKCE verifiers, states and nonces, the SHA-256 of
-# the PKCE challenge (RFC 7636 §4.2) and the constant-time comparisons, from
-# the crypto library rustls already builds on.
-aws-lc-rs.workspace = true
 # The import page reads its ZIP from a multipart form post.
 axum = { workspace = true, features = ["multipart"] }
-base64.workspace = true
 clap.workspace = true
-# The `__Host-` session cookies (RFC 6265bis).
-cookie.workspace = true
 # The family's process plumbing (FerroSYS): the configuration loader and its
 # `_file` secrets, the console log, the health routes over a registry and a
 # lifecycle, the browser security headers, the same-origin check, the drain,
@@ -69,22 +62,27 @@ ferrohealth-telemetry.workspace = true
 # `OperationOutcome` and `Parameters` of a run, in the terminology root set
 # of the generated model.
 fhir-types = { workspace = true, features = ["r4", "terminology"] }
-# The OpenID Connect relying party operators sign in through (`oidc`):
-# the authorization request with PKCE, the code exchange and the ID Token
-# check (OpenID Connect Core 1.0 §3.1.3.7), the refresh and the end-session
-# request.
+# The operators' sign-in and their session (FerroAUTH): the `[oidc]` and
+# `[session]` sections, the store, the refresh before an access token
+# expires, and with `axum` the routes `/login`, `/auth/callback`, `/logout`
+# and `/session` and the middleware every page sits behind.
+ferrohealth-session = { workspace = true, features = ["axum"] }
+# The relying party the sign-in runs through, whose refusals a stopped
+# sign-in names, and the scope values the console checks `[oidc]` for.
 ferrohealth-smart = { workspace = true, features = ["oidc"] }
 # The bridge client and the OpenID Provider's client.
 reqwest.workspace = true
-# A secret read from the configuration and every token a session holds,
-# zeroed when dropped.
+# The operator's access token on its way to the bridge, zeroed when dropped.
 secrecy.workspace = true
-# `sync` holds one refresh of a session's access token at a time, and keeps
-# each document a request reads from the bridge once.
+# `sync` keeps each document a request reads from the bridge once.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
 tracing.workspace = true
 
 [dev-dependencies]
+# The sign-in cases check the PKCE challenge (RFC 7636 §4.2) and a
+# confidential client's Basic credentials.
+aws-lc-rs.workspace = true
+base64.workspace = true
 # The test OpenID Provider the sign-in, the refresh and the sign-out run
 # against; a dev-dependency links into no shipped artifact.
 ferrobridge-testkit.workspace = true
