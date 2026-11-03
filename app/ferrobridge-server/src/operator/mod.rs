@@ -11,7 +11,7 @@
 //! owner, `GET /operator/mappings/{path}` one file's verbatim bytes with its
 //! digest as the `ETag`, and `GET /operator/configuration` the configuration
 //! the bridge started on, every secret by reference alone
-//! ([`configuration`]), `GET /operator/etl/runs` the OMOP ETL runs the bridge
+//! ([`crate::config::document`]), `GET /operator/etl/runs` the OMOP ETL runs the bridge
 //! schema keeps and `GET /operator/etl/runs/{run_id}` one of them,
 //! `GET /operator/templates/{id}/example` a synthetic example composition
 //! of a template ([`templates`]),
