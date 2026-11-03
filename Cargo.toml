@@ -53,6 +53,11 @@ openehr-rm = "0.0.116"
 openehr-base = "0.0.116"
 # anyhow is a binary-only error type (.claude/rules/rust-style.md).
 anyhow = "1.0.104"
+# The forwarder ratchet parses the hand-written Rust (tools/forwarders).
+# Verified against crates.io on 2026-11-03.
+syn = { version = "3.0.6", default-features = false, features = ["full", "parsing", "printing"] }
+proc-macro2 = { version = "1.0.107", default-features = false, features = ["span-locations"] }
+quote = { version = "1.0.47", default-features = false }
 clap = { version = "4.6.7", features = ["derive"] }
 tempfile = "3.27.0"
 # Test-only.

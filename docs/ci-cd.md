@@ -40,6 +40,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` and every issue `Command::pending_issue` names is open |
 | `file-length` | `scripts/checks/file-length.sh`: a hand-written Rust file stays at most 1000 lines, after its `--self-test`; a listed breach may shrink and never grow |
 | `duplication` | `scripts/checks/duplication.sh --self-test`, then the guard: jscpd from its pinned image over the hand-written Rust, the duplicated lines held to `scripts/checks/duplication.count`; a rise fails and names both places of each new block, a fall passes with a note (#1359) |
+| `forwarders` | `scripts/checks/forwarders.sh --self-test`, then the guard: `tools/forwarders` lists the functions whose whole body forwards to one other call, held to `scripts/checks/forwarders.count`; a rise fails and names each new forwarder with its target, a fall passes with a note (#1414) |
 | `changelog-guard` | `scripts/checks/changelog-guard.sh --self-test`, then the guard on a pull request: a change to `app/`, `crates/`, `docker/`, `compose.yaml` or the root Cargo manifests adds a fragment under `changelog.d/` unless it carries `no-changelog`, and no change writes under `[Unreleased]` |
 | `tracker-helpers` | the `--self-test` of `scripts/gh/fields.sh`, `labels.sh` and `migrate-fields.sh`, each driven against a stub `gh` on `PATH`, and of `scripts/deploy-probe.sh` against a stub `curl` |
 
@@ -536,10 +537,11 @@ pull-requests write) when one is set, and otherwise says in the pull request
 body to close and reopen it (#1363, the rule FerroEHR adopted in
 FerroHEALTH/FerroEHR#4554). No specification governs this: our own design.
 
-The duplication guard (`scripts/checks/duplication.sh`) and the file-length
-allow-list (`scripts/checks/file-length.sh`) are ratchets of the same kind
-(#1359): each fails a rise, passes a fall with a note, and has an `--update`
-that never raises, and the lane lowers all three in its one pull request.
+The duplication guard (`scripts/checks/duplication.sh`), the file-length
+allow-list (`scripts/checks/file-length.sh`, #1359) and the forwarder guard
+(`scripts/checks/forwarders.sh`, #1414) are ratchets of the same kind: each
+fails a rise, passes a fall with a note, and has an `--update` that never
+raises, and the lane lowers them all in its one pull request.
 
 ## Triggers and concurrency
 
