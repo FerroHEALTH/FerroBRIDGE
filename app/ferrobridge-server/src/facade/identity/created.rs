@@ -17,9 +17,9 @@
 
 use core::fmt;
 
-use fhirconnect::engine::seam::IdentityRequest;
-use fhirconnect::engine::seam::IdentitySink;
 use fhirconnect::engine::seam::ReferenceError;
+use fhirconnect::engine::seam::identity::IdentityRequest;
+use fhirconnect::engine::seam::identity::IdentitySink;
 
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::derive;

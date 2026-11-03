@@ -8,7 +8,7 @@ use axum::body::Body;
 use ferrobridge_server::facade::identity::FhirResourceId;
 use ferrobridge_server::facade::identity::derive;
 use ferrobridge_server::facade::identity::store::Store;
-use fhirconnect::engine::seam::IdentityRequest;
+use fhirconnect::engine::seam::identity::IdentityRequest;
 use http::Request;
 use http::StatusCode;
 use http::header;

@@ -20,7 +20,7 @@
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 
 use fhirconnect::engine::identity::deterministic_id;
-use fhirconnect::engine::seam::IdentityRequest;
+use fhirconnect::engine::seam::identity::IdentityRequest;
 
 use crate::facade::identity::ExternalResourceId;
 use crate::facade::identity::FhirResourceId;
@@ -183,18 +183,24 @@ mod tests {
 
     /// Returns the created id of a split occurrence at `position`.
     fn created_at(position: u32, unique: &[&str]) -> crate::facade::identity::FhirResourceId {
-        let request =
-            fhirconnect::engine::seam::IdentityRequest::new("Condition", "Condition", "split")
-                .with_occurrence(vec![position])
-                .with_unique(unique.iter().map(|value| String::from(*value)).collect());
+        let request = fhirconnect::engine::seam::identity::IdentityRequest::new(
+            "Condition",
+            "Condition",
+            "split",
+        )
+        .with_occurrence(vec![position])
+        .with_unique(unique.iter().map(|value| String::from(*value)).collect());
         super::created_id(&parent(), &request)
     }
 
     #[test]
     fn a_created_id_is_the_one_tofhir_answers() {
-        let request =
-            fhirconnect::engine::seam::IdentityRequest::new("Condition", "Condition", "split")
-                .with_occurrence(vec![2]);
+        let request = fhirconnect::engine::seam::identity::IdentityRequest::new(
+            "Condition",
+            "Condition",
+            "split",
+        )
+        .with_occurrence(vec![2]);
         let id = super::created_id(&parent(), &request);
         assert_eq!(
             fhirconnect::engine::identity::created_id(
@@ -217,9 +223,12 @@ mod tests {
 
     #[test]
     fn the_composition_version_does_not_move_a_created_id() {
-        let request =
-            fhirconnect::engine::seam::IdentityRequest::new("Condition", "Condition", "split")
-                .with_occurrence(vec![2]);
+        let request = fhirconnect::engine::seam::identity::IdentityRequest::new(
+            "Condition",
+            "Condition",
+            "split",
+        )
+        .with_occurrence(vec![2]);
         let one = request
             .clone()
             .with_composition(format!("{CONTAINER}::ferroehr::1"));

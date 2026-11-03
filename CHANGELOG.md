@@ -1222,7 +1222,7 @@ the quantity, temporal, URI, string and interval data-type pairs.
 - `fhirconnect::operations::run::to_fhir` takes the id of the mapped
   resource from a caller-supplied identity seam when the seams carry one
   (#619): `Seams::with_resource_identity` over the new
-  `engine::seam::ResourceIdentity` trait, which answers a
+  `engine::seam::identity::ResourceIdentity` trait, which answers a
   `ResourceRequest` (the resource type, the template, the composition's
   `OBJECT_VERSION_ID` and the `id` the mapping wrote). A seam that refuses
   ends the run with `OperationError::Identity`, and an id outside the R4

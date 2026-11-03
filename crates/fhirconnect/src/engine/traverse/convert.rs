@@ -25,8 +25,8 @@ use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
-use crate::engine::rm::Carried;
 use crate::engine::rm::RmValue;
+use crate::engine::rm::carried::Carried;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::manual::ManualValue;
@@ -518,8 +518,8 @@ fn scalar_number(
     kind: FhirKind,
     text: &str,
 ) -> Option<Result<FhirValue, LensError>> {
-    let carried =
-        rm::carried(openehr.tail_class(), &tail_segments(openehr)).map(|(_, carried)| carried);
+    let carried = rm::carried::carried(openehr.tail_class(), &tail_segments(openehr))
+        .map(|(_, carried)| carried);
     let unreadable = |cell: &'static str, attribute: &'static str| LensError::Shape {
         cell,
         attribute,

@@ -23,7 +23,7 @@
 
 use sha2::Digest;
 
-use crate::engine::seam::IdentityRequest;
+use crate::engine::seam::identity::IdentityRequest;
 
 /// The RFC 4648 §6 base32 alphabet, lowercased.
 const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";

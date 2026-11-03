@@ -46,10 +46,10 @@ use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::condition::Verdict;
 use fhirconnect::engine::condition::evaluate;
-use fhirconnect::engine::seam::IdentityRequest;
-use fhirconnect::engine::seam::IdentitySink;
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::ReferenceSource;
+use fhirconnect::engine::seam::identity::IdentityRequest;
+use fhirconnect::engine::seam::identity::IdentitySink;
 use fhirconnect::engine::traverse::Defaults;
 
 use fhirconnect::resolve::program::Program;

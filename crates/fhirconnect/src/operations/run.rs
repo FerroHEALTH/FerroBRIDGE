@@ -31,8 +31,8 @@ use crate::engine::origin::SourceItem;
 use crate::engine::outcome::Location;
 use crate::engine::outcome::Warning;
 use crate::engine::seam::BundleReferences;
-use crate::engine::seam::ResourceRequest;
 use crate::engine::seam::Seams;
+use crate::engine::seam::identity::ResourceRequest;
 use crate::engine::traverse;
 use crate::engine::traverse::Defaults;
 use crate::operations::contract::CompositionPayload;
@@ -439,7 +439,7 @@ fn object_of(document: &Value) -> Result<Object, OperationError> {
 
 /// Returns the FHIR id the mapped resource takes.
 ///
-/// A caller's [`crate::engine::seam::ResourceIdentity`] seam assigns it when the seams carry one,
+/// A caller's [`crate::engine::seam::identity::ResourceIdentity`] seam assigns it when the seams carry one,
 /// and the id it answers must fit the FHIR id grammar
 /// `[A-Za-z0-9\-\.]{1,64}` (<https://hl7.org/fhir/R4/resource.html>).
 /// Without one, a mapping that wrote an `id` keeps it, and otherwise the id
