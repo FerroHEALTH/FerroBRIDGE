@@ -25,7 +25,9 @@ use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
+use fhirconnect::model::load::MappingSet;
 use fhirconnect::model::load::load_set;
+use fhirconnect::model::load::load_set_from_text;
 use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::operations::contract::CompositionPayload;
 use fhirconnect::operations::contract::ToFhirRequest;
@@ -44,6 +46,7 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::PathError;
 use openehr_mapping_core::template::TemplateSource;
 
+use crate::mappings::Project;
 use crate::transformation::Pin;
 
 /// FHIRconnect context mappings compiled against one operational template.
@@ -102,12 +105,60 @@ impl Mapping {
         let codes = StaticMappingCodes::default();
         let set = load_set(files.iter().map(AsRef::as_ref), &codes)
             .map_err(|diagnostics| MappingError::Refused { diagnostics })?;
+        let files = files
+            .iter()
+            .filter_map(|file| file.as_ref().file_name())
+            .map(|name| name.to_string_lossy().into_owned())
+            .collect();
+        Self::from_set(index, &set, contexts, files)
+    }
+
+    /// Compiles the context mappings `project` names from its embedded
+    /// files, against the operational template `source`, with no file
+    /// written: the files load from their text as [`Mapping::compile_template`]
+    /// loads them from disk.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Mapping::compile_template`].
+    pub fn compile_project(
+        source: &TemplateSource,
+        project: &Project,
+    ) -> Result<Self, MappingError> {
+        let index = WebTemplateIndex::build(source).map_err(|source| MappingError::Template {
+            source: Box::new(source),
+        })?;
+        let set = load_set_from_text(
+            project
+                .files()
+                .iter()
+                .map(|file| (Path::new(project.directory()).join(file.name), file.text)),
+            &StaticMappingCodes::default(),
+        )
+        .map_err(|diagnostics| MappingError::Refused { diagnostics })?;
+        let files = project
+            .files()
+            .iter()
+            .map(|file| file.name.to_owned())
+            .collect();
+        Self::from_set(index, &set, project.contexts(), files)
+    }
+
+    /// Compiles the context mappings `contexts` names from `set` against
+    /// `index`, the mapping's files named `files`.
+    fn from_set(
+        index: WebTemplateIndex,
+        set: &MappingSet,
+        contexts: &[&str],
+        files: Vec<String>,
+    ) -> Result<Self, MappingError> {
+        let codes = StaticMappingCodes::default();
         let mut compiled = Vec::with_capacity(contexts.len());
         for context in contexts {
             let name = MappingName::new(*context)
                 .map_err(|source| MappingError::ContextName { source })?;
             compiled.push(
-                compile(&set, &name, &index, &SCHEMAS, &codes)
+                compile(set, &name, &index, &SCHEMAS, &codes)
                     .map_err(|diagnostics| MappingError::Refused { diagnostics })?,
             );
         }
@@ -118,11 +169,6 @@ impl Mapping {
                 .insert_program(program)
                 .map_err(|source| MappingError::Program { source })?;
         }
-        let files = files
-            .iter()
-            .filter_map(|file| file.as_ref().file_name())
-            .map(|name| name.to_string_lossy().into_owned())
-            .collect();
         Ok(Self { programs, files })
     }
 

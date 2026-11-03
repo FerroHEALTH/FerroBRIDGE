@@ -20,6 +20,7 @@ use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::header::metadata::MappingType;
 use openehr_mapping_core::loader::MappingDocument;
 use openehr_mapping_core::loader::load_file;
+use openehr_mapping_core::loader::load_str;
 
 use crate::model::ast::ContextMappingFile;
 use crate::model::ast::ModelMappingFile;
@@ -198,16 +199,60 @@ where
     I: IntoIterator<Item = P>,
     P: AsRef<Path>,
 {
-    let mut set = MappingSet::new();
-    let mut diagnostics = Vec::new();
     let mut paths: Vec<PathBuf> = files
         .into_iter()
         .map(|file| file.as_ref().to_path_buf())
         .collect();
     paths.sort_unstable();
+    load_documents(paths.iter().map(|path| read(path)), codes)
+}
 
-    for path in paths {
-        let document = match read(&path) {
+/// Loads and validates a whole set of mapping files given as text.
+///
+/// Each entry is a file's name, the path its diagnostics name, and its
+/// YAML text. The set is loaded as [`load_set`] loads files from disk: in
+/// the order of their names, each read, schema-checked and lowered on its
+/// own, and then checked against the semantic rules.
+///
+/// # Errors
+///
+/// Returns every refusal from every file, followed by every semantic refusal,
+/// as [`load_set`] does.
+pub fn load_set_from_text<I, N, T>(
+    files: I,
+    codes: &dyn MappingCodeRegistry,
+) -> Result<MappingSet, Vec<Diagnostic>>
+where
+    I: IntoIterator<Item = (N, T)>,
+    N: Into<PathBuf>,
+    T: AsRef<str>,
+{
+    let mut texts: Vec<(PathBuf, T)> = files
+        .into_iter()
+        .map(|(name, text)| (name.into(), text))
+        .collect();
+    texts.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+    load_documents(
+        texts.iter().map(|(name, text)| {
+            load_str(name.clone(), text.as_ref()).map_err(|error| vec![Diagnostic::from(&error)])
+        }),
+        codes,
+    )
+}
+
+/// Schema-checks and lowers each of `documents`, then checks the set
+/// against the semantic rules.
+fn load_documents<I>(
+    documents: I,
+    codes: &dyn MappingCodeRegistry,
+) -> Result<MappingSet, Vec<Diagnostic>>
+where
+    I: Iterator<Item = Result<MappingDocument, Vec<Diagnostic>>>,
+{
+    let mut set = MappingSet::new();
+    let mut diagnostics = Vec::new();
+    for document in documents {
+        let document = match document {
             Ok(document) => document,
             Err(mut errors) => {
                 diagnostics.append(&mut errors);

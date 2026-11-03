@@ -40,6 +40,7 @@ use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::operations::run::Settings;
+use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
 use super::support::{emit, lab};
@@ -517,6 +518,25 @@ fn the_report_identifier_the_template_holds_one_of_is_declared_lost() -> Result<
                 && issue["expression"][0] == "DiagnosticReport.identifier.value"
         });
     assert!(declared, "the dropped identifier is declared: {outcome}");
+    Ok(())
+}
+
+#[test]
+fn the_embedded_project_compiles_and_maps_as_its_files_do() -> Result<(), Box<dyn Error>> {
+    let embedded =
+        Mapping::compile_project(&TemplateSource::opt14(KDS_LABORBERICHT_OPT)?, &LABORATORY)?;
+    let from_disk = mapping()?;
+    assert_eq!(
+        embedded.contexts().collect::<Vec<_>>(),
+        from_disk.contexts().collect::<Vec<_>>()
+    );
+    assert_eq!(embedded.files(), from_disk.files());
+    let document = ReceivedDocument::read(&received_text()?)?;
+    assert_eq!(
+        embedded.to_openehr(&document, &settings())?,
+        from_disk.to_openehr(&document, &settings())?,
+        "the embedded files map the document as the files on disk do"
+    );
     Ok(())
 }
 
