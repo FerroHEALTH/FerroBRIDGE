@@ -15,7 +15,7 @@
 //! `CdmPool`.
 //!
 //! The structural facts a check reads (required, datatype, keys, domain,
-//! class) come from the CDM v5.4.3 definitions through
+//! class) come from the CDM v5.4 definitions through
 //! [`crate::generated::TABLES`]; the thresholds, the notes and the enablement
 //! of `isStandardValidConcept`, the completeness checks and the temporal
 //! plausibility checks come from the Dashboard's files. The SQL is

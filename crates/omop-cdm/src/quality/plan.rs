@@ -3,7 +3,7 @@
 
 //! Which check instances exist for the CDM v5.4 tables.
 //!
-//! A check runs where the CDM v5.4.3 definitions say its fact holds:
+//! A check runs where the CDM v5.4 definitions say its fact holds:
 //! `cdmTable` for every table, `cdmField` for every column, `isRequired`
 //! where the column is required, `cdmDatatype` where it is an integer,
 //! `isPrimaryKey` where it is the primary key, `isForeignKey` where it is a

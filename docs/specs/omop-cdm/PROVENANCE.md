@@ -8,15 +8,15 @@ Vendored verbatim by `scripts/vendor/omop-cdm.sh`
 docs/VERSIONS.md and re-run the script.
 
 - Source: <https://github.com/OHDSI/CommonDataModel>
-- Pin: tag `v5.4.3`, which resolves to commit `746a15e0fb36a95ba6cc0993737f1273bbad92f2`
-- Fetched: 2026-09-25
+- Pin: tag `v5.5.0`, which resolves to commit `ba3dc1b651cc243279052bca3d051485c3ec1136`
+- Fetched: 2026-11-03
 - Upstream licence: `Apache License 2.0`. **The repository has no `LICENSE` file.**
   `DESCRIPTION` is the only place the licence is declared, which is why that
   file is vendored here and the script fails if a `LICENSE` file ever appears.
 - Layout: the upstream paths, unchanged
 - Files: 8
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `67a4bdcb2886db921ea2c38865c0b8356845dfe86750c588722a9da9deece9ba`
+  `PROVENANCE.md` excluded): `5c310bd11270a964d25a0f4f0e694a80fef0137eb3bf9c9b436ba499e133fcae`
 
 ## What is here
 
@@ -34,8 +34,8 @@ this file so an upstream change to the scripts is noticed.
 
 | File | sha256 | git blob id |
 |---|---|---|
-| `inst/csv/OMOP_CDMv5.4_Field_Level.csv` | `2b763c7a2aeb309372c1564350939551531318e2078fd4443e03b2741e79b77c` | `fdec16107fba2a45c3ec360ef84c0d837a43998b` |
-| `inst/csv/OMOP_CDMv5.4_Table_Level.csv` | `a8ad96bc9eece99b8496ea7ca4e5c61df7ec6be09688862e46e326dfc82b8284` | `8e6e2ad2e3b56a4b1c4fc3824785178904405e82` |
+| `inst/csv/OMOP_CDMv5.4_Field_Level.csv` | `1b727775c4bf470274d6bb7b5b20f447fac37184e11ac7c69c1e2d6c3c48d06c` | `a6d0d4b26e86928bcd0aee7f31e7d3b96956f0b4` |
+| `inst/csv/OMOP_CDMv5.4_Table_Level.csv` | `7b17597d4f1c02b1e31043f0c414f0112f46735a2313d7f7fc9770a6e2c840d9` | `07711071feec20e5bdc1e8bee51a2f756c0e771b` |
 | `inst/ddl/5.4/postgresql/OMOPCDM_postgresql_5.4_ddl.sql` | `c340fc1723cc71c411aa7d5d67844882ec720bed1135eca2b8a9029d0a3ef854` | `162bdc5c863fec8ca32e07814a40a347f267788a` |
 | `inst/ddl/5.4/postgresql/OMOPCDM_postgresql_5.4_primary_keys.sql` | `d8f50617f9a698bd9fbfe8d4106d76dcd543949a6976032786f64a91c1941f81` | `9304d020bcb007bca8ad8e57873b76a2b626e8d9` |
 | `inst/ddl/5.4/postgresql/OMOPCDM_postgresql_5.4_indices.sql` | `ea23abbb327ee94e974728196cce2b2db466c7ad4bb4313f36fa3ce2388e8776` | `18b739493af0c3bcc90bff728e987a5b06a7bb0b` |

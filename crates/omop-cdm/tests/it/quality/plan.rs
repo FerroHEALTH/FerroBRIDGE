@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! Which checks the plan holds: the facts from the CDM v5.4.3 definitions where
+//! Which checks the plan holds: the facts from the CDM v5.4 definitions where
 //! the Dashboard's settings disagree with them, the thresholds and the
 //! enablement from the Dashboard, the default exclusions, and the order.
 
