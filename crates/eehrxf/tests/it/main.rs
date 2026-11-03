@@ -43,6 +43,16 @@ mod laboratory;
 #[cfg(feature = "openehr")]
 mod mapping;
 #[cfg(test)]
+#[cfg(all(
+    feature = "openehr",
+    any(
+        feature = "prescription",
+        feature = "dispensation",
+        feature = "laboratory"
+    )
+))]
+mod mappings;
+#[cfg(test)]
 #[cfg(any(feature = "prescription", feature = "dispensation"))]
 mod medication;
 #[cfg(test)]

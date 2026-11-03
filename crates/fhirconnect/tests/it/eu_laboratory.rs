@@ -33,6 +33,7 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
 use crate::support::FIXTURES;
+use crate::support::SHIPPED;
 use crate::support::render;
 
 /// The vendored mapping library, relative to this crate's manifest.
@@ -50,13 +51,18 @@ const PROJECT_DIR: &str = "projects/ferrobridge/eu_laboratory";
 /// The files of the project directory, the context first.
 const PROJECT: &[&str] = &[
     "ferrobridge_eu_laboratory.context.yml",
+    "ferrobridge_eu_laboratory_result.yml",
+    "ferrobridge_eu_composition.DiagnosticReport.yml",
+];
+
+/// The models and extensions the context loads from the shipped laboratory
+/// project, which the document context of `eehrxf` loads too.
+const SHIPPED_LABORATORY: &[&str] = &[
     "ferrobridge_laboratory_test_result.v1.yml",
     "ferrobridge_laboratory_test_analyte.v1.yml",
     "ferrobridge_specimen.v1.yml",
-    "ferrobridge_eu_laboratory_result.yml",
     "ferrobridge_eu_laboratory_analyte.yml",
     "ferrobridge_eu_laboratory_specimen.yml",
-    "ferrobridge_eu_composition.DiagnosticReport.yml",
 ];
 
 /// The context this crate authored for the profiles.
@@ -91,6 +97,11 @@ fn eu_laboratory_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn E
             PROJECT
                 .iter()
                 .map(|file| format!("{FIXTURES}/{PROJECT_DIR}/{file}")),
+        )
+        .chain(
+            SHIPPED_LABORATORY
+                .iter()
+                .map(|file| format!("{SHIPPED}/laboratory/{file}")),
         )
         .collect();
     let set = load_set(files, &StaticMappingCodes::default())
