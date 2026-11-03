@@ -8,7 +8,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use ferrobridge_hl7v2::mllp::{Codec, Timeouts, serve_with};
+use ferrobridge_hl7v2::mllp::Codec;
+use ferrobridge_hl7v2::mllp::listener::{Timeouts, serve_with};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
@@ -412,11 +413,11 @@ async fn a_frame_that_stalls_past_its_timeout_is_answered_ar_and_closed() {
 /// reports.
 struct PeerEcho;
 
-impl ferrobridge_hl7v2::mllp::Handler for PeerEcho {
+impl ferrobridge_hl7v2::mllp::listener::Handler for PeerEcho {
     fn handle(
         &self,
         _message: Vec<u8>,
-        connection: &ferrobridge_hl7v2::mllp::Connection,
+        connection: &ferrobridge_hl7v2::mllp::listener::Connection,
     ) -> impl Future<Output = Option<Vec<u8>>> {
         std::future::ready(Some(
             connection

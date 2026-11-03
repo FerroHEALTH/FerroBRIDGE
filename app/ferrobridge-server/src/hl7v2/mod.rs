@@ -36,7 +36,8 @@ use ferrobridge_hl7v2::ack::{self, Code, Header};
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Inbound, Received};
 use ferrobridge_hl7v2::map::corpus::{Corpus, CorpusError};
-use ferrobridge_hl7v2::mllp::{self, Codec, Connection, Handler, Malformed, Timeouts};
+use ferrobridge_hl7v2::mllp::listener::{self, Connection, Handler, Timeouts};
+use ferrobridge_hl7v2::mllp::{Codec, Malformed};
 use ferrobridge_hl7v2::parse::structure::structure_for;
 use ferrobridge_hl7v2::parse::{self, Message};
 use fhir_types::codec::Value;
@@ -634,7 +635,7 @@ where
     let inner = Arc::clone(&signalled);
     let flag = listening.clone();
     listening.set(true);
-    let server = mllp::serve_with(
+    let server = listener::serve_with(
         socket,
         face,
         listener.codec,

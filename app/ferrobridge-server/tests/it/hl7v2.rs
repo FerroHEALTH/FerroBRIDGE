@@ -20,7 +20,7 @@ use crate::facade::settings;
 use crate::facade::stub::Echo;
 use crate::facade::stub::mount_echo;
 use ferrobridge_hl7v2::decode::Charset;
-use ferrobridge_hl7v2::mllp::Timeouts;
+use ferrobridge_hl7v2::mllp::listener::Timeouts;
 use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::config::Hl7v2Settings;
 use ferrobridge_server::facade::Facade;
