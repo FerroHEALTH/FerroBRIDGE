@@ -381,8 +381,8 @@ fn the_strict_schemas_accept_the_four_keys_the_published_model_schema_omits()
 /// function the engine has not registered (`concept-mappings.adoc`,
 /// §Programmed mappings).
 // NOTE: sub-contexts.adoc §Example: IPS writes `openehr: $reference/items[...]`
-// itself, against Reference.adoc; the refusal follows Reference.adoc until the
-// specification settles which page holds.
+// against Reference.adoc; the refusal follows Reference.adoc until the
+// specification settles which page holds (#1436).
 #[test]
 fn the_corpus_semantic_refusals_are_the_pinned_set() -> Result<(), Box<dyn Error>> {
     let measured = corpus_diagnostics(&StaticMappingCodes::default())?;
