@@ -80,7 +80,7 @@ where
         Common::Healthcheck => runtime_then(|| healthcheck(&settings)),
         Common::Config {
             command: ConfigCommand::Check,
-        } => config_check(settings, report),
+        } => runtime_then(|| config_check(settings, report)),
         Common::Serve => runtime_then(|| serve(settings)),
     }
 }
@@ -109,6 +109,9 @@ where
 
 /// Runs `config check`: the running tree with every secret redacted, then the
 /// state the server would start with is built, and nothing is bound.
+///
+/// No provider is contacted: with an `[oidc]` that leaves an endpoint to
+/// discovery, the bridge client alone is built.
 #[expect(
     clippy::print_stdout,
     reason = "the job's one answer goes to standard output"
@@ -117,7 +120,7 @@ where
     clippy::print_stderr,
     reason = "the job's refusal goes to standard error"
 )]
-fn config_check(
+async fn config_check(
     settings: Settings,
     report: Option<Result<String, ferrohealth_config::error::ConfigError>>,
 ) -> ExitCode {
@@ -129,8 +132,19 @@ fn config_check(
         }
         None => {}
     }
-    match ConsoleState::new(settings) {
-        Ok(_state) => {
+    let offline = settings
+        .oidc
+        .as_ref()
+        .is_none_or(crate::config::settings::OidcSettings::endpoints_given);
+    let built = if offline {
+        ConsoleState::new(settings).await.map(drop)
+    } else {
+        crate::bridge::Bridge::new(&settings.bridge)
+            .map(drop)
+            .map_err(crate::server::StateError::from)
+    };
+    match built {
+        Ok(()) => {
             println!("ferrobridge-console: the configuration is valid");
             ExitCode::SUCCESS
         }
@@ -184,7 +198,7 @@ async fn serve(settings: Settings) -> ExitCode {
     };
     ferrohealth_telemetry::panic::install_hook();
     let listen = settings.listen;
-    let state = match ConsoleState::new(settings) {
+    let state = match ConsoleState::new(settings).await {
         Ok(state) => state,
         Err(error) => {
             tracing::error!(error = %chain(&error), "cannot start");

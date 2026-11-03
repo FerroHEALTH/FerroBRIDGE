@@ -57,13 +57,13 @@ pub fn export_href(id: &str) -> String {
 }
 
 /// The export of the revision the path names, as the bridge wrote it, for
-/// the session the request's cookie names.
+/// the session the request holds.
 pub async fn export(
     Extension(state): Extension<ConsoleState>,
+    Extension(held): Extension<ferrohealth_session::record::Held>,
     Path(id): Path<String>,
-    headers: http::HeaderMap,
 ) -> Response {
-    let Some(token) = crate::server::session_token(&state, &headers) else {
+    let Some(token) = crate::server::session_token(&held) else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
     if id.is_empty() || !id.chars().all(|character| character.is_ascii_digit()) {

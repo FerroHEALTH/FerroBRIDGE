@@ -28,7 +28,7 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use ferrobridge_console::session::PREFERENCE_PREFIX;
+use ferrobridge_console::server::PREFERENCE_PREFIX;
 use serde::Deserialize;
 use serde_json::json;
 use thirtyfour::{By, Cookie};

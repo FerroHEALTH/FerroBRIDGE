@@ -14,8 +14,8 @@ use http::{Request, StatusCode};
 use url::Url;
 
 use crate::support::{
-    CLIENT_ID, OPERATOR_TOKEN, ORIGIN, configuration, console, get_with, header, send, set_cookies,
-    sign_in,
+    CLIENT_ID, OPERATOR_TOKEN, ORIGIN, configuration, console, get_with, header, occupancy, send,
+    set_cookies, sign_in,
 };
 
 /// The bridge address of a console whose tests never reach the bridge.
@@ -55,7 +55,7 @@ async fn signed_in(
     } else {
         String::new()
     };
-    let (state, service) = console(&configuration(&provider, NO_BRIDGE, &oidc, ""))?;
+    let (state, service) = console(&configuration(&provider, NO_BRIDGE, &oidc, "")).await?;
     let cookie = sign_in(&service, &provider, TokenAnswer::bearer(OPERATOR_TOKEN)).await?;
     Ok((provider, state, service, cookie))
 }
@@ -78,7 +78,7 @@ async fn a_sign_out_ends_the_session_and_removes_the_cookie() -> Result<(), Box<
         ),
         "{cookies:?}"
     );
-    assert_eq!(0, state.sessions().occupancy()?.sessions);
+    assert_eq!(0, occupancy(&state)?.sessions);
     let (_page, body) = send(&service, get_with("/signed-out", &cookie)?).await?;
     assert!(
         body.contains("You are signed out of the console."),
@@ -149,7 +149,7 @@ async fn a_cross_site_sign_out_is_refused_and_the_session_lives_on() -> Result<(
     ] {
         let (response, _body) = send(&service, sign_out(&cookie, &from)?).await?;
         assert_eq!(StatusCode::FORBIDDEN, response.status(), "{from:?}");
-        assert_eq!(1, state.sessions().occupancy()?.sessions, "{from:?}");
+        assert_eq!(1, occupancy(&state)?.sessions, "{from:?}");
     }
     Ok(())
 }
@@ -160,7 +160,7 @@ async fn a_sign_out_from_the_consoles_own_origin_passes_without_fetch_metadata()
     let (_provider, state, service, cookie) = signed_in(false).await?;
     let (response, _body) = send(&service, sign_out(&cookie, &[("origin", ORIGIN)])?).await?;
     assert_eq!(StatusCode::SEE_OTHER, response.status());
-    assert_eq!(0, state.sessions().occupancy()?.sessions);
+    assert_eq!(0, occupancy(&state)?.sessions);
     Ok(())
 }
 
@@ -169,7 +169,7 @@ async fn sign_out_is_never_a_get() -> Result<(), Box<dyn Error>> {
     let (_provider, state, service, cookie) = signed_in(false).await?;
     let (response, _body) = send(&service, get_with("/logout", &cookie)?).await?;
     assert!(response.status().is_client_error(), "{}", response.status());
-    assert_eq!(1, state.sessions().occupancy()?.sessions);
+    assert_eq!(1, occupancy(&state)?.sessions);
     Ok(())
 }
 

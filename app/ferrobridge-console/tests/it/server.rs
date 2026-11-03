@@ -18,7 +18,9 @@ use crate::support::settings;
 
 /// Sends `request` to a console whose bridge is out of reach.
 async fn send(request: Request<Body>) -> Response<Body> {
-    let state = ConsoleState::new(settings("http://127.0.0.1:9/")).expect("the state builds");
+    let state = ConsoleState::new(settings("http://127.0.0.1:9/"))
+        .await
+        .expect("the state builds");
     router(state)
         .oneshot(request)
         .await

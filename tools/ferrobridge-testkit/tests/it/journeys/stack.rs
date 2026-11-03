@@ -275,10 +275,8 @@ impl Stack {
         let settings =
             ferrobridge_console::config::Config::from_sources(Some(&text), &BTreeMap::new())?
                 .resolve()?;
-        let state = ferrobridge_console::server::ConsoleState::new(settings)?;
-        let cookie = state
-            .sessions()
-            .cookie_name(ferrobridge_console::session::COOKIE);
+        let state = ferrobridge_console::server::ConsoleState::new(settings).await?;
+        let cookie = state.session_cookie();
         let lifecycle = state.lifecycle().clone();
         tokio::spawn(ferrobridge_console::server::serve(
             listener,

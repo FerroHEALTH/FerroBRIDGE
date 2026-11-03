@@ -12,10 +12,13 @@
 //! scripts and styles come from the console alone with no nonce. FerroUI's
 //! assets keep the year-long cache their router sets, under a path that
 //! names the library's version. A request that is not a safe method is taken
-//! only from the console's own pages (`ferrohealth_server::same_origin`),
-//! and a session's access token is refreshed before the request it arrives
-//! with is served. The health routes are the family's. No specification
-//! governs the console's HTTP surface: our own design.
+//! only from the console's own pages (`ferrohealth_server::same_origin`).
+//! The sign-in, callback, sign-out and session routes, and the middleware
+//! that refreshes a session's access token before the request it arrives
+//! with is served and hands the request its `Held`, are
+//! `ferrohealth-session`'s, which draws a stopped sign-in through
+//! [`crate::stopped::SignInPages`]. The health routes are the family's. No
+//! specification governs the console's HTTP surface: our own design.
 
 use std::sync::Arc;
 
@@ -31,17 +34,20 @@ use ferrohealth_server::health::Health;
 use ferrohealth_server::same_origin::{self, SameOrigin};
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::Drained;
+use ferrohealth_session::cookies::{CookieNames, HOST_PREFIX};
+use ferrohealth_session::record::{Credential, Held};
+use ferrohealth_session::routes::{SignIn, keep_session};
+use ferrohealth_session::sessions::Sessions;
+use ferrohealth_smart::oidc::RelyingParty;
 use http::header::CONTENT_TYPE;
 use http::{HeaderValue, Method, StatusCode};
 
-use crate::bridge::{Bridge, BridgeError};
-use crate::config::settings::{OidcSettings, Settings};
+use crate::bridge::{AccessToken, Bridge, BridgeError};
+use crate::config::settings::Settings;
 use crate::locale::messages::Msg;
 use crate::locale::{catalog, tr_in};
-use crate::session::Sessions;
+use crate::stopped::SignInPages;
 use crate::visit::Visit;
-use ferrohealth_smart::metadata::{Http, ServerMetadata};
-use ferrohealth_smart::oidc::{OidcError, Provider, RelyingParty};
 
 /// The path of the console's summary health route.
 pub const HEALTH: &str = ferrohealth_server::health::SUMMARY;
@@ -49,56 +55,73 @@ pub const HEALTH: &str = ferrohealth_server::health::SUMMARY;
 /// The largest form body a page takes: a draft, a run's input.
 pub const POST_MAX: usize = 2 * 1024 * 1024;
 
+/// The base name of every cookie the console sets.
+///
+/// `ferrobridge_console_session` carries the session,
+/// `ferrobridge_console_sign_in` a pending sign-in, and
+/// [`PREFERENCE_PREFIX`] and a preference's name each preference.
+pub const COOKIES: &str = "ferrobridge_console";
+
+/// What the name of every preference cookie starts with, before the
+/// preference's own name and under the `__Host-` prefix when the cookie is
+/// `Secure`, such as `ferrobridge_console_theme`.
+pub const PREFERENCE_PREFIX: &str = "ferrobridge_console_";
+
 /// What every request handler shares.
 #[derive(Debug, Clone)]
 pub struct ConsoleState {
     settings: Arc<Settings>,
-    sessions: Sessions,
+    sign_in: SignIn<SignInPages>,
     bridge: Bridge,
-    relying_party: Option<RelyingParty>,
     health: Health,
 }
 
 /// Why the console's state could not be built.
 #[derive(Debug, thiserror::Error)]
 pub enum StateError {
-    /// A client of the bridge or of the OpenID Provider could not be built.
+    /// A client of the bridge could not be built.
     #[error(transparent)]
     Client(#[from] BridgeError),
-    /// The configured OpenID Provider endpoints are not ones a relying party
-    /// can use.
-    #[error("the OpenID Provider's endpoints cannot be used")]
+    /// The relying party at the OpenID Provider could not be built: its
+    /// client, its discovery, or endpoints it cannot use.
+    #[error("the OpenID Provider cannot be used")]
     Provider {
         /// What the relying party refused.
         #[source]
-        source: OidcError,
+        source: Box<ferrohealth_session::config::ConfigError>,
     },
 }
 
 impl ConsoleState {
-    /// The state for `settings`, with an empty session store.
+    /// The state for `settings`, with an empty session store; the relying
+    /// party discovers the provider's endpoints first when the configuration
+    /// does not name them.
     ///
     /// # Errors
-    /// Returns [`StateError::Client`] when the bridge client, or the client of
-    /// the OpenID Provider, cannot be built, and [`StateError::Provider`]
-    /// when the configured provider endpoints are not ones a relying party
-    /// can use.
-    pub fn new(settings: Settings) -> Result<Self, StateError> {
+    /// Returns [`StateError::Client`] when the bridge client cannot be built,
+    /// and [`StateError::Provider`] for a relying party that cannot be built
+    /// or a provider that cannot be read.
+    pub async fn new(settings: Settings) -> Result<Self, StateError> {
         let bridge = Bridge::new(&settings.bridge)?;
-        let relying_party = settings
-            .oidc
-            .as_ref()
-            .map(|oidc| relying_party(oidc, &settings))
-            .transpose()?;
+        let party =
+            match &settings.oidc {
+                Some(oidc) => Some(oidc.checked.relying_party().await.map_err(|source| {
+                    StateError::Provider {
+                        source: Box::new(source),
+                    }
+                })?),
+                None => None,
+            };
+        let sessions = Sessions::new(settings.session.clone(), CookieNames::for_console(COOKIES));
+        let sign_in = SignIn::new(sessions, party, SignInPages::new(settings.locale.clone()));
         // The settings are resolved and the clients built, so the console
         // serves from here.
         let lifecycle = Lifecycle::default();
         lifecycle.booted();
         Ok(Self {
-            sessions: Sessions::new(settings.session),
             settings: Arc::new(settings),
+            sign_in,
             bridge,
-            relying_party,
             health: Health::new(Registry::default(), lifecycle),
         })
     }
@@ -122,10 +145,16 @@ impl ConsoleState {
         &self.settings
     }
 
+    /// The sign-in: the session store, the relying party and the pages.
+    #[must_use]
+    pub fn sign_in(&self) -> &SignIn<SignInPages> {
+        &self.sign_in
+    }
+
     /// The session store.
     #[must_use]
     pub fn sessions(&self) -> &Sessions {
-        &self.sessions
+        self.sign_in.sessions()
     }
 
     /// The bridge client.
@@ -139,52 +168,30 @@ impl ConsoleState {
     /// token with; `None` when no provider is configured.
     #[must_use]
     pub fn relying_party(&self) -> Option<&RelyingParty> {
-        self.relying_party.as_ref()
+        self.sign_in.party()
     }
-}
 
-/// The relying party of the provider `oidc` names, calling it within the
-/// timeout of a call to the bridge.
-fn relying_party(oidc: &OidcSettings, settings: &Settings) -> Result<RelyingParty, StateError> {
-    // NOTE: RFC 6749 §3.2: the token endpoint answers the request itself, so
-    // the provider's client follows no redirect.
-    let client = reqwest::Client::builder()
-        .timeout(settings.bridge.timeout)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|source| BridgeError::Transport { source })?;
-    let metadata = ServerMetadata {
-        issuer: oidc.issuer.clone(),
-        authorization_endpoint: Some(oidc.authorization_endpoint.to_string()),
-        token_endpoint: Some(oidc.token_endpoint.to_string()),
-        jwks_uri: Some(oidc.jwks_uri.to_string()),
-        end_session_endpoint: oidc.end_session_endpoint.as_ref().map(ToString::to_string),
-        ..ServerMetadata::default()
-    };
-    let provider =
-        Provider::from_metadata(&metadata).map_err(|source| StateError::Provider { source })?;
-    let mut relying_party = RelyingParty::new(
-        Http::from_client(client),
-        provider,
-        oidc.client_id.clone(),
-        oidc.redirect_uri.clone(),
-    )
-    .with_scopes(oidc.scopes.iter().cloned());
-    if let Some(secret) = &oidc.client_secret {
-        relying_party = relying_party.with_client_secret(secret.clone());
+    /// The name `base` takes on this console: under the `__Host-` prefix
+    /// when the cookies are `Secure`, and `base` alone when they are not.
+    #[must_use]
+    pub fn cookie_name(&self, base: &str) -> String {
+        if self.settings.session.secure_cookie() {
+            format!("{HOST_PREFIX}{base}")
+        } else {
+            base.to_owned()
+        }
     }
-    if oidc.offline_access {
-        relying_party = relying_party.with_offline_access();
+
+    /// The name of the cookie that carries the session on this console.
+    #[must_use]
+    pub fn session_cookie(&self) -> String {
+        self.cookie_name(&CookieNames::for_console(COOKIES).session())
     }
-    if let Some(redirect) = &oidc.post_logout_redirect_uri {
-        relying_party = relying_party.with_post_logout_redirect_uri(redirect.clone());
-    }
-    Ok(relying_party)
 }
 
 /// Builds the console's whole HTTP service over `state`.
 pub fn router(state: ConsoleState) -> axum::Router {
-    let form_action = form_action(state.settings());
+    let form_action = form_action(&state);
     let health = ferrohealth_server::health::routes(state.health().clone());
     let same_origin = same_origin_check(state.settings());
     let pages = axum::Router::new()
@@ -208,16 +215,12 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .route(crate::app::PREFERENCE, post(crate::prefs::choose))
         .route(crate::app::RESET, post(crate::prefs::reset))
         .route(crate::app::SIDEBAR, post(crate::prefs::rail))
-        .route(crate::oidc::LOGIN, get(crate::oidc::login))
-        .route(crate::oidc::CALLBACK, get(crate::oidc::callback))
-        .route(
-            crate::oidc::logout::LOGOUT,
-            post(crate::oidc::logout::logout),
-        )
         .fallback(page)
-        .layer(axum::middleware::from_fn(
-            crate::oidc::refresh::refresh_session,
+        .layer(axum::middleware::from_fn_with_state(
+            state.sign_in().clone(),
+            keep_session::<SignInPages>,
         ))
+        .merge(ferrohealth_session::routes::router(state.sign_in().clone()))
         .layer(axum::middleware::from_fn(
             move |request: Request, next: Next| {
                 same_origin::only(same_origin.clone(), request, next)
@@ -302,11 +305,10 @@ fn same_origin_check(settings: &Settings) -> SameOrigin {
 /// Connect RP-Initiated Logout 1.0 §2), so without its origin the browser
 /// blocks the sign-out on its way to the provider.
 #[must_use]
-pub fn form_action(settings: &Settings) -> String {
-    let end_session = settings
-        .oidc
-        .as_ref()
-        .and_then(|oidc| oidc.end_session_endpoint.as_ref())
+pub fn form_action(state: &ConsoleState) -> String {
+    let end_session = state
+        .relying_party()
+        .and_then(|party| party.provider().end_session_endpoint())
         .map(url::Url::origin)
         .filter(url::Origin::is_tuple);
     match end_session {
@@ -342,26 +344,28 @@ fn svg(text: &'static str) -> Response {
         .into_response()
 }
 
-/// Serves the bridge's `GET /health/info` document as a download, for a
-/// signed-in operator: the About page's self-description.
-/// The access token of the session the request's cookie names, for a
-/// route outside the pages that reads the bridge, such as a download.
-pub(crate) fn session_token(
-    state: &ConsoleState,
-    headers: &http::HeaderMap,
-) -> Option<crate::bridge::AccessToken> {
-    state
-        .sessions()
-        .cookie_in(headers, crate::session::COOKIE)
-        .and_then(|id| state.sessions().access_token(&id).ok().flatten())
-        .map(crate::bridge::AccessToken::new)
+/// The access token of the session the request holds, for a route outside
+/// the pages that reads the bridge, such as a download; `None` without a
+/// live session.
+pub(crate) fn session_token(held: &Held) -> Option<AccessToken> {
+    match held {
+        Held::SignedIn(session) => match session.credential() {
+            Credential::Bearer(token) => Some(AccessToken::new(token.to_secret_string())),
+            // NOTE: no specification governs this: our own design; the console signs in through
+            // its OpenID Provider alone, so a session carries a bearer token or no credential.
+            Credential::Basic { .. } => None,
+        },
+        Held::TokenExpired | Held::Ended | Held::Absent => None,
+    }
 }
 
+/// Serves the bridge's `GET /health/info` document as a download, for a
+/// signed-in operator: the About page's self-description.
 async fn info_json(
     Extension(state): Extension<ConsoleState>,
-    headers: http::HeaderMap,
+    Extension(held): Extension<Held>,
 ) -> Response {
-    let Some(token) = session_token(&state, &headers) else {
+    let Some(token) = session_token(&held) else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
     match state.bridge().health_info(&token).await {
