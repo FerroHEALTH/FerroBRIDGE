@@ -145,6 +145,12 @@ pub fn get(
         (RmValue::Count(count), FhirKind::Integer) => {
             CountLens.get(count.as_ref()).map(FhirValue::Integer)
         }
+        (RmValue::Count(count), FhirKind::UnsignedInt) => {
+            CountLens.get(count.as_ref()).map(FhirValue::UnsignedInt)
+        }
+        (RmValue::Count(count), FhirKind::PositiveInt) => {
+            CountLens.get(count.as_ref()).map(FhirValue::PositiveInt)
+        }
         (RmValue::Count(count), FhirKind::Quantity) => CountLens
             .get(count.as_ref())
             .map(|quantity| FhirValue::Quantity(Box::new(quantity))),
@@ -355,15 +361,7 @@ pub fn put(
         ("DV_QUANTITY", FhirValue::Integer(integer)) => QuantityLens
             .put(integer, held_quantity(existing))
             .map(|quantity| RmValue::Quantity(Box::new(quantity))),
-        ("DV_COUNT", FhirValue::Integer(integer)) => CountLens
-            .put(integer, held_count(existing))
-            .map(|count| RmValue::Count(Box::new(count))),
-        ("DV_COUNT", FhirValue::Quantity(quantity)) => CountLens
-            .put(quantity.as_ref(), held_count(existing))
-            .map(|count| RmValue::Count(Box::new(count))),
-        ("DV_COUNT", FhirValue::Count(count)) => CountLens
-            .put(count.as_ref(), held_count(existing))
-            .map(|count| RmValue::Count(Box::new(count))),
+        ("DV_COUNT", view) => put_count(view, existing),
         ("DV_ORDINAL", FhirValue::CodeableConcept(concept)) => OrdinalLens::new(coded, ordinals)
             .put(concept.as_ref(), held_ordinal(existing))
             .map(|ordinal| RmValue::Ordinal(Box::new(ordinal))),
@@ -395,6 +393,25 @@ pub fn put(
         value,
         fallbacks: fallbacks(view, rm_type, existing, binding),
     })
+}
+
+/// Writes a FHIR element back into a `DV_COUNT`, through the `DV_COUNT.adoc`
+/// cells and the restricted integers of R4.
+fn put_count(view: &FhirValue, existing: Option<&RmValue>) -> Result<RmValue, LensError> {
+    let held = held_count(existing);
+    let count = match *view {
+        FhirValue::Integer(ref integer) => CountLens.put(integer, held),
+        FhirValue::UnsignedInt(ref integer) => CountLens.put(integer, held),
+        FhirValue::PositiveInt(ref integer) => CountLens.put(integer, held),
+        FhirValue::Quantity(ref quantity) => CountLens.put(quantity.as_ref(), held),
+        FhirValue::Count(ref count) => CountLens.put(count.as_ref(), held),
+        ref other => Err(LensError::NoCell {
+            rm_type: String::from("DV_COUNT"),
+            kind: other.kind().as_str(),
+            direction: Direction::FhirToOpenehr,
+        }),
+    }?;
+    Ok(RmValue::Count(Box::new(count)))
 }
 
 /// Returns the one-way rows the cell would take writing `view` over
@@ -619,14 +636,20 @@ mod tests {
         for (value, kinds) in [
             (
                 &quantity,
-                [FhirKind::Quantity, FhirKind::Decimal, FhirKind::Quantity],
+                &[FhirKind::Quantity, FhirKind::Decimal, FhirKind::Quantity][..],
             ),
             (
                 &count,
-                [FhirKind::Integer, FhirKind::Quantity, FhirKind::Count],
+                &[
+                    FhirKind::Integer,
+                    FhirKind::UnsignedInt,
+                    FhirKind::PositiveInt,
+                    FhirKind::Quantity,
+                    FhirKind::Count,
+                ][..],
             ),
         ] {
-            for kind in kinds {
+            for &kind in kinds {
                 let view = get(value, kind, None).expect("the chapter has the row");
                 assert_eq!(view.kind(), kind);
                 let back =
