@@ -11,7 +11,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::emit::{files_under, read_tree, rustfmt, write_tree};
+use crate::emit::rustfmt;
 use crate::roots::{NotAStructure, V2RootSet};
 use crate::v2::corpus::{Corpus, LoadError};
 use crate::v2::legacy::lower::{LegacyError, LegacyModel};
@@ -92,6 +92,9 @@ pub enum EmitError {
     /// Writing, formatting, or checking the tree failed.
     #[error(transparent)]
     Tree(#[from] crate::emit::EmitError),
+    /// The generated tree could not be written, formatted or read back.
+    #[error(transparent)]
+    Files(#[from] generated_tree::TreeError),
 }
 
 /// Runs the v2 pipeline per `options`.
@@ -114,29 +117,15 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
         source,
     })?;
     let scratch_src = scratch.path().join("src");
-    write_tree(&scratch_src, &files)?;
+    generated_tree::write(&scratch_src, &files)?;
     rustfmt(&scratch_src, &options.crate_dir)?;
-    let formatted = read_tree(&scratch_src, &files)?;
+    let formatted = generated_tree::read(&scratch_src, files.keys())?;
 
     let target_src = options.crate_dir.join("src");
     if options.check {
-        let mut drift = Vec::new();
-        for (relative, content) in &formatted {
-            match fs::read_to_string(target_src.join(relative)) {
-                Ok(existing) if existing == *content => {}
-                Ok(_) => drift.push(relative.clone()),
-                Err(_) => drift.push(format!("{relative} (missing)")),
-            }
-        }
-        if target_src.is_dir() {
-            for relative in files_under(&target_src, "")? {
-                let relative = relative.trim_start_matches('/').to_owned();
-                if !formatted.contains_key(&relative) {
-                    drift.push(format!("{relative} (stale)"));
-                }
-            }
-        }
-        drift.sort();
+        let owned = [(target_src.clone(), "")];
+        let drift =
+            generated_tree::drift(&formatted, |relative| target_src.join(relative), &owned)?;
         if !drift.is_empty() {
             return Err(crate::emit::EmitError::Drift { paths: drift }.into());
         }
@@ -147,7 +136,7 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
                 source,
             })?;
         }
-        write_tree(&target_src, &formatted)?;
+        generated_tree::write(&target_src, &formatted)?;
     }
     Ok(EmitReport {
         structures: model.structures.len(),

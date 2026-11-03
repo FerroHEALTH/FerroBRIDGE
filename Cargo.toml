@@ -77,6 +77,8 @@ omop-cdm = { path = "crates/omop-cdm", version = "0.0.0", default-features = fal
 # Path-only, with no version: cargo strips the dev-dependency from a packaged
 # crates/* manifest instead of looking it up on crates.io.
 ferrobridge-testkit = { path = "tools/ferrobridge-testkit" }
+# The generated-tree writer and drift check both generators share (#1417).
+generated-tree = { path = "tools/generated-tree" }
 # Published from this workspace and consumed by the published
 # ferrobridge-hl7v2, so the requirement carries both a path and a version.
 ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.141" }

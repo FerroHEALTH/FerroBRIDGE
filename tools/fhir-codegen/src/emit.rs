@@ -15,7 +15,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::closure::{ClosureError, TypeClosure};
 use crate::lower::{LowerError, VersionModule};
@@ -84,12 +83,9 @@ pub enum EmitError {
         #[source]
         source: io::Error,
     },
-    /// `rustfmt` did not run or rejected the output.
-    #[error("rustfmt failed: {stderr}")]
-    Rustfmt {
-        /// What rustfmt printed.
-        stderr: String,
-    },
+    /// The generated tree could not be written, formatted or read back.
+    #[error(transparent)]
+    Tree(#[from] generated_tree::TreeError),
     /// Check mode found the tree out of date.
     #[error("the generated crate is out of date; {} file(s) differ: {}", .paths.len(), .paths.join(", "))]
     Drift {
@@ -136,14 +132,19 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
         source,
     })?;
     let scratch_src = scratch.path().join("src");
-    write_tree(&scratch_src, &files)?;
+    generated_tree::write(&scratch_src, &files)?;
     rustfmt(&scratch_src, &options.crate_dir)?;
-    let formatted = read_tree(&scratch_src, &files)?;
+    let formatted = generated_tree::read(&scratch_src, files.keys())?;
 
     let module_names: Vec<&str> = models.iter().map(|m| m.name.as_str()).collect();
     let target_src = options.crate_dir.join("src");
     if options.check {
-        let drift = compare(&target_src, &formatted, &module_names)?;
+        let owned: Vec<(PathBuf, &str)> = module_names
+            .iter()
+            .map(|module| (target_src.join(module), *module))
+            .collect();
+        let drift =
+            generated_tree::drift(&formatted, |relative| target_src.join(relative), &owned)?;
         if !drift.is_empty() {
             return Err(EmitError::Drift { paths: drift });
         }
@@ -256,7 +257,7 @@ fn replace_tree(
             })?;
         }
     }
-    write_tree(target_src, files)
+    Ok(generated_tree::write(target_src, files)?)
 }
 
 /// Lowers every version's module and operation contracts, the terminology
@@ -306,36 +307,6 @@ fn lower_models(
     Ok(models)
 }
 
-pub(crate) fn write_tree(root: &Path, files: &BTreeMap<String, String>) -> Result<(), EmitError> {
-    for (relative, content) in files {
-        let path = root.join(relative);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|source| EmitError::Io {
-                path: parent.to_path_buf(),
-                source,
-            })?;
-        }
-        fs::write(&path, content).map_err(|source| EmitError::Io { path, source })?;
-    }
-    Ok(())
-}
-
-pub(crate) fn read_tree(
-    root: &Path,
-    files: &BTreeMap<String, String>,
-) -> Result<BTreeMap<String, String>, EmitError> {
-    let mut out = BTreeMap::new();
-    for relative in files.keys() {
-        let path = root.join(relative);
-        let content = fs::read_to_string(&path).map_err(|source| EmitError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        out.insert(relative.clone(), content);
-    }
-    Ok(out)
-}
-
 /// Formats the rendered tree with the pinned `rustfmt`.
 ///
 /// `rustfmt` formats a file together with every out-of-line module it
@@ -343,76 +314,8 @@ pub(crate) fn read_tree(
 /// rendered file is reachable from. Naming the other files as well would
 /// format each `mod.rs` subtree again (#433).
 pub(crate) fn rustfmt(root: &Path, crate_dir: &Path) -> Result<(), EmitError> {
-    let config = crate_dir.join("../../rustfmt.toml");
-    let mut command = Command::new("rustfmt");
-    command.arg("--edition").arg("2024");
-    if config.is_file() {
-        command.arg("--config-path").arg(&config);
-    }
-    command.arg(root.join("lib.rs"));
-    let output = command.output().map_err(|source| EmitError::Io {
-        path: PathBuf::from("rustfmt"),
-        source,
-    })?;
-    if !output.status.success() {
-        return Err(EmitError::Rustfmt {
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
-    }
-    Ok(())
-}
-
-/// The relative paths that differ between the rendered files and the tree on
-/// disk, including files under a version directory that the model no longer
-/// produces.
-fn compare(
-    target_src: &Path,
-    files: &BTreeMap<String, String>,
-    version_modules: &[&str],
-) -> Result<Vec<String>, EmitError> {
-    let mut drift = Vec::new();
-    for (relative, content) in files {
-        let path = target_src.join(relative);
-        match fs::read_to_string(&path) {
-            Ok(existing) if existing == *content => {}
-            Ok(_) => drift.push(relative.clone()),
-            Err(_) => drift.push(format!("{relative} (missing)")),
-        }
-    }
-    for module in version_modules {
-        let version_dir = target_src.join(module);
-        if !version_dir.is_dir() {
-            continue;
-        }
-        for relative in files_under(&version_dir, module)? {
-            if !files.contains_key(&relative) {
-                drift.push(format!("{relative} (stale)"));
-            }
-        }
-    }
-    drift.sort();
-    Ok(drift)
-}
-
-/// Every file under `dir`, recursively, as `prefix/…` relative paths.
-pub(crate) fn files_under(dir: &Path, prefix: &str) -> Result<Vec<String>, EmitError> {
-    let entries = fs::read_dir(dir).map_err(|source| EmitError::Io {
-        path: dir.to_path_buf(),
-        source,
-    })?;
-    let mut out = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|source| EmitError::Io {
-            path: dir.to_path_buf(),
-            source,
-        })?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let relative = format!("{prefix}/{name}");
-        if entry.path().is_dir() {
-            out.extend(files_under(&entry.path(), &relative)?);
-        } else {
-            out.push(relative);
-        }
-    }
-    Ok(out)
+    Ok(generated_tree::rustfmt(
+        [root.join("lib.rs")],
+        &crate_dir.join("../../rustfmt.toml"),
+    )?)
 }

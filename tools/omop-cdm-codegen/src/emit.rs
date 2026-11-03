@@ -13,7 +13,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::definitions::{Definitions, LoadError};
 use crate::dqd::{Catalogue, Dashboard, DqdError};
@@ -71,12 +70,9 @@ pub enum EmitError {
         #[source]
         source: io::Error,
     },
-    /// `rustfmt` did not run or rejected the output.
-    #[error("rustfmt failed: {stderr}")]
-    Rustfmt {
-        /// What rustfmt printed.
-        stderr: String,
-    },
+    /// The generated tree could not be written, formatted or read back.
+    #[error(transparent)]
+    Tree(#[from] generated_tree::TreeError),
     /// Check mode found the tree out of date.
     #[error("the generated tree is out of date; {} file(s) differ: {}", .paths.len(), .paths.join(", "))]
     Drift {
@@ -123,9 +119,12 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
         path: PathBuf::from("(temporary directory)"),
         source,
     })?;
-    write_tree(scratch.path(), &sources)?;
-    rustfmt(scratch.path(), &sources, &options.rustfmt_config)?;
-    let mut files = read_tree(scratch.path(), sources.keys())?;
+    generated_tree::write(scratch.path(), &sources)?;
+    generated_tree::rustfmt(
+        sources.keys().map(|relative| scratch.path().join(relative)),
+        &options.rustfmt_config,
+    )?;
+    let mut files = generated_tree::read(scratch.path(), sources.keys())?;
     for (name, content) in read_ddl(&options.ddl_dir)? {
         files.insert(name, content);
     }
@@ -133,7 +132,15 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
 
     let src = options.crate_dir.join("src");
     if options.check {
-        let drift = compare(&options.crate_dir, &src, &files)?;
+        let owned = [
+            (src.join(GENERATED_DIR), GENERATED_DIR),
+            (options.crate_dir.join(DDL_DIR), DDL_DIR),
+        ];
+        let drift = generated_tree::drift(
+            &files,
+            |relative| target_path(&options.crate_dir, &src, relative),
+            &owned,
+        )?;
         if !drift.is_empty() {
             return Err(EmitError::Drift { paths: drift });
         }
@@ -145,9 +152,12 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
                 source,
             })?;
         }
-        for (relative, content) in &files {
-            write_file(&target_path(&options.crate_dir, &src, relative), content)?;
-        }
+        let (modules, ddl): (BTreeMap<String, String>, BTreeMap<String, String>) = files
+            .iter()
+            .map(|(relative, content)| (relative.clone(), content.clone()))
+            .partition(|(relative, _)| relative.starts_with(GENERATED_DIR));
+        generated_tree::write(&src, &modules)?;
+        generated_tree::write(&options.crate_dir, &ddl)?;
     }
 
     Ok(EmitReport {
@@ -216,121 +226,4 @@ fn provenance() -> String {
         out.push_str("`\n");
     }
     out
-}
-
-/// Writes every rendered file under `root`.
-fn write_tree(root: &Path, files: &BTreeMap<String, String>) -> Result<(), EmitError> {
-    for (relative, content) in files {
-        write_file(&root.join(relative), content)?;
-    }
-    Ok(())
-}
-
-/// Writes one file, creating the directories above it.
-fn write_file(path: &Path, content: &str) -> Result<(), EmitError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|source| EmitError::Io {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
-    fs::write(path, content).map_err(|source| EmitError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-/// Reads back the named files under `root`.
-fn read_tree<'a>(
-    root: &Path,
-    names: impl Iterator<Item = &'a String>,
-) -> Result<BTreeMap<String, String>, EmitError> {
-    let mut out = BTreeMap::new();
-    for relative in names {
-        let path = root.join(relative);
-        let content = fs::read_to_string(&path).map_err(|source| EmitError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        out.insert(relative.clone(), content);
-    }
-    Ok(out)
-}
-
-/// Formats every rendered file with the pinned `rustfmt`.
-fn rustfmt(root: &Path, files: &BTreeMap<String, String>, config: &Path) -> Result<(), EmitError> {
-    let mut command = Command::new("rustfmt");
-    command.arg("--edition").arg("2024");
-    if config.is_file() {
-        command.arg("--config-path").arg(config);
-    }
-    for relative in files.keys() {
-        command.arg(root.join(relative));
-    }
-    let output = command.output().map_err(|source| EmitError::Io {
-        path: PathBuf::from("rustfmt"),
-        source,
-    })?;
-    if !output.status.success() {
-        return Err(EmitError::Rustfmt {
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
-    }
-    Ok(())
-}
-
-/// The paths that differ between the rendered files and the tree on disk,
-/// including a file in either emitted directory that the run does not produce.
-fn compare(
-    crate_dir: &Path,
-    src: &Path,
-    files: &BTreeMap<String, String>,
-) -> Result<Vec<String>, EmitError> {
-    let mut drift = Vec::new();
-    for (relative, content) in files {
-        let path = target_path(crate_dir, src, relative);
-        match fs::read_to_string(&path) {
-            Ok(existing) if existing == *content => {}
-            Ok(_) => drift.push(relative.clone()),
-            Err(_) => drift.push(format!("{relative} (missing)")),
-        }
-    }
-    for (dir, prefix) in [
-        (src.join(GENERATED_DIR), GENERATED_DIR),
-        (crate_dir.join(DDL_DIR), DDL_DIR),
-    ] {
-        if !dir.is_dir() {
-            continue;
-        }
-        for relative in files_under(&dir, prefix)? {
-            if !files.contains_key(&relative) {
-                drift.push(format!("{relative} (stale)"));
-            }
-        }
-    }
-    drift.sort();
-    Ok(drift)
-}
-
-/// Every file under `dir`, recursively, as `prefix/…` relative paths.
-fn files_under(dir: &Path, prefix: &str) -> Result<Vec<String>, EmitError> {
-    let entries = fs::read_dir(dir).map_err(|source| EmitError::Io {
-        path: dir.to_path_buf(),
-        source,
-    })?;
-    let mut out = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|source| EmitError::Io {
-            path: dir.to_path_buf(),
-            source,
-        })?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let relative = format!("{prefix}/{name}");
-        if entry.path().is_dir() {
-            out.extend(files_under(&entry.path(), &relative)?);
-        } else {
-            out.push(relative);
-        }
-    }
-    Ok(out)
 }

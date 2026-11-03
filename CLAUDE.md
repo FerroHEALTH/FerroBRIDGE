@@ -247,6 +247,10 @@ the testkit tool crate. Beside it:
 - `tools/omop-cdm-codegen`: that generator, reading
   `docs/specs/omop-cdm/inst/` and emitting the 39 table modules, the metadata
   index and the embedded DDL.
+- `tools/generated-tree`: what both generators share about a generated tree
+  (#1417): writing the rendered files, formatting them with the pinned
+  `rustfmt`, reading them back, and the drift comparison with the committed
+  tree.
 - `tools/ferrobridge-testkit`: the test-support crate, a path-only
   dev-dependency (#78). `containers` starts PostgreSQL and the reference CDR
   behind the `FERROBRIDGE_E2E` gate, with every image pinned by digest in
