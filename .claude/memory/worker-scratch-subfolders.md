@@ -10,7 +10,7 @@ metadata:
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 Every worker in a session shares one scratchpad directory. A worker writes
-its scratch files (PR bodies, issue comments, notes, reports) under its own
+its scratch files (PR bodies, issue comments, notes, reports; never a git worktree, which goes in `<repo>/.claude/worktrees/<name>` per [[worktrees-in-repo]]) under its own
 subfolder of that scratchpad, named for its task (`<scratchpad>/<task>/`),
 and never at the scratchpad root.
 
