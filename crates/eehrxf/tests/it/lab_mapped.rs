@@ -41,7 +41,7 @@ use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::operations::run::Settings;
 use serde_json::Value;
 
-use super::support::lab;
+use super::support::{emit, lab};
 
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
@@ -366,6 +366,7 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
     let document = ReceivedDocument::read(&written)?;
     assert_eq!(document.category()?, Category::Laboratory);
     document.check(&lab(LAB_BUNDLE)?, &lab(LAB_COMPOSITION)?)?;
+    emit("eehrxf-laboratory-mapped", &written)?;
 
     let input: Value = serde_json::from_str(&received)?;
     let output: Value = serde_json::from_str(&written)?;

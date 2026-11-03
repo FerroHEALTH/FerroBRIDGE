@@ -132,12 +132,18 @@ pub(crate) fn vendored(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
 /// The environment variable naming the directory a suite writes the
 /// documents it has held to the vendored profiles to, for a run of HL7's
 /// FHIR Validator over them.
-#[cfg(all(feature = "openehr", feature = "patient-summary"))]
+#[cfg(all(
+    feature = "openehr",
+    any(feature = "patient-summary", feature = "laboratory")
+))]
 const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
 
 /// Writes `text` to `<dir>/<name>.json` when [`EMIT_DIR_VARIABLE`] names a
 /// directory, and does nothing when it is unset.
-#[cfg(all(feature = "openehr", feature = "patient-summary"))]
+#[cfg(all(
+    feature = "openehr",
+    any(feature = "patient-summary", feature = "laboratory")
+))]
 pub(crate) fn emit(name: &str, text: &str) -> Result<(), Box<dyn Error>> {
     let Some(dir) = std::env::var_os(EMIT_DIR_VARIABLE) else {
         return Ok(());
