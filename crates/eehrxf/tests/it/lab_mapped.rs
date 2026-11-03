@@ -37,12 +37,13 @@ use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::operations::run::Settings;
 use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
-use super::support::lab;
+use super::support::{emit, lab};
 
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
@@ -194,6 +195,7 @@ fn lab_document(identifier: &str) -> Result<(Document, String, String), Box<dyn 
             family: Some("Synthetic".into()),
             ..HumanName::default()
         }],
+        birth_date: Some("1970-01-01".into()),
         ..Patient::default()
     })?;
     let device = document.with_author(&Resource::Device(Box::new(Device {
@@ -367,6 +369,7 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
     let document = ReceivedDocument::read(&written)?;
     assert_eq!(document.category()?, Category::Laboratory);
     document.check(&lab(LAB_BUNDLE)?, &lab(LAB_COMPOSITION)?)?;
+    emit("eehrxf-laboratory-mapped", &written)?;
 
     let input: Value = serde_json::from_str(&received)?;
     let output: Value = serde_json::from_str(&written)?;
@@ -392,6 +395,13 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         result["meta"]["profile"][0], OBSERVATION_RESULTSLAB_EU_LAB,
         "{result}"
     );
+    // NOTE: HL7 Europe Laboratory Report 2.0.0 Observation-resultslab-eu-lab requires
+    // effective[x]; an analyte takes the time of its laboratory test result's event.
+    assert_eq!(
+        result.pointer("/effectiveDateTime"),
+        after.pointer("/effectiveDateTime"),
+        "{result}"
+    );
     assert_eq!(
         result.pointer("/valueQuantity/value"),
         only(&input, "Observation")?.pointer("/valueQuantity/value")
@@ -401,6 +411,11 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
     assert_eq!(
         specimen.pointer("/type/coding/0/code"),
         only(&input, "Specimen")?.pointer("/type/coding/0/code")
+    );
+    assert_eq!(
+        of_type(&output, "OperationOutcome").len(),
+        0,
+        "the run's outcome reports the run and stays out of the document"
     );
     let composition = only(&output, "Composition")?;
     let section = &composition["section"][0];
@@ -521,6 +536,52 @@ fn the_embedded_project_compiles_and_maps_as_its_files_do() -> Result<(), Box<dy
         embedded.to_openehr(&document, &settings())?,
         from_disk.to_openehr(&document, &settings())?,
         "the embedded files map the document as the files on disk do"
+    );
+    Ok(())
+}
+
+// NOTE: FHIR R4 extension-data-absent-reason.html: KDS_Laborbericht holds no performing
+// laboratory, so the result's required performer is written absent and the run declares it.
+#[test]
+fn the_performer_the_template_holds_none_of_is_written_absent_and_declared()
+-> Result<(), Box<dyn Error>> {
+    let mapping = mapping()?;
+    let document = ReceivedDocument::read(&received_text()?)?;
+    let composition = mapping.to_openehr(&document, &settings())?;
+    let (run, warnings) = mapping.to_fhir_with_warnings(
+        &committed(composition.composition())?,
+        &Settings::new("Device/ferrobridge-eehrxf-test", NOW),
+        CallContext::new(),
+    )?;
+    let bundle = serde_json::to_value(run.bundle())?;
+    let result = only(&bundle, "Observation")?;
+    assert_eq!(
+        result.pointer("/performer/0"),
+        Some(&serde_json::json!({"extension": [{
+            "url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+            "valueCode": "unknown"
+        }]})),
+        "{result}"
+    );
+    let declared = warnings.iter().any(|warning| {
+        warning.loss()
+            == &Loss::Absent {
+                reason: String::from("unknown"),
+            }
+            && warning.location().fhir() == Some("Observation.performer[0]")
+    });
+    assert!(
+        declared,
+        "the absent performer is a declared loss: {warnings:?}"
+    );
+    let outcome = only(&bundle, "OperationOutcome")?;
+    assert!(
+        outcome["issue"]
+            .as_array()
+            .ok_or("the outcome's issues")?
+            .iter()
+            .any(|issue| issue["expression"][0] == "Observation.performer[0]"),
+        "the Bundle's outcome names it: {outcome}"
     );
     Ok(())
 }

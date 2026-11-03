@@ -279,8 +279,8 @@ fn the_mapping_library_carries_its_full_yaml_corpus() -> Result<(), Box<dyn Erro
     let files = files_under(&repo_root().join("docs/specs/fhirconnect-mapping-lib"))?;
     assert_eq!(
         count_with_extension(&files, &["yml", "yaml"]),
-        107,
-        "the FHIRconnect mapping library is pinned at 107 YAML mapping files"
+        129,
+        "the FHIRconnect mapping library is pinned at 129 YAML mapping files"
     );
     Ok(())
 }

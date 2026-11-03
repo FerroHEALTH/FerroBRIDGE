@@ -42,7 +42,7 @@ fails when it names a different commit, tag or pin-set digest.
 | Item | Pin | Repeated in |
 |---|---|---|
 | FHIRconnect specification source | `SevKohler/FHIRconnect-spec` commit `5046a6dd9ee34f5a1de152301778f302c55e3b7b` (carries the REST API chapter, pull request #93, the sub-contexts, pull request #100, and `openehr` moved inside `properties` in the source `split` definition, pull request #106) | `docs/architecture.md` §2 and §4.7, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/PROVENANCE.md`, `crates/fhirconnect/tests/fixtures/rest-api/PROVENANCE.md` |
-| FHIRconnect mapping library (corpus, never an oracle) | `SevKohler/FHIRconnect-mapping-lib` commit `6bd4c19a2f96821c04fbeed3c6f6c190fd85825b` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect-mapping-lib.sh`, `docs/specs/fhirconnect-mapping-lib/PROVENANCE.md` |
+| FHIRconnect mapping library (corpus, never an oracle) | `SevKohler/FHIRconnect-mapping-lib` commit `2ba7cf5dc9c37d135e06571ae0a8e58b702b3471` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect-mapping-lib.sh`, `docs/specs/fhirconnect-mapping-lib/PROVENANCE.md` |
 | OMOCL corpus | `SevKohler/OMOCL` commit `cfb26bad3ad035f975736299b53a494696b2e604` (grammar `OMOCL/v1.0.0`; the git tag `v1.0.0` carries pre-grammar files) | `docs/architecture.md` §2, `scripts/vendor/omocl.sh`, `docs/specs/omocl/PROVENANCE.md` |
 | OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.5.0` (the v5.4 definitions and DDL only: the tag carries the v5.4 CSV corrections made after `v5.4.3`, and the CDM stays on v5.4 while OMOCL declares 5.4) | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
 | OHDSI Data Quality Dashboard | `OHDSI/DataQualityDashboard` tag `v2.9.0` | `docs/architecture.md` §2 and §11, `scripts/vendor/dqd.sh`, `docs/specs/dqd/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of the `dqd` module it emits, the `DQD_TAG` constant of `omop-cdm` |
@@ -328,9 +328,9 @@ No build reads anything here.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `validator_cli.jar` | 6.10.4 sha256 `1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `validator_cli.jar` | 7.0.4 sha256 `43e29fa8822d670740a909c395ca5b70a3d07fbaa8936f8dedc6a98b007f555b` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.xver-extensions` | 0.1.0 sha256 `f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a` | read by `scripts/vendor/hl7-validator-agreement.sh` |
-| `hl7.terminology` | 7.4.0 sha256 `b321ad4ee1c18798abd8692f45bc86550cffac72ae97413125cfb82f0112c72d` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology` | 7.5.0 sha256 `c54ebe534cd3f2474459eaed68e54c34f09b003766605b19e5552db376f2cc42` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.extensions` | 5.3.0 sha256 `6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.terminology.r5` | 7.1.0 sha256 `473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.extensions.r5` | 5.2.0 sha256 `e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170` | read by `scripts/vendor/hl7-validator-agreement.sh` |

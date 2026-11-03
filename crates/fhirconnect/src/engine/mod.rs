@@ -31,6 +31,8 @@
 //! demographics endpoint a party reference resolves through, is the [`seam`]
 //! it is handed.
 
+pub mod absent;
+
 pub(crate) mod bundle;
 
 pub mod cell;

@@ -325,3 +325,73 @@ fn a_section_of_another_form_or_a_report_the_form_holds_none_of_is_refused()
     ));
     Ok(())
 }
+
+/// A second synthetic report with the document report's `id` and a code.
+fn twin() -> DiagnosticReport {
+    let mut twin = report("Observation/glucose");
+    twin.code = CodeableConcept {
+        coding: vec![Coding {
+            system: Some(LOINC.into()),
+            code: Some("24331-1".into()),
+            ..Coding::default()
+        }],
+        ..CodeableConcept::default()
+    };
+    twin
+}
+
+/// The `fullUrl` of every entry of `bundle`.
+fn full_urls(bundle: &Value) -> Vec<String> {
+    bundle["entry"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry["fullUrl"].as_str().map(str::to_owned))
+        .collect()
+}
+
+// NOTE: FHIR R4 Bundle bdl-7, FullUrl must be unique in a bundle; a resource added after the
+// report under the report's own `DiagnosticReport/{id}` takes the next free id instead.
+#[test]
+fn a_report_added_after_the_document_report_is_renamed() -> Result<(), Box<dyn Error>> {
+    let mut document = document()?;
+    let urls = document.add(&[Resource::DiagnosticReport(Box::new(twin()))])?;
+    let report_url = format!("{BASE}/DiagnosticReport/lab-report");
+    assert_ne!(
+        urls,
+        std::slice::from_ref(&report_url),
+        "the later report is renamed"
+    );
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    let urls = full_urls(&bundle);
+    let unique: std::collections::BTreeSet<&String> = urls.iter().collect();
+    assert_eq!(unique.len(), urls.len(), "bdl-7: {urls:?}");
+    assert!(
+        urls.contains(&report_url),
+        "the document report keeps its url"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_document_report_under_an_entry_s_url_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut document = Document::of(
+        &LABORATORY_REPORT_FORM,
+        BASE,
+        IDENTIFIER.to_owned(),
+        String::from("2026-10-25T12:00:00Z"),
+        String::from("Laboratory report"),
+    );
+    document.with_patient(patient())?;
+    document.add(&[Resource::DiagnosticReport(Box::new(twin()))])?;
+    let refused = document.with_report(report("Observation/glucose"));
+    assert!(
+        matches!(
+            refused,
+            Err(DocumentError::Collision { ref full_url })
+                if *full_url == format!("{BASE}/DiagnosticReport/lab-report")
+        ),
+        "{refused:?}"
+    );
+    Ok(())
+}

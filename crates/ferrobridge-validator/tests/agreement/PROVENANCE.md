@@ -9,7 +9,7 @@
   entry profile. The EU cases claim `patient-eu-core` of `hl7.fhir.eu.base`
   2.0.1 or `bundle-eu-eps` of `hl7.fhir.eu.eps` 1.0.0-ballot in
   `meta.profile`, so both validators hold them to the claim.
-- `reference/`: the outcome the HL7 FHIR Validator 6.10.4 gives each case,
+- `reference/`: the outcome the HL7 FHIR Validator 7.0.4 gives each case,
   written by `scripts/vendor/hl7-validator-agreement.sh`, which runs
   `validator_cli.jar` offline with `-version 4.0.1 -ig
   hl7.fhir.eu.eps#1.0.0-ballot -ig hl7.fhir.eu.base#2.0.1 -tx n/a

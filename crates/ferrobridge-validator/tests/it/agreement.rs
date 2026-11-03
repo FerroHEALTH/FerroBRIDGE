@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! Agreement with the HL7 FHIR Validator 6.10.4 on a shared corpus (#442):
+//! Agreement with the HL7 FHIR Validator 7.0.4 on a shared corpus (#442):
 //! the synthetic cases under `tests/agreement/cases/`, validated here and by
 //! the reference, whose outcomes `scripts/vendor/hl7-validator-agreement.sh`
 //! recorded under `tests/agreement/reference/`.

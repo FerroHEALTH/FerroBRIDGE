@@ -24,6 +24,7 @@ pub const ROUTES: &[&str] = &[
     "/search",
     "/mappings",
     "/mappings/new",
+    "/mappings/import",
     "/mappings/:tab",
     "/mappings/files/*path",
     "/mappings/templates/:id",
@@ -66,6 +67,8 @@ pub enum Page {
     Template,
     /// `/mappings/new`.
     NewFile,
+    /// `/mappings/import`.
+    Import,
     /// `/mappings/edit/*path`.
     Editor,
     /// `/mappings/revisions/:id`.
@@ -105,6 +108,7 @@ impl Page {
             [] => Self::Dashboard,
             ["search"] => Self::Search,
             ["mappings", "new"] => Self::NewFile,
+            ["mappings", "import"] => Self::Import,
             ["mappings", "files", _, ..] => Self::File,
             ["mappings", "templates", _] => Self::Template,
             ["mappings", "edit", _, ..] => Self::Editor,
@@ -158,6 +162,7 @@ pub async fn draw(visit: &Visit) -> Drawn {
         Page::Template => pages::template::page(visit).await,
         Page::NewFile | Page::Editor => pages::editor::page(visit, None).await,
         Page::Revision => pages::mappings::revisions::page(visit, None).await,
+        Page::Import => pages::mappings::archive::page(visit, None),
         Page::Playground => pages::playground::page(visit, None).await,
         Page::Facade => pages::facade::page(visit).await,
         Page::Hl7v2 => pages::hl7v2::page(visit).await,
@@ -173,12 +178,17 @@ pub async fn draw(visit: &Visit) -> Drawn {
     }
 }
 
-/// The answer to the form body `body` posted to the page `visit` names: the
-/// page drawn again with the bridge's answer, or a redirect; `None` for a
-/// page that takes no post. The caller has checked the session.
-pub async fn posted(visit: &Visit, body: &str) -> Option<Response> {
+/// The answer to the body `raw` in `content_type` posted to the page `visit`
+/// names.
+///
+/// It is the page drawn again with the bridge's answer, or a redirect, and
+/// `None` for a page that takes no post. A form post is read as text, and
+/// the import's multipart post as it came. The caller has checked the session.
+pub async fn posted(visit: &Visit, raw: &[u8], content_type: Option<&str>) -> Option<Response> {
     use crate::pages;
+    let body = &String::from_utf8_lossy(raw);
     match Page::of(&visit.path)? {
+        Page::Import => Some(pages::mappings::archive::posted(visit, raw, content_type).await),
         Page::Mappings => Some(pages::mappings::reload(visit).await),
         Page::NewFile | Page::Editor => Some(pages::editor::posted(visit, body).await),
         Page::Revision => Some(pages::mappings::revisions::posted(visit, body).await),
@@ -215,6 +225,7 @@ mod tests {
             ("/mappings/files/e/f.yml", Page::File),
             ("/mappings/templates/d", Page::Template),
             ("/mappings/new", Page::NewFile),
+            ("/mappings/import", Page::Import),
             ("/mappings/edit/e/f.yml", Page::Editor),
             ("/mappings/revisions/d", Page::Revision),
             ("/playground/a", Page::Playground),

@@ -33,6 +33,8 @@ pub enum Kind {
     ReasonRequired,
     /// `400`: the path names no mapping file the console can write.
     BadPath,
+    /// `400`: an import's body is no mapping-set archive the bridge reads.
+    BadArchive,
     /// `401`: the request carries no valid credential.
     Unauthenticated,
     /// `403`: the access token does not carry the operator scope.
@@ -64,10 +66,11 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
+        Self::BadArchive,
         Self::Unauthenticated,
         Self::NotPermitted,
         Self::NotFound,
@@ -101,6 +104,11 @@ impl Kind {
             Self::BadPath => (
                 "bad-path",
                 "The path names no mapping file the console can write",
+                StatusCode::BAD_REQUEST,
+            ),
+            Self::BadArchive => (
+                "bad-archive",
+                "The body is no mapping-set archive the bridge reads",
                 StatusCode::BAD_REQUEST,
             ),
             Self::Unauthenticated => (

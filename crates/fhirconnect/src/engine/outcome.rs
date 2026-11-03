@@ -403,6 +403,13 @@ pub enum Loss {
         /// How many occurrences the condition did not admit.
         count: usize,
     },
+    /// An element a mapping wrote out of openEHR with only the FHIR R4
+    /// data-absent-reason extension, because the content holds no value for
+    /// it ([`crate::engine::absent`]).
+    Absent {
+        /// The extension's `valueCode`.
+        reason: String,
+    },
 }
 
 impl fmt::Display for Loss {
@@ -434,6 +441,10 @@ impl fmt::Display for Loss {
             } => write!(
                 f,
                 "the context's condition does not hold at {count} occurrences of {archetype}, so no resource maps them"
+            ),
+            Self::Absent { ref reason } => write!(
+                f,
+                "the element is written absent, data-absent-reason `{reason}`"
             ),
         }
     }

@@ -211,6 +211,17 @@ program ferrobridge_eu_laboratory.context
                 manual laboratory
                   fhir $resource.category.coding.system -> Coding.system primitive writable = http://terminology.hl7.org/CodeSystem/observation-category
                   fhir $resource.category.coding.code -> Coding.code primitive writable = laboratory
+              mapping resultTime from ferrobridge_eu_laboratory_analyte
+                fhir $resource.effective.as(DateTime) -> Observation.effective[x] primitive writable
+                openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/time -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/time DV_DATE_TIME occurrences [laborbericht/laborbefund/any_event]
+                derived dateTime
+                unidirectional openehr->fhir
+              mapping performerAbsent from ferrobridge_eu_laboratory_analyte
+                fhir $resource.performer.extension -> Reference.extension complex writable
+                unidirectional openehr->fhir
+                manual unknown
+                  fhir $resource.performer.extension.url -> Extension.url attribute writable = http://hl7.org/fhir/StructureDefinition/data-absent-reason
+                  fhir $resource.performer.extension.valueCode -> Extension.value[x] primitive writable = unknown
   mapping metaURL from ferrobridge_eu_laboratory_result
     fhir $resource.meta -> DiagnosticReport.meta complex writable
     unidirectional openehr->fhir

@@ -41,7 +41,7 @@ const CORPUS: &str = concat!(
 const SPEC: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/specs/fhirconnect");
 
 /// How many mapping files the vendored corpus holds.
-const CORPUS_SIZE: usize = 107;
+const CORPUS_SIZE: usize = 129;
 
 /// Every corpus file the published schemas refuse, with its error count.
 ///
@@ -113,6 +113,15 @@ const PUBLISHED_REJECTIONS: &[(&str, usize)] = &[
         "projects/org.highmed/KDS/vitalstatus/KDS_composition.yml",
         1,
     ),
+    (
+        "projects/org.openehr/IPS/allergy/IPS_allergy_section.yml",
+        1,
+    ),
+    ("projects/org.openehr/IPS/device/IPS_device_section.yml", 1),
+    (
+        "projects/org.openehr/IPS/problem/IPS_problem_section.yml",
+        1,
+    ),
 ];
 
 /// Every corpus file this crate's strict schemas refuse, with its reason.
@@ -130,10 +139,18 @@ const STRICT_REJECTIONS: &[&str] = &[
 ];
 
 /// Every PROGRAMMED function the corpus names, in `mappingCode` order.
+///
+/// The specification leaves how the code is provided "up to the vendor" and
+/// gives `mappingCode` no argument syntax
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/concept-type/concept-mappings.adoc`,
+/// §Programmed mappings), so a value with arguments is one opaque name.
 const CORPUS_MAPPING_CODES: &[&str] = &[
     "dosageDurationToAdministrationDuration",
     "dosageQuantityToRange",
     "ehrStatusAddExternalREF",
+    "generateNarrative(entry, allergies)",
+    "generateNarrative(entry, conditions)",
+    "generateNarrative(entry, deviceUseStatements)",
     "rangeToText",
     "ratio_to_dosage",
     "ratio_to_dosage_action",
@@ -259,8 +276,8 @@ fn every_corpus_file_validates_against_the_published_schemas_or_is_in_the_pinned
         "the published schemas refuse a different set than the pinned one"
     );
     let total: usize = measured.iter().map(|(_, count)| *count).sum();
-    assert_eq!(total, 34, "the pinned rejection set is 34 errors");
-    assert_eq!(measured.len(), 24, "the pinned rejection set is 24 files");
+    assert_eq!(total, 37, "the pinned rejection set is 37 errors");
+    assert_eq!(measured.len(), 27, "the pinned rejection set is 27 files");
     Ok(())
 }
 
@@ -281,20 +298,36 @@ fn the_published_rejections_fall_into_exactly_three_classes() -> Result<(), Box<
         *classes.entry(class).or_default() += 1;
     }
     assert_eq!(classes.get("link").copied(), Some(22));
-    assert_eq!(classes.get("mappingCode").copied(), Some(9));
+    assert_eq!(classes.get("mappingCode").copied(), Some(12));
     assert_eq!(classes.get("null mappings").copied(), Some(3));
     Ok(())
 }
 
+/// The two copies differ by the sub-context keys alone: the repository source
+/// gains `slotContext` (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/sub-contexts.adoc`),
+/// the rendered v1.0.0 site has not, so the rendered copy refuses the one
+/// corpus file that enters a sub-context, once per `slotContext`.
 #[test]
-fn the_two_vendored_copies_of_the_published_schemas_refuse_the_same_files()
+fn the_two_vendored_copies_of_the_published_schemas_differ_only_by_slot_context()
 -> Result<(), Box<dyn Error>> {
     let source = validate_corpus(&schemas_from("modules/ROOT/attachments")?)?;
-    let rendered = validate_corpus(&schemas_from("build/site/FHIRconnect/v1.0.0/_attachments")?)?;
+    let mut rendered =
+        validate_corpus(&schemas_from("build/site/FHIRconnect/v1.0.0/_attachments")?)?;
+    let entering = rendered
+        .remove("projects/org.openehr/IPS/IPS_composition.yml")
+        .ok_or("the rendered copy refuses the IPS composition")?;
+    assert_eq!(entering.len(), 4, "{entering:?}");
+    assert!(
+        entering
+            .iter()
+            .all(|message| message.contains("'slotContext' was unexpected")),
+        "{entering:?}"
+    );
+    assert!(!source.contains_key("projects/org.openehr/IPS/IPS_composition.yml"));
     assert_eq!(
         source, rendered,
-        "the repository-source and rendered copies of the published schemas disagree over the \
-         corpus"
+        "the repository-source and rendered copies of the published schemas disagree beyond \
+         `slotContext`"
     );
     Ok(())
 }
@@ -327,7 +360,7 @@ fn the_strict_schemas_accept_the_four_keys_the_published_model_schema_omits()
         .collect();
     assert_eq!(
         recovered.len(),
-        21,
+        24,
         "the strict schemas recover the files the published ones refuse over `link` and \
          `mappingCode`"
     );
@@ -338,13 +371,24 @@ fn the_strict_schemas_accept_the_four_keys_the_published_model_schema_omits()
 /// order through the loader and then document order through the semantic
 /// rules, so a rule that starts reporting somewhere else is a failing test
 /// rather than a silent reshuffle.
+///
+/// `device_summary.v0.yml` and the three IPS section extensions write a
+/// `reference` whose `with.openehr` is a path, and the Reference page says the
+/// openEHR key "is always set with `openEHR: $reference`, since it is a
+/// resource initialization and no direct path mapping"
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/concept-type/Reference.adoc`).
+/// The three sections also name `generateNarrative(...)`, a PROGRAMMED
+/// function the engine has not registered (`concept-mappings.adoc`,
+/// §Programmed mappings).
+// NOTE: sub-contexts.adoc §Example: IPS writes `openehr: $reference/items[...]`
+// against Reference.adoc; the refusal follows Reference.adoc until the
+// specification settles which page holds (#1436).
 #[test]
 fn the_corpus_semantic_refusals_are_the_pinned_set() -> Result<(), Box<dyn Error>> {
     let measured = corpus_diagnostics(&StaticMappingCodes::default())?;
     let expected = vec![
         "model/cluster/org.highmed/lebensphase.v0.yml\tfc-schema-violation".to_owned(),
         "model/cluster/org.highmed/study_details.v1.yml\tfc-schema-violation".to_owned(),
-        "projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml\tyaml-syntax".to_owned(),
         "projects/org.highmed/KDS/laborauftrag/KDS_composition.yml\tduplicate-mapping-name".to_owned(),
         "projects/org.highmed/KDS/person_pseudo/KDS_composition.yml\tduplicate-mapping-name".to_owned(),
         "projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml\tduplicate-mapping-name".to_owned(),
@@ -365,16 +409,23 @@ fn the_corpus_semantic_refusals_are_the_pinned_set() -> Result<(), Box<dyn Error
         "model/composition/org.openehr/report-result.v1.Composition.yml\tfc-extension-method-outside-model".to_owned(),
         "model/composition/org.openehr/report.v1.MedicationAdministration.yml\tfc-condition-target-root-mismatch".to_owned(),
         "model/evaluation/org.openehr/cause_of_death.v1.yml\tfc-extension-method-outside-model".to_owned(),
+        "model/evaluation/org.openehr/device_summary.v0.yml\tfc-reference-without-reference-variable".to_owned(),
+        "projects/org.openehr/IPS/allergy/IPS_allergy_section.yml\tfc-reference-without-reference-variable".to_owned(),
+        "projects/org.openehr/IPS/allergy/IPS_allergy_section.yml\tfc-unknown-mapping-code".to_owned(),
+        "projects/org.openehr/IPS/device/IPS_device_section.yml\tfc-reference-without-reference-variable".to_owned(),
+        "projects/org.openehr/IPS/device/IPS_device_section.yml\tfc-unknown-mapping-code".to_owned(),
+        "projects/org.openehr/IPS/problem/IPS_problem_section.yml\tfc-reference-without-reference-variable".to_owned(),
+        "projects/org.openehr/IPS/problem/IPS_problem_section.yml\tfc-unknown-mapping-code".to_owned(),
         "projects/org.highmed/KDS/person_pseudo/KDS_pseudo_admin_person.yml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.highmed/KDS/person_pseudo/KDS_pseudo_admin_person.yml\tfc-unknown-mapping-code".to_owned(),
         "projects/org.highmed/KDS/person/KDS_admin_entry_person.yml\tfc-unknown-mapping-code".to_owned(),
         "projects/org.highmed/KDS/diagnose/KDS_composition.yml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.highmed/KDS/diagnose/KDS_lebensphase.yml\tfc-unknown-mapping-reference".to_owned(),
+        "projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.openehr/EEHRxF/lab/bundle/lab_result.yml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.highmed/KDS/person/person.context.yaml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml\tfc-unknown-mapping-reference".to_owned(),
-        "projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml\tfc-unknown-mapping-reference".to_owned(),
         "projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml\tfc-unknown-mapping-reference".to_owned(),
     ];
@@ -454,7 +505,7 @@ fn the_corpus_mapping_codes_pass_once_the_engine_registers_them() -> Result<(), 
         .collect();
     assert!(unknown.is_empty(), "{unknown:?}");
     let baseline = corpus_diagnostics(&StaticMappingCodes::default())?;
-    assert_eq!(baseline.len() - diagnostics.len(), 9);
+    assert_eq!(baseline.len() - diagnostics.len(), 12);
     Ok(())
 }
 

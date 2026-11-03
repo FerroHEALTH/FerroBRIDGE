@@ -161,7 +161,7 @@ Fixtures are synthetic.
 
 `agreement.rs` is the `validator-agreement` conformance corpus (#442): the
 synthetic cases under `tests/agreement/cases/` against the outcomes the HL7
-FHIR Validator 6.10.4 recorded under `tests/agreement/reference/`, which
+FHIR Validator 7.0.4 recorded under `tests/agreement/reference/`, which
 `scripts/vendor/hl7-validator-agreement.sh` regenerates. The reference is
 prior art: every disagreement is adjudicated in the test's `ADJUDICATED`
 table with the specification text that settles it, never resolved by

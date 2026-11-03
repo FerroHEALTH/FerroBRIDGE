@@ -21,6 +21,7 @@
 //! whose guard runs in the ordinary suite. No specification governs the
 //! journeys: our own design.
 
+mod archive;
 mod browser;
 mod configuration;
 mod editor;

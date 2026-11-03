@@ -11,9 +11,10 @@ projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   left out projects/org.highmed/KDS/diagnose/KDS_composition.yml (error fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/diagnose/KDS_lebensphase.yml (error fc-unknown-mapping-reference)
-  left out projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml (error yaml-syntax)
+  left out projects/org.highmed/KDS/diagnose/KDS_problem_diagnose.yml (error fc-unknown-mapping-reference)
   refused
     projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:20 error fc-unknown-mapping-reference
     projects/org.highmed/KDS/diagnose/KDS_diagnose.context.yaml:25 error fc-unknown-mapping-reference
@@ -28,6 +29,7 @@ projects/org.highmed/KDS/fall/KDS_fall_einfach.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
     projects/org.highmed/KDS/fall/KDS_fall_einfach.context.yaml:30 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
@@ -39,6 +41,7 @@ projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
     model/cluster/org.openehr/specimen.v1.yml:101 warning fc-excluded-template-node
     model/cluster/org.openehr/specimen.v1.yml:139 warning fc-excluded-template-node
@@ -57,7 +60,6 @@ projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
     model/composition/org.openehr/request.v1.ServiceRequest.yml:64 error fc-unknown-template-node
     model/composition/org.openehr/request.v1.ServiceRequest.yml:66 error fc-unknown-template-node
     model/composition/org.openehr/request.v1.ServiceRequest.yml:68 error fc-unknown-template-node
-    model/instruction/org.openehr/service_request.v1.yml:19 error fc-unknown-template-node
     model/instruction/org.openehr/service_request.v1.yml:34 error fc-unknown-template-node
     projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:108 error fc-unknown-extension-target
     projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:17 error fc-archetype-mismatch
@@ -72,6 +74,7 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:109 error fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:131 error fc-uncarried-tail
@@ -103,7 +106,6 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:62 error fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:64 error fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:70 error fc-unknown-template-node
-    model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:98 error fc-unknown-fhir-element
     model/observation/org.openehr/laboratory_test_result.v1.yml:142 error fc-unknown-fhir-element
     model/observation/org.openehr/laboratory_test_result.v1.yml:156 error fc-unknown-fhir-element
     model/observation/org.openehr/laboratory_test_result.v1.yml:178 warning fc-excluded-template-node
@@ -123,6 +125,7 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
     model/cluster/org.openehr/medication.v2.substance.yml:19 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.substance.yml:24 error fc-unknown-template-node
@@ -180,6 +183,7 @@ projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.c
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   left out projects/org.highmed/KDS/medikationsverabreichung/KDS_composition.yml (error fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/medikationsverabreichung/KDS_medikamentenverabreichung.yml (error fc-unknown-mapping-reference)
   refused
@@ -195,6 +199,7 @@ projects/org.highmed/KDS/person/person.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
     projects/org.highmed/KDS/person/person.context.yaml:29 error fc-unknown-mapping-reference
 projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml
@@ -206,6 +211,7 @@ projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   left out projects/org.highmed/KDS/person_pseudo/KDS_composition.yml (error fc-unknown-mapping-reference)
   left out projects/org.highmed/KDS/person_pseudo/KDS_pseudo_admin_person.yml (error fc-unknown-mapping-reference)
   refused
@@ -222,6 +228,7 @@ projects/org.highmed/KDS/procedure/procedure.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   left out projects/org.highmed/KDS/procedure/KDS_procedure.v1.yml (error fc-unknown-mapping-reference)
   refused
     projects/org.highmed/KDS/procedure/procedure.context.yaml:19 error fc-unknown-mapping-reference
@@ -236,6 +243,7 @@ projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   left out projects/org.highmed/KDS/studienteilnahme/KDS_informed_consent.yaml (error fc-schema-violation)
   refused
     projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml:18 error fc-unknown-mapping-reference
@@ -252,6 +260,7 @@ projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   left out projects/org.highmed/KDS/todesursache/KDS_cause_of_death.yml (error fc-unknown-mapping-reference)
   refused
     projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml:18 error fc-unknown-mapping-reference
@@ -266,6 +275,7 @@ projects/org.highmed/KDS/vitalstatus/KDS_Vitalstatus.context.yaml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
     model/composition/org.openehr/report.v1.Observation.yml:101 error fc-unknown-template-node
     model/composition/org.openehr/report.v1.Observation.yml:103 error fc-unknown-template-node
@@ -308,8 +318,31 @@ projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml
   left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
   left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   left out projects/org.openehr/EEHRxF/lab/bundle/lab_composition.yml (error empty-document)
   left out projects/org.openehr/EEHRxF/lab/bundle/lab_result.yml (error fc-unknown-mapping-reference)
   refused
     projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml:21 error fc-unknown-mapping-reference
     projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml:23 error fc-unknown-mapping-reference
+projects/org.openehr/IPS/IPS.context.yml
+  left out model/action/org.openehr/informed_consent.v0.yml (error fc-unknown-mapping-reference)
+  left out model/action/org.openehr/procedure.v1.yml (error fc-condition-target-root-mismatch)
+  left out model/cluster/org.highmed/lebensphase.v0.yml (error fc-schema-violation)
+  left out model/cluster/org.highmed/study_details.v1.yml (error fc-schema-violation)
+  left out model/cluster/org.highmed/study_participation.v1.yml (error fc-unknown-mapping-reference)
+  left out model/composition/org.openehr/report-result.v1.Composition.yml (error fc-extension-method-outside-model)
+  left out model/composition/org.openehr/report.v1.MedicationAdministration.yml (error fc-condition-target-root-mismatch)
+  left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
+  left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
+  left out projects/org.openehr/IPS/IPS_composition.yml (error fc-unknown-mapping-reference)
+  left out projects/org.openehr/IPS/allergy/IPS_allergy.context.yml (error fc-unknown-mapping-reference)
+  left out projects/org.openehr/IPS/allergy/IPS_allergy_section.yml (error fc-reference-without-reference-variable)
+  left out projects/org.openehr/IPS/device/IPS_device.context.yml (error fc-unknown-mapping-reference)
+  left out projects/org.openehr/IPS/device/IPS_device_section.yml (error fc-reference-without-reference-variable)
+  left out projects/org.openehr/IPS/problem/IPS_problem.context.yml (error fc-unknown-mapping-reference)
+  left out projects/org.openehr/IPS/problem/IPS_problem_section.yml (error fc-reference-without-reference-variable)
+  refused
+    projects/org.openehr/IPS/IPS.context.yml:20 error fc-unknown-mapping-reference
+    projects/org.openehr/IPS/IPS.context.yml:22 error fc-unknown-mapping-reference
+    projects/org.openehr/IPS/IPS.context.yml:23 error fc-unknown-mapping-reference
+    projects/org.openehr/IPS/IPS.context.yml:25 error fc-unknown-mapping-reference
