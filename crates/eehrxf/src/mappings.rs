@@ -73,6 +73,11 @@ impl Project {
 }
 
 /// Embeds the file `name` of the shipped project `directory`.
+#[cfg(any(
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "laboratory"
+))]
 macro_rules! shipped {
     ($directory:literal, $name:literal) => {
         File {

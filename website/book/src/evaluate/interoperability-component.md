@@ -123,9 +123,11 @@ The patient summary is the most complete category: the crosswalk, the
 document `Bundle`, its mapping from openEHR, the terminology rules and the
 receipt are built. The prescription and dispensation records are read and
 written in the MPD form, and [mapped from and into openEHR](prescription-mapping.md)
-through FerroBRIDGE's MPD contexts. The laboratory, imaging and discharge reports have
-their crosswalks and their document assembly; building each report from
-openEHR content waits on the mapping contexts for their profiles. The open
+through FerroBRIDGE's MPD contexts. The laboratory report is
+[mapped from and into openEHR](laboratory-mapping.md) through the shipped
+laboratory project and received as a `Bundle-eu-lab`. The imaging and
+discharge reports have their crosswalks and their document assembly;
+building each from openEHR content waits on a published template. The open
 work is on the [tracker](https://github.com/FerroHEALTH/FerroBRIDGE/issues).
 The profiles this repository's own FHIR facade maps to, category by category,
 are on [EHDS readiness](ehds-readiness.md).
