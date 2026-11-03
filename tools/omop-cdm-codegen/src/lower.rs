@@ -365,7 +365,7 @@ fn lower_column(field: &FieldRecord) -> Result<Column, LowerError> {
         });
     }
     // NOTE: `visit_occurrence.visit_type_concept_id` is the one field of the
-    // v5.4.3 definitions spelled `Integer`; normalising it here keeps the
+    // v5.4 definitions spelled `Integer`; normalising it here keeps the
     // emitted model uniform, and the typo is reported upstream on #103.
     let datatype = if field.datatype == "Integer" {
         String::from("integer")

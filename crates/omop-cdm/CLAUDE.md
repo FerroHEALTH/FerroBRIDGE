@@ -103,7 +103,7 @@ Full discipline: `.claude/rules/codegen.md`.
   completeness and seven temporal plausibility checks (`withinVisitDates` and
   the Temporal subcategory, `scripts/vendor/dqd.sh` vendors their templates). The
   structural facts (required, datatype, keys, `fk_domain`, `fk_class`) come
-  from the CDM v5.4.3 definitions through `ColumnMeta`; the thresholds, the
+  from the CDM v5.4 definitions through `ColumnMeta`; the thresholds, the
   notes and the enablement of `isStandardValidConcept`, the completeness
   and the temporal checks come from the Dashboard's settings (a completeness check whose
   settings or template name a column its table lacks refuses the plan). Where the two disagree the definitions win, and

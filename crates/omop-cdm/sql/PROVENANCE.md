@@ -9,7 +9,7 @@ The OMOP CDM documentation publishes a "Condition Eras" and a "Drug Eras"
 script on its SQL scripts page
 (<https://ohdsi.github.io/CommonDataModel/sqlScripts.html>). The page source is
 `site/sqlScripts.qmd` of `OHDSI/CommonDataModel`, which
-`scripts/vendor/omop-cdm.sh` vendors verbatim at tag `v5.4.3` under
+`scripts/vendor/omop-cdm.sh` vendors verbatim at tag `v5.5.0` under
 `docs/specs/omop-cdm/site/`. The repository declares the Apache License 2.0 in
 its `DESCRIPTION` file (`docs/specs/omop-cdm/PROVENANCE.md`).
 
