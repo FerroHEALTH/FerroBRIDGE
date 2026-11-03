@@ -20,13 +20,16 @@
 //! (`crate::change_feed::report`). With `[operator] mapping_dir`, `POST
 //! /operator/mappings/check` checks a draft over the running set, `PUT
 //! /operator/mappings/{path}` saves one and reloads, and `POST
-//! /operator/reload` reloads the files on disk ([`save`], [`reload`]). No
-//! specification governs the operator surface: our own design.
+//! /operator/reload` reloads the files on disk ([`save`], [`reload`]), and
+//! `GET /operator/revisions`, one revision, its `/diff` and `POST
+//! /operator/revisions/{id}/apply` read and apply the history of the console
+//! files ([`revisions`]). No specification governs the operator surface: our own design.
 
 pub mod configuration;
 pub mod files;
 pub mod guard;
 pub mod reload;
+pub mod revisions;
 pub mod save;
 pub mod snapshot;
 
@@ -77,6 +80,8 @@ pub struct Operator {
     saving: tokio::sync::Mutex<()>,
     /// The configuration the bridge started on, when it is answered.
     configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
+    /// The mapping-set revisions, when saving is configured.
+    revisions: Option<revisions::Store>,
 }
 
 impl Operator {
@@ -91,6 +96,7 @@ impl Operator {
             mapping_dir: None,
             saving: tokio::sync::Mutex::new(()),
             configuration: None,
+            revisions: None,
         }
     }
 
@@ -118,6 +124,7 @@ impl Operator {
                 language.console_directory(&mapping_dir),
             ));
         }
+        self.revisions = Some(revisions::Store::new(&mapping_dir));
         self.mapping_dir = Some(mapping_dir);
         self.reloader = Some(reloader);
         self
@@ -168,20 +175,31 @@ impl Operator {
         report: &crate::check::Report,
         draft: Option<&reload::Draft>,
     ) -> ferrobridge_operator_api::operator::LoadReport {
-        ferrobridge_operator_api::operator::LoadReport {
-            clean: report.is_clean(),
-            counts: report.counts(),
-            diagnostics: report
-                .diagnostics()
-                .iter()
-                .map(|diagnostic| {
-                    crate::check::shown_diagnostic(
-                        diagnostic,
-                        &reload::shown(&self.roots, draft, diagnostic.file()),
-                    )
-                })
-                .collect(),
-        }
+        load_report_over(report, &self.roots, draft)
+    }
+}
+
+/// Returns `report` as a check answers it, each file by its wire path under
+/// `roots` and `draft` by the path it stands for.
+#[must_use]
+pub fn load_report_over(
+    report: &crate::check::Report,
+    roots: &[Root],
+    draft: Option<&reload::Draft>,
+) -> ferrobridge_operator_api::operator::LoadReport {
+    ferrobridge_operator_api::operator::LoadReport {
+        clean: report.is_clean(),
+        counts: report.counts(),
+        diagnostics: report
+            .diagnostics()
+            .iter()
+            .map(|diagnostic| {
+                crate::check::shown_diagnostic(
+                    diagnostic,
+                    &reload::shown(roots, draft, diagnostic.file()),
+                )
+            })
+            .collect(),
     }
 }
 
@@ -221,6 +239,16 @@ pub fn routes(
         .route("/operator/mappings/check", post(save::check))
         .route("/operator/mappings/{*path}", get(mapping).put(save::save))
         .route("/operator/reload", post(save::reload))
+        .route("/operator/revisions", get(revisions::routes::list))
+        .route("/operator/revisions/{id}", get(revisions::routes::one))
+        .route(
+            "/operator/revisions/{id}/diff",
+            get(revisions::routes::differences),
+        )
+        .route(
+            "/operator/revisions/{id}/apply",
+            post(revisions::routes::apply),
+        )
         .with_state(operator)
         .merge(readiness)
         .merge(lane)

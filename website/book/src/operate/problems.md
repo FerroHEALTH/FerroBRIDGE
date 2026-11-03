@@ -55,11 +55,11 @@ the process is not ready.
 | [`bad-path`](#bad-path) | `400` | The path names no mapping file the console can write. |
 | [`unauthenticated`](#unauthenticated) | `401` | The request carries no valid access token. |
 | [`not-permitted`](#not-permitted) | `403` | The token does not carry the operator scope. |
-| [`not-found`](#not-found) | `404` | The mapping file or the configuration does not exist. |
+| [`not-found`](#not-found) | `404` | The mapping file, the revision or the configuration does not exist. |
 | [`provisioned`](#provisioned) | `409` | A provisioned file holds the path. |
 | [`not-configured`](#not-configured) | `409` | No `[operator] mapping_dir` is configured. |
-| [`precondition-failed`](#precondition-failed) | `412` | The file changed since the `ETag` the save names. |
-| [`precondition-required`](#precondition-required) | `428` | The save sends no precondition. |
+| [`precondition-failed`](#precondition-failed) | `412` | What the request replaces changed since the `ETag` it names. |
+| [`precondition-required`](#precondition-required) | `428` | The write sends no precondition. |
 | [`unreadable`](#unreadable) | `500` | A mapping directory could not be read. |
 | [`unwritable`](#unwritable) | `500` | The mapping directory could not be written. |
 | [`dead-letters-unavailable`](#dead-letters-unavailable) | `500` | The dead-letter store could not be read or written. |
@@ -115,13 +115,15 @@ saves and reloads nothing. Set `mapping_dir` to turn on editing.
 ## precondition-failed
 
 `412`. The file changed since the `ETag` the save names, or
-`If-None-Match: *` names a file that exists. Read the file again and save
-over its new `ETag`.
+`If-None-Match: *` names a file that exists, or the running revision is no
+longer the one an apply names in `If-Match`. Read the file or the revisions
+again and send the new `ETag`.
 
 ## precondition-required
 
 `428`. A save sends `If-Match` with the file's `ETag`, or
-`If-None-Match: *` for a new file. Add one of them.
+`If-None-Match: *` for a new file, and an apply sends `If-Match` with the
+running revision's id. Add the header.
 
 ## unreadable
 

@@ -562,6 +562,11 @@ async fn build_operator(
         .await
         .context("loading the console's mapping files")?
         .context("loading the console's mapping files")?;
+        let worker = Arc::clone(&operator);
+        tokio::task::spawn_blocking(move || worker.settle(operator::save::on_disk()))
+            .await
+            .context("recording the console's mapping files as a revision")?
+            .context("recording the console's mapping files as a revision")?;
         Arc::try_unwrap(operator).map_err(|_shared| {
             anyhow::anyhow!("the operator API is still shared after its boot load")
         })?
