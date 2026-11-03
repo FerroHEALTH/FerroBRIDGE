@@ -25,6 +25,8 @@ pub(crate) struct Output {
 pub(crate) struct Test {
     /// The group the test belongs to.
     pub(crate) group: String,
+    /// The `mode` attribute of that group, when given.
+    pub(crate) group_mode: Option<String>,
     /// The `name` attribute.
     pub(crate) name: String,
     /// The attributes of the `test` element.
@@ -62,6 +64,7 @@ pub(crate) fn read(text: &str) -> Result<Vec<Test>, String> {
     let mut reader = Reader::from_str(text);
     let mut tests = Vec::new();
     let mut group = String::new();
+    let mut group_mode: Option<String> = None;
     let mut current: Option<Test> = None;
     let mut capture: Option<(bool, Option<String>)> = None;
     let mut buffer = String::new();
@@ -70,12 +73,15 @@ pub(crate) fn read(text: &str) -> Result<Vec<Test>, String> {
         match event {
             Event::Eof => break,
             Event::Start(start) | Event::Empty(start) if start.name().as_ref() == "group" => {
-                group = attributes(&start).remove("name").unwrap_or_default();
+                let mut attributes = attributes(&start);
+                group = attributes.remove("name").unwrap_or_default();
+                group_mode = attributes.remove("mode");
             }
             Event::Start(start) if start.name().as_ref() == "test" => {
                 let attributes = attributes(&start);
                 current = Some(Test {
                     group: group.clone(),
+                    group_mode: group_mode.clone(),
                     name: attributes.get("name").cloned().unwrap_or_default(),
                     attributes,
                     ..Test::default()
