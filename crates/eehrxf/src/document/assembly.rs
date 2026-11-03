@@ -14,7 +14,7 @@ use fhir_types::r4::meta::Meta;
 use fhir_types::r4::reference::Reference;
 
 use crate::document::{
-    Authorship, Companion, Document, DocumentError, Kind, URN_SYSTEM, coding, reference,
+    Authorship, Companion, Document, DocumentError, Kind, REPORT_ID, URN_SYSTEM, coding, reference,
 };
 
 impl Document {
@@ -96,7 +96,7 @@ impl Document {
         subject: &str,
         composition_url: &str,
     ) -> (String, DiagnosticReport) {
-        let id = report.id.clone().unwrap_or_else(|| String::from("report"));
+        let id = report.id.clone().unwrap_or_else(|| String::from(REPORT_ID));
         report.id = Some(id.clone());
         let profiles = &mut report.meta.get_or_insert_with(Meta::default).profile;
         if !profiles
