@@ -28,6 +28,7 @@ mod refresh;
 mod revisions;
 mod run;
 mod server;
+mod session;
 mod shell;
 mod sign_in;
 mod sign_out;

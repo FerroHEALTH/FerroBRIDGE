@@ -16,8 +16,8 @@
 //! while omitting `mappingCode`, `link`, `participationsFunction` and
 //! mapping-level `conceptmap`, which the prose defines
 //! (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/concept-type/concept-mappings.adoc`),
-//! so it refuses files the prose admits. [`schema::published`] exists to
-//! exercise the published schemas and pin that disagreement; the loader runs
+//! so it refuses files the prose admits. [`schema::Schemas::compile`] compiles
+//! the published schemas to exercise them and pin that disagreement; the loader runs
 //! [`schema::strict`].
 
 pub mod ast;

@@ -73,6 +73,9 @@ exceptions = [
   # ferrohealth-secret is the family's one mask, which ferrohealth-smart
   # renders its secrets and URLs through, the same Licensor's crate.
   { allow = ["BUSL-1.1"], crate = "ferrohealth-secret" },
+  # ferrohealth-session is the family's console sign-in and session crate the
+  # operator console signs operators in with, the same Licensor's crate.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-session" },
   # The FerroSYS crates are the family's process plumbing the server and the
   # console run on (configuration, telemetry, health, the server shell and the
   # usage report), the same Licensor's crates under the same licence.
@@ -101,6 +104,7 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "ferrobridge-testkit" },
   { allow = ["BUSL-1.1"], crate = "fhir-codegen" },
   { allow = ["BUSL-1.1"], crate = "omop-cdm-codegen" },
+  { allow = ["BUSL-1.1"], crate = "forwarders" },
   { allow = ["BUSL-1.1"], crate = "generated-tree" },
 ]
 

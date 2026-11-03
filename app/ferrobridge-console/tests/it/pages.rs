@@ -57,7 +57,7 @@ const PAGES: [(&str, &str); 29] = [
 
 #[tokio::test]
 async fn a_visitor_reads_the_sign_in_on_every_page() -> Result<(), Box<dyn Error>> {
-    let (_state, service) = console("")?;
+    let (_state, service) = console("").await?;
     for (route, _) in PAGES {
         let (response, body) = send(&service, get(route)?).await?;
         assert_eq!(StatusCode::OK, response.status(), "{route}");
@@ -124,7 +124,8 @@ async fn a_bridge_out_of_reach_is_said_on_the_page_never_left_blank() -> Result<
         "http://127.0.0.1:9/",
         "",
         "",
-    ))?;
+    ))
+    .await?;
     let cookie = crate::support::sign_in(
         &service,
         &provider,

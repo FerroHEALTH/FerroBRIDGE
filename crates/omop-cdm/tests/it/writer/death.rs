@@ -86,6 +86,7 @@ async fn the_newest_writer_of_a_death_row_wins_and_a_removal_restores_the_one_be
         .commit(
             &death(COMPOSITION, 1, Some("2026-06-15"))?,
             &RunId::new("run-1")?,
+            None,
         )
         .await?;
     assert_eq!(vec![String::from("2026-06-15")], deaths(&client).await?);
@@ -94,6 +95,7 @@ async fn the_newest_writer_of_a_death_row_wins_and_a_removal_restores_the_one_be
         .commit(
             &death(OTHER_COMPOSITION, 1, Some("2026-06-16"))?,
             &RunId::new("run-1")?,
+            None,
         )
         .await?;
     assert_eq!(
@@ -130,6 +132,7 @@ async fn a_later_version_without_a_death_takes_its_row_with_it() -> Result<(), B
         .commit(
             &death(COMPOSITION, 1, Some("2026-06-15"))?,
             &RunId::new("run-1")?,
+            None,
         )
         .await?;
     database
@@ -137,6 +140,7 @@ async fn a_later_version_without_a_death_takes_its_row_with_it() -> Result<(), B
         .commit(
             &death(COMPOSITION, 1, Some("2026-06-15"))?,
             &RunId::new("run-2")?,
+            None,
         )
         .await?;
     assert_eq!(
@@ -146,7 +150,7 @@ async fn a_later_version_without_a_death_takes_its_row_with_it() -> Result<(), B
     );
     database
         .writer
-        .commit(&death(COMPOSITION, 2, None)?, &RunId::new("run-3")?)
+        .commit(&death(COMPOSITION, 2, None)?, &RunId::new("run-3")?, None)
         .await?;
     assert_eq!(Vec::<String>::new(), deaths(&client).await?);
     Ok(())

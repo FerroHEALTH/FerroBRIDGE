@@ -277,15 +277,26 @@ impl Walk {
             let named: BTreeSet<&str> = slices
                 .iter()
                 .filter_map(|slice| {
+                    if path == "$this" {
+                        return Some(*slice);
+                    }
                     let id = format!("{}.{path}", slice.path().as_str());
                     snapshot.by_id.get(id.as_str()).copied()
                 })
                 .flat_map(|target| target.types().iter().map(String::as_str))
                 .collect();
+            // NOTE: FHIR R4 formats.html#choice: a choice element's occurrence names its type in the
+            // property's suffix, so a `$this` type slice of `value[x]` is matched by that suffix.
+            let choice = last_segment(element.path().as_str())
+                .strip_suffix("[x]")
+                .filter(|_| path == "$this");
             let is_named: Vec<bool> = found
                 .iter()
-                .map(|(_, value)| {
-                    value
+                .map(|(at, value)| match choice {
+                    Some(base) => last_segment(at)
+                        .strip_prefix(base)
+                        .is_some_and(|suffix| named.iter().any(|code| same_type(code, suffix))),
+                    None => value
                         .and_then(|value| {
                             if path == "$this" {
                                 Some(value)
@@ -295,7 +306,7 @@ impl Walk {
                         })
                         .and_then(|target| target.get("resourceType"))
                         .and_then(Value::as_str)
-                        .is_some_and(|kind| named.contains(kind))
+                        .is_some_and(|kind| named.contains(kind)),
                 })
                 .collect();
             let last_named = is_named.iter().rposition(|hit| *hit);
@@ -459,4 +470,14 @@ enum Fit {
     No,
     /// No discriminator refuses it, and one could not be evaluated.
     Possibly,
+}
+
+/// Whether the type code `code` is the type a choice property's `suffix`
+/// names, the code with its first letter in upper case
+/// (<https://hl7.org/fhir/R4/formats.html#choice>).
+fn same_type(code: &str, suffix: &str) -> bool {
+    let mut letters = code.chars();
+    letters.next().is_some_and(|first| {
+        suffix.strip_prefix(first.to_ascii_uppercase()) == Some(letters.as_str())
+    })
 }

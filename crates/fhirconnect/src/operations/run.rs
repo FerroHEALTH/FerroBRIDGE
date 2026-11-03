@@ -50,7 +50,7 @@ use crate::operations::provenance::CompositionSource;
 use crate::operations::subjects;
 use crate::resolve::program::Program;
 use crate::resolve::program::binding::TemplateId;
-use crate::resolve::select::select_by_profile_pinned;
+use crate::resolve::select::select_by_profile;
 use crate::resolve::select::select_by_template;
 use crate::tree::element::Table;
 
@@ -629,7 +629,7 @@ fn select<'set>(
             .map(AsRef::as_ref)
             .map_err(|source| OperationError::Select { source });
     }
-    select_by_profile_pinned(programs.programs(), &claimed, template)
+    select_by_profile(programs.programs(), &claimed, template)
         .map(AsRef::as_ref)
         .map_err(|source| OperationError::Select { source })
 }

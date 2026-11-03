@@ -50,10 +50,12 @@ pub enum SelectError {
     },
 }
 
-/// Returns the program whose profile the instance claims.
+/// Returns the program whose profile the instance claims, pinned by template
+/// when `template` names one.
 ///
 /// `claimed` is the instance's `meta.profile`, each entry a canonical URL with
-/// an optional `|version`.
+/// an optional `|version`. The `templateId` parameter of the FHIRconnect
+/// operations is what pins the choice when several contexts map one profile.
 ///
 /// # Errors
 ///
@@ -62,21 +64,6 @@ pub enum SelectError {
 /// [`SelectError::ProfileVersion`], naming every program that claims the
 /// profile under another version, when that is why nothing matched.
 pub fn select_by_profile<'a>(
-    programs: &'a [Arc<Program>],
-    claimed: &[String],
-) -> Result<&'a Arc<Program>, SelectError> {
-    select_by_profile_pinned(programs, claimed, None)
-}
-
-/// Returns the program whose profile the instance claims, pinned by template.
-///
-/// The `templateId` parameter of the FHIRconnect operations is what pins the
-/// choice when several contexts map one profile.
-///
-/// # Errors
-///
-/// The errors of [`select_by_profile`].
-pub fn select_by_profile_pinned<'a>(
     programs: &'a [Arc<Program>],
     claimed: &[String],
     template: Option<&TemplateId>,

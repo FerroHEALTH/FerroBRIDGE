@@ -268,7 +268,7 @@ fn lower_models(
 ) -> Result<Vec<VersionModule>, EmitError> {
     let mut root_sets = Vec::with_capacity(packages.len());
     for package in packages {
-        root_sets.push(RootSet::select_scoped(package, RootScope::Resources)?);
+        root_sets.push(RootSet::select(package, RootScope::Resources)?);
     }
     // NOTE: the overlay pre-adopts R6 parameters into every earlier version
     // (`crate::ecosystem`); the R6 module is the source, named `r6`.

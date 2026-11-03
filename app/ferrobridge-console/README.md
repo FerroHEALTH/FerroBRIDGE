@@ -41,7 +41,10 @@ under the `__Host-` prefix when it is `Secure`, and never a token. The
 console refreshes the access token before it expires, one refresh per
 session at a time, and keeps a rotated refresh token. `POST /logout` ends
 the session and, when the provider publishes one, sends the operator to its
-end-session endpoint with the ID Token hint, or else to `/signed-out`. Every request other than
+end-session endpoint with the ID Token hint, or else to `/signed-out`.
+`GET /session` reads what the session has left and `POST /session` extends
+it, the route FerroUI's session watch on every signed-in page asks. The
+four routes are those of `ferrohealth-session`. Every request other than
 `GET`, `HEAD` and `OPTIONS` is taken only from the console's own pages.
 
 ## The subcommands
@@ -66,6 +69,7 @@ base_url = "https://bridge.example.org/"
 timeout_ms = 30000
 
 [session]
+store = "memory"
 secure_cookie = true
 sign_in_timeout_s = 300
 max_sign_ins = 1000
@@ -87,7 +91,10 @@ end_session_endpoint = "https://idp.example.org/realms/ferrobridge/protocol/open
 post_logout_redirect_uri = "https://console.example.org/"
 ```
 
-Without `[oidc]` the console offers no sign-in. The provider's endpoints
+Without `[oidc]` the console offers no sign-in. `[oidc]` and `[session]`
+are the sections of `ferrohealth-session`: with `issuer` alone the
+endpoints are discovered when the console starts, and `config check`
+contacts no provider. The provider's endpoints
 must be `https`, or `http` on loopback. `secure_cookie = false` is refused
 unless `redirect_uri` is `http` on loopback. `offline_access = true` asks
 the provider for a refresh token; list it there, never in `scopes`.

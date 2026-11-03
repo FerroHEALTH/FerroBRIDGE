@@ -16,6 +16,7 @@ use std::collections::BTreeSet;
 use ferrobridge_testkit::examples::Package;
 use ferrobridge_validator::issue::Rule;
 use ferrobridge_validator::issue::Severity;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use ferrobridge_validator::validate::Validator;
 use fhir_types::codec::Value;
@@ -70,7 +71,7 @@ fn no_core_invariant_fails_on_an_r4_example_but_the_recorded_ones() -> TestResul
     if !fetched()? {
         return Ok(());
     }
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let validator = Validator::new(&set);
     let mut found = BTreeSet::new();
     let mut read = 0_usize;

@@ -198,16 +198,36 @@ pub const FERROBRIDGE_MEDICATION_TEMPLATE: &str =
 pub const FERROBRIDGE_MEDICATION_TEMPLATE_ID: &str =
     "openEHR-EHR-COMPOSITION.ferrobridge_medication.v1.0.0";
 
-/// The ten published CKM archetypes of [`FERROBRIDGE_MEDICATION_TEMPLATE`].
+/// FerroBRIDGE's ADL 2 patient summary template, with its template
+/// overlays.
 ///
-/// Each is `(file name, ADL 1.4 source)`: the seven the template specialises
-/// and the three clusters the medication order's authorisation, order
-/// summary and dispense amount slots admit.
+/// A health summary `COMPOSITION` holding a medication summary section, an
+/// ad hoc `SECTION` holding `INSTRUCTION.medication_order.v3`, and an
+/// immunisations section, the vaccination list `SECTION` whose
+/// "Vaccinations administered" slot holds `ACTION.medication.v1`. A suite builds
+/// the ADL 2 operational template from it and [`CKM_MEDICATION_ARCHETYPES`]
+/// at test time. The template identifier is
+/// [`FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID`].
+pub const FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE: &str =
+    include_str!("../fixtures/adl2/ferrobridge_patient_summary.adlt");
+
+/// The template identifier [`FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE`] declares.
+pub const FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0";
+
+/// The thirteen published CKM archetypes of [`FERROBRIDGE_MEDICATION_TEMPLATE`]
+/// and [`FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE`].
+///
+/// Each is `(file name, ADL 1.4 source)`: the seven the medication template
+/// specialises, the three clusters the medication order's authorisation,
+/// order summary and dispense amount slots admit, and the health summary
+/// composition, ad hoc section and vaccination list section the patient
+/// summary template specialises.
 ///
 /// `scripts/vendor/ckm-medication.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 10] = [
+pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 13] = [
     ckm_medication!("openEHR-EHR-COMPOSITION.encounter.v1.adl"),
     ckm_medication!("openEHR-EHR-INSTRUCTION.medication_order.v3.adl"),
     ckm_medication!("openEHR-EHR-ACTION.medication.v1.adl"),
@@ -218,6 +238,9 @@ pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 10] = [
     ckm_medication!("openEHR-EHR-CLUSTER.medication_authorisation.v0.adl"),
     ckm_medication!("openEHR-EHR-CLUSTER.medication_order_summary.v0.adl"),
     ckm_medication!("openEHR-EHR-CLUSTER.medication_supply_amount.v0.adl"),
+    ckm_medication!("openEHR-EHR-COMPOSITION.health_summary.v1.adl"),
+    ckm_medication!("openEHR-EHR-SECTION.adhoc.v1.adl"),
+    ckm_medication!("openEHR-EHR-SECTION.immunisation_list.v0.adl"),
 ];
 
 /// A synthetic FLAT composition of [`KDS_PERSON_OPT`]: one person with a

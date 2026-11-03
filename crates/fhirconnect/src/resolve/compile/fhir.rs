@@ -26,19 +26,9 @@ use crate::resolve::compile::Scope;
 use crate::resolve::compile::Site;
 
 impl<'a> Compiler<'a> {
-    /// Compiles the FHIR side of a `hierarchy.with`, which is only read.
+    /// Compiles the FHIR side of a `with`; a `hierarchy.with` is only read,
+    /// at [`Site::ReadOnly`].
     pub(super) fn fhir_side(
-        &mut self,
-        file: &'a ModelMappingFile,
-        with: &With,
-        scope: &Scope,
-        path: &ModelPath,
-    ) -> Option<FhirTarget> {
-        self.fhir_side_at(file, with, scope, path, Site::ReadOnly)
-    }
-
-    /// Compiles the FHIR side of a `with`.
-    pub(super) fn fhir_side_at(
         &mut self,
         file: &'a ModelMappingFile,
         with: &With,

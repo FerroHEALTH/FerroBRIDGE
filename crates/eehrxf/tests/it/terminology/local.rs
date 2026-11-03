@@ -24,8 +24,7 @@ use eehrxf::terminology::transcode::PreferredSystems;
 use eehrxf::terminology::transcode::TranscodeError;
 use eehrxf::terminology::transcode::Transcoded;
 use eehrxf::terminology::transcode::transcode;
-use eehrxf::terminology::transcode::transcode_local;
-use eehrxf::terminology::transcode::transcode_local_with;
+use eehrxf::terminology::transcode::transcode_with;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::archetype_id::ArchetypeId;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
@@ -91,10 +90,10 @@ fn a_local_code_is_rendered_from_the_template_in_the_language_asked() -> TestRes
     let terms = terms()?;
     let evaluation = archetype(EVALUATION);
     let local = Local::new(&terms, &evaluation, "en");
-    let transcoded = transcode_local(
+    let transcoded = transcode(
         &coded("local", "at0002", "Substance")?,
         &PreferredSystems::default(),
-        &local,
+        Some(&local),
     )?;
     assert_eq!(
         first(&transcoded),
@@ -117,10 +116,10 @@ fn the_template_term_opens_the_narrative_before_a_differing_recorded_text() -> T
     let terms = terms()?;
     let evaluation = archetype(EVALUATION);
     let local = Local::new(&terms, &evaluation, "en");
-    let transcoded = transcode_local(
+    let transcoded = transcode(
         &coded("local", "at0003", "Synthetic recorded status")?,
         &PreferredSystems::default(),
-        &local,
+        Some(&local),
     )?;
     assert_eq!(display(&transcoded), Some("Clinical status"));
     assert_eq!(
@@ -152,7 +151,7 @@ fn a_language_the_template_does_not_carry_follows_article_10_7() -> TestResult {
     let evaluation = archetype(EVALUATION);
     let local = Local::new(&terms, &evaluation, "nl");
     let text = coded("local", "at0002", "Substance")?;
-    let transcoded = transcode_local(&text, &PreferredSystems::default(), &local)?;
+    let transcoded = transcode(&text, &PreferredSystems::default(), Some(&local))?;
     assert_eq!(
         first(&transcoded),
         Some((EVALUATION_SYSTEM, "at0002")),
@@ -177,9 +176,16 @@ fn the_same_local_code_of_two_archetypes_is_two_systems() -> TestResult {
     let composition = archetype(COMPOSITION);
     let text = coded("local", "at0000", "Synthetic")?;
     let preferred = PreferredSystems::default();
-    let of_evaluation = transcode_local(&text, &preferred, &Local::new(&terms, &evaluation, "en"))?;
-    let of_composition =
-        transcode_local(&text, &preferred, &Local::new(&terms, &composition, "en"))?;
+    let of_evaluation = transcode(
+        &text,
+        &preferred,
+        Some(&Local::new(&terms, &evaluation, "en")),
+    )?;
+    let of_composition = transcode(
+        &text,
+        &preferred,
+        Some(&Local::new(&terms, &composition, "en")),
+    )?;
     assert_eq!(first(&of_evaluation), Some((EVALUATION_SYSTEM, "at0000")));
     assert_eq!(
         first(&of_composition),
@@ -197,10 +203,10 @@ fn a_local_code_read_in_an_archetype_id_that_is_not_one_is_refused() -> TestResu
     let malformed = archetype("not an archetype");
     let local = Local::new(&terms, &malformed, "en");
     let text = r#"{ "_type": "DV_TEXT", "value": "Substance", "mappings": [{ "_type": "TERM_MAPPING", "match": "=", "target": { "_type": "CODE_PHRASE", "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "local" }, "code_string": "at0002" } }] }"#;
-    let refused = transcode_local(
+    let refused = transcode(
         &serde_json::from_str(text)?,
         &PreferredSystems::default(),
-        &local,
+        Some(&local),
     );
     assert!(
         matches!(
@@ -217,10 +223,10 @@ fn a_local_code_the_archetype_does_not_define_is_refused() -> TestResult {
     let terms = terms()?;
     let evaluation = archetype(EVALUATION);
     let local = Local::new(&terms, &evaluation, "en");
-    let refused = transcode_local(
+    let refused = transcode(
         &coded("local", "at0099", "Synthetic")?,
         &PreferredSystems::default(),
-        &local,
+        Some(&local),
     );
     assert!(
         matches!(
@@ -238,6 +244,7 @@ fn without_a_template_a_local_code_follows_article_10_7() -> TestResult {
     let transcoded = transcode(
         &coded("local", "at0002", "Substance")?,
         &PreferredSystems::default(),
+        None,
     )?;
     assert!(
         transcoded.codings().is_empty(),
@@ -267,10 +274,10 @@ async fn a_template_term_asks_no_terminology_server() -> TestResult {
     let terminology = Terminology::server(Arc::new(Scripted(Script::Refuse(
         StatusCode::INTERNAL_SERVER_ERROR,
     ))));
-    let transcoded = transcode_local_with(
+    let transcoded = transcode_with(
         &coded("local", "at0002", "Substance")?,
         &PreferredSystems::new([PREFERRED]),
-        &local,
+        Some(&local),
         &terminology,
     )
     .await?;
@@ -292,6 +299,7 @@ fn a_snomed_ct_code_passes_as_recorded_under_the_default_systems() -> TestResult
     let transcoded = transcode(
         &coded(ehn::SNOMED_CT, "1001", "Synthetic finding")?,
         &PreferredSystems::default(),
+        None,
     )?;
     assert_eq!(first(&transcoded), Some((ehn::SNOMED_CT, "1001")));
     assert!(!transcoded.untranscoded());
@@ -303,6 +311,7 @@ fn a_caller_may_name_its_own_systems() -> TestResult {
     let transcoded = transcode(
         &coded(ehn::SNOMED_CT, "1001", "Synthetic finding")?,
         &PreferredSystems::new([PREFERRED]),
+        None,
     )?;
     assert!(
         transcoded.untranscoded(),

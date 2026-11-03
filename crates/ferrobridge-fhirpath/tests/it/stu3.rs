@@ -200,6 +200,8 @@ fn unescape_json_replaces_only_the_escapes() {
     );
     assert!(argument_error("'\\\\q'.unescape('json')"));
     assert!(argument_error("'\\\\ud83d'.unescape('json')"));
+    // RFC 8259 §7: `\u` takes four hexadecimal digits, and a sign is none.
+    assert!(argument_error("'\\\\u+041'.unescape('json')"));
 }
 
 #[test]
@@ -255,6 +257,109 @@ fn a_decimal_boundary_is_half_a_unit_of_its_last_place_away() {
     ] {
         assert_eq!(shown(expression).as_deref(), Some(expected), "{expression}");
     }
+}
+
+/// The single item `expression` answers on a synthetic `Parameters` whose
+/// `valueDecimal` is the JSON number `value`, as it is written.
+fn decimal_shown(value: &str, expression: &str) -> Option<String> {
+    let resource = crate::support::json(&format!(
+        r#"{{"resourceType":"Parameters","parameter":[{{"name":"d","valueDecimal":{value}}}]}}"#
+    ));
+    let answer = Expression::parse(expression)
+        .expect("the expression should parse")
+        .evaluate(
+            &Environment::new(&R4).with_fhirpath_stu3_functions(),
+            Focus::resource(&resource),
+        )
+        .expect("evaluates");
+    match answer.as_slice() {
+        [] => None,
+        [item] => Some(item.to_string()),
+        other => panic!("expected one item, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_decimal_with_a_positive_exponent_takes_its_precision_from_the_mantissa() {
+    // FHIRPath 3.0.0 lowBoundary(): the least possible value of the input; FHIR R4 Data Types,
+    // decimal: the precision has significance, so 9.5e2 states its tens and stands for 945 to 955.
+    for (value, expression, expected) in [
+        ("9.5e2", "Parameters.parameter.value.lowBoundary(0)", "945"),
+        ("9.5e2", "Parameters.parameter.value.highBoundary(0)", "955"),
+        (
+            "9.5e2",
+            "Parameters.parameter.value.highBoundary()",
+            "955.00000000",
+        ),
+        (
+            "-9.5e2",
+            "Parameters.parameter.value.lowBoundary(0)",
+            "-955",
+        ),
+        (
+            "-9.5e2",
+            "Parameters.parameter.value.highBoundary(0)",
+            "-945",
+        ),
+        (
+            "1.5E2",
+            "Parameters.parameter.value.lowBoundary(1)",
+            "145.0",
+        ),
+        (
+            "1.5E+2",
+            "Parameters.parameter.value.highBoundary(1)",
+            "155.0",
+        ),
+    ] {
+        assert_eq!(
+            decimal_shown(value, expression).as_deref(),
+            Some(expected),
+            "{value}: {expression}"
+        );
+    }
+}
+
+#[test]
+fn a_decimal_with_a_negative_exponent_takes_its_precision_from_the_mantissa() {
+    // FHIRPath 3.0.0 lowBoundary() and highBoundary(): 1.5e-3 states its ten-thousandths and
+    // stands for 0.00145 to 0.00155.
+    for (value, expression, expected) in [
+        (
+            "1.5e-3",
+            "Parameters.parameter.value.lowBoundary()",
+            "0.00145000",
+        ),
+        (
+            "1.5e-3",
+            "Parameters.parameter.value.highBoundary()",
+            "0.00155000",
+        ),
+        (
+            "15e-1",
+            "Parameters.parameter.value.highBoundary(2)",
+            "1.55",
+        ),
+    ] {
+        assert_eq!(
+            decimal_shown(value, expression).as_deref(),
+            Some(expected),
+            "{value}: {expression}"
+        );
+    }
+}
+
+#[test]
+fn a_decimal_without_an_exponent_keeps_the_precision_of_its_places() {
+    // FHIRPath 3.0.0 lowBoundary() and highBoundary(): 950 states its units, 945.5 to 950.5.
+    assert_eq!(
+        decimal_shown("950", "Parameters.parameter.value.highBoundary(1)").as_deref(),
+        Some("950.5")
+    );
+    assert_eq!(
+        decimal_shown("1.587", "Parameters.parameter.value.lowBoundary(6)").as_deref(),
+        Some("1.586500")
+    );
 }
 
 #[test]

@@ -138,7 +138,7 @@ impl<'a> Compiler<'a> {
             children,
         } = sides;
         let class = openehr.leaf_class().unwrap_or(openehr.node().rm_type());
-        if derive::is_structural(class) {
+        if model::is_a(class, derive::STRUCTURAL) {
             if let Some(event) = self.event_time(file, fhir, openehr, position, path) {
                 return Some(event);
             }
