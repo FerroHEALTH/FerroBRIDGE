@@ -77,7 +77,8 @@ impl Project {
 #[cfg(any(
     feature = "prescription",
     feature = "dispensation",
-    feature = "laboratory"
+    feature = "laboratory",
+    feature = "patient-summary"
 ))]
 macro_rules! shipped {
     ($directory:literal, $name:literal) => {
@@ -145,5 +146,31 @@ pub const LABORATORY: Project = Project {
         shipped!("laboratory", "ferrobridge_report_result.v1.Composition.yml"),
         shipped!("laboratory", "ferrobridge_eu_lab_composition.yml"),
         shipped!("laboratory", "ferrobridge_eu_lab_composition_report.yml"),
+    ],
+};
+
+/// The HL7 Europe Patient Summary 1.0.0-ballot project.
+///
+/// It maps over FerroBRIDGE's patient summary template, which places the
+/// medication as the openEHR International Patient Summary template does. Its
+/// context maps each medication order of the template's medication summary
+/// section to a `MedicationStatement-eu-eps`, the medication summary's
+/// entry. The directory also holds `ferrobridge_eu_eps_immunization.context`,
+/// which maps each medication action of the template's immunisations
+/// section to an `immunization-eu-core` over the same template and is
+/// compiled on its own. The template path is the placement criterion: each
+/// context starts at the archetype the template holds in its section alone.
+#[cfg(feature = "patient-summary")]
+pub const EPS: Project = Project {
+    directory: "eps",
+    contexts: &["ferrobridge_eu_eps_medication.context"],
+    files: &[
+        shipped!("eps", "ferrobridge_eu_eps_medication.context.yml"),
+        shipped!(
+            "eps",
+            "ferrobridge_medication_order.v3.MedicationStatement.yml"
+        ),
+        shipped!("eps", "ferrobridge_eu_eps_immunization.context.yml"),
+        shipped!("eps", "ferrobridge_medication.v1.Immunization.yml"),
     ],
 };
