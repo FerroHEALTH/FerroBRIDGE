@@ -11,7 +11,8 @@
 //! owner, `GET /operator/mappings/{path}` one file's verbatim bytes with its
 //! digest as the `ETag`, and `GET /operator/configuration` the configuration
 //! the bridge started on, every secret by reference alone
-//! ([`configuration`]), `GET /operator/events` the change-feed consumers, their
+//! ([`configuration`]), `GET /operator/hl7v2/concept-maps` the HL7 v2 face's
+//! `ConceptMap` directory, `GET /operator/events` the change-feed consumers, their
 //! parked events and the AMQP topology, and `POST
 //! /operator/events/{consumer}/parked/{id}/replay` a replay of one
 //! (`crate::change_feed::report`). With `[operator] mapping_dir`, `POST
@@ -191,6 +192,7 @@ pub fn routes(
     health: Registry,
     lifecycle: Lifecycle,
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
+    concept_maps: Option<Arc<crate::hl7v2::directory::Directory>>,
 ) -> Router {
     let readiness = Router::new()
         .route("/operator/readiness", get(readiness))
@@ -202,6 +204,9 @@ pub fn routes(
             post(replay_parked),
         )
         .with_state(change_feed);
+    let face = Router::new()
+        .route("/operator/hl7v2/concept-maps", get(concept_map_directory))
+        .with_state(concept_maps);
     Router::new()
         .route("/operator/state", get(state))
         .route("/operator/configuration", get(running_configuration))
@@ -212,6 +217,7 @@ pub fn routes(
         .with_state(operator)
         .merge(readiness)
         .merge(lane)
+        .merge(face)
         .route_layer(guard::layer(smart))
 }
 
@@ -278,6 +284,17 @@ async fn replay_parked(
         Err(error) => dead_letters_unavailable(&error),
     })
     .await
+}
+
+/// `GET /operator/hl7v2/concept-maps`: the HL7 v2 face's `ConceptMap`
+/// directory with the messages each map served, `404` when the face is off.
+async fn concept_map_directory(
+    State(directory): State<Option<Arc<crate::hl7v2::directory::Directory>>>,
+) -> Response {
+    match directory {
+        Some(directory) => axum::Json(directory.document()).into_response(),
+        None => refuse(Kind::NotFound, "this bridge runs no HL7 v2 face"),
+    }
 }
 
 /// Runs `work`, which reads or writes the dead-letter store, off the async

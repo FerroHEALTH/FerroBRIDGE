@@ -26,6 +26,7 @@ mod configuration;
 mod editor;
 mod engine;
 mod events;
+mod hl7v2;
 mod navigation;
 mod no_script;
 mod playground;

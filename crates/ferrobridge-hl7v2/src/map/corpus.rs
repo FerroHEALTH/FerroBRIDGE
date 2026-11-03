@@ -166,6 +166,8 @@ pub struct Map {
     pub id: String,
     /// The canonical url.
     pub url: String,
+    /// The title, when the map carries one.
+    pub title: Option<String>,
     /// The kind, from the id.
     pub kind: Kind,
     /// The rows, in map order; empty for a table map.
@@ -234,6 +236,41 @@ impl Map {
                     }
             })
         })
+    }
+
+    /// What the map maps from and to: each group's source and target code
+    /// system for a table map, else what its id names before and after
+    /// `-to-`: the message type and trigger of a message map
+    /// (`message-adt-a01-to-bundle` gives `adt-a01` and `bundle`), and the
+    /// segment or data type of any other, without its qualifier
+    /// (`datatype-ei-placer-to-identifier` gives `ei` and `identifier`).
+    ///
+    /// No specification governs the reading of an id: our own design, the
+    /// naming [`Corpus::find`] relies on, since the guide's maps other than
+    /// the table maps carry no `group.source` or `group.target`.
+    #[must_use]
+    pub fn ends(&self) -> Vec<(String, String)> {
+        if self.kind == Kind::Table {
+            return self
+                .groups
+                .iter()
+                .map(|group| (group.source.clone(), group.target.clone()))
+                .collect();
+        }
+        let named = self
+            .id
+            .split_once('-')
+            .and_then(|(_, rest)| rest.split_once("-to-"));
+        match named {
+            Some((source, target)) => {
+                let source = match self.kind {
+                    Kind::Message => source,
+                    _ => source.split('-').next().unwrap_or(source),
+                };
+                vec![(source.to_owned(), target.to_owned())]
+            }
+            None => Vec::new(),
+        }
     }
 
     /// The component positions the rows of this data type map read, `EIP.1`
@@ -531,9 +568,14 @@ fn decode_map(path: &Path, bytes: &[u8]) -> Result<Map, CorpusError> {
             }
         }
     }
+    let title = concept_map
+        .title
+        .as_ref()
+        .and_then(|title| title.value.clone());
     Ok(Map {
         id,
         url,
+        title,
         kind,
         rows,
         groups,

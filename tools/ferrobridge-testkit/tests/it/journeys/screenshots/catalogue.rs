@@ -28,7 +28,7 @@ pub(super) const CONTEXT_FILE: &str =
     "/mappings/files/fhirconnect/ferrobridge_journey_diagnose.context.yml";
 
 /// The pages a signed-in operator loads and reads as they are.
-pub(super) const PAGES: [Shot; 34] = [
+pub(super) const PAGES: [Shot; 35] = [
     Shot::page("dashboard", "/", "/", "//h1[. = 'Dashboard']"),
     Shot::page(
         "mappings",
@@ -134,6 +134,12 @@ pub(super) const PAGES: [Shot; 34] = [
         "//*[contains(., 'facade.base_url')]",
     ),
     Shot::page("hl7v2", "/hl7v2", "/hl7v2", "//h1[. = 'HL7 v2']"),
+    Shot::page(
+        "hl7v2-concept-maps",
+        "/hl7v2/:tab",
+        "/hl7v2/concept-maps",
+        "//*[contains(., 'segment-pid-to-patient')]",
+    ),
     Shot::page(
         "hl7v2-settings",
         "/hl7v2/:tab",
