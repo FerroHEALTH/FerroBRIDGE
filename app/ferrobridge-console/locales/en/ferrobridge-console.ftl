@@ -801,3 +801,23 @@ apply-reason-placeholder = Why you apply it
 apply-done = Applied: the set compiled and runs as revision { $id }
 apply-refused = Not applied: the set does not compile with this revision, so the running set is unchanged
 apply-diagnostics = Diagnostics of the apply
+
+## Mapping-set archives
+import-title = Import a mapping set
+import-subtitle = Check a ZIP of mapping files and save it as a revision that does not run until you apply it
+import-archive-card = The ZIP
+import-archive = ZIP of a mapping set
+import-archive-help = As an export wrote it: files under fhirconnect/ and omocl/, at most 2 MB
+import-no-archive = Choose the ZIP to import.
+import-saved = Checked: the set compiles with the imported files, saved as revision { $id }, which does not run yet
+import-open = Open the revision to apply it
+import-refused = Not saved: the set does not compile with the imported files
+import-diagnostics = Diagnostics of the import
+import-bar = Import the mapping set
+import-reason-placeholder = Why you import it
+import-save = Check and save as a revision
+import-set = Import a mapping set
+import-set-note = Checks a ZIP and saves it as a revision
+export-running = Export the running set
+export-running-note = The console's files as a ZIP; provisioned files stay out
+export-revision = Export as ZIP

@@ -20,6 +20,7 @@ use crate::support::{OPERATOR_TOKEN, ORIGIN, get, get_with, header, send};
 fn posts() -> Vec<(String, String)> {
     vec![
         (String::from("/mappings"), String::new()),
+        (String::from("/mappings/import"), String::from("reason=r")),
         (
             String::from("/mappings/revisions/2"),
             String::from("running=3&reason=r&decision=apply"),

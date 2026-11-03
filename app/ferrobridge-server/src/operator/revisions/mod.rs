@@ -15,7 +15,9 @@
 //! own design.
 
 pub mod apply;
+pub mod archive;
 pub mod diff;
+pub mod exchange;
 pub mod routes;
 
 use std::collections::BTreeMap;

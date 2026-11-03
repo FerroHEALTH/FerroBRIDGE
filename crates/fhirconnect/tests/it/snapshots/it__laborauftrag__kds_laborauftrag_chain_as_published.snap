@@ -13,7 +13,6 @@ expression: rows(&diagnostics)
   "request.v1.ServiceRequest.yml:64 error fc-unknown-template-node",
   "request.v1.ServiceRequest.yml:66 error fc-unknown-template-node",
   "request.v1.ServiceRequest.yml:68 error fc-unknown-template-node",
-  "service_request.v1.yml:19 error fc-unknown-template-node",
   "service_request.v1.yml:34 error fc-unknown-template-node",
   "specimen.v1.yml:101 warning fc-excluded-template-node",
   "specimen.v1.yml:139 warning fc-excluded-template-node",

@@ -99,6 +99,8 @@ sqlx.workspace = true
 sha2.workspace = true
 # The line diff of a revision against the running one.
 similar.workspace = true
+# The mapping-set archive an export writes and an import reads.
+zip.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 toml.workspace = true

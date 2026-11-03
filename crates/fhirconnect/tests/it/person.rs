@@ -320,7 +320,7 @@ fn the_kds_person_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn 
     let context = std::fs::read_to_string(published(
         "projects/org.highmed/KDS/person/person.context.yaml",
     ))?
-    .replace("    - \"KDS_person_data.v0\"\n", "")
+    .replace("    - KDS_person_data.v0\n", "")
     .replace(
         "  name:  KDS_Person.context\n",
         "  name: published_kds_person.context\n",
