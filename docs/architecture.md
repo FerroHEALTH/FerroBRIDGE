@@ -1141,10 +1141,10 @@ from each guide's `package-list.json` and `ImplementationGuide` resource):
 | HL7 Europe Hospital Discharge Report | `hl7.fhir.eu.hdr` | 1.0.0, R4 (2026-10-16), on Base 2.0.1 and IPS 2.0.1; read 2026-10-28 from its `package.json`, pinned with the `eehrxf` crate (#1314), which holds its crosswalk; it replaced 0.1.0-ballot (2025-06-03) on superseded Base 0.1.0-ballot, Laboratory 0.1.1 and IPS 1.1.0 | no context: no template carries a discharge report, a corpus gap |
 
 **The R4 profile validator's package set** is pinned ahead of any mapping
-(#435): EPS 1.0.0-ballot, EU Base 2.0.1 and IPS 2.0.0, with every package
+(#435): EPS 1.0.0-ballot, EU Base 2.0.1 and IPS 2.0.1, with every package
 their `package.json` files name, transitively, at the version each dependent
-names (`docs/VERSIONS.md` "Profile packages"). The 17 package versions, about
-570 MB unpacked, are fetched at build time into the ignored
+names (`docs/VERSIONS.md` "Profile packages"). The 21 package versions, about
+650 MB unpacked, are fetched at build time into the ignored
 `docs/specs/fhir-packages/` and never committed; only each `PROVENANCE.md`
 is. `hl7.fhir.r4.core` 4.0.1, which every one of them names, is read from the
 generator's committed tree. Pinning a package there is no conformance claim:
