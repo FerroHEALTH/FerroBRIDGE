@@ -175,6 +175,26 @@ async fn dump(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
     crate::etl::dump(postgres).await
 }
 
+/// Asserts that the run history holds `runs`, newest first, each with the
+/// compositions it committed.
+async fn assert_runs_kept(postgres: &Postgres, runs: &[&RunReport]) -> Result<(), Box<dyn Error>> {
+    let expected: Vec<Vec<String>> = runs
+        .iter()
+        .map(|run| vec![run.run_id.clone(), run.compositions.committed.to_string()])
+        .collect();
+    assert_eq!(
+        expected,
+        rows(
+            postgres,
+            "SELECT run_id, report->'compositions'->>'committed' FROM ferrobridge.run \
+             ORDER BY started_at DESC"
+        )
+        .await?,
+        "each run keeps its report in the run history"
+    );
+    Ok(())
+}
+
 /// Runs the ported Data Quality Dashboard plan over the round trip's CDM and
 /// asserts that every conformance and temporal plausibility check passes and that the concept record
 /// completeness checks count the concept 0 rows the run report counted,
@@ -330,19 +350,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
         dump(&postgres).await?,
         "a second run leaves the data as it was"
     );
-    assert_eq!(
-        vec![
-            vec![second.run_id.clone(), String::from("3")],
-            vec![first.run_id.clone(), String::from("3")],
-        ],
-        rows(
-            &postgres,
-            "SELECT run_id, report->'compositions'->>'committed' FROM ferrobridge.run \
-             ORDER BY started_at DESC"
-        )
-        .await?,
-        "each run keeps its report in the run history"
-    );
+    assert_runs_kept(&postgres, &[&second, &first]).await?;
 
     let altered = LABORATORIES.get(1).ok_or("the second composition")?;
     let mut changed = *altered;
