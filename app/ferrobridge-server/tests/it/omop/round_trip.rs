@@ -330,6 +330,19 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
         dump(&postgres).await?,
         "a second run leaves the data as it was"
     );
+    assert_eq!(
+        vec![
+            vec![second.run_id.clone(), String::from("3")],
+            vec![first.run_id.clone(), String::from("3")],
+        ],
+        rows(
+            &postgres,
+            "SELECT run_id, report->'compositions'->>'committed' FROM ferrobridge.run \
+             ORDER BY started_at DESC"
+        )
+        .await?,
+        "each run keeps its report in the run history"
+    );
 
     let altered = LABORATORIES.get(1).ok_or("the second composition")?;
     let mut changed = *altered;

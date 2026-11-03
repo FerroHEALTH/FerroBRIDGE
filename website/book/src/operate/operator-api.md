@@ -102,6 +102,29 @@ lane is off answers `200` with no consumer and a `null` topology.
 The document carries identifiers, instants and counts, never an event body,
 and never the broker URL.
 
+## `GET /operator/etl/runs`
+
+The newest 50 [OMOP ETL](../integrate/omop-etl.md#the-run-history) runs the
+bridge schema keeps, newest first, as `{"runs": [...]}`. Each run names its
+`id`, its `kind` (`compositions` for `etl run`, `fhir` for `etl fhir`), when
+it `started` and `finished` (RFC 3339 UTC), its `compositions` (`read`,
+`committed`, `skipped` and `refused`), the `rows` it wrote over every table,
+its `refusals`, and the compositions it `removed` because the CDR reports
+them deleted. A bridge with no `[cdm]` answers `404`, and one whose CDM
+database does not answer, or holds no run table yet, answers `503`
+([`run-history-unavailable`](problems.md#run-history-unavailable)).
+
+### `GET /operator/etl/runs/{run_id}`
+
+One run whole: the facts of the listing, the `rows` it wrote by CDM table,
+its `concept_zero` assignments, every refused record in `refusals` (its
+`composition`, `mapping`, `table`, `column`, openEHR `element` and
+`reason`), and its `deletions` (`checked`, `extant`, the `removed`, `kept`
+and `unknown` compositions by versioned object id, and the `rows` removed by
+table). A run the history does not hold answers `404`. A run names
+compositions by their versioned object id and never carries a clinical
+value.
+
 ## `GET /operator/configuration`
 
 The configuration the bridge started on, as one JSON document. The bridge

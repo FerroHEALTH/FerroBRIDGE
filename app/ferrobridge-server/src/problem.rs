@@ -56,13 +56,15 @@ pub enum Kind {
     DeadLettersUnavailable,
     /// `503`: the mapping set could not be reloaded.
     ReloadUnavailable,
+    /// `503`: the run history of the bridge schema could not be read.
+    RunHistoryUnavailable,
     /// `503`: the access token could not be checked.
     AuthorizationUnavailable,
 }
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
@@ -77,6 +79,7 @@ impl Kind {
         Self::Unwritable,
         Self::DeadLettersUnavailable,
         Self::ReloadUnavailable,
+        Self::RunHistoryUnavailable,
         Self::AuthorizationUnavailable,
     ];
 
@@ -153,6 +156,11 @@ impl Kind {
             Self::ReloadUnavailable => (
                 "reload-unavailable",
                 "The mapping set could not be reloaded",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::RunHistoryUnavailable => (
+                "run-history-unavailable",
+                "The run history could not be read",
                 StatusCode::SERVICE_UNAVAILABLE,
             ),
             Self::AuthorizationUnavailable => (

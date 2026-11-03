@@ -202,6 +202,8 @@ pub struct AppState {
     lanes: Vec<crate::startup::Lane>,
     /// Whether the HL7 v2 listener accepts, when the face runs.
     hl7v2: Option<crate::hl7v2::Listening>,
+    /// The OMOP ETL run history the operator API reads, when `[cdm]` is set.
+    etl_history: Option<Arc<crate::etl::history::Store>>,
     /// The resource server, when inbound authentication is on.
     auth: Option<Arc<crate::smart::Smart>>,
     /// The requests the usage report counts, recorded by the request log.
@@ -309,6 +311,7 @@ impl AppState {
             },
             lanes: Vec::new(),
             hl7v2: None,
+            etl_history: None,
             auth: None,
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
@@ -331,6 +334,7 @@ impl AppState {
             operations_off: OperationsOff::default(),
             lanes: Vec::new(),
             hl7v2: None,
+            etl_history: None,
             auth: None,
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
@@ -398,6 +402,20 @@ impl AppState {
             .and(Arc::new(indicators::Hl7v2Listener::new(listening.clone())));
         self.hl7v2 = Some(listening);
         self
+    }
+
+    /// Returns this state answering the OMOP ETL run history `history` on
+    /// the operator API.
+    #[must_use]
+    pub fn with_etl_history(mut self, history: Arc<crate::etl::history::Store>) -> Self {
+        self.etl_history = Some(history);
+        self
+    }
+
+    /// Returns the OMOP ETL run history, when the bridge has a CDM database.
+    #[must_use]
+    pub const fn etl_history(&self) -> Option<&Arc<crate::etl::history::Store>> {
+        self.etl_history.as_ref()
     }
 
     /// Returns this state with `smart` checking the credential of every guarded

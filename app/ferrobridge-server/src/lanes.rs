@@ -106,6 +106,11 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         .await
         .context("starting the operator API")?;
         state = state.with_operator(Arc::new(operator));
+        if let Some(cdm) = settings.cdm.as_ref() {
+            let history = crate::etl::history::Store::new(cdm)
+                .context("preparing the connection the run history is read through")?;
+            state = state.with_etl_history(Arc::new(history));
+        }
     }
     if let Some(operations) = state.operations() {
         set_counts(&mut lanes, "operations", operation_counts(operations));

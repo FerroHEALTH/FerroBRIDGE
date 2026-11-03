@@ -136,8 +136,13 @@ console answers with the page it drew.
   `CapabilityStatement` serves, the SMART discovery document, and its
   settings.
 - **HL7 v2** (`/hl7v2`, `/hl7v2/settings`) and **OMOP ETL** (`/omop`,
-  `/omop/settings`): whether the MLLP listener runs and where, whether an
-  ETL is configured, and each face's settings.
+  `/omop/runs`, `/omop/settings`): whether the MLLP listener runs and
+  where, whether an ETL is configured, and each face's settings. The OMOP
+  ETL's Runs tab lists the runs the bridge schema keeps, from
+  `GET /operator/etl/runs`, each with its job, when it ran and its counts,
+  and links each to its report (`/omop/runs/{id}`): the compositions it
+  read, the rows it wrote by table, what its deletion check found, and
+  every record it refused with the reason.
 - **Events** (`/events`): every change-feed consumer and the AMQP topology
   of the [events lane](../integrate/events.md), from `GET /operator/events`:
   each consumer's source and reader, its position in each stream (an outbox
@@ -380,6 +385,15 @@ The OMOP ETL of a bridge with no ETL configured.
 ![The OMOP ETL settings](img/console/omop-settings.png)
 
 The OMOP ETL's settings. [Dark theme](img/console/omop-settings-dark.png).
+
+![The OMOP ETL runs](img/console/omop-runs.png)
+
+The runs the bridge schema keeps. [Dark theme](img/console/omop-runs-dark.png).
+
+![One OMOP ETL run](img/console/omop-run.png)
+
+The report of one run, with the record it refused.
+[Dark theme](img/console/omop-run-dark.png).
 
 ![Events](img/console/events.png)
 

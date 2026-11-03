@@ -24,6 +24,7 @@
 pub mod aql;
 pub mod deletions;
 pub mod fhir;
+pub mod history;
 pub mod incremental;
 pub mod job;
 pub mod ledger;
