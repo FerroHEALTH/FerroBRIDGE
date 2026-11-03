@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's extension of OBSERVATION.laboratory_test_result.v1 for the
-# Laboratory Report 2.0.0 DiagnosticReport-eu-lab profile: the composition
-# slot, the canonical, and the report status, which KDS_Laborbericht keeps
+# Laboratory Report 2.0.0 DiagnosticReport-eu-lab profile: the canonical,
+# and the report status, which KDS_Laborbericht keeps
 # in the composition's other_context (at0005) bound to the FHIR
 # diagnostic-report-status value set; its DV_CODED_TEXT carries the R4 code
 # system as terminology (no specification governs the terminology id: our
@@ -18,13 +18,6 @@ spec:
   extends: OBSERVATION.laboratory_test_result.v1
 
 mappings:
-  - name: "compositionMapping"
-    extension: "add"
-    with:
-      fhir: "$resource"
-      openehr: "$composition"
-    slotArchetype: "COMPOSITION.report_result.v1.DiagnosticReport"
-
   - name: "metaURL"
     extension: "add"
     unidirectional: "openEHR->fhir"

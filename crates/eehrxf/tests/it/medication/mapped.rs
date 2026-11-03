@@ -20,6 +20,7 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use eehrxf::mapping::Mapping;
+use eehrxf::mappings::MPD;
 use eehrxf::medication::Medicinal;
 use eehrxf::medication::dispensation::Dispense;
 use eehrxf::medication::prescription::Prescription;
@@ -50,27 +51,18 @@ const REQUEST: &str = "ferrobridge_eu_mpd_request.context";
 /// The dispense context of FerroBRIDGE's MPD project.
 const DISPENSE: &str = "ferrobridge_eu_mpd_dispense.context";
 
-/// The files of FerroBRIDGE's MPD project.
-const PROJECT: &[&str] = &[
-    "ferrobridge_eu_mpd_request.context.yml",
-    "ferrobridge_medication_order.v3.yml",
-    "ferrobridge_medication.v2.yml",
-    "ferrobridge_dosage.v2.yml",
-    "ferrobridge_eu_mpd_request.yml",
-    "ferrobridge_eu_mpd_medication.yml",
-    "ferrobridge_eu_mpd_dispense.context.yml",
-    "ferrobridge_medication.v1.yml",
-    "ferrobridge_eu_mpd_dispense.yml",
-];
-
 /// The remaining-dispensations extension of `eehrxf`.
 const REMAINING: &str = "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations";
 
-/// The paths of the project's files.
+/// The paths of the shipped MPD project's files.
 fn files() -> Vec<PathBuf> {
     let project = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd");
-    PROJECT.iter().map(|file| project.join(file)).collect()
+        .join("mappings")
+        .join(MPD.directory());
+    MPD.files()
+        .iter()
+        .map(|file| project.join(file.name))
+        .collect()
 }
 
 /// The ADL 2 operational template of the medication template.

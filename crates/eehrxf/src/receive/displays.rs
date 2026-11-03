@@ -15,11 +15,9 @@ use fhir_types::codec::Object;
 use fhir_types::codec::Path;
 use fhir_types::codec::Value;
 use fhir_types::r4::bundle::Bundle;
-use fhir_types::r4::resource::Resource;
 
 use crate::receive::ReceiveError;
 use crate::receive::ReceivedDocument;
-use crate::receive::entries;
 use crate::terminology::Terminology;
 use crate::terminology::TerminologyError;
 use crate::terminology::walk;
@@ -166,30 +164,7 @@ impl ReceivedDocument {
     fn rebuilt(&self, tree: Object) -> Result<Self, ReceiveError> {
         let bundle = Bundle::from_json(&tree, &mut Path::root("Bundle"))
             .map_err(|source| ReceiveError::Decode { source })?;
-        let Some(Resource::Composition(composition)) = bundle
-            .entry
-            .first()
-            .and_then(|entry| entry.resource.as_ref())
-        else {
-            return Err(ReceiveError::NoComposition);
-        };
-        let composition = composition.clone();
-        let index = entries::patient(&tree)?;
-        let Some(Resource::Patient(patient)) = bundle
-            .entry
-            .get(index)
-            .and_then(|entry| entry.resource.as_ref())
-        else {
-            return Err(ReceiveError::SubjectUnresolved);
-        };
-        let patient = patient.clone();
-        Ok(Self {
-            original: self.original.clone(),
-            tree,
-            bundle,
-            composition,
-            patient,
-        })
+        Self::from_parts(self.original.clone(), tree, bundle)
     }
 }
 

@@ -32,31 +32,19 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
-use crate::support::FIXTURES;
+use crate::support::SHIPPED;
 use crate::support::render;
 
-/// The vendored mapping library, relative to this crate's manifest.
-const CORPUS: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../docs/specs/fhirconnect-mapping-lib"
-);
-
-/// The published model mapping the context loads, as the library ships it.
-const PUBLISHED: &[&str] = &["model/composition/org.openehr/report_result.v1.DiagnosticReport.yml"];
-
-/// The project directory this crate authored for the profiles.
-const PROJECT_DIR: &str = "projects/ferrobridge/eu_laboratory";
-
-/// The files of the project directory, the context first.
-const PROJECT: &[&str] = &[
+/// The files the context loads from the shipped laboratory project, the
+/// context first.
+const SHIPPED_LABORATORY: &[&str] = &[
     "ferrobridge_eu_laboratory.context.yml",
+    "ferrobridge_eu_laboratory_result.yml",
     "ferrobridge_laboratory_test_result.v1.yml",
     "ferrobridge_laboratory_test_analyte.v1.yml",
     "ferrobridge_specimen.v1.yml",
-    "ferrobridge_eu_laboratory_result.yml",
     "ferrobridge_eu_laboratory_analyte.yml",
     "ferrobridge_eu_laboratory_specimen.yml",
-    "ferrobridge_eu_composition.DiagnosticReport.yml",
 ];
 
 /// The context this crate authored for the profiles.
@@ -84,14 +72,9 @@ fn kds_laborbericht_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
 /// Compiles the context against the published template.
 fn eu_laboratory_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     let index = kds_laborbericht_template()?;
-    let files: Vec<String> = PUBLISHED
+    let files: Vec<String> = SHIPPED_LABORATORY
         .iter()
-        .map(|file| format!("{CORPUS}/{file}"))
-        .chain(
-            PROJECT
-                .iter()
-                .map(|file| format!("{FIXTURES}/{PROJECT_DIR}/{file}")),
-        )
+        .map(|file| format!("{SHIPPED}/laboratory/{file}"))
         .collect();
     let set = load_set(files, &StaticMappingCodes::default())
         .map_err(|diagnostics| render(&diagnostics))?;

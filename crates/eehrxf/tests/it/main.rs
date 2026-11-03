@@ -37,11 +37,24 @@ mod imaging_document;
 #[cfg(all(feature = "laboratory", feature = "fhir-r4"))]
 mod lab_document;
 #[cfg(test)]
+#[cfg(all(feature = "openehr", feature = "laboratory"))]
+mod lab_mapped;
+#[cfg(test)]
 #[cfg(feature = "laboratory")]
 mod laboratory;
 #[cfg(test)]
 #[cfg(feature = "openehr")]
 mod mapping;
+#[cfg(test)]
+#[cfg(all(
+    feature = "openehr",
+    any(
+        feature = "prescription",
+        feature = "dispensation",
+        feature = "laboratory"
+    )
+))]
+mod mappings;
 #[cfg(test)]
 #[cfg(any(feature = "prescription", feature = "dispensation"))]
 mod medication;

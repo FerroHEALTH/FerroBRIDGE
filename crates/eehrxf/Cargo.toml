@@ -5,7 +5,7 @@ name = "eehrxf"
 description = "The European interoperability software component of an EHR system under Regulation (EU) 2025/327: the format-neutral dataset model of the priority categories read from the Xt-EHR EHDS logical models, and the European electronic health record exchange format in FHIR R4, mapped from openEHR by FHIRconnect"
 # On the crate line, the fhir-types line, since it moved here from FerroFED at
 # 0.0.40 (docs/VERSIONS.md).
-version = "0.1.136"
+version = "0.1.137"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -18,7 +18,7 @@ keywords = ["ehds", "eehrxf", "fhir", "openehr", "health"]
 categories = ["science"]
 # The crate line is published on crates.io; include is the packaged content.
 publish = true
-include = ["src/**", "README.md", "LICENSE"]
+include = ["src/**", "mappings/**", "README.md", "LICENSE"]
 
 # One crate for the interoperability component the Regulation defines, with one
 # feature per priority category and one per serialisation (no specification

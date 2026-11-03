@@ -62,7 +62,7 @@ profile = "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationRequest-eu-mpd"
 package = "hl7.fhir.eu.mpd 1.0.0"
 template = "FerroBRIDGE medication template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_request.context.yml"
+context = "crates/eehrxf/mappings/mpd/ferrobridge_eu_mpd_request.context.yml"
 test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_profile_elements_of_the_prescription_survive_the_round_trip"
 
 [[category.row]]
@@ -71,7 +71,7 @@ profile = "http://hl7.eu/fhir/mpd/StructureDefinition/Medication-eu-mpd"
 package = "hl7.fhir.eu.mpd 1.0.0"
 template = "FerroBRIDGE medication template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_request.context.yml"
+context = "crates/eehrxf/mappings/mpd/ferrobridge_eu_mpd_request.context.yml"
 test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_product_of_the_prescription_survives_the_round_trip"
 
 [[category.row]]
@@ -80,7 +80,7 @@ profile = "http://hl7.eu/fhir/mpd/StructureDefinition/Dosage-eu-mpd"
 package = "hl7.fhir.eu.mpd 1.0.0"
 template = "FerroBRIDGE medication template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_request.context.yml"
+context = "crates/eehrxf/mappings/mpd/ferrobridge_eu_mpd_request.context.yml"
 test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_dosage_of_the_prescription_survives_the_round_trip"
 claimed = false
 
@@ -95,7 +95,7 @@ profile = "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationDispense-eu-mpd"
 package = "hl7.fhir.eu.mpd 1.0.0"
 template = "FerroBRIDGE medication template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_medication.adlt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_mpd/ferrobridge_eu_mpd_dispense.context.yml"
+context = "crates/eehrxf/mappings/mpd/ferrobridge_eu_mpd_dispense.context.yml"
 test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_profile_elements_of_the_dispense_survive_the_round_trip"
 
 [[category]]
@@ -118,7 +118,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
 test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_report_survive_the_round_trip"
 
 [[category.row]]
@@ -127,7 +127,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-results
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
 test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_result_survive_the_round_trip"
 
 [[category.row]]
@@ -136,7 +136,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab"
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory.context.yml"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
 test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_the_laboratory_specimen_survive_the_round_trip"
 
 [[category.row]]
@@ -145,7 +145,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab"
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition.context.yml"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_lab_composition.context.yml"
 test = "crates/fhirconnect/tests/it/eu_lab_composition.rs::the_profile_elements_of_the_document_composition_survive_the_round_trip"
 
 [[category.row]]
@@ -154,7 +154,7 @@ profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab"
 package = "hl7.fhir.eu.laboratory 2.0.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
-context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition.context.yml"
+context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_lab_composition.context.yml"
 test = "app/ferrobridge-server/tests/it/facade/document.rs::the_document_is_the_composition_and_every_resource_it_creates"
 claimed = false
 remark = "assembled by the facade's Composition/$document, proven on a synthetic Composition context; the claimed document is the interoperability component's (`eehrxf`) laboratory document"

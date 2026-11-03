@@ -27,21 +27,21 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
-use crate::support::FIXTURES;
+use crate::support::SHIPPED;
 use crate::support::render;
 
-/// The files this context loads, the context first, each under the
-/// project directory that holds it.
+/// The files this context loads, the context first, each in the shipped
+/// laboratory project.
 const FILES: &[&str] = &[
-    "projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition.context.yml",
-    "projects/ferrobridge/eu_lab_composition/ferrobridge_report_result.v1.Composition.yml",
-    "projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition.yml",
-    "projects/ferrobridge/eu_lab_composition/ferrobridge_eu_lab_composition_report.yml",
-    "projects/ferrobridge/eu_laboratory/ferrobridge_laboratory_test_result.v1.yml",
-    "projects/ferrobridge/eu_laboratory/ferrobridge_laboratory_test_analyte.v1.yml",
-    "projects/ferrobridge/eu_laboratory/ferrobridge_specimen.v1.yml",
-    "projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory_analyte.yml",
-    "projects/ferrobridge/eu_laboratory/ferrobridge_eu_laboratory_specimen.yml",
+    "ferrobridge_eu_lab_composition.context.yml",
+    "ferrobridge_report_result.v1.Composition.yml",
+    "ferrobridge_eu_lab_composition.yml",
+    "ferrobridge_eu_lab_composition_report.yml",
+    "ferrobridge_laboratory_test_result.v1.yml",
+    "ferrobridge_laboratory_test_analyte.v1.yml",
+    "ferrobridge_specimen.v1.yml",
+    "ferrobridge_eu_laboratory_analyte.yml",
+    "ferrobridge_eu_laboratory_specimen.yml",
 ];
 
 /// The context this crate authored for the profile.
@@ -61,7 +61,7 @@ fn program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     let index = WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(opt)))?;
     let files: Vec<String> = FILES
         .iter()
-        .map(|file| format!("{FIXTURES}/{file}"))
+        .map(|file| format!("{SHIPPED}/laboratory/{file}"))
         .collect();
     let set = load_set(files, &StaticMappingCodes::default())
         .map_err(|diagnostics| render(&diagnostics))?;

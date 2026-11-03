@@ -66,6 +66,7 @@ fn another_coding_beside_the_category_still_names_it() -> Result<(), Box<dyn Err
 #[test]
 fn a_type_no_category_fixes_is_uncategorised() -> Result<(), Box<dyn Error>> {
     for replaced in [
+        #[cfg(not(feature = "laboratory"))]
         r#""type": { "coding": [{ "system": "http://loinc.org", "code": "11502-2" }] }"#,
         r#""type": { "coding": [{ "system": "http://example.org/loinc", "code": "60591-5" }] }"#,
         r#""type": { "coding": [{ "code": "60591-5" }] }"#,

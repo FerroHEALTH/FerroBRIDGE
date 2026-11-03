@@ -25,6 +25,11 @@ use openehr_mapping_core::template::TemplateSource;
 /// The fixtures this crate's tests ship.
 pub(crate) const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
 
+/// The FHIRconnect mappings the `eehrxf` crate ships, one directory per
+/// project, which these suites check as they check their own.
+pub(crate) const SHIPPED: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/eehrxf/mappings");
+
 /// Builds the index over the testkit's diagnosis template.
 pub(crate) fn template() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let opt = openehr_its::opt14::from_xml(ferrobridge_testkit::fixtures::DIAGNOSE_OPT)?;
