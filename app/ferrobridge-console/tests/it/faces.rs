@@ -145,6 +145,82 @@ async fn the_hl7v2_face_and_the_etl_say_what_they_run() -> Result<(), Box<dyn Er
 }
 
 #[tokio::test]
+async fn the_hl7v2_face_lists_its_concept_maps_and_the_messages_each_served()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        "/operator/hl7v2/concept-maps",
+        200,
+        &json!({
+            "directory": "/etc/ferrobridge/v2mappings",
+            "supplements": [],
+            "counted_since": "2026-11-03T09:00:00Z",
+            "maps": [
+                {
+                    "id": "segment-pid-to-patient",
+                    "url": "http://hl7.org/fhir/uv/v2mappings/ConceptMap/segment-pid-to-patient",
+                    "title": "Segment PID to Patient Map",
+                    "kind": "segment",
+                    "origin": "guide",
+                    "ends": [{"source": "pid", "target": "patient"}],
+                    "rows": 31,
+                    "messages": 1204
+                },
+                {
+                    "id": "table-hl70001-to-administrative-gender",
+                    "url": "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70001-to-administrative-gender",
+                    "title": null,
+                    "kind": "table",
+                    "origin": "override",
+                    "ends": [{"source": "http://terminology.hl7.org/CodeSystem/v2-0001", "target": "http://hl7.org/fhir/administrative-gender"}],
+                    "rows": 0,
+                    "messages": 0
+                }
+            ]
+        }),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, page) = send(&service, get_with("/hl7v2/concept-maps", &cookie)?).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    for words in [
+        "/etc/ferrobridge/v2mappings",
+        "Segment PID to Patient Map",
+        "segment-pid-to-patient",
+        "patient",
+        "1,204",
+        "Replaces the guide",
+        "table-hl70001-to-administrative-gender",
+        "http://hl7.org/fhir/administrative-gender",
+        "None beyond the bridge",
+    ] {
+        assert!(page.contains(words), "{words}: {page}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_concept_maps_of_a_face_that_is_off_say_so() -> Result<(), Box<dyn Error>> {
+    let bridge = MockServer::start().await;
+    let mut off = info();
+    off["lanes"] = json!([{"name": "hl7v2", "enabled": false}]);
+    answer(&bridge, "/health/info", 200, &off).await;
+    answer(&bridge, "/health/readiness", 200, &readiness()).await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/hl7v2/concept-maps", &cookie)?).await?;
+    assert!(page.contains("A sender"), "{page}");
+    let asked = bridge.received_requests().await.unwrap_or_default();
+    assert!(
+        asked
+            .iter()
+            .all(|request| request.url.path() != "/operator/hl7v2/concept-maps"),
+        "the directory is not asked of a face that is off"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn each_upstream_carries_its_indicator_and_the_lanes_that_use_it()
 -> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;

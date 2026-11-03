@@ -264,7 +264,7 @@ impl<'a> Run<'a> {
         base: &Base,
         claimed: &BTreeSet<String>,
     ) -> Result<Covered, MapError> {
-        self.supplemented(map, &scope.at);
+        self.applied(map, &scope.at);
         let mut inner = scope.clone();
         inner.datatype = Some((String::from(datatype), datum));
         inner.repetition = None;

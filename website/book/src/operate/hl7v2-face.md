@@ -136,6 +136,10 @@ The shipped supplements:
 | `message-orl-o22-to-bundle` | added | ORL_O22 (the laboratory order response), from the guide's OML_O21 rows under `RESPONSE`, with the MSA row into `MessageHeader.response` (#256) |
 | `message-oul-r22-to-bundle` | added | OUL_R22 (the specimen-oriented observation), from the guide's ORU_R01 rows at the OUL_R22 paths; the OBR row into a Specimen is left out, since SPM carries the specimen (#256) |
 
+The operator console's HL7 v2 page lists every map the face runs on its
+ConceptMaps tab, the guide's and the supplements alike, from
+[`GET /operator/hl7v2/concept-maps`](operator-api.md#get-operatorhl7v2concept-maps).
+
 What the supplements leave to the guide, and what stays open:
 
 - CWE.3 is written into `Coding.system` as the sender sends it (`LN`). The

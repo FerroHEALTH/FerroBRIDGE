@@ -16,6 +16,7 @@ use std::sync::Arc;
 use ferrobridge_operator_api::configuration::Configuration;
 use ferrobridge_operator_api::events::Events;
 use ferrobridge_operator_api::health::Info;
+use ferrobridge_operator_api::hl7v2::ConceptMaps;
 use ferrobridge_operator_api::operator::{EngineState, Listed};
 use ferrohealth_health::document::Readiness;
 use tokio::sync::OnceCell;
@@ -183,6 +184,16 @@ impl Reads {
         })
         .await
         .clone()
+    }
+
+    /// The HL7 v2 face's `ConceptMap` directory, `GET
+    /// /operator/hl7v2/concept-maps`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn concept_maps(&self) -> Loaded<ConceptMaps> {
+        let (state, token) = self.signed_in()?;
+        loaded(state.bridge().concept_maps(token).await)
     }
 
     /// The bridge's SMART discovery document, `GET

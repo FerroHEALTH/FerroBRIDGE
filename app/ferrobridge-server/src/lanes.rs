@@ -115,7 +115,9 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         let (started, listening) = start_hl7v2(settings, lane, &state)
             .await
             .context("starting the HL7 v2 face")?;
-        state = state.with_hl7v2(listening);
+        state = state
+            .with_hl7v2(listening)
+            .with_concept_maps(Arc::clone(started.face.directory()));
         face = Some(started);
     }
     let mut feeds = Vec::new();
