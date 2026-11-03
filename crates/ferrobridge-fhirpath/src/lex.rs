@@ -120,7 +120,8 @@ pub(crate) enum Token {
 ///
 /// N1 §4.1.2 lists the escapes; a backslash before any other character is
 /// dropped and the character kept, and `\u` without four hex digits is the
-/// letter `u` (the specification's own `'\u005'` example).
+/// letter `u` (the specification's own `'\u005'` example). A digit is one of
+/// the grammar's `HEX` (`[0-9a-fA-F]`), so a sign is no digit.
 fn unescape(slice: &str) -> String {
     let mut chars = slice.chars();
     chars.next();
@@ -138,7 +139,9 @@ fn unescape(slice: &str) -> String {
             Some('f') => text.push('\u{c}'),
             Some('u') => {
                 let hex: String = chars.clone().take(4).collect();
-                match (hex.len() == 4)
+                // NOTE: FHIRPath N1 grammar, `UNICODE: 'u' HEX HEX HEX HEX`: `from_str_radix`
+                // also reads a leading `+`, which no `HEX` matches.
+                match (hex.len() == 4 && hex.chars().all(|digit| digit.is_ascii_hexdigit()))
                     .then(|| u32::from_str_radix(&hex, 16).ok())
                     .flatten()
                     .and_then(char::from_u32)
@@ -305,6 +308,25 @@ mod tests {
                 Token::CloseParen,
             ]
         );
+    }
+
+    #[test]
+    fn a_unicode_escape_takes_four_hex_digits_and_no_sign() {
+        // FHIRPath N1 §4.1.2 and its grammar (`UNICODE: 'u' HEX HEX HEX HEX`): `\u0041` is
+        // `A`, and a `\` before anything else is dropped, `'\u005'` reading `u005`.
+        for (literal, text) in [
+            (r"'\u0041'", "A"),
+            (r"'\u005'", "u005"),
+            (r"'\u+041'", "u+041"),
+            (r"'\u-041'", "u-041"),
+            (r"'\u 041'", "u 041"),
+        ] {
+            assert_eq!(
+                tokens(literal),
+                vec![Token::Text(String::from(text))],
+                "{literal}"
+            );
+        }
     }
 
     #[test]
