@@ -287,12 +287,12 @@ fn a_malformed_resource_names_its_file() -> Result<(), Box<dyn std::error::Error
 
 #[test]
 fn the_loader_reads_an_r5_package_unchanged() {
-    // hl7.terminology 7.3.0 is published on R5 (5.0.0); the same loader reads it unchanged.
+    // hl7.terminology 7.5.0 is published on R5 (5.0.0); the same loader reads it unchanged.
     let tho =
         Package::open(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/hl7.terminology"))
             .expect("the vendored hl7.terminology package should load");
     assert_eq!(tho.manifest().name, "hl7.terminology");
-    assert_eq!(tho.manifest().version, "7.3.0");
+    assert_eq!(tho.manifest().version, "7.5.0");
     assert_eq!(tho.manifest().fhir_versions, vec!["5.0.0".to_owned()]);
     assert!(tho.code_systems().len() > 500);
     assert!(tho.value_sets().len() > 500);
