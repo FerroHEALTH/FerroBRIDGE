@@ -243,10 +243,7 @@ pub fn routes(
         .route("/operator/mappings/check", post(save::check))
         .route("/operator/mappings/{*path}", get(mapping).put(save::save))
         .route("/operator/reload", post(save::reload))
-        .route(
-            "/operator/templates/{id}/example",
-            get(templates::example),
-        )
+        .route("/operator/templates/{id}/example", get(templates::example))
         .route("/operator/revisions", get(revisions::routes::list))
         .route(
             "/operator/revisions/import",
