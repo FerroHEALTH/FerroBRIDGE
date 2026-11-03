@@ -18,7 +18,8 @@ use std::io::Read;
 use eehrxf::document::imaging::{
     IMAGING_BUNDLE, IMAGING_CATEGORIES, IMAGING_REPORT, IMAGING_REPORT_FORM, IMAGING_SLOTS,
 };
-use eehrxf::document::{Document, LOINC, Section};
+use eehrxf::document::section::Section;
+use eehrxf::document::{Document, LOINC};
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::device::Device;

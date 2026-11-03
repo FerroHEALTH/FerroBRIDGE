@@ -6,7 +6,8 @@
 //! and `DiagnosticReport-eu-lab` each name the other.
 
 use crate::crosswalk::laboratory::{LAB_COMPOSITION, LAB_DIAGNOSTIC_REPORT};
-use crate::document::{Authorship, Code, Companion, EU_CORE_PATIENT, Form, Kind, LOINC, Slot};
+use crate::document::form::{Authorship, Code, Companion, Form, Kind, Slot};
+use crate::document::{EU_CORE_PATIENT, LOINC};
 
 /// The canonical URL of the HL7 Europe Laboratory Report `Bundle` profile.
 pub const LAB_BUNDLE: &str = "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab";

@@ -11,7 +11,8 @@
 //! `dr-comp-author-org` requires; the operator is its custodian.
 
 use crate::crosswalk::imaging::{IMAGING_COMPOSITION, IMAGING_DIAGNOSTIC_REPORT};
-use crate::document::{Authorship, Code, Companion, EU_CORE_PATIENT, Form, Kind, LOINC, Slot};
+use crate::document::form::{Authorship, Code, Companion, Form, Kind, Slot};
+use crate::document::{EU_CORE_PATIENT, LOINC};
 
 /// The canonical URL of the HL7 Europe Imaging Report `Bundle` profile.
 pub const IMAGING_BUNDLE: &str =

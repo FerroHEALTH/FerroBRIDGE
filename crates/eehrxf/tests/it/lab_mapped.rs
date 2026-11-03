@@ -21,7 +21,8 @@ use std::path::PathBuf;
 
 use eehrxf::category::Category;
 use eehrxf::document::laboratory::{LAB_BUNDLE, LAB_SLOTS, LABORATORY_REPORT_FORM};
-use eehrxf::document::{Document, DocumentError, Section};
+use eehrxf::document::section::Section;
+use eehrxf::document::{Document, DocumentError};
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::LABORATORY;
 use eehrxf::receive::ReceivedDocument;
