@@ -4,7 +4,7 @@
 --
 -- The PostgreSQL form of the "Condition Eras" script of the OMOP CDM SQL
 -- scripts page (https://ohdsi.github.io/CommonDataModel/sqlScripts.html),
--- source site/sqlScripts.qmd of OHDSI/CommonDataModel at tag v5.4.3.
+-- source site/sqlScripts.qmd of OHDSI/CommonDataModel at tag v5.5.0.
 -- The published script is OHDSI SQL for SqlRender; this file keeps its
 -- statements and their order and changes only the dialect (sql/PROVENANCE.md).
 -- @cdmDatabaseSchema is the CDM schema, as in OHDSI's rendered DDL.

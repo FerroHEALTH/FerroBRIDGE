@@ -6,7 +6,7 @@
 //! the facts the conformance checks read (`isRequired`, `isPrimaryKey`,
 //! `isForeignKey`, `fkDomain`, `fkClass`).
 //!
-//! The port takes its field set from the CDM v5.4.3 definitions, which the
+//! The port takes its field set from the CDM v5.4 definitions, which the
 //! vendored DDL agrees with, and its thresholds from the Dashboard
 //! (`docs/architecture.md` section 2), so a disagreement is a fact the port
 //! must know about, never one it absorbs.
@@ -153,7 +153,7 @@ fn the_dashboard_and_the_definitions_disagree_exactly_where_recorded() -> Result
             ));
         }
     }
-    // NOTE: DQD v2.9.0 `inst/csv/OMOP_CDMv5.4_Field_Level.csv` against CDM v5.4.3
+    // NOTE: DQD v2.9.0 `inst/csv/OMOP_CDMv5.4_Field_Level.csv` against CDM v5.5.0
     // `OMOP_CDMv5.4_Field_Level.csv`; each pair is Dashboard / definitions.
     let recorded = [
         "cdm_source.cdm_version_concept_id fkDomain: Some(\"Metadata\") / None",

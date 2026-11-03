@@ -44,7 +44,7 @@ fails when it names a different commit, tag or pin-set digest.
 | FHIRconnect specification source | `SevKohler/FHIRconnect-spec` commit `5046a6dd9ee34f5a1de152301778f302c55e3b7b` (carries the REST API chapter, pull request #93, the sub-contexts, pull request #100, and `openehr` moved inside `properties` in the source `split` definition, pull request #106) | `docs/architecture.md` §2 and §4.7, `scripts/vendor/fhirconnect.sh`, `docs/specs/fhirconnect/PROVENANCE.md`, `crates/fhirconnect/tests/fixtures/rest-api/PROVENANCE.md` |
 | FHIRconnect mapping library (corpus, never an oracle) | `SevKohler/FHIRconnect-mapping-lib` commit `2ba7cf5dc9c37d135e06571ae0a8e58b702b3471` | `docs/architecture.md` §2, `scripts/vendor/fhirconnect-mapping-lib.sh`, `docs/specs/fhirconnect-mapping-lib/PROVENANCE.md` |
 | OMOCL corpus | `SevKohler/OMOCL` commit `cfb26bad3ad035f975736299b53a494696b2e604` (grammar `OMOCL/v1.0.0`; the git tag `v1.0.0` carries pre-grammar files) | `docs/architecture.md` §2, `scripts/vendor/omocl.sh`, `docs/specs/omocl/PROVENANCE.md` |
-| OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.4.3` | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
+| OMOP CDM definitions and PostgreSQL DDL | `OHDSI/CommonDataModel` tag `v5.5.0` (the v5.4 definitions and DDL only: the tag carries the v5.4 CSV corrections made after `v5.4.3`, and the CDM stays on v5.4 while OMOCL declares 5.4) | `docs/architecture.md` §2, `scripts/vendor/omop-cdm.sh`, `docs/specs/omop-cdm/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of every file it emits |
 | OHDSI Data Quality Dashboard | `OHDSI/DataQualityDashboard` tag `v2.9.0` | `docs/architecture.md` §2 and §11, `scripts/vendor/dqd.sh`, `docs/specs/dqd/PROVENANCE.md`, `tools/omop-cdm-codegen` and the banner of the `dqd` module it emits, the `DQD_TAG` constant of `omop-cdm` |
 | OHDSI Athena vocabulary download | `OHDSI/Athena` commit `2aab8cac738d407211d9f5582827262899dc7603` (the application that writes the download; read from code, never a specification) | `docs/architecture.md` §5.3, `scripts/vendor/athena.sh`, `docs/specs/athena/PROVENANCE.md` |
 | openEHR ITS-REST OpenAPI | `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, modules Overview, System, EHR, Query, Definition (`STABLE`) and Demographic (`DEVELOPMENT`), and the Simplified Formats and Simplified Data Template sources | `docs/architecture.md` §2, `scripts/vendor/its-rest.sh`, `docs/specs/its-rest/PROVENANCE.md` |
@@ -70,7 +70,7 @@ fails when it names a different commit, tag or pin-set digest.
 | HL7 v2 samples: NIST LOI (build time, never committed) | `usnistgov/hit-mu-tools-resource-bundles` commit `2c5e502787cd5e0fe0f347a7c00d5507a9f8035a` (branch `loi-r1`) files `65` digest `712d023d5a7ceb21ba520f513490fe1a29603436ed4756f48646d5922702f549` | `scripts/vendor/hl7v2-samples.sh --build-time`, `crates/ferrobridge-hl7v2/vendor/nist/PROVENANCE.md`, the same cache key |
 | HL7 v2 samples: NIST syndromic surveillance (build time, never committed) | `usnistgov/hit-mu-tools-resource-bundles` commit `0d7a2c7b714188878b030068a94b94d1db6cb30a` (branch `ss-r2`) files `24` digest `aca07c08f2718139456f712ce8e45fc42cadba9c9fed665fd7ef5465c30af4c6` | `scripts/vendor/hl7v2-samples.sh --build-time`, `crates/ferrobridge-hl7v2/vendor/nist/PROVENANCE.md`, the same cache key |
 | HL7 v2 samples: AIRA MQE (build time, never committed) | `immregistries/mqe` commit `8b8a4274e1830cdb78ff5c8627763e1625caeac7` path `examples` files `9` digest `1fbda5ede288bdaf9ea53b16ded2149f11627cf4b0b39d2837299ab5803972b7` | `scripts/vendor/hl7v2-samples.sh --build-time`, `crates/ferrobridge-hl7v2/vendor/aira-mqe/PROVENANCE.md`, the same cache key |
-| FHIRPath test suite (R4) | `FHIR/fhir-test-cases` commit `9b57d9564f3f7e0343c020942155df13e56ef7a7` path `r4/fhirpath/tests-fhir-r4.xml` and the inputs it names files `13` digest `af9848ea9d046b288289adf64f199d4b4d0bdfebf6c000496b6e7f69a4b0dc48` | `scripts/vendor/fhirpath-tests.sh`, `docs/specs/fhirpath-tests/PROVENANCE.md`, `conformance/fhirpath-r4/PROVENANCE.md` |
+| FHIRPath test suite (R4) | `FHIR/fhir-test-cases` commit `4435b9d0815233e8bd9836d85bbb6cc522c19946` path `r4/fhirpath/tests-fhir-r4.xml` and the inputs it names files `17` digest `1e8ec7fa00ed06f72971214c782c7c6d1a7384e804ad22b696fa23c162d8e8a2` | `scripts/vendor/fhirpath-tests.sh`, `docs/specs/fhirpath-tests/PROVENANCE.md`, `conformance/fhirpath-r4/PROVENANCE.md` |
 | HL7 v2+ licence page | `HL7/v2plus` commit `1a8fbb7e198047d71b9b13ceb582aaded4fa19f3` path `license.html` sha256 `48e2d1108ab38faafb9993342a9626b52d673ce2e683ef123716950564d76efd` | `scripts/vendor/v2ig.sh` and `scripts/vendor/v2-legacy.sh` (quoted verbatim in `tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md` and `tools/fhir-codegen/vendor/hl7-v2-legacy/PROVENANCE.md`) |
 | Xt-EHR EHDS Logical Information Models | package `xtehr.eu.ehds.models` 1.0.0, pin-set digest `796cc0974133058ba0b34d9b678baf272eb89b1ceeddc6930e6d66936a38c953`, tarball sha256 `a4853e58a869468464847e2eafa50fb07349e6da1e99456a0d93aae27848e1f8` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-xtehr-models/PROVENANCE.md` |
 | HL7 Europe Base and Core | package `hl7.fhir.eu.base` 2.0.1, pin-set digest `b84f7ba0799903e6bf4d2bf0ecaeeaefd0f71510238c7e30d63244ff6c603c67`, tarball sha256 `3fb23b64d70656ea809e1ad66d84d5d008400e18424266debf176cb46fba0b4a` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-base/PROVENANCE.md` |
@@ -217,7 +217,7 @@ of every `PROVENANCE.md` below back against its row.
 | `hl7.fhir.r4b.core` | 4.3.0 | `tools/fhir-codegen/vendor/hl7.fhir.r4b.core/PROVENANCE.md` |
 | `hl7.fhir.r5.core` | 5.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.r5.core/PROVENANCE.md` |
 | `hl7.fhir.r6.core` | 6.0.0-ballot5 | `tools/fhir-codegen/vendor/hl7.fhir.r6.core/PROVENANCE.md` |
-| `hl7.terminology` (THO) | 7.3.0 | `tools/fhir-codegen/vendor/hl7.terminology/PROVENANCE.md` |
+| `hl7.terminology` (THO) | 7.5.0 | `tools/fhir-codegen/vendor/hl7.terminology/PROVENANCE.md` |
 | `hl7.fhir.uv.v2mappings` (the v2-to-FHIR IG) | 1.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md` (FHIR 4.0.1; the package declares CC0-1.0, its source repository `HL7/v2-to-fhir` Apache-2.0) |
 
 ## FHIR examples packages (the conformance corpora, build time, never committed)
@@ -250,18 +250,18 @@ The R4 profile validator runs offline against the packages below, fetched
 verbatim from the FHIR package registry at build time by
 `scripts/vendor/profile-packages.sh` into the ignored
 `docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
-from this table (#435). At about 570 MB unpacked they are never committed;
+from this table (#435). At about 650 MB unpacked they are never committed;
 only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
 `scripts/vendor/profile-packages.sh --cache-key`. The five roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
-one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.0,
+one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.1,
 and the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
 2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
 held;
 every other row is in the set because a vendored package's `package.json`
 `dependencies` names it at that version. A package two dependents name at
 different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
-2.0.0, so both 2.0.0 and 2.0.1 are here, and the five `hl7.terminology.r4`
-rows are the five versions the set names. Every package depends on
+2.0.0 and IPS 2.0.0, so both 2.0.0 and 2.0.1 of each are here, and the six
+`hl7.terminology.r4` rows are the six versions the set names. Every package depends on
 `hl7.fhir.r4.core` 4.0.1, which has no row here: the set reads the tree the
 FHIR packages table above already vendors at
 `tools/fhir-codegen/vendor/hl7.fhir.r4.core/`. Each pin is the version, then
@@ -291,7 +291,8 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.fhir.eu.eps` | 1.0.0-ballot files `76` digest `d8fe50b7359f698ce513821235502dd5bf43ad2e4e70c25a4dbe12d0b8b39f2e` | `docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.base` | 2.0.1 files `75` digest `05d7ea672cac41eaa5efb7806c6ce9e4638b1604a811a0aea78f84685efff91d` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.1/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.base` | 2.0.0 files `77` digest `0b2e85a498e4f0df5ed8f122d97737c824250cb247792db9e392f4186245ea01` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.0/PROVENANCE.md` |
-| `hl7.fhir.uv.ips` | 2.0.0 files `154` digest `86dbd916617c60642e0296c33bea0d1aa6497c4ca46a2db285a0e5c975f28316` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#2.0.0/PROVENANCE.md` (a root) |
+| `hl7.fhir.uv.ips` | 2.0.1 files `155` digest `7a4670ea917702532f6c82f6c7df1089ebb26c99fb3149fe4972c3e552108250` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#2.0.1/PROVENANCE.md` (a root) |
+| `hl7.fhir.uv.ips` | 2.0.0 files `154` digest `86dbd916617c60642e0296c33bea0d1aa6497c4ca46a2db285a0e5c975f28316` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#2.0.0/PROVENANCE.md` |
 | `hl7.fhir.eu.laboratory` | 2.0.0 files `94` digest `f142bbdac038895d90841bb92b7865fdf0eb16b9b0b84a8db702998b36636263` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.mpd` | 1.0.0 files `51` digest `e44ea93f6506fc118287051120ae9bfa737cff3a2791cde5ea1f222bf43e88fa` | `docs/specs/fhir-packages/hl7.fhir.eu.mpd#1.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.uv.ipa` | 1.1.0 files `53` digest `70a5f0881a37859ef7fefd5502c0db05c6ce6c2d6dfa1e71828785f523ba7021` | `docs/specs/fhir-packages/hl7.fhir.uv.ipa#1.1.0/PROVENANCE.md` |
@@ -303,6 +304,7 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.fhir.uv.extensions.r4` | 5.2.0 files `1401` digest `727a50ef9b1c4472653d772ae0b470405b305c2c983c02f1f621ebcc5e05a5b3` | `docs/specs/fhir-packages/hl7.fhir.uv.extensions.r4#5.2.0/PROVENANCE.md` |
 | `hl7.fhir.uv.xver-r5.r4` | 0.1.0 files `6139` digest `cb81d3f43fd473471a8a4e5ea0a8066aeeb06bbcf24acb31a24dd85db0ebb0e2` | `docs/specs/fhir-packages/hl7.fhir.uv.xver-r5.r4#0.1.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 7.3.0 files `4191` digest `0c47d902204317908d1103108f554ad5a0abd238466a9f7410b85d269fcb3098` | `docs/specs/fhir-packages/hl7.terminology.r4#7.3.0/PROVENANCE.md` |
+| `hl7.terminology.r4` | 7.2.0 files `4180` digest `831e44ca28abb1efcbc0b2ad7fdc9c452eeab1dd80f632ea7c617a3ab70a0406` | `docs/specs/fhir-packages/hl7.terminology.r4#7.2.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 7.1.0 files `4118` digest `0f91757bc29290a3c1c090cf3fe57c884f5af91472182157bac7cf4d0ead73c3` | `docs/specs/fhir-packages/hl7.terminology.r4#7.1.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 6.5.0 files `4407` digest `acae644b9b4dba9d388b96b35f452c2a35f8bf199c1d2b570e85634c6972ee09` | `docs/specs/fhir-packages/hl7.terminology.r4#6.5.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 6.3.0 files `4389` digest `67c5e37eee889968f623290df576cf8a24a6de8936c0ad4b14e742b6faf9833f` | `docs/specs/fhir-packages/hl7.terminology.r4#6.3.0/PROVENANCE.md` |

@@ -403,7 +403,7 @@ initialised.
 OHDSI's fourth file, `OMOPCDM_postgresql_5.4_constraints.sql`, carries the
 foreign keys and is left out by default. `cdm init --with-constraints`
 applies it after the tables, statement by statement in one transaction of its
-own. At the pinned OHDSI tag `v5.4.3` PostgreSQL refuses line 157, a foreign
+own. At the pinned OHDSI tag `v5.5.0` PostgreSQL refuses line 157, a foreign
 key onto `vocabulary (vocabulary_id)` that the primary keys file gives no key
 (SQLSTATE `42830`), so the flag exits 1, prints that statement, and leaves the
 tables in place and no foreign key behind.

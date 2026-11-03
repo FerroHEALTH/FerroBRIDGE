@@ -85,7 +85,7 @@ meta_url_for() {
 }
 
 # The pin for a package: the second cell of its row in the docs/VERSIONS.md
-# FHIR table, e.g. "| `hl7.terminology` (THO) | 7.3.0 | ... |".
+# FHIR table, e.g. "| `hl7.terminology` (THO) | 7.5.0 | ... |".
 pin_for() {
   local pkg="$1"
   awk -F'|' -v pkg="$pkg" '
