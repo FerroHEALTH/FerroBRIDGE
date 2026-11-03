@@ -97,6 +97,8 @@ serde_json.workspace = true
 sqlx.workspace = true
 # The digest behind a derived FHIR resource id.
 sha2.workspace = true
+# The line diff of a revision against the running one.
+similar.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 toml.workspace = true

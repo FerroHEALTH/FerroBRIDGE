@@ -234,6 +234,10 @@ chumsky = "0.13.0"
 # crates.io on 2026-10-15.
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 tar = { version = "0.4.46", default-features = false }
+# The line diff of a mapping-set revision against the running one, as the
+# operator API answers it (#609). Apache-2.0. Verified against crates.io on
+# 2026-11-03.
+similar = { version = "3.2.1", default-features = false, features = ["std", "text"] }
 # The FerroHEALTH components the operator console (app/ferrobridge-console,
 # #599) draws with: the server-rendered views, the shell, the table model,
 # the highlighter, the Lucide icons, the stylesheet, the role tokens and the

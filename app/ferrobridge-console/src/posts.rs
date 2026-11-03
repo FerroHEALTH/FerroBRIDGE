@@ -4,10 +4,12 @@
 //! What the posts of `crate::actions` ask the bridge.
 //!
 //! Reload the set, the editor's post, where a discarded draft goes back to,
-//! and the replay of a parked change-feed event. No specification governs
-//! the console: our own design.
+//! the replay of a parked change-feed event, and the apply of a revision. No
+//! specification governs the console: our own design.
 
-use crate::actions::{Edited, EditorPost, Reloaded, ReplayAnswer, ReplayPost};
+use crate::actions::{
+    ApplyAnswer, ApplyPost, Edited, EditorPost, Reloaded, ReplayAnswer, ReplayPost,
+};
 use crate::bridge::AccessToken;
 use crate::model::{Outcome, loaded};
 use crate::server::ConsoleState;
@@ -83,4 +85,23 @@ fn editor_path(address: &str, post: &EditorPost) -> Option<String> {
     } else {
         Some(given.to_owned())
     }
+}
+
+/// The answer to the apply `post` of the revision `id`, as the operator
+/// whose token is `token`: the bridge is asked only with a reason it takes.
+pub async fn applied(
+    state: &ConsoleState,
+    token: &AccessToken,
+    id: &str,
+    post: &ApplyPost,
+) -> ApplyAnswer {
+    if let Some(fault) = crate::pages::editor::answer::reason_fault(&post.reason) {
+        return ApplyAnswer::Invalid(fault);
+    }
+    ApplyAnswer::Answered(loaded(
+        state
+            .bridge()
+            .apply_revision(id, post.running.trim(), &post.reason, token)
+            .await,
+    ))
 }

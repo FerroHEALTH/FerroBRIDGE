@@ -13,6 +13,7 @@
 
 use axum::response::Response;
 use ferrobridge_operator_api::operator::{EngineState, Listed, Owner, Program, Template};
+use ferrobridge_operator_api::revisions::Revisions;
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
@@ -45,17 +46,19 @@ use crate::pages::parts::{
 use crate::visit::Visit;
 
 mod files;
+pub mod revisions;
 
 /// The id of the reload's confirmation dialog.
 pub const RELOAD_DIALOG: &str = "reload-set";
 
 /// The tabs of the mapping set, each its key and its words.
-const TABS: [(&str, Msg); 5] = [
+const TABS: [(&str, Msg); 6] = [
     ("contexts", Msg::TabContexts),
     ("omocl", Msg::TabOmocl),
     ("templates", Msg::TabTemplates),
     ("files", Msg::TabFiles),
     ("diagnostics", Msg::TabDiagnostics),
+    ("revisions", Msg::TabRevisions),
 ];
 
 /// The page of the tab `key`.
@@ -76,13 +79,13 @@ pub async fn page(visit: &Visit, reloaded: Option<Reloaded>) -> Drawn {
     }
     let state = visit.reads.running().await;
     let listing = visit.reads.listing().await;
+    let revisions = visit.reads.revisions().await;
     let body = drawn(
         &visit.locale,
         &tab,
         &visit.query,
         reloaded.as_ref(),
-        &state,
-        &listing,
+        (&state, &listing, &revisions),
     );
     Drawn::shell(visit.tr(Msg::MappingSet), body)
 }
@@ -147,7 +150,7 @@ fn heading(l: &Locale, here: &str) -> Html {
 }
 
 /// The counts of a load report for `errors` and `warnings`.
-fn counts(l: &Locale, errors: usize, warnings: usize) -> Vec<Count> {
+pub(super) fn counts(l: &Locale, errors: usize, warnings: usize) -> Vec<Count> {
     vec![
         Count {
             value: errors.to_string(),
@@ -217,8 +220,11 @@ fn drawn(
     tab: &str,
     query: &Query,
     reloaded: Option<&Reloaded>,
-    state: &Loaded<EngineState>,
-    listing: &Loaded<Vec<Listed>>,
+    (state, listing, revisions): (
+        &Loaded<EngineState>,
+        &Loaded<Vec<Listed>>,
+        &Loaded<Revisions>,
+    ),
 ) -> Html {
     let here = tab_href(tab);
     let heading = heading(l, &here);
@@ -265,7 +271,7 @@ fn drawn(
                 pager: None,
             },
         ),
-        None => tab_card(l, tab, query, state, listing),
+        None => tab_card(l, tab, query, state, listing, revisions),
     };
     heading.then(h(format!(
         r#"<div class="fui-list-page">{report}{card}</div>"#
@@ -278,13 +284,24 @@ pub(super) fn count(n: usize) -> u64 {
 }
 
 /// The binder tabs of the set, the one keyed `current` the page.
-fn tab_row(l: &Locale, current: &str, state: &EngineState, listing: &[Listed]) -> TabRow {
+fn tab_row(
+    l: &Locale,
+    current: &str,
+    state: &EngineState,
+    listing: &[Listed],
+    revisions: &Loaded<Revisions>,
+) -> TabRow {
+    let recorded = match revisions {
+        Ok(Outcome::Shown(revisions)) => Some(revisions.revisions.len()),
+        _ => None,
+    };
     let counts = [
-        state.contexts.len(),
-        state.omocl.files.len(),
-        state.templates.len(),
-        listing.len(),
-        state.diagnostics.len(),
+        Some(state.contexts.len()),
+        Some(state.omocl.files.len()),
+        Some(state.templates.len()),
+        Some(listing.len()),
+        Some(state.diagnostics.len()),
+        recorded,
     ];
     TabRow {
         label: tr(l, Msg::MappingSet),
@@ -292,7 +309,11 @@ fn tab_row(l: &Locale, current: &str, state: &EngineState, listing: &[Listed]) -
             .iter()
             .zip(counts)
             .map(|((key, words), number)| {
-                Tab::new(*key, tab_href(key), tr(l, *words)).count(count(number), tr(l, *words))
+                let tab = Tab::new(*key, tab_href(key), tr(l, *words));
+                match number {
+                    Some(number) => tab.count(count(number), tr(l, *words)),
+                    None => tab,
+                }
             })
             .collect(),
         current: current.to_owned(),
@@ -300,11 +321,19 @@ fn tab_row(l: &Locale, current: &str, state: &EngineState, listing: &[Listed]) -
 }
 
 /// The card of the tab `tab`: its table, list or diagnostics.
-fn tab_card(l: &Locale, tab: &str, query: &Query, state: &EngineState, listing: &[Listed]) -> Html {
+fn tab_card(
+    l: &Locale,
+    tab: &str,
+    query: &Query,
+    state: &EngineState,
+    listing: &[Listed],
+    revisions: &Loaded<Revisions>,
+) -> Html {
     let (body, pager) = match tab {
         "omocl" => (omocl_table(l, state, listing), None),
         "templates" => (templates_table(l, state), None),
         "files" => files_body(l, query, listing),
+        "revisions" => (revisions::listing(l, revisions), None),
         "diagnostics" => (
             if state.diagnostics.is_empty() {
                 quiet(tr(l, Msg::NoDiagnostics), None)
@@ -321,7 +350,7 @@ fn tab_card(l: &Locale, tab: &str, query: &Query, state: &EngineState, listing: 
             title: tr(l, Msg::MappingSet),
             count: None,
             order: None,
-            tabs: Some(tab_row(l, tab, state, listing)),
+            tabs: Some(tab_row(l, tab, state, listing, revisions)),
             actions: None,
             body,
             pager,

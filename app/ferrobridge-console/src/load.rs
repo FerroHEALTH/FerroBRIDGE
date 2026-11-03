@@ -19,6 +19,7 @@ use ferrobridge_operator_api::events::Events;
 use ferrobridge_operator_api::health::Info;
 use ferrobridge_operator_api::hl7v2::ConceptMaps;
 use ferrobridge_operator_api::operator::{EngineState, Listed};
+use ferrobridge_operator_api::revisions::{Revision, RevisionDiff, Revisions};
 use ferrohealth_health::document::Readiness;
 use tokio::sync::OnceCell;
 
@@ -203,6 +204,34 @@ impl Reads {
     pub async fn etl_run(&self, run_id: &str) -> Loaded<Run> {
         let (state, token) = self.signed_in()?;
         loaded(state.bridge().etl_run(run_id, token).await)
+    }
+
+    /// The mapping-set revisions, `GET /operator/revisions`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn revisions(&self) -> Loaded<Revisions> {
+        let (state, token) = self.signed_in()?;
+        loaded(state.bridge().revisions(token).await)
+    }
+
+    /// One revision, `GET /operator/revisions/{id}`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn revision(&self, id: &str) -> Loaded<Revision> {
+        let (state, token) = self.signed_in()?;
+        loaded(state.bridge().revision(id, token).await)
+    }
+
+    /// How one revision differs from the running one, `GET
+    /// /operator/revisions/{id}/diff`.
+    ///
+    /// # Errors
+    /// As [`Self::info`].
+    pub async fn revision_diff(&self, id: &str) -> Loaded<RevisionDiff> {
+        let (state, token) = self.signed_in()?;
+        loaded(state.bridge().revision_diff(id, token).await)
     }
 
     /// The HL7 v2 face's `ConceptMap` directory, `GET

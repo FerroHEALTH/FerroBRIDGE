@@ -44,6 +44,7 @@ use crate::journeys::screenshots::catalogue::EDIT_REFUSED;
 use crate::journeys::screenshots::catalogue::EDIT_SAVED;
 use crate::journeys::screenshots::catalogue::EVENTS_DEGRADED;
 use crate::journeys::screenshots::catalogue::MAPPINGS_RELOADED;
+use crate::journeys::screenshots::catalogue::MAPPINGS_REVISIONS;
 use crate::journeys::screenshots::catalogue::NOT_FOUND;
 use crate::journeys::screenshots::catalogue::OMOP_RUN;
 use crate::journeys::screenshots::catalogue::OMOP_RUNS;
@@ -51,6 +52,7 @@ use crate::journeys::screenshots::catalogue::PAGES;
 use crate::journeys::screenshots::catalogue::PLAYGROUND_ANSWERED;
 use crate::journeys::screenshots::catalogue::PLAYGROUND_OFF;
 use crate::journeys::screenshots::catalogue::PLAYGROUND_REFUSED;
+use crate::journeys::screenshots::catalogue::REVISION;
 use crate::journeys::screenshots::catalogue::SIGN_IN;
 use crate::journeys::screenshots::catalogue::SIGNED_OUT;
 use crate::journeys::screenshots::catalogue::shots;
@@ -415,6 +417,9 @@ async fn capture(
     if shot.shell {
         loaded(browser).await?;
     }
+    if PINNED_INSTANTS.contains(&shot.image) {
+        pin_instants(browser).await?;
+    }
     rest_pointer(browser).await?;
     let height = content_height(browser).await?;
     window(browser, width, height).await?;
@@ -433,6 +438,28 @@ async fn capture(
         [error] if error.contains(shot.url) && error.contains("404") => Ok(()),
         _ => Err(format!("the page of an unknown path logged {errors:?}, not its one 404").into()),
     }
+}
+
+/// The shots that draw an instant the bridge read from its clock: when it
+/// started, or when it recorded a revision.
+const PINNED_INSTANTS: [&str; 3] = ["hl7v2-concept-maps", "mappings-revisions", "revision"];
+
+/// The instant [`pin_instants`] draws in place of the clock's.
+const PINNED: &str = "2026-11-03T09:00:00Z";
+
+/// Draws [`PINNED`] in place of every instant the page shows in a code span,
+/// so the image is the same at every capture (no specification governs this:
+/// our own design).
+async fn pin_instants(browser: &Browser) -> Result<(), Box<dyn Error>> {
+    let expression = format!(
+        r"for (const node of document.querySelectorAll('code')) {{ if (/^\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}(\.\d+)?Z$/.test(node.textContent.trim())) {{ node.textContent = '{PINNED}'; }} }} true"
+    );
+    browser
+        .driver()
+        .cdp()
+        .send_raw("Runtime.evaluate", json!({ "expression": expression }))
+        .await?;
+    Ok(())
 }
 
 /// Loads `shot` and captures it in `theme`.
@@ -499,7 +526,9 @@ async fn answers(
     save(browser, "a second profile over the diagnosis").await?;
     capture(browser, &EDIT_SAVED, theme, width).await?;
     reload(browser, stack).await?;
-    capture(browser, &MAPPINGS_RELOADED, theme, width).await
+    capture(browser, &MAPPINGS_RELOADED, theme, width).await?;
+    visit(browser, stack, &MAPPINGS_REVISIONS, (theme, width)).await?;
+    visit(browser, stack, &REVISION, (theme, width)).await
 }
 
 /// Captures every shot of the full stack in `theme`.

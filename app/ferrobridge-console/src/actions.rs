@@ -185,6 +185,36 @@ pub enum ReplayAnswer {
     Answered(Loaded<()>),
 }
 
+/// What a revision page's Apply posts: the running revision the page
+/// showed and the reason.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ApplyPost {
+    /// The running revision's id, as the page drew it.
+    pub running: String,
+    /// The reason, as typed.
+    pub reason: String,
+}
+
+impl ApplyPost {
+    /// The post the Apply form body `body` carried.
+    #[must_use]
+    pub fn from_form(body: &str) -> Self {
+        Self {
+            running: field(body, "running"),
+            reason: field(body, "reason"),
+        }
+    }
+}
+
+/// What the bridge answered an apply.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ApplyAnswer {
+    /// The reason cannot go with an apply, so the bridge was not asked.
+    Invalid(Msg),
+    /// The bridge applied the revision, refused it, or could not be asked.
+    Answered(Loaded<Answered>),
+}
+
 /// The last value of the field `name` in the form body `body`
 /// (`application/x-www-form-urlencoded`), empty when it carries none.
 #[must_use]
