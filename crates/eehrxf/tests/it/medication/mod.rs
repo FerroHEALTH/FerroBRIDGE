@@ -12,5 +12,11 @@ mod dispensation;
 mod extension;
 #[cfg(feature = "fhir-r4")]
 mod fixtures;
+#[cfg(all(
+    feature = "openehr",
+    feature = "prescription",
+    feature = "dispensation"
+))]
+mod mapped;
 #[cfg(all(feature = "fhir-r4", feature = "prescription"))]
 mod prescription;

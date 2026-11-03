@@ -18,7 +18,12 @@ HighBoundary/HighBoundaryDecimal6
 HighBoundary/HighBoundaryDecimal7
 HighBoundary/HighBoundaryDecimal8
 HighBoundary/HighBoundaryDecimal9
+HighBoundary/HighBoundaryDecimalCarry1
+HighBoundary/HighBoundaryDecimalCarry2
+HighBoundary/HighBoundaryDecimalCarry3
+HighBoundary/HighBoundaryDecimalCarry4
 HighBoundary/HighBoundaryDecimalDefault
+HighBoundary/HighBoundaryDecimalExponent3
 HighBoundary/HighBoundaryTimeMillisecond
 LowBoundary/LowBoundaryDateMonth
 LowBoundary/LowBoundaryDateTimeMillisecond2
@@ -37,7 +42,13 @@ LowBoundary/LowBoundaryDecimal6
 LowBoundary/LowBoundaryDecimal7
 LowBoundary/LowBoundaryDecimal8
 LowBoundary/LowBoundaryDecimal9
+LowBoundary/LowBoundaryDecimalBorrow1
+LowBoundary/LowBoundaryDecimalBorrow2
+LowBoundary/LowBoundaryDecimalCarry1
+LowBoundary/LowBoundaryDecimalCarry2
+LowBoundary/LowBoundaryDecimalCarry3
 LowBoundary/LowBoundaryDecimalDefault
+LowBoundary/LowBoundaryDecimalExponent2
 LowBoundary/LowBoundaryNegDecimal1
 LowBoundary/LowBoundaryNegDecimal2
 LowBoundary/LowBoundaryNegDecimal3
@@ -62,6 +73,9 @@ testEscapeUnescape/testEscapeHtml
 testEscapeUnescape/testEscapeJson
 testEscapeUnescape/testUnescapeHtml
 testEscapeUnescape/testUnescapeJson
+testEscapeUnescape/testUnescapeJson2
+testEscapeUnescape/testUnescapeJson3
+testEscapeUnescape/testUnescapeJson4
 testJoin/testJoin
 testJoin/testJoinEmpty
 testMatches/testMatchesFullWithinUrl1
@@ -91,4 +105,4 @@ testTrim/testTrim3
 testTrim/testTrim4
 testTrim/testTrim5
 testTrim/testTrim6
-total 104
+total 125

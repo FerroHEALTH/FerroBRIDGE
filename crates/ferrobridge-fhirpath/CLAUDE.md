@@ -84,7 +84,8 @@ UTC; `trace()` logs shapes, never values; `iif()` keeps the surrounding
 (`docs/specs/fhirpath-tests/`) as two corpora, never special-casing a test
 by name: `fhirpath-r4` in the default N1 environment, and `fhirpath-r4-stu3`
 for the cases that use a 3.0.0 STU function, routed by function name and run
-with the opt-in. `tests/it/constraints.rs` parses every invariant of the vendored
+with the opt-in. A group the suite marks `mode="custom"` (`documentFunctions`)
+is in neither corpus. `tests/it/constraints.rs` parses every invariant of the vendored
 packages and checks the R4 core ones against their elements; an invariant a
 package publishes with a defect is an expected refusal with the evidence.
 The same sweep checks the STU3 core invariants against `model::stu3::Stu3`.

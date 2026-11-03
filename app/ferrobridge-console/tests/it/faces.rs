@@ -144,6 +144,206 @@ async fn the_hl7v2_face_and_the_etl_say_what_they_run() -> Result<(), Box<dyn Er
     Ok(())
 }
 
+/// The synthetic id of a kept run.
+const RUN_ID: &str = "0b6c5a3e-1d3f-4c7e-9a43-000000000001";
+
+/// A synthetic kept run, with one refused record.
+fn kept_run() -> serde_json::Value {
+    json!({
+        "id": RUN_ID,
+        "kind": "compositions",
+        "started": "2026-11-03T09:00:00Z",
+        "finished": "2026-11-03T09:01:30Z",
+        "compositions": {"read": 3, "committed": 2, "skipped": 0, "refused": 1},
+        "rows": {"measurement": 1204, "person": 2},
+        "concept_zero": 1,
+        "refusals": [{
+            "composition": "8849182c-82ad-4088-a07f-48ead4180515",
+            "mapping": null,
+            "table": null,
+            "column": null,
+            "element": null,
+            "reason": "the composition names no template"
+        }],
+        "deletions": {
+            "checked": 1, "extant": 0,
+            "removed": ["7d44b88c-4199-4bad-97dc-d78268e01398"],
+            "kept": [], "unknown": [],
+            "rows": {"measurement": 3}
+        }
+    })
+}
+
+#[tokio::test]
+async fn the_etl_lists_the_runs_the_bridge_keeps_each_linked_to_its_report()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        "/operator/etl/runs",
+        200,
+        &json!({"runs": [{
+            "id": RUN_ID,
+            "kind": "compositions",
+            "started": "2026-11-03T09:00:00Z",
+            "finished": "2026-11-03T09:01:30Z",
+            "compositions": {"read": 3, "committed": 2, "skipped": 0, "refused": 1},
+            "rows": 1206,
+            "refusals": 1,
+            "removed": 1
+        }]}),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, page) = send(&service, get_with("/omop/runs", &cookie)?).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    for words in [
+        &format!("/omop/runs/{RUN_ID}"),
+        "2026-11-03T09:01:30Z",
+        "Compositions from the CDR",
+        "1,206",
+    ] {
+        assert!(page.contains(words), "{words}: {page}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_bridge_with_no_run_kept_says_so() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(&bridge, "/operator/etl/runs", 200, &json!({"runs": []})).await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/omop/runs", &cookie)?).await?;
+    assert!(page.contains("No run is kept yet"), "{page}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_run_report_shows_its_rows_deletions_and_refusals() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        &format!("/operator/etl/runs/{RUN_ID}"),
+        200,
+        &kept_run(),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, page) = send(
+        &service,
+        get_with(&format!("/omop/runs/{RUN_ID}"), &cookie)?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, response.status());
+    for words in [
+        RUN_ID,
+        "measurement",
+        "1,204",
+        "7d44b88c-4199-4bad-97dc-d78268e01398",
+        "the composition names no template",
+        "8849182c-82ad-4088-a07f-48ead4180515",
+    ] {
+        assert!(page.contains(words), "{words}: {page}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_run_the_bridge_does_not_keep_is_not_found() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        "/operator/etl/runs/0b6c5a3e-0000-0000-0000-000000000000",
+        404,
+        &json!({"type": "https://ferrobridge.eu/docs/operate/problems.html#not-found", "title": "What the request names does not exist", "status": 404}),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, _page) = send(
+        &service,
+        get_with("/omop/runs/0b6c5a3e-0000-0000-0000-000000000000", &cookie)?,
+    )
+    .await?;
+    assert_eq!(StatusCode::NOT_FOUND, response.status());
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_hl7v2_face_lists_its_concept_maps_and_the_messages_each_served()
+-> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(
+        &bridge,
+        "/operator/hl7v2/concept-maps",
+        200,
+        &json!({
+            "directory": "/etc/ferrobridge/v2mappings",
+            "supplements": [],
+            "counted_since": "2026-11-03T09:00:00Z",
+            "maps": [
+                {
+                    "id": "segment-pid-to-patient",
+                    "url": "http://hl7.org/fhir/uv/v2mappings/ConceptMap/segment-pid-to-patient",
+                    "title": "Segment PID to Patient Map",
+                    "kind": "segment",
+                    "origin": "guide",
+                    "ends": [{"source": "pid", "target": "patient"}],
+                    "rows": 31,
+                    "messages": 1204
+                },
+                {
+                    "id": "table-hl70001-to-administrative-gender",
+                    "url": "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70001-to-administrative-gender",
+                    "title": null,
+                    "kind": "table",
+                    "origin": "override",
+                    "ends": [{"source": "http://terminology.hl7.org/CodeSystem/v2-0001", "target": "http://hl7.org/fhir/administrative-gender"}],
+                    "rows": 0,
+                    "messages": 0
+                }
+            ]
+        }),
+    )
+    .await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (response, page) = send(&service, get_with("/hl7v2/concept-maps", &cookie)?).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    for words in [
+        "/etc/ferrobridge/v2mappings",
+        "Segment PID to Patient Map",
+        "segment-pid-to-patient",
+        "patient",
+        "1,204",
+        "Replaces the guide",
+        "table-hl70001-to-administrative-gender",
+        "http://hl7.org/fhir/administrative-gender",
+        "None beyond the bridge",
+    ] {
+        assert!(page.contains(words), "{words}: {page}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_concept_maps_of_a_face_that_is_off_say_so() -> Result<(), Box<dyn Error>> {
+    let bridge = MockServer::start().await;
+    let mut off = info();
+    off["lanes"] = json!([{"name": "hl7v2", "enabled": false}]);
+    answer(&bridge, "/health/info", 200, &off).await;
+    answer(&bridge, "/health/readiness", 200, &readiness()).await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(&service, get_with("/hl7v2/concept-maps", &cookie)?).await?;
+    assert!(page.contains("A sender"), "{page}");
+    let asked = bridge.received_requests().await.unwrap_or_default();
+    assert!(
+        asked
+            .iter()
+            .all(|request| request.url.path() != "/operator/hl7v2/concept-maps"),
+        "the directory is not asked of a face that is off"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn each_upstream_carries_its_indicator_and_the_lanes_that_use_it()
 -> Result<(), Box<dyn Error>> {

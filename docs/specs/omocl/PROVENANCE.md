@@ -8,8 +8,8 @@ The whole repository tree, vendored verbatim by `scripts/vendor/omocl.sh`
 docs/VERSIONS.md and re-run the script.
 
 - Source: <https://github.com/SevKohler/OMOCL>
-- Pin: commit `c082db8ed81a062a574a2c058366045f600c2ed7`
-- Fetched: 2026-09-25
+- Pin: commit `cfb26bad3ad035f975736299b53a494696b2e604`
+- Fetched: 2026-11-02
 - Upstream licence: Apache License 2.0, the repository's `LICENSE` file,
   vendored beside this file
 - Layout: the whole upstream tree, unchanged
@@ -18,7 +18,7 @@ docs/VERSIONS.md and re-run the script.
 - Files: 215, of which 208 are mapping files, and all 208 of those
   declare `grammar: OMOCL/v1.0.0`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `0b0a0350c4f971e243f96b4dacd559ba73e82f8275235c3942d421133c501309`
+  `PROVENANCE.md` excluded): `07e62cfa408df90c7bdbf02713463f4c4e9a7677a9b33102ec58440e22b3a899`
 
 ## Why the pin is a commit
 

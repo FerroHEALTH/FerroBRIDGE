@@ -1486,15 +1486,17 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.1.134"
+version = "0.1.136"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
+ "ferrobridge-testkit",
  "ferrobridge-validator",
  "fhir-types",
  "fhirconnect",
  "flate2",
  "http",
+ "openehr-adl",
  "openehr-base",
  "openehr-its",
  "openehr-mapping-core",
@@ -1706,7 +1708,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.167"
+version = "0.1.169"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1836,11 +1838,13 @@ dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
  "ferrobridge-console",
+ "ferrobridge-operator-api",
  "ferrobridge-server",
  "ferrohealth-ui",
  "fhir-types",
  "jiff",
  "jsonwebtoken",
+ "omop-cdm",
  "png",
  "reqwest",
  "rustix",
@@ -2067,7 +2071,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.209"
+version = "0.1.210"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",

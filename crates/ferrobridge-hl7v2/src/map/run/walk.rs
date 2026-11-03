@@ -16,12 +16,16 @@ use crate::map::{MapError, Outcome};
 use crate::parse::{Item, Location};
 
 impl<'a> Run<'a> {
-    /// Counts `map` as [`Outcome::Supplemented`] at `at` when it is a
-    /// supplement the run has not counted yet.
+    /// Records that the run applied `map`, and counts it as
+    /// [`Outcome::Supplemented`] at `at` when it is a supplement the run has
+    /// not counted yet.
     ///
     /// No specification governs this: our own design; once per map and
     /// message keeps the count a record of which supplements a message used.
-    pub(super) fn supplemented(&mut self, map: &Map, at: &Location) {
+    pub(super) fn applied(&mut self, map: &Map, at: &Location) {
+        if !self.applied.contains(&map.id) {
+            self.applied.insert(map.id.clone());
+        }
         let Origin::Supplement { overrides } = map.origin else {
             return;
         };
@@ -44,7 +48,7 @@ impl<'a> Run<'a> {
             self.outcomes.push(Outcome::UnmappedSegment { at });
             return Ok(());
         };
-        self.supplemented(map, &at);
+        self.applied(map, &at);
         let scope = Scope {
             parsed: self.parsed,
             index: visit.index,
