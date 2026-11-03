@@ -501,3 +501,15 @@ fn every_mapped_resource_is_an_r4_resource() -> Result<(), Box<dyn Error>> {
     }
     Ok(())
 }
+
+#[test]
+fn the_embedded_project_compiles_as_its_files_do() -> Result<(), Box<dyn Error>> {
+    let embedded = Mapping::compile_project(&template()?, &MPD)?;
+    let from_disk = Mapping::compile_template(&template()?, &files(), MPD.contexts())?;
+    assert_eq!(embedded.len(), MPD.contexts().len());
+    assert_eq!(
+        embedded.contexts().collect::<Vec<_>>(),
+        from_disk.contexts().collect::<Vec<_>>()
+    );
+    Ok(())
+}

@@ -16,8 +16,9 @@ its package, and `eehrxf::mappings` embeds them as text. `MPD` is the
 [prescription and dispensation](prescription-mapping.md) project.
 `LABORATORY` is the laboratory project over the published `KDS_Laborbericht`
 template, whose laboratory result, analyte and specimen archetypes are
-CKM's. `Project::write_to` writes a project's files where a system keeps
-its mappings, the paths `Mapping::compile` takes. FerroBRIDGE's own
+CKM's. `Mapping::compile_project` compiles a project from its embedded
+text with no file written, and `Project::write_to` writes a project's files
+where a system keeps its mappings, the paths `Mapping::compile` takes. FerroBRIDGE's own
 round-trip tests read the same directories, so a system that depends on the
 published crate runs the files those tests prove.
 

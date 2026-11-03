@@ -8,8 +8,9 @@
 //! package, embedded here as text so a system that depends on the published
 //! crate runs the same files the crate's tests run. A [`Project`] names its
 //! files, in loading order, and the context mappings to compile from them;
-//! the files are the input of [`crate::mapping::Mapping`], which a caller
-//! compiles from the files written where it keeps its mappings. No
+//! [`crate::mapping::Mapping::compile_project`] compiles them from their
+//! text with no file written, and [`Project::write_to`] writes them where a
+//! system keeps its mappings for [`crate::mapping::Mapping::compile`]. No
 //! specification governs where a mapping is shipped: our own design.
 
 use std::io;
