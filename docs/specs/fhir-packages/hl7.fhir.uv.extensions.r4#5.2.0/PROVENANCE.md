@@ -22,7 +22,7 @@ script with `--stamp`, and record the count and digest it prints.
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
   `PROVENANCE.md` excluded): `727a50ef9b1c4472653d772ae0b470405b305c2c983c02f1f621ebcc5e05a5b3`
 - Declared dependencies (`package/package.json`): `hl7.fhir.r4.core` 4.0.1
-- Stamped: 2026-10-15
+- Stamped: 2026-11-03
 
 Each declared dependency is fetched beside this tree at the version named,
 except `hl7.fhir.r4.core` 4.0.1, which is read from the committed
@@ -31,7 +31,7 @@ except `hl7.fhir.r4.core` 4.0.1, which is read from the committed
 
 ## Why build time
 
-The package set unpacks to about 570 MB, five versions of
+The package set unpacks to about 650 MB, six versions of
 `hl7.terminology.r4` and `hl7.fhir.uv.xver-r5.r4` among it, for input only
 the validator and its tests read. The licences would permit vendoring; the
 size decides. CI restores the trees from a cache keyed on
