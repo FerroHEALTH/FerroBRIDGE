@@ -22,11 +22,18 @@ fn directory(project: &Project) -> PathBuf {
         .join(project.directory())
 }
 
-/// Asserts that `project` embeds every file of its directory, and only
-/// those, each with the text on disk.
+/// Asserts that `project` embeds every mapping file of its directory, and
+/// only those, each with the text on disk.
 fn embeds_its_directory(project: &Project) -> Result<(), Box<dyn Error>> {
     let on_disk: BTreeSet<String> = std::fs::read_dir(directory(project))?
         .map(|entry| entry.map(|entry| entry.file_name().to_string_lossy().into_owned()))
+        .filter(|name| {
+            name.as_ref().map_or(true, |name| {
+                std::path::Path::new(name)
+                    .extension()
+                    .is_some_and(|extension| extension == "yml")
+            })
+        })
         .collect::<Result<_, _>>()?;
     let embedded: BTreeSet<String> = project
         .files()

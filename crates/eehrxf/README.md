@@ -53,7 +53,9 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   `laboratory`), the HL7 Europe Laboratory Report 2.0.0 report with its
   results and specimens over the published `KDS_Laborbericht` template. `Project::write_to` writes a
   project's files where a system keeps its mappings, the paths
-  `Mapping::compile` takes.
+  `Mapping::compile` takes. Three model mappings of the laboratory project are
+  modified copies of FHIRconnect mapping library files and keep its Apache
+  License 2.0, which `mappings/laboratory/PROVENANCE.md` records beside them.
 - `medication` (feature `fhir-r4` with `prescription` or `dispensation`):
   the electronic prescription and dispensation datasets as Rust records.
   `Prescription::read` reads a member's `MedicationRequest`s, one per item,
