@@ -107,7 +107,7 @@ const CONTEXTS: &[(&str, Opt)] = &[
     ),
     (
         "projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml",
-        Opt::Library("projects/org.openehr/EEHRxF/lab/resources/EHDS - Laboratory report.opt"),
+        Opt::Library("projects/org.openehr/EEHRxF/lab/resources/openehr/templates/EHDS - Laboratory report.opt"),
     ),
 ];
 
