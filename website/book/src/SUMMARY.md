@@ -15,6 +15,7 @@
 - [The interoperability component](evaluate/interoperability-component.md)
   - [The category crosswalks](evaluate/category-crosswalks.md)
   - [Receiving a document](evaluate/receiving-documents.md)
+  - [Prescriptions and dispensations from openEHR](evaluate/prescription-mapping.md)
 - [Licensing](evaluate/licensing.md)
 - [CRA information for users](evaluate/cra-user-information.md)
 
