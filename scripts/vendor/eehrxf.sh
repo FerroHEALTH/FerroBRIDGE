@@ -118,6 +118,16 @@ pinned_corpus eu-hl7-hdr "HL7 Europe Hospital Discharge Report" \
   "The European hospital discharge report guide at its first release,
 canonical \`http://hl7.eu/fhir/hdr\`, committed under CC0-1.0." "" "$read_by"
 
+pin commit hl7.fhir.eu.health-data-api-1.0.0-ballot.tgz "1.0.0-ballot (FHIR 4.0.1, 2026-03-13)" \
+  "$registry/hl7.fhir.eu.health-data-api/1.0.0-ballot" \
+  5204af60bf7f74f301a627e641a34683d392014f53d5df8ba3651c964e92977b "$cc0" \
+  "$whole The only version on the registry. Its EEHRxFDocumentPriorityCategoryCS names the priority categories and their displays."
+pinned_corpus eu-hl7-health-data-api "HL7 Europe EU Health Data API" \
+  "the HL7 Europe EU Health Data API guide hl7.fhir.eu.health-data-api" \
+  "The European guide to exchanging the priority categories of Regulation
+(EU) 2025/327 over FHIR, canonical \`http://hl7.eu/fhir/health-data-api\`, in
+its ballot version, committed under CC0-1.0." "" "$read_by"
+
 pin commit myhealth.eu.fhir.mvc-package-9.1.0.tgz "9.1.0 (FHIR 4.0.1, 2026-05-08)" \
   "$registry/myhealth.eu.fhir.mvc-package/9.1.0" \
   3f99350f36a2a1ea17b7fde37c39ff766bd5c3bc9a29c6183af1acfd07b78ce1 "$cc0" \

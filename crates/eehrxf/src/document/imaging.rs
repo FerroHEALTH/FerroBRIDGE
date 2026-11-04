@@ -10,6 +10,7 @@
 //! `Organization` authors are the report's performing organizations, which
 //! `dr-comp-author-org` requires; the operator is its custodian.
 
+use crate::category::PRIORITY_SYSTEM;
 use crate::crosswalk::imaging::{IMAGING_COMPOSITION, IMAGING_DIAGNOSTIC_REPORT};
 use crate::document::form::{Authorship, Code, Companion, Form, Kind, Slot};
 use crate::document::{EU_CORE_PATIENT, LOINC};
@@ -17,11 +18,6 @@ use crate::document::{EU_CORE_PATIENT, LOINC};
 /// The canonical URL of the HL7 Europe Imaging Report `Bundle` profile.
 pub const IMAGING_BUNDLE: &str =
     "http://hl7.eu/fhir/imaging/StructureDefinition/BundleReportEuImaging";
-
-/// The code system of the EHDS priority categories of the HL7 Europe Health
-/// Data API, which codes the imaging category.
-pub const PRIORITY_CATEGORY: &str =
-    "http://hl7.eu/fhir/health-data-api/CodeSystem/eehrxf-document-priority-category-cs";
 
 /// The `Composition.type` of a report whose `DiagnosticReport.code` carries
 /// none: LOINC `18726-0`, the concept the `ImagingReportTypesEuVSEuImaging`
@@ -37,7 +33,7 @@ pub const IMAGING_CATEGORIES: [Code; 2] = [
         code: "85430-7",
     },
     Code {
-        system: PRIORITY_CATEGORY,
+        system: PRIORITY_SYSTEM,
         code: "Medical-Imaging",
     },
 ];

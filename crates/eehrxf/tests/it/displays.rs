@@ -20,6 +20,7 @@ use std::error::Error;
 use std::io::Read;
 use std::path::PathBuf;
 
+use eehrxf::category::PRIORITY_SYSTEM;
 use eehrxf::document::discharge::{DISCHARGE_SUMMARY, HDR_SLOTS};
 use eehrxf::document::display::display;
 use eehrxf::document::form::{SLOTS, Slot};
@@ -30,15 +31,20 @@ use flate2::read::GzDecoder;
 use serde_json::Value;
 
 /// The vendored packages a display is read from, relative to `docs/specs/`.
-const PACKAGES: [&str; 7] = [
+const PACKAGES: [&str; 8] = [
     "ehdsi-mvc/myhealth.eu.fhir.mvc-package-9.1.0.tgz",
     "eu-hl7-base/hl7.fhir.eu.base-2.0.1.tgz",
     "eu-hl7-eps/hl7.fhir.eu.eps-1.0.0-ballot.tgz",
     "eu-hl7-hdr/hl7.fhir.eu.hdr-1.0.0.tgz",
+    HEALTH_DATA_API,
     "eu-hl7-imaging/hl7.fhir.eu.imaging-1.0.0-ballot.tgz",
     "eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.0.0.tgz",
     "eu-hl7-mpd/hl7.fhir.eu.mpd-1.0.0.tgz",
 ];
+
+/// The EU Health Data API package, which holds the priority category code
+/// system, relative to `docs/specs/`.
+const HEALTH_DATA_API: &str = "eu-hl7-health-data-api/hl7.fhir.eu.health-data-api-1.0.0-ballot.tgz";
 
 /// Where a vendored display stands in the precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -208,6 +214,43 @@ fn every_empty_reason_carries_its_r4_display() -> Result<(), Box<dyn Error>> {
         let code = concept["code"].as_str().ok_or("a code")?;
         assert_eq!(
             display(EMPTY_REASON, code),
+            concept["display"].as_str(),
+            "{code}"
+        );
+    }
+    Ok(())
+}
+
+/// Returns the vendored member `file` of the package `package`.
+fn member(package: &str, file: &str) -> Result<Value, Box<dyn Error>> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/specs")
+        .join(package);
+    let mut archive = tar::Archive::new(GzDecoder::new(std::fs::File::open(path)?));
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        if entry.path()?.ends_with(file) {
+            let mut text = String::new();
+            entry.read_to_string(&mut text)?;
+            return Ok(serde_json::from_str(&text)?);
+        }
+    }
+    Err(format!("{package} holds no {file}").into())
+}
+
+#[test]
+fn every_priority_category_carries_its_health_data_api_display() -> Result<(), Box<dyn Error>> {
+    let system = member(
+        HEALTH_DATA_API,
+        "CodeSystem-eehrxf-document-priority-category-cs.json",
+    )?;
+    assert_eq!(system["url"].as_str(), Some(PRIORITY_SYSTEM));
+    let concepts = system["concept"].as_array().ok_or("the concepts")?;
+    assert!(!concepts.is_empty(), "the code system names its categories");
+    for concept in concepts {
+        let code = concept["code"].as_str().ok_or("a code")?;
+        assert_eq!(
+            display(PRIORITY_SYSTEM, code),
             concept["display"].as_str(),
             "{code}"
         );
