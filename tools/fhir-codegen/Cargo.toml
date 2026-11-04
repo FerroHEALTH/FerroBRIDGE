@@ -27,6 +27,7 @@ serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
+generated-tree.workspace = true
 
 [dev-dependencies]
 # The tests read the wide root set too, so the generated crate is built with

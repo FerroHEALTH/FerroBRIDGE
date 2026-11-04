@@ -43,7 +43,7 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::etl::EtlSettings;
+use crate::config::EtlSettings;
 use crate::etl::Mapper;
 use crate::etl::MappingContext;
 use crate::etl::RunError;

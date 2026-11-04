@@ -153,9 +153,9 @@ async fn a_batch_file_is_answered_with_one_acknowledgment_per_message_in_a_respo
 async fn a_sending_facility_not_listed_is_answered_ar_at_msh_4_and_never_mapped()
 -> Result<(), Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.senders = vec![ferrobridge_server::hl7v2::Sender::Namespace(String::from(
-        "SOUTHLAB",
-    ))];
+    lane.senders = vec![ferrobridge_server::config::hl7v2::Sender::Namespace(
+        String::from("SOUTHLAB"),
+    )];
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     let running = Running::start_with(lane, lookup).await?;
     let ack = running.send(&oru_r01(CONTROL_ID)).await?;
@@ -182,9 +182,9 @@ async fn a_sending_facility_not_listed_is_answered_ar_at_msh_4_and_never_mapped(
 #[tokio::test]
 async fn a_listed_sending_facility_is_mapped() -> Result<(), Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.senders = vec![ferrobridge_server::hl7v2::Sender::Namespace(String::from(
-        "NORTHLAB",
-    ))];
+    lane.senders = vec![ferrobridge_server::config::hl7v2::Sender::Namespace(
+        String::from("NORTHLAB"),
+    )];
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     let running = Running::start_with(lane, lookup).await?;
     let ack = running.send(&oru_r01(CONTROL_ID)).await?;

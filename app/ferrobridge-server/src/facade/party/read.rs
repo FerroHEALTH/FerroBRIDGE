@@ -19,7 +19,6 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
-use openehr_base::v1_3::base_types::identification::version_tree_id::VersionTreeId;
 use openehr_its::rest::generated::demographic::client::VersionedPartyRevisionHistoryOutcome;
 
 use crate::cdr::Answered;
@@ -66,15 +65,7 @@ pub(crate) async fn vread(
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     party::admit(access, Permission::Read, resource_type, Some(id))?;
     let uid = party::party_id(resource_type, id)?;
-    let tree = VersionTreeId::new(vid).map_err(|error| {
-        reply::refusal(
-            StatusCode::NOT_FOUND,
-            Issue::error(IssueType::NotFound).diagnosing(format!(
-                "{resource_type}/{id} has no version {vid}: {}",
-                crate::facade::outcome::chain(&error)
-            )),
-        )
-    })?;
+    let tree = crate::facade::handlers::read::version_tree(resource_type, id, vid)?;
     let client = facade.client_for(headers);
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;

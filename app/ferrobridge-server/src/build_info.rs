@@ -13,6 +13,12 @@
 use ferrobridge_operator_api::health::{Build, Info, Lane, Pin};
 use ferrohealth_server::build_info::BuildInfo;
 
+/// The product name the root document reports.
+pub const PRODUCT: &str = "FerroBRIDGE";
+
+/// The product version the root document reports.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// The full git commit this binary was built from, or `unknown` outside a
 /// checkout.
 pub const COMMIT: &str = env!("FERROBRIDGE_BUILD_COMMIT");
@@ -42,7 +48,7 @@ pub const FHIR_TYPES: &str = env!("FERROBRIDGE_BUILD_FHIR_TYPES");
 /// version, the commit when the build ran in a checkout, the instant and the
 /// compiler.
 pub const BUILD: BuildInfo = {
-    let info = BuildInfo::new("ferrobridge", crate::state::VERSION)
+    let info = BuildInfo::new("ferrobridge", VERSION)
         .with_built_at(BUILT_AT)
         .with_rustc(RUSTC);
     // NOTE: no specification governs this: our own design; the build script
@@ -90,8 +96,8 @@ fn grammar_version(grammar: &str) -> &str {
 #[must_use]
 pub fn info(lanes: Vec<Lane>) -> Info {
     Info {
-        product: crate::state::PRODUCT.to_owned(),
-        version: crate::state::VERSION.to_owned(),
+        product: PRODUCT.to_owned(),
+        version: VERSION.to_owned(),
         build: Build {
             commit: COMMIT.to_owned(),
             commit_short: COMMIT_SHORT.to_owned(),
@@ -105,7 +111,7 @@ pub fn info(lanes: Vec<Lane>) -> Info {
 /// Logs the build facts as one structured event.
 pub fn log() {
     tracing::info!(
-        version = crate::state::VERSION,
+        version = VERSION,
         commit = COMMIT_SHORT,
         built_at = BUILT_AT,
         rustc = RUSTC,

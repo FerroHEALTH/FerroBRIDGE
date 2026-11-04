@@ -91,7 +91,7 @@ fn check_reports_edited_missing_and_stale_files() {
     fs::remove_file(src.join("structure/oru_r01_a.rs")).expect("remove");
     fs::write(src.join("structure/stale.rs"), "// stale\n").expect("stale");
     match emit(&options(dir.path(), true)) {
-        Err(EmitError::Tree(fhir_codegen::emit::EmitError::Drift { paths })) => assert_eq!(
+        Err(EmitError::Tree(generated_tree::TreeError::Drift { paths })) => assert_eq!(
             paths,
             vec![
                 "segment/obx.rs",

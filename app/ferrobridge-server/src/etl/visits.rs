@@ -13,7 +13,7 @@
 //! design (the CDM leaves visits to the ETL,
 //! <https://ohdsi.github.io/CommonDataModel/cdm54.html#visit_occurrence>).
 
-use crate::etl::aql::CheckedQuery;
+use crate::aql::CheckedQuery;
 use omop_cdm::graph::{
     key::MappingName, key::Visit, key::VisitKey, key::VisitSource, report::Refusal,
 };
@@ -149,7 +149,7 @@ pub fn group(query: &CheckedQuery, rows: &[Vec<serde_json::Value>]) -> Visits {
 #[cfg(test)]
 mod tests {
     use super::{group, moment, without_offset};
-    use crate::etl::aql::{CheckedQuery, Query};
+    use crate::aql::{CheckedQuery, Query};
     use serde_json::json;
 
     /// A visit query with the four projections.
