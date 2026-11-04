@@ -11,8 +11,7 @@
 
 use core::fmt;
 
-use openehr_mapping_core::diagnostic::DiagnosticCode;
-use openehr_mapping_core::diagnostic::LanguageCode;
+use openehr_mapping_core::diagnostic::LanguageCodes;
 
 /// A refusal the resolver raises while compiling one context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -263,21 +262,9 @@ impl fmt::Display for ResolveCode {
     }
 }
 
-impl From<ResolveCode> for DiagnosticCode {
-    /// # Panics
-    ///
-    /// Never in practice. Every spelling [`ResolveCode::as_str`] returns is
-    /// lowercase ASCII letters and hyphens, which is the alphabet
-    /// [`LanguageCode::new`] admits, and `every_code_is_a_language_code` in
-    /// this module asserts that over [`ResolveCode::all`].
-    #[expect(
-        clippy::expect_used,
-        reason = "the code alphabet is fixed by as_str and pinned by every_code_is_a_language_code"
-    )]
-    fn from(code: ResolveCode) -> Self {
-        let language =
-            LanguageCode::new(code.as_str()).expect("a resolve code should be a language code");
-        Self::Language(language)
+impl LanguageCodes for ResolveCode {
+    fn spelling(self) -> &'static str {
+        self.as_str()
     }
 }
 

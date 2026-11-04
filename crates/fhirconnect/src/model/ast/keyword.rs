@@ -6,6 +6,8 @@
 use core::fmt;
 use core::str::FromStr;
 
+use openehr_mapping_core::diagnostic::render_admitted;
+
 /// Why a keyword value was refused.
 ///
 /// The message lists every value the keyword admits, so a mapping author sees
@@ -17,15 +19,6 @@ pub struct KeywordError {
     pub value: String,
     /// Every value the keyword admits.
     pub admitted: &'static [&'static str],
-}
-
-/// Renders an admitted set as a comma-separated backticked list.
-fn render_admitted(admitted: &[&str]) -> String {
-    admitted
-        .iter()
-        .map(|value| format!("`{value}`"))
-        .collect::<Vec<String>>()
-        .join(", ")
 }
 
 /// The direction a `unidirectional` key pins a file or a mapping to.
