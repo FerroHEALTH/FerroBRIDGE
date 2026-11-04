@@ -611,3 +611,26 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
     emit("eehrxf-summary-medicine-and-vaccine", &text)?;
     Ok(())
 }
+
+// NOTE: no specification governs this: our own design; a spawned thread gets the 2 MiB
+// default stack (std::thread "Stack size"), so the engine must compile and map within it.
+#[test]
+fn the_project_compiles_and_maps_on_a_default_stack_thread() -> Result<(), Box<dyn Error>> {
+    let source = template()?;
+    let spawned = std::thread::Builder::new().spawn(move || -> Result<usize, String> {
+        let mapping = Mapping::compile_project(&source, &EPS).map_err(|error| error.to_string())?;
+        let composition = medicine_and_vaccine();
+        let resources = run(
+            &mapping,
+            &composition,
+            call("Patient/synthetic-subject", "Device/gateway"),
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(resources.len())
+    })?;
+    let mapped = spawned
+        .join()
+        .map_err(|_panicked| "the mapping thread panicked")??;
+    assert!(mapped > 0, "the run mapped the composition");
+    Ok(())
+}

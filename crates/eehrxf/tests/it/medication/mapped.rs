@@ -21,7 +21,7 @@ use std::path::PathBuf;
 
 use eehrxf::mapping::Mapping;
 use eehrxf::mapping::identified;
-use eehrxf::mappings::MPD;
+use eehrxf::mappings::{MPD, UnknownContext};
 use eehrxf::medication::Medicinal;
 use eehrxf::medication::dispensation::Dispense;
 use eehrxf::medication::prescription::Prescription;
@@ -90,12 +90,12 @@ fn template() -> Result<TemplateSource, Box<dyn Error>> {
     })
 }
 
-/// The mapping of the one context `context`.
+/// The mapping of the one context `context`, compiled from the embedded
+/// project.
 fn mapping(context: &str) -> Result<Mapping, Box<dyn Error>> {
-    Ok(Mapping::compile_template(
+    Ok(Mapping::compile_project(
         &template()?,
-        &files(),
-        &[context],
+        &MPD.with_context(context)?,
     )?)
 }
 
@@ -215,7 +215,15 @@ fn round_trip(
     context: &str,
     resource: &serde_json::Value,
 ) -> Result<(String, Vec<Object>), Box<dyn Error>> {
-    let mapping = mapping(context)?;
+    round_trip_through(&mapping(context)?, resource)
+}
+
+/// Receives `resource` through `mapping` and maps the composition back out,
+/// as [`round_trip`] does.
+fn round_trip_through(
+    mapping: &Mapping,
+    resource: &serde_json::Value,
+) -> Result<(String, Vec<Object>), Box<dyn Error>> {
     let received = ReceivedResources::read(&collection(resource))?;
     let composition = mapping.resources_to_openehr(&received, &settings())?;
     let committed = committed(composition.composition())?;
@@ -548,6 +556,31 @@ fn the_embedded_project_compiles_as_its_files_do() -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
+#[test]
+fn one_named_context_of_the_project_compiles_alone() -> Result<(), Box<dyn Error>> {
+    for context in [REQUEST, DISPENSE] {
+        let narrowed = MPD.with_context(context)?;
+        assert_eq!(narrowed.contexts(), [context]);
+        assert_eq!(narrowed.files(), MPD.files(), "the same files load");
+        let mapping = Mapping::compile_project(&template()?, &narrowed)?;
+        let names: Vec<&str> = mapping.contexts().map(|compiled| compiled.name).collect();
+        assert_eq!(names, [context]);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_context_the_project_does_not_compile_is_refused() {
+    let refused = MPD.with_context("ferrobridge_eu_mpd_unknown.context");
+    assert_eq!(
+        refused,
+        Err(UnknownContext {
+            project: "mpd",
+            context: String::from("ferrobridge_eu_mpd_unknown.context"),
+        })
+    );
+}
+
 // FHIR R4 Resource.meta.profile: every mapped resource claims its MPD profile, and the
 // validator lane holds each claim.
 #[test]
@@ -558,4 +591,30 @@ fn the_mapped_prescription_is_written_for_the_validator() -> Result<(), Box<dyn 
 #[test]
 fn the_mapped_dispense_is_written_for_the_validator() -> Result<(), Box<dyn Error>> {
     emit_mapped(DISPENSE, &dispense(), "eehrxf-mpd-dispense")
+}
+
+// NOTE: no specification governs this: our own design; a spawned thread gets the 2 MiB
+// default stack (std::thread "Stack size"), so the engine must compile and map within it.
+#[test]
+fn both_contexts_round_trip_on_a_default_stack_thread() -> Result<(), Box<dyn Error>> {
+    let source = template()?;
+    let spawned = std::thread::Builder::new().spawn(move || -> Result<usize, String> {
+        let mut mapped = 0;
+        for (context, resource) in [(REQUEST, request()), (DISPENSE, dispense())] {
+            let project = MPD
+                .with_context(context)
+                .map_err(|error| error.to_string())?;
+            let mapping =
+                Mapping::compile_project(&source, &project).map_err(|error| error.to_string())?;
+            let (_, resources) =
+                round_trip_through(&mapping, &resource).map_err(|error| error.to_string())?;
+            mapped += resources.len();
+        }
+        Ok(mapped)
+    })?;
+    let mapped = spawned
+        .join()
+        .map_err(|_panicked| "the mapping thread panicked")??;
+    assert!(mapped > 0, "both round trips mapped");
+    Ok(())
 }
