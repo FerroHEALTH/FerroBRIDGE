@@ -24,7 +24,7 @@ pub(crate) mod linked;
 mod pairing;
 mod reconcile;
 pub(crate) mod refusal;
-mod single;
+pub(crate) mod single;
 mod transaction;
 
 use fhir_types::codec::Value;
@@ -242,7 +242,7 @@ pub enum Delivery {
 #[derive(Debug)]
 pub enum Recognised {
     /// The map consumed no version of the source's `id`: the create runs
-    /// [`Ingest::ingest_resource`], which also finishes the binding a
+    /// `Ingest::ingest_resource`, which also finishes the binding a
     /// transaction left undone.
     Unknown,
     /// The source repeats one the map consumed, so nothing is committed and

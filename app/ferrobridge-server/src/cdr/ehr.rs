@@ -48,7 +48,7 @@ impl CdrClient {
     ) -> Result<Answered<EhrCreateOutcome>, CdrError> {
         let client = self.call(HeaderMap::new())?;
         let params = EhrCreateParams {
-            prefer: Some(prefer.param()),
+            prefer: Some(String::from(prefer.as_str())),
             accept: None,
             content_type: None,
             openehr_version: None,
@@ -142,7 +142,7 @@ impl CdrClient {
         let params = EhrStatusUpdateParams {
             ehr_id: String::from(ehr_id.as_str()),
             if_match: if_match_value(preceding),
-            prefer: Some(prefer.param()),
+            prefer: Some(String::from(prefer.as_str())),
             accept: None,
             content_type: None,
             openehr_item_tag: None,

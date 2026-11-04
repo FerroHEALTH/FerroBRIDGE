@@ -200,8 +200,11 @@ pub fn router(state: ConsoleState) -> axum::Router {
             ferrohealth_ui::serve::PREFIX,
             ferrohealth_ui::serve::axum_router::router(),
         )
-        .route(crate::app::MARK_LIGHT, get(mark_light))
-        .route(crate::app::MARK_DARK, get(mark_dark))
+        .route(
+            crate::app::MARK_LIGHT,
+            get(|| async { svg(MARK_LIGHT_SVG) }),
+        )
+        .route(crate::app::MARK_DARK, get(|| async { svg(MARK_DARK_SVG) }))
         .route(crate::app::FAVICON, get(favicon))
         .route(crate::pages::about::INFO_JSON, get(info_json))
         .route(
@@ -382,16 +385,6 @@ async fn info_json(
             StatusCode::BAD_GATEWAY.into_response()
         }
     }
-}
-
-/// Serves the brand mark of the light theme.
-async fn mark_light() -> Response {
-    svg(MARK_LIGHT_SVG)
-}
-
-/// Serves the brand mark of the dark theme.
-async fn mark_dark() -> Response {
-    svg(MARK_DARK_SVG)
 }
 
 /// Serves `router` on `listener` until `shutdown` resolves, then drains as

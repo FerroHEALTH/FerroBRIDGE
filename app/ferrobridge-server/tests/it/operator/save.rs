@@ -158,7 +158,7 @@ impl Case {
         let set = programs::read_set(&provisioned)?;
         let templates = programs::fetch_templates(&set, &client).await?;
         let compiled = programs::compile_set(&set, &templates)?;
-        let store = Arc::new(MemoryStore::new());
+        let store = Arc::new(MemoryStore::default());
         let built = Facade::new(
             compiled,
             crate::facade::handle(&store),

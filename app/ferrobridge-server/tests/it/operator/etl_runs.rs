@@ -10,6 +10,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use ferrobridge_operator_api::etl::{Run, RunKind, Runs};
+use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::history::{self, Store};
 use ferrobridge_server::etl::report::{RefusalEntry, RunReport};
 use ferrobridge_testkit::containers;
@@ -26,7 +27,7 @@ fn cdm(url: &str) -> Result<ferrobridge_server::config::CdmSettings, Box<dyn Err
         Some(&format!("[cdm]\nurl = \"{url}\"\n")),
         &BTreeMap::new(),
     )?
-    .resolve()?;
+    .resolve(Process::Server)?;
     Ok(settings.cdm.ok_or("the [cdm] section resolves")?)
 }
 

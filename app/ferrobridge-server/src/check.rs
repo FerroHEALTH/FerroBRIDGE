@@ -370,13 +370,14 @@ async fn check_fhirconnect(
     report: &mut Report,
 ) -> Result<(), Error> {
     report.counts.fhirconnect_files = files.len();
-    let set = match compile::read(files) {
-        Ok(set) => set,
-        Err(mut diagnostics) => {
-            report.diagnostics.append(&mut diagnostics);
-            return Ok(());
-        }
-    };
+    let set =
+        match fhirconnect::model::load::load_set(files, &fhirconnect::engine::library::Library) {
+            Ok(set) => set,
+            Err(mut diagnostics) => {
+                report.diagnostics.append(&mut diagnostics);
+                return Ok(());
+            }
+        };
     report.counts.contexts = set.contexts().count();
     let mut resolved = match templates {
         Templates::Directory(directory) => {

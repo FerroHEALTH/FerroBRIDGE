@@ -63,11 +63,11 @@ pub async fn check(
     body: Bytes,
 ) -> Response {
     let Some(mapping_dir) = operator.mapping_dir.clone() else {
-        return unconfigured();
+        return Failure::Unconfigured.into_response();
     };
     let relative = match files::relative(&query.path) {
         Ok((root, relative)) if files::Language::of_root(root).is_some() => relative,
-        Ok(_) | Err(_) => return bad_path(),
+        Ok(_) | Err(_) => return Failure::BadEntry.into_response(),
     };
     let staged = mapping_dir
         .join(DRAFTS)
@@ -110,17 +110,17 @@ pub async fn save(
 ) -> Response {
     let subject = subject_of(&access).to_owned();
     let Some(mapping_dir) = operator.mapping_dir.clone() else {
-        return unconfigured();
+        return Failure::Unconfigured.into_response();
     };
     let Some((language, relative)) = files::relative(&wire)
         .ok()
         .and_then(|(root, relative)| Some((files::Language::of_root(root)?, relative)))
     else {
-        return bad_path();
+        return Failure::BadEntry.into_response();
     };
     let target = language.console_directory(&mapping_dir).join(&relative);
     if !files::is_mapping(&target) {
-        return bad_path();
+        return Failure::BadEntry.into_response();
     }
     let Some(reason) = reason(&headers) else {
         return refuse(
@@ -343,9 +343,15 @@ impl IntoResponse for Failure {
                 Kind::Provisioned,
                 "a provisioned file holds this path, and the console never writes one",
             ),
-            Self::Unconfigured => unconfigured(),
+            Self::Unconfigured => refuse(
+                Kind::NotConfigured,
+                "no [operator] mapping_dir is configured, so the operator API checks and saves nothing",
+            ),
             Self::UnknownRevision => refuse(Kind::NotFound, "no revision has this id"),
-            Self::BadEntry => bad_path(),
+            Self::BadEntry => refuse(
+                Kind::BadPath,
+                "the path names no FHIRconnect or OMOCL mapping file the console can write",
+            ),
             Self::Archive(_) => refuse(
                 Kind::BadArchive,
                 "the body is no mapping-set archive the bridge reads",
@@ -557,22 +563,6 @@ where
     tokio::task::spawn_blocking(move || work(&worker))
         .await
         .map_err(Failure::Task)?
-}
-
-/// Returns the `409` of an operator API with no `mapping_dir`.
-fn unconfigured() -> Response {
-    refuse(
-        Kind::NotConfigured,
-        "no [operator] mapping_dir is configured, so the operator API checks and saves nothing",
-    )
-}
-
-/// Returns the `400` of a path the console cannot save at.
-fn bad_path() -> Response {
-    refuse(
-        Kind::BadPath,
-        "the path names no FHIRconnect or OMOCL mapping file the console can write",
-    )
 }
 
 /// Returns the `503` of a reload an upstream or the file system stopped.
