@@ -4,6 +4,7 @@
 //! Canonical resolution (<https://hl7.org/fhir/R4/references.html#canonical>,
 //! §2.3.0.5 and §2.3.0.6) and the snapshot a profile SHALL carry.
 
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use ferrobridge_validator::set::ResolveError;
 use ferrobridge_validator::validate::ValidateError;
@@ -30,7 +31,7 @@ fn two_versions() -> TestResult<(
     new["version"] = json!("1.2.0");
     let first = package("example.a", "1.0.0", &[], &[old])?;
     let second = package("example.a", "1.2.0", &[], &[new])?;
-    let set = PackageSet::load([first.path(), second.path()])?;
+    let set = PackageSet::<R4>::load([first.path(), second.path()])?;
     Ok((first, second, set))
 }
 
@@ -101,7 +102,7 @@ fn two_different_definitions_under_one_version_are_ambiguous() -> TestResult {
     other["version"] = json!("1.0.0");
     let first = package("example.a", "1.0.0", &[], &[one])?;
     let second = package("example.b", "1.0.0", &[], &[other])?;
-    let set = PackageSet::load([first.path(), second.path()])?;
+    let set = PackageSet::<R4>::load([first.path(), second.path()])?;
     let error = set
         .structure_definition(&format!("{BASE}flag"))
         .expect_err("two definitions");
@@ -114,7 +115,7 @@ fn two_different_definitions_under_one_version_are_ambiguous() -> TestResult {
 
 #[test]
 fn a_core_definition_resolves_from_the_vendored_package() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let patient =
         set.structure_definition("http://hl7.org/fhir/StructureDefinition/Patient|4.0.1")?;
     assert_eq!(patient.r#type.value.as_deref(), Some("Patient"));
@@ -146,7 +147,7 @@ fn a_profile_without_a_snapshot_is_refused_by_its_url() -> TestResult {
 
 #[test]
 fn an_unknown_profile_is_an_error_naming_it() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let error = validate(
         &set,
         &json!({"resourceType": "Patient"}),

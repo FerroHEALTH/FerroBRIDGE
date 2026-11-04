@@ -6,7 +6,7 @@
 //! [`set::PackageSet::load`] reads packages from `.tgz` files and unpacked
 //! directories, checks that every dependency their manifests name is present,
 //! and resolves `StructureDefinitions` by canonical into the generated
-//! `fhir_types::r4` model; [`set::PackageSet::load_release`] reads them as
+//! `fhir_types::r4` model; [`set::PackageSet::load`] reads them as
 //! another [`release::Release`], [`release::Stu3`]. [`validate::Validator`]
 //! walks an instance, the lexical document model of `fhir-types`, over the
 //! release's element table and holds it to the snapshot of the profile it is
@@ -17,12 +17,13 @@
 //! did not evaluate.
 //!
 //! ```no_run
+//! use ferrobridge_validator::release::R4;
 //! use ferrobridge_validator::set::PackageSet;
 //! use ferrobridge_validator::validate::Validator;
 //! use fhir_types::codec::Value;
 //! use fhir_types::r4::operation_outcome::OperationOutcome;
 //!
-//! let set = PackageSet::load(["vendor/hl7.fhir.r4.core", "packages/my.profiles.tgz"])?;
+//! let set = PackageSet::<R4>::load(["vendor/hl7.fhir.r4.core", "packages/my.profiles.tgz"])?;
 //! let validator = Validator::new(&set);
 //! let patient: Value = serde_json::from_str(r#"{"resourceType": "Patient", "active": true}"#)?;
 //! let report = validator.validate_against(&patient, "http://example.org/StructureDefinition/my-patient")?;

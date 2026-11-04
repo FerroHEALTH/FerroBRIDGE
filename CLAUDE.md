@@ -247,6 +247,9 @@ the testkit tool crate. Beside it:
 - `tools/omop-cdm-codegen`: that generator, reading
   `docs/specs/omop-cdm/inst/` and emitting the 39 table modules, the metadata
   index and the embedded DDL.
+- `tools/forwarders`: the forwarder ratchet's detector (#1414), which parses
+  the hand-written Rust with `syn` and lists each function whose whole body
+  forwards to one other call, for `scripts/checks/forwarders.sh`.
 - `tools/ferrobridge-testkit`: the test-support crate, a path-only
   dev-dependency (#78). `containers` starts PostgreSQL and the reference CDR
   behind the `FERROBRIDGE_E2E` gate, with every image pinned by digest in
@@ -310,7 +313,9 @@ the testkit tool crate. Beside it:
   upstream release; `duplication.sh`, the jscpd ratchet that holds the
   duplicated lines of the hand-written Rust to `duplication.count`, and
   `file-length.sh`, the 1000-line cap with its allow-list, both ratchets
-  that fail a rise, pass a fall and only tighten (#1359); and `conformance.sh`, the pass-list gate over the six
+  that fail a rise, pass a fall and only tighten (#1359); `forwarders.sh`,
+  the ratchet of the same kind over the functions that only forward to
+  another, which `tools/forwarders` lists (#1414); and `conformance.sh`, the pass-list gate over the six
   corpora under `conformance/` (fifteen: the two mapping libraries, the
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
   FHIR examples packages per version, STU3 to R6, the R4 facade, the HL7

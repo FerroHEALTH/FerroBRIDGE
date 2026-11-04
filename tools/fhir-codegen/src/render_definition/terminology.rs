@@ -6,7 +6,7 @@
 
 use std::fmt::{self, Write as _};
 
-use super::{C, D, Reader, method};
+use super::{C, D, Read, Reader, method};
 /// Writes the `ValueSetRead`, `ContainsRead`, `CodeSystemRead` and
 /// `ConceptRead` impls, each where the version defines its type.
 pub(super) fn render_terminology(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
@@ -19,38 +19,43 @@ fn render_value_set(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let filter = "ValueSet.compose.include.filter";
     let filter_read = format!(
         "{D}::FilterRead {{ property: {}, op: {}, value: {} }}",
-        reader.text_opt(filter, "property", "item"),
-        reader.text_opt(filter, "op", "item"),
-        reader.text_opt(filter, "value", "item"),
+        reader.optional(filter, "property", "item", Read::Text),
+        reader.optional(filter, "op", "item", Read::Text),
+        reader.optional(filter, "value", "item", Read::Text),
     );
     let include = "ValueSet.compose.include";
     let concept_codes = match reader.field(include, "concept") {
         Some(field) => format!(
             "item.{}.iter().filter_map(|item| {}).collect()",
             field.name,
-            reader.text_opt("ValueSet.compose.include.concept", "code", "item")
+            reader.optional(
+                "ValueSet.compose.include.concept",
+                "code",
+                "item",
+                Read::Text
+            )
         ),
         None => String::from("Vec::new()"),
     };
     let include_read = format!(
         "{D}::IncludeRead {{ system: {}, version: {}, concepts: {concept_codes}, filters: {}, value_sets: {} }}",
-        reader.text_opt(include, "system", "item"),
-        reader.text_opt(include, "version", "item"),
+        reader.optional(include, "system", "item", Read::Text),
+        reader.optional(include, "version", "item", Read::Text),
         reader.struct_list(include, "filter", "item", &filter_read),
         reader.text_list(include, "valueSet", "item"),
     );
     let compose = "ValueSet.compose";
     let compose_read = format!(
         "{D}::ComposeRead {{ inactive: {}, includes: {}, excludes: {} }}",
-        reader.copy_opt(compose, "inactive", "item"),
+        reader.optional(compose, "inactive", "item", Read::Copy),
         reader.struct_list(compose, "include", "item", &include_read),
         reader.struct_list(compose, "exclude", "item", &include_read),
     );
     let expansion = "ValueSet.expansion";
     let expansion_read = format!(
         "{D}::ExpansionRead {{ total: {}, offset: {}, contains: {} }}",
-        reader.copy_opt(expansion, "total", "item"),
-        reader.copy_opt(expansion, "offset", "item"),
+        reader.optional(expansion, "total", "item", Read::Copy),
+        reader.optional(expansion, "offset", "item", Read::Copy),
         reader.slice(expansion, "contains", "item"),
     );
     let contains = "ValueSet.expansion.contains";
@@ -90,14 +95,14 @@ fn render_value_set(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
                 out,
                 name,
                 "Option<&str>",
-                &reader.text_opt(contains, element, "self"),
+                &reader.optional(contains, element, "self", Read::Text),
             )?;
         }
         method(
             out,
             "is_abstract",
             "Option<bool>",
-            &reader.copy_opt(contains, "abstract", "self"),
+            &reader.optional(contains, "abstract", "self", Read::Copy),
         )?;
         method(
             out,
@@ -129,20 +134,20 @@ fn render_code_system(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
                 out,
                 name,
                 "Option<&str>",
-                &reader.text_opt("CodeSystem", element, "self"),
+                &reader.optional("CodeSystem", element, "self", Read::Text),
             )?;
         }
         method(
             out,
             "case_sensitive",
             "Option<bool>",
-            &reader.copy_opt("CodeSystem", "caseSensitive", "self"),
+            &reader.optional("CodeSystem", "caseSensitive", "self", Read::Copy),
         )?;
         let property = "CodeSystem.property";
         let property_read = format!(
             "{D}::PropertyRead {{ code: {}, uri: {} }}",
-            reader.text_opt(property, "code", "item"),
-            reader.text_opt(property, "uri", "item"),
+            reader.optional(property, "code", "item", Read::Text),
+            reader.optional(property, "uri", "item", Read::Text),
         );
         method(
             out,
@@ -168,14 +173,19 @@ fn render_code_system(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
                 out,
                 name,
                 "Option<&str>",
-                &reader.text_opt(concept, element, "self"),
+                &reader.optional(concept, element, "self", Read::Text),
             )?;
         }
         let designations = match reader.field(concept, "designation") {
             Some(field) => format!(
                 "self.{}.iter().filter_map(|item| {}).collect()",
                 field.name,
-                reader.text_opt("CodeSystem.concept.designation", "value", "item")
+                reader.optional(
+                    "CodeSystem.concept.designation",
+                    "value",
+                    "item",
+                    Read::Text
+                )
             ),
             None => String::from("Vec::new()"),
         };
@@ -185,7 +195,7 @@ fn render_code_system(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
             Some(field) => format!(
                 "self.{}.iter().map(|item| Ok({D}::ConceptPropertyRead {{ code: {}, value: {}? }})).collect()",
                 field.name,
-                reader.text_opt(value, "code", "item"),
+                reader.optional(value, "code", "item", Read::Text),
                 reader.choice_value(value, "value", "item"),
             ),
             None => String::from("Ok(Vec::new())"),

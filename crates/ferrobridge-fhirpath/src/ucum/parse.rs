@@ -26,7 +26,7 @@ pub(super) struct Term {
 
 /// The multiplication `.` or the division `/` of UCUM §7.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Operator {
+pub(crate) enum Operator {
     /// `.`
     Multiply,
     /// `/`

@@ -18,7 +18,7 @@ The release is a type parameter: `release::Release` is sealed to `R4` and
 `Stu3`, and names the generated `StructureDefinition`, `ElementDefinition`,
 `ValueSet` and `CodeSystem`, the element table (`SCHEMAS`) and the FHIRPath
 model. `PackageSet<R>` and `Validator<'_, R>` default to R4
-(`PackageSet::load`), and `PackageSet::<Stu3>::load_release` reads STU3.
+(`PackageSet::load`), and `PackageSet::<Stu3>::load` reads STU3.
 Every resource decodes into the release's generated model and every check
 reads it through `fhir_types::definition` (`ElementDefinitionRead`,
 `StructureDefinitionRead`, `ValueSetRead`, `CodeSystemRead`); an instance

@@ -7,12 +7,9 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use secrecy::ExposeSecret as _;
-
+use ferrobridge_console::config::Config;
 use ferrobridge_console::config::error::Error;
-use ferrobridge_console::config::{Config, secret};
 use ferrohealth_secret::file::SecretError;
-use ferrohealth_secret::secret::Secret;
 
 fn environment(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -224,59 +221,4 @@ fn each_oidc_or_session_value_its_key_does_not_admit_is_refused_by_key() {
         };
         assert_eq!(key, named, "{text}");
     }
-}
-
-#[test]
-fn a_secret_is_read_from_its_file_without_its_line_ending() {
-    let dir = tempfile::tempdir().expect("a temporary directory");
-    let path = dir.path().join("secret");
-    std::fs::write(&path, "s3cret\r\n").expect("the secret file");
-    let read = secret::resolve("oidc.client_secret", None, Some(&path))
-        .expect("the secret reads")
-        .expect("a secret");
-    assert_eq!("s3cret", read.expose_secret());
-}
-
-#[test]
-fn an_inline_secret_stands_and_no_secret_is_none() {
-    let inline = Secret::new("inline");
-    let read = secret::resolve("k", Some(&inline), None).expect("the secret stands");
-    assert_eq!(
-        Some("inline"),
-        read.as_ref().map(secrecy::ExposeSecret::expose_secret)
-    );
-    assert!(
-        secret::resolve("k", None, None)
-            .expect("nothing to read")
-            .is_none()
-    );
-}
-
-#[test]
-fn a_secret_set_twice_is_refused_by_key() {
-    let dir = tempfile::tempdir().expect("a temporary directory");
-    let inline = Secret::new("inline");
-    let error = secret::resolve("k", Some(&inline), Some(dir.path())).expect_err("both set");
-    assert!(
-        matches!(&error, Error::SecretFile { source: SecretError::Both { key } } if key == "k"),
-        "{error:?}"
-    );
-}
-
-#[test]
-fn a_missing_or_empty_secret_file_is_refused_by_its_file_key() {
-    let dir = tempfile::tempdir().expect("a temporary directory");
-    let missing = dir.path().join("missing");
-    let error = secret::resolve("k", None, Some(&missing)).expect_err("no file");
-    assert!(
-        matches!(&error, Error::SecretFile { source: SecretError::Read { key, .. } } if key == "k"),
-        "{error:?}"
-    );
-    let empty = dir.path().join("empty");
-    std::fs::write(&empty, "\n").expect("the empty file");
-    let error = secret::resolve("k", None, Some(&empty)).expect_err("an empty file");
-    assert!(
-        matches!(&error, Error::SecretFile { source: SecretError::Empty { key, .. } } if key == "k"),
-        "{error:?}"
-    );
 }

@@ -111,16 +111,6 @@ pub struct RootSet<'a> {
 }
 
 impl<'a> RootSet<'a> {
-    /// Selects the terminology root set and the terminology operations of `package`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MissingRoot`] when the package defines no structure for one
-    /// of [`root_resources`].
-    pub fn select(package: &'a Package) -> Result<Self, MissingRoot> {
-        Self::select_scoped(package, RootScope::Terminology)
-    }
-
     /// Selects the root set `scope` declares, and the terminology operations.
     ///
     /// [`RootScope::Resources`] widens the resource set to every concrete
@@ -133,7 +123,7 @@ impl<'a> RootSet<'a> {
     ///
     /// Returns [`MissingRoot`] when the package defines no structure for one
     /// of [`root_resources`].
-    pub fn select_scoped(package: &'a Package, scope: RootScope) -> Result<Self, MissingRoot> {
+    pub fn select(package: &'a Package, scope: RootScope) -> Result<Self, MissingRoot> {
         let mut resources = BTreeMap::new();
         let mut scopes = BTreeMap::new();
         for name in root_resources(package).iter().copied() {

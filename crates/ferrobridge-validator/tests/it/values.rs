@@ -6,6 +6,7 @@
 //! (<https://hl7.org/fhir/R4/elementdefinition-definitions.html>).
 
 use ferrobridge_validator::issue::MessageId;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
 
@@ -58,7 +59,7 @@ fn a_resource_id_outside_the_id_form_is_refused() -> TestResult {
 
 #[test]
 fn a_lexical_form_of_a_choice_type_is_read_from_its_definition() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let report = validate(&set, &observation("valueTime", json!("25:00:00")), None)?;
     assert_eq!(
         locations(&report, MessageId::LexicalForm),
@@ -69,7 +70,7 @@ fn a_lexical_form_of_a_choice_type_is_read_from_its_definition() -> TestResult {
 
 #[test]
 fn an_integer_above_the_32_bit_range_is_refused() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let report = validate(
         &set,
         &observation("valueInteger", json!(2_147_483_648_i64)),
@@ -84,7 +85,7 @@ fn an_integer_above_the_32_bit_range_is_refused() -> TestResult {
 
 #[test]
 fn an_integer_with_a_fraction_is_refused() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let value: serde_json::Value = serde_json::from_str("1.5")?;
     let report = validate(&set, &observation("valueInteger", value), None)?;
     assert_eq!(
@@ -96,7 +97,7 @@ fn an_integer_with_a_fraction_is_refused() -> TestResult {
 
 #[test]
 fn a_number_written_as_a_string_is_refused() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let report = validate(&set, &observation("valueInteger", json!("12")), None)?;
     assert_eq!(
         locations(&report, MessageId::WrongJsonType),
