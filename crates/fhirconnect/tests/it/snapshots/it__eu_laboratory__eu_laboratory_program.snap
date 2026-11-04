@@ -184,6 +184,20 @@ program ferrobridge_eu_laboratory.context
                 fhir $resource.value -> Observation.value[x] choice writable
                 openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0001] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0001,'Messwert'] ELEMENT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt, laborbericht/laborbefund/any_event/pro_laboranalyt/messwert]
                 derived choice read $resource.value -> Observation.value[x] choice writable Quantity into DV_QUANTITY integer into DV_QUANTITY CodeableConcept into DV_CODED_TEXT string into DV_TEXT CodeableConcept into DV_TEXT
+                mapping analyteMeasurement.referenceRange from ferrobridge_eu_laboratory_analyte
+                  fhir $resource.referenceRange -> Observation.referenceRange complex writable
+                  openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0001] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0001,'Messwert'] ELEMENT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt, laborbericht/laborbefund/any_event/pro_laboranalyt/messwert]
+                  derived anchor
+                  fhirCondition empty [] on fhir $resource.referenceRange -> Observation.referenceRange complex writable (element)
+                    attribute fhir $resource.referenceRange.type -> Observation.referenceRange.type complex writable
+                  mapping analyteMeasurement.referenceRange.low from ferrobridge_eu_laboratory_analyte
+                    fhir $resource.referenceRange.low -> Observation.referenceRange.low complex writable
+                    openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0001]/value/normal_range/lower -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0001,'Messwert']/value DV_QUANTITY tail normal_range/lower occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt, laborbericht/laborbefund/any_event/pro_laboranalyt/messwert]
+                    derived Quantity
+                  mapping analyteMeasurement.referenceRange.high from ferrobridge_eu_laboratory_analyte
+                    fhir $resource.referenceRange.high -> Observation.referenceRange.high complex writable
+                    openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0001]/value/normal_range/upper -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0001,'Messwert']/value DV_QUANTITY tail normal_range/upper occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt, laborbericht/laborbefund/any_event/pro_laboranalyt/messwert]
+                    derived Quantity
               mapping analyteName from CLUSTER.laboratory_test_analyte.v1
                 fhir $resource.code -> Observation.code complex writable
                 openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0024] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0024]/value DV_CODED_TEXT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
@@ -325,3 +339,17 @@ program ferrobridge_eu_laboratory.context
         attribute fhir $resource.status -> DiagnosticReport.status primitive writable
       openehrCondition one of [unknown] on openehr /context/other_context[at0001]/items[at0005] -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT (element)
         attribute openehr /context/other_context[at0001]/items[at0005]/defining_code/code_string -> /context/other_context[at0001]/items[at0005]/value DV_CODED_TEXT tail defining_code/code_string
+  mapping basedOn from ferrobridge_eu_laboratory_result
+    fhir $resource.basedOn -> DiagnosticReport.basedOn complex writable
+    openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/protocol[at0004]/items[at0094] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/protocol[at0004]/items[at0094] CLUSTER
+    derived anchor
+    fhirCondition not empty [] on fhir $resource.basedOn -> DiagnosticReport.basedOn complex writable (element)
+      attribute fhir $resource.basedOn.identifier -> Reference.identifier complex writable
+    mapping basedOn.orderIdentifier from ferrobridge_eu_laboratory_result
+      fhir $resource.basedOn.identifier -> Reference.identifier complex writable
+      openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/protocol[at0004]/items[at0094]/items[at0063] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/protocol[at0004]/items[at0094]/items[at0063,'Auftrags-ID des empfangenden Systems'] ELEMENT
+      derived Identifier into DV_IDENTIFIER
+    mapping basedOn.orderType from ferrobridge_eu_laboratory_result
+      unidirectional openehr->fhir
+      manual serviceRequest
+        fhir $resource.basedOn.type -> Reference.type primitive writable = ServiceRequest

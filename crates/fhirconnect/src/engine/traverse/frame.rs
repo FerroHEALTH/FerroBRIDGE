@@ -36,11 +36,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Location {
         let mut location = Location::default();
         if let Some(target) = fhir {
-            location = location.with_fhir(locate(
-                self.document_for(target),
-                target.resolved(),
-                occurrence,
-            ));
+            let document = self.document_for(target);
+            location = location.with_fhir(locate(document, target.resolved(), occurrence));
+            if let Some(reference) = reference_of(document) {
+                location = location.with_resource(reference);
+            }
         }
         if let Some(target) = openehr {
             location = location.with_openehr(openehr_path(target));
@@ -159,4 +159,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
         }
         core::mem::replace(&mut self.fhir, frame.document)
     }
+}
+
+/// Returns the relative literal reference of the resource `document` is, as
+/// `Type/id` (<https://hl7.org/fhir/R4/references.html>), `None` when it
+/// carries no `resourceType` or no `id`.
+fn reference_of(document: &Value) -> Option<String> {
+    let kind = document.get("resourceType").and_then(Value::as_str)?;
+    let id = document.get("id").and_then(Value::as_str)?;
+    Some(format!("{kind}/{id}"))
 }

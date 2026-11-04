@@ -69,3 +69,29 @@ mappings:
             value: "http://hl7.org/fhir/StructureDefinition/data-absent-reason"
           - path: "valueCode"
             value: "unknown"
+
+  # NOTE: openEHR RM data_types §DV_ORDERED: `normal_range` is the one normal range of the
+  # quantity, and R4 Observation.referenceRange.type assumes the normal range when absent.
+  - name: "referenceRange"
+    extension: "append"
+    appendTo: "analyteMeasurement"
+    followedBy:
+      mappings:
+        - name: "referenceRange"
+          with:
+            fhir: "$resource.referenceRange"
+            openehr: "$openehrRoot"
+          fhirCondition:
+            targetRoot: "$resource.referenceRange"
+            targetAttribute: "type"
+            operator: "empty"
+          followedBy:
+            mappings:
+              - name: "low"
+                with:
+                  fhir: "low"
+                  openehr: "value/normal_range/lower"
+              - name: "high"
+                with:
+                  fhir: "high"
+                  openehr: "value/normal_range/upper"

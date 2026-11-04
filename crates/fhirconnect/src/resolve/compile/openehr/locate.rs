@@ -47,7 +47,11 @@ impl<'a> Compiler<'a> {
             let node = match self.template.at_rm_path(&prefix) {
                 Ok(node) => node,
                 Err(PathError::AmbiguousPath { .. }) => {
-                    return Err(self.ambiguity(&prefix, &self.template.all_at_rm_path(&prefix)));
+                    let candidates = self.template.all_at_rm_path(&prefix);
+                    match *carrying(&candidates, &rest).as_slice() {
+                        [only] => only,
+                        _ => return Err(self.ambiguity(&prefix, &candidates)),
+                    }
                 }
                 Err(_) => {
                     let found: Vec<&ResolvedNode> = self
@@ -131,6 +135,24 @@ impl<'a> Compiler<'a> {
     }
 }
 
+/// Returns the nodes among `candidates` whose class carries `tail`.
+///
+/// A polymorphic `ELEMENT` gives each data type it admits a value node at one
+/// path, and a tail below that path names the attributes of one class: a
+/// `normal_range` below the value of an element admitting `DV_QUANTITY` and
+/// `DV_TEXT` names the quantity, which alone is a `DV_ORDERED`. An empty tail
+/// selects no alternative. No specification governs this: our own design.
+fn carrying<'a>(candidates: &[&'a ResolvedNode], tail: &RmPath) -> Vec<&'a ResolvedNode> {
+    if tail.segments.is_empty() {
+        return Vec::new();
+    }
+    candidates
+        .iter()
+        .copied()
+        .filter(|node| rm_tail(node.rm_type(), tail).is_ok())
+        .collect()
+}
+
 /// Returns the class a tail ends on when it names attributes of the
 /// `ELEMENT` the Web Template compacted into `node`, its value.
 ///
@@ -182,20 +204,19 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
         return Ok(None);
     }
     let mut leaf: Option<&'static str> = None;
+    let mut holder = String::from(rm_type);
     for (position, segment) in tail.segments.iter().enumerate() {
         let attribute = segment.attribute.as_str();
         let mut declared: Option<&'static str> = None;
+        let mut typed: Option<String> = None;
         let mut next: Vec<&'static str> = Vec::new();
         for candidate in &candidates {
             let Some(found) = model::attribute(candidate, attribute) else {
                 continue;
             };
-            let held = if position == 0 {
-                derive::attribute_class(rm_type, found)
-            } else {
-                found.declared_type
-            };
+            let held = derive::attribute_class(&holder, found);
             declared.get_or_insert(held);
+            typed.get_or_insert_with(|| instantiated(held, found));
             for form in concrete_forms(held) {
                 if !next.contains(&form) {
                     next.push(form);
@@ -209,6 +230,7 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
             ));
         };
         leaf = Some(declared);
+        holder = typed.unwrap_or_else(|| String::from(declared));
         if next.is_empty() {
             let last = position.saturating_add(1) == tail.segments.len();
             return Ok(last.then(|| String::from(declared)));
@@ -216,6 +238,18 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
         candidates = next;
     }
     Ok(leaf.map(concrete_leaf))
+}
+
+/// Returns the class `held` with the one type argument `attribute` declares
+/// it with (`DV_INTERVAL<DV_QUANTITY>` for `DV_QUANTITY.normal_range`), so a
+/// bound below it reads as that argument.
+fn instantiated(held: &str, attribute: &model::RmAttribute) -> String {
+    match *attribute.type_params {
+        [ref only] if held == attribute.declared_type && only.params.is_empty() => {
+            format!("{held}<{}>", only.name)
+        }
+        _ => String::from(held),
+    }
 }
 
 /// Returns the one concrete form of an abstract class, or the class itself.

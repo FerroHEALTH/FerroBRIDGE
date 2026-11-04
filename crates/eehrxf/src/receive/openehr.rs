@@ -20,6 +20,7 @@
 
 use std::fmt;
 
+use fhir_types::codec::Value;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhir_types::r4::schema::SCHEMAS;
@@ -45,6 +46,7 @@ use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
 use crate::mapping::Mapping;
 use crate::receive::ReceivedDocument;
 use crate::receive::ReceivedResources;
+use crate::receive::accounted;
 
 /// The media type of FHIR JSON (<https://hl7.org/fhir/R4/json.html>), the
 /// `DV_PARSABLE.formalism` the original document is kept under.
@@ -109,12 +111,17 @@ impl Mapping {
     /// The composition is read back as RM 1.2 canonical JSON, the original
     /// document is set as a `DV_PARSABLE` with the formalism [`FHIR_JSON`],
     /// and it is written out again. `settings` names the engine's device,
-    /// the system its `FEEDER_AUDIT` records.
+    /// the system its `FEEDER_AUDIT` records. Each received instance of an
+    /// element the mapping accounts for ([`Mapping::accounting`]) that the
+    /// run carried into no structured element is declared in the
+    /// composition's [`ReceivedComposition::outcome`] beside the engine's own
+    /// losses.
     ///
     /// # Errors
     ///
     /// Returns [`ReceiveMappingError::Run`] when the engine refuses the
-    /// document, [`ReceiveMappingError::Composition`] when its composition
+    /// document, [`ReceiveMappingError::Original`] when its text does not
+    /// read as JSON, [`ReceiveMappingError::Composition`] when its composition
     /// does not read as RM canonical JSON, [`ReceiveMappingError::Untemplated`]
     /// when it names no template, [`ReceiveMappingError::OriginalTaken`] when
     /// the mapping already wrote an original content, and
@@ -158,7 +165,7 @@ impl Mapping {
         settings: &Settings,
     ) -> Result<ReceivedComposition, ReceiveMappingError> {
         let request = ToOpenehrRequest::new(bundle.clone());
-        let response = run::to_openehr(
+        let transformed = run::to_openehr_with_warnings(
             self.programs(),
             &SCHEMAS,
             &Seams::default(),
@@ -168,6 +175,17 @@ impl Mapping {
         .map_err(|source| ReceiveMappingError::Run {
             source: Box::new(source),
         })?;
+        let received: Value = serde_json::from_str(original)
+            .map_err(|source| ReceiveMappingError::Original { source })?;
+        let not_carried = accounted::not_carried(&received, self.accounted(), transformed.reads());
+        let response = transformed.into_response();
+        let mut outcome = response.outcome().cloned();
+        if !not_carried.is_empty() {
+            outcome
+                .get_or_insert_with(OperationOutcome::default)
+                .issue
+                .extend(not_carried);
+        }
         let mut composition: Composition = serde_json::from_str(response.composition())
             .map_err(|source| ReceiveMappingError::Composition { source })?;
         let template_id = composition
@@ -206,7 +224,7 @@ impl Mapping {
             model: composition,
             composition: canonical,
             template_id,
-            outcome: response.outcome().cloned(),
+            outcome,
         })
     }
 }
@@ -564,6 +582,13 @@ pub enum ReceiveMappingError {
     /// The engine's composition does not read as RM canonical JSON.
     #[error("the mapped composition does not read as RM canonical JSON")]
     Composition {
+        /// The read failure.
+        #[source]
+        source: serde_json::Error,
+    },
+    /// The received text does not read as JSON.
+    #[error("the received text does not read as JSON")]
+    Original {
         /// The read failure.
         #[source]
         source: serde_json::Error,

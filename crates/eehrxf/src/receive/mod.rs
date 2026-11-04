@@ -34,6 +34,8 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+#[cfg(feature = "openehr")]
+mod accounted;
 pub mod category;
 pub mod conform;
 pub mod displays;

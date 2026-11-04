@@ -54,6 +54,7 @@ use crate::transformation::Pin;
 pub struct Mapping {
     programs: ProgramSet,
     files: Vec<String>,
+    accounted: &'static [&'static str],
 }
 
 impl Mapping {
@@ -141,7 +142,7 @@ impl Mapping {
             .iter()
             .map(|file| file.name.to_owned())
             .collect();
-        Self::from_set(index, &set, project.contexts(), files)
+        Ok(Self::from_set(index, &set, project.contexts(), files)?.accounting(project.accounted()))
     }
 
     /// Compiles the context mappings `contexts` names from `set` against
@@ -169,7 +170,29 @@ impl Mapping {
                 .insert_program(program)
                 .map_err(|source| MappingError::Program { source })?;
         }
-        Ok(Self { programs, files })
+        Ok(Self {
+            programs,
+            files,
+            accounted: &[],
+        })
+    }
+
+    /// Returns this mapping accounting for the received elements `accounted`
+    /// names ([`Project::accounted`]): a received instance of one that the
+    /// run carries into no structured element is declared in the run's
+    /// `OperationOutcome` ([`Mapping::to_openehr`]).
+    ///
+    /// [`Mapping::compile_project`] accounts for its project's elements; a
+    /// mapping compiled from files accounts for none until this names them.
+    #[must_use]
+    pub const fn accounting(mut self, accounted: &'static [&'static str]) -> Self {
+        self.accounted = accounted;
+        self
+    }
+
+    /// Returns the received elements the mapping accounts for.
+    pub(crate) const fn accounted(&self) -> &'static [&'static str] {
+        self.accounted
     }
 
     /// Returns how many compiled context mappings the mapping holds.
