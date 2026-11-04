@@ -447,10 +447,11 @@ pub(crate) async fn derive(
     )
     .await
     .map_err(RunError::Database)?;
-    report.derived.condition_era = derived::condition_era(writer, settings.derived_tables)
-        .await
-        .map_err(RunError::Database)?;
-    report.derived.drug_era = derived::drug_era(writer, settings.derived_tables)
+    report.derived.condition_era =
+        derived::era(writer, derived::Era::Condition, settings.derived_tables)
+            .await
+            .map_err(RunError::Database)?;
+    report.derived.drug_era = derived::era(writer, derived::Era::Drug, settings.derived_tables)
         .await
         .map_err(RunError::Database)?;
     let persons = writer.persons().await.map_err(RunError::Database)?;
@@ -507,7 +508,7 @@ pub(crate) async fn commit_one<M: Mapper>(
             return Ok(Some(refusal));
         }
     };
-    match writer.commit(&graph, step.run_id).await {
+    match writer.commit(&graph, step.run_id, None).await {
         Ok(written) => {
             report.committed(read.source, &written);
             report.tied(tie.as_ref());

@@ -112,7 +112,7 @@ fn template() -> Result<WebTemplateIndex, Box<dyn Error>> {
 
 /// Compiles the synthetic context and model against `index`.
 fn program(index: &WebTemplateIndex) -> Result<Arc<Program>, Box<dyn Error>> {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     let context = openehr_mapping_core::loader::load_str("context.yml", CONTEXT)?;
     set.insert_context(lower_context(&context).map_err(|diagnostics| render(&diagnostics))?)
         .map_err(|error| error.to_string())?;

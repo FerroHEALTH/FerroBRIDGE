@@ -38,12 +38,6 @@ pub struct MappingSet {
 }
 
 impl MappingSet {
-    /// Creates an empty set.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds one loaded document and its lowered file.
     ///
     /// # Errors
@@ -152,7 +146,7 @@ where
         .collect();
     paths.sort_unstable();
 
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     let mut diagnostics = Vec::new();
     for path in paths {
         let outcome = read(&path).and_then(|document| {

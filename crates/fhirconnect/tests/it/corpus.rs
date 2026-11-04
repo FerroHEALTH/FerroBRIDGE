@@ -23,7 +23,6 @@ use fhirconnect::engine::library::Library;
 use fhirconnect::model::error::SchemaKind;
 use fhirconnect::model::load::load_set;
 use fhirconnect::model::schema::Schemas;
-use fhirconnect::model::schema::published;
 use fhirconnect::model::schema::strict;
 use fhirconnect::model::semantic::StaticMappingCodes;
 use openehr_mapping_core::header::metadata::MappingName;
@@ -195,7 +194,7 @@ fn schemas_from(directory: &str) -> Result<Schemas, Box<dyn Error>> {
     let attachments = PathBuf::from(SPEC).join(directory);
     let model = fs::read_to_string(attachments.join(SchemaKind::Model.file_name()))?;
     let context = fs::read_to_string(attachments.join(SchemaKind::Context.file_name()))?;
-    Ok(published::compile(&model, &context)?)
+    Ok(Schemas::compile(&model, &context)?)
 }
 
 /// Returns this crate's own compiled schemas.

@@ -37,8 +37,8 @@ use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Inbound, Received};
 use ferrobridge_hl7v2::map::corpus::{Corpus, CorpusError};
 use ferrobridge_hl7v2::mllp::{self, Codec, Connection, Handler, Malformed, Timeouts};
+use ferrobridge_hl7v2::parse::Message;
 use ferrobridge_hl7v2::parse::structure::structure_for;
-use ferrobridge_hl7v2::parse::{self, Message};
 use fhir_types::codec::Value;
 use fhirconnect::engine::origin::{MessageControlId, MessageType, SourceItem};
 use tokio::net::TcpListener;
@@ -110,7 +110,7 @@ impl Sender {
         let component = |position: usize| {
             facility
                 .and_then(|facility| facility.component(position))
-                .and_then(parse::Component::text)
+                .and_then(|component| component.subcomponent(1))
         };
         match self {
             Self::Namespace(namespace) => component(1) == Some(namespace.as_str()),
@@ -128,7 +128,7 @@ fn sending_facility(message: &Message) -> Option<&str> {
         .and_then(|header| header.field(4))
         .and_then(|field| field.repetitions().first())
         .and_then(|facility| facility.component(1))
-        .and_then(parse::Component::text)
+        .and_then(|component| component.subcomponent(1))
 }
 
 /// Returns whether `senders` accepts the sending facility of `message`; an

@@ -30,7 +30,7 @@ async fn a_row_names_its_resource_and_the_resource_names_its_rows() -> Result<()
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit_from(
+        .commit(
             &laboratory(1, 1)?,
             &RunId::new("run-1")?,
             Some(&observation("1")),
@@ -58,7 +58,7 @@ async fn a_row_names_its_resource_and_the_resource_names_its_rows() -> Result<()
     );
     database
         .writer
-        .commit_from(
+        .commit(
             &laboratory(2, 1)?,
             &RunId::new("run-2")?,
             Some(&observation("2")),
@@ -81,7 +81,7 @@ async fn a_composition_from_a_cdr_has_no_resource_and_a_removal_forgets_one()
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?, None)
         .await?;
     assert_eq!(
         Vec::<ResourceOrigin>::new(),
@@ -89,7 +89,7 @@ async fn a_composition_from_a_cdr_has_no_resource_and_a_removal_forgets_one()
     );
     database
         .writer
-        .commit_from(
+        .commit(
             &laboratory(2, 1)?,
             &RunId::new("run-2")?,
             Some(&observation("2")),

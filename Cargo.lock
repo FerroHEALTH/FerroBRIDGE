@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.1.140"
+version = "0.1.143"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1701,7 +1701,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-console"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1738,7 +1738,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.1.128"
+version = "0.1.130"
 dependencies = [
  "base64 0.23.1",
  "chumsky",
@@ -1757,7 +1757,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.171"
+version = "0.1.172"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1792,7 +1792,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-server"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1883,7 +1883,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-testkit"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -1917,7 +1917,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.141"
+version = "0.1.143"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -2118,7 +2118,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-codegen"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "anyhow",
  "clap",
@@ -2145,7 +2145,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.212"
+version = "0.1.213"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -2313,6 +2313,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "forwarders"
+version = "0.0.16"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -3817,7 +3827,7 @@ dependencies = [
 
 [[package]]
 name = "omop-cdm-codegen"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "anyhow",
  "clap",
@@ -3937,7 +3947,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.138"
+version = "0.1.139"
 dependencies = [
  "ferrobridge-testkit",
  "insta",

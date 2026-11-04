@@ -7,7 +7,7 @@ use fhir_codegen::closure::TypeClosure;
 use fhir_codegen::lower::VersionModule;
 use fhir_codegen::operations::OperationContract;
 use fhir_codegen::package::Package;
-use fhir_codegen::roots::RootSet;
+use fhir_codegen::roots::{RootScope, RootSet};
 
 use crate::operations::find;
 use crate::{R4, R4B, R5, R6};
@@ -15,8 +15,8 @@ use crate::{R4, R4B, R5, R6};
 /// The contracts of `package` with the terminology ecosystem overlay applied,
 /// the R6 package as the source of the pre-adopted parameters.
 fn overlaid(package: &Package, module: &str) -> Vec<OperationContract> {
-    let roots = RootSet::select(package).expect("root set selects");
-    let r6_roots = RootSet::select(&R6).expect("the R6 root set selects");
+    let roots = RootSet::select(package, RootScope::Terminology).expect("root set selects");
+    let r6_roots = RootSet::select(&R6, RootScope::Terminology).expect("the R6 root set selects");
     let closure = TypeClosure::compute(package, &roots).expect("closure computes");
     let model = VersionModule::lower(&closure, module, "pkg", "0").expect("model lowers");
     let mut contracts = Vec::new();

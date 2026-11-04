@@ -267,14 +267,9 @@ fn declared_charset(message: &[u8]) -> Result<Option<String>, DecodeError> {
     }
 }
 
-/// Decodes `bytes` in `charset`, refusing any byte outside it: the bytes a
-/// `\Xhh..\` escape sequence spells.
-pub(crate) fn decode_bytes(bytes: &[u8], charset: Charset) -> Result<Cow<'_, str>, DecodeError> {
-    decode_as(bytes, charset)
-}
-
-/// Decodes `message` in `charset`, refusing any byte outside it.
-fn decode_as(message: &[u8], charset: Charset) -> Result<Cow<'_, str>, DecodeError> {
+/// Decodes `message` in `charset`, refusing any byte outside it: a whole
+/// message, or the bytes a `\Xhh..\` escape sequence spells.
+pub(crate) fn decode_as(message: &[u8], charset: Charset) -> Result<Cow<'_, str>, DecodeError> {
     let undeclared = |offset: usize| DecodeError::Undeclared {
         charset: charset.code(),
         offset,

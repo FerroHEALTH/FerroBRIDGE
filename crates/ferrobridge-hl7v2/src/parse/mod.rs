@@ -190,7 +190,9 @@ impl Repetition {
     /// is not valued.
     #[must_use]
     pub fn text(&self) -> Option<&str> {
-        self.components.first().and_then(Component::text)
+        self.components
+            .first()
+            .and_then(|component| component.subcomponent(1))
     }
 }
 
@@ -221,12 +223,6 @@ impl Component {
     #[must_use]
     pub fn is_valued(&self) -> bool {
         self.subcomponents.iter().any(|value| valued(value))
-    }
-
-    /// Returns the first subcomponent, `None` when it is not valued.
-    #[must_use]
-    pub fn text(&self) -> Option<&str> {
-        self.subcomponent(1)
     }
 }
 
@@ -282,7 +278,7 @@ impl Message {
             .repetitions()
             .first()?
             .component(component)?
-            .text()
+            .subcomponent(1)
     }
 
     /// Returns MSH-10, the message control id.

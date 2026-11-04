@@ -175,13 +175,6 @@ pub mod its_rest {
         ResponseTemplate::new(204).insert_header("ETag", format!("W/\"{version_id}\""))
     }
 
-    /// Returns the `204` a `GET` of a deleted composition answers, which
-    /// carries no body and no `ETag`.
-    #[must_use]
-    pub fn no_content() -> ResponseTemplate {
-        ResponseTemplate::new(204)
-    }
-
     /// Returns the `404` of a resource that does not exist.
     #[must_use]
     pub fn not_found(message: &str) -> ResponseTemplate {

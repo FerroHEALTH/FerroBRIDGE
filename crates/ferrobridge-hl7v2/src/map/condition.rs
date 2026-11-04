@@ -34,7 +34,7 @@
 //! the v2 definitions name that segment, else a component of the data type
 //! they name, as the `hd-endpoint` maps write `HD-3` beside `HD.2`. An `IN`,
 //! `NOT IN`, `VALUED` or `NOT VALUED` with no operand before it reads the
-//! row's own source ([`parse_for`]); those on a row with no source, and any
+//! row's own source ([`parse`]); those on a row with no source, and any
 //! other operand-less check, are [`ConditionError::NoOperand`].
 //! Anything else is refused at load, and the row is a counted outcome.
 //!
@@ -337,19 +337,10 @@ fn component(slice: &str) -> Option<Operand> {
 )]
 type Extra<'a> = chumsky::extra::Err<Simple<'a, Token>>;
 
-/// Parses a `Computable-ANTLR` condition.
+/// Parses a `Computable-ANTLR` condition of a row whose source is `source`.
 ///
-/// # Errors
-///
-/// Returns [`ConditionError::Lex`] for text no token matches and
-/// [`ConditionError::Syntax`] for tokens outside the grammar.
-pub fn parse(text: &str) -> Result<Expr, ConditionError> {
-    parse_for(text, None)
-}
-
-/// Parses a `Computable-ANTLR` condition of a row whose source is `source`,
-/// reading an `IN`, `NOT IN`, `VALUED` or `NOT VALUED` check with no operand
-/// before it as a check of `source`.
+/// An `IN`, `NOT IN`, `VALUED` or `NOT VALUED` check with no operand before
+/// it reads as a check of `source`, which is `None` for a row with no source.
 ///
 /// The mapping guidelines list `IN` and `NOT IN` without an operand
 /// (`mapping_guidelines.md` §Conditions: `IF IN ("A","B", "C")`, `IF NOT IN
@@ -364,7 +355,7 @@ pub fn parse(text: &str) -> Result<Expr, ConditionError> {
 /// [`ConditionError::NoOperand`] for a check with no operand that `source`
 /// does not supply, and [`ConditionError::Syntax`] for tokens outside the
 /// grammar.
-pub fn parse_for(text: &str, source: Option<&Operand>) -> Result<Expr, ConditionError> {
+pub fn parse(text: &str, source: Option<&Operand>) -> Result<Expr, ConditionError> {
     let tokens = lex(text).map_err(|(offset, slice)| ConditionError::Lex { offset, slice })?;
     condition(source.cloned())
         .parse(tokens.as_slice())
