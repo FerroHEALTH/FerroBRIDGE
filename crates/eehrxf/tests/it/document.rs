@@ -244,6 +244,16 @@ fn the_document_is_a_bundle_the_eps_profiles_constrain() -> Result<(), Box<dyn E
     assert_eq!(composition["resourceType"], "Composition");
     assert_eq!(composition["status"], "final");
     assert_eq!(composition["type"]["coding"][0]["code"], PATIENT_SUMMARY);
+    assert_eq!(
+        composition["type"]["coding"][0]["display"], "Patient summary Document",
+        "a receiver with no terminology server reads the type from its display"
+    );
+    for section in composition["section"].as_array().ok_or("the sections")? {
+        assert!(
+            section["code"]["coding"][0]["display"].is_string(),
+            "{section}"
+        );
+    }
     let subject = composition["subject"]["reference"]
         .as_str()
         .ok_or("a subject")?;

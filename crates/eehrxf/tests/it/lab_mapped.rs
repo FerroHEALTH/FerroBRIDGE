@@ -407,6 +407,24 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         result.pointer("/valueQuantity/value"),
         only(&input, "Observation")?.pointer("/valueQuantity/value")
     );
+    // FHIR R4 Quantity qty-3: a code carries its system, UCUM for a laboratory value.
+    for pointer in [
+        "/valueQuantity/unit",
+        "/valueQuantity/code",
+        "/valueQuantity/system",
+    ] {
+        assert_eq!(
+            result.pointer(pointer),
+            only(&input, "Observation")?.pointer(pointer),
+            "{pointer}: {result}"
+        );
+    }
+    // FHIR R4 CodeSystem observation-category: the category carries its display.
+    assert_eq!(
+        result.pointer("/category/0/coding/0/display"),
+        Some(&serde_json::json!("Laboratory")),
+        "{result}"
+    );
     let specimen = only(&output, "Specimen")?;
     assert_eq!(specimen["meta"]["profile"][0], SPECIMEN_EU_LAB);
     assert_eq!(
