@@ -206,6 +206,20 @@ pub fn load_file(file: impl Into<PathBuf>) -> Result<MappingDocument, LoadError>
     load_str(file, &source)
 }
 
+/// Returns the files of a mapping set in path order.
+///
+/// Both languages load a set file by file in this order, so the same files
+/// give the same diagnostics in the same order whatever order the caller
+/// names them in.
+pub fn in_path_order<P: AsRef<Path>>(files: impl IntoIterator<Item = P>) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = files
+        .into_iter()
+        .map(|file| file.as_ref().to_path_buf())
+        .collect();
+    paths.sort_unstable();
+    paths
+}
+
 #[cfg(test)]
 mod tests {
     use super::load_str;

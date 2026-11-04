@@ -24,9 +24,9 @@ use crate::model::parse::Lowering;
 use crate::model::parse::alternative::lower_alternative;
 use crate::model::parse::include::lower_custom_mapping;
 use crate::model::parse::include::lower_include;
-use crate::model::parse::render_admitted;
 use crate::model::projection::key_without_column;
 use crate::model::projection::projection;
+use openehr_mapping_core::diagnostic::render_admitted;
 
 /// Lowers one entry of `mappings`.
 pub(super) fn lower_entity(

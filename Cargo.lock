@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.1.145"
+version = "0.1.146"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1757,7 +1757,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.173"
+version = "0.1.174"
 dependencies = [
  "bytes",
  "chumsky",
@@ -2145,7 +2145,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.214"
+version = "0.1.215"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -3947,10 +3947,11 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.139"
+version = "0.1.140"
 dependencies = [
  "ferrobridge-testkit",
  "insta",
+ "jsonschema",
  "openehr-adl",
  "openehr-am",
  "openehr-base",
