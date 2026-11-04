@@ -25,6 +25,124 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.17] - 2026-11-04
+
+The interoperability-component release. `eehrxf` feeds the patient
+summary's medication summary from medication orders, so a patient whose
+medicines a CDR records only as orders has them in the summary. It feeds the
+immunisations from the medication actions the CKM vaccination list section
+holds, placing each entry by the template section that records it, never by
+its content (hazard I-03). Every coding of a document the component writes
+now carries its `display`, read from the MyHealth@EU catalogue and the HL7
+Europe guides, so a receiver with no terminology server can read it. The
+prescription and dispense collections name each entry by `fullUrl`, and the
+CI `fhir-validator` job holds them to HL7 Europe MPD 1.0.0. `$tofhir` maps no
+resource from a composition that holds no occurrence of the context's start
+archetype. The operator console moves to FerroUI 0.6.6 and draws a mapping
+revision's changes as a line diff. The model layer FHIRconnect and OMOCL
+share moves into `openehr-mapping-core`.
+
+Three changes move a consumer's code. The published crates drop their
+forwarding functions, and the longest modules are split by concern, which
+moves public items to new paths (both listed under Changed). `fhirconnect`'s
+`$tofhir` over a composition without the start archetype answers
+`EngineError::NotApplicable` where it mapped one resource from the root.
+
+### Added
+
+- `eehrxf::mapping::identified` names every entry of the `collection` Bundle
+  a mapping run answers by the `fullUrl` `{base}/{type}/{id}`, giving the
+  run's `Provenance` a free id, so the prescription or dispensation a system
+  exchanges identifies each resource it holds (FHIR R4
+  `Bundle.entry.fullUrl`). The CI `fhir-validator` job now runs HL7's FHIR
+  Validator over the mapped MPD prescription and dispensation against
+  `hl7.fhir.eu.mpd` 1.0.0 (#1321).
+- `eehrxf` ships an HL7 Europe Patient Summary mapping project
+  (`mappings::EPS`) over FerroBRIDGE's patient summary template, built from
+  CKM archetypes. It maps each medication order of the template's medication
+  summary section to a `MedicationStatement-eu-eps`, so a patient whose
+  medicines a CDR records only as orders has them in the medication summary,
+  and each medication action of its immunisations section to an
+  `immunization-eu-core`. The patient summary crosswalk names these openEHR
+  sources (`crosswalk::patient_summary::SOURCES`): an entry is placed by the
+  template section that holds it, so a composition with a vaccine and a
+  medicine puts each in its own section (#1323).
+
+### Changed
+
+- The published crates drop the functions that only forwarded to another,
+  so a caller names the one that decides: `fhirconnect` takes the
+  template pin in `resolve::select::select_by_profile`, the code in
+  `engine::library::ratio::to_fhir` and `to_openehr`, and
+  `resolve::derive::STRUCTURAL` in place of `is_structural`;
+  `ferrobridge-hl7v2` takes the row's source in `map::condition::parse`
+  and drops `parse::Component::text` for `subcomponent(1)`; `eehrxf` takes
+  an optional template context in `terminology::transcode::transcode` and
+  `transcode_with`, which replace `transcode_local` and
+  `transcode_local_with`; `ferrobridge-validator` names the release in
+  `set::PackageSet::load` and `new`, which replace `load_release` and
+  `new_release`; `omop-cdm` takes the origin in `writer::CdmWriter::commit`,
+  which replaces `commit_from`, and rebuilds an era through
+  `derived::era`; the mapping sets and the registry are built with
+  `Default` (#1415).
+- `openehr-mapping-core` owns what FHIRconnect and OMOCL share at the model
+  layer: `schema::SchemaError`, `schema::compile` and `schema::validate`
+  (the draft-07 compilation of a mapping schema and the step that turns each
+  schema error into a positioned diagnostic), `diagnostic::LanguageCodes`
+  (a language crate's code set, converted into a `DiagnosticCode`),
+  `diagnostic::render_admitted` and `loader::in_path_order`. `fhirconnect`
+  and `omocl` drop their own `SchemaError` and the `Display` of their
+  `ModelCode`, and implement `LanguageCodes` for their code sets; every
+  diagnostic code, position and message stays as it was (#1416).
+- The published crates' longest modules are split by concern, which moves
+  their public items to new paths: `ferrobridge-hl7v2` serves and sends
+  through `mllp::listener` (`serve`, `serve_with`, `Connection`, `Handler`,
+  `Timeouts`) and `mllp::sender` (`send`, `SendTimeouts`, `SendError`);
+  `fhirconnect` names `engine::rm::carried::{Carried, carried}`,
+  `engine::seam::identity` (`IdentitySink`, `IdentityRequest`,
+  `ResourceIdentity`, `ResourceRequest`, `DerivedIdentity`) and
+  `engine::cell::withheld::{withheld, uncarried_code}`; `eehrxf` names
+  `document::form` (`Slot`, `slot`, `Code`, `Companion`, `Kind`,
+  `Authorship`, `Form`) and `document::section` (`Section`,
+  `EmptyReason`) (#1423).
+- The operator console moves to FerroUI 0.6.6, and its assets are served
+  under `/ferrohealth-ui/0.6.6/`. A mapping-set revision's page draws each
+  changed file as a line diff: every line with its numbers before and after,
+  a removed line marked "−" and an added line "+", each with its word for a
+  screen reader. It replaces the plain unified text of the code viewer. The
+  table of the revision's changed files heads its key column "File" (#1501).
+
+### Fixed
+
+- `eehrxf`'s structural check (`receive::conform`) matches an occurrence of
+  a choice element such as `effective[x]` to its type slice by the type its
+  property names. It refused a conformant `effectivePeriod` under the closed
+  type slicing of `MedicationStatement-eu-eps` before (#1323).
+- `ferrobridge-fhirpath`: a `\u` escape in a string or delimited identifier
+  takes four hexadecimal digits and no sign, as the FHIRPath N1 grammar's
+  `UNICODE` rule writes it. `'\u+041'` reads as `u+041` (N1 §4.1.2: a
+  backslash before a non-escape is dropped) where it read as `A`, and
+  `unescape('json')` refuses `\u+041` (RFC 8259 §7) (#1425).
+- `fhirconnect`'s `$tofhir` no longer maps a resource from the composition
+  root when the composition holds no occurrence of the context's start
+  archetype. That resource held only a context's constant mappings, for a
+  record that is not there. The run now refuses as not applicable, as it does
+  when the context's condition admits no occurrence (FHIRconnect 1.0.0
+  `context-mappings.adoc` §Start, `rest-api.adoc` §$tofhir). `eehrxf`'s
+  patient summary medication context drops the guard it carried against it (#1486).
+- `eehrxf` writes a `display` on every coding of a document it assembles:
+  `Composition.type`, each section's `code`, each section's empty reason and
+  the LOINC categories of a form. A laboratory result's category, written by
+  the shipped laboratory project, carries one too. Without these, a receiver
+  with no terminology server refused the document. Each display comes from
+  the vendored European material: the MyHealth@EU Master Value Sets
+  Catalogue 9.1.0 first, then an HL7 Europe guide's value set or code
+  system, then an English example of a guide, and FHIR R4
+  `list-empty-reason` for an empty reason. `document::display::display`
+  answers it. The six section codes none of that material names (18842-5,
+  48767-8, 57080-4, 77599-9, 81338-6, LP173421-1) and the imaging priority
+  category still carry no display (#1499).
+
 ## [0.0.16] - 2026-11-03
 
 The console-breadth release. With `[operator] mapping_dir`, the bridge keeps
@@ -5726,7 +5844,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.16...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.17...HEAD
+[0.0.17]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.13...v0.0.14

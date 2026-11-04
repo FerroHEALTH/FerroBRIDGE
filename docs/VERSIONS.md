@@ -381,11 +381,11 @@ an MSRV is only ever raised.
 
 The product version is the workspace `version` in the root `Cargo.toml`, which
 every member inherits. The milestone line is 0.0.x, so the first product
-version is 0.0.16.
+version is 0.0.17.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Product version | 0.0.16 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
+| Product version | 0.0.17 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
 
 `CITATION.cff` tracks this row exactly, and the guard compares the two whenever
 `CITATION.cff` exists. Once the root `Cargo.toml` lands, the guard also compares

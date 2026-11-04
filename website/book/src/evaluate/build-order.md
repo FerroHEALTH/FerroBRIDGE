@@ -31,14 +31,15 @@ has every change of every release.
 | [v0.0.14](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.14) | 2026-10-29 | The EU profile targets: round trips of the HL7 Europe Base and Core `medicalTestResult-eu-core`, the Laboratory Report `Composition-eu-lab` and the Medication Prescription and Dispense profiles, and `Composition/$document` on the facade. The `eehrxf` interoperability component taken in from FerroFED and checked with HL7's FHIR Validator. The server and the console on the FerroSYS crates, with `config check`, `healthcheck` and `GET /operator/readiness`. One deterministic resource id on the facade and `$tofhir`, and RFC 9457 problem details read from the CDR and answered outside the FHIR routes. |
 | [v0.0.15](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.15) | 2026-11-02 | The change feed: the change-feed adapter over a vendor-neutral AQL source for any CDR and FerroEHR's outbox cursor feed, AMQP broker publishing that takes over from FerroEHR 5.6.0's removed publisher with the same routing keys, several consumers with a dead-letter store and replay, the console's Events page, and the incremental OMOP load. The run report and the Data Quality Dashboard checks closed, and the facade's access-record decision recorded in the architecture. |
 | [v0.0.16](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.16) | 2026-11-03 | Console breadth: mapping-set revisions with history, diff, rollback and ZIP export and import, a synthetic example composition per template in the playground, the OMOP ETL run history, the HL7 v2 ConceptMap directory, and sign-in through `ferrohealth-session` with a session watch. The outbound FHIR lane over the change feed, the EHDS Annex II 3.2 access record of every facade access sent as IHE BALP `AuditEvent`s, and the `eehrxf` openEHR mappings of prescriptions, dispensations and laboratory reports. |
+| [v0.0.17](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.17) | 2026-11-04 | The interoperability component: the patient summary's medication summary fed from medication orders and its immunisations from the vaccination list section, each placed by its template section, the prescription and dispense collections named by `fullUrl` and checked with HL7's FHIR Validator, and every document coding written with its display. `$tofhir` maps no resource from a composition without the start archetype, the operator console on FerroUI 0.6.6 with a revision's changes as a line diff, and the model layer of FHIRconnect and OMOCL moved into `openehr-mapping-core`. |
 
 ## Next
 
-The milestones after v0.0.16, each one theme:
+The milestones after v0.0.17, each one theme:
 
-1. **v0.0.17, the interoperability component.** The openEHR mappings of the
-   medication, laboratory, discharge and imaging categories, and the
-   documents received in each.
+1. **v0.0.18, one owner per concept.** FerroBRIDGE reshaped around one
+   owner per concept, with the discharge and imaging categories mapped from
+   openEHR once their templates are published.
 
 ## How correctness is measured
 
