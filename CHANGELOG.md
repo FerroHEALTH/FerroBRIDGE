@@ -25,6 +25,24 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.19] - 2026-11-04
+
+A family upkeep release. The server and the operator console move to
+`ferrohealth-config` 0.2.8, `ferrohealth-server` 0.4.3 and
+`ferrohealth-telemetry` 0.2.4, and both binaries run on the FerroSYS run
+path, which answers help, the version, a usage error and a runtime that
+cannot start as every FerroHEALTH binary does. The `eehrxf` EPS project lists
+its immunisations context beside the medication summary. `eehrxf` 0.1.153
+breaks one call: `Mapping::compile_project(&EPS)` compiles both contexts,
+so a consumer narrows the project with `EPS.with_context(..)` first. The
+crate line moves one patch per change, a breaking one included, so a
+consumer pins it exactly.
+
+### Changed
+
+- `eehrxf`: the EPS mapping project lists `ferrobridge_eu_eps_immunization.context` beside its medication summary context, so `Project::with_context` compiles the immunisations from the embedded files. Both contexts map one template, so `Mapping::compile_project(&EPS)` now compiles two programs, and a run that used it for the medication summary narrows the project first: `EPS.with_context("ferrobridge_eu_eps_medication.context")` (#1531).
+- The server and the operator console run on `ferrohealth-config` 0.2.8, `ferrohealth-server` 0.4.3 and `ferrohealth-telemetry` 0.2.4. A configuration refusal no longer echoes a value written unquoted, such as a secret set as a number, and a refusal inside an array of tables names its key with the element's index. The panic line of the log carries the server's request id of the request that panicked. The request span is named `{method} {route}` (#1537).
+
 ## [0.0.18] - 2026-11-04
 
 A short release that closes the one-owner reshape. A FHIRconnect `manual`
@@ -5896,7 +5914,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.18...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.19...HEAD
+[0.0.19]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.18...v0.0.19
 [0.0.18]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.17...v0.0.18
 [0.0.17]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.15...v0.0.16
