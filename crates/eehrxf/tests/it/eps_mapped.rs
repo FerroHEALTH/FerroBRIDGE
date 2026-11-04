@@ -18,7 +18,6 @@
 )]
 
 use std::error::Error;
-use std::path::PathBuf;
 
 use eehrxf::crosswalk::patient_summary::{
     PATIENT_SUMMARY, PATIENT_SUMMARY_TEMPLATE, SOURCES, Source,
@@ -54,7 +53,7 @@ use super::support::{emit, eps, vendored};
 /// The medication summary context of the EPS project.
 const MEDICATION: &str = "ferrobridge_eu_eps_medication.context";
 
-/// The immunisations context the EPS project's directory also holds.
+/// The immunisations context of the EPS project.
 const IMMUNIZATION: &str = "ferrobridge_eu_eps_immunization.context";
 
 /// The EPS profile of a medication summary entry.
@@ -97,28 +96,21 @@ fn template() -> Result<TemplateSource, Box<dyn Error>> {
     })
 }
 
-/// The paths of the shipped EPS project's files.
-fn files() -> Vec<PathBuf> {
-    let project = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("mappings")
-        .join(EPS.directory());
-    EPS.files()
-        .iter()
-        .map(|file| project.join(file.name))
-        .collect()
-}
-
-/// The EPS project compiled as it ships, its medication summary context.
+/// The medication summary context of the EPS project, compiled from its
+/// embedded files.
 fn medication() -> Result<Mapping, Box<dyn Error>> {
-    Ok(Mapping::compile_project(&template()?, &EPS)?)
+    Ok(Mapping::compile_project(
+        &template()?,
+        &EPS.with_context(MEDICATION)?,
+    )?)
 }
 
-/// The immunisations context of the EPS project, compiled on its own.
+/// The immunisations context of the EPS project, compiled from its embedded
+/// files.
 fn immunization() -> Result<Mapping, Box<dyn Error>> {
-    Ok(Mapping::compile_template(
+    Ok(Mapping::compile_project(
         &template()?,
-        &files(),
-        &[IMMUNIZATION],
+        &EPS.with_context(IMMUNIZATION)?,
     )?)
 }
 
@@ -467,8 +459,8 @@ fn every_source_names_the_template_section_that_holds_it() -> Result<(), Box<dyn
 fn every_eps_context_starts_at_a_source_and_maps_to_its_row() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         EPS.contexts(),
-        &[MEDICATION],
-        "the project compiles one context"
+        &[MEDICATION, IMMUNIZATION],
+        "the project compiles both contexts"
     );
     for mapping in [medication()?, immunization()?] {
         let context = mapping.contexts().next().ok_or("one context")?;
@@ -618,7 +610,11 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
 fn the_project_compiles_and_maps_on_a_default_stack_thread() -> Result<(), Box<dyn Error>> {
     let source = template()?;
     let spawned = std::thread::Builder::new().spawn(move || -> Result<usize, String> {
-        let mapping = Mapping::compile_project(&source, &EPS).map_err(|error| error.to_string())?;
+        let project = EPS
+            .with_context(MEDICATION)
+            .map_err(|error| error.to_string())?;
+        let mapping =
+            Mapping::compile_project(&source, &project).map_err(|error| error.to_string())?;
         let composition = medicine_and_vaccine();
         let resources = run(
             &mapping,

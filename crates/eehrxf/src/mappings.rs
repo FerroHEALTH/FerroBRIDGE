@@ -214,17 +214,21 @@ pub const LABORATORY: Project = Project {
 ///
 /// It maps over FerroBRIDGE's patient summary template, which places the
 /// medication as the openEHR International Patient Summary template does. Its
-/// context maps each medication order of the template's medication summary
-/// section to a `MedicationStatement-eu-eps`, the medication summary's
-/// entry. The directory also holds `ferrobridge_eu_eps_immunization.context`,
-/// which maps each medication action of the template's immunisations
-/// section to an `immunization-eu-core` over the same template and is
-/// compiled on its own. The template path is the placement criterion: each
-/// context starts at the archetype the template holds in its section alone.
+/// two contexts map that one template, so a run compiles one of them with
+/// [`Project::with_context`]: `ferrobridge_eu_eps_medication.context` maps
+/// each medication order of the template's medication summary section to a
+/// `MedicationStatement-eu-eps`, the medication summary's entry, and
+/// `ferrobridge_eu_eps_immunization.context` maps each medication action of
+/// the template's immunisations section to an `immunization-eu-core`. The
+/// template path is the placement criterion: each context starts at the
+/// archetype the template holds in its section alone.
 #[cfg(feature = "patient-summary")]
 pub const EPS: Project = Project {
     directory: "eps",
-    contexts: &["ferrobridge_eu_eps_medication.context"],
+    contexts: &[
+        "ferrobridge_eu_eps_medication.context",
+        "ferrobridge_eu_eps_immunization.context",
+    ],
     files: &[
         shipped!("eps", "ferrobridge_eu_eps_medication.context.yml"),
         shipped!(
