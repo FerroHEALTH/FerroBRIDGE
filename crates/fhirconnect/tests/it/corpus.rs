@@ -514,7 +514,9 @@ fn the_corpus_mapping_codes_pass_once_the_engine_registers_them() -> Result<(), 
 /// applied to one. The programs are the diagnosis chain against the
 /// synthetic template, the KDS diagnosis, person and laboratory request
 /// project contexts against the published `KDS_Diagnose`, `KDS_Person` and
-/// `KDS_Laborauftrag` templates, and every published context that compiles
+/// `KDS_Laborauftrag` templates, the library's own model mappings against
+/// the library report template built from the CKM archetypes, and every
+/// published context that compiles
 /// verbatim against the template it names. Each template carries the
 /// archetypes the files it reaches map.
 fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
@@ -531,6 +533,11 @@ fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
         owned(crate::person::kds_person_chain()?),
         owned(crate::laborauftrag::kds_laborauftrag_chain()?),
     ];
+    chains.extend(
+        crate::mapping_library::library_chains()?
+            .into_iter()
+            .map(owned),
+    );
     chains.extend(crate::published::published_chains()?);
     for (files, program) in chains {
         let mut names: Vec<&str> = vec![program.context().as_str()];

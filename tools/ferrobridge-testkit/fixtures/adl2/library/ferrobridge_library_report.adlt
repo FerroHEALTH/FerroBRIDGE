@@ -1,0 +1,93 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library model mappings
+-- over three published CKM archetypes (fixtures/ckm/library): a report
+-- COMPOSITION holding EVALUATION.gender.v1, whose open protocol slot holds
+-- CLUSTER.device.v1. No specification governs this template: our own design,
+-- carrying the archetypes the mappings name. Node identifiers are at-coded, the
+-- ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_report.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library model mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.gender-ferrobridge.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library report">
+                description = <"Library report">
+            >
+            ["at0000.2"] = <
+                text = <"Gender">
+                description = <"Gender">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-EVALUATION.gender-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-EVALUATION.gender.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library model mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    EVALUATION[at0000.1] matches {
+        /protocol[at0003]/items matches {
+            use_archetype CLUSTER[at0005.1, openEHR-EHR-CLUSTER.device.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Gender">
+                description = <"Gender">
+            >
+            ["at0005.1"] = <
+                text = <"Device">
+                description = <"Device">
+            >
+        >
+    >
