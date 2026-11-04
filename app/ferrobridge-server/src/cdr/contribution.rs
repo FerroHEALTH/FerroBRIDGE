@@ -61,7 +61,7 @@ impl CdrClient {
         let client = self.call(HeaderMap::new())?;
         let params = ContributionCreateParams {
             ehr_id: String::from(ehr_id.as_str()),
-            prefer: Some(prefer.param()),
+            prefer: Some(String::from(prefer.as_str())),
             accept: None,
             content_type: None,
             openehr_template_id: None,

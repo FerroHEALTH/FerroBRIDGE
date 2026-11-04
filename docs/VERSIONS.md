@@ -491,10 +491,13 @@ release without a reviewed change (`docs/release.md`).
 
 `scripts/checks/versions.sh` reads every `tool:` line of the two release
 workflows back against these rows, so a bump moves one row and the workflows
-follow it. `trivy` is installed by the digest-pinned
-`aquasecurity/setup-trivy` at the version each workflow's `TRIVY_VERSION`
-names, and `versions.sh` reads each of those back against its row; it is the
-version FerroEHR's release lane runs.
+follow it. `trivy` is installed by `scripts/release/install-trivy.sh` at
+the version each workflow's `TRIVY_VERSION` names, from the GitHub release
+tarball `trivy_<version>_Linux-64bit.tar.gz` checked against the sha256 the
+script pins for that version (#1478); `versions.sh` reads each
+`TRIVY_VERSION` back against its row and fails when the script pins no
+sha256 for it. A bump adds the version's row to the script, read from the
+release's `trivy_<version>_checksums.txt`.
 
 ## Operator console browser journeys
 

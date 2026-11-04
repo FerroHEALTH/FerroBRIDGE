@@ -4,8 +4,8 @@
 # by --update: the path, the owner and the call it makes. A tab and a
 # reason after a key record why that forwarder stays.
 app/ferrobridge-console/src/app.rs: unnamed_operator -> tr(locale, Msg::Operator)
-app/ferrobridge-console/src/markup.rs: h -> Html::raw(markup)
-app/ferrobridge-console/src/markup.rs: t -> Html::text(text)
+app/ferrobridge-console/src/markup.rs: h -> Html::raw(markup)	the page-markup vocabulary .claude/rules/console-ui.md section 1 fixes: crate::markup::h over a format! of escaped parts
+app/ferrobridge-console/src/markup.rs: t -> Html::text(text)	the page-markup vocabulary .claude/rules/console-ui.md section 1 fixes: every text of a page goes through crate::markup::t
 app/ferrobridge-console/src/pages/parts.rs: quiet -> list_empty(sentence, link)
 app/ferrobridge-console/src/server.rs: mark_dark -> svg(MARK_DARK_SVG)
 app/ferrobridge-console/src/server.rs: mark_light -> svg(MARK_LIGHT_SVG)
@@ -26,7 +26,7 @@ app/ferrobridge-server/src/operator/mod.rs: absent -> refuse(Kind::NotFound, "no
 app/ferrobridge-server/src/operator/mod.rs: no_history -> refuse(Kind::NotFound, "this bridge has no CDM database to keep a run history in", )
 app/ferrobridge-server/src/operator/save.rs: bad_path -> refuse(Kind::BadPath, "the path names no FHIRconnect or OMOCL mapping file the console can write", )
 app/ferrobridge-server/src/operator/save.rs: unconfigured -> refuse(Kind::NotConfigured, "no [operator] mapping_dir is configured, so the operator API checks and saves nothing", )
-app/ferrobridge-server/src/terminology/fetch.rs: shared -> Arc::new(error)
+app/ferrobridge-server/src/terminology/fetch.rs: shared -> Arc::new(error)	it decides the type: the unsizing coercion of each failure to the shared Arc<dyn Error> every run of the question reads, which as_conversions forbids writing as a cast at the call sites
 crates/eehrxf/src/dataset/mod.rs: DatasetModel::read -> read::package(archive)
 crates/eehrxf/src/dataset/mod.rs: ResourceProfile::read -> read::resource_profile(archive, url)
 crates/eehrxf/src/terminology/transcode.rs: transcode -> rules(text, preferred, None)

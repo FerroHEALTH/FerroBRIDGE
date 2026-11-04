@@ -56,7 +56,7 @@ async fn a_patient_search_pages_the_committed_conditions_back_from_a_real_cdr()
     let templates = programs::fetch_templates(&set, &client).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     let catalog = search::load(std::path::Path::new(FIXTURES), &compiled)?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let facade = Arc::new(
         Facade::new(
             compiled,
@@ -143,7 +143,7 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
     let templates = programs::fetch_templates(&set, &client).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     let catalog = search::load(directory.path(), &compiled)?;
-    let memory = Arc::new(MemoryStore::new());
+    let memory = Arc::new(MemoryStore::default());
     let store: Arc<dyn Store> = memory.clone();
     let facade = Arc::new(
         Facade::new(

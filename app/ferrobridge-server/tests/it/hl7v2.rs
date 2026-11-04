@@ -378,7 +378,7 @@ impl Running {
         let set = programs::read_set(std::path::Path::new(FIXTURES))?;
         let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
         let compiled = programs::compile_set(&set, &templates)?;
-        let store = Arc::new(MemoryStore::new());
+        let store = Arc::new(MemoryStore::default());
         let facade = Arc::new(Facade::new(
             compiled,
             handle(&store),
@@ -765,7 +765,7 @@ async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<
     facade_settings.ehr_policy = Policy::CreateOnFirstWrite;
     let facade = Arc::new(Facade::new(
         compiled,
-        Arc::new(MemoryStore::new()),
+        Arc::new(MemoryStore::default()),
         client,
         facade_settings,
     ));

@@ -44,10 +44,9 @@ use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
-use crate::pages::parts::{
-    by_file, faulted, file_href, owner_tag, quiet, refused, section, short, tally,
-};
+use crate::pages::parts::{by_file, faulted, file_href, owner_tag, refused, section, short, tally};
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The id of the form the dock's Apply submits.
 const FORM: &str = "revision-apply";
@@ -93,13 +92,13 @@ pub(super) fn listing(l: &Locale, revisions: &Loaded<Revisions>) -> Html {
         Ok(Outcome::Refused(refusal))
             if refusal.status() == Some(http::StatusCode::CONFLICT) || refusal.not_served() =>
         {
-            return quiet(tr(l, Msg::RevisionsUnavailable), None);
+            return list_empty(tr(l, Msg::RevisionsUnavailable), None);
         }
         Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
         Err(fault) => return faulted(l, fault, &super::tab_href("revisions")),
     };
     if revisions.revisions.is_empty() {
-        return quiet(tr(l, Msg::RevisionsNone), None);
+        return list_empty(tr(l, Msg::RevisionsNone), None);
     }
     revision_table(l, revisions.running.as_deref(), &revisions.revisions)
 }
@@ -290,7 +289,7 @@ fn sections(
         ),
     ]);
     let changes = if diff.files.is_empty() {
-        quiet(tr(l, Msg::RevisionNoChanges), None)
+        list_empty(tr(l, Msg::RevisionNoChanges), None)
     } else {
         let short =
             |digest: Option<&String>| digest.map(|digest| digest.chars().take(12).collect());
@@ -360,7 +359,7 @@ fn provisioned(l: &Locale, listing: &Loaded<Vec<Listed>>) -> Html {
         .filter(|file| file.owner == Owner::Provisioned)
         .collect::<Vec<_>>();
     let body = if files.is_empty() {
-        quiet(tr(l, Msg::RevisionNoProvisioned), None)
+        list_empty(tr(l, Msg::RevisionNoProvisioned), None)
     } else {
         let note = section_intro(tr(l, Msg::RevisionProvisionedNote));
         let columns = [
