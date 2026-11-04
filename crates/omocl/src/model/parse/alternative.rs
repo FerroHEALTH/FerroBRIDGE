@@ -23,7 +23,7 @@ use crate::model::parse::ALTERNATIVE_KEYS;
 use crate::model::parse::CONCEPT_MAP_KEYS;
 use crate::model::parse::FACTOR_KEYS;
 use crate::model::parse::Lowering;
-use crate::model::parse::render_admitted;
+use openehr_mapping_core::diagnostic::render_admitted;
 
 /// Lowers one alternative, which writes exactly one of the four forms.
 pub(super) fn lower_alternative(

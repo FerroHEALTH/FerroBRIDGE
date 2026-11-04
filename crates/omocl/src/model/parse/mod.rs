@@ -20,6 +20,7 @@ use std::path::PathBuf;
 
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
+use openehr_mapping_core::diagnostic::render_admitted;
 use openehr_mapping_core::header::grammar::GrammarSemVer;
 use openehr_mapping_core::header::grammar::MappingLanguage;
 use openehr_mapping_core::header::metadata::MappingName;
@@ -240,15 +241,6 @@ impl Lowering {
         };
         Some(Located::new(node.position(), ConceptId::new(number)))
     }
-}
-
-/// Renders an admitted set as a comma-separated backticked list.
-fn render_admitted(admitted: &[&str]) -> String {
-    admitted
-        .iter()
-        .map(|value| format!("`{value}`"))
-        .collect::<Vec<String>>()
-        .join(", ")
 }
 
 /// Lowers one loaded document into the OMOCL file model.
