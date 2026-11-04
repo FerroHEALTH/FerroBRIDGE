@@ -25,6 +25,15 @@ mod discharge;
 #[cfg(all(feature = "discharge", feature = "fhir-r4"))]
 mod discharge_document;
 #[cfg(test)]
+#[cfg(all(
+    feature = "fhir-r4",
+    feature = "patient-summary",
+    feature = "laboratory",
+    feature = "discharge",
+    feature = "imaging"
+))]
+mod displays;
+#[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod document;
 #[cfg(test)]
