@@ -41,6 +41,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       actions: write # read the CI run and re-run its guard jobs
+      checks: read # find the CI run through its guard's check run
       pull-requests: read # the head commit of the pull request now
     steps:
       - name: Re-run the guards the change affects once the CI run completes
@@ -84,10 +85,30 @@ jobs:
             printf '%s\n' "${out}"
           }
 
+          # The runs list can leave out a CI run that exists (#1552), so a run
+          # it does not name is found through the check run of the guard's job
+          # on the head commit: a job's id is its check run's id, and the job
+          # names its run.
+          from_check_run() {
+            local job found sha path
+            job=$(retry gh api "repos/${GH_REPO}/commits/${HEAD}/check-runs?check_name=${guards[0]}&filter=latest" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")][0].id // empty') || return 1
+            [ -n "${job}" ] || return 0
+            found=$(retry gh api "repos/${GH_REPO}/actions/jobs/${job}" \
+              --jq '"\(.run_id) \(.head_sha)"') || return 1
+            read -r found sha <<<"${found}"
+            [ "${sha}" = "${HEAD}" ] || return 0
+            path=$(retry gh api "repos/${GH_REPO}/actions/runs/${found}" --jq .path) || return 1
+            [ "${path}" = ".github/workflows/ci.yml" ] && printf '%s\n' "${found}"
+            return 0
+          }
+
           run=""
           for _ in $(seq 1 30); do
             run=$(retry gh run list --workflow ci.yml --commit "${HEAD}" --event pull_request \
               --limit 1 --json databaseId --jq '.[0].databaseId // empty') || exit 1
+            [ -n "${run}" ] && break
+            run=$(from_check_run) || exit 1
             [ -n "${run}" ] && break
             sleep 10
           done
