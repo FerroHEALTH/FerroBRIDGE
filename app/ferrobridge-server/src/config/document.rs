@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 
 use ferrobridge_operator_api::configuration::{Configuration, Entry, SecretState, Source, Value};
 
-use crate::config::Config;
+use super::Config;
 use ferrohealth_config::provenance::Provenance;
 
 /// The secrets the tree holds as a value or through a `_file` sibling, by

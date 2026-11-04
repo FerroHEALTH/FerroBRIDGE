@@ -174,8 +174,8 @@ impl Default for Operations {
             enabled: true,
             device_reference: format!(
                 "Device/{}-{}",
-                crate::state::PRODUCT.to_ascii_lowercase(),
-                crate::state::VERSION
+                crate::build_info::PRODUCT.to_ascii_lowercase(),
+                crate::build_info::VERSION
             ),
             composer: String::from("FHIRconnect"),
             composition_language: None,

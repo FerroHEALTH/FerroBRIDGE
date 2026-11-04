@@ -14,7 +14,7 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
-use crate::config::{self, Settings};
+use crate::config::{self, OperatorSettings, Settings};
 use crate::serve_until;
 use crate::state::{self, AppState};
 use crate::terminology::Translator;
@@ -40,7 +40,7 @@ impl Started {
     pub(crate) fn announce(&self) {
         startup::log(&self.lanes);
         tracing::info!(
-            version = state::VERSION,
+            version = crate::build_info::VERSION,
             indicators = self.state.health().names().join(","),
             "ferrobridge starting"
         );
@@ -502,7 +502,7 @@ fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
 /// (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
-    operator_settings: &operator::OperatorSettings,
+    operator_settings: &OperatorSettings,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<state::OperationsLane>>,
 ) -> anyhow::Result<operator::Operator> {
