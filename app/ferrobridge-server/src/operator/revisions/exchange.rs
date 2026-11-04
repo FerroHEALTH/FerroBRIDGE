@@ -33,7 +33,7 @@ use crate::operator::reload::ReloadError;
 use crate::operator::revisions::Entry;
 use crate::operator::revisions::apply::{Checked, Staged};
 use crate::operator::revisions::archive;
-use crate::operator::save::{Failure, blocking, reason, subject_of, unavailable};
+use crate::operator::save::{Failure, OnBlockingThread, blocking, reason, subject_of, unavailable};
 use crate::problem::{Kind, refuse};
 
 /// The media type of a mapping-set archive.
@@ -42,7 +42,7 @@ pub const ZIP: &str = "application/zip";
 /// `GET /operator/revisions/{id}/export`: the revision's console files as
 /// one ZIP, the same bytes at every export of the same files.
 pub async fn export(State(operator): State<Arc<Operator>>, Path(id): Path<String>) -> Response {
-    let exported = blocking(Arc::clone(&operator), move |operator| {
+    let exported = blocking(Arc::clone(&operator), move |operator, _thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
         let revision = store
             .get(&id)
@@ -125,7 +125,7 @@ pub async fn import(
     let digest = files::sha256(&body);
     let imported = blocking(Arc::clone(&operator), {
         let (subject, reason) = (subject.clone(), reason.clone());
-        move |operator| operator.import_blocking(&body, &subject, &reason)
+        move |operator, thread| operator.import_blocking(thread, &body, &subject, &reason)
     })
     .await;
     let (recorded, files, response) = match imported {
@@ -171,6 +171,7 @@ impl Operator {
     /// them as an unapplied revision under `author` and `reason`.
     pub(crate) fn import_blocking(
         &self,
+        thread: &OnBlockingThread,
         archive: &[u8],
         author: &str,
         reason: &str,
@@ -181,7 +182,7 @@ impl Operator {
         };
         let contents = archive::import(archive).map_err(Failure::Archive)?;
         let staged = Staged::write(mapping_dir, &contents)?;
-        let report = match self.check_staged(&staged) {
+        let report = match self.check_staged(thread, &staged) {
             Ok(prepared) => {
                 crate::operator::load_report_over(prepared.report(), &staged.roots(self), None)
             }

@@ -77,9 +77,9 @@ pub async fn check(
         wire: query.path,
         path: staged.clone(),
     };
-    let checked = blocking(Arc::clone(&operator), move |operator| {
+    let checked = blocking(Arc::clone(&operator), move |operator, thread| {
         write_durably(&draft.path, &body).map_err(Failure::Write)?;
-        let outcome = operator.prepare(Some(&draft));
+        let outcome = operator.prepare(thread, Some(&draft));
         let staging = draft.path.ancestors().nth(relative.components().count());
         if let Some(staging) = staging {
             remove_quietly(staging);
@@ -133,7 +133,9 @@ pub async fn save(
     let saved = blocking(Arc::clone(&operator), {
         let wire = wire.clone();
         let change = (subject.clone(), reason.clone());
-        move |operator| operator.save_blocking(&wire, &target, &body, &precondition, &change)
+        move |operator, thread| {
+            operator.save_blocking(thread, &wire, &target, &body, &precondition, &change)
+        }
     })
     .await;
     let (status, old_digest, response) = match saved {
@@ -176,9 +178,9 @@ pub async fn save(
 
 /// `POST /operator/reload`: compiles the files on disk and swaps them in.
 pub async fn reload(State(operator): State<Arc<Operator>>, access: Access) -> Response {
-    let reloaded = blocking(Arc::clone(&operator), |operator| {
+    let reloaded = blocking(Arc::clone(&operator), |operator, thread| {
         let reloaded = operator
-            .prepare(None)
+            .prepare(thread, None)
             .map(|prepared| operator.apply(prepared));
         if reloaded.is_ok() {
             operator.settle(on_disk()).map_err(Failure::Store)?;
@@ -377,8 +379,12 @@ impl Operator {
     ///
     /// Returns what [`Reloader::prepare`] returns, and [`ReloadError::Read`]
     /// when a directory cannot be listed.
-    pub fn prepare(&self, draft: Option<&Draft>) -> Result<Prepared, ReloadError> {
-        self.prepare_over(&self.roots, draft)
+    pub(crate) fn prepare(
+        &self,
+        thread: &OnBlockingThread,
+        draft: Option<&Draft>,
+    ) -> Result<Prepared, ReloadError> {
+        self.prepare_over(thread, &self.roots, draft)
     }
 
     /// Checks and compiles the set the files under `roots` make, `draft`
@@ -387,8 +393,9 @@ impl Operator {
     /// # Errors
     ///
     /// Returns what [`Operator::prepare`] returns.
-    pub fn prepare_over(
+    pub(crate) fn prepare_over(
         &self,
+        thread: &OnBlockingThread,
         roots: &[files::Root],
         draft: Option<&Draft>,
     ) -> Result<Prepared, ReloadError> {
@@ -400,7 +407,7 @@ impl Operator {
                 source: std::io::Error::other("the operator API has no reload configured"),
             }))?;
         let sources = Reloader::sources(roots, draft)?;
-        tokio::runtime::Handle::current().block_on(reloader.prepare(&sources))
+        thread.wait(reloader.prepare(&sources))
     }
 
     /// Swaps `prepared` in and returns the report of the new set, or `None`
@@ -419,6 +426,7 @@ impl Operator {
     /// precondition holds and the set compiles with it.
     fn save_blocking(
         &self,
+        thread: &OnBlockingThread,
         wire: &str,
         target: &Path,
         body: &[u8],
@@ -446,7 +454,7 @@ impl Operator {
             wire: wire.to_owned(),
             path: staged.clone(),
         };
-        match self.prepare(Some(&draft)) {
+        match self.prepare(thread, Some(&draft)) {
             Ok(_prepared) => {}
             Err(ReloadError::Rejected(report)) => {
                 remove_quietly(&staged);
@@ -465,7 +473,7 @@ impl Operator {
             Failure::Write(error)
         })?;
         sync_directory(target).map_err(Failure::Write)?;
-        match self.prepare(None) {
+        match self.prepare(thread, None) {
             Ok(prepared) => {
                 let report = self.apply(prepared);
                 self.settle(Entry {
@@ -551,16 +559,48 @@ pub(crate) fn reason(headers: &HeaderMap) -> Option<String> {
     Some(reason.to_owned())
 }
 
+/// Proof that the code holding it runs on a thread of the runtime's blocking
+/// pool, the one place the load path may wait on the runtime.
+///
+/// Tokio's `Handle::block_on` panics on a thread that drives async tasks and
+/// is safe on a `spawn_blocking` thread (tokio docs, `Handle::block_on`), so
+/// the operator's prepare path takes this proof and only
+/// [`on_blocking_thread`] mints it. No specification governs this: our own
+/// design.
+#[derive(Debug)]
+pub(crate) struct OnBlockingThread(());
+
+impl OnBlockingThread {
+    /// Waits for `future` on this blocking thread.
+    #[expect(
+        clippy::unused_self,
+        reason = "the receiver is the proof that this thread is a blocking one"
+    )]
+    pub(crate) fn wait<F: Future>(&self, future: F) -> F::Output {
+        tokio::runtime::Handle::current().block_on(future)
+    }
+}
+
+/// Runs `work` on a thread of the blocking pool, handing it the proof that
+/// it runs there.
+pub(crate) fn on_blocking_thread<T, F>(work: F) -> tokio::task::JoinHandle<T>
+where
+    F: FnOnce(&OnBlockingThread) -> T + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(move || work(&OnBlockingThread(())))
+}
+
 /// Runs `work` on a blocking thread, where the load path reads the file
-/// system.
+/// system, one operator change at a time.
 pub(crate) async fn blocking<T, F>(operator: Arc<Operator>, work: F) -> Result<T, Failure>
 where
-    F: FnOnce(&Operator) -> Result<T, Failure> + Send + 'static,
+    F: FnOnce(&Operator, &OnBlockingThread) -> Result<T, Failure> + Send + 'static,
     T: Send + 'static,
 {
     let _serialized = operator.saving.lock().await;
     let worker = Arc::clone(&operator);
-    tokio::task::spawn_blocking(move || work(&worker))
+    on_blocking_thread(move |thread| work(&worker, thread))
         .await
         .map_err(Failure::Task)?
 }

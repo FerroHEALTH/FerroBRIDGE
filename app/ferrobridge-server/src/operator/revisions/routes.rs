@@ -32,7 +32,7 @@ use crate::problem::{Kind, refuse};
 /// `GET /operator/revisions`: every revision, newest first, with the id of
 /// the running one.
 pub async fn list(State(operator): State<Arc<Operator>>) -> Response {
-    let listed = blocking(Arc::clone(&operator), |operator| {
+    let listed = blocking(Arc::clone(&operator), |operator, _thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
         let revisions = store.list().map_err(Failure::Store)?;
         let running = revisions
@@ -58,7 +58,7 @@ pub async fn list(State(operator): State<Arc<Operator>>) -> Response {
 
 /// `GET /operator/revisions/{id}`: one revision whole.
 pub async fn one(State(operator): State<Arc<Operator>>, Path(id): Path<String>) -> Response {
-    let found = blocking(Arc::clone(&operator), move |operator| {
+    let found = blocking(Arc::clone(&operator), move |operator, _thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
         store
             .get(&id)
@@ -78,7 +78,7 @@ pub async fn differences(
     State(operator): State<Arc<Operator>>,
     Path(id): Path<String>,
 ) -> Response {
-    let found = blocking(Arc::clone(&operator), move |operator| {
+    let found = blocking(Arc::clone(&operator), move |operator, _thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
         let to = store
             .get(&id)
@@ -116,7 +116,9 @@ pub async fn apply(
     let precondition = Precondition::of(&headers);
     let applied = blocking(Arc::clone(&operator), {
         let (id, subject, reason) = (id.clone(), subject.clone(), reason.clone());
-        move |operator| operator.apply_blocking(&id, &precondition, &subject, &reason)
+        move |operator, thread| {
+            operator.apply_blocking(thread, &id, &precondition, &subject, &reason)
+        }
     })
     .await;
     let (running, recorded, response) = match applied {

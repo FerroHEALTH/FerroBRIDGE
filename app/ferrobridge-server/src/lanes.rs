@@ -556,8 +556,10 @@ async fn build_operator(
         // NOTE: no specification governs this: our own design; the console's
         // saved files join the running set at boot, or the start is refused.
         let worker = Arc::clone(&operator);
-        tokio::task::spawn_blocking(move || {
-            worker.prepare(None).map(|prepared| worker.apply(prepared))
+        operator::save::on_blocking_thread(move |thread| {
+            worker
+                .prepare(thread, None)
+                .map(|prepared| worker.apply(prepared))
         })
         .await
         .context("loading the console's mapping files")?
