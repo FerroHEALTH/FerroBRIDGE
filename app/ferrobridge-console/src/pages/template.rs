@@ -20,8 +20,9 @@ use crate::locale::tr;
 use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::mappings::{program_href, template_id};
-use crate::pages::parts::{faulted, file_href, owner_tag, quiet, refused_operator, section};
+use crate::pages::parts::{faulted, file_href, owner_tag, refused_operator, section};
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The page of the template the route names.
 pub async fn page(visit: &Visit) -> Drawn {
@@ -79,7 +80,7 @@ fn drawn(
     ];
     let [_, resource, owner] = &columns;
     let table = if contexts.is_empty() {
-        quiet(tr(l, Msg::TemplateNoContexts), None)
+        list_empty(tr(l, Msg::TemplateNoContexts), None)
     } else {
         let rows = contexts
             .iter()

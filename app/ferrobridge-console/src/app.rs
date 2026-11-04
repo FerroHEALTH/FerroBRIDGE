@@ -19,8 +19,6 @@ use ferrohealth_ui::view::session::{Watch, session_watch};
 use ferrohealth_ui::view::shell::{Document, centred, document};
 use ferrohealth_ui::view::toast::{Flash, toast_region};
 
-use crate::locale::messages::Msg;
-use crate::locale::tr;
 use crate::markup::{h, t};
 use crate::model::SessionState;
 use crate::visit::Visit;
@@ -232,10 +230,4 @@ fn watch(visit: &Visit) -> Html {
             left,
         ))
     })
-}
-
-/// The word an unnamed operator is shown as.
-#[must_use]
-pub fn unnamed_operator(locale: &ferrohealth_ui::i18n::Locale) -> String {
-    tr(locale, Msg::Operator)
 }

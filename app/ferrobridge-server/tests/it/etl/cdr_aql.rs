@@ -17,7 +17,7 @@ use ferrobridge_server::cdr::commit::CommitContext;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::{EhrId, template_id, versioned_object_uid};
 use ferrobridge_server::cdr::query::PageSize;
-use ferrobridge_server::etl::aql::CheckedQuery;
+use ferrobridge_server::etl::aql::{CheckedQuery, Query};
 use ferrobridge_testkit::containers::{self, Cdr};
 use ferrobridge_testkit::fixtures::{
     LABORATORY_REPORT_FLAT, LABORATORY_REPORT_OPT, LABORATORY_REPORT_TEMPLATE_ID,
@@ -409,8 +409,8 @@ fn events(composition: &Value) -> Vec<(String, Vec<String>, Vec<String>)> {
 fn the_queries_the_cases_send_check_as_the_runner_checks_them() {
     // The cases below read these texts through the runner's own checks, so a
     // text the runner would refuse cannot pass for a shape the bridge sends.
-    CheckedQuery::compositions(COMPOSITIONS).expect("the composition query checks");
-    CheckedQuery::visits(VISITS).expect("the visit query checks");
+    CheckedQuery::new(Query::Compositions, COMPOSITIONS).expect("the composition query checks");
+    CheckedQuery::new(Query::Visits, VISITS).expect("the visit query checks");
 }
 
 /// Returns what [`events`] must read from [`TWO_EVENTS`]: each event's
@@ -451,7 +451,7 @@ async fn the_composition_query_answers_repeated_events_whole_and_each_value_with
     }
     let harness = Harness::start().await?;
     let version = harness.create(&TWO_EVENTS).await?;
-    let query = CheckedQuery::compositions(COMPOSITIONS)?;
+    let query = CheckedQuery::new(Query::Compositions, COMPOSITIONS)?;
     let rows = harness.rows(&query).await?;
     assert_eq!(1, rows.len(), "one composition, one row: {rows:?}");
     let row = rows.first().ok_or("one row")?;
@@ -475,7 +475,7 @@ async fn the_visit_query_reads_the_three_context_leaves_of_one_composition_in_on
     }
     let harness = Harness::start().await?;
     harness.create(&TWO_EVENTS).await?;
-    let query = CheckedQuery::visits(VISITS)?;
+    let query = CheckedQuery::new(Query::Visits, VISITS)?;
     let rows = harness.rows(&query).await?;
     assert_eq!(1, rows.len(), "one composition, one visit row: {rows:?}");
     let row = rows.first().ok_or("one row")?;
@@ -502,7 +502,7 @@ async fn the_composition_query_answers_the_latest_version_and_leaves_out_a_delet
     }
     let harness = Harness::start().await?;
     let (kept, _deleting) = harness.kept_and_deleted().await?;
-    let query = CheckedQuery::compositions(COMPOSITIONS)?;
+    let query = CheckedQuery::new(Query::Compositions, COMPOSITIONS)?;
     let rows = harness.rows(&query).await?;
     let versions: Vec<&Value> = rows
         .iter()
@@ -531,7 +531,7 @@ async fn the_visit_query_answers_the_latest_context_and_leaves_out_a_deleted_com
     }
     let harness = Harness::start().await?;
     harness.kept_and_deleted().await?;
-    let query = CheckedQuery::visits(VISITS)?;
+    let query = CheckedQuery::new(Query::Visits, VISITS)?;
     let rows = harness.rows(&query).await?;
     let spans: Vec<(&Value, &Value, &Value)> = rows
         .iter()

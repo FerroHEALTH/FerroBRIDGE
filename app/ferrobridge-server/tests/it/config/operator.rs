@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::operator::OperatorSettings;
 
@@ -14,7 +15,7 @@ const AUTH: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org/re
 
 #[test]
 fn the_operator_api_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(""), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(""), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(None, settings.operator);
     Ok(())
 }
@@ -22,7 +23,7 @@ fn the_operator_api_is_off_by_default() -> Result<(), Box<dyn std::error::Error>
 #[test]
 fn the_operator_api_turns_on_beside_auth() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{AUTH}\n[operator]\nenabled = true\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(
         Some(OperatorSettings { mapping_dir: None }),
         settings.operator,
@@ -37,7 +38,7 @@ fn the_environment_turns_the_operator_api_on() -> Result<(), Box<dyn std::error:
         String::from("FERROBRIDGE__OPERATOR__ENABLED"),
         String::from("true"),
     )]);
-    let settings = Config::from_sources(Some(AUTH), &environment)?.resolve()?;
+    let settings = Config::from_sources(Some(AUTH), &environment)?.resolve(Process::Server)?;
     assert!(settings.operator.is_some());
     Ok(())
 }
@@ -48,7 +49,7 @@ fn the_operator_api_without_auth_refuses_to_boot() -> Result<(), Box<dyn std::er
         Some("[auth]\nenabled = false\n\n[operator]\nenabled = true\n"),
         &BTreeMap::new(),
     )?
-    .resolve()
+    .resolve(Process::Server)
     .expect_err("an operator API without authentication is refused");
     assert!(
         matches!(&error, Error::Needs { key, needs } if key == "operator.enabled" && needs == "auth.enabled"),
@@ -62,7 +63,7 @@ fn the_operator_api_without_an_issuer_refuses_to_boot() -> Result<(), Box<dyn st
     // NOTE: no specification governs this: our own design, `[auth]` is on by
     // default, so the operator API refuses to start until it names an issuer.
     let error = Config::from_sources(Some("[operator]\nenabled = true\n"), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("an operator API without an issuer is refused");
     assert!(
         matches!(
@@ -83,7 +84,7 @@ fn the_operator_scope_is_read_from_the_file_and_the_environment()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{AUTH}\n[operator]\nenabled = true\n");
     let default = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()?
+        .resolve(Process::Server)?
         .auth
         .ok_or("auth is on beside the operator API")?;
     assert_eq!(
@@ -101,7 +102,7 @@ fn the_operator_scope_is_read_from_the_file_and_the_environment()
         ),
     ]);
     let auth = Config::from_sources(Some(AUTH), &environment)?
-        .resolve()?
+        .resolve(Process::Server)?
         .auth
         .ok_or("auth is on beside the operator API")?;
     assert_eq!("__console.operator", auth.operator_scope);
@@ -121,7 +122,7 @@ fn the_mapping_dir_is_read_from_the_file_and_the_environment()
     let text = format!(
         "{AUTH}\n[operator]\nenabled = true\nmapping_dir = \"/var/lib/ferrobridge/mappings\"\n"
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(
         Some(OperatorSettings {
             mapping_dir: Some(std::path::PathBuf::from("/var/lib/ferrobridge/mappings")),
@@ -138,7 +139,7 @@ fn the_mapping_dir_is_read_from_the_file_and_the_environment()
             String::from("/srv/console"),
         ),
     ]);
-    let settings = Config::from_sources(Some(AUTH), &environment)?.resolve()?;
+    let settings = Config::from_sources(Some(AUTH), &environment)?.resolve(Process::Server)?;
     assert_eq!(
         Some(std::path::PathBuf::from("/srv/console")),
         settings.operator.and_then(|operator| operator.mapping_dir)

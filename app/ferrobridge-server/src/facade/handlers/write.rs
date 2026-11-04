@@ -129,7 +129,13 @@ pub(crate) async fn create(
         return Ok(answer);
     }
     let written = ingest
-        .ingest_resource(&claim, &inbound, program, &Provenance::EachResource)
+        .ingest_resource(
+            &claim,
+            &inbound,
+            program,
+            &Provenance::EachResource,
+            ingest::single::Linking::Commit,
+        )
         .await?;
     let status = match written.delivery {
         ingest::Delivery::Committed => StatusCode::CREATED,

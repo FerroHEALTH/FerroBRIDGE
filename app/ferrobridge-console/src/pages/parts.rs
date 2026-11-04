@@ -239,13 +239,6 @@ pub fn section(l: &Locale, title: String, count: Option<u64>, body: Html) -> Htm
     )
 }
 
-/// Returns one quiet line: an empty, off or no-match state with a text link
-/// at most.
-#[must_use]
-pub fn quiet(sentence: String, link: Option<(String, String)>) -> Html {
-    list_empty(sentence, link)
-}
-
 /// Returns the console's fault `fault` in the place of what it kept from
 /// the page, with the way to try again.
 #[must_use]
@@ -278,7 +271,7 @@ pub fn refused(l: &Locale, refusal: &Refusal) -> Html {
 pub fn operator_off(l: &Locale) -> Html {
     h(format!(
         r#"<div class="fui-stack">{quiet}<p class="fui-small fui-muted">{key} · {hint}</p></div>"#,
-        quiet = quiet(tr(l, Msg::OperatorOff), None),
+        quiet = list_empty(tr(l, Msg::OperatorOff), None),
         key = code("[operator] enabled = false"),
         hint = t(tr(l, Msg::OperatorOffHint)),
     ))

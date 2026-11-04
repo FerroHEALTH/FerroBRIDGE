@@ -108,7 +108,7 @@ async fn linking(base: &str, committing: Committing) -> Result<Harness, Box<dyn 
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let policy = Policy::new(vec![base.parse()?], 2, Duration::from_secs(5))?;
     let facade =
         Facade::new(compiled, handle(&store), client(&cdr), settings()).with_references(policy);

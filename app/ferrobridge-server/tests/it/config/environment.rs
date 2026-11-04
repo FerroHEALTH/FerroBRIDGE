@@ -5,6 +5,7 @@
 //! variables.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::config::{FILTER_ENV, FORMAT_ENV};
 use ferrohealth_telemetry::section::{DEFAULT_FILTER, Format};
@@ -19,7 +20,7 @@ fn an_environment_override_wins_over_the_file() -> Result<(), Box<dyn std::error
         Some(FULL),
         &env("FERROBRIDGE__SERVER__LISTEN", "127.0.0.1:7777"),
     )?
-    .resolve()?;
+    .resolve(Process::Server)?;
     assert_eq!("127.0.0.1:7777", settings.server.listen.to_string());
     Ok(())
 }
@@ -31,7 +32,7 @@ fn an_environment_override_reaches_a_nested_section_and_keeps_its_type()
         Some(FULL),
         &env("FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS", "9"),
     )?
-    .resolve()?;
+    .resolve(Process::Server)?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
     assert_eq!(9, cdr.retry.max_attempts);
     Ok(())
@@ -54,7 +55,7 @@ fn an_environment_override_turns_a_lane_on_with_no_file_at_all()
             String::from("synthetic-password"),
         ),
     ]);
-    let settings = Config::from_sources(None, &environment)?.resolve()?;
+    let settings = Config::from_sources(None, &environment)?.resolve(Process::Server)?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
     assert!(
         cdr.credentials.is_some(),
@@ -148,7 +149,7 @@ fn cdr_user(user: &str) -> Result<String, Box<dyn std::error::Error>> {
             String::from("12345"),
         ),
     ]);
-    let settings = Config::from_sources(None, &environment)?.resolve()?;
+    let settings = Config::from_sources(None, &environment)?.resolve(Process::Server)?;
     let cdr = settings.cdr.ok_or("the CDR lane is on")?;
     match cdr.credentials {
         Some(ferrobridge_server::cdr::config::CdrCredentials::Basic { user, .. }) => Ok(user),
@@ -249,7 +250,7 @@ fn a_numeric_key_given_a_number_out_of_its_range_is_refused() {
 #[test]
 fn the_demographic_api_is_off_unless_the_cdr_section_turns_it_on()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(
         !settings
             .cdr
@@ -258,7 +259,7 @@ fn the_demographic_api_is_off_unless_the_cdr_section_turns_it_on()
             .demographic
     );
     let settings = Config::from_sources(Some(FULL), &env("FERROBRIDGE__CDR__DEMOGRAPHIC", "true"))?
-        .resolve()?;
+        .resolve(Process::Server)?;
     assert!(
         settings
             .cdr

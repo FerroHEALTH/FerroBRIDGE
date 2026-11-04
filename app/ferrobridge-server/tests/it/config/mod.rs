@@ -22,6 +22,7 @@ mod secrets;
 mod usage_report;
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 
@@ -74,6 +75,6 @@ fn env(name: &str, value: &str) -> BTreeMap<String, String> {
 /// Returns the refusal `text` resolves to.
 fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     Ok(Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("the configuration is refused"))
 }

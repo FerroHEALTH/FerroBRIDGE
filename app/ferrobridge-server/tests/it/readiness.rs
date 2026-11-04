@@ -6,6 +6,7 @@
 use crate::support;
 use axum::body::Body;
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::state::AppState;
 use ferrobridge_testkit::net::closed_http_url;
 use http::{Request, StatusCode};
@@ -22,7 +23,7 @@ const PROBE_PATH: &str = "/v1/definition/template/adl1.4";
 /// Returns the serving state of a deployment whose CDR is `base`.
 async fn router(base: &str) -> Result<Arc<AppState>, Box<dyn Error>> {
     let text = format!("[cdr]\nbase_url = \"{base}/v1\"\ntimeout_ms = 2000\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     Ok(serving(AppState::build(&settings).await?))
 }
 
@@ -169,7 +170,7 @@ async fn a_cdr_token_that_cannot_be_obtained_makes_readiness_five_hundred_and_th
         ),
         base = base
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let state = serving(AppState::build(&settings).await?);
 
     let (status, document) = readiness(state).await?;
@@ -225,7 +226,7 @@ async fn liveness_stays_two_hundred_while_an_upstream_is_down() -> Result<(), Bo
 /// database `url`.
 async fn cdm_router(url: &str) -> Result<Arc<AppState>, Box<dyn Error>> {
     let text = format!("[cdm]\nurl = {url:?}\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     Ok(serving(AppState::build(&settings).await?))
 }
 
@@ -266,7 +267,7 @@ async fn a_reachable_cdm_database_makes_readiness_two_hundred() -> Result<(), Bo
 
 #[tokio::test]
 async fn without_a_cdm_section_readiness_carries_no_cdm_indicator() -> Result<(), Box<dyn Error>> {
-    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve(Process::Server)?;
     let state = AppState::build(&settings).await?;
     assert!(
         !state.health().names().contains(&"cdm"),

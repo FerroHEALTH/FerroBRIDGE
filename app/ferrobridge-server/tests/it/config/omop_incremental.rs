@@ -5,6 +5,7 @@
 //! consumer of the change feed, and every refusal.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 
@@ -43,14 +44,14 @@ fn the_incremental_load_is_off_by_default() -> Result<(), Box<dyn std::error::Er
     let config = Config::from_sources(None, &BTreeMap::new())?;
     assert!(!config.omop_incremental.enabled);
     assert_eq!("", config.omop_incremental.reader);
-    assert!(config.resolve()?.omop_incremental.is_none());
+    assert!(config.resolve(Process::Server)?.omop_incremental.is_none());
     Ok(())
 }
 
 #[test]
 fn an_enabled_load_is_a_consumer_of_the_change_feed() -> Result<(), Box<dyn std::error::Error>> {
     let text = load(BASE, "reader = \"ferrobridge-omop\"\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let resolved = settings.omop_incremental.ok_or("the load is on")?;
     assert_eq!("ferrobridge-omop", resolved.reader.as_str());
     assert!(

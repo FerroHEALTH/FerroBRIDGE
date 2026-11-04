@@ -5,6 +5,7 @@
 //! lanes are on, the hosts they reach, and no credential anywhere.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::{banner, build_info, startup};
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -28,7 +29,7 @@ enabled = false
 
 #[test]
 fn every_lane_is_reported_with_the_hosts_it_reaches() -> Result<(), Box<dyn Error>> {
-    let settings = Config::from_sources(Some(FILE), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(FILE), &BTreeMap::new())?.resolve(Process::Server)?;
     let lanes = startup::lanes(&settings);
     let names: Vec<&str> = lanes.iter().map(|lane| lane.name).collect();
     assert_eq!(
@@ -67,7 +68,7 @@ fn every_lane_is_reported_with_the_hosts_it_reaches() -> Result<(), Box<dyn Erro
 
 #[test]
 fn the_banner_names_the_hosts_and_never_the_user_information() -> Result<(), Box<dyn Error>> {
-    let settings = Config::from_sources(Some(FILE), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(FILE), &BTreeMap::new())?.resolve(Process::Server)?;
     let text = banner::render(
         &build_info::BUILD,
         &build_info::pins(),

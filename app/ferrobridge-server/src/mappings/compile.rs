@@ -135,16 +135,6 @@ pub struct Compiled {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-/// Loads and validates the FHIRconnect files `files` names as one set.
-///
-/// # Errors
-///
-/// Returns every diagnostic of the loader, the schemas and the semantic
-/// rules when the set does not load.
-pub fn read(files: &[PathBuf]) -> Result<MappingSet, Vec<Diagnostic>> {
-    fhirconnect::model::load::load_set(files, &Library)
-}
-
 /// Builds the index of every `.opt` file under `directory`.
 ///
 /// A file that does not build is a `template-build` diagnostic on that file,

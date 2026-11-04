@@ -12,6 +12,7 @@ use std::io::Write as _;
 use crate::support::subscriber;
 use ferrobridge_operator_api::configuration::{Configuration, SecretState, Source, Value};
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrohealth_telemetry::section::Rendering;
 use http::StatusCode;
 
@@ -63,8 +64,8 @@ fn environment() -> BTreeMap<String, String> {
 fn running() -> Result<(Configuration, tempfile::NamedTempFile), Box<dyn Error>> {
     let mut password = tempfile::NamedTempFile::new()?;
     writeln!(password, "SYNTHETIC-TERMINOLOGY-PASSWORD")?;
-    let settings =
-        Config::from_sources(Some(&file_text(password.path())), &environment())?.resolve()?;
+    let settings = Config::from_sources(Some(&file_text(password.path())), &environment())?
+        .resolve(Process::Server)?;
     let configuration = settings
         .configuration
         .ok_or("an operator API answers its configuration")?;
@@ -222,7 +223,7 @@ fn an_unset_operator_scope_is_answered_as_the_scope_the_bridge_runs_on()
         "[operator]\nenabled = true\n",
     );
     let configuration = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()?
+        .resolve(Process::Server)?
         .configuration
         .ok_or("an operator API answers its configuration")?;
     assert_eq!(
