@@ -11,17 +11,23 @@
 //! relative to [`TABLES_DIR`] (`2.5.1/elements.json`).
 
 use std::collections::BTreeMap;
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Deserialize;
 use serde::de::IgnoredAny;
 
-use crate::v2::corpus::pinned_commit;
+use crate::v2::fetched;
+use crate::v2::fetched::{FetchError, Fetched, Source};
 
 /// The directory under the fetched tree that holds one directory per version.
 pub const TABLES_DIR: &str = "src/main/resources/hl7db";
+
+/// The fetched legacy tables.
+const LEGACY_TABLES: Source = Source {
+    dir: TABLES_DIR,
+    holds: "legacy tables",
+    script: "scripts/vendor/v2-legacy.sh",
+};
 
 /// The upstream repository of the export, as the banners name it.
 pub const REPOSITORY: &str = "usnistgov/igamt-hl7Tools-service";
@@ -36,38 +42,9 @@ pub const TABLE_0354_URL: &str = "http://terminology.hl7.org/CodeSystem/v2-0354"
 /// A failure while reading the legacy tables or table 0354.
 #[derive(Debug, thiserror::Error)]
 pub enum SourceError {
-    /// The fetched tree is not on disk.
-    #[error(
-        "{path} holds no HL7 v2 legacy tables; run scripts/vendor/v2-legacy.sh to fetch them at the pin"
-    )]
-    NotFetched {
-        /// The directory that was expected.
-        path: PathBuf,
-    },
-    /// The provenance file names no pinned commit.
-    #[error("{path} names no pinned commit (a line \"- Pin: commit `<sha>`\")")]
-    NoPin {
-        /// The provenance file.
-        path: PathBuf,
-    },
-    /// A directory could not be listed or a file could not be read.
-    #[error("cannot read {path}")]
-    Io {
-        /// The path that failed.
-        path: PathBuf,
-        /// The underlying I/O error.
-        #[source]
-        source: io::Error,
-    },
-    /// A file is not the JSON the projection expects.
-    #[error("cannot parse {path}")]
-    Json {
-        /// The file that failed to parse.
-        path: PathBuf,
-        /// The underlying JSON error.
-        #[source]
-        source: serde_json::Error,
-    },
+    /// The fetched tree did not open, or a file in it did not read or parse.
+    #[error(transparent)]
+    Fetched(#[from] FetchError),
     /// A directory under [`TABLES_DIR`] is not named as a version.
     #[error("{name} under {TABLES_DIR} is not a dotted version number")]
     NotAVersion {
@@ -273,29 +250,13 @@ impl Tables {
     ///
     /// # Errors
     ///
-    /// Returns [`SourceError::NotFetched`] when the tables are not on disk,
-    /// [`SourceError::NoPin`] when the provenance names no commit,
-    /// [`SourceError::NotAVersion`] for a directory not named as a version,
-    /// and an I/O or JSON error naming the file that failed.
+    /// Returns [`SourceError::Fetched`] when the tables are not on disk, the
+    /// provenance names no commit, or a file fails to read or parse, and
+    /// [`SourceError::NotAVersion`] for a directory not named as a version.
     pub fn open(root: impl AsRef<Path>) -> Result<Self, SourceError> {
-        let root = root.as_ref();
-        let tree = root.join(TABLES_DIR);
-        if !tree.is_dir() {
-            return Err(SourceError::NotFetched { path: tree });
-        }
-        let provenance = root.join("PROVENANCE.md");
-        let commit =
-            pinned_commit(&read(&provenance)?).ok_or(SourceError::NoPin { path: provenance })?;
+        let Fetched { tree, commit } = LEGACY_TABLES.open(root.as_ref())?;
         let mut named = BTreeMap::new();
-        let entries = fs::read_dir(&tree).map_err(|source| SourceError::Io {
-            path: tree.clone(),
-            source,
-        })?;
-        for entry in entries {
-            let entry = entry.map_err(|source| SourceError::Io {
-                path: tree.clone(),
-                source,
-            })?;
+        for entry in fetched::entries(&tree)? {
             if !entry.path().is_dir() {
                 continue;
             }
@@ -434,16 +395,6 @@ impl Table0354 {
     }
 }
 
-fn read(path: &Path) -> Result<String, SourceError> {
-    fs::read_to_string(path).map_err(|source| SourceError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
 fn parse<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, SourceError> {
-    serde_json::from_str(&read(path)?).map_err(|source| SourceError::Json {
-        path: path.to_path_buf(),
-        source,
-    })
+    Ok(fetched::parse(path, &fetched::read(path)?)?)
 }

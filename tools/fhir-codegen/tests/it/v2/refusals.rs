@@ -11,6 +11,7 @@ use fhir_codegen::roots::{
     V2_BASES, V2_DATA_TYPE_DIRS, V2_MESSAGE_DIR, V2_SEGMENT_DIR, V2_STRUCTURE_DIR, V2RootSet,
 };
 use fhir_codegen::v2::corpus::{Corpus, LoadError, SOURCE_OF_TRUTH};
+use fhir_codegen::v2::fetched::FetchError;
 use fhir_codegen::v2::lower::{Defect, LowerError, Model};
 use serde_json::Value;
 
@@ -315,7 +316,7 @@ fn an_unknown_element_member_is_refused_at_load() {
         value["differential"]["element"][1]["mustSupport"] = Value::from(true);
     });
     match Corpus::open(copy.path()) {
-        Err(LoadError::Json { path, .. }) => assert!(path.ends_with(OBX)),
+        Err(LoadError::Fetched(FetchError::Json { path, .. })) => assert!(path.ends_with(OBX)),
         other => panic!("expected a JSON refusal, got {other:?}"),
     }
 }
@@ -324,6 +325,9 @@ fn an_unknown_element_member_is_refused_at_load() {
 fn an_unfetched_tree_names_the_fetch_script() {
     let empty = tempfile::tempdir().expect("tempdir");
     let error = Corpus::open(empty.path()).expect_err("nothing to load");
-    assert!(matches!(error, LoadError::NotFetched { .. }));
+    assert!(matches!(
+        error,
+        LoadError::Fetched(FetchError::NotFetched { .. })
+    ));
     assert!(error.to_string().contains("scripts/vendor/v2ig.sh"));
 }

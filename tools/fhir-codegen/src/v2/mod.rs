@@ -13,6 +13,7 @@
 pub mod corpus;
 pub mod definition;
 pub mod emit;
+pub mod fetched;
 pub mod legacy;
 pub mod lower;
 pub mod render;

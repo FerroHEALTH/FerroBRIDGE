@@ -11,51 +11,29 @@
 //! defect is reported, and tolerated, by the file that carries it.
 
 use std::collections::BTreeMap;
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::roots::{V2_BASES, V2_DATA_TYPE_DIRS, V2_MESSAGE_DIR, V2_SEGMENT_DIR, V2_STRUCTURE_DIR};
 use crate::v2::definition::{MessageDefinition, StructureDefinition};
+use crate::v2::fetched;
+use crate::v2::fetched::{FetchError, Fetched, Source};
 
 /// The directory under the fetched tree that holds the definitions.
 pub const SOURCE_OF_TRUTH: &str = "input/sourceOfTruth";
 
+/// The fetched HL7 v2 definitions.
+const DEFINITIONS: Source = Source {
+    dir: SOURCE_OF_TRUTH,
+    holds: "definitions",
+    script: "scripts/vendor/v2ig.sh",
+};
+
 /// A failure while reading the v2 definitions.
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
-    /// The fetched tree is not on disk.
-    #[error(
-        "{path} holds no HL7 v2 definitions; run scripts/vendor/v2ig.sh to fetch them at the pin"
-    )]
-    NotFetched {
-        /// The directory that was expected.
-        path: PathBuf,
-    },
-    /// The provenance file names no pinned commit.
-    #[error("{path} names no pinned commit (a line \"- Pin: commit `<sha>`\")")]
-    NoPin {
-        /// The provenance file.
-        path: PathBuf,
-    },
-    /// A directory could not be listed or a file could not be read.
-    #[error("cannot read {path}")]
-    Io {
-        /// The path that failed.
-        path: PathBuf,
-        /// The underlying I/O error.
-        #[source]
-        source: io::Error,
-    },
-    /// A file is not the JSON the projection expects.
-    #[error("cannot parse {path}")]
-    Json {
-        /// The file that failed to parse.
-        path: PathBuf,
-        /// The underlying JSON error.
-        #[source]
-        source: serde_json::Error,
-    },
+    /// The fetched tree did not open, or a file in it did not read or parse.
+    #[error(transparent)]
+    Fetched(#[from] FetchError),
     /// A file in a definition directory is not a `StructureDefinition`.
     #[error("{path} is a {resource_type}, not a StructureDefinition")]
     NotAStructure {
@@ -112,19 +90,11 @@ impl Corpus {
     ///
     /// # Errors
     ///
-    /// Returns [`LoadError::NotFetched`] when the definitions are not on disk,
-    /// [`LoadError::NoPin`] when the provenance names no commit, an I/O or JSON
-    /// error naming the file that failed, and [`LoadError::DuplicateCanonical`]
-    /// when two files define one URL.
+    /// Returns [`LoadError::Fetched`] when the definitions are not on disk, the
+    /// provenance names no commit, or a file fails to read or parse, and
+    /// [`LoadError::DuplicateCanonical`] when two files define one URL.
     pub fn open(root: impl AsRef<Path>) -> Result<Self, LoadError> {
-        let root = root.as_ref();
-        let tree = root.join(SOURCE_OF_TRUTH);
-        if !tree.is_dir() {
-            return Err(LoadError::NotFetched { path: tree });
-        }
-        let provenance = root.join("PROVENANCE.md");
-        let text = read(&provenance)?;
-        let commit = pinned_commit(&text).ok_or(LoadError::NoPin { path: provenance })?;
+        let Fetched { tree, commit } = DEFINITIONS.open(root.as_ref())?;
 
         let mut bases = BTreeMap::new();
         for file in V2_BASES {
@@ -147,7 +117,7 @@ impl Corpus {
         let mut messages: BTreeMap<String, SourcedMessage> = BTreeMap::new();
         for file in json_files(&tree, V2_MESSAGE_DIR)? {
             let path = tree.join(&file);
-            let definition: MessageDefinition = parse(&path, &read(&path)?)?;
+            let definition: MessageDefinition = fetched::parse(&path, &fetched::read(&path)?)?;
             if definition.resource_type != "StructureDefinition" {
                 return Err(LoadError::NotAStructure {
                     path: file,
@@ -210,19 +180,9 @@ impl Corpus {
     }
 }
 
-/// The commit a `PROVENANCE.md` pins, from its line that opens `- Pin: commit`.
-pub(crate) fn pinned_commit(provenance: &str) -> Option<String> {
-    provenance.lines().find_map(|line| {
-        let rest = line.strip_prefix("- Pin: commit `")?;
-        let (sha, _) = rest.split_once('`')?;
-        let hex = sha.len() == 40 && sha.bytes().all(|b| b.is_ascii_hexdigit());
-        hex.then(|| sha.to_owned())
-    })
-}
-
 fn insert(map: &mut BTreeMap<String, Sourced>, tree: &Path, file: &str) -> Result<(), LoadError> {
     let path = tree.join(file);
-    let definition: StructureDefinition = parse(&path, &read(&path)?)?;
+    let definition: StructureDefinition = fetched::parse(&path, &fetched::read(&path)?)?;
     if definition.resource_type != "StructureDefinition" {
         return Err(LoadError::NotAStructure {
             path: file.to_owned(),
@@ -249,16 +209,8 @@ fn insert(map: &mut BTreeMap<String, Sourced>, tree: &Path, file: &str) -> Resul
 /// The `.json` files directly under `tree/dir`, as sorted `dir/name` paths.
 fn json_files(tree: &Path, dir: &str) -> Result<Vec<String>, LoadError> {
     let path = tree.join(dir);
-    let entries = fs::read_dir(&path).map_err(|source| LoadError::Io {
-        path: path.clone(),
-        source,
-    })?;
     let mut files = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|source| LoadError::Io {
-            path: path.clone(),
-            source,
-        })?;
+    for entry in fetched::entries(&path)? {
         let name = entry.file_name().to_string_lossy().into_owned();
         let is_json = entry.path().extension().is_some_and(|ext| ext == "json");
         if is_json && entry.path().is_file() {
@@ -267,18 +219,4 @@ fn json_files(tree: &Path, dir: &str) -> Result<Vec<String>, LoadError> {
     }
     files.sort();
     Ok(files)
-}
-
-fn read(path: &Path) -> Result<String, LoadError> {
-    fs::read_to_string(path).map_err(|source| LoadError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn parse<T: for<'de> serde::Deserialize<'de>>(path: &Path, text: &str) -> Result<T, LoadError> {
-    serde_json::from_str(text).map_err(|source| LoadError::Json {
-        path: path.to_path_buf(),
-        source,
-    })
 }
