@@ -611,6 +611,18 @@ jobs:
           args=()
           for package in "${packages[@]}"; do args+=(-p "$package"); done
           cargo hack clippy "${args[@]}" --all-targets --locked -- -D warnings
+      # A package with a feature its default set leaves off is linted with
+      # every feature on as well, so a file only those features compile is
+      # never skipped (scripts/checks/featured.sh).
+      - env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          set -euo pipefail
+          read -ra packages <<<"$PACKAGES"
+          featured="$(bash scripts/checks/featured.sh "${packages[@]}")"
+          for package in $featured; do
+            cargo clippy -p "$package" --all-features --all-targets --locked -- -D warnings
+          done
       # ferrobridge-hl7v2 without its default `map` feature, the surface of a
       # consumer that takes only the listener, the parser and the ack (#1221).
       - if: contains(matrix.packages, 'ferrobridge-hl7v2')
@@ -767,18 +779,24 @@ jobs:
           if [ "${#docs[@]}" -gt 0 ]; then
             cargo hack test --doc "${docs[@]}" --locked
           fi
-      # eehrxf has no default feature, so its suites run with every feature on.
-      # The suites that hold a patient summary or a laboratory report
-      # document to the vendored profiles also write it under
-      # EEHRXF_EMIT_DIR, and so does the one that maps a prescription and a
-      # dispense to their MPD collections, for the fhir-validator job.
-      - if: contains(matrix.packages, 'eehrxf')
-        env:
+      # A package with a feature its default set leaves off runs its suites
+      # with every feature on as well (scripts/checks/featured.sh); eehrxf has
+      # no default feature, so only this step runs its suites. The eehrxf
+      # suites that hold a patient summary or a laboratory report document to
+      # the vendored profiles also write it under EEHRXF_EMIT_DIR, and so does
+      # the one that maps a prescription and a dispense to their MPD
+      # collections, for the fhir-validator job.
+      - env:
+          PACKAGES: ${{ matrix.packages }}
           EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
           set -euo pipefail
-          cargo nextest run -p eehrxf --all-features --locked --no-tests=pass
-          cargo test --doc -p eehrxf --all-features --locked
+          read -ra packages <<<"$PACKAGES"
+          featured="$(bash scripts/checks/featured.sh "${packages[@]}")"
+          for package in $featured; do
+            cargo nextest run -p "$package" --all-features --locked --no-tests=pass
+            cargo test --doc -p "$package" --all-features --locked
+          done
       - name: Upload the emitted exchange-format documents
         if: contains(matrix.packages, 'eehrxf')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

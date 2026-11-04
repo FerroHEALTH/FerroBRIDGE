@@ -107,6 +107,15 @@ for package in $packages; do args+=(-p "$package"); done
 run cargo fmt --check "${args[@]}"
 run cargo clippy --locked "${args[@]}" --all-targets -- -D warnings
 run cargo nextest run --locked "${args[@]}" --no-tests=pass
+# A package with a feature its default set leaves off is linted and tested
+# with every feature on as well, as the CI lanes do, so a file only those
+# features compile is never skipped.
+# shellcheck disable=SC2086 # the package list splits on whitespace by design
+featured="$(scripts/checks/featured.sh $packages)"
+for package in $featured; do
+  run cargo clippy --locked -p "$package" --all-features --all-targets -- -D warnings
+  run cargo nextest run --locked -p "$package" --all-features --no-tests=pass
+done
 # `cargo test --doc` refuses a package without a library target; a `cdylib`
 # beside an `rlib` (the console) still has one.
 libraries="$(cargo metadata --no-deps --format-version 1 --locked |

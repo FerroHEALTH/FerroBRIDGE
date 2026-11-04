@@ -92,7 +92,7 @@ A changed path reaches packages in one of these ways:
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
 | `.claude/rules/console-ui.md`, `scripts/release/journey-tools.sh`, `scripts/checks/stray-literals.*` | `ferrobridge-console` (the rule holds what its pages, posts and journeys keep; the scripts install the browser its journeys drive and check its sources for stray literals) |
 | `website/book/src/**` | the testkit's own tests (its screenshot guard reads every page of the book and every console screenshot) |
-| `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh` | everything |
+| `.github/workflows/ci.yml`, `.github/actions/setup-rust/**`, `scripts/checks/affected.sh`, `scripts/checks/fast.sh`, `scripts/checks/featured.sh` | everything |
 | the rest of `.github/`, the rest of `.claude/`, the rest of `website/`, `assets/`, `docker/`, `fuzz/`, `scripts/gh/`, the rest of `scripts/release/`, `docs/ci-cd.md`, `docs/release.md`, the root community files, and the guard scripts tier 1 runs | nothing |
 | anything else (`docs/specs/**`, `scripts/vendor/**`, `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, a new root file) | everything |
 
@@ -435,7 +435,11 @@ side, the hosted runner's seven gigabytes run out, and the runner kills the
 job with exit 143 and no diagnostic; per package the two never meet. The
 `clippy-fhir-types` matrix lints `fhir-types` per version with `resources`,
 which is what a consumer builds; the all-features union (five versions, every
-resource, one crate) is no consumer's surface and is not linted in CI. No
+resource, one crate) is no consumer's surface and is not linted in CI. A
+package with a feature its default set leaves off (`scripts/checks/featured.sh`
+names them: `eehrxf` and `ferrobridge-term` today) is also linted and tested
+with `--all-features`, in the `clippy` and `test` jobs and in `fast.sh`, so a
+file only those features compile cannot hide a broken import. No
 specification governs this: our own design.
 
 ## The advisory analyzers beside this one
