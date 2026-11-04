@@ -42,6 +42,7 @@ use fhir_types::r4::resource::Resource;
 mod assembly;
 #[cfg(feature = "discharge")]
 pub mod discharge;
+pub mod display;
 pub mod form;
 #[cfg(feature = "imaging")]
 pub mod imaging;
@@ -552,11 +553,10 @@ fn composition_section(section: &Section) -> CompositionSection {
             .empty
             .filter(|_| section.entries.is_empty())
             .map(|reason| CodeableConcept {
-                coding: vec![Coding {
-                    system: Some(EMPTY_REASON.into()),
-                    code: Some(reason.code().into()),
-                    ..Coding::default()
-                }],
+                coding: vec![coding(Code {
+                    system: EMPTY_REASON,
+                    code: reason.code(),
+                })],
                 ..CodeableConcept::default()
             }),
         ..CompositionSection::default()
@@ -610,6 +610,7 @@ fn coding(code: Code) -> Coding {
     Coding {
         system: Some(code.system.into()),
         code: Some(code.code.into()),
+        display: display::display(code.system, code.code).map(Into::into),
         ..Coding::default()
     }
 }

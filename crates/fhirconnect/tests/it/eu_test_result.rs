@@ -120,7 +120,8 @@ fn panel() -> (serde_json::Value, serde_json::Value) {
         "status": "final",
         "category": [{"coding": [{
             "system": "http://terminology.hl7.org/CodeSystem/observation-category",
-            "code": "laboratory"
+            "code": "laboratory",
+            "display": "Laboratory"
         }]}],
         "code": {"coding": [{
             "system": "http://loinc.org",

@@ -40,6 +40,9 @@ mappings:
             value: "http://terminology.hl7.org/CodeSystem/observation-category"
           - path: "code"
             value: "laboratory"
+          # FHIR R4 CodeSystem observation-category: the display of `laboratory`.
+          - path: "display"
+            value: "Laboratory"
 
   # Observation-resultslab-eu-lab requires effective[x] (min 1); an analyte is
   # observed at the time of the laboratory test result's event, which the
