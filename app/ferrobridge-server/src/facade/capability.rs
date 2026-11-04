@@ -45,12 +45,6 @@ use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::party::PartySearch;
 use crate::smart::Security;
 
-/// The FHIR release this facade speaks.
-///
-/// The value is a code of `http://hl7.org/fhir/ValueSet/FHIR-version`, and R4
-/// is `4.0.1` (<https://hl7.org/fhir/R4/capabilitystatement.html>).
-pub const FHIR_VERSION: &str = "4.0.1";
-
 /// The date this capability description was published.
 ///
 /// The statement is compiled in and changes with the build, so two calls to
@@ -252,7 +246,7 @@ pub fn statement_of(
         // this one is published by the build, so it is not a clock reading.
         date: PUBLISHED.into(),
         kind: "instance".into(),
-        fhir_version: FHIR_VERSION.into(),
+        fhir_version: crate::build_info::FHIR_VERSION.into(),
         format: vec![
             crate::facade::media::FHIR_JSON.into(),
             crate::facade::media::JSON.into(),
@@ -563,8 +557,7 @@ fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatement
 #[cfg(test)]
 mod tests {
     use super::{
-        FHIR_VERSION, Hl7v2, Operations, TOFHIR_DEFINITION, TOOPENEHR_DEFINITION, statement,
-        statement_with,
+        Hl7v2, Operations, TOFHIR_DEFINITION, TOOPENEHR_DEFINITION, statement, statement_with,
     };
     use crate::facade::programs::Programs;
 
@@ -616,7 +609,10 @@ mod tests {
             "http://localhost:8080/fhir",
             Operations::Absent,
         );
-        assert_eq!(Some(FHIR_VERSION), built.fhir_version.value.as_deref());
+        assert_eq!(
+            Some(crate::build_info::FHIR_VERSION),
+            built.fhir_version.value.as_deref()
+        );
         let formats: Vec<&str> = built
             .format
             .iter()

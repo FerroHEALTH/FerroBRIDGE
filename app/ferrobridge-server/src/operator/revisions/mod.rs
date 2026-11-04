@@ -26,9 +26,9 @@ use std::path::PathBuf;
 
 use ferrobridge_operator_api::revisions::{Origin, Revision};
 
+use crate::mappings::files;
+use crate::mappings::files::Root;
 use crate::operator::Operator;
-use crate::operator::files;
-use crate::operator::files::Root;
 
 /// The directory under `mapping_dir` the revisions are kept in.
 pub const REVISIONS: &str = "..revisions";

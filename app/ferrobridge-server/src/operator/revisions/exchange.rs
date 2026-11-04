@@ -26,8 +26,8 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::header;
 
+use crate::mappings::files;
 use crate::operator::Operator;
-use crate::operator::files;
 use crate::operator::guard::AUDIT_TARGET;
 use crate::operator::reload::ReloadError;
 use crate::operator::revisions::Entry;

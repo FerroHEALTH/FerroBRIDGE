@@ -20,6 +20,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use ferrobridge_hl7v2::ack::Code;
+use ferrohealth_health::lifecycle::Lifecycle;
+use ferrohealth_health::registry::Registry;
 use ferrohealth_usage_report::envelope::{Key, LicenceGrant, Product, report_git_sha};
 use ferrohealth_usage_report::reporter::{Identity, Notice, ProductSection};
 use ferrohealth_usage_report::section::UsageReportSection;
@@ -27,7 +29,6 @@ use ferrohealth_usage_report::window::Window;
 use http::Method;
 use tokio::task::JoinHandle;
 
-use crate::state::AppState;
 use crate::usage_report::status::{LaneToken, MappingBucket, Status};
 
 /// What the boot line says about the report.
@@ -70,24 +71,58 @@ pub fn window() -> Window {
     Window::new(grouping)
 }
 
+/// What the report reads of this process: the lanes from the boot summary,
+/// the readiness indicators, the lifecycle, whether inbound authentication
+/// is on, and the window the request log fills.
+#[derive(Debug, Clone)]
+pub struct Reported {
+    lanes: Vec<crate::startup::Lane>,
+    health: Registry,
+    lifecycle: Lifecycle,
+    auth: bool,
+    window: Arc<Window>,
+}
+
+impl Reported {
+    /// Returns what the report reads: the boot summary's `lanes`, the
+    /// `health` indicators under `lifecycle`, whether `auth` is on, and the
+    /// request `window`.
+    #[must_use]
+    pub const fn new(
+        lanes: Vec<crate::startup::Lane>,
+        health: Registry,
+        lifecycle: Lifecycle,
+        auth: bool,
+        window: Arc<Window>,
+    ) -> Self {
+        Self {
+            lanes,
+            health,
+            lifecycle,
+            auth,
+            window,
+        }
+    }
+}
+
 /// Logs the boot line and, when the report runs, starts its background task
-/// over `state`.
+/// over `reported`.
 ///
 /// `ci` is the CI variable the process environment sets, when one is
 /// (`ferrohealth_usage_report::section::ci_of`). `None` when the report is
 /// off; the report never fails boot.
 pub async fn start(
     section: &UsageReportSection,
-    state: Arc<AppState>,
+    reported: Reported,
     started: Instant,
     ci: Option<&'static str>,
 ) -> Option<JoinHandle<()>> {
-    let window = Arc::clone(state.usage_window());
+    let window = Arc::clone(&reported.window);
     ferrohealth_usage_report::reporter::start(
         section,
         &NOTICE,
         identity(),
-        state,
+        Arc::new(reported),
         window,
         started,
         ci,
@@ -95,7 +130,7 @@ pub async fn start(
     .await
 }
 
-impl ProductSection for AppState {
+impl ProductSection for Reported {
     type Status = Status;
     const PRODUCT: Product = Product::Bridge;
 
@@ -106,9 +141,9 @@ impl ProductSection for AppState {
 
 /// Returns the status of this process as of now: the lanes from the boot
 /// summary and each upstream's readiness check.
-async fn status_of(state: &AppState) -> Status {
+async fn status_of(state: &Reported) -> Status {
     let mut lanes: Vec<LaneToken> = state
-        .lanes()
+        .lanes
         .iter()
         .filter(|lane| lane.enabled)
         .filter_map(|lane| LaneToken::of(lane.name))
@@ -117,13 +152,13 @@ async fn status_of(state: &AppState) -> Status {
     lanes.dedup();
     let mappings = |name: &str| {
         state
-            .lanes()
+            .lanes
             .iter()
             .find(|lane| lane.name == name && lane.enabled)
             .and_then(|lane| lane.mappings)
             .map(|counts| MappingBucket::of(counts.programs))
     };
-    let report = state.health().readiness(state.lifecycle()).await;
+    let report = state.health.readiness(&state.lifecycle).await;
     let up = |name: &str| {
         report
             .indicators
@@ -133,7 +168,7 @@ async fn status_of(state: &AppState) -> Status {
     };
     Status {
         lanes,
-        auth: state.auth().is_some(),
+        auth: state.auth,
         facade_mappings: mappings("facade"),
         operations_mappings: mappings("operations"),
         cdr_ok: up("cdr"),

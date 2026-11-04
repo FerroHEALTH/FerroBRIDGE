@@ -16,9 +16,9 @@ use std::path::PathBuf;
 use ferrobridge_operator_api::operator::LoadReport;
 use ferrobridge_operator_api::revisions::{Origin, Revision};
 
+use crate::mappings::files;
+use crate::mappings::files::{Language, Root};
 use crate::operator::Operator;
-use crate::operator::files;
-use crate::operator::files::{Language, Root};
 use crate::operator::reload::{Prepared, ReloadError};
 use crate::operator::revisions::{BRIDGE, Entry};
 use crate::operator::save::{Failure, Precondition};

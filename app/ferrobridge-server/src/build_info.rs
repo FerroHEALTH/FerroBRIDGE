@@ -19,6 +19,12 @@ pub const PRODUCT: &str = "FerroBRIDGE";
 /// The product version the root document reports.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The FHIR release the facade speaks.
+///
+/// The value is a code of `http://hl7.org/fhir/ValueSet/FHIR-version`, and R4
+/// is `4.0.1` (<https://hl7.org/fhir/R4/capabilitystatement.html>).
+pub const FHIR_VERSION: &str = "4.0.1";
+
 /// The full git commit this binary was built from, or `unknown` outside a
 /// checkout.
 pub const COMMIT: &str = env!("FERROBRIDGE_BUILD_COMMIT");
@@ -72,10 +78,7 @@ pub fn pins() -> Vec<Pin> {
     };
     vec![
         pin("FHIRconnect", grammar_version(fhirconnect::GRAMMAR)),
-        pin(
-            "FHIR",
-            &format!("R4 ({})", crate::facade::capability::FHIR_VERSION),
-        ),
+        pin("FHIR", &format!("R4 ({FHIR_VERSION})")),
         pin("OMOCL", grammar_version(omocl::GRAMMAR)),
         pin("OMOP CDM", &format!("v{}", omop_cdm::CDM_VERSION)),
         pin("openEHR ITS-REST", crate::cdr::ITS_REST_VERSION),
@@ -172,7 +175,7 @@ mod tests {
             );
         }
         let r4 = ferrobridge_testkit::matrix_pin("hl7.fhir.r4.core")?;
-        assert_eq!(r4, crate::facade::capability::FHIR_VERSION);
+        assert_eq!(r4, super::FHIR_VERSION);
         Ok(())
     }
 

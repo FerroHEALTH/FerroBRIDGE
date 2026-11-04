@@ -49,7 +49,6 @@ use serde::Deserialize;
 
 use crate::operations::lane::OperationsLane;
 use crate::operations::lane::OperationsOff;
-use crate::state::AppState;
 use crate::terminology::Direction;
 use ferrohealth_usage_report::window::Window;
 
@@ -82,30 +81,52 @@ pub struct OperationQuery {
     pub ehr_id: Option<String>,
 }
 
+/// What the routes of the two operations read: the lane when it runs, why
+/// it does not when it is off, and the window a refused run is counted in.
+#[derive(Debug, Clone)]
+pub struct Served {
+    lane: Option<Arc<OperationsLane>>,
+    off: OperationsOff,
+    usage: Arc<Window>,
+}
+
+impl Served {
+    /// Returns the routes' view of `lane`, which is `None` for the reason
+    /// `off`, counting refused runs in `usage`.
+    #[must_use]
+    pub const fn new(
+        lane: Option<Arc<OperationsLane>>,
+        off: OperationsOff,
+        usage: Arc<Window>,
+    ) -> Self {
+        Self { lane, off, usage }
+    }
+}
+
 /// Returns the routes of the two operations and their direct forms.
 ///
 /// The enveloped operations are the interoperable contract; the two bare
 /// routes are the direct form, which the chapter marks as "a deliberate
 /// deviation from the FHIR Operations framework" and keeps out of the
 /// FHIRconnect FHIR implementation guide.
-pub fn router(state: Arc<AppState>) -> Router {
+pub fn router(served: Served) -> Router {
     Router::new()
         .route("/fhir/$tofhir", post(to_fhir))
         .route("/fhir/$toopenehr", post(to_openehr))
         .route("/fhir/tofhir", post(to_fhir_direct))
         .route("/fhir/toopenehr", post(to_openehr_direct))
-        .with_state(state)
+        .with_state(served)
 }
 
 /// `POST /fhir/$tofhir`: a `Parameters` in, a `Bundle` out.
 async fn to_fhir(
-    State(state): State<Arc<AppState>>,
+    State(served): State<Served>,
     Query(query): Query<OperationQuery>,
     headers: http::HeaderMap,
     body: String,
 ) -> Response {
-    let Some(lane) = state.operations() else {
-        return unavailable(state.operations_off());
+    let Some(lane) = served.lane.as_deref() else {
+        return unavailable(served.off);
     };
     let settings = lane.settings();
     if let Some(refusal) = fhir_media_type(&headers) {
@@ -113,20 +134,20 @@ async fn to_fhir(
     }
     match tofhir_answer(lane, &settings, &query, &body).await {
         Ok(response) => response,
-        Err(error) => refused(state.usage_window(), &error),
+        Err(error) => refused(&served.usage, &error),
     }
 }
 
 /// `POST /fhir/$toopenehr`: a `Bundle` or a `Parameters` in, a `Parameters`
 /// out.
 async fn to_openehr(
-    State(state): State<Arc<AppState>>,
+    State(served): State<Served>,
     Query(query): Query<OperationQuery>,
     headers: http::HeaderMap,
     body: String,
 ) -> Response {
-    let Some(lane) = state.operations() else {
-        return unavailable(state.operations_off());
+    let Some(lane) = served.lane.as_deref() else {
+        return unavailable(served.off);
     };
     let settings = lane.settings();
     if let Some(refusal) = fhir_media_type(&headers) {
@@ -134,7 +155,7 @@ async fn to_openehr(
     }
     match toopenehr_answer(lane, &settings, &query, &body).await {
         Ok(response) => response,
-        Err(error) => refused(state.usage_window(), &error),
+        Err(error) => refused(&served.usage, &error),
     }
 }
 
@@ -143,13 +164,13 @@ async fn to_openehr(
 /// The direct form of the chapter's §Direct payload invocation, outside the
 /// FHIR implementation guide.
 async fn to_fhir_direct(
-    State(state): State<Arc<AppState>>,
+    State(served): State<Served>,
     Query(query): Query<OperationQuery>,
     headers: http::HeaderMap,
     body: String,
 ) -> Response {
-    let Some(lane) = state.operations() else {
-        return unavailable(state.operations_off());
+    let Some(lane) = served.lane.as_deref() else {
+        return unavailable(served.off);
     };
     let settings = lane.settings();
     if let Some(refusal) = media_type(&headers, &[OPENEHR_JSON]) {
@@ -167,7 +188,7 @@ async fn to_fhir_direct(
             StatusCode::OK,
             &Resource::Bundle(Box::new(response.into_bundle())),
         ),
-        Err(error) => refused(state.usage_window(), &error),
+        Err(error) => refused(&served.usage, &error),
     }
 }
 
@@ -176,13 +197,13 @@ async fn to_fhir_direct(
 /// The direct form of the chapter's §Direct payload invocation, outside the
 /// FHIR implementation guide.
 async fn to_openehr_direct(
-    State(state): State<Arc<AppState>>,
+    State(served): State<Served>,
     Query(query): Query<OperationQuery>,
     headers: http::HeaderMap,
     body: String,
 ) -> Response {
-    let Some(lane) = state.operations() else {
-        return unavailable(state.operations_off());
+    let Some(lane) = served.lane.as_deref() else {
+        return unavailable(served.off);
     };
     let settings = lane.settings();
     if let Some(refusal) = media_type(&headers, &[FHIR_JSON, "application/json"]) {
@@ -199,7 +220,7 @@ async fn to_openehr_direct(
             String::from(response.composition()),
         )
             .into_response(),
-        Err(error) => refused(state.usage_window(), &error),
+        Err(error) => refused(&served.usage, &error),
     }
 }
 
