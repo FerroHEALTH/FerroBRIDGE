@@ -16,7 +16,7 @@ use ferrobridge_server::check::Report;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
-use ferrobridge_server::operations::OperationsLane;
+use ferrobridge_server::operations::lane::OperationsLane;
 use ferrobridge_server::operator::Operator;
 use ferrobridge_server::operator::files::{Language, Root};
 use ferrobridge_server::operator::reload::Reloader;

@@ -50,7 +50,7 @@ use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::programs;
-use ferrobridge_server::operations::OperationsLane;
+use ferrobridge_server::operations::lane::OperationsLane;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::terminology::Translator;
 use ferrohealth_health::registry::Registry;

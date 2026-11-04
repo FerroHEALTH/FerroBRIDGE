@@ -23,7 +23,7 @@ use crate::check::Templates;
 use crate::facade::Facade;
 use crate::facade::programs::Programs;
 use crate::facade::search::Catalog;
-use crate::operations::OperationsLane;
+use crate::operations::lane::OperationsLane;
 use crate::operator::files;
 use crate::operator::files::Language;
 use crate::operator::files::Root;

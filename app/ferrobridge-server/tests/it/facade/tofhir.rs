@@ -5,8 +5,8 @@
 
 use crate::support;
 use axum::body::Body;
+use ferrobridge_server::operations::lane::OperationsLane;
 use ferrobridge_server::state::AppState;
-use ferrobridge_server::state::OperationsLane;
 use ferrohealth_health::registry::Registry;
 use http::Request;
 use http::StatusCode;

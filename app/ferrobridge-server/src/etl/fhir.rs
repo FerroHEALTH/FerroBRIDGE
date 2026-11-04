@@ -205,7 +205,7 @@ impl FhirSide<'_> {
             .pointer("/meta/lastUpdated")
             .and_then(Value::as_str)
             .unwrap_or(self.now);
-        crate::operations::run_settings(
+        crate::operations::lane::run_settings(
             self.device,
             self.composer,
             self.language,

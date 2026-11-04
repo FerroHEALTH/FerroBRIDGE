@@ -12,7 +12,7 @@ use fhirconnect::engine::demographics::NoDemographics;
 
 use crate::config::Settings;
 use crate::indicators;
-use crate::operations::{OperationsLane, OperationsOff};
+use crate::operations::lane::{OperationsLane, OperationsOff};
 use crate::terminology::Translator;
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
