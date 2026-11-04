@@ -273,7 +273,7 @@ impl CdrClient {
             ..self.client.retry()
         };
         let client = self.scoped_at(base, HeaderMap::new(), once, false)?;
-        let answered = client.forward(request).await;
+        let answered = client.forward(&request, false).await;
         let upstream = client.transport().answered();
         match answered {
             Err(source) => Err(refusal(&client, source, upstream)),

@@ -340,7 +340,14 @@ pub(super) fn interior_paths(template: &WebTemplateIndex) -> Vec<RmPath> {
 ///
 /// A shortened path that reaches more than one node keeps all of them, because
 /// binding the mapping to one of them would bind it to a node nothing named.
+/// A node below another indexed node in the compacted tail, such as the
+/// `lower` and `upper` parts of a `DV_INTERVAL` value, is reached through that
+/// node and compacts to nothing of its own.
 pub(super) fn compaction_map(template: &WebTemplateIndex) -> Vec<(RmPath, &ResolvedNode)> {
+    let indexed: std::collections::BTreeSet<String> = template
+        .nodes()
+        .map(|node| node.rm_path().to_string())
+        .collect();
     let mut found: Vec<(RmPath, &ResolvedNode)> = Vec::new();
     for node in template.nodes() {
         let path = node.rm_path();
@@ -350,6 +357,16 @@ pub(super) fn compaction_map(template: &WebTemplateIndex) -> Vec<(RmPath, &Resol
             .rposition(constrains)
             .map_or(0, |last| last.saturating_add(1));
         if kept == path.segments.len() {
+            continue;
+        }
+        let below_indexed = (kept.saturating_add(1)..path.segments.len()).any(|end| {
+            let ancestor = RmPath {
+                absolute: path.absolute,
+                segments: path.segments.get(..end).unwrap_or_default().to_vec(),
+            };
+            indexed.contains(&ancestor.to_string())
+        });
+        if below_indexed {
             continue;
         }
         let shortened = RmPath {
