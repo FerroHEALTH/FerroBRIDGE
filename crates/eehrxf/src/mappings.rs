@@ -174,17 +174,21 @@ pub const MPD: Project = Project {
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
 ///
-/// It maps over the published `KDS_Laborbericht` template. Its context maps
-/// the laboratory test result to the `DiagnosticReport-eu-lab` the document
-/// holds beside its composition, each analyte to an
-/// `Observation-resultslab-eu-lab` and each specimen to a `Specimen-eu-lab`.
-/// The directory also holds `ferrobridge_eu_lab_composition.context`, which
-/// maps the report composition to a `Composition-eu-lab` over the same
-/// template and is compiled on its own.
+/// It maps over the published `KDS_Laborbericht` template. Its two contexts
+/// map that one template, so a run compiles one of them with
+/// [`Project::with_context`]: `ferrobridge_eu_laboratory.context` maps the
+/// laboratory test result to the `DiagnosticReport-eu-lab` the document holds
+/// beside its composition, each analyte to an `Observation-resultslab-eu-lab`
+/// and each specimen to a `Specimen-eu-lab`, and
+/// `ferrobridge_eu_lab_composition.context` maps the report composition to a
+/// `Composition-eu-lab`.
 #[cfg(feature = "laboratory")]
 pub const LABORATORY: Project = Project {
     directory: "laboratory",
-    contexts: &["ferrobridge_eu_laboratory.context"],
+    contexts: &[
+        "ferrobridge_eu_laboratory.context",
+        "ferrobridge_eu_lab_composition.context",
+    ],
     files: &[
         shipped!("laboratory", "ferrobridge_eu_laboratory.context.yml"),
         shipped!("laboratory", "ferrobridge_laboratory_test_result.v1.yml"),
