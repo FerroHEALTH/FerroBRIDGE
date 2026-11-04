@@ -6,6 +6,7 @@
 //! <https://hl7.org/fhir/R4/elementdefinition.html>).
 
 use ferrobridge_validator::issue::MessageId;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
 
@@ -18,7 +19,7 @@ use crate::support::validate;
 
 #[test]
 fn a_missing_required_element_of_the_base_is_reported_at_its_parent() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let report = validate(
         &set,
         &json!({"resourceType": "Observation", "code": {"text": "t"}}),
@@ -35,7 +36,7 @@ fn a_missing_required_element_of_the_base_is_reported_at_its_parent() -> TestRes
 fn a_primitive_present_only_through_its_sibling_counts_as_present() -> TestResult {
     // json.html §2.6.2.3: a primitive with an extension and no value is
     // written as the `_` member alone, and it is an occurrence.
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let observation = json!({
         "resourceType": "Observation",
         "_status": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",

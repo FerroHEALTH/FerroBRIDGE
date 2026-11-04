@@ -192,46 +192,71 @@ struct Extension {
     value_canonical: Option<String>,
 }
 
-/// Reads `archive` into a dataset model.
-pub(super) fn package(archive: impl Read) -> Result<DatasetModel, DatasetError> {
-    let (package, mut definitions) = definitions(archive, |_| true)?;
-    definitions.retain(|definition| definition.kind.as_deref() == Some("logical"));
-    assemble(package, definitions)
+impl DatasetModel {
+    /// Reads the dataset model from a FHIR package archive, the gzip-compressed
+    /// tarball a FHIR package registry serves.
+    ///
+    /// Every `StructureDefinition` of kind `logical` directly under `package/`
+    /// is read: a `specialization` as a logical model, a `constraint` as an
+    /// obligations profile over the model its `baseDefinition` names. Every
+    /// other resource of the package is left out.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DatasetError`] when the archive cannot be read, carries no
+    /// manifest, holds a JSON file that does not parse, or holds a logical
+    /// definition that is defective: no snapshot, an element with no
+    /// cardinality, a duplicate canonical URL or element path, a profile over
+    /// a model the package lacks or whose snapshot drops one of its elements,
+    /// or an obligation with no single code or with an empty actor.
+    pub fn read(archive: impl Read) -> Result<Self, DatasetError> {
+        let (package, mut definitions) = definitions(archive, |_| true)?;
+        definitions.retain(|definition| definition.kind.as_deref() == Some("logical"));
+        assemble(package, definitions)
+    }
 }
 
-/// Reads the one `StructureDefinition` of `archive` at the canonical `url`.
-pub(super) fn resource_profile(
-    archive: impl Read,
-    url: &str,
-) -> Result<ResourceProfile, DatasetError> {
-    let (package, definitions) = definitions(archive, |head| head.url.as_deref() == Some(url))?;
-    let mut definitions = definitions.into_iter();
-    let definition = match (definitions.next(), definitions.next()) {
-        (Some(definition), None) => definition,
-        (Some(_), Some(_)) => {
-            return Err(DatasetError::DuplicateUrl {
-                url: url.to_owned(),
-            });
-        }
-        (None, _) => {
-            return Err(DatasetError::MissingProfile {
-                url: url.to_owned(),
-            });
-        }
-    };
-    let snapshot = definition
-        .snapshot
-        .ok_or_else(|| DatasetError::MissingSnapshot {
-            url: definition.url.clone(),
-        })?;
-    let elements = elements(&definition.url, snapshot.element, |_| Ok(()))?;
-    Ok(ResourceProfile {
-        package,
-        url: definition.url,
-        name: definition.name,
-        version: definition.version,
-        elements,
-    })
+impl ResourceProfile {
+    /// Reads the profile at the canonical `url` from a FHIR package archive,
+    /// the gzip-compressed tarball a FHIR package registry serves.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DatasetError`] when the archive cannot be read, carries no
+    /// manifest, holds a JSON file that does not parse, holds no
+    /// `StructureDefinition` at `url` ([`DatasetError::MissingProfile`]) or
+    /// two of them, or holds one with no snapshot, an element with no
+    /// cardinality, or an element id given twice.
+    pub fn read(archive: impl Read, url: &str) -> Result<Self, DatasetError> {
+        let (package, definitions) = definitions(archive, |head| head.url.as_deref() == Some(url))?;
+        let mut definitions = definitions.into_iter();
+        let definition = match (definitions.next(), definitions.next()) {
+            (Some(definition), None) => definition,
+            (Some(_), Some(_)) => {
+                return Err(DatasetError::DuplicateUrl {
+                    url: url.to_owned(),
+                });
+            }
+            (None, _) => {
+                return Err(DatasetError::MissingProfile {
+                    url: url.to_owned(),
+                });
+            }
+        };
+        let snapshot = definition
+            .snapshot
+            .ok_or_else(|| DatasetError::MissingSnapshot {
+                url: definition.url.clone(),
+            })?;
+        let elements = elements(&definition.url, snapshot.element, |_| Ok(()))?;
+        Ok(ResourceProfile {
+            package,
+            url: definition.url,
+            name: definition.name,
+            version: definition.version,
+            elements,
+        })
+    }
 }
 
 /// Reads the manifest of `archive` and every `StructureDefinition` whose

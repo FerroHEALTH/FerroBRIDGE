@@ -142,7 +142,7 @@ condition grammar reads the guide's comparison forms (`=`, `EQUALS`, `IS`,
 (`PID-3.1`), a component (`HD.3`, or `HD-3` when the name before `-` is a
 data type and no segment) or a segment, and an `IN`, `NOT IN`, `VALUED` or
 `NOT VALUED` with no operand reads the row's own source
-(`condition::parse_for`; `mapping_guidelines.md` §Conditions lists the two
+(`condition::parse`; `mapping_guidelines.md` §Conditions lists the two
 `IN` forms, and the `VALUED` forms are our own reading); the assignment
 grammar is literals
 and operands joined by `+` (`"urn:oid:"+HD.2`), where an operand with no

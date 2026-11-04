@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write};
 
 use crate::lower::{TypeDef, VersionModule};
+use crate::naming::type_name;
 use crate::package::Package;
 
 /// One search parameter as the registry carries it.
@@ -195,11 +196,6 @@ fn lineage(model: &VersionModule, resource: &TypeDef) -> Vec<String> {
     names
 }
 
-/// The Rust variant name of a `search-param-type` code.
-fn variant(code: &str) -> String {
-    crate::naming::type_name(code)
-}
-
 /// Renders the crate-level `search.rs`: the registry's shape and the
 /// `search-param-type` enum over the codes every version uses.
 ///
@@ -213,11 +209,11 @@ pub fn render_shared(banner: &str, codes: &BTreeSet<&str>) -> Result<String, fmt
         "\n/// `SearchParameter.type`, a code of `search-param-type`\n/// (<https://hl7.org/fhir/R4/valueset-search-param-type.html>), over the codes\n/// every emitted version uses.\n#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]\npub enum SearchParamType {\n",
     );
     for code in codes {
-        writeln!(out, "    /// `{code}`.\n    {},", variant(code))?;
+        writeln!(out, "    /// `{code}`.\n    {},", type_name(code))?;
     }
     out.push_str("}\n\nimpl SearchParamType {\n    /// Returns the code.\n    #[must_use]\n    pub const fn code(self) -> &'static str {\n        match self {\n");
     for code in codes {
-        writeln!(out, "            Self::{} => {code:?},", variant(code))?;
+        writeln!(out, "            Self::{} => {code:?},", type_name(code))?;
     }
     out.push_str("        }\n    }\n}\n");
     Ok(out)
@@ -252,7 +248,7 @@ pub fn render(model: &VersionModule, registry: &Registry) -> Result<String, fmt:
             parameter.name,
             parameter.code,
             base.join(", "),
-            variant(&parameter.type_code),
+            type_name(&parameter.type_code),
             parameter.experimental
         )?;
     }

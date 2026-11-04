@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the immunisations of the HL7 Europe Patient
+# Summary 1.0.0-ballot over FerroBRIDGE's patient summary template: each
+# medication action of its immunisations section, the CKM vaccination list
+# whose slot holds the "Vaccinations administered", becomes one
+# immunization-eu-core, the profile the section's immunization entry slice
+# admits. The template holds ACTION.medication.v1 in that section alone, so
+# the template path places a vaccine in the immunisations and never in the
+# medication summary.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_eps_immunization.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/immunization-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "ACTION.medication.v1.Immunization"
+  start: "ACTION.medication.v1.Immunization"

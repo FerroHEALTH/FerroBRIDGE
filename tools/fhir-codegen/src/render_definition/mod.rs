@@ -118,49 +118,49 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
         &mut out,
         "element_id",
         "Option<&str>",
-        &reader.text_opt(own, "id", "self"),
+        &reader.optional(own, "id", "self", Read::Text),
     )?;
     method(
         &mut out,
         "path",
         "Option<&str>",
-        &reader.text_opt(own, "path", "self"),
+        &reader.optional(own, "path", "self", Read::Text),
     )?;
     method(
         &mut out,
         "slice_name",
         "Option<&str>",
-        &reader.text_opt(own, "sliceName", "self"),
+        &reader.optional(own, "sliceName", "self", Read::Text),
     )?;
     method(
         &mut out,
         "min",
         "Option<u32>",
-        &reader.copy_opt(own, "min", "self"),
+        &reader.optional(own, "min", "self", Read::Copy),
     )?;
     method(
         &mut out,
         "max",
         "Option<&str>",
-        &reader.text_opt(own, "max", "self"),
+        &reader.optional(own, "max", "self", Read::Text),
     )?;
     method(
         &mut out,
         "max_length",
         "Option<i32>",
-        &reader.copy_opt(own, "maxLength", "self"),
+        &reader.optional(own, "maxLength", "self", Read::Copy),
     )?;
     method(
         &mut out,
         "is_modifier",
         "Option<bool>",
-        &reader.copy_opt(own, "isModifier", "self"),
+        &reader.optional(own, "isModifier", "self", Read::Copy),
     )?;
     method(
         &mut out,
         "content_reference",
         "Option<&str>",
-        &reader.text_opt(own, "contentReference", "self"),
+        &reader.optional(own, "contentReference", "self", Read::Text),
     )?;
     render_structured(&mut out, &reader)?;
     writeln!(out, "}}")?;
@@ -192,14 +192,14 @@ fn render_structure(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
             out,
             name,
             "Option<&str>",
-            &reader.text_opt(own, element, "self"),
+            &reader.optional(own, element, "self", Read::Text),
         )?;
     }
     method(
         out,
         "is_abstract",
         "Option<bool>",
-        &reader.copy_opt(own, "abstract", "self"),
+        &reader.optional(own, "abstract", "self", Read::Copy),
     )?;
     let snapshot = match (
         reader.field(own, "snapshot"),
@@ -235,11 +235,11 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let ty = "ElementDefinition.type";
     let type_read = format!(
         "{D}::TypeRead {{ code: {}, profiles: {}, target_profiles: {}, aggregation: {}, versioning: {}, regex: {} }}",
-        reader.text_opt(ty, "code", "item"),
+        reader.optional(ty, "code", "item", Read::Text),
         reader.text_list(ty, "profile", "item"),
         reader.text_list(ty, "targetProfile", "item"),
         reader.text_list(ty, "aggregation", "item"),
-        reader.text_opt(ty, "versioning", "item"),
+        reader.optional(ty, "versioning", "item", Read::Text),
         reader.extension(ty, "item", Urls::Listed(LEXICAL_FORMS), Read::Text),
     );
     method(
@@ -251,8 +251,8 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let binding = "ElementDefinition.binding";
     let binding_read = format!(
         "{D}::BindingRead {{ strength: {}, value_set: {}, max_value_set: {} }}",
-        reader.text_opt(binding, "strength", "item"),
-        reader.text_opt(binding, "valueSet", "item"),
+        reader.optional(binding, "strength", "item", Read::Text),
+        reader.optional(binding, "valueSet", "item", Read::Text),
         reader.extension(binding, "item", Urls::One(MAX_VALUE_SET), Read::Text),
     );
     method(
@@ -264,12 +264,12 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let constraint = "ElementDefinition.constraint";
     let constraint_read = format!(
         "{D}::ConstraintRead {{ key: {}, severity: {}, human: {}, expression: {}, xpath: {}, source: {}, best_practice: {} }}",
-        reader.text_opt(constraint, "key", "item"),
-        reader.text_opt(constraint, "severity", "item"),
-        reader.text_opt(constraint, "human", "item"),
-        reader.text_opt(constraint, "expression", "item"),
-        reader.text_opt(constraint, "xpath", "item"),
-        reader.text_opt(constraint, "source", "item"),
+        reader.optional(constraint, "key", "item", Read::Text),
+        reader.optional(constraint, "severity", "item", Read::Text),
+        reader.optional(constraint, "human", "item", Read::Text),
+        reader.optional(constraint, "expression", "item", Read::Text),
+        reader.optional(constraint, "xpath", "item", Read::Text),
+        reader.optional(constraint, "source", "item", Read::Text),
         reader.extension(constraint, "item", Urls::One(BEST_PRACTICE), Read::Bool),
     );
     method(
@@ -281,16 +281,16 @@ fn render_structured(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let discriminator = "ElementDefinition.slicing.discriminator";
     let discriminator_read = format!(
         "{D}::DiscriminatorRead {{ kind: {}, path: {} }}",
-        reader.text_opt(discriminator, "type", "item"),
-        reader.text_opt(discriminator, "path", "item"),
+        reader.optional(discriminator, "type", "item", Read::Text),
+        reader.optional(discriminator, "path", "item", Read::Text),
     );
     let slicing = "ElementDefinition.slicing";
     let slicing_read = format!(
         "{D}::SlicingRead {{ discriminators: {}, description: {}, ordered: {}, rules: {} }}",
         reader.struct_list(slicing, "discriminator", "item", &discriminator_read),
-        reader.text_opt(slicing, "description", "item"),
-        reader.copy_opt(slicing, "ordered", "item"),
-        reader.text_opt(slicing, "rules", "item"),
+        reader.optional(slicing, "description", "item", Read::Text),
+        reader.optional(slicing, "ordered", "item", Read::Copy),
+        reader.optional(slicing, "rules", "item", Read::Text),
     );
     method(
         out,
@@ -340,18 +340,6 @@ impl Reader<'_> {
         fields
             .iter()
             .find(|field| field.fhir_name == name || field.fhir_name == format!("{name}[x]"))
-    }
-
-    /// An `Option<&str>` read of the element `name` of the struct at `path`
-    /// on `receiver`.
-    fn text_opt(&self, path: &str, name: &str, receiver: &str) -> String {
-        self.optional(path, name, receiver, Read::Text)
-    }
-
-    /// An `Option<scalar>` read of the element `name` of the struct at
-    /// `path` on `receiver`.
-    fn copy_opt(&self, path: &str, name: &str, receiver: &str) -> String {
-        self.optional(path, name, receiver, Read::Copy)
     }
 
     /// The `Option` read of one element, absent when the version lacks it.
@@ -428,7 +416,7 @@ impl Reader<'_> {
         let Some(field) = self.field(path, "extension") else {
             return String::from("None");
         };
-        let url_read = self.text_opt("Extension", "url", "extension");
+        let url_read = self.optional("Extension", "url", "extension", Read::Text);
         let value = self.optional("Extension", "value", "extension", read);
         let test = match urls {
             Urls::One(url) => format!("{url_read} == Some({url:?})"),
@@ -449,8 +437,8 @@ impl Reader<'_> {
         if self.type_at(entry).is_some() {
             let read = format!(
                 "{D}::ContextRead {{ kind: {}, expression: {} }}",
-                self.text_opt(entry, "type", "item"),
-                self.text_opt(entry, "expression", "item"),
+                self.optional(entry, "type", "item", Read::Text),
+                self.optional(entry, "expression", "item", Read::Text),
             );
             return self.struct_list(own, "context", "self", &read);
         }
@@ -460,7 +448,7 @@ impl Reader<'_> {
         format!(
             "self.{}.iter().map(|item| {D}::ContextRead {{ kind: {}, expression: {} }}).collect()",
             field.name,
-            self.text_opt(own, "contextType", "self"),
+            self.optional(own, "contextType", "self", Read::Text),
             self.value(&field.ty.target, "item", Read::Text),
         )
     }

@@ -106,7 +106,7 @@ impl Run<'_> {
             label,
             map: reference.map.clone(),
         };
-        self.record(&leaf, pending, at, reference);
+        self.write(&leaf, pending, at, reference, false);
         true
     }
 

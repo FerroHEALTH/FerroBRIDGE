@@ -11,7 +11,7 @@
 use ferrobridge_testkit::containers::{self, Postgres};
 use omop_cdm::database::{self, CdmPool};
 use omop_cdm::ddl::SchemaName;
-use omop_cdm::derived::{self, Scope};
+use omop_cdm::derived::{self, Era, Scope};
 use omop_cdm::graph::{
     RecordGraph, key::ArchetypeRootPath, key::Discriminator, key::MappingName, key::OccurrencePath,
     key::RecordKey, key::Source, row::Reference, row::Row, row::Value,
@@ -138,7 +138,9 @@ async fn the_observation_period_spans_the_first_to_the_last_event() -> Result<()
         return Ok(());
     }
     let (postgres, mut writer) = database().await?;
-    writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
+    writer
+        .commit(&clinical()?, &RunId::new("run-1")?, None)
+        .await?;
     assert_eq!(
         1,
         derived::observation_period(&mut writer, 32880, Scope::OwnedPersons).await?
@@ -169,14 +171,16 @@ async fn the_condition_era_script_joins_conditions_within_thirty_days() -> Resul
         return Ok(());
     }
     let (postgres, mut writer) = database().await?;
-    writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
+    writer
+        .commit(&clinical()?, &RunId::new("run-1")?, None)
+        .await?;
     assert_eq!(
         1,
-        derived::condition_era(&mut writer, Scope::OwnedPersons).await?
+        derived::era(&mut writer, Era::Condition, Scope::OwnedPersons).await?
     );
     assert_eq!(
         1,
-        derived::condition_era(&mut writer, Scope::OwnedPersons).await?,
+        derived::era(&mut writer, Era::Condition, Scope::OwnedPersons).await?,
         "a rebuild replaces"
     );
     assert_eq!(
@@ -211,10 +215,12 @@ async fn the_drug_era_script_rolls_exposures_up_to_their_ingredient() -> Result<
              INSERT INTO cdm.concept_ancestor VALUES ({INGREDIENT}, 1010, 1, 1)"
         ))
         .await?;
-    writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
+    writer
+        .commit(&clinical()?, &RunId::new("run-1")?, None)
+        .await?;
     assert_eq!(
         1,
-        derived::drug_era(&mut writer, Scope::OwnedPersons).await?
+        derived::era(&mut writer, Era::Drug, Scope::OwnedPersons).await?
     );
     assert_eq!(
         vec!["1", "5001", "2026-05-01", "2026-06-02", "2", "20"],
@@ -256,10 +262,12 @@ async fn a_rebuild_keeps_the_derived_rows_of_a_person_the_bridge_does_not_write(
     }
     let (postgres, mut writer) = database().await?;
     foreign_era(&postgres).await?;
-    writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
+    writer
+        .commit(&clinical()?, &RunId::new("run-1")?, None)
+        .await?;
     assert_eq!(
         2,
-        derived::condition_era(&mut writer, Scope::OwnedPersons).await?
+        derived::era(&mut writer, Era::Condition, Scope::OwnedPersons).await?
     );
     assert_eq!(
         vec!["1", "2020-01-01", "3"],
@@ -285,7 +293,7 @@ async fn a_rebuild_keeps_the_derived_rows_of_a_person_the_bridge_does_not_write(
     );
     assert_eq!(
         2,
-        derived::condition_era(&mut writer, Scope::OwnedPersons).await?,
+        derived::era(&mut writer, Era::Condition, Scope::OwnedPersons).await?,
         "a second rebuild keeps both"
     );
     Ok(())
@@ -298,10 +306,12 @@ async fn a_whole_table_rebuild_replaces_every_derived_row() -> Result<(), Box<dy
     }
     let (postgres, mut writer) = database().await?;
     foreign_era(&postgres).await?;
-    writer.commit(&clinical()?, &RunId::new("run-1")?).await?;
+    writer
+        .commit(&clinical()?, &RunId::new("run-1")?, None)
+        .await?;
     assert_eq!(
         1,
-        derived::condition_era(&mut writer, Scope::WholeTable).await?,
+        derived::era(&mut writer, Era::Condition, Scope::WholeTable).await?,
         "person 900 has no condition, so the script derives no era for it"
     );
     assert_eq!(

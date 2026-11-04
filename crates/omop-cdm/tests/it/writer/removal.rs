@@ -27,7 +27,7 @@ async fn a_removal_deletes_the_rows_links_and_watermark_and_keeps_the_person()
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit(&laboratory(2, 2)?, &RunId::new("run-1")?)
+        .commit(&laboratory(2, 2)?, &RunId::new("run-1")?, None)
         .await?;
     let committed = only_watermark(&database.writer).await?;
     assert_eq!(COMPOSITION, committed.versioned_object_uid().value());
@@ -75,12 +75,12 @@ async fn a_removal_overtaken_by_a_newer_version_deletes_nothing() -> Result<(), 
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 2)?, &RunId::new("run-1")?, None)
         .await?;
     let stale = only_watermark(&database.writer).await?;
     database
         .writer
-        .commit(&laboratory(2, 2)?, &RunId::new("run-2")?)
+        .commit(&laboratory(2, 2)?, &RunId::new("run-2")?, None)
         .await?;
     assert_eq!(Removal::Superseded, database.writer.remove(&stale).await?);
     let client = reader(&database.postgres).await?;
@@ -97,7 +97,7 @@ async fn the_watermarks_page_in_order_of_the_versioned_composition() -> Result<(
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?)
+        .commit(&laboratory(1, 1)?, &RunId::new("run-1")?, None)
         .await?;
     let first = database.writer.watermarks_after(None, 1).await?;
     assert_eq!(1, first.len());

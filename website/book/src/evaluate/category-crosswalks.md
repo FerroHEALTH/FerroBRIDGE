@@ -43,6 +43,42 @@ product that writes the summary decides how it states them: the medical
 alert (A.2.1.2), which a producer must be able to populate, and the
 functional status (A.2.3.4).
 
+### The openEHR sources of the medication summary and the immunisations
+
+The crosswalk also names the openEHR content that feeds two entry rows, in
+`SOURCES`, each with the template section that holds it. Both are sections
+of the openEHR International Patient Summary template:
+
+| Entry row | Archetype | Template section |
+|---|---|---|
+| `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-INSTRUCTION.medication_order.v3` | IPS Medication Summary |
+| `EHDSPatientSummary.immunisations.immunisation` | `openEHR-EHR-ACTION.medication.v1` | IPS Immunizations |
+
+The template section is the placement criterion. A CDR often keeps the
+current medication list as medication orders, so the medication summary
+takes the order. The template holds the medication action in its
+immunisations section alone, so a vaccine recorded as an action is placed
+in the immunisations and never in the medication summary. No entry is placed
+by reading its content. A test holds each source to the vendored template.
+
+The shipped `eps` mapping project writes the two entries:
+
+- `ferrobridge_eu_eps_medication.context` maps each order to a
+  `MedicationStatement-eu-eps`. Its status is `unknown`, because no
+  published crosswalk pairs an order with a statement status. The template
+  leaves out the order details, so the statement's period carries the data
+  absent reason `unknown`.
+- `ferrobridge_eu_eps_immunization.context` maps each action at the careflow
+  step "Dose administered" to a `completed` `immunization-eu-core`, and each
+  action at "Dose administration aborted" to a `not-done` one. An action at
+  "Medication double checked" records no administration, so the mapping
+  writes no `Immunization` for it.
+
+A test runs both contexts over one composition that holds a medicine and a
+vaccine. Each context writes its own entry alone, and the document holds
+each in its own section. HL7's FHIR Validator checks that document in the
+`fhir-validator` job.
+
 ## The medication crosswalks
 
 The electronic prescription (Art 14(1)(b), feature `prescription`) and the

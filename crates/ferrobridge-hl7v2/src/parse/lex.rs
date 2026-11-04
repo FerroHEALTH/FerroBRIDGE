@@ -323,7 +323,7 @@ impl Lexer<'_> {
             .collect();
         let bytes =
             bytes.ok_or("a hexadecimal escape sequence is not an even run of hex digits")?;
-        match crate::decode::decode_bytes(&bytes, self.charset) {
+        match crate::decode::decode_as(&bytes, self.charset) {
             Ok(text) => Ok(text.into_owned()),
             Err(crate::decode::DecodeError::Undeclared { .. }) => {
                 Err("a hexadecimal escape sequence spells bytes outside the character set")

@@ -65,48 +65,11 @@ const DV_DURATION: &str = "DV_DURATION";
 /// (<https://docs.rs/rust_decimal/latest/rust_decimal/struct.Decimal.html>).
 const SIGNIFICANT_DIGITS: usize = 28;
 
-/// Writes a rate `Ratio` of the dosage as its rate and duration.
-///
-/// # Errors
-///
-/// Returns [`MappingCodeError`] when the element is no `Ratio` the rate and
-/// the duration carry exactly, by the rules of this module.
-pub fn dosage_rate_to_openehr(element: &Value) -> Result<Ports, MappingCodeError> {
-    to_openehr(DOSAGE_RATE, element)
-}
-
-/// Reads a dosage's rate and duration back as a rate `Ratio`.
-///
-/// # Errors
-///
-/// Returns [`MappingCodeError`] when the rate and the duration have no exact
-/// `Ratio` form, by the rules of this module.
-pub fn dosage_rate_to_fhir(ports: &Ports) -> Result<Option<Value>, MappingCodeError> {
-    to_fhir(DOSAGE_RATE, ports)
-}
-
-/// Writes a rate `Ratio` of an administration as its rate and duration.
-///
-/// # Errors
-///
-/// Returns [`MappingCodeError`] when the element is no `Ratio` the rate and
-/// the duration carry exactly, by the rules of this module.
-pub fn action_rate_to_openehr(element: &Value) -> Result<Ports, MappingCodeError> {
-    to_openehr(ACTION_RATE, element)
-}
-
-/// Reads an administration's rate and duration back as a rate `Ratio`.
-///
-/// # Errors
-///
-/// Returns [`MappingCodeError`] when the rate and the duration have no exact
-/// `Ratio` form, by the rules of this module.
-pub fn action_rate_to_fhir(ports: &Ports) -> Result<Option<Value>, MappingCodeError> {
-    to_fhir(ACTION_RATE, ports)
-}
-
 /// Writes a rate `Ratio` as the rate it divides to and the duration in its
 /// denominator.
+///
+/// `code` is the function name, [`DOSAGE_RATE`] or [`ACTION_RATE`], which a
+/// refusal names.
 ///
 /// The numerator `n a` over the denominator `d t`, `t` a unit of time, is the
 /// rate `n/d a/t` and the duration `d t`. Reads `Ratio.numerator` and
@@ -119,7 +82,7 @@ pub fn action_rate_to_fhir(ports: &Ports) -> Result<Option<Value>, MappingCodeEr
 /// `ucum_amount` refuses, a denominator in no unit of time or of zero, a
 /// quotient the decimals cannot hold exactly, or a duration
 /// [`duration::to_iso`] refuses.
-fn to_openehr(code: &str, element: &Value) -> Result<Ports, MappingCodeError> {
+pub fn to_openehr(code: &str, element: &Value) -> Result<Ports, MappingCodeError> {
     let ratio: Ratio = decode(code, "Ratio", element)?;
     if ratio.id.is_some() || !ratio.extension.is_empty() {
         return Err(refused(
@@ -168,6 +131,9 @@ fn to_openehr(code: &str, element: &Value) -> Result<Ports, MappingCodeError> {
 /// Reads the rate and the duration back as the `Ratio` of the amount given
 /// over the duration.
 ///
+/// `code` is the function name, [`DOSAGE_RATE`] or [`ACTION_RATE`], which a
+/// refusal names.
+///
 /// The rate `r a/t` over the duration `d t` is the numerator `r*d a` over the
 /// denominator `d t`. Nothing is written unless both are held. Reads the rate
 /// and the duration; writes `Ratio.numerator` and `Ratio.denominator`.
@@ -178,7 +144,7 @@ fn to_openehr(code: &str, element: &Value) -> Result<Ports, MappingCodeError> {
 /// units are no `<amount>/<time>` whose time is the duration's unit, when
 /// the duration [`duration::from_iso`] refuses, or when the product
 /// overflows the decimals.
-fn to_fhir(code: &str, ports: &Ports) -> Result<Option<Value>, MappingCodeError> {
+pub fn to_fhir(code: &str, ports: &Ports) -> Result<Option<Value>, MappingCodeError> {
     let (Some(rate_class), Some(_)) = (class_at(ports, RATE), class_at(ports, DURATION)) else {
         return Ok(None);
     };
