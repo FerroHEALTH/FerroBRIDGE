@@ -132,12 +132,6 @@ impl RecordGraph {
     pub fn report_mut(&mut self) -> &mut Report {
         &mut self.report
     }
-
-    /// Returns the report, consuming the graph.
-    #[must_use]
-    pub fn into_report(self) -> Report {
-        self.report
-    }
 }
 
 /// Returns the bound of a `varchar(n)` datatype, `None` for any other.

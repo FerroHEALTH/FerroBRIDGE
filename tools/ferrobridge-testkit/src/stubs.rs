@@ -161,13 +161,6 @@ pub mod its_rest {
             .set_body_string(error_body(message, validation_errors))
     }
 
-    /// Returns the `412` of a `PUT` whose `If-Match` does not name the latest
-    /// version, with that latest version in its `ETag`.
-    #[must_use]
-    pub fn precondition_failed(latest_version_id: &str) -> ResponseTemplate {
-        ResponseTemplate::new(412).insert_header("ETag", format!("W/\"{latest_version_id}\""))
-    }
-
     /// Returns the `204` a `DELETE` answers, naming the deleting version in
     /// its `ETag`.
     #[must_use]
