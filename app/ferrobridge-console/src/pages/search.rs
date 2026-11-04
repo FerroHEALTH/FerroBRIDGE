@@ -210,7 +210,7 @@ fn drawn(l: &Locale, words: &str, state: &Loaded<EngineState>) -> Html {
             subtitle: Some(tr(l, Msg::SearchScope).into()),
             ..Header::default()
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let body = match state {
         _ if words.is_empty() => h(format!(

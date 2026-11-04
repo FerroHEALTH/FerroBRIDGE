@@ -433,7 +433,7 @@ fn heading(l: &Locale, opened: &Opening, saved: Option<&str>) -> Html {
                 crumbs: vec![Crumb::new(tr(l, Msg::MappingSet), MAPPINGS)],
                 ..Header::default()
             },
-            ActionGroup::none(),
+            ActionGroup::default(),
         );
     }
     let title = message(if opened.read_only() {
@@ -461,7 +461,7 @@ fn heading(l: &Locale, opened: &Opening, saved: Option<&str>) -> Html {
             ],
             ..Header::default()
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     )
 }
 

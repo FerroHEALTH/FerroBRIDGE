@@ -8,7 +8,7 @@ use ferrobridge_operator_api::operator::{EngineState, Listed, Template};
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::surface::{Crumb, Header, facts_row, panel_sections_card};
@@ -94,13 +94,14 @@ fn drawn(
                 let href = program_href(program).or_else(|| program.file.as_deref().map(file_href));
                 h(format!(
                     "<tr>{}{}{}</tr>",
-                    title_cell(href.as_deref(), t(&program.context), None),
+                    title_cell(None, href.as_deref(), t(&program.context), None),
                     cell(resource, t(&program.resource_type)),
                     cell(owner, owner_tag),
                 ))
             })
             .collect::<Html>();
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &tr(l, Msg::TemplateContexts),
             columns: &columns,
             sorting: Sorting::default(),
@@ -135,7 +136,7 @@ fn drawn(
                 mono: true,
                 badge: None,
             },
-            actions: ActionGroup::none(),
+            actions: ActionGroup::default(),
             stepper: None,
             tabs: None,
             body,

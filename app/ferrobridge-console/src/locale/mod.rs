@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn a_throwaway_catalog_changes_the_words_with_no_code_change() {
-        let english = Locale::english();
+        let english = Locale::default();
         assert_eq!(
             "Page not found",
             tr_in(catalog(), &english, Msg::NotFoundTitle)

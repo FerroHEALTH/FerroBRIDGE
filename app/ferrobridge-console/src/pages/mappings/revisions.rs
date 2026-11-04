@@ -15,27 +15,26 @@
 use axum::response::Response;
 use ferrobridge_operator_api::operator::{Listed, Owner};
 use ferrobridge_operator_api::revisions::{
-    FileChange, Origin, Revision, RevisionDiff, RevisionSummary, Revisions,
+    Origin, Revision, RevisionDiff, RevisionSummary, Revisions,
 };
-use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::change::{Change, change_table};
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::change::{Change, change_table};
-use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
 use ferrohealth_ui::view::diagnostics::diagnostics_by_file;
 use ferrohealth_ui::view::dock::{Decision, DecisionBar, DockField, DockForm, decision_bar};
+use ferrohealth_ui::view::line_diff::line_diff;
 use ferrohealth_ui::view::load_report;
 use ferrohealth_ui::view::load_report::{Arrival, LoadReport};
 use ferrohealth_ui::view::notice::{Announce, notice_text};
-use ferrohealth_ui::view::surface::{Crumb, Header, definitions, panel_sections, section_intro};
+use ferrohealth_ui::view::surface::{Container, Crumb, Header, definitions, section_intro};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
 use crate::actions::{ApplyAnswer, ApplyPost};
@@ -120,6 +119,7 @@ fn revision_table(l: &Locale, running: Option<&str>, revisions: &[RevisionSummar
             h(format!(
                 "<tr>{}{}{}{}{}{}</tr>",
                 title_cell(
+                    None,
                     Some(&revision_href(&revision.id)),
                     code(&revision.id),
                     Some(t(tr(l, origin_words(revision.origin)))),
@@ -143,6 +143,7 @@ fn revision_table(l: &Locale, running: Option<&str>, revisions: &[RevisionSummar
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::TabRevisions),
         columns: &columns,
         sorting: Sorting::default(),
@@ -239,7 +240,7 @@ fn frame(l: &Locale, title: &str, revision: Option<&Revision>, body: Html) -> Ht
                 mono: false,
                 badge: None,
             },
-            actions: revision.map_or_else(ActionGroup::none, |revision| {
+            actions: revision.map_or_else(ActionGroup::default, |revision| {
                 ActionGroup::primary(Action::new(
                     Some(Glyph::DOWNLOAD),
                     tr(l, Msg::ExportRevision),
@@ -296,6 +297,7 @@ fn sections(
         change_table(
             l,
             tr(l, Msg::RevisionChanges),
+            Some(tr(l, Msg::ColFile)),
             &diff
                 .files
                 .iter()
@@ -311,32 +313,15 @@ fn sections(
         .files
         .iter()
         .map(|file| {
-            code_section(
+            section(
                 l,
-                CodeHead {
-                    title: file.path.clone(),
-                    tags: vec![tr(
-                        l,
-                        match file.change {
-                            FileChange::Added => Msg::FileAdded,
-                            FileChange::Removed => Msg::FileRemoved,
-                            FileChange::Changed => Msg::FileChanged,
-                        },
-                    )],
-                    ..CodeHead::default()
-                },
-                &Code {
-                    label: tr_with(l, Msg::DiffOf, &[("path", file.path.clone().into())]),
-                    language: Language::Plain,
-                    text: file.unified.clone(),
-                    ids: None,
-                    current: None,
-                    diagnostics: Vec::new(),
-                },
+                file.path.clone(),
+                None,
+                line_diff(l, &file.path, &file.unified),
             )
         })
         .collect::<Html>();
-    panel_sections(
+    Container::PanelSections.wrap(
         section(l, tr(l, Msg::RevisionFacts), None, facts)
             .then(section(
                 l,
@@ -373,6 +358,7 @@ fn provisioned(l: &Locale, listing: &Loaded<Vec<Listed>>) -> Html {
                 h(format!(
                     "<tr>{}{}</tr>",
                     title_cell(
+                        None,
                         Some(&file_href(&file.path)),
                         t(short(&file.path)),
                         Some(code(&file.path)),
@@ -382,6 +368,7 @@ fn provisioned(l: &Locale, listing: &Loaded<Vec<Listed>>) -> Html {
             })
             .collect::<Html>();
         note.then(data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &tr(l, Msg::RevisionProvisioned),
             columns: &columns,
             sorting: Sorting::default(),

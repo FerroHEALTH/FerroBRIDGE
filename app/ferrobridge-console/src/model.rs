@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn a_refusal_and_a_fault_draw_their_english_words_from_the_catalog() {
-        let english = ferrohealth_ui::i18n::Locale::english();
+        let english = ferrohealth_ui::i18n::Locale::default();
         let refused = Refusal::Bridge {
             status: StatusCode::SERVICE_UNAVAILABLE,
             diagnostics: vec![String::from("synthetic diagnostic")],

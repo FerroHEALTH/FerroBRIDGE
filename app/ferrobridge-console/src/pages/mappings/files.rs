@@ -11,14 +11,13 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::query::Query;
-use ferrohealth_ui::table::filter::{
-    FilterChoice, FilterMenu, Find, MenuForm, filter_menu, find_form,
-};
+use ferrohealth_ui::table::filter::{Find, find_form};
 use ferrohealth_ui::table::model::{Paging, StateSource, Window};
 use ferrohealth_ui::table::pager::{Listing, link_pager};
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
+use ferrohealth_ui::view::filter_menu::{FilterChoice, FilterMenu, MenuForm, filter_menu};
 use ferrohealth_ui::view::template::list::{ActiveFilters, FilterChip, active_filters};
 
 use crate::locale::messages::Msg;
@@ -326,7 +325,7 @@ fn files_table(l: &Locale, files: &[&Listed]) -> Html {
             let (errors, warnings) = tally(&file.diagnostics);
             h(format!(
                 "<tr>{}{}{}{}</tr>",
-                title_cell(Some(&file_href(&file.path)), code(&file.path), None),
+                title_cell(None, Some(&file_href(&file.path)), code(&file.path), None),
                 cell(
                     kind,
                     t(file.kind.clone().unwrap_or_else(|| String::from("–")))
@@ -340,6 +339,7 @@ fn files_table(l: &Locale, files: &[&Listed]) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::TabFiles),
         columns: &columns,
         sorting: Sorting::default(),

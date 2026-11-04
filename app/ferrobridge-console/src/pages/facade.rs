@@ -19,13 +19,13 @@ use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::code::{Code, code_viewer};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{definitions, facts_row, panel_sections};
+use ferrohealth_ui::view::surface::{Container, definitions, facts_row};
 
 use crate::app::{Drawn, FACADE, MAPPINGS, PLAYGROUND};
 use crate::locale::messages::Msg;
@@ -272,7 +272,7 @@ fn overview(
         ),
     ]);
     let identity = identity(l, readiness);
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         section(l, tr(l, Msg::FhirFacade), None, facts),
         section(l, tr(l, Msg::WhatItServes), None, serves),
         section(l, tr(l, Msg::FlowOperations), None, ops),
@@ -359,7 +359,7 @@ fn capability_panel(l: &Locale, statement: &Capability, state: &Loaded<EngineSta
             );
             h(format!(
                 "<tr>{}{}{}{}{}</tr>",
-                title_cell(href.as_deref(), t(&kind), None),
+                title_cell(None, href.as_deref(), t(&kind), None),
                 cell(profiles, t(resource.supported_profiles.to_string())),
                 cell(interactions, t(codes)),
                 cell(search, t(params)),
@@ -368,6 +368,7 @@ fn capability_panel(l: &Locale, statement: &Capability, state: &Loaded<EngineSta
         })
         .collect::<Html>();
     let table = data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::FactResourceTypes),
         columns: &columns,
         sorting: Sorting::default(),
@@ -435,5 +436,5 @@ fn security_panel(l: &Locale, smart: Option<&Loaded<serde_json::Value>>) -> Html
         Some(Err(fault)) => faulted(l, fault, &LANE.href("security")),
         None => Html::empty(),
     };
-    panel_sections(body)
+    Container::PanelSections.wrap(body)
 }
