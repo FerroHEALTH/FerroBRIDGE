@@ -33,12 +33,16 @@ has every change of every release.
 | [v0.0.16](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.16) | 2026-11-03 | Console breadth: mapping-set revisions with history, diff, rollback and ZIP export and import, a synthetic example composition per template in the playground, the OMOP ETL run history, the HL7 v2 ConceptMap directory, and sign-in through `ferrohealth-session` with a session watch. The outbound FHIR lane over the change feed, the EHDS Annex II 3.2 access record of every facade access sent as IHE BALP `AuditEvent`s, and the `eehrxf` openEHR mappings of prescriptions, dispensations and laboratory reports. |
 | [v0.0.17](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.17) | 2026-11-04 | The interoperability component: the patient summary's medication summary fed from medication orders and its immunisations from the vaccination list section, each placed by its template section, the prescription and dispense collections named by `fullUrl` and checked with HL7's FHIR Validator, and every document coding written with its display. `$tofhir` maps no resource from a composition without the start archetype, the operator console on FerroUI 0.6.6 with a revision's changes as a line diff, and the model layer of FHIRconnect and OMOCL moved into `openehr-mapping-core`. |
 | [v0.0.18](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.18) | 2026-11-04 | The close of the one-owner reshape: a FHIRconnect `manual` entry records the reads of the FHIR elements it writes into openEHR, the `eehrxf` imaging and discharge codings carry the displays of the HL7 Europe EU Health Data API package, one named context of an `eehrxf` mapping project compiles alone, and the operator console runs on `ferrohealth-session` 0.2.2 with a client certificate toward its provider. |
+| [v0.0.19](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.19) | 2026-11-04 | Family upkeep: the server and the operator console on `ferrohealth-config` 0.2.8, `ferrohealth-server` 0.4.3 and `ferrohealth-telemetry` 0.2.4, both binaries on the FerroSYS run path, and the FerroHEALTH family crates moved together by one daily Dependabot group. The `eehrxf` EPS project lists its immunisations context beside the medication summary. |
 
 ## Next
 
-The milestones after v0.0.18, each one theme:
+The milestones after v0.0.19, each one theme:
 
-1. **v0.0.19, the remaining categories.** The discharge and imaging
+1. **v0.0.20, the FHIRconnect mapping library.** Every mapping of the
+   published FHIRconnect library passing, and the laboratory composition
+   context listed in its `eehrxf` project.
+2. **v0.0.21, the remaining categories.** The discharge and imaging
    categories mapped from openEHR once their templates are published, and
    the patient summary re-checked against the adopted Art 15(1) act.
 
