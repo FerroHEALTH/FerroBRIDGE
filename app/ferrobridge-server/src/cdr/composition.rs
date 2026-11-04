@@ -50,10 +50,10 @@ impl CdrClient {
         commit: &CommitContext,
         prefer: Prefer,
     ) -> Result<Answered<CompositionCreateOutcome>, CdrError> {
-        crate::audit::reach::touched(
-            crate::audit::reach::Touch::Created,
+        crate::cdr::reach::touched(
+            crate::cdr::reach::Touch::Created,
             Some(ehr_id),
-            crate::audit::reach::composition(composition, None),
+            crate::cdr::reach::composition(composition, None),
         );
         let headers = commit.headers()?;
         let client = self.call(HeaderMap::new())?;
@@ -93,10 +93,10 @@ impl CdrClient {
         commit: &CommitContext,
         prefer: Prefer,
     ) -> Result<Answered<CompositionUpdateOutcome>, CdrError> {
-        crate::audit::reach::touched(
-            crate::audit::reach::Touch::Updated,
+        crate::cdr::reach::touched(
+            crate::cdr::reach::Touch::Updated,
             Some(ehr_id),
-            crate::audit::reach::composition(composition, None),
+            crate::cdr::reach::composition(composition, None),
         );
         let headers = commit.headers()?;
         let client = self.call(HeaderMap::new())?;

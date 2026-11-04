@@ -11,10 +11,10 @@ use fhirconnect::resolve::select::SelectError;
 use http::StatusCode;
 use openehr_rm::v1_2::composition::composition::Composition;
 
+use crate::cause::chain;
 use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::outcome::chain;
 use crate::facade::request::Inbound;
 use crate::facade::request::RequestError;
 use crate::facade::request::patient_person;

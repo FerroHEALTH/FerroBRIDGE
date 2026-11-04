@@ -54,10 +54,10 @@ pub(crate) fn canonical(
     composition: &Composition,
     template_id: &str,
 ) -> Result<CanonicalComposition, Refusal> {
-    crate::audit::reach::touched(
-        crate::audit::reach::Touch::Read,
+    crate::cdr::reach::touched(
+        crate::cdr::reach::Touch::Read,
         Some(ehr_id),
-        crate::audit::reach::composition(composition, Some(template_id)),
+        crate::cdr::reach::composition(composition, Some(template_id)),
     );
     let text = openehr_its::json::to_canonical_json(composition);
     let value = text.parse::<serde_json::Value>().map_err(|error| {
@@ -203,7 +203,7 @@ pub(crate) async fn version_of_etag(
             StatusCode::BAD_REQUEST,
             Issue::error(IssueType::Invalid).diagnosing(format!(
                 "If-Match carries `{bare}`, which is neither a versionId nor an openEHR version id: {}",
-                crate::facade::outcome::chain(&error)
+                crate::cause::chain(&error)
             )),
         )
     })?;

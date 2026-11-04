@@ -540,7 +540,7 @@ mod tests {
                 },
                 error
             );
-            let text = crate::facade::outcome::chain(&error);
+            let text = crate::cause::chain(&error);
             assert!(text.contains("facade.subject_id_form"), "{text}");
         }
         assert_eq!(

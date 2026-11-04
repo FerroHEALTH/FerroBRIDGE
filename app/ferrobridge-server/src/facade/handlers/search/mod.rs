@@ -125,7 +125,7 @@ async fn search(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotSupported).diagnosing(format!(
                 "no search is declared for {resource_type}; GET {}/metadata names the interactions each type supports",
-                crate::facade::BASE_PATH
+                crate::mount::BASE_PATH
             )),
         ));
     };
@@ -199,7 +199,7 @@ async fn search(
     let body = bundle::searchset(&envelope, &matches).map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(crate::facade::outcome::chain(&error)),
+            Issue::error(IssueType::Exception).diagnosing(crate::cause::chain(&error)),
         )
     })?;
     tracing::info!(

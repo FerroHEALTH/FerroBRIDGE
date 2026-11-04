@@ -6,8 +6,8 @@
 //! Every access an authenticated caller makes through the FHIR facade is
 //! recorded as the access record of Regulation (EU) 2025/327 Annex II 3.2,
 //! built through `ehds-logging` with its categories classified from the
-//! template and archetype ids the request reached ([`reach`]), and written
-//! as an IHE BALP `AuditEvent` ([`facade`]). Each message the HL7 v2 face
+//! template and archetype ids the request reached ([`crate::cdr::reach`]), and written
+//! as an IHE BALP `AuditEvent` ([`crate::facade::audit`]). Each message the HL7 v2 face
 //! commits is recorded as a system import ([`hl7v2`], ITI TF-2 Table
 //! 3.20.4.1.1.1-1 "PHI-import"). Both are stored in a spool on disk and
 //! sent from there over the ITI-20 ATX: FHIR Feed (ITI TF-2 §3.20.4.2) by
@@ -18,9 +18,7 @@
 //! `ihe-atna` (no specification governs this: our own design). The OMOP ETL
 //! and the operator API record nothing of their own.
 
-pub mod facade;
 pub mod hl7v2;
-pub mod reach;
 mod spool;
 
 use std::path::PathBuf;
@@ -173,5 +171,36 @@ impl AccessLog {
     #[must_use]
     pub const fn endpoint(&self) -> &NetworkAddress {
         &self.endpoint
+    }
+
+    /// Returns the sink that writes an access record as a BALP `AuditEvent`.
+    #[must_use]
+    pub const fn sink(&self) -> &BalpSink {
+        &self.sink
+    }
+
+    /// Returns the deployment's category map.
+    #[must_use]
+    pub const fn categories(&self) -> &CategoryMap {
+        &self.categories
+    }
+
+    /// Returns how long a record is kept.
+    #[must_use]
+    pub const fn retention(&self) -> &RetentionPolicy {
+        &self.retention
+    }
+
+    /// Returns the security labels a record carries.
+    #[must_use]
+    pub const fn labels(&self) -> &LabelPolicy {
+        &self.labels
+    }
+
+    /// Returns the CDR the facade's data come from, the origin of Annex II
+    /// 3.2(e).
+    #[must_use]
+    pub fn origin(&self) -> &str {
+        &self.origin
     }
 }

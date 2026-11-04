@@ -68,7 +68,7 @@ pub fn parse(file: &Path, text: &str) -> Result<DeclarationFile, DeclarationErro
 mod tests {
     use super::parse;
     use crate::facade::search::declaration::DeclarationError;
-    use crate::facade::search::declaration::is_declaration;
+    use crate::walk::is_declaration;
     use std::path::Path;
 
     const FILE: &str = "condition.search.yml";

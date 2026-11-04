@@ -625,7 +625,7 @@ fn not_supported(resource_type: &str) -> Refusal {
         StatusCode::NOT_FOUND,
         Issue::error(IssueType::NotSupported).diagnosing(format!(
             "no loaded mapping answers for {resource_type}; GET {}/metadata names the types this server supports",
-            crate::facade::BASE_PATH
+            crate::mount::BASE_PATH
         )),
     )
 }

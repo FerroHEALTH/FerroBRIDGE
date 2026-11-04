@@ -16,6 +16,7 @@ use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVer
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
+use crate::cause::chain;
 use crate::cdr::Returned;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::versioned_object_uid;
@@ -30,7 +31,6 @@ use crate::facade::identity::record::Identifier;
 use crate::facade::identity::record::SourceVersion;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::outcome::chain;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;

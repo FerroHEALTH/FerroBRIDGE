@@ -225,11 +225,11 @@ pub async fn cdr_templates(
             ),
             TemplateCause::Unusable(error) if matches!(**error, Error::CdrTemplate { .. }) => (
                 DiagnosticCode::TemplateBuild,
-                crate::facade::outcome::chain(error.as_ref()),
+                crate::cause::chain(error.as_ref()),
             ),
             TemplateCause::Unusable(error) => (
                 language(UNKNOWN_TEMPLATE),
-                crate::facade::outcome::chain(error.as_ref()),
+                crate::cause::chain(error.as_ref()),
             ),
             TemplateCause::NotProvided => (language(UNKNOWN_TEMPLATE), String::new()),
         };
