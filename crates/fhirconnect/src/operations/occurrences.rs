@@ -79,15 +79,18 @@ fn anchored<'a>(container: Option<&'a str>, entry_path: &'a str) -> Option<Ancho
 /// names it. An occurrence the context's condition does not admit maps no
 /// resource and is counted as [`Loss::InapplicableOccurrences`]; when it
 /// admits none, the run refuses as [`traverse::to_fhir`] does. A composition
-/// holding no occurrence runs once, from the root. Each run names the
-/// resources it creates under its own occurrence, so a new version of the
-/// composition keeps every created id (`engine/id-management.adoc`
-/// §Deterministic IDs). No specification governs this: our own design.
+/// that holds no occurrence gives the run nowhere to begin (FHIRconnect 1.0.0
+/// `types-of-mapping-files/context-mappings.adoc` §Start) and no resource to
+/// answer, so it refuses the same way. Each run names the resources it
+/// creates under its own occurrence, so a new version of the composition
+/// keeps every created id (`engine/id-management.adoc` §Deterministic IDs).
+/// No specification governs the naming: our own design.
 ///
 /// # Errors
 ///
 /// Returns [`OperationError::Mapping`] for an occurrence the program cannot
-/// map, and when the condition admits no occurrence.
+/// map, when the composition holds no occurrence, and when the condition
+/// admits none.
 pub(super) fn occurrences<T: Table + ?Sized>(
     program: &Program,
     table: &T,
@@ -101,26 +104,12 @@ pub(super) fn occurrences<T: Table + ?Sized>(
     };
     let container = composition_uid(composition).map(identity::versioned_object_uid);
     let named = occurrence::occurrences(program, index, composition).map_err(refused)?;
+    // NOTE: FHIRconnect 1.0.0 context-mappings.adoc §Start and rest-api.adoc §$tofhir: the run
+    // begins at the start archetype and answers "one or more" resources, so with none it refuses.
     if named.is_empty() {
-        let sink = anchored(container, identity::ROOT_PATH);
-        let outcome = match sink {
-            Some(ref sink) => traverse::to_fhir(
-                program,
-                table,
-                index,
-                composition,
-                &seams.with_identities(sink),
-                context,
-            ),
-            None => traverse::to_fhir(program, table, index, composition, seams, context),
-        }
-        .map_err(refused)?;
-        // NOTE: a composition holding no occurrence maps one resource from
-        // the root; no specification governs this, our own design.
-        return Ok((
-            vec![(Vec::new(), String::from(identity::ROOT_PATH), outcome)],
-            Vec::new(),
-        ));
+        return Err(refused(EngineError::NotApplicable {
+            context: String::from(program.context().as_str()),
+        }));
     }
     let mut mapped = Vec::new();
     let mut inapplicable = 0_usize;
