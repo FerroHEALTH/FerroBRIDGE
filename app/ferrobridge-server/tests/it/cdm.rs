@@ -93,7 +93,7 @@ fn a_fallback_sslmode_exits_seventy_eight() -> Result<(), Box<dyn std::error::Er
         .env_remove("FERROBRIDGE_CONFIG")
         .output()?;
     assert_eq!(
-        Some(i32::from(ferrobridge_server::EXIT_CONFIG)),
+        Some(i32::from(ferrohealth_server::run::EXIT_CONFIG.get())),
         output.status.code(),
         "a refused sslmode is EX_CONFIG"
     );
@@ -151,7 +151,7 @@ fn a_url_without_sslmode_exits_seventy_eight() -> Result<(), Box<dyn std::error:
         .env_remove("FERROBRIDGE_CONFIG")
         .output()?;
     assert_eq!(
-        Some(i32::from(ferrobridge_server::EXIT_CONFIG)),
+        Some(i32::from(ferrohealth_server::run::EXIT_CONFIG.get())),
         output.status.code()
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -176,7 +176,7 @@ fn a_libpq_tls_variable_in_the_environment_is_refused_naming_it()
             .env(name, "/nonexistent/file.pem")
             .output()?;
         assert_eq!(
-            Some(i32::from(ferrobridge_server::EXIT_CONFIG)),
+            Some(i32::from(ferrohealth_server::run::EXIT_CONFIG.get())),
             output.status.code(),
             "{name}"
         );

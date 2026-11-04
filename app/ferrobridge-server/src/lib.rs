@@ -56,12 +56,11 @@ use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use clap::Parser;
 use ferrohealth_config::loader::Loaded;
 use ferrohealth_server::cli::{Common, ConfigCommand};
 use ferrohealth_server::health::Health;
 use ferrohealth_server::healthcheck::Outcome;
-use ferrohealth_server::run::chain;
+use ferrohealth_server::run::{EXIT_CONFIG, Run, chain};
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::{Drained, ServeError};
 use ferrohealth_server::stack::{self, StackPolicy};
@@ -73,19 +72,6 @@ use tokio::net::TcpListener;
 use crate::cli::Cli;
 use crate::config::{Config, Process, Settings};
 use crate::state::AppState;
-
-/// The exit code of a usage refusal.
-///
-/// Two is the conventional usage exit, the code a command line uses when the
-/// invocation is not understood.
-pub const EXIT_USAGE: u8 = 2;
-
-/// The exit code of a refused configuration.
-///
-/// `EX_CONFIG` from `sysexits`
-/// (<https://man.freebsd.org/cgi/man.cgi?query=sysexits>), so an orchestrator
-/// tells a bad configuration from a failure to serve.
-pub const EXIT_CONFIG: u8 = 78;
 
 /// The exit code of a `mapping check` that could not run: a directory it
 /// cannot read, or a CDR that does not serve a template.
@@ -100,31 +86,37 @@ pub const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(3);
 /// Runs the binary with `args` and returns the process exit code.
 ///
 /// `args` is the whole argument vector, the program name included, so the
-/// command-line parser reports usage under the right name.
+/// command-line parser reports usage under the right name. The family's run
+/// path parses it, answers help, the version and a usage error with clap's
+/// exit code, and runs the job on its multi-threaded runtime.
 #[must_use]
-#[expect(
-    clippy::print_stderr,
-    reason = "a usage refusal and a refused configuration are reported before any log subscriber exists"
-)]
 pub fn run<I>(args: I) -> ExitCode
 where
     I: IntoIterator<Item = String>,
 {
-    let cli = match Cli::try_parse_from(args) {
-        Ok(cli) => cli,
-        Err(error) => return ExitCode::from(clap_exit(&error)),
-    };
+    Run::new("ferrobridge").run(
+        args,
+        |cli: Cli| async move { Ok(Box::pin(dispatch(cli)).await) },
+    )
+}
+
+/// Runs the job `cli` names and returns the process exit code.
+#[expect(
+    clippy::print_stderr,
+    reason = "a refused configuration is reported before any log subscriber exists"
+)]
+async fn dispatch(cli: Cli) -> ExitCode {
     let job = Job::of(&cli.command);
     let loaded = match Config::load(cli.config.config.as_deref(), &cli.config.sets) {
         Ok(loaded) => loaded,
         Err(error) => {
             eprintln!("ferrobridge: cannot start: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
     };
     match job {
         Job::ConfigCheck => return config_check(loaded),
-        Job::Healthcheck => return healthcheck_command(&loaded.settings().server),
+        Job::Healthcheck => return healthcheck_command(&loaded.settings().server).await,
         _ => {}
     }
     let config = Config::from_loaded(loaded);
@@ -136,7 +128,7 @@ where
         Ok(settings) => settings,
         Err(error) => {
             eprintln!("ferrobridge: cannot start: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
     };
     let console = Console::detect();
@@ -152,19 +144,19 @@ where
     // NOTE: no specification governs this: our own design; `mapping check`
     // installs no log subscriber, so its report is the whole of stdout.
     if matches!(job, Job::MappingCheck { .. }) {
-        return job.run(settings);
+        return Box::pin(job.run(settings)).await;
     }
     let service = Service::new("ferrobridge", build_info::VERSION);
     let telemetry = match Telemetry::new(&settings.telemetry, service) {
         Ok(telemetry) => telemetry,
         Err(error) => {
             eprintln!("ferrobridge: cannot start: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
     };
     if let Err(error) = telemetry.install(&settings.telemetry, &console) {
         eprintln!("ferrobridge: cannot start: {}", chain(&error));
-        return ExitCode::from(EXIT_CONFIG);
+        return ExitCode::from(EXIT_CONFIG.get());
     }
     ferrohealth_telemetry::panic::install_hook();
     let terminal = std::io::stdout().is_terminal();
@@ -177,7 +169,7 @@ where
         filter = settings.telemetry.filter.as_str(),
         "console"
     );
-    let code = job.run(settings);
+    let code = Box::pin(job.run(settings)).await;
     if let Err(error) = telemetry.shutdown() {
         tracing::warn!(error = %error, "the telemetry did not flush");
     }
@@ -196,7 +188,7 @@ fn config_check(loaded: Loaded<Config>) -> ExitCode {
         Ok(report) => report,
         Err(error) => {
             eprintln!("ferrobridge config check: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
     };
     println!("{report}");
@@ -204,7 +196,7 @@ fn config_check(loaded: Loaded<Config>) -> ExitCode {
         Ok(_settings) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("ferrobridge config check: {}", chain(&error));
-            ExitCode::from(EXIT_CONFIG)
+            ExitCode::from(EXIT_CONFIG.get())
         }
     }
 }
@@ -215,14 +207,8 @@ fn config_check(loaded: Loaded<Config>) -> ExitCode {
     clippy::print_stderr,
     reason = "the probe's refusal is the whole of its output, and no log subscriber exists"
 )]
-fn healthcheck_command(section: &ServerSection) -> ExitCode {
-    let outcome = match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime.block_on(healthcheck(section)),
-        Err(error) => Outcome::Failed(format!("the probe could not start: {error}")),
-    };
+async fn healthcheck_command(section: &ServerSection) -> ExitCode {
+    let outcome = healthcheck(section).await;
     if outcome.exit_code() == 0 {
         return ExitCode::SUCCESS;
     }
@@ -292,10 +278,10 @@ impl Job {
         clippy::print_stderr,
         reason = "a missing section and a refused check are reported on stderr, outside the report on stdout"
     )]
-    fn run(self, settings: Settings) -> ExitCode {
+    async fn run(self, settings: Settings) -> ExitCode {
         match self {
             Job::ConfigCheck | Job::Healthcheck => ExitCode::SUCCESS,
-            Job::Serve => match serve_command(settings) {
+            Job::Serve => match Box::pin(serve_command(settings)).await {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     tracing::error!(error = format!("{error:#}"), "cannot serve");
@@ -305,9 +291,9 @@ impl Job {
             Job::CdmInit { with_constraints } => {
                 let Some(cdm) = settings.cdm else {
                     eprintln!("ferrobridge: cannot start: `cdm init` needs a [cdm] section");
-                    return ExitCode::from(EXIT_CONFIG);
+                    return ExitCode::from(EXIT_CONFIG.get());
                 };
-                match jobs::cdm_init_command(&cdm, with_constraints) {
+                match jobs::cdm_init_command(&cdm, with_constraints).await {
                     Ok(()) => ExitCode::SUCCESS,
                     Err(error) => {
                         tracing::error!(error = format!("{error:#}"), "cdm init failed");
@@ -318,9 +304,9 @@ impl Job {
             Job::VocabLoad { directory, schema } => {
                 let Some(cdm) = settings.cdm else {
                     eprintln!("ferrobridge: cannot start: `vocab load` needs a [cdm] section");
-                    return ExitCode::from(EXIT_CONFIG);
+                    return ExitCode::from(EXIT_CONFIG.get());
                 };
-                match jobs::vocab_load_command(&cdm, &directory, &schema) {
+                match jobs::vocab_load_command(&cdm, &directory, &schema).await {
                     Ok(()) => ExitCode::SUCCESS,
                     Err(error) => {
                         tracing::error!(error = format!("{error:#}"), "vocab load failed");
@@ -331,9 +317,9 @@ impl Job {
             Job::EtlRun(options) => {
                 if let Some(missing) = etl::job::missing_section(&settings) {
                     eprintln!("ferrobridge: cannot start: `etl run` needs {missing}");
-                    return ExitCode::from(EXIT_CONFIG);
+                    return ExitCode::from(EXIT_CONFIG.get());
                 }
-                match jobs::etl_run_command(&settings, &options) {
+                match jobs::etl_run_command(&settings, &options).await {
                     Ok(()) => ExitCode::SUCCESS,
                     Err(error) => {
                         tracing::error!(error = format!("{error:#}"), "etl run failed");
@@ -344,9 +330,9 @@ impl Job {
             Job::DqCheck { format } => {
                 let Some(cdm) = settings.cdm else {
                     eprintln!("ferrobridge: cannot start: `dq check` needs a [cdm] section");
-                    return ExitCode::from(EXIT_CONFIG);
+                    return ExitCode::from(EXIT_CONFIG.get());
                 };
-                match jobs::dq_check_command(&cdm, format) {
+                match jobs::dq_check_command(&cdm, format).await {
                     Ok(true) => ExitCode::SUCCESS,
                     Ok(false) => ExitCode::FAILURE,
                     Err(error) => {
@@ -358,9 +344,9 @@ impl Job {
             Job::EtlFhir { input } => {
                 if let Some(missing) = etl::job::missing_fhir_section(&settings) {
                     eprintln!("ferrobridge: cannot start: `etl fhir` needs {missing}");
-                    return ExitCode::from(EXIT_CONFIG);
+                    return ExitCode::from(EXIT_CONFIG.get());
                 }
-                match jobs::etl_fhir_command(&settings, &input) {
+                match jobs::etl_fhir_command(&settings, &input).await {
                     Ok(()) => ExitCode::SUCCESS,
                     Err(error) => {
                         tracing::error!(error = format!("{error:#}"), "etl fhir failed");
@@ -369,12 +355,12 @@ impl Job {
                 }
             }
             Job::MappingCheck { format, vocabulary } => {
-                match jobs::mapping_check_command(&settings, format, vocabulary) {
+                match jobs::mapping_check_command(&settings, format, vocabulary).await {
                     Ok(true) => ExitCode::SUCCESS,
                     Ok(false) => ExitCode::FAILURE,
                     Err(jobs::CheckFailure::Configuration(error)) => {
                         eprintln!("ferrobridge: cannot check: {}", chain(&error));
-                        ExitCode::from(EXIT_CONFIG)
+                        ExitCode::from(EXIT_CONFIG.get())
                     }
                     Err(jobs::CheckFailure::Run(error)) => {
                         eprintln!("ferrobridge: cannot check: {error:#}");
@@ -427,54 +413,26 @@ enum Job {
     },
 }
 
-/// Builds the runtime and serves until the process is asked to stop.
-fn serve_command(settings: Settings) -> anyhow::Result<()> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async move {
-        use anyhow::Context;
+/// Serves until the process is asked to stop.
+async fn serve_command(settings: Settings) -> anyhow::Result<()> {
+    use anyhow::Context;
 
-        build_info::log();
-        let listen = settings.server.listen;
-        let bind = move || async move {
-            TcpListener::bind(listen)
-                .await
-                .with_context(|| format!("binding {listen}"))
-        };
-        boot::serve_settings(
-            &settings,
-            bind,
-            boot::Backoff::default(),
-            ferrohealth_server::serve::shutdown_signal(),
-        )
-        .await?;
-        tracing::info!("ferrobridge stopped");
-        Ok(())
-    })
-}
-
-/// Returns the exit code a command-line refusal deserves.
-///
-/// `--help` and `--version` are not failures: clap reports both as an error
-/// whose kind says the text was printed
-/// (<https://docs.rs/clap/4/clap/error/enum.ErrorKind.html>).
-#[expect(
-    clippy::print_stdout,
-    reason = "clap renders help and version to stdout, which is where a person reads them"
-)]
-#[expect(
-    clippy::print_stderr,
-    reason = "a usage refusal is reported before any log subscriber exists"
-)]
-fn clap_exit(error: &clap::Error) -> u8 {
-    if error.use_stderr() {
-        eprint!("{error}");
-        EXIT_USAGE
-    } else {
-        print!("{error}");
-        0
-    }
+    build_info::log();
+    let listen = settings.server.listen;
+    let bind = move || async move {
+        TcpListener::bind(listen)
+            .await
+            .with_context(|| format!("binding {listen}"))
+    };
+    boot::serve_settings(
+        &settings,
+        bind,
+        boot::Backoff::default(),
+        ferrohealth_server::serve::shutdown_signal(),
+    )
+    .await?;
+    tracing::info!("ferrobridge stopped");
+    Ok(())
 }
 
 /// Builds the HTTP application over `state` inside the family's stack.

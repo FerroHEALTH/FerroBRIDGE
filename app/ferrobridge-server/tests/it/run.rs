@@ -3,8 +3,12 @@
 
 //! The binary is thin over the library, so a test drives the real run path.
 
-use ferrobridge_server::{EXIT_CONFIG, EXIT_USAGE};
 use std::process::ExitCode;
+
+use ferrohealth_server::run::EXIT_CONFIG;
+
+/// The exit code clap gives a usage error.
+const EXIT_USAGE: u8 = 2;
 
 /// Runs the library entry point with `argv`.
 fn run(argv: &[&str]) -> ExitCode {
@@ -23,7 +27,7 @@ fn etl_run_without_an_etl_section_exits_seventy_eight() {
         .env_remove("FERROBRIDGE_CONFIG")
         .output()
         .expect("the binary runs");
-    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    assert_eq!(Some(i32::from(EXIT_CONFIG.get())), output.status.code());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("[etl]"),
@@ -38,7 +42,7 @@ fn vocab_load_without_a_cdm_section_exits_seventy_eight() {
         .env_remove("FERROBRIDGE_CONFIG")
         .output()
         .expect("the binary runs");
-    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    assert_eq!(Some(i32::from(EXIT_CONFIG.get())), output.status.code());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("[cdm]"),
@@ -53,7 +57,7 @@ fn cdm_init_without_a_cdm_section_exits_seventy_eight() {
         .env_remove("FERROBRIDGE_CONFIG")
         .output()
         .expect("the binary runs");
-    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    assert_eq!(Some(i32::from(EXIT_CONFIG.get())), output.status.code());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("[cdm]"),
@@ -153,7 +157,7 @@ fn help_and_version_are_printed_and_exit_zero() {
 #[test]
 fn a_configuration_file_that_does_not_exist_exits_seventy_eight() {
     assert_eq!(
-        rendered(ExitCode::from(EXIT_CONFIG)),
+        rendered(ExitCode::from(EXIT_CONFIG.get())),
         rendered(run(&[
             "ferrobridge",
             "serve",
@@ -171,7 +175,7 @@ fn dq_check_without_a_cdm_section_exits_seventy_eight() {
         .env_remove("FERROBRIDGE_CONFIG")
         .output()
         .expect("the binary runs");
-    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    assert_eq!(Some(i32::from(EXIT_CONFIG.get())), output.status.code());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("`dq check` needs a [cdm] section"),
@@ -186,7 +190,7 @@ fn etl_fhir_without_an_etl_section_exits_seventy_eight() {
         .env_remove("FERROBRIDGE_CONFIG")
         .output()
         .expect("the binary runs");
-    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    assert_eq!(Some(i32::from(EXIT_CONFIG.get())), output.status.code());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("`etl fhir` needs an [etl] section"),

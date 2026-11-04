@@ -6,9 +6,8 @@
 
 use std::process::ExitCode;
 
-use clap::Parser;
 use ferrohealth_server::cli::{Common, ConfigCommand};
-use ferrohealth_server::run::chain;
+use ferrohealth_server::run::{EXIT_CONFIG, Run, chain};
 use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 
 use crate::cli::Cli;
@@ -19,35 +18,26 @@ use crate::server::ConsoleState;
 /// How long `healthcheck` waits for the console's answer.
 pub const HEALTHCHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
-/// The exit code of a configuration the console will not start on, from the
-/// BSD `sysexits.h` set (`EX_CONFIG`).
-pub const EXIT_CONFIG: u8 = 78;
-
 /// Runs the binary with `args` and returns the process exit code.
 ///
 /// `args` is the whole argument vector, the program name included, so the
-/// command-line parser reports usage under the right name.
+/// command-line parser reports usage under the right name. The family's run
+/// path parses it, answers help, the version and a usage error with clap's
+/// exit code, and runs the job on its multi-threaded runtime.
 #[must_use]
-#[expect(
-    clippy::print_stderr,
-    reason = "a refused configuration is reported before any log subscriber exists"
-)]
 pub fn run<I>(args: I) -> ExitCode
 where
     I: IntoIterator<Item = String>,
 {
-    let cli = match Cli::try_parse_from(args) {
-        Ok(cli) => cli,
-        Err(error) => {
-            // NOTE: no specification governs this: our own design; clap prints
-            // the usage or the version itself and names the exit code.
-            let code = error.exit_code();
-            if error.print().is_err() {
-                return ExitCode::FAILURE;
-            }
-            return u8::try_from(code).map_or(ExitCode::FAILURE, ExitCode::from);
-        }
-    };
+    Run::new("ferrobridge-console").run(args, |cli: Cli| async move { Ok(dispatch(cli).await) })
+}
+
+/// Runs the job `cli` names and returns the process exit code.
+#[expect(
+    clippy::print_stderr,
+    reason = "a refused configuration is reported before any log subscriber exists"
+)]
+async fn dispatch(cli: Cli) -> ExitCode {
     let loaded = match Config::load(cli.config.config.as_deref(), &cli.config.sets) {
         Ok(loaded) => loaded,
         Err(error) if cli.command == Common::Healthcheck => {
@@ -56,7 +46,7 @@ where
         }
         Err(error) => {
             eprintln!("ferrobridge-console: cannot start: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
     };
     let report = (cli.command
@@ -72,37 +62,15 @@ where
         }
         Err(error) => {
             eprintln!("ferrobridge-console: cannot start: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
     };
     match cli.command {
-        Common::Healthcheck => runtime_then(|| healthcheck(&settings)),
+        Common::Healthcheck => healthcheck(&settings).await,
         Common::Config {
             command: ConfigCommand::Check,
-        } => runtime_then(|| config_check(settings, report)),
-        Common::Serve => runtime_then(|| serve(settings)),
-    }
-}
-
-/// Runs `job` on a multi-threaded runtime.
-#[expect(
-    clippy::print_stderr,
-    reason = "a runtime that cannot start is reported before any log subscriber exists"
-)]
-fn runtime_then<F, J>(job: J) -> ExitCode
-where
-    J: FnOnce() -> F,
-    F: Future<Output = ExitCode>,
-{
-    match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime.block_on(job()),
-        Err(error) => {
-            eprintln!("ferrobridge-console: cannot start the runtime: {error}");
-            ExitCode::FAILURE
-        }
+        } => config_check(settings, report).await,
+        Common::Serve => serve(settings).await,
     }
 }
 
@@ -127,7 +95,7 @@ async fn config_check(
         Some(Ok(report)) => println!("{report}"),
         Some(Err(error)) => {
             eprintln!("ferrobridge-console: cannot start: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
         None => {}
     }
@@ -149,7 +117,7 @@ async fn config_check(
         }
         Err(error) => {
             eprintln!("ferrobridge-console: cannot start: {}", chain(&error));
-            ExitCode::from(EXIT_CONFIG)
+            ExitCode::from(EXIT_CONFIG.get())
         }
     }
 }
@@ -201,7 +169,7 @@ async fn serve(settings: Settings) -> ExitCode {
         Ok(state) => state,
         Err(error) => {
             tracing::error!(error = %chain(&error), "cannot start");
-            return ExitCode::from(EXIT_CONFIG);
+            return ExitCode::from(EXIT_CONFIG.get());
         }
     };
     let listener = match tokio::net::TcpListener::bind(listen).await {
