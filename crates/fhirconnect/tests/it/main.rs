@@ -24,6 +24,7 @@ mod laborauftrag;
 mod laws;
 mod library;
 mod locations;
+mod mapping_library;
 mod model;
 mod operations;
 mod person;

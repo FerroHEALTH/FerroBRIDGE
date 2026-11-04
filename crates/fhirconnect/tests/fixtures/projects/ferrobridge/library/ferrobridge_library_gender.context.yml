@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the mapping library model EVALUATION.gender.v1, which no published
+# context of the library starts at. It compiles the model verbatim against the
+# library report template built from the vendored CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_gender.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Patient"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_report.v1.0.0"
+  archetypes:
+    - "EVALUATION.gender.v1"
+  start: "EVALUATION.gender.v1"
