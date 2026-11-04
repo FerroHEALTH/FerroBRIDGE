@@ -2123,6 +2123,7 @@ dependencies = [
  "anyhow",
  "clap",
  "fhir-types",
+ "generated-tree",
  "hl7v2-types",
  "insta",
  "proptest",
@@ -2462,6 +2463,14 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "generated-tree"
+version = "0.0.16"
+dependencies = [
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -3832,6 +3841,7 @@ dependencies = [
  "anyhow",
  "clap",
  "csv",
+ "generated-tree",
  "serde",
  "tempfile",
  "thiserror",

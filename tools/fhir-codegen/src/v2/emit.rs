@@ -8,10 +8,9 @@
 //! produces. The files go through the same scratch directory and `rustfmt`
 //! pass as `fhir-types`.
 
-use std::fs;
 use std::path::PathBuf;
 
-use crate::emit::{files_under, read_tree, rustfmt, write_tree};
+use crate::emit::formatted;
 use crate::roots::{NotAStructure, V2RootSet};
 use crate::v2::corpus::{Corpus, LoadError};
 use crate::v2::legacy::lower::{LegacyError, LegacyModel};
@@ -91,7 +90,7 @@ pub enum EmitError {
     Render(#[from] RenderError),
     /// Writing, formatting, or checking the tree failed.
     #[error(transparent)]
-    Tree(#[from] crate::emit::EmitError),
+    Tree(#[from] generated_tree::TreeError),
 }
 
 /// Runs the v2 pipeline per `options`.
@@ -99,7 +98,7 @@ pub enum EmitError {
 /// # Errors
 ///
 /// Returns [`EmitError`] for a load, lowering, render, I/O, or `rustfmt`
-/// failure, and a [`crate::emit::EmitError::Drift`] in check mode when the tree differs.
+/// failure, and a [`generated_tree::TreeError::Drift`] in check mode when the tree differs.
 pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     let corpus = Corpus::open(&options.definitions)?;
     let roots = V2RootSet::select(&corpus)?;
@@ -109,45 +108,15 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     let legacy = LegacyModel::lower(&tables, &model, &table)?;
     let files = render(&model, &legacy)?;
 
-    let scratch = tempfile::tempdir().map_err(|source| crate::emit::EmitError::Io {
-        path: PathBuf::from("(temporary directory)"),
-        source,
-    })?;
-    let scratch_src = scratch.path().join("src");
-    write_tree(&scratch_src, &files)?;
-    rustfmt(&scratch_src, &options.crate_dir)?;
-    let formatted = read_tree(&scratch_src, &files)?;
+    let formatted = formatted(&files, &options.crate_dir)?;
 
     let target_src = options.crate_dir.join("src");
     if options.check {
-        let mut drift = Vec::new();
-        for (relative, content) in &formatted {
-            match fs::read_to_string(target_src.join(relative)) {
-                Ok(existing) if existing == *content => {}
-                Ok(_) => drift.push(relative.clone()),
-                Err(_) => drift.push(format!("{relative} (missing)")),
-            }
-        }
-        if target_src.is_dir() {
-            for relative in files_under(&target_src, "")? {
-                let relative = relative.trim_start_matches('/').to_owned();
-                if !formatted.contains_key(&relative) {
-                    drift.push(format!("{relative} (stale)"));
-                }
-            }
-        }
-        drift.sort();
-        if !drift.is_empty() {
-            return Err(crate::emit::EmitError::Drift { paths: drift }.into());
-        }
+        let owned = [(target_src.clone(), "")];
+        generated_tree::check(&formatted, |relative| target_src.join(relative), &owned)?;
     } else {
-        if target_src.exists() {
-            fs::remove_dir_all(&target_src).map_err(|source| crate::emit::EmitError::Io {
-                path: target_src.clone(),
-                source,
-            })?;
-        }
-        write_tree(&target_src, &formatted)?;
+        generated_tree::clear(&target_src)?;
+        generated_tree::write(&target_src, &formatted)?;
     }
     Ok(EmitReport {
         structures: model.structures.len(),
