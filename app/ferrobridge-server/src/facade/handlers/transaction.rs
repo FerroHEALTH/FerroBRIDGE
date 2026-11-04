@@ -36,7 +36,6 @@ use crate::facade::commit::Change;
 use crate::facade::commit::Committer;
 use crate::facade::compartment;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
 use crate::facade::ingest::Committed;
 use crate::facade::ingest::EntryOutcome;
@@ -46,6 +45,7 @@ use crate::facade::ingest::UnmappedEntries;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::request::Inbound;
 
 /// The `Bundle.type` this route commits.
