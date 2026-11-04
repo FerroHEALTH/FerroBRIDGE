@@ -342,6 +342,9 @@ impl CdmWriter {
     /// and the watermark names this version and `run`. Committing the same
     /// graph again writes the same rows under the same ids.
     ///
+    /// The same transaction records the FHIR resource `origin` the graph was
+    /// mapped from, when there is one ([`origin`]).
+    ///
     /// # Errors
     ///
     /// Returns [`WriteError::SequenceExhausted`] when a table has no id left,
@@ -351,18 +354,7 @@ impl CdmWriter {
     /// and [`WriteError::Database`] for any statement PostgreSQL refuses. In
     /// every case the transaction is rolled back and nothing of the
     /// composition is written.
-    pub async fn commit(&mut self, graph: &RecordGraph, run: &RunId) -> Result<Report, WriteError> {
-        self.commit_from(graph, run, None).await
-    }
-
-    /// Commits the record graph of one composition version as [`CdmWriter::commit`]
-    /// does, and records in the same transaction the FHIR resource `origin`
-    /// it was mapped from, when there is one ([`origin`]).
-    ///
-    /// # Errors
-    ///
-    /// Returns what [`CdmWriter::commit`] returns.
-    pub async fn commit_from(
+    pub async fn commit(
         &mut self,
         graph: &RecordGraph,
         run: &RunId,

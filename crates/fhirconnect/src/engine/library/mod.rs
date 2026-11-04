@@ -114,15 +114,15 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: ratio::DOSAGE_RATE,
         ports: ratio::PORTS,
-        to_fhir: ratio::dosage_rate_to_fhir,
-        to_openehr: ratio::dosage_rate_to_openehr,
+        to_fhir: |ports| ratio::to_fhir(ratio::DOSAGE_RATE, ports),
+        to_openehr: |element| ratio::to_openehr(ratio::DOSAGE_RATE, element),
         subject: None,
     },
     Function {
         code: ratio::ACTION_RATE,
         ports: ratio::PORTS,
-        to_fhir: ratio::action_rate_to_fhir,
-        to_openehr: ratio::action_rate_to_openehr,
+        to_fhir: |ports| ratio::to_fhir(ratio::ACTION_RATE, ports),
+        to_openehr: |element| ratio::to_openehr(ratio::ACTION_RATE, element),
         subject: None,
     },
     Function {

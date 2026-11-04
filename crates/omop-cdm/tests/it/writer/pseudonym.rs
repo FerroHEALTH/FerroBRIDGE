@@ -156,7 +156,7 @@ async fn write(key: &[u8]) -> Result<Database, Box<dyn Error>> {
         )
         .await?;
     writer
-        .commit(&graph(&visit)?, &RunId::new("run-1")?)
+        .commit(&graph(&visit)?, &RunId::new("run-1")?, None)
         .await?;
     Ok(Database { postgres, writer })
 }

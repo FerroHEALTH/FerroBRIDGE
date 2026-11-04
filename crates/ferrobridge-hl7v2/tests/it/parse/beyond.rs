@@ -60,7 +60,7 @@ fn a_valued_component_past_the_data_type_is_counted_and_the_message_parses() {
         .and_then(|pid| pid.field(3))
         .and_then(|field| field.repetitions().first())
         .and_then(|repetition| repetition.component(13))
-        .and_then(|component| component.text());
+        .and_then(|component| component.subcomponent(1));
     assert_eq!(kept, Some("EXTRA"), "the value stays reachable");
 }
 

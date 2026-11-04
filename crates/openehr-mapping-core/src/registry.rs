@@ -79,12 +79,6 @@ pub struct MappingRegistry {
 }
 
 impl MappingRegistry {
-    /// Creates an empty registry.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds one loaded document.
     ///
     /// # Errors
@@ -183,7 +177,7 @@ mod tests {
             .expect("a well-formed header");
         let second = load_str("b.yml", &source("shared", "openEHR-EHR-CLUSTER.device.v1"))
             .expect("a well-formed header");
-        let mut registry = MappingRegistry::new();
+        let mut registry = MappingRegistry::default();
         registry.insert(first).expect("the first file loads");
         let error = registry.insert(second).expect_err("the second is refused");
         assert!(matches!(error, RegistryError::DuplicateName { .. }));
@@ -199,7 +193,7 @@ mod tests {
     #[test]
     fn several_mappings_may_share_one_archetype() {
         let archetype = "openEHR-EHR-OBSERVATION.body_weight.v2";
-        let mut registry = MappingRegistry::new();
+        let mut registry = MappingRegistry::default();
         registry
             .insert(load_str("model.yml", &source("model", archetype)).expect("a header"))
             .expect("the model loads");

@@ -493,6 +493,13 @@ for wf in .github/workflows/release.yml .github/workflows/scan-and-tag.yml .gith
   fi
 done
 [ "$trivy_seen" -gt 0 ] || note "no workflow installs trivy yet, skipped"
+if [ -n "$trivy_want" ]; then
+  if trivy_sha="$(bash scripts/release/install-trivy.sh --sha256 "$trivy_want" 2>/dev/null)"; then
+    note "OK: trivy $trivy_want is pinned by sha256 in scripts/release/install-trivy.sh ($trivy_sha)"
+  else
+    bad "trivy: scripts/release/install-trivy.sh pins no sha256 for $trivy_want"
+  fi
+fi
 
 echo "== operator console journeys (ci.yml, Cargo.toml, scripts/release/journey-tools.sh <-> docs/VERSIONS.md)"
 if [ -f app/ferrobridge-console/Cargo.toml ]; then

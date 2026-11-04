@@ -17,7 +17,7 @@
 pub mod algebra;
 mod essence;
 mod magnitude;
-mod parse;
+pub(crate) mod parse;
 
 use std::cmp::Ordering;
 use std::sync::LazyLock;
@@ -144,7 +144,7 @@ static ESSENCE: LazyLock<Essence> = LazyLock::new(load);
     reason = "the essence is embedded at build time and the essence test proves it loads"
 )]
 fn load() -> Essence {
-    Essence::load().expect("the embedded UCUM essence should load")
+    Essence::parse(essence::TEXT).expect("the embedded UCUM essence should load")
 }
 
 impl Canonical {

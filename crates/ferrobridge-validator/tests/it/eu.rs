@@ -8,6 +8,7 @@
 //! ([`crate::support::profile_packages`]).
 
 use ferrobridge_validator::issue::MessageId;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
 
@@ -33,7 +34,7 @@ pub(crate) fn eu_set() -> TestResult<Option<PackageSet>> {
             paths.push(path);
         }
     }
-    Ok(Some(PackageSet::load(paths)?))
+    Ok(Some(PackageSet::<R4>::load(paths)?))
 }
 
 /// The emptyReason of a patient summary section with nothing to hold, which
