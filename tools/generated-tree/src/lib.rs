@@ -36,6 +36,82 @@ pub enum TreeError {
         /// What rustfmt printed.
         stderr: String,
     },
+    /// Check mode found the tree out of date.
+    #[error("the generated tree is out of date; {} file(s) differ: {}", .paths.len(), .paths.join(", "))]
+    Drift {
+        /// The files that differ, are missing, or are stale.
+        paths: Vec<String>,
+    },
+}
+
+/// Which files of a rendered tree `rustfmt` is given.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Formatting<'a> {
+    /// The crate root alone, from which `rustfmt` reaches every module the
+    /// tree declares out of line.
+    FromRoot(&'a str),
+    /// Every file of the tree.
+    EachFile,
+}
+
+/// Returns `files` as `rustfmt` formats them under `config`, written to and
+/// read back from a scratch directory.
+///
+/// # Errors
+///
+/// Returns [`TreeError::Io`] when the scratch directory cannot be made,
+/// written or read, and [`TreeError::Rustfmt`] when `rustfmt` does not run
+/// or refuses the files.
+pub fn formatted(
+    files: &BTreeMap<String, String>,
+    formatting: Formatting<'_>,
+    config: &Path,
+) -> Result<BTreeMap<String, String>, TreeError> {
+    let scratch = tempfile::tempdir().map_err(|source| TreeError::Io {
+        path: PathBuf::from("(temporary directory)"),
+        source,
+    })?;
+    let root = scratch.path();
+    write(root, files)?;
+    match formatting {
+        Formatting::FromRoot(crate_root) => rustfmt([root.join(crate_root)], config)?,
+        Formatting::EachFile => rustfmt(files.keys().map(|relative| root.join(relative)), config)?,
+    }
+    read(root, files.keys())
+}
+
+/// Removes the directory `dir` and everything under it, when it exists.
+///
+/// # Errors
+///
+/// Returns [`TreeError::Io`] naming the directory that could not be removed.
+pub fn clear(dir: &Path) -> Result<(), TreeError> {
+    if dir.exists() {
+        fs::remove_dir_all(dir).map_err(|source| TreeError::Io {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+    }
+    Ok(())
+}
+
+/// Checks `files` against the tree on disk, as [`drift`] compares them.
+///
+/// # Errors
+///
+/// Returns [`TreeError::Drift`] naming every file that differs, is missing or
+/// is stale, and [`TreeError::Io`] when an owned directory cannot be listed.
+pub fn check(
+    files: &BTreeMap<String, String>,
+    path_of: impl Fn(&str) -> PathBuf,
+    owned: &[(PathBuf, &str)],
+) -> Result<(), TreeError> {
+    let paths = drift(files, path_of, owned)?;
+    if paths.is_empty() {
+        Ok(())
+    } else {
+        Err(TreeError::Drift { paths })
+    }
 }
 
 /// Writes every file of `files` under `root`, creating the directories above

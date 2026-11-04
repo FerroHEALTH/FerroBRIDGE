@@ -143,7 +143,9 @@ fn check_mode_reports_a_hand_edit_and_a_stale_file() -> Result<(), Box<dyn Error
         "-- no vendored file carries this\n",
     )?;
 
-    let Err(EmitError::Drift { paths }) = emit(&options(scratch.path(), true)) else {
+    let Err(EmitError::Tree(generated_tree::TreeError::Drift { paths })) =
+        emit(&options(scratch.path(), true))
+    else {
         panic!("check mode accepted an edited tree");
     };
     assert_eq!(

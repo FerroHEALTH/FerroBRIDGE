@@ -12,9 +12,9 @@
 //! mode, compares it with the tree on disk and reports every difference.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+
+use generated_tree::Formatting;
 
 use crate::closure::{ClosureError, TypeClosure};
 use crate::lower::{LowerError, VersionModule};
@@ -74,24 +74,9 @@ pub enum EmitError {
     /// A search parameter registry failed to lower.
     #[error(transparent)]
     Search(#[from] crate::search::SearchError),
-    /// A file could not be read or written.
-    #[error("cannot access {path}")]
-    Io {
-        /// The path.
-        path: PathBuf,
-        /// The underlying error.
-        #[source]
-        source: io::Error,
-    },
     /// The generated tree could not be written, formatted or read back.
     #[error(transparent)]
     Tree(#[from] generated_tree::TreeError),
-    /// Check mode found the tree out of date.
-    #[error("the generated crate is out of date; {} file(s) differ: {}", .paths.len(), .paths.join(", "))]
-    Drift {
-        /// The files that differ, are missing, or are stale.
-        paths: Vec<String>,
-    },
 }
 
 /// What an emit run produced.
@@ -108,7 +93,7 @@ pub struct EmitReport {
 /// # Errors
 ///
 /// Returns [`EmitError`] for a load, closure, lowering, I/O, or `rustfmt`
-/// failure, and [`EmitError::Drift`] in check mode when the tree differs.
+/// failure, and [`generated_tree::TreeError::Drift`] in check mode when the tree differs.
 pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     if options.versions.is_empty() {
         return Err(EmitError::NoVersions);
@@ -127,14 +112,7 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     }
     let files = render_files(&models, &registries)?;
 
-    let scratch = tempfile::tempdir().map_err(|source| EmitError::Io {
-        path: PathBuf::from("(temporary directory)"),
-        source,
-    })?;
-    let scratch_src = scratch.path().join("src");
-    generated_tree::write(&scratch_src, &files)?;
-    rustfmt(&scratch_src, &options.crate_dir)?;
-    let formatted = generated_tree::read(&scratch_src, files.keys())?;
+    let formatted = formatted(&files, &options.crate_dir)?;
 
     let module_names: Vec<&str> = models.iter().map(|m| m.name.as_str()).collect();
     let target_src = options.crate_dir.join("src");
@@ -143,11 +121,7 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
             .iter()
             .map(|module| (target_src.join(module), *module))
             .collect();
-        let drift =
-            generated_tree::drift(&formatted, |relative| target_src.join(relative), &owned)?;
-        if !drift.is_empty() {
-            return Err(EmitError::Drift { paths: drift });
-        }
+        generated_tree::check(&formatted, |relative| target_src.join(relative), &owned)?;
     } else {
         replace_tree(&target_src, &formatted, &module_names)?;
     }
@@ -249,13 +223,7 @@ fn replace_tree(
     version_modules: &[&str],
 ) -> Result<(), EmitError> {
     for module in version_modules {
-        let version_dir = target_src.join(module);
-        if version_dir.exists() {
-            fs::remove_dir_all(&version_dir).map_err(|source| EmitError::Io {
-                path: version_dir.clone(),
-                source,
-            })?;
-        }
+        generated_tree::clear(&target_src.join(module))?;
     }
     Ok(generated_tree::write(target_src, files)?)
 }
@@ -307,15 +275,19 @@ fn lower_models(
     Ok(models)
 }
 
-/// Formats the rendered tree with the pinned `rustfmt`.
+/// Returns the rendered tree as the pinned `rustfmt` formats it.
 ///
 /// `rustfmt` formats a file together with every out-of-line module it
 /// declares, so the tree is formatted once, from its crate root, which every
 /// rendered file is reachable from. Naming the other files as well would
 /// format each `mod.rs` subtree again (#433).
-pub(crate) fn rustfmt(root: &Path, crate_dir: &Path) -> Result<(), EmitError> {
-    Ok(generated_tree::rustfmt(
-        [root.join("lib.rs")],
+pub(crate) fn formatted(
+    files: &BTreeMap<String, String>,
+    crate_dir: &Path,
+) -> Result<BTreeMap<String, String>, generated_tree::TreeError> {
+    generated_tree::formatted(
+        files,
+        Formatting::FromRoot("lib.rs"),
         &crate_dir.join("../../rustfmt.toml"),
-    )?)
+    )
 }

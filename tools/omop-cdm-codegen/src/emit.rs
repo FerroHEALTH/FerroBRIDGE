@@ -10,9 +10,9 @@
 //! it with what is on disk and reports every difference.
 
 use std::collections::BTreeMap;
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+
+use generated_tree::Formatting;
 
 use crate::definitions::{Definitions, LoadError};
 use crate::dqd::{Catalogue, Dashboard, DqdError};
@@ -61,24 +61,9 @@ pub enum EmitError {
     /// Rendering to a string failed.
     #[error("rendering failed")]
     Render(#[from] std::fmt::Error),
-    /// A file could not be read or written.
-    #[error("cannot access {path}")]
-    Io {
-        /// The path.
-        path: PathBuf,
-        /// The underlying error.
-        #[source]
-        source: io::Error,
-    },
     /// The generated tree could not be written, formatted or read back.
     #[error(transparent)]
     Tree(#[from] generated_tree::TreeError),
-    /// Check mode found the tree out of date.
-    #[error("the generated tree is out of date; {} file(s) differ: {}", .paths.len(), .paths.join(", "))]
-    Drift {
-        /// The files that differ, are missing, or are stale.
-        paths: Vec<String>,
-    },
 }
 
 /// What an emit run produced.
@@ -97,7 +82,7 @@ pub struct EmitReport {
 /// # Errors
 ///
 /// Returns [`EmitError`] for a load, lowering, I/O or `rustfmt` failure, and
-/// [`EmitError::Drift`] in check mode when the tree differs from what the
+/// [`generated_tree::TreeError::Drift`] in check mode when the tree differs from what the
 /// emitter produces.
 pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
     let definitions = Definitions::load(&options.definitions_dir)?;
@@ -115,16 +100,8 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
         );
     }
 
-    let scratch = tempfile::tempdir().map_err(|source| EmitError::Io {
-        path: PathBuf::from("(temporary directory)"),
-        source,
-    })?;
-    generated_tree::write(scratch.path(), &sources)?;
-    generated_tree::rustfmt(
-        sources.keys().map(|relative| scratch.path().join(relative)),
-        &options.rustfmt_config,
-    )?;
-    let mut files = generated_tree::read(scratch.path(), sources.keys())?;
+    let mut files =
+        generated_tree::formatted(&sources, Formatting::EachFile, &options.rustfmt_config)?;
     for (name, content) in read_ddl(&options.ddl_dir)? {
         files.insert(name, content);
     }
@@ -136,22 +113,13 @@ pub fn emit(options: &EmitOptions) -> Result<EmitReport, EmitError> {
             (src.join(GENERATED_DIR), GENERATED_DIR),
             (options.crate_dir.join(DDL_DIR), DDL_DIR),
         ];
-        let drift = generated_tree::drift(
+        generated_tree::check(
             &files,
             |relative| target_path(&options.crate_dir, &src, relative),
             &owned,
         )?;
-        if !drift.is_empty() {
-            return Err(EmitError::Drift { paths: drift });
-        }
     } else {
-        let generated = src.join(GENERATED_DIR);
-        if generated.exists() {
-            fs::remove_dir_all(&generated).map_err(|source| EmitError::Io {
-                path: generated.clone(),
-                source,
-            })?;
-        }
+        generated_tree::clear(&src.join(GENERATED_DIR))?;
         let (modules, ddl): (BTreeMap<String, String>, BTreeMap<String, String>) = files
             .iter()
             .map(|(relative, content)| (relative.clone(), content.clone()))
@@ -183,16 +151,11 @@ fn target_path(crate_dir: &Path, src: &Path, relative: &str) -> PathBuf {
 
 /// Reads the four vendored DDL files, keyed by their path under `ddl/`.
 fn read_ddl(ddl_dir: &Path) -> Result<BTreeMap<String, String>, EmitError> {
-    let mut out = BTreeMap::new();
-    for ddl in DDL_FILES {
-        let path = ddl_dir.join(ddl.file);
-        let content = fs::read_to_string(&path).map_err(|source| EmitError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        out.insert(format!("{DDL_DIR}/{}", ddl.file), content);
-    }
-    Ok(out)
+    let names: Vec<String> = DDL_FILES.iter().map(|ddl| String::from(ddl.file)).collect();
+    Ok(generated_tree::read(ddl_dir, &names)?
+        .into_iter()
+        .map(|(file, content)| (format!("{DDL_DIR}/{file}"), content))
+        .collect())
 }
 
 /// Returns the provenance note that travels with the copied DDL.
