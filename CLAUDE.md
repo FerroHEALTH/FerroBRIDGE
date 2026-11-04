@@ -297,7 +297,7 @@ the testkit tool crate. Beside it:
 - `.claude/`: the working discipline. `rules/` (the path-scoped and standing
   rules), `hooks/`, `skills/`, `agents/`, `memory/`.
 - `scripts/gh/`: the tracker helpers (`rel.sh`, `project.sh`, `fields.sh`,
-  `watch-prs.sh`, `labels.sh`, `migrate-fields.sh`).
+  `watch-prs.sh`, `queue-stuck.sh`, `labels.sh`, `migrate-fields.sh`).
 - `scripts/checks/`: the committed guards. `comment-style.sh`; `versions.sh`,
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or
   claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate

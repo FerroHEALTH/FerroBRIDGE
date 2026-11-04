@@ -480,6 +480,7 @@ jobs:
           bash scripts/gh/labels.sh --self-test
           bash scripts/gh/migrate-fields.sh --self-test
           bash scripts/gh/watch-prs.sh --self-test
+          bash scripts/gh/queue-stuck.sh --self-test
           bash scripts/deploy-probe.sh --self-test
           bash scripts/release/milestone.sh --self-test
           bash .claude/hooks/block_dangerous.sh --self-test
