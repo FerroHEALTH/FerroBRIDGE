@@ -86,6 +86,9 @@ base64.workspace = true
 # The test OpenID Provider the sign-in, the refresh and the sign-out run
 # against; a dev-dependency links into no shipped artifact.
 ferrobridge-testkit.workspace = true
+# `test-clock` gives the session tests a time they move, so a timeout is
+# reached without waiting for it; it is enabled for the tests alone.
+ferrohealth-session = { workspace = true, features = ["axum", "test-clock"] }
 # The sign-in cases sign a shared-secret ID Token the console must refuse.
 jsonwebtoken.workspace = true
 tempfile.workspace = true
