@@ -7,10 +7,10 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::header;
 
-use crate::facade::handlers::Refusal;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 
 /// The media type of a `POST _search` body.
 ///

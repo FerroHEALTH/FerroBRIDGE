@@ -34,7 +34,6 @@ use crate::facade::Facade;
 use crate::facade::commit::Change;
 use crate::facade::commit::Committer;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read::parse;
 use crate::facade::handlers::write::same_id;
 use crate::facade::outcome::Issue;
@@ -44,6 +43,7 @@ use crate::facade::party::read::class_of;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
 use crate::facade::reply::Header;
+use crate::facade::reply::Refusal;
 use crate::terminology::Direction;
 
 /// `POST [base]/{type}` of a party type.

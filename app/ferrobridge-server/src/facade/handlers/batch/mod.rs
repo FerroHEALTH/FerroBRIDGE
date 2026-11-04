@@ -40,13 +40,13 @@ use crate::facade::Facade;
 use crate::facade::guard;
 use crate::facade::guard::AuditedEntry;
 use crate::facade::guard::Interaction;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::search;
 use crate::facade::handlers::write;
 use crate::facade::media::FHIR_JSON;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::mount::BASE_PATH;
 
 /// The `Bundle.type` a processed batch answers with.

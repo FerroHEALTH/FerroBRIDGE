@@ -21,7 +21,6 @@ use http::StatusCode;
 use std::collections::BTreeSet;
 
 use crate::facade::Facade;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
@@ -30,6 +29,7 @@ use crate::facade::identity::record::SystemMatch;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 
 /// The search parameters the conditional create answers.
 const ANSWERED: [&str; 2] = ["_id", "identifier"];
