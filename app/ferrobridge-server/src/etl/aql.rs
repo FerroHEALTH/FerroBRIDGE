@@ -124,41 +124,45 @@ pub struct CheckedQuery {
     parameters: Vec<String>,
 }
 
-impl CheckedQuery {
-    /// Checks `text` as the composition query: `ehr_id`, `version_uid` and
-    /// the whole `composition`, with `versioned_object_uid` when it selects
-    /// one.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AqlError`] naming the first fault.
-    pub fn compositions(text: &str) -> Result<Self, AqlError> {
-        Self::check(
-            "composition query",
-            text,
-            &COMPOSITION_PROJECTIONS,
-            &OPTIONAL_COMPOSITION_PROJECTIONS,
-        )
-    }
-
-    /// Checks `text` as the visit query: `ehr_id`, `visit_source`,
-    /// `visit_start` and `visit_end`, naming no `$since`.
+/// Which of the two queries of `[etl]` a text is checked as.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Query {
+    /// The composition query: `ehr_id`, `version_uid` and the whole
+    /// `composition`, with `versioned_object_uid` when it selects one.
+    Compositions,
+    /// The visit query: `ehr_id`, `visit_source`, `visit_start` and
+    /// `visit_end`, naming no `$since`.
     ///
     /// The runner reads every visit the deployment derives and never binds
     /// `--since` to this query, so a `$since` in it would reach the CDR
     /// unbound. No specification governs this: our own design.
+    Visits,
+}
+
+impl CheckedQuery {
+    /// Checks `text` as `query`.
     ///
     /// # Errors
     ///
-    /// Returns [`AqlError`] naming the first fault, [`AqlError::Windowed`]
-    /// when the query names `$since`.
-    pub fn visits(text: &str) -> Result<Self, AqlError> {
-        const QUERY: &str = "visit query";
-        let checked = Self::check(QUERY, text, &VISIT_PROJECTIONS, &[])?;
-        if checked.names_parameter(SINCE_PARAMETER) {
-            return Err(AqlError::Windowed { query: QUERY });
+    /// Returns [`AqlError`] naming the first fault, and
+    /// [`AqlError::Windowed`] when the visit query names `$since`.
+    pub fn new(query: Query, text: &str) -> Result<Self, AqlError> {
+        match query {
+            Query::Compositions => Self::check(
+                "composition query",
+                text,
+                &COMPOSITION_PROJECTIONS,
+                &OPTIONAL_COMPOSITION_PROJECTIONS,
+            ),
+            Query::Visits => {
+                const QUERY: &str = "visit query";
+                let checked = Self::check(QUERY, text, &VISIT_PROJECTIONS, &[])?;
+                if checked.names_parameter(SINCE_PARAMETER) {
+                    return Err(AqlError::Windowed { query: QUERY });
+                }
+                Ok(checked)
+            }
         }
-        Ok(checked)
     }
 
     /// Parses `text` and finds each of `projections`, and each of `optional`
@@ -326,7 +330,7 @@ fn both(left: Option<bool>, right: Option<bool>) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{AqlError, CheckedQuery, SINCE_PARAMETER};
+    use super::{AqlError, CheckedQuery, Query, SINCE_PARAMETER};
 
     /// A composition query with the four projections.
     const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, \
@@ -337,7 +341,7 @@ mod tests {
 
     #[test]
     fn the_four_projections_are_found_by_alias() {
-        let query = CheckedQuery::compositions(COMPOSITIONS).expect("the query checks");
+        let query = CheckedQuery::new(Query::Compositions, COMPOSITIONS).expect("the query checks");
         assert_eq!(Some(0), query.column("ehr_id"));
         assert_eq!(Some(3), query.column("versioned_object_uid"));
         assert_eq!(Some(2), query.column("composition"));
@@ -346,13 +350,14 @@ mod tests {
 
     #[test]
     fn a_query_that_does_not_parse_is_refused() {
-        let error = CheckedQuery::compositions("SELECT FROM WHERE").expect_err("not AQL");
+        let error =
+            CheckedQuery::new(Query::Compositions, "SELECT FROM WHERE").expect_err("not AQL");
         assert!(matches!(error, AqlError::Parse { .. }), "{error:?}");
     }
 
     #[test]
     fn a_missing_projection_is_refused_by_name() {
-        let error = CheckedQuery::compositions(
+        let error = CheckedQuery::new(Query::Compositions,
             "SELECT e/ehr_id/value AS ehr_id, c AS composition FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY e/ehr_id/value",
         )
         .expect_err("the version_uid is missing");
@@ -370,7 +375,7 @@ mod tests {
 
     #[test]
     fn a_query_without_the_versioned_object_uid_checks_and_reads_none() {
-        let query = CheckedQuery::compositions(
+        let query = CheckedQuery::new(Query::Compositions,
             "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS version_uid, c AS composition \
              FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c ORDER BY v/uid/value",
         )
@@ -400,7 +405,7 @@ mod tests {
             "EHR e CONTAINS (COMPOSITION d OR VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c)",
             "EHR e CONTAINS VERSION v[LATEST_VERSION]",
         ] {
-            let error = CheckedQuery::compositions(&over(from)).expect_err(from);
+            let error = CheckedQuery::new(Query::Compositions, &over(from)).expect_err(from);
             assert!(
                 matches!(error, AqlError::Unscoped { .. }),
                 "{from}: {error:?}"
@@ -425,7 +430,7 @@ mod tests {
             "v/commit_audit/time_committed/value DESC, v/uid/value DESC",
             "e/ehr_id/value, v/uid/value ASC",
         ] {
-            CheckedQuery::compositions(&ordered(order)).expect(order);
+            CheckedQuery::new(Query::Compositions, &ordered(order)).expect(order);
         }
     }
 
@@ -442,7 +447,7 @@ mod tests {
             "v/uid",
             "v/uid/value/x",
         ] {
-            let error = CheckedQuery::compositions(&ordered(order)).expect_err(order);
+            let error = CheckedQuery::new(Query::Compositions, &ordered(order)).expect_err(order);
             assert!(
                 matches!(error, AqlError::Unkeyed { .. }),
                 "{order}: {error:?}"
@@ -452,7 +457,8 @@ mod tests {
 
     #[test]
     fn the_uid_of_a_version_outside_the_latest_scope_is_no_key() {
-        let error = CheckedQuery::compositions(
+        let error = CheckedQuery::new(
+            Query::Compositions,
             "SELECT e/ehr_id/value AS ehr_id, w/uid/value AS version_uid, c AS composition \
              FROM EHR e CONTAINS (VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
              AND VERSION w[ALL_VERSIONS] CONTAINS OBSERVATION o) ORDER BY w/uid/value",
@@ -463,7 +469,8 @@ mod tests {
 
     #[test]
     fn a_visit_query_below_no_latest_version_scope_is_refused() {
-        let error = CheckedQuery::visits(
+        let error = CheckedQuery::new(
+            Query::Visits,
             "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_source, \
              c/context/start_time/value AS visit_start, c/context/end_time/value AS visit_end \
              FROM EHR e CONTAINS COMPOSITION c ORDER BY c/context/start_time/value, v/uid/value",
@@ -485,9 +492,10 @@ mod tests {
 
     #[test]
     fn a_visit_query_naming_no_since_checks() {
-        let query = CheckedQuery::visits(&visits_where(
-            "WHERE c/context/start_time/value >= '2026-01-01T00:00:00Z'",
-        ))
+        let query = CheckedQuery::new(
+            Query::Visits,
+            &visits_where("WHERE c/context/start_time/value >= '2026-01-01T00:00:00Z'"),
+        )
         .expect("the visit query checks");
         assert_eq!(Some(2), query.column("visit_start"));
         assert!(!query.names_parameter(SINCE_PARAMETER));
@@ -495,9 +503,10 @@ mod tests {
 
     #[test]
     fn a_visit_query_naming_since_is_refused() {
-        let error = CheckedQuery::visits(&visits_where(
-            "WHERE v/commit_audit/time_committed/value > $since",
-        ))
+        let error = CheckedQuery::new(
+            Query::Visits,
+            &visits_where("WHERE v/commit_audit/time_committed/value > $since"),
+        )
         .expect_err("the visit query names $since");
         assert!(
             matches!(
@@ -513,10 +522,13 @@ mod tests {
 
     #[test]
     fn a_composition_query_naming_since_checks() {
-        let query = CheckedQuery::compositions(&over(
-            "EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
+        let query = CheckedQuery::new(
+            Query::Compositions,
+            &over(
+                "EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
              WHERE v/commit_audit/time_committed/value > $since",
-        ))
+            ),
+        )
         .expect("the composition query binds $since");
         assert!(query.names_parameter(SINCE_PARAMETER));
     }
@@ -531,7 +543,7 @@ mod tests {
             "EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
              NOT CONTAINS COMPOSITION d",
         ] {
-            CheckedQuery::compositions(&over(from)).expect(from);
+            CheckedQuery::new(Query::Compositions, &over(from)).expect(from);
         }
     }
 }

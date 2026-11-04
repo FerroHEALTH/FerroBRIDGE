@@ -184,7 +184,11 @@ impl Store {
             .map_err(ReadError::Database)?;
         let runs = reports
             .iter()
-            .map(|report| parse(report).map(|run| summary(&run)))
+            .map(|report| {
+                serde_json::from_str(report)
+                    .map(|run| summary(&run))
+                    .map_err(ReadError::Document)
+            })
             .collect::<Result<_, _>>()?;
         Ok(Runs { runs })
     }
@@ -201,12 +205,7 @@ impl Store {
             .await
             .map_err(ReadError::Database)?
             .as_deref()
-            .map(parse)
+            .map(|report| serde_json::from_str(report).map_err(ReadError::Document))
             .transpose()
     }
-}
-
-/// Reads one recorded report.
-fn parse(report: &str) -> Result<Run, ReadError> {
-    serde_json::from_str(report).map_err(ReadError::Document)
 }

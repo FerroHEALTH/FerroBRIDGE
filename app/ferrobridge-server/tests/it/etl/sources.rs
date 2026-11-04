@@ -10,6 +10,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::job::{missing_section, omocl_roots};
 use ferrobridge_server::etl::mapper::{MapperError, read_roots};
 use ferrobridge_server::operator::files::{Language, Owner};
@@ -61,7 +62,7 @@ impl Trees {
             self.provisioned().display(),
             self.mapping_dir().display()
         );
-        Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?)
+        Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?)
     }
 }
 
@@ -103,7 +104,7 @@ fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Bo
         "[mappings]\nomocl = \"{}\"\n",
         trees.provisioned().display()
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let roots = omocl_roots(&settings);
     assert_eq!(1, roots.len());
     assert_eq!(
@@ -112,7 +113,7 @@ fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Bo
             .first()
             .map(ferrobridge_server::operator::files::Root::owner)
     );
-    let bare = Config::from_sources(Some(""), &BTreeMap::new())?.resolve()?;
+    let bare = Config::from_sources(Some(""), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(
         omocl_roots(&bare),
         Vec::<ferrobridge_server::operator::files::Root>::new()
@@ -183,7 +184,7 @@ fn a_console_tree_alone_serves_and_an_empty_one_is_refused() -> Result<(), Box<d
         "{AUTH}\n[operator]\nenabled = true\nmapping_dir = \"{}\"\n",
         trees.mapping_dir().display()
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let roots = omocl_roots(&settings);
     assert!(
         matches!(read_roots(&roots), Err(MapperError::Empty { .. })),

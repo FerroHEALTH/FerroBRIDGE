@@ -53,6 +53,9 @@ const PROBE: &str =
     "ehr:/00000000-0000-4000-8000-000000000000/compositions/00000000-0000-4000-8000-000000000000";
 
 /// The answers one run of a linking resource reads.
+///
+/// The default linker is a probe run's, which answers every linked resource
+/// with [`PROBE`] and records it.
 #[derive(Debug, Default)]
 pub(crate) struct Linker {
     /// Where each linked resource's composition stands, by literal
@@ -64,12 +67,6 @@ pub(crate) struct Linker {
 }
 
 impl Linker {
-    /// Returns the linker of a probe run, which answers every linked
-    /// resource with [`PROBE`] and records it.
-    pub(crate) fn probing() -> Self {
-        Self::default()
-    }
-
     /// Returns the linker of the final run, which answers from `answers`.
     fn answering(answers: BTreeMap<String, Linked>) -> Self {
         Self {
@@ -154,7 +151,7 @@ impl Ingest<'_> {
     ) -> Result<Built, Refused> {
         // NOTE: ITS-REST 1.1.0 `UpdateVersion` carries no `uid`, so a linked composition's
         // id exists only after its commit, and the linking run waits for it (our own design).
-        let probe = Linker::probing();
+        let probe = Linker::default();
         let Engined {
             composition: probed,
             subject: offered,
@@ -264,8 +261,14 @@ impl Ingest<'_> {
                 ));
             }
             Recognised::Unknown => {
-                Box::pin(self.ingest_unlinked(&claim, &linked, program, &Provenance::EachResource))
-                    .await?
+                Box::pin(self.ingest_resource(
+                    &claim,
+                    &linked,
+                    program,
+                    &Provenance::EachResource,
+                    super::single::Linking::Refuse,
+                ))
+                .await?
             }
         };
         let committed =

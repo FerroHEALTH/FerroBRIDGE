@@ -4,6 +4,7 @@
 //! The `[change_feed]` section: off until enabled, and every refusal.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 
@@ -21,7 +22,7 @@ fn the_change_feed_is_off_by_default() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(100, config.change_feed.page_size);
     assert_eq!(5, config.change_feed.max_attempts);
     assert_eq!(None, config.change_feed.dead_letters);
-    let settings = config.resolve()?;
+    let settings = config.resolve(Process::Server)?;
     assert!(settings.change_feed.is_none());
     Ok(())
 }

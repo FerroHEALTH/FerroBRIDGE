@@ -185,7 +185,7 @@ pub enum CommitError {
 #[must_use]
 pub fn status_context(system_id: &str, committer: &Committer) -> CommitContext {
     CommitContext {
-        lifecycle_state: Some(lifecycle()),
+        lifecycle_state: Some(lifecycle_state(VersionLifecycleState::Complete)),
         audit: Some(audit_data(Change::Modification, system_id, committer)),
         template_id: None,
     }
@@ -211,7 +211,9 @@ pub fn context(
             // NOTE: RM Common IM, Logical Deletion: a delete commits a version in the `deleted`
             // lifecycle state (`version_lifecycle_state` 523 of the openEHR terminology).
             Change::Deleted => lifecycle_state(VersionLifecycleState::Deleted),
-            Change::Creation | Change::Modification => lifecycle(),
+            Change::Creation | Change::Modification => {
+                lifecycle_state(VersionLifecycleState::Complete)
+            }
         }),
         audit: Some(audit_data(change, system_id, committer)),
         template_id: Some(
@@ -245,14 +247,10 @@ fn audit_data(change: Change, system_id: &str, committer: &Committer) -> UpdateA
     }
 }
 
-/// Returns the `lifecycle_state` a contribution entry carries.
+/// Returns the `lifecycle_state` naming `state`; a contribution entry carries
+/// [`VersionLifecycleState::Complete`].
 #[must_use]
-pub fn lifecycle() -> DvCodedText {
-    lifecycle_state(VersionLifecycleState::Complete)
-}
-
-/// Returns the `lifecycle_state` naming `state`.
-fn lifecycle_state(state: VersionLifecycleState) -> DvCodedText {
+pub fn lifecycle_state(state: VersionLifecycleState) -> DvCodedText {
     coded(state.code(), state.rubric())
 }
 
@@ -277,11 +275,12 @@ fn coded(code: &str, rubric: &str) -> DvCodedText {
 
 #[cfg(test)]
 mod tests {
-    use super::{Change, Committer, audit, context, legal_namespace, lifecycle};
+    use super::{Change, Committer, audit, context, legal_namespace, lifecycle_state};
     use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
     use openehr_its::rest::generated::common::UpdateAudit;
     use openehr_rm::v1_2::common::generic::party_identified::PartyIdentified;
     use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
+    use openehr_term::codes::VersionLifecycleState;
 
     #[test]
     fn the_change_codes_are_the_openehr_terminology_ones() {
@@ -320,7 +319,12 @@ mod tests {
             "openehr",
             data.change_type.defining_code.terminology_id.value
         );
-        assert_eq!("532", lifecycle().defining_code.code_string);
+        assert_eq!(
+            "532",
+            lifecycle_state(VersionLifecycleState::Complete)
+                .defining_code
+                .code_string
+        );
     }
 
     #[test]

@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
 use ferrobridge_server::change_feed::{Domain, Event, Position, ReaderName, Seq};
+use ferrobridge_server::config::Process;
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
@@ -496,7 +497,7 @@ async fn bridge(
         mllp = neighbour(port, 30)?,
     );
     let settings = ferrobridge_server::config::Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()?;
+        .resolve(Process::Server)?;
     // NOTE: no specification governs this: our own design; the binary drives
     // `serve_settings` on its main thread, so the bridge runs on a runtime of
     // its own thread, as the binary does.

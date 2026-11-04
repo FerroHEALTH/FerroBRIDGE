@@ -27,8 +27,9 @@ use crate::markup::{code, h, t};
 use crate::pages::mappings::count;
 use crate::pages::mappings::tab_href;
 use crate::pages::parts::{
-    diagnostics_state, file_href, language_name, owner_tag, owner_word, quiet, tally,
+    diagnostics_state, file_href, language_name, owner_tag, owner_word, tally,
 };
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The languages the Files tab filters by, in the order its menu lists them.
 const LANGUAGES: [Language; 2] = [Language::Fhirconnect, Language::Omocl];
@@ -288,7 +289,7 @@ pub(super) fn files_body(l: &Locale, query: &Query, listing: &[Listed]) -> (Html
     let toolbar = files_toolbar(l, &filters, listing);
     let chips = files_chips(l, &filters, total, listing.len()).unwrap_or_default();
     let table = if shown.is_empty() {
-        quiet(
+        list_empty(
             tr(l, Msg::NoFileMatches),
             Some((tr(l, Msg::ClearFilters), tab_href("files"))),
         )
