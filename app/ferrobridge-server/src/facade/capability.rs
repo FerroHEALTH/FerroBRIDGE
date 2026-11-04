@@ -44,7 +44,6 @@ use crate::facade::search::declaration;
 use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::party::PartySearch;
 use crate::smart::Security;
-use crate::state;
 
 /// The FHIR release this facade speaks.
 ///
@@ -259,8 +258,8 @@ pub fn statement_of(
             crate::facade::media::JSON.into(),
         ],
         software: Some(CapabilityStatementSoftware {
-            name: state::PRODUCT.into(),
-            version: Some(state::VERSION.into()),
+            name: crate::build_info::PRODUCT.into(),
+            version: Some(crate::build_info::VERSION.into()),
             ..CapabilityStatementSoftware::default()
         }),
         implementation: Some(

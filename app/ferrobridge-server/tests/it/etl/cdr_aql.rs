@@ -11,13 +11,13 @@
 //! and the logical deletion of openEHR RM Common 1.1.0, never from what the
 //! reference server answers.
 
+use ferrobridge_server::aql::{CheckedQuery, Query};
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::commit::CommitContext;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::{EhrId, template_id, versioned_object_uid};
 use ferrobridge_server::cdr::query::PageSize;
-use ferrobridge_server::etl::aql::{CheckedQuery, Query};
 use ferrobridge_testkit::containers::{self, Cdr};
 use ferrobridge_testkit::fixtures::{
     LABORATORY_REPORT_FLAT, LABORATORY_REPORT_OPT, LABORATORY_REPORT_TEMPLATE_ID,

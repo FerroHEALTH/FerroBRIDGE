@@ -12,6 +12,7 @@
 //! to stop. `main.rs` only hands in the arguments and returns the exit code.
 #![doc(test(attr(deny(warnings))))]
 
+pub mod aql;
 pub mod audit;
 pub mod banner;
 pub mod boot;
@@ -153,7 +154,7 @@ where
     if matches!(job, Job::MappingCheck { .. }) {
         return job.run(settings);
     }
-    let service = Service::new("ferrobridge", state::VERSION);
+    let service = Service::new("ferrobridge", build_info::VERSION);
     let telemetry = match Telemetry::new(&settings.telemetry, service) {
         Ok(telemetry) => telemetry,
         Err(error) => {
@@ -601,8 +602,8 @@ async fn correlate(mut request: Request, next: Next) -> Response {
 /// `GET /`: the product and the version, as JSON.
 pub(crate) async fn root() -> Response {
     axum::Json(serde_json::json!({
-        "product": state::PRODUCT,
-        "version": state::VERSION,
+        "product": build_info::PRODUCT,
+        "version": build_info::VERSION,
     }))
     .into_response()
 }

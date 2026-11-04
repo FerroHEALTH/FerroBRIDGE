@@ -19,11 +19,10 @@ use std::sync::LazyLock;
 
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::loader::MappingDocument;
-use openehr_mapping_core::schema::locate;
-use openehr_mapping_core::schema::to_json;
+use openehr_mapping_core::schema;
+use openehr_mapping_core::schema::SchemaError;
 
 use crate::model::error::ModelCode;
-use crate::model::error::SchemaError;
 
 /// The authored schema, as JSON text.
 pub const SCHEMA: &str = include_str!("../../schemas/omocl-mapping.schema.json");
@@ -60,14 +59,9 @@ impl Schema {
     /// Returns [`SchemaError::Json`] when the document is not JSON and
     /// [`SchemaError::Compile`] when it is not a usable draft-07 schema.
     pub fn compile(source: &str) -> Result<Self, SchemaError> {
-        let document: serde_json::Value =
-            serde_json::from_str(source).map_err(|source| SchemaError::Json { source })?;
-        let validator = jsonschema::draft7::options()
-            .build(&document)
-            .map_err(|source| SchemaError::Compile {
-                source: Box::new(source),
-            })?;
-        Ok(Self { validator })
+        Ok(Self {
+            validator: schema::compile(source, "OMOCL mapping")?,
+        })
     }
 
     /// Returns the compiled validator.
@@ -83,38 +77,17 @@ impl Schema {
     /// node the error is about.
     #[must_use]
     pub fn validate_document(&self, document: &MappingDocument) -> Vec<Diagnostic> {
-        let file = document.file().to_path_buf();
-        let tree = document.document();
-        let instance = match to_json(tree) {
-            Ok(instance) => instance,
-            Err(position) => {
-                return vec![
-                    Diagnostic::error(
-                        file,
-                        ModelCode::SchemaViolation.into(),
-                        "the document holds a number JSON cannot represent, so it cannot be \
-                         validated against a JSON Schema",
-                    )
-                    .with_position(position),
-                ];
-            }
-        };
         let name = document.header().name().value().clone();
-        self.validator
-            .iter_errors(&instance)
-            .map(|error| {
-                let pointer = error.instance_path().to_string();
-                let (path, position) = locate(tree, &pointer);
-                Diagnostic::error(
-                    file.clone(),
-                    ModelCode::SchemaViolation.into(),
-                    format!("omocl-mapping.schema.json: {error}"),
-                )
-                .with_position(position)
-                .with_model_path(path)
-                .with_mapping_name(name.clone())
-            })
-            .collect()
+        schema::validate(
+            &self.validator,
+            document.file(),
+            document.document(),
+            &ModelCode::SchemaViolation.into(),
+            "omocl-mapping.schema.json",
+        )
+        .into_iter()
+        .map(|diagnostic| diagnostic.with_mapping_name(name.clone()))
+        .collect()
     }
 }
 

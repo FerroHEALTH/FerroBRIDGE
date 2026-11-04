@@ -258,7 +258,7 @@ pub enum Error {
         key: String,
         /// Why the query is refused.
         #[source]
-        source: Box<crate::etl::aql::AqlError>,
+        source: Box<crate::aql::AqlError>,
     },
     /// A configured identifier query that binds no parameter it is handed.
     #[error("{key} is refused")]
@@ -377,9 +377,9 @@ pub enum Error {
     /// The mapping set the operations lane runs did not load.
     #[error("the mapping set could not be loaded")]
     Mappings {
-        /// Why it did not load, the template and upstream status included.
+        /// Why it did not load.
         #[source]
-        source: Box<crate::mappings::Error>,
+        source: NoTemplateSource,
     },
     /// An Audit Record Repository base the FHIR Feed refuses.
     #[error("{key} is refused as the base of an Audit Record Repository")]
@@ -399,4 +399,16 @@ pub enum Error {
         #[source]
         source: ehds_logging::map::MapErrors,
     },
+}
+
+/// The operations lane has a mapping directory and nowhere to take its
+/// templates from.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "[mappings] directory {} is set with no [mappings] templates and no [cdr]: the FHIRconnect operations have no template to compile against",
+    directory.display()
+)]
+pub struct NoTemplateSource {
+    /// The mapping directory that was configured.
+    pub directory: PathBuf,
 }

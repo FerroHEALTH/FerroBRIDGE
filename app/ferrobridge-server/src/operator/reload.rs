@@ -219,9 +219,11 @@ impl Reloader {
                     (None, Some(client)) => {
                         crate::mappings::load_files_from_cdr(directory, fhirconnect, client).await
                     }
-                    (None, None) => Err(crate::mappings::Error::NoTemplateSource {
-                        directory: directory.to_path_buf(),
-                    }),
+                    (None, None) => Err(crate::mappings::Error::NoTemplateSource(
+                        crate::config::error::NoTemplateSource {
+                            directory: directory.to_path_buf(),
+                        },
+                    )),
                 }
                 .map_err(ReloadError::Operations)?,
             ),

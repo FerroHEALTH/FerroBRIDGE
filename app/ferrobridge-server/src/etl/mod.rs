@@ -21,7 +21,6 @@
 //! specification governs the run: our own design, over openEHR ITS-REST
 //! 1.1.0 `POST /query/aql` with `offset` and `fetch` paging.
 
-pub mod aql;
 pub mod deletions;
 pub mod fhir;
 pub mod history;
@@ -33,17 +32,17 @@ pub mod report;
 pub mod tie;
 pub mod visits;
 
+use crate::aql::{CheckedQuery, SINCE_PARAMETER};
 use crate::cdr::CdrClient;
 use crate::cdr::query::{PageSize, QueryPageError};
-use crate::etl::aql::{CheckedQuery, SINCE_PARAMETER};
-use crate::etl::deletions::{CheckError, DeletionPolicy, Sweep};
+use crate::config::EtlSettings;
+use crate::etl::deletions::{CheckError, Sweep};
 use crate::etl::report::{Persons, RunReport};
 use crate::etl::tie::{Tie, Windows};
 use futures_util::StreamExt;
-use omocl::engine::concept::VocabularyAliases;
 use omop_cdm::derived;
 use omop_cdm::graph::{RecordGraph, key::Source, key::VisitKey, report::Refusal};
-use omop_cdm::writer::{CdmWriter, error::WriteError, input::RunId, input::VisitConcepts};
+use omop_cdm::writer::{CdmWriter, error::WriteError, input::RunId};
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
@@ -53,41 +52,6 @@ use openehr_rm::v1_2::common::archetyped::archetyped::Archetyped;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::sync::Arc;
-
-/// The derived visits a run writes before the compositions.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VisitSettings {
-    /// The checked visit query.
-    pub query: CheckedQuery,
-    /// The concepts every visit carries.
-    pub concepts: VisitConcepts,
-}
-
-/// The `[etl]` section, resolved: the checked queries and the concepts the
-/// deployment configures.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EtlSettings {
-    /// The checked composition query, which `etl run` needs and `etl fhir`
-    /// does not read.
-    pub compositions: Option<CheckedQuery>,
-    /// How many rows one page of either query asks for.
-    pub page_size: PageSize,
-    /// The `*_type_concept_id` the mapper writes: the provenance of the
-    /// records, which the deployment knows.
-    pub type_concept_id: i32,
-    /// The `period_type_concept_id` of every observation period.
-    pub observation_period_type_concept_id: i32,
-    /// The visit derivation, when configured.
-    pub visits: Option<VisitSettings>,
-    /// What the run does with a composition the CDR reports deleted.
-    pub deletions: DeletionPolicy,
-    /// The OHDSI `vocabulary_id` each terminology id is looked up under.
-    pub aliases: VocabularyAliases,
-    /// Whether `etl run` runs the quality checks after the load.
-    pub quality_checks: bool,
-    /// Which rows of the derived tables a run rebuilds.
-    pub derived_tables: derived::Scope,
-}
 
 /// What a mapper is handed besides the composition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -648,7 +612,7 @@ async fn map<M: Mapper>(
 #[cfg(test)]
 mod tests {
     use super::source;
-    use crate::etl::aql::{CheckedQuery, Query};
+    use crate::aql::{CheckedQuery, Query};
     use serde_json::json;
 
     /// The version every case reads.

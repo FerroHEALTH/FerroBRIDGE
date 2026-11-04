@@ -12,9 +12,9 @@
 
 use std::error::Error;
 
+use ferrobridge_server::config::DeletionPolicy;
+use ferrobridge_server::config::EtlSettings;
 use ferrobridge_server::config::MappingSettings;
-use ferrobridge_server::etl::EtlSettings;
-use ferrobridge_server::etl::deletions::DeletionPolicy;
 use ferrobridge_server::etl::fhir::{self, FhirSide};
 use ferrobridge_server::etl::mapper::{CdmVocabulary, OmoclMapper, read_set};
 use ferrobridge_server::mappings;

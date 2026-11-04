@@ -250,6 +250,10 @@ the testkit tool crate. Beside it:
 - `tools/forwarders`: the forwarder ratchet's detector (#1414), which parses
   the hand-written Rust with `syn` and lists each function whose whole body
   forwards to one other call, for `scripts/checks/forwarders.sh`.
+- `tools/generated-tree`: what both generators share about a generated tree
+  (#1417): writing the rendered files, formatting them with the pinned
+  `rustfmt`, reading them back, and the drift comparison with the committed
+  tree.
 - `tools/ferrobridge-testkit`: the test-support crate, a path-only
   dev-dependency (#78). `containers` starts PostgreSQL and the reference CDR
   behind the `FERROBRIDGE_E2E` gate, with every image pinned by digest in

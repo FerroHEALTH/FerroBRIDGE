@@ -56,7 +56,7 @@ pub(crate) fn listing(l: &Locale, runs: &Loaded<Runs>) -> Html {
             return list_empty(tr(l, Msg::RunsUnavailable), None);
         }
         Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
-        Err(fault) => return faulted(l, fault, &super::tab_href("runs")),
+        Err(fault) => return faulted(l, fault, &super::LANE.href("runs")),
     };
     let body = if runs.runs.is_empty() {
         list_empty(tr(l, Msg::RunsNone), None)
@@ -149,7 +149,7 @@ fn drawn(l: &Locale, run_id: &str, run: &Loaded<Run>) -> Html {
                 title: run_id.to_owned().into(),
                 subtitle: Some(tr(l, Msg::RunTitle).into()),
                 subtitle_view: None,
-                crumbs: vec![Crumb::new(tr(l, Msg::OmopEtl), super::tab_href("runs"))],
+                crumbs: vec![Crumb::new(tr(l, Msg::OmopEtl), super::LANE.href("runs"))],
                 mono: true,
                 badge: None,
             },

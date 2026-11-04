@@ -17,11 +17,21 @@ use crate::terminology::Translator;
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
 
-/// The product name the root document reports.
-pub const PRODUCT: &str = "FerroBRIDGE";
-
-/// The product version the root document reports.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Why the lanes could not be built from the resolved settings.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum BuildError {
+    /// An upstream client or a lane refused the settings it was handed.
+    #[error(transparent)]
+    Config(#[from] crate::config::error::Error),
+    /// The mapping set the operations lane runs did not load.
+    #[error("the mapping set could not be loaded")]
+    Mappings {
+        /// Why it did not load, the template and upstream status included.
+        #[source]
+        source: Box<crate::mappings::Error>,
+    },
+}
 
 /// The state the router is built over.
 #[derive(Debug)]
@@ -75,10 +85,10 @@ impl AppState {
     /// start.
     ///
     /// # Errors
-    /// Returns [`crate::config::error::Error::Client`] when an upstream client
-    /// refuses the configuration it was handed, and
-    /// [`crate::config::error::Error::Mappings`] when the mapping set does not load.
-    pub async fn build(settings: &Settings) -> Result<Self, crate::config::error::Error> {
+    /// Returns [`BuildError::Config`] over [`crate::config::error::Error::Client`]
+    /// when an upstream client refuses the configuration it was handed, and
+    /// [`BuildError::Mappings`] when the mapping set does not load.
+    pub async fn build(settings: &Settings) -> Result<Self, BuildError> {
         let mut indicators: Vec<Arc<dyn ferrohealth_health::registry::HealthIndicator>> =
             Vec::new();
         let mut cdr = None;
@@ -115,7 +125,7 @@ impl AppState {
         }
         let programs = crate::mappings::load_configured(settings, cdr.as_ref())
             .await
-            .map_err(|source| crate::config::error::Error::Mappings {
+            .map_err(|source| BuildError::Mappings {
                 source: Box::new(source),
             })?;
         // NOTE: engine/demographics.adoc falls back to "the IDs maintained by the FHIRconnect

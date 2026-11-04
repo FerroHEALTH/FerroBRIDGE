@@ -90,6 +90,30 @@ pub(crate) struct Origin<'a> {
 }
 
 impl<'a> Origin<'a> {
+    /// Returns the origin of the content of version `version`, ITS-REST URL
+    /// `source`, bound to `id`, with the facade's identity map, usage window
+    /// and demographics endpoint.
+    #[must_use]
+    pub(crate) fn new(
+        facade: &'a Facade,
+        id: &'a FhirResourceId,
+        version: &'a ObjectVersionId,
+        source: &'a Url,
+        subject: Option<&'a Value>,
+    ) -> Self {
+        Self {
+            id,
+            version,
+            source,
+            subject,
+            store: facade.store(),
+            usage: facade.usage(),
+            demographics: facade.demographics(),
+        }
+    }
+}
+
+impl<'a> Origin<'a> {
     /// Returns the origin of the resource `id` rendered from `version`, read at
     /// `source`, of the subject `subject`, bound in `facade`'s identity map.
     pub(crate) fn of(
