@@ -24,10 +24,17 @@ use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::seam::BundleReferences;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::Seams;
+use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::engine::traverse::to_openehr;
 use fhirconnect::model::load::load_set;
 use fhirconnect::model::semantic::StaticMappingCodes;
+use fhirconnect::operations::contract::CompositionPayload;
+use fhirconnect::operations::contract::ToFhirRequest;
+use fhirconnect::operations::error::OperationError;
+use fhirconnect::operations::programs::ProgramSet;
+use fhirconnect::operations::run;
+use fhirconnect::operations::run::Settings;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use openehr_adl::artefact::ArchetypeRepository;
@@ -514,6 +521,60 @@ fn the_dispense_is_recorded_at_the_dispensed_careflow_step() -> Result<(), Box<d
     assert_eq!(
         transition.pointer("/current_state/defining_code/code_string"),
         Some(&serde_json::json!("245"))
+    );
+    Ok(())
+}
+
+// FHIRconnect 1.0.0 context-mappings.adoc §Start: the run begins at the start archetype, and
+// rest-api.adoc §$tofhir answers "one or more FHIR resources", so a composition holding an order
+// and no dispense action maps no dispense: the run refuses as not applicable.
+#[test]
+fn a_composition_without_the_start_archetype_maps_no_resource() -> Result<(), Box<dyn Error>> {
+    let (request_program, index) = program(REQUEST)?;
+    let bundle = BundleReferences::new(
+        vec![(
+            Some(String::from("Medication/synthetic-product")),
+            Value::from_serde_json(medication()),
+        )],
+        &NoReferences,
+    );
+    let order = to_openehr(
+        &request_program,
+        &SCHEMAS,
+        &index,
+        &Value::from_serde_json(request()),
+        &Seams::default().with_references(&bundle),
+        &laws::defaults(),
+        &CallContext::new(),
+    )?;
+    let mut composition = order.value().value().clone();
+    composition
+        .as_object_mut()
+        .ok_or("the composition is an object")?
+        .insert(
+            "uid".to_owned(),
+            serde_json::json!({
+                "_type": "OBJECT_VERSION_ID",
+                "value": "6a0b1c2d-0000-4000-8000-000000001486::synthetic.example.org::1"
+            }),
+        );
+    let (dispense_program, index) = program(DISPENSE)?;
+    let mut set = ProgramSet::new();
+    set.insert_template(index);
+    set.insert_program(dispense_program)?;
+    let answer = run::to_fhir_with_warnings(
+        &set,
+        &SCHEMAS,
+        &Seams::default(),
+        &Settings::new("Device/ferrobridge", "2026-11-04T10:00:00Z"),
+        &ToFhirRequest::new(CompositionPayload::parse(&composition.to_string())?),
+    );
+    let Err(OperationError::Mapping { source }) = answer else {
+        return Err(format!("an order with no dispense mapped a dispense: {answer:?}").into());
+    };
+    assert!(
+        matches!(*source, EngineError::NotApplicable { .. }),
+        "the run refuses as not applicable: {source:?}"
     );
     Ok(())
 }

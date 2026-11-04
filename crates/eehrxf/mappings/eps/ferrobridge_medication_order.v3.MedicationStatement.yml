@@ -20,14 +20,6 @@ spec:
   fhirConfig:
     structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationStatement
 
-# An order that names no medicine states nothing to take, so it writes no
-# MedicationStatement.
-preprocessor:
-  openehrCondition:
-    targetRoot: "$archetype"
-    targetAttribute: "activities[at0001]/description[at0002]/items[at0070]"
-    operator: "not empty"
-
 mappings:
   # NOTE: CKM INSTRUCTION.medication_order.v3 at0112 holds the order status "generally used in
   # non-prescription contexts", and no published crosswalk pairs an order with the R4

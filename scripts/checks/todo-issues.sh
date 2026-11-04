@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# Stale pending-work guard (#614). A `TODO(#N):` comment and the issue a
-# not-yet-running subcommand names (`Command::pending_issue` in the server's
-# cli.rs) both promise that issue N carries the missing work. When N closes
-# without it, the pointer lies and nothing else notices. This guard collects
-# every such number from the tracked tree (the vendored corpora under
-# docs/specs excluded) and fails when the tracker reports one closed or
-# missing.
+# Stale pending-work guard (#614). A `TODO(#N):` comment promises that issue
+# N carries the missing work. When N closes without it, the pointer lies and
+# nothing else notices. This guard collects every such number from the
+# tracked tree (the vendored corpora under docs/specs excluded) and fails when
+# the tracker reports one closed or missing.
 #
 #   scripts/checks/todo-issues.sh
 #
@@ -21,8 +19,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-readonly PENDING_SOURCE=app/ferrobridge-server/src/cli.rs
-
 # One "number<TAB>file:line" record per pointer.
 pointers() {
   git grep -nE 'TODO\(#[0-9]+\)' -- . ':!docs/specs' |
@@ -35,21 +31,6 @@ pointers() {
           printf '%s\t%s\n' "$number" "$location"
         done
     done
-  if [ -f "$PENDING_SOURCE" ]; then
-    # The arms of `pending_issue`, from its signature to the closing brace of
-    # the function at the impl's indentation.
-    awk -v file="$PENDING_SOURCE" '
-      /fn pending_issue\(/ { inside = 1; next }
-      inside && /^    }/ { inside = 0 }
-      inside {
-        line = $0
-        while (match(line, /Some\([0-9]+\)/)) {
-          printf "%s\t%s:%d\n", substr(line, RSTART + 5, RLENGTH - 6), file, NR
-          line = substr(line, RSTART + RLENGTH)
-        }
-      }
-    ' "$PENDING_SOURCE"
-  fi
 }
 
 if ! command -v gh > /dev/null 2>&1; then

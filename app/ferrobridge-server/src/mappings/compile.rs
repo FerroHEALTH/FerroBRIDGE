@@ -135,14 +135,6 @@ pub struct Compiled {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-impl Compiled {
-    /// Whether no context was refused.
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.refusals.is_empty()
-    }
-}
-
 /// Builds the index of every `.opt` file under `directory`.
 ///
 /// A file that does not build is a `template-build` diagnostic on that file,

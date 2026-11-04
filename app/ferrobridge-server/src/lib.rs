@@ -72,11 +72,11 @@ use crate::cli::Cli;
 use crate::config::{Config, Process, Settings};
 use crate::state::AppState;
 
-/// The exit code of a job that parses and does not run yet.
+/// The exit code of a usage refusal.
 ///
 /// Two is the conventional usage exit, the code a command line uses when the
-/// invocation is understood and refused.
-pub const EXIT_UNAVAILABLE_JOB: u8 = 2;
+/// invocation is not understood.
+pub const EXIT_USAGE: u8 = 2;
 
 /// The exit code of a refused configuration.
 ///
@@ -112,10 +112,7 @@ where
         Ok(cli) => cli,
         Err(error) => return ExitCode::from(clap_exit(&error)),
     };
-    let job = match Job::of(&cli.command) {
-        Ok(job) => job,
-        Err(code) => return code,
-    };
+    let job = Job::of(&cli.command);
     let loaded = match Config::load(cli.config.config.as_deref(), &cli.config.sets) {
         Ok(loaded) => loaded,
         Err(error) => {
@@ -246,82 +243,46 @@ pub async fn healthcheck(section: &ServerSection) -> Outcome {
 }
 
 impl Job {
-    /// Returns the job `command` names, or the exit code of one that parses
-    /// and does not run yet.
-    #[expect(
-        clippy::print_stderr,
-        reason = "a pending job is reported before any log subscriber exists"
-    )]
-    fn of(command: &cli::Command) -> Result<Self, ExitCode> {
-        Ok(match (command, command.pending_issue()) {
-            (cli::Command::Common(Common::Serve), None) => Self::Serve,
-            (
-                cli::Command::Common(Common::Config {
-                    command: ConfigCommand::Check,
-                }),
-                None,
-            ) => Self::ConfigCheck,
-            (cli::Command::Common(Common::Healthcheck), None) => Self::Healthcheck,
-            (
-                cli::Command::Cdm {
-                    command: cli::Cdm::Init { with_constraints },
-                },
-                None,
-            ) => Job::CdmInit {
+    /// Returns the job `command` names.
+    fn of(command: &cli::Command) -> Self {
+        match command {
+            cli::Command::Common(Common::Serve) => Self::Serve,
+            cli::Command::Common(Common::Config {
+                command: ConfigCommand::Check,
+            }) => Self::ConfigCheck,
+            cli::Command::Common(Common::Healthcheck) => Self::Healthcheck,
+            cli::Command::Cdm {
+                command: cli::Cdm::Init { with_constraints },
+            } => Job::CdmInit {
                 with_constraints: *with_constraints,
             },
-            (
-                cli::Command::Etl {
-                    command: cli::Etl::Run { resume, since },
-                },
-                None,
-            ) => Job::EtlRun(etl::RunOptions {
+            cli::Command::Etl {
+                command: cli::Etl::Run { resume, since },
+            } => Job::EtlRun(etl::RunOptions {
                 resume: *resume,
                 since: since.clone(),
             }),
-            (
-                cli::Command::Vocab {
-                    command: cli::Vocab::Load { directory, schema },
-                },
-                None,
-            ) => Job::VocabLoad {
+            cli::Command::Vocab {
+                command: cli::Vocab::Load { directory, schema },
+            } => Job::VocabLoad {
                 directory: directory.clone(),
                 schema: schema.clone(),
             },
-            (
-                cli::Command::Etl {
-                    command: cli::Etl::Fhir { input },
-                },
-                None,
-            ) => Job::EtlFhir {
+            cli::Command::Etl {
+                command: cli::Etl::Fhir { input },
+            } => Job::EtlFhir {
                 input: input.clone(),
             },
-            (
-                cli::Command::Mapping {
-                    command: cli::Mapping::Check { format, vocabulary },
-                },
-                None,
-            ) => Job::MappingCheck {
+            cli::Command::Mapping {
+                command: cli::Mapping::Check { format, vocabulary },
+            } => Job::MappingCheck {
                 format: *format,
                 vocabulary: *vocabulary,
             },
-            (
-                cli::Command::Dq {
-                    command: cli::Dq::Check { format },
-                },
-                None,
-            ) => Job::DqCheck { format: *format },
-            (command, issue) => {
-                let issue = issue.map_or_else(String::new, |issue| {
-                    format!("; it lands with issue #{issue}")
-                });
-                eprintln!(
-                    "ferrobridge: `{}` is not implemented yet{issue}",
-                    command.spelling()
-                );
-                return Err(ExitCode::from(EXIT_UNAVAILABLE_JOB));
-            }
-        })
+            cli::Command::Dq {
+                command: cli::Dq::Check { format },
+            } => Job::DqCheck { format: *format },
+        }
     }
 
     /// Runs the job under `settings` and returns the process exit code.
@@ -507,7 +468,7 @@ fn serve_command(settings: Settings) -> anyhow::Result<()> {
 fn clap_exit(error: &clap::Error) -> u8 {
     if error.use_stderr() {
         eprint!("{error}");
-        EXIT_UNAVAILABLE_JOB
+        EXIT_USAGE
     } else {
         print!("{error}");
         0
