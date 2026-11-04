@@ -60,6 +60,41 @@ expect "$g" 2 "$(bash_call "git -C $work/ours-wt commit -m x" "$work/theirs")"
 expect "$g" 0 "$(bash_call 'git -C $NOWHERE_SET commit -m x' "$work/ours")"
 expect "$g" 0 "$(bash_call 'git status' "$work/ours")"
 
+# While a merge of main is in progress the guard is judged against main
+# itself, never the older merge base, so content main brings in is not this
+# branch's. A stand-in guard records the base it was given.
+merge="$work/merge"
+repo "$merge"
+mkdir -p "$merge/crates" "$merge/scripts/checks"
+# shellcheck disable=SC2016 # the stand-in reads its own first argument
+printf '#!/usr/bin/env bash\necho "$1" >"%s/base"\nexit 0\n' "$work" >"$merge/scripts/checks/crate-version-guard.sh"
+chmod +x "$merge/scripts/checks/crate-version-guard.sh"
+gitm() { git -C "$merge" -c user.email=t@example.invalid -c user.name=t "$@"; }
+echo one >"$merge/shared.txt"
+gitm add -A && gitm commit -q -m fork
+fork="$(gitm rev-parse HEAD)"
+gitm switch -q -c branch
+echo branch >"$merge/shared.txt" && gitm commit -q -am branch
+gitm switch -q -
+echo main >"$merge/shared.txt" && gitm commit -q -am main
+main="$(gitm rev-parse HEAD)"
+gitm update-ref refs/remotes/origin/main "$main"
+gitm switch -q branch
+recorded() {
+  rm -f "$work/base"
+  CLAUDE_PROJECT_DIR="$merge" bash "$hooks/$g" <<<"$(bash_call 'git commit -m x' "$merge")" >/dev/null 2>&1 || true
+  cat "$work/base" 2>/dev/null || echo none
+}
+if [ "$(recorded)" != "$fork" ]; then
+  echo "FAIL: $g judged a commit outside a merge against $(recorded), want the merge base $fork" >&2
+  failures=$((failures + 1))
+fi
+gitm merge -q origin/main >/dev/null 2>&1 || true
+if [ "$(recorded)" != "$main" ]; then
+  echo "FAIL: $g judged a merge of main against $(recorded), want main itself $main" >&2
+  failures=$((failures + 1))
+fi
+
 # The token is assembled so this file does not carry it.
 token="Gene""rated with Cla""ude Co""de"
 expect no_attribution_guard.sh 2 "$(bash_call "git -C $work/theirs commit -m 'x $token'" "$work/ours")"

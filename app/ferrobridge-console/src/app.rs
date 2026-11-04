@@ -133,8 +133,6 @@ pub struct Drawn {
     pub dock: Option<Html>,
     /// The answer's status.
     pub status: http::StatusCode,
-    /// The toasts the page arrives with (FerroUI R17).
-    pub flash: Vec<Flash>,
 }
 
 impl Drawn {
@@ -147,7 +145,6 @@ impl Drawn {
             content,
             dock: None,
             status: http::StatusCode::OK,
-            flash: Vec::new(),
         }
     }
 
@@ -173,13 +170,6 @@ impl Drawn {
         self.dock = Some(dock);
         self
     }
-
-    /// This page with the toasts `flash`.
-    #[must_use]
-    pub fn with_flash(mut self, flash: Vec<Flash>) -> Self {
-        self.flash = flash;
-        self
-    }
 }
 
 /// The document title of a page titled `text`: the page, then the product.
@@ -197,7 +187,7 @@ pub async fn render(visit: &Visit, drawn: Drawn) -> Response {
     let locale = &visit.locale;
     let body = match (drawn.frame, visit.session) {
         (Frame::Shell, SessionState::SignedIn) => {
-            let toasts = toast_region(locale, drawn.flash);
+            let toasts = toast_region(locale, Vec::<Flash>::new());
             crate::shell::shell(visit, drawn.content, drawn.dock, toasts)
                 .await
                 .then(watch(visit))

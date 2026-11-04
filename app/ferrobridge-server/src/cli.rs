@@ -8,7 +8,7 @@
 //! same run path. No specification governs the command line: our own design.
 
 use clap::{Parser, Subcommand};
-use ferrohealth_server::cli::{Common, ConfigArgs, ConfigCommand};
+use ferrohealth_server::cli::{Common, ConfigArgs};
 use std::path::PathBuf;
 
 /// The `ferrobridge` command line.
@@ -149,54 +149,6 @@ pub enum ReportFormat {
     Text,
     /// One JSON document.
     Json,
-}
-
-impl Command {
-    /// Returns the tracker issue that lands this job, or `None` when it runs.
-    ///
-    /// A job that parses and does not run yet names the issue that carries
-    /// it, so an operator reads one line instead of a silent success.
-    #[must_use]
-    pub const fn pending_issue(&self) -> Option<u32> {
-        match self {
-            Self::Common(_)
-            | Self::Cdm { .. }
-            | Self::Etl { .. }
-            | Self::Mapping { .. }
-            | Self::Vocab { .. }
-            | Self::Dq { .. } => None,
-        }
-    }
-
-    /// Returns the job as it is spelled on the command line.
-    #[must_use]
-    pub const fn spelling(&self) -> &'static str {
-        match self {
-            Self::Common(Common::Serve) => "serve",
-            Self::Common(Common::Config {
-                command: ConfigCommand::Check,
-            }) => "config check",
-            Self::Common(Common::Healthcheck) => "healthcheck",
-            Self::Etl {
-                command: Etl::Run { .. },
-            } => "etl run",
-            Self::Etl {
-                command: Etl::Fhir { .. },
-            } => "etl fhir",
-            Self::Cdm {
-                command: Cdm::Init { .. },
-            } => "cdm init",
-            Self::Vocab {
-                command: Vocab::Load { .. },
-            } => "vocab load",
-            Self::Mapping {
-                command: Mapping::Check { .. },
-            } => "mapping check",
-            Self::Dq {
-                command: Dq::Check { .. },
-            } => "dq check",
-        }
-    }
 }
 
 #[cfg(test)]
@@ -349,7 +301,12 @@ mod tests {
         ])
         .expect("--set parses after the subcommand");
         assert_eq!(2, cli.config.sets.len());
-        assert_eq!("config check", cli.command.spelling());
+        assert_eq!(
+            Command::Common(Common::Config {
+                command: ConfigCommand::Check,
+            }),
+            cli.command
+        );
     }
 
     #[test]
@@ -369,54 +326,6 @@ mod tests {
         assert!(
             Cli::try_parse_from(["ferrobridge", "vocab", "load"]).is_err(),
             "the loader needs a directory and a schema"
-        );
-    }
-
-    #[test]
-    fn a_pending_job_names_the_issue_that_lands_it() {
-        assert_eq!(None, Command::Common(Common::Serve).pending_issue());
-        assert_eq!(
-            None,
-            Command::Cdm {
-                command: Cdm::Init {
-                    with_constraints: false
-                }
-            }
-            .pending_issue()
-        );
-        let etl = Command::Etl {
-            command: Etl::Run {
-                resume: false,
-                since: None,
-            },
-        };
-        assert_eq!(
-            None,
-            etl.pending_issue(),
-            "the runner maps with the OMOCL engine"
-        );
-        assert_eq!("etl run", etl.spelling());
-        assert_eq!(
-            None,
-            Command::Vocab {
-                command: Vocab::Load {
-                    directory: PathBuf::from("/srv/athena"),
-                    schema: String::from("cdm"),
-                },
-            }
-            .pending_issue(),
-            "the loader runs"
-        );
-        assert_eq!(
-            None,
-            Command::Mapping {
-                command: Mapping::Check {
-                    format: ReportFormat::Text,
-                    vocabulary: false,
-                }
-            }
-            .pending_issue(),
-            "the checker runs"
         );
     }
 }

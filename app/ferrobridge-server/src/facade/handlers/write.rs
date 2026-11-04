@@ -44,7 +44,6 @@ use crate::facade::Facade;
 use crate::facade::commit::Committer;
 use crate::facade::compartment;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::conditional;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
@@ -65,6 +64,7 @@ use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::references;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::request::Inbound;
 use crate::facade::status;
 

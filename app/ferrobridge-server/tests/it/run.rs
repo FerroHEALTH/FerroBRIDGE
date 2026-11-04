@@ -3,7 +3,7 @@
 
 //! The binary is thin over the library, so a test drives the real run path.
 
-use ferrobridge_server::{EXIT_CONFIG, EXIT_UNAVAILABLE_JOB};
+use ferrobridge_server::{EXIT_CONFIG, EXIT_USAGE};
 use std::process::ExitCode;
 
 /// Runs the library entry point with `argv`.
@@ -14,42 +14,6 @@ fn run(argv: &[&str]) -> ExitCode {
 /// Renders `code` the way `ExitCode` renders itself, so two are comparable.
 fn rendered(code: ExitCode) -> String {
     format!("{code:?}")
-}
-
-/// The jobs that parse and do not run yet, with the issue each names; every
-/// job runs today.
-const PENDING: [(&[&str], &str); 0] = [];
-
-#[test]
-fn every_pending_job_exits_two() {
-    for (argv, _) in PENDING {
-        let argv: Vec<&str> = std::iter::once("ferrobridge")
-            .chain(argv.iter().copied())
-            .collect();
-        assert_eq!(
-            rendered(ExitCode::from(EXIT_UNAVAILABLE_JOB)),
-            rendered(run(&argv)),
-            "{argv:?} parses and is refused"
-        );
-    }
-}
-
-#[test]
-fn the_binary_prints_the_issue_that_lands_each_pending_job() {
-    for (argv, issue) in PENDING {
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_ferrobridge"))
-            .args(argv)
-            .output()
-            .expect("the binary runs");
-        assert_eq!(
-            Some(i32::from(EXIT_UNAVAILABLE_JOB)),
-            output.status.code(),
-            "{argv:?}"
-        );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains(issue), "{argv:?} names {issue}: {stderr}");
-        assert_eq!(1, stderr.lines().count(), "one line, not a backtrace");
-    }
 }
 
 #[test]
@@ -168,7 +132,7 @@ fn serve_under_json_prints_no_banner_and_only_json_lines() {
 #[test]
 fn no_job_at_all_is_a_usage_refusal() {
     assert_eq!(
-        rendered(ExitCode::from(EXIT_UNAVAILABLE_JOB)),
+        rendered(ExitCode::from(EXIT_USAGE)),
         rendered(run(&["ferrobridge"])),
         "the binary does nothing without a job"
     );
