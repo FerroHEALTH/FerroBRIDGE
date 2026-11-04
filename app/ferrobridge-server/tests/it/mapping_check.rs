@@ -5,6 +5,7 @@
 //! operator API, over the testkit template and synthetic mapping files.
 
 use ferrobridge_server::check::{self, Inputs, Templates};
+use ferrobridge_server::config::Process;
 use ferrobridge_server::{EXIT_CHECK_UNAVAILABLE, EXIT_CONFIG};
 use openehr_mapping_core::diagnostic::Severity;
 use std::path::Path;
@@ -265,7 +266,7 @@ fn client(
         Some(&text),
         &std::collections::BTreeMap::new(),
     )?
-    .resolve()?;
+    .resolve(Process::Server)?;
     let config = settings.cdr.ok_or("a [cdr] section")?;
     Ok(ferrobridge_server::cdr::CdrClient::new(&config)?)
 }

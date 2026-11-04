@@ -7,6 +7,7 @@
 use std::collections::BTreeMap;
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 
 use super::refusal;
@@ -28,7 +29,7 @@ fn the_outbound_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error
     let config = Config::from_sources(None, &BTreeMap::new())?;
     assert!(!config.fhir_outbound.enabled);
     assert_eq!(30_000, config.fhir_outbound.timeout_ms);
-    assert!(config.resolve()?.fhir_outbound.is_none());
+    assert!(config.resolve(Process::Server)?.fhir_outbound.is_none());
     Ok(())
 }
 
@@ -36,7 +37,7 @@ fn the_outbound_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error
 fn an_enabled_lane_resolves_every_key_and_follows_the_change_feed()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = lane(&format!("{COMPLETE}timeout_ms = 5000\n"));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let outbound = settings.fhir_outbound.ok_or("the lane is on")?;
     assert!(
         settings.change_feed.is_some(),
@@ -57,7 +58,8 @@ fn the_environment_sets_the_endpoint() -> Result<(), Box<dyn std::error::Error>>
         String::from("FERROBRIDGE__FHIR_OUTBOUND__BASE_URL"),
         String::from("https://fhir.example.org/other"),
     )]);
-    let settings = Config::from_sources(Some(&lane(COMPLETE)), &environment)?.resolve()?;
+    let settings =
+        Config::from_sources(Some(&lane(COMPLETE)), &environment)?.resolve(Process::Server)?;
     let outbound = settings.fhir_outbound.ok_or("the lane is on")?;
     assert_eq!(
         "https://fhir.example.org/other",
@@ -75,7 +77,7 @@ fn the_basic_password_reads_from_a_file() -> Result<(), Box<dyn std::error::Erro
         "{COMPLETE}\n[fhir_outbound.credentials]\nuser = \"bridge\"\npassword_file = \"{}\"\n",
         file.display()
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let rendered = format!("{:?}", settings.fhir_outbound.ok_or("the lane is on")?.sink);
     assert!(
         rendered.contains("Basic"),
@@ -147,7 +149,7 @@ fn a_cleartext_endpoint_is_refused_unless_accepted() -> Result<(), Box<dyn std::
     let accepted = lane(&format!("{keys}cleartext = true\n"));
     assert!(
         Config::from_sources(Some(&accepted), &BTreeMap::new())?
-            .resolve()?
+            .resolve(Process::Server)?
             .fhir_outbound
             .is_some()
     );

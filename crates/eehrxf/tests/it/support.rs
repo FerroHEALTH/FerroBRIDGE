@@ -134,7 +134,12 @@ pub(crate) fn vendored(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
 /// FHIR Validator over them.
 #[cfg(all(
     feature = "openehr",
-    any(feature = "patient-summary", feature = "laboratory")
+    any(
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "prescription",
+        feature = "dispensation"
+    )
 ))]
 const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
 
@@ -142,7 +147,12 @@ const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
 /// directory, and does nothing when it is unset.
 #[cfg(all(
     feature = "openehr",
-    any(feature = "patient-summary", feature = "laboratory")
+    any(
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "prescription",
+        feature = "dispensation"
+    )
 ))]
 pub(crate) fn emit(name: &str, text: &str) -> Result<(), Box<dyn Error>> {
     let Some(dir) = std::env::var_os(EMIT_DIR_VARIABLE) else {

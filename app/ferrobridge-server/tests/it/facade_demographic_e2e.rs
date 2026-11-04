@@ -208,7 +208,7 @@ async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
     let templates = programs::fetch_templates(&set, &client).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let facade = Arc::new(Facade::new(
         compiled,
         store,

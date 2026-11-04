@@ -135,7 +135,7 @@ async fn facade_over(cdr: &Cdr, search: PartySearch) -> Result<Arc<Facade>, Box<
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
     programs::check_party_search(&compiled, Some(&search))?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let settings = Settings {
         base_url: String::from(BASE_URL),
         ehr_policy: Policy::Existing,

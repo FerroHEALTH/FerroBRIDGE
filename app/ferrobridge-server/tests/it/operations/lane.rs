@@ -7,6 +7,7 @@
 
 use axum::Router;
 use axum::body::Body;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::{Config, MappingSettings};
 use ferrobridge_server::mappings;
 use ferrobridge_server::state::AppState;
@@ -51,7 +52,7 @@ async fn the_operations_answer_unavailable_with_no_mapping_set() -> Result<(), B
 /// Returns the reason the application `text` configures answers a
 /// `$toopenehr` with, which must be a `503`.
 async fn reason_of(text: &str) -> Result<String, Box<dyn Error>> {
-    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
     let state = AppState::build(&settings).await?;
     let app = ferrobridge_server::router(Arc::new(state), &server_settings());
     let (status, _media, body) = call(

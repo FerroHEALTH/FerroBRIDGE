@@ -4,6 +4,7 @@
 //! The `[hl7v2]` section: off until present, every key, and every refusal.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -20,7 +21,7 @@ fn with_face(face: &str) -> String {
 
 #[test]
 fn the_hl7v2_face_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(
         settings.hl7v2.is_none(),
         "no [hl7v2] enabled leaves the face off"
@@ -44,7 +45,7 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
         "senders = [{ namespace_id = \"NORTHLAB\" }, { universal_id = \"1.2.3.4\", universal_id_type = \"ISO\" }]\n",
         "profiles = [{ resource_type = \"Observation\", profile = \"http://example.org/fhir/StructureDefinition/lab\" }]\n",
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let face = settings.hl7v2.ok_or("the face is on")?;
     assert_eq!("0.0.0.0:2576", face.listen.to_string());
     assert_eq!(
@@ -95,7 +96,7 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
 fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn std::error::Error>>
 {
     let text = with_face("concept_maps = \"/srv/v2mappings/package\"\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let face = settings.hl7v2.ok_or("the face is on")?;
     assert_eq!("127.0.0.1:2575", face.listen.to_string());
     assert_eq!(
@@ -122,7 +123,7 @@ fn an_hl7v2_key_is_set_through_its_environment_name() -> Result<(), Box<dyn std:
         Some(&text),
         &env("FERROBRIDGE__HL7V2__LISTEN", "0.0.0.0:2577"),
     )?
-    .resolve()?;
+    .resolve(Process::Server)?;
     let face = settings.hl7v2.ok_or("the face is on")?;
     assert_eq!("0.0.0.0:2577", face.listen.to_string());
     Ok(())

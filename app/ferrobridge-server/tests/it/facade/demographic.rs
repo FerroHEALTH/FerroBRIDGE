@@ -142,7 +142,7 @@ pub(super) async fn harness_with(
     let templates = programs::fetch_templates(&set, &client).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let facade = Facade::new(compiled, handle(&store), client, facade_settings);
     Ok((cdr, Arc::new(facade)))
 }

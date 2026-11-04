@@ -298,12 +298,6 @@ pub struct MemoryStore {
 }
 
 impl MemoryStore {
-    /// Returns an empty store.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Runs `f` over the tables.
     fn with<T>(&self, f: impl FnOnce(&mut Tables) -> T) -> Result<T, StoreError> {
         let mut guard = self
@@ -516,7 +510,7 @@ mod tests {
 
     #[test]
     fn an_empty_store_knows_nothing() {
-        let store = MemoryStore::new();
+        let store = MemoryStore::default();
         let patient = PersonId::new("http://example.org/ns", "p-1").expect("a legal person id");
         assert!(
             store
@@ -528,7 +522,7 @@ mod tests {
 
     #[test]
     fn the_map_wins_once_written() {
-        let store = MemoryStore::new();
+        let store = MemoryStore::default();
         let internal = FhirResourceId::new("abc").expect("a legal FHIR id");
         let first = store
             .record_binding("Condition", &internal, &binding("uid-1"))
@@ -542,7 +536,7 @@ mod tests {
 
     #[test]
     fn a_recorded_ehr_and_internal_id_read_back() {
-        let store = MemoryStore::new();
+        let store = MemoryStore::default();
         let patient = PersonId::new("http://example.org/ns", "p-1").expect("a legal person id");
         let ehr = EhrId::new("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11").expect("a legal ehr_id");
         assert_eq!(ehr, store.record_ehr(&patient, &ehr).expect("the write"));
@@ -570,7 +564,7 @@ mod tests {
 
     #[test]
     fn a_consumed_source_resolves_a_re_sent_resource() {
-        let store = MemoryStore::new();
+        let store = MemoryStore::default();
         let external = ExternalResourceId::new("sender-1").expect("a legal external id");
         let source = SourceVersion::new("Condition", external, Some(String::from("1")));
         let consumed = ConsumedSource {
@@ -591,7 +585,7 @@ mod tests {
 
     #[test]
     fn every_consumed_version_of_one_id_reads_back_and_no_other_id() {
-        let store = MemoryStore::new();
+        let store = MemoryStore::default();
         let source = |id: &str, version: Option<&str>| {
             SourceVersion::new(
                 "Condition",

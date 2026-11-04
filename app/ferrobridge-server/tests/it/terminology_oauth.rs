@@ -7,6 +7,7 @@
 //! `401`, from `[terminology.credentials.oauth]` to the wire.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::LookupOutcome;
@@ -44,7 +45,7 @@ fn client(
         authorization.uri(),
         TOKEN_PATH,
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let config = settings.terminology.ok_or("the terminology lane is on")?;
     Ok(Client::new(config)?)
 }

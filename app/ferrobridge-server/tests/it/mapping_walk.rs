@@ -15,6 +15,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::walk;
 
@@ -113,7 +114,7 @@ async fn a_configmap_volume_mapping_directory_boots_the_operations_lane()
         volume.path().display(),
         templates.path().display()
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
 
     let state = AppState::build(&settings).await?;
     assert_eq!(

@@ -285,10 +285,12 @@ fn read(
     directory: &Path,
     files: &[PathBuf],
 ) -> Result<fhirconnect::model::load::MappingSet, Error> {
-    compile::read(files).map_err(|diagnostics| Error::Mappings {
-        path: directory.to_path_buf(),
-        report: compile::render(&diagnostics),
-    })
+    fhirconnect::model::load::load_set(files, &fhirconnect::engine::library::Library).map_err(
+        |diagnostics| Error::Mappings {
+            path: directory.to_path_buf(),
+            report: compile::render(&diagnostics),
+        },
+    )
 }
 
 /// Compiles every context of `set` into the operations lane's program set.

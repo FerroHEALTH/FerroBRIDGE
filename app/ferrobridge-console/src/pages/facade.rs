@@ -35,9 +35,10 @@ use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, link, t};
 use crate::model::{Loaded, Outcome};
-use crate::pages::parts::{faulted, quiet, refused, section};
+use crate::pages::parts::{faulted, refused, section};
 use crate::pages::settings::rows;
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The tabs of a facade that is on, each its key and its words.
 const TABS: [(&str, Msg); 4] = [
@@ -183,7 +184,7 @@ fn drawn(l: &Locale, tab: &str, answers: &Answers<'_>) -> Html {
         let body = if tab == "settings" {
             settings_panel(l, configuration)
         } else {
-            quiet(
+            list_empty(
                 tr(l, Msg::FacadeOff),
                 Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
             )
@@ -399,7 +400,7 @@ fn capability_panel(l: &Locale, statement: &Capability, state: &Loaded<EngineSta
     let mut found = resources(statement);
     found.sort_by_key(|resource| type_of(resource));
     if found.is_empty() {
-        return quiet(tr(l, Msg::NoResourceTypes), None);
+        return list_empty(tr(l, Msg::NoResourceTypes), None);
     }
     let rows = found
         .iter()
@@ -497,7 +498,7 @@ fn security_panel(l: &Locale, smart: Option<&Loaded<serde_json::Value>>) -> Html
             l,
             tr(l, Msg::SmartDiscovery),
             None,
-            quiet(tr(l, Msg::NoSmart), None),
+            list_empty(tr(l, Msg::NoSmart), None),
         ),
         Some(Ok(Outcome::Refused(refusal))) => refused(l, refusal),
         Some(Err(fault)) => faulted(l, fault, &tab_href("security")),

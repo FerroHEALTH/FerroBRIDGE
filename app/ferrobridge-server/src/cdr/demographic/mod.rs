@@ -158,7 +158,7 @@ macro_rules! party_operations {
             let headers = commit.headers()?;
             let client = self.cdr.party_call(HeaderMap::new())?;
             let params = $create_params {
-                prefer: Some(prefer.param()),
+                prefer: Some(String::from(prefer.as_str())),
                 accept: None,
                 content_type: None,
                 openehr_item_tag: None,
@@ -189,7 +189,7 @@ macro_rules! party_operations {
             let params = $update_params {
                 uid_based_id: String::from(uid_based_id),
                 if_match: if_match_value(preceding),
-                prefer: Some(prefer.param()),
+                prefer: Some(String::from(prefer.as_str())),
                 accept: None,
                 content_type: None,
                 openehr_version_item_tag: None,
