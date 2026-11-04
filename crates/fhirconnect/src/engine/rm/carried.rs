@@ -77,7 +77,7 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
     {
         return Some((owner, Carried::Value));
     }
-    if derive::is_structural(class) {
+    if model::is_a(class, derive::STRUCTURAL) {
         return None;
     }
     let (&first, rest) = tail.split_first()?;

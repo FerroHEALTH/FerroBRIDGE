@@ -118,7 +118,7 @@ impl<'a> Compiler<'a> {
             .map_or(inherited, |located| Some(*located.value()));
         let with = method.with.as_ref();
         let fhir = with.and_then(|with| {
-            self.fhir_side_at(
+            self.fhir_side(
                 file,
                 with,
                 scope,

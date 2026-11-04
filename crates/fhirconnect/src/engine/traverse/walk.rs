@@ -320,7 +320,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let depth = axes.len();
         let bound = parent.openehr.len().min(depth);
         let mut prefix: Vec<RmPosition> = parent.openehr.iter().take(bound).copied().collect();
-        while let Some(pinned) = axes.get(prefix.len()).and_then(|axis| self.pin(axis)) {
+        while let Some(pinned) = axes
+            .get(prefix.len())
+            .and_then(|axis| self.pin(axis.as_str()))
+        {
             prefix.push(pinned);
         }
         if prefix.len() >= depth {
@@ -343,7 +346,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 })?,
             );
             for axis in axes.iter().skip(positions.len()) {
-                positions.push(self.pin(axis).unwrap_or_else(RmPosition::first));
+                positions.push(self.pin(axis.as_str()).unwrap_or_else(RmPosition::first));
             }
             if !self.node_held(name, input, &positions)? {
                 break;
@@ -638,7 +641,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// the run wrote any value at or below it.
     fn provided(&self, target: &OpenehrTarget) -> bool {
         let node = target.node().flat_id();
-        if !derive::is_structural(target.node().rm_type()) {
+        if !openehr_rm::v1_2::model::is_a(target.node().rm_type(), derive::STRUCTURAL) {
             return self.written.iter().any(|written| written.flat_id == *node);
         }
         let below = format!("{}/", node.as_str());

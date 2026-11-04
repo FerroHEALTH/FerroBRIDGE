@@ -90,7 +90,7 @@ fn chain(fixtures: &[&str]) -> Result<MappingSet, Vec<Diagnostic>> {
 
 /// Builds a set from in-memory files, for the rules that need small inputs.
 pub(crate) fn set_of(files: &[(&str, &str)]) -> Result<MappingSet, Box<dyn Error>> {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     for (name, text) in files {
         let document = load_str(*name, text)?;
         if text.contains("\ntype: context\n") {

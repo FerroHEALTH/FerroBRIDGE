@@ -25,6 +25,211 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.16] - 2026-11-03
+
+The console-breadth release. With `[operator] mapping_dir`, the bridge keeps
+every state of the console's mapping files it ran as a revision, with who,
+when and why, and the operator API lists, diffs, applies, exports and imports
+them as ZIP archives; the operator console shows them on the Mapping set's
+Revisions tab with Roll back to this revision. The console also gains a
+synthetic example composition per template in the `$tofhir` playground, the
+OMOP ETL run history (each finished `etl run` and `etl fhir` report is kept
+in the bridge schema), the HL7 v2 face's ConceptMap directory, and sign-in
+through `ferrohealth-session` with FerroUI's session watch. Two lanes land
+beside it: `[fhir_outbound]` delivers each changed composition to a FHIR R4
+endpoint as one `transaction` Bundle, and `[audit]` writes the Regulation
+(EU) 2025/327 Annex II 3.2 access record of every facade access and sends it
+as an IHE BALP `AuditEvent`, refusing the access with `503` when the record
+has no place. `eehrxf` maps prescriptions and dispensations to and from the
+HL7 Europe MPD 1.0.0 resources and laboratory reports to and from the HL7
+Europe Laboratory Report 2.0.0 document, and ships its FHIRconnect projects
+in its package. The `openehr-*` crates move to 0.0.116.
+
+Four changes break an existing deployment or a consumer. The console refuses
+at start a `[session]` whose `absolute_timeout_s` is below its
+`idle_timeout_s`; `config check` reports it. `fhirconnect`'s
+`engine::fhir::FhirKind` and `FhirValue` gain `UnsignedInt` and
+`PositiveInt`, and its `Loss` gains `Absent`, so an exhaustive match adds the
+arms. `ferrobridge-hl7v2`'s `Map` gains `title`, so a consumer that builds
+one by its fields adds it. The published crates now require
+`openehr-* ^0.0.116`, so a consumer moves its `openehr-*` pins with them.
+
+The library crates publish at `eehrxf` 0.1.141, `fhirconnect` 0.1.212,
+`openehr-mapping-core` 0.1.138, `ferrobridge-hl7v2` 0.1.171,
+`ferrobridge-validator` 0.1.142 and `ferrobridge-fhirpath` 0.1.129, and
+`fhir-types` 0.1.128, `hl7v2-types` 0.1.127 and `ferrobridge-term` 0.1.141
+stay where they are. A crate version an entry below names is the step at
+which that change came in.
+
+### Added
+
+- `eehrxf` maps electronic prescriptions and dispensations between openEHR
+  and the HL7 Europe MPD 1.0.0 resources through FerroBRIDGE's FHIRconnect
+  contexts. `Mapping::compile_template` compiles a mapping against an ADL 2
+  operational template as well as an OPT 1.4 one.
+  `ReceivedResources::read` reads a `collection` Bundle as strictly as a
+  document, and `Mapping::resources_to_openehr` maps it into one composition
+  that keeps the collection as its original content.
+  `ReceivedComposition::instructed_by` names the order a received dispense
+  carries out. The MPD request mapping now carries the refills authorised,
+  their least interval, the refills remaining, and the amount and duration
+  of one fill, from the CKM medication authorisation and supply amount
+  clusters. Every mapped `MedicationRequest` carries the status `unknown`,
+  because no published crosswalk pairs the openEHR order status with the R4
+  request status (#1322).
+- `eehrxf` maps laboratory reports between openEHR and the HL7 Europe
+  Laboratory Report 2.0.0 document through FerroBRIDGE's FHIRconnect
+  laboratory project over `KDS_Laborbericht`. The crate now ships its
+  FHIRconnect projects under `mappings/` in its package, and
+  `eehrxf::mappings` embeds them (`MPD`, `LABORATORY`, `Project::write_to`).
+  `Document::with_mapped_report` takes the report, results, specimens and
+  `Provenance` of one mapping run into a laboratory report document, and
+  `receive` names a received `Bundle-eu-lab` a laboratory report and holds
+  it to the `Bundle-eu-lab` and `Composition-eu-lab` profiles.
+  `DocumentError` gains `Unmapped`. The `DiagnosticReport-eu-lab` context
+  no longer loads the mapping library's `report_result.v1.DiagnosticReport`
+  model, whose mappings it overwrote to none (#1324).
+- The outbound FHIR lane, behind a new `[fhir_outbound]` section, follows the
+  change feed and delivers each changed composition to a FHIR R4 endpoint as
+  one `transaction` Bundle per event, mapped through the facade's programs:
+  every resource is a `PUT` carrying its `id`, `meta.versionId` and
+  `meta.source`, and a deletion, an erasure or a resource a new version no
+  longer maps to is a `DELETE`. Delivery is at least once; a composition of an
+  EHR bound to no patient, or a resource without its subject, is refused and
+  parked; the start warns that the lane carries identifiable data (#1374).
+- The bridge records its own accesses behind a new `[audit]` section. Every
+  FHIR facade access an authenticated caller makes is written as the access
+  record of Regulation (EU) 2025/327 Annex II 3.2: the caller the token
+  verified, the categories of the templates it reached (the
+  `[audit.categories]` map), the time and the CDR as the origin. Each message
+  the HL7 v2 face commits is written as a system import record. Both are sent
+  as IHE BALP `AuditEvent`s over the ITI-20 ATX: FHIR Feed to the Audit Record
+  Repository `[audit] base_url` names, from a spool on disk. Recording fails
+  closed: an access whose record has no place is refused with `503` before the
+  CDR is called, and an HL7 v2 message is answered `AR` (#1377).
+- The FHIRconnect engine carries an openEHR `DV_COUNT` to and from the R4
+  restricted integers `unsignedInt` and `positiveInt`, such as
+  `MedicationRequest.dispenseRequest.numberOfRepeatsAllowed`. A count below
+  the least value the type admits (0 or 1) is refused going out, never
+  clamped. The FHIRconnect 1.0.0 `DV_COUNT` page names only `integer`, so
+  this pairing is FerroBRIDGE's own reading of the R4 definitions.
+  This breaks the `fhirconnect` API: `engine::fhir::FhirKind` and
+  `FhirValue` gain the variants `UnsignedInt` and `PositiveInt`, so a
+  consumer that matches either exhaustively adds the two arms (#1400).
+- The operator console answers `GET /session` with the idle and absolute
+  seconds its session has left, never counting as activity, `POST /session`
+  extends the idle timeout, and both answer `401` once the session is gone,
+  with an RFC 9457 problem whose `detail` is in the console's language.
+  Every signed-in page carries FerroUI's session watch, which warns before
+  the idle timeout with Stay signed in, and ends every tab of the console
+  together when the session ends or the operator signs out, leading to the
+  sign-in with the page left as its return address (#1435).
+- The FHIRconnect engine declares every element a run writes out of
+  openEHR with only the FHIR R4 `data-absent-reason` extension as a loss,
+  `Loss::Absent`, a `warning` in the run's `OperationOutcome` located at
+  the element. `Loss` gains that variant, so a consumer that matches it
+  exhaustively adds the arm (#1443).
+- `fhirconnect::model::load::load_set_from_text` loads a FHIRconnect mapping
+  set from `(name, text)` pairs through the same schema, lowering and
+  semantic checks as `load_set`, and `eehrxf`'s
+  `Mapping::compile_project` compiles a shipped `mappings::Project` from
+  its embedded text with no file written (#1445).
+- With `[operator] mapping_dir`, the bridge keeps each state of the console's
+  mapping files it ran as a revision under `mapping_dir/..revisions`: at
+  start-up, after each save, after a reload that finds the files changed and
+  after each apply, with who, when and why. The operator API lists them at
+  `GET /operator/revisions`, answers one at `GET /operator/revisions/{id}`
+  and its line diff against the running one at
+  `GET /operator/revisions/{id}/diff`, and applies one at
+  `POST /operator/revisions/{id}/apply` under `If-Match` on the running
+  revision with a reason, compiling the set first and changing nothing when
+  it does not compile. Provisioned files are in no revision. The operator
+  console lists the revisions on the Mapping set's Revisions tab and shows
+  each one's diff with Roll back to this revision (#609).
+- The operator API exports a mapping-set revision as a ZIP at
+  `GET /operator/revisions/{id}/export`, the same bytes at every export of
+  the same files, and imports one at `POST /operator/revisions/import`: the
+  ZIP sent raw as `application/zip` with a reason, read with a ceiling,
+  checked with the provisioned files as a dry run and saved as a revision
+  that does not run until an apply. An import that does not compile is
+  refused with its diagnostics, and a body that is no mapping-set archive
+  answers the new `bad-archive` problem. The operator console exports from a
+  revision's page and the Mapping set's More menu, and imports from the new
+  Import a mapping set page (#610).
+- The operator API answers a synthetic example composition of each template
+  the running set compiled against at `GET /operator/templates/{id}/example`,
+  generated from the template's Web Template, validated against it and the
+  same at every request. A template with no example answers the new
+  `no-example` problem. The operator console's playground offers it from the
+  Example menu of the `$tofhir` tab, so a mapping can be tried without
+  hand-written input. `openehr-mapping-core` 0.1.138 adds
+  `WebTemplateIndex::example_composition` and `PathError::NotComposition` (#611).
+- `etl run` and `etl fhir` keep each finished run's report in a run table of
+  the bridge schema, which `ferrobridge cdm init` creates, and the operator
+  API answers the newest runs at `GET /operator/etl/runs` and one run at
+  `GET /operator/etl/runs/{run_id}`. The operator console lists the runs on
+  the OMOP ETL page's Runs tab and shows each run's report: when it ran, the
+  rows it wrote, its deletion check and every record it refused. When the
+  record is refused, the job still prints the report and then exits with the
+  refusal (#612).
+- The operator API answers `GET /operator/hl7v2/concept-maps`, the HL7 v2
+  face's ConceptMap directory: every map the face runs with its kind, what it
+  maps from and to, whether it is the guide's or a supplement's, its rows and
+  the messages it served since the bridge started. The operator console shows
+  it on the HL7 v2 page's ConceptMaps tab. `ferrobridge-hl7v2` gives each
+  `Map` its `title` and its `ends()`, and each `Mapped` the maps it
+  `applied()`; a consumer that builds a `Map` by its fields adds `title` (#613).
+
+### Changed
+
+- The `openehr-*` crates move from 0.0.109 to 0.0.116, so the published
+  `eehrxf` 0.1.133, `fhirconnect` 0.1.208, `openehr-mapping-core` 0.1.136 and
+  `ferrobridge-hl7v2` 0.1.166 require `openehr-* ^0.0.116` (#1394).
+- The OMOP CDM v5.4 definitions move to OHDSI `CommonDataModel` tag `v5.5.0`, read at its v5.4 files only: the tag corrects the v5.4 field definition of `cdm_source.cdm_etl_reference`, whose text is user guidance and no ETL convention, and the boolean casing of the v5.4 table definitions. The CDM stays on v5.4, the DDL is unchanged, and `cdm init` names `OHDSI v5.5.0` as the definitions it applies (#1403).
+- The operator console signs operators in and keeps their sessions through
+  `ferrohealth-session` 0.1.1, the sign-in crate of every FerroHEALTH
+  console, in place of its own copy. The routes stay `GET /login`,
+  `GET /auth/callback` and `POST /logout`; `GET /login` takes
+  `?return=<page>` and a completed sign-in lands on that page of the
+  console, and the sign-in card's button carries the page the operator
+  asked for. `[oidc]` takes `issuer` alone and discovers
+  `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+  `end_session_endpoint` and the new `revocation_endpoint` when the console
+  starts, each written one taking the place of the discovered one, with the
+  new keys `ca_file` and `timeout_s` (default `10`); `config check`
+  contacts no provider. `[session]` adds `store` (`memory`, the default, or
+  `sealed`, one encrypted cookie per session) with `key` or `key_file`, and
+  refuses an `absolute_timeout_s` shorter than `idle_timeout_s`. A sign-out
+  revokes the operator's token at a provider that has a revocation
+  endpoint, and lands on `/signed-out` on a console with no provider in
+  place of a `503`. A session without a refresh token ends when its access
+  token expires. A cookie that names no live session is answered with its
+  removal. The cookie names are unchanged.
+  Upgrade: no key is renamed; a configuration whose `absolute_timeout_s` is
+  below its `idle_timeout_s` is refused at start and needs one of the two
+  changed, and `config check` reports it (#1434).
+
+### Fixed
+
+- `ferrobridge-fhirpath`: `lowBoundary()` and `highBoundary()` (the
+  FHIRPath 3.0.0 STU functions behind
+  `Environment::with_fhirpath_stu3_functions`) read a FHIR decimal written
+  with an exponent at the precision of its mantissa. `9.5e2` now stands for
+  `945` to `955`, so `highBoundary(0)` answers `955` where it answered
+  `951`, and `1.5e-3` stands for `0.00145` to `0.00155` (#1426).
+- `eehrxf` reserves the `fullUrl` of a document's report among its entries,
+  so the `Bundle` keeps FHIR R4 `bdl-7`: a resource added later under the
+  report's `DiagnosticReport/{id}` takes the next free id, and
+  `Document::with_report` refuses a report whose `fullUrl` an entry holds
+  already as the new `DocumentError::Collision` (#1442).
+- `eehrxf`'s shipped laboratory mapping writes each result's
+  `effective[x]`, from the time of the laboratory test result's event, and
+  its `performer` absent with the FHIR R4 `data-absent-reason` extension,
+  because `KDS_Laborbericht` holds no performing laboratory. HL7 Europe
+  Laboratory Report 2.0.0 `Observation-resultslab-eu-lab` requires both.
+  `Document::with_mapped_report` keeps the run's `OperationOutcome` out of
+  the document, which reaches every entry from its `Composition` (#1443).
+
 ## [0.0.15] - 2026-11-02
 
 The change-feed release. `[change_feed]` is the adapter the new consumers
@@ -5521,7 +5726,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.15...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.16...HEAD
+[0.0.16]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.12...v0.0.13

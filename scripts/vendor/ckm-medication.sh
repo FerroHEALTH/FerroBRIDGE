@@ -3,10 +3,13 @@
 # SPDX-License-Identifier: BUSL-1.1
 # scripts/vendor/ckm-medication.sh
 #
-# Vendors the ten published CKM archetypes of FerroBRIDGE's medication
-# template into tools/ferrobridge-testkit/fixtures/ckm/medication/: the
-# seven it specialises and the three clusters the medication order's
-# authorisation, order summary and dispense amount slots admit
+# Vendors the thirteen published CKM archetypes of FerroBRIDGE's medication
+# and patient summary templates into
+# tools/ferrobridge-testkit/fixtures/ckm/medication/: the seven the
+# medication template specialises, the three clusters the medication order's
+# authorisation, order summary and dispense amount slots admit, and the
+# health summary composition, ad hoc section and vaccination list section
+# the patient summary template specialises
 # (.claude/rules/vendored-inputs.md), at the openEHR CKM mirror commit the
 # "CKM medication archetypes (fixture)" row of docs/VERSIONS.md pins, with
 # the mirror's LICENSE at the same commit. The row's sha256 is the tree
@@ -46,6 +49,9 @@ paths=(
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.medication_authorisation.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.medication_order_summary.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.medication_supply_amount.v0.adl"
+  "local/archetypes/composition/openEHR-EHR-COMPOSITION.health_summary.v1.adl"
+  "local/archetypes/section/openEHR-EHR-SECTION.adhoc.v1.adl"
+  "local/archetypes/section/openEHR-EHR-SECTION.immunisation_list.v0.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"
@@ -86,7 +92,7 @@ cat > "$dest/PROVENANCE.md" << PROV
 
 # Provenance: the CKM medication archetypes
 
-Ten published archetypes of the openEHR Clinical Knowledge Manager,
+Thirteen published archetypes of the openEHR Clinical Knowledge Manager,
 vendored verbatim by \`scripts/vendor/ckm-medication.sh\`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -98,7 +104,8 @@ docs/VERSIONS.md and re-run the script.
 - Fetched: $fetched
 - Upstream licence: Creative Commons Attribution-ShareAlike 3.0 Unported, the
   mirror's \`LICENSE\` file at the same commit, vendored beside this file
-- Use: the archetypes FerroBRIDGE's medication template specialises or fills its slots with, read by
+- Use: the archetypes FerroBRIDGE's medication and patient summary templates
+  specialise or fill their slots with, read by
   the FerroBRIDGE test suites and never shipped in a crate (the testkit crate
   is \`publish = false\`)
 
@@ -106,4 +113,4 @@ Files:
 $listing
 PROV
 
-say "10 archetypes, tree digest $got"
+say "13 archetypes, tree digest $got"

@@ -85,7 +85,11 @@ fn the_openehr_names_map_to_their_fhir_systems() -> TestResult {
         ("ICD10", ehn::ICD_10),
     ] {
         assert_eq!(fhir_system(name, None)?.as_deref(), Some(uri), "{name}");
-        let transcoded = transcode(&coded(name, "1001", None)?, &PreferredSystems::default())?;
+        let transcoded = transcode(
+            &coded(name, "1001", None)?,
+            &PreferredSystems::default(),
+            None,
+        )?;
         assert_eq!(codes(&transcoded), [(uri, "1001")], "{name}");
         assert!(!transcoded.untranscoded(), "{name} is preferred");
         assert_eq!(transcoded.unmapped(), []);
@@ -97,7 +101,11 @@ fn the_openehr_names_map_to_their_fhir_systems() -> TestResult {
 fn a_terminology_with_no_known_system_is_no_coding_and_is_reported() -> TestResult {
     for name in ["openehr", "ISO_639-1", "ICD10AM", "ICPC2E"] {
         assert_eq!(fhir_system(name, None)?, None, "{name}");
-        let transcoded = transcode(&coded(name, "C-1", None)?, &PreferredSystems::default())?;
+        let transcoded = transcode(
+            &coded(name, "C-1", None)?,
+            &PreferredSystems::default(),
+            None,
+        )?;
         assert!(
             transcoded.codings().is_empty(),
             "{name} is never written raw"
@@ -121,6 +129,7 @@ fn an_equivalent_mapping_with_no_known_system_is_narrated_and_reported() -> Test
     let transcoded = transcode(
         &coded("SNOMED-CT", "1001", Some(("ICPC2E", "K86")))?,
         &PreferredSystems::default(),
+        None,
     )?;
     assert_eq!(codes(&transcoded), [(ehn::SNOMED_CT, "1001")]);
     assert_eq!(
@@ -145,6 +154,7 @@ fn a_terminology_id_that_is_an_absolute_uri_is_its_own_system() -> TestResult {
     let transcoded = transcode(
         &coded(PREFERRED, "1001", None)?,
         &PreferredSystems::new([PREFERRED]),
+        None,
     )?;
     assert_eq!(codes(&transcoded), [(PREFERRED, "1001")]);
     Ok(())

@@ -37,6 +37,57 @@ pub static PATIENT_SUMMARY: Crosswalk<'static> = Crosswalk {
     gaps: GAPS,
 };
 
+/// The id of FerroBRIDGE's patient summary template, whose sections place
+/// the openEHR content of the entry rows [`SOURCES`] names.
+pub const PATIENT_SUMMARY_TEMPLATE: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0";
+
+/// One openEHR source of an entry row: the archetype that feeds the row and
+/// the section archetype that holds it in a template.
+///
+/// The template path is the placement criterion: an entry is placed in the
+/// row whose source names its archetype under the section that holds it,
+/// never by its content, so an archetype two rows share is placed by the
+/// section the composition records it in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Source {
+    /// The Xt-EHR element path of the entry row the source feeds.
+    pub path: &'static str,
+    /// The id of the operational template that holds the source.
+    pub template: &'static str,
+    /// The id of the `SECTION` archetype that holds the archetype in the
+    /// template.
+    pub section: &'static str,
+    /// The id of the archetype a context starts at to feed the row.
+    pub archetype: &'static str,
+}
+
+/// The openEHR sources of the entry rows the component's EPS mappings feed.
+///
+/// The medication summary takes the medication order (CKM
+/// `openEHR-EHR-INSTRUCTION.medication_order.v3`, revision 3.2.1), in which a
+/// CDR often keeps the current medication list. The immunisations take the
+/// medication action (CKM `openEHR-EHR-ACTION.medication.v1`, revision
+/// 1.6.0) the CKM vaccination list section
+/// (`openEHR-EHR-SECTION.immunisation_list.v0`) holds in its "Vaccinations
+/// administered" slot, so a vaccine recorded as an action is never in the
+/// medication summary (no specification governs the placement: our own
+/// design).
+pub const SOURCES: &[Source] = &[
+    Source {
+        path: "EHDSPatientSummary.medicationSummary.medicationUse",
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.adhoc.v1",
+        archetype: "openEHR-EHR-INSTRUCTION.medication_order.v3",
+    },
+    Source {
+        path: "EHDSPatientSummary.immunisations.immunisation",
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.immunisation_list.v0",
+        archetype: "openEHR-EHR-ACTION.medication.v1",
+    },
+];
+
 /// The elements open for the clinical safety review: the medical alert
 /// (A.2.1.2) and the functional status (A.2.3.4), for which no openEHR
 /// content is named to feed them.
