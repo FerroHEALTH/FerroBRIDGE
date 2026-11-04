@@ -26,8 +26,9 @@ use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
-use crate::pages::parts::{faulted, quiet, refused, section};
+use crate::pages::parts::{faulted, refused, section};
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The address of the report of the run `run_id`.
 fn run_href(run_id: &str) -> String {
@@ -52,13 +53,13 @@ pub(crate) fn listing(l: &Locale, runs: &Loaded<Runs>) -> Html {
     let runs = match runs {
         Ok(Outcome::Shown(runs)) => runs,
         Ok(Outcome::Refused(refusal)) if refusal.not_served() => {
-            return quiet(tr(l, Msg::RunsUnavailable), None);
+            return list_empty(tr(l, Msg::RunsUnavailable), None);
         }
         Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
         Err(fault) => return faulted(l, fault, &super::LANE.href("runs")),
     };
     let body = if runs.runs.is_empty() {
-        quiet(tr(l, Msg::RunsNone), None)
+        list_empty(tr(l, Msg::RunsNone), None)
     } else {
         run_table(l, &runs.runs)
     };
@@ -209,7 +210,7 @@ fn report(l: &Locale, run: &Run) -> Html {
 /// The rows `run` wrote, one line per CDM table.
 fn rows(l: &Locale, run: &Run) -> Html {
     if run.rows.is_empty() {
-        return quiet(tr(l, Msg::RunNoRows), None);
+        return list_empty(tr(l, Msg::RunNoRows), None);
     }
     definitions(
         run.rows
@@ -222,7 +223,7 @@ fn rows(l: &Locale, run: &Run) -> Html {
 /// The records `run` refused, each with where and why.
 fn refusals(l: &Locale, run: &Run) -> Html {
     if run.refusals.is_empty() {
-        return quiet(tr(l, Msg::RunNoRefusals), None);
+        return list_empty(tr(l, Msg::RunNoRefusals), None);
     }
     let columns = [
         Column::text("reason", tr(l, Msg::ColReason)).role(Role::Title),

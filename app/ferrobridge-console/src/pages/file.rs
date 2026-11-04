@@ -40,9 +40,10 @@ use crate::markup::{code, h, t};
 use crate::model::{Loaded, OpenedFile, Outcome};
 use crate::pages::parts::{
     diagnostics_state, edit_href, faulted, file_href, findings, language_name, line_diagnostics,
-    quiet, refused_operator, section, short, tally, wire_path, with_markup,
+    refused_operator, section, short, tally, wire_path, with_markup,
 };
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The id prefix of the code viewer's lines, which a diagnostic links to.
 const LINE_IDS: &str = "L";
@@ -167,7 +168,7 @@ fn drawn(
     let source = match &text {
         Some(text) => source_panel(l, path, text, &found, current, listed),
         None => source_split(
-            quiet(
+            list_empty(
                 tr(l, Msg::FileNotUtf8),
                 Some((tr(l, Msg::EveryFile), String::from(FILES))),
             ),
@@ -188,7 +189,7 @@ fn drawn(
         Kind::Context => {
             let body = if program_tab {
                 program.map_or_else(
-                    || quiet(tr(l, Msg::NoProgram), None),
+                    || list_empty(tr(l, Msg::NoProgram), None),
                     |program| program_panel(l, program, listing),
                 )
             } else {
@@ -300,7 +301,7 @@ fn diagnostics_section(
 ) -> Html {
     let count = u64::try_from(found.len()).unwrap_or(u64::MAX);
     let body = if found.is_empty() {
-        quiet(tr(l, Msg::NoFileDiagnostics), None)
+        list_empty(tr(l, Msg::NoFileDiagnostics), None)
     } else {
         diagnostics(
             l,
@@ -422,7 +423,7 @@ fn program_panel(l: &Locale, program: &Program, listing: &[Listed]) -> Html {
     });
     let search = match &program.search {
         Some(search) => h(format!(r#"<p class="fui-panel-body">{}</p>"#, code(search))),
-        None => quiet(
+        None => list_empty(
             tr_with(
                 l,
                 Msg::NoSearch,
@@ -469,7 +470,7 @@ fn used_by(l: &Locale, path: &str, state: &EngineState) -> Html {
     ];
     let [_, resource] = &columns;
     let body = if users.is_empty() {
-        quiet(tr(l, Msg::UsedByNone), None)
+        list_empty(tr(l, Msg::UsedByNone), None)
     } else {
         let rows = users
             .iter()

@@ -35,9 +35,10 @@ use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::dashboard::{UPSTREAMS, indicator_name};
 use crate::pages::facade::indicator;
-use crate::pages::parts::{faulted, quiet, refused, section};
+use crate::pages::parts::{faulted, refused, section};
 use crate::pages::settings::rows::{self, Credentials};
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The lanes that use the upstream `name`, as `GET /health/info` names
 /// them, each its words.
@@ -307,7 +308,7 @@ fn detail(
         });
     let by = users(l, info, name);
     let used = if by.is_empty() {
-        quiet(tr(l, Msg::UsedByNoLane), None)
+        list_empty(tr(l, Msg::UsedByNoLane), None)
     } else {
         definitions(
             by.into_iter()
@@ -327,7 +328,7 @@ fn detail(
             };
             crate::pages::settings::tab(l, configuration, &rows, &tab_href(name, tab))
         }
-        None if found.is_none() => quiet(tr(l, Msg::UpstreamNotConfigured), None),
+        None if found.is_none() => list_empty(tr(l, Msg::UpstreamNotConfigured), None),
         None => panel_sections(Html::join([
             warning
                 .map(|warning| ferrohealth_ui::view::surface::panel_section(l, None, warning))
