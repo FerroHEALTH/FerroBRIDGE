@@ -350,6 +350,24 @@ fn a_decimal_with_a_negative_exponent_takes_its_precision_from_the_mantissa() {
 }
 
 #[test]
+fn precision_of_a_decimal_with_an_exponent_counts_the_places_after_the_point() {
+    // FHIRPath 3.0.0 precision(): the digits of precision after the decimal place, so 1.5e-3,
+    // 0.0015, has four; the text is silent above the units, and 9.5e2 answers 0 as 100 does.
+    for (value, expected) in [
+        ("1.5e-3", "4"),
+        ("1.50e-1", "3"),
+        ("9.5e2", "0"),
+        ("1.5E+2", "0"),
+    ] {
+        assert_eq!(
+            decimal_shown(value, "Parameters.parameter.value.precision()").as_deref(),
+            Some(expected),
+            "{value}"
+        );
+    }
+}
+
+#[test]
 fn a_decimal_without_an_exponent_keeps_the_precision_of_its_places() {
     // FHIRPath 3.0.0 lowBoundary() and highBoundary(): 950 states its units, 945.5 to 950.5.
     assert_eq!(
