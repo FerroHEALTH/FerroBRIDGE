@@ -507,8 +507,8 @@ dependency of the testkit. Chrome and chromedriver come as one Chrome for
 Testing release, which `browser-actions/setup-chrome` installs in the
 `journeys (browser)` job of `ci.yml`, so the browser and its driver always
 match. `thirtyfour` 0.38.1 is the release that carries the RUSTSEC-2026-0381
-fix, taken on 2026-10-28, and the Chrome for Testing release is the one FerroFED's journeys
-pin, the newest stable one on 2026-10-14. The weekly
+fix, taken on 2026-10-28, and the Chrome for Testing release is the one FerroPIX's journeys
+pin, the newest Stable one on 2026-11-03. The weekly
 `scripts/checks/pin-freshness.sh` reports a newer Stable release.
 
 For a local run, `scripts/release/journey-tools.sh` installs the same
@@ -516,18 +516,18 @@ release into `target/journey-tools`, where the journeys look first. It takes
 each download URL from the Chrome for Testing JSON API
 (`known-good-versions-with-downloads.json`) and checks each zip against the
 SHA-256 below before it unpacks it. Chrome for Testing publishes no SHA-256;
-each digest is the one FerroFED took on 2026-10-16 of a download whose MD5
-equals the `x-goog-hash` the storage bucket serves with it, and the
-`mac-arm64` pair verified again here on 2026-10-18.
+each digest is the one FerroPIX took (FerroHEALTH/FerroPIX#452) of a
+download whose MD5 equals the `x-goog-hash` the storage bucket serves with
+it.
 
 | Item | Pin | Repeated in |
 |---|---|---|
 | `thirtyfour` | 0.38.1 | the root `Cargo.toml` `[workspace.dependencies]` |
-| Chrome for Testing (Chrome and chromedriver) | 155.0.8059.79 | the `chrome-version` of `.github/workflows/ci.yml`, and `scripts/release/journey-tools.sh` |
-| Chrome for Testing, `chrome-linux64.zip` SHA-256 | `bcd9a79130d7e44d70f93be87042e9bcee7fe0f0b3898e06b8c9bed5fb619dcd` | `scripts/release/journey-tools.sh` |
-| Chrome for Testing, `chrome-mac-arm64.zip` SHA-256 | `e141a7cbf948780bb7d381860bd5a7944c6736f79b9918b9826fccb199d28ea4` | `scripts/release/journey-tools.sh` |
-| Chrome for Testing, `chromedriver-linux64.zip` SHA-256 | `876f0ea4095237bb3e93321d95758d38c9195989935d7bdc9f51d8e26bc6a3a1` | `scripts/release/journey-tools.sh` |
-| Chrome for Testing, `chromedriver-mac-arm64.zip` SHA-256 | `ca9a98c74b8d3904be6536ff6d26493abb7d7a476e2b384a75cd55d101bce29d` | `scripts/release/journey-tools.sh` |
+| Chrome for Testing (Chrome and chromedriver) | 156.0.8078.80 | the `chrome-version` of `.github/workflows/ci.yml`, and `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chrome-linux64.zip` SHA-256 | `b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7` | `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chrome-mac-arm64.zip` SHA-256 | `8bc590d1b1acac042a000234c768f31830f25a3983a83ed5e067114c87c4cad1` | `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chromedriver-linux64.zip` SHA-256 | `cae58bbd262ba5c8a0ce2540f44254b6e789efc4fe9b18bbb4a00487a9f5859e` | `scripts/release/journey-tools.sh` |
+| Chrome for Testing, `chromedriver-mac-arm64.zip` SHA-256 | `b5fe5abe5a82ca3ac49b3f2ea9e177b63f82fc3a4227883e0eaa9894a6bf3b7f` | `scripts/release/journey-tools.sh` |
 
 `scripts/checks/versions.sh` reads each of them back against these rows.
 
