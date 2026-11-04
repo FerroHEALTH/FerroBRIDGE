@@ -19,13 +19,13 @@ use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::query::Query;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, menu_cell, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, menu_cell, title_cell,
 };
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu, row_menu};
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::diagnostics::diagnostics_by_file;
-use ferrohealth_ui::view::dialog::{Confirmation, confirm_dialog};
+use ferrohealth_ui::view::dialog::{Confirmation, Stakes, confirm_dialog};
 use ferrohealth_ui::view::load_report;
 use ferrohealth_ui::view::load_report::{Arrival, Count, LoadReport};
 use ferrohealth_ui::view::surface::{Header, page_heading};
@@ -144,6 +144,8 @@ fn heading(l: &Locale, here: &str, running: Option<&str>) -> Html {
             title: tr(l, Msg::ReloadDialogTitle).into(),
             message: tr(l, Msg::ReloadDialogBody).into(),
         },
+        Stakes::Plain,
+        None,
         h(format!(
             r#"<form method="post" action="{here}" class="fui-action-form"><button type="submit" class="{class}">{glyph}{words}</button></form>"#,
             here = t(here),
@@ -482,7 +484,7 @@ fn contexts_table(l: &Locale, state: &EngineState, listing: &[Listed]) -> Html {
             let href = program_href(program);
             h(format!(
                 "<tr>{}{}{}{}{}{}{}{}</tr>",
-                title_cell(href.as_deref(), t(context_name(program)), None),
+                title_cell(None, href.as_deref(), t(context_name(program)), None),
                 cell(resource, t(&program.resource_type)),
                 cell(template, code(&program.template)),
                 cell(
@@ -516,6 +518,7 @@ fn contexts_table(l: &Locale, state: &EngineState, listing: &[Listed]) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::TabContexts),
         columns: &columns,
         sorting: Sorting::default(),
@@ -542,7 +545,7 @@ fn omocl_table(l: &Locale, state: &EngineState, listing: &[Listed]) -> Html {
             let (errors, warnings) = file_tally(state, path);
             h(format!(
                 "<tr>{}{}{}</tr>",
-                title_cell(Some(&file_href(path)), t(short(path)), None),
+                title_cell(None, Some(&file_href(path)), t(short(path)), None),
                 cell(
                     owner,
                     listed(listing, path)
@@ -557,6 +560,7 @@ fn omocl_table(l: &Locale, state: &EngineState, listing: &[Listed]) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::TabOmocl),
         columns: &columns,
         sorting: Sorting::default(),
@@ -607,13 +611,14 @@ fn templates_table(l: &Locale, state: &EngineState) -> Html {
             let href = format!("{TEMPLATES}/{id}");
             h(format!(
                 "<tr>{}{}{}</tr>",
-                title_cell(Some(&href), code(&id), None),
+                title_cell(None, Some(&href), code(&id), None),
                 cell(source, t(from)),
                 cell(contexts, t(named.to_string())),
             ))
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::TabTemplates),
         columns: &columns,
         sorting: Sorting::default(),

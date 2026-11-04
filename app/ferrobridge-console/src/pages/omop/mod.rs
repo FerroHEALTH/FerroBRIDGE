@@ -19,7 +19,7 @@ use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{Header, definitions, panel_sections};
+use ferrohealth_ui::view::surface::{Container, Header, definitions};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
 use crate::app::{CONNECTIONS, Drawn, MAPPINGS, OMOP};
@@ -158,10 +158,10 @@ fn drawn(
         l,
         DetailPage {
             header,
-            actions: ActionGroup::none(),
+            actions: ActionGroup::default(),
             stepper: None,
             tabs: Some(LANE.tab_row(l, tab, |_, drawn| Some(drawn))),
-            body: panel_sections(
+            body: Container::PanelSections.wrap(
                 section(l, tr(l, Msg::WhatARunDoes), None, flow).then(section(
                     l,
                     tr(l, Msg::Runs),

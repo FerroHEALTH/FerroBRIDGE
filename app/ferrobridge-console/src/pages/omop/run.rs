@@ -15,10 +15,10 @@ use ferrobridge_operator_api::etl::{Run, RunKind, RunSummary, Runs};
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::action::ActionGroup;
-use ferrohealth_ui::view::surface::{Crumb, Header, definitions, panel_sections};
+use ferrohealth_ui::view::surface::{Container, Crumb, Header, definitions};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
 use crate::app::{Drawn, OMOP};
@@ -63,7 +63,7 @@ pub(crate) fn listing(l: &Locale, runs: &Loaded<Runs>) -> Html {
     } else {
         run_table(l, &runs.runs)
     };
-    panel_sections(section(
+    Container::PanelSections.wrap(section(
         l,
         tr(l, Msg::Runs),
         Some(u64::try_from(runs.runs.len()).unwrap_or(u64::MAX)),
@@ -99,6 +99,7 @@ fn run_table(l: &Locale, runs: &[RunSummary]) -> Html {
             h(format!(
                 "<tr>{}{}{}{}{}{}{}{}</tr>",
                 title_cell(
+                    None,
                     Some(&run_href(&run.id)),
                     code(&run.id),
                     Some(t(tr(l, kind_words(run.kind)))),
@@ -114,6 +115,7 @@ fn run_table(l: &Locale, runs: &[RunSummary]) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::Runs),
         columns: &columns,
         sorting: Sorting::default(),
@@ -153,7 +155,7 @@ fn drawn(l: &Locale, run_id: &str, run: &Loaded<Run>) -> Html {
                 mono: true,
                 badge: None,
             },
-            actions: ActionGroup::none(),
+            actions: ActionGroup::default(),
             stepper: None,
             tabs: None,
             body,
@@ -189,7 +191,7 @@ fn report(l: &Locale, run: &Run) -> Html {
         (tr(l, Msg::FactKept), ids(&deletions.kept)),
         (tr(l, Msg::FactUnknown), ids(&deletions.unknown)),
     ]);
-    panel_sections(
+    Container::PanelSections.wrap(
         section(l, tr(l, Msg::RunWhen), None, facts)
             .then(section(
                 l,
@@ -245,7 +247,7 @@ fn refusals(l: &Locale, run: &Run) -> Html {
             };
             h(format!(
                 "<tr>{}{}{}{}{}</tr>",
-                title_cell(None, t(&refusal.reason), None),
+                title_cell(None, None, t(&refusal.reason), None),
                 cell(composition, shown(refusal.composition.as_deref())),
                 cell(mapping, shown(refusal.mapping.as_deref())),
                 cell(column, shown(place.as_deref())),
@@ -254,6 +256,7 @@ fn refusals(l: &Locale, run: &Run) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::RunRefusals),
         columns: &columns,
         sorting: Sorting::default(),

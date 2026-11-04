@@ -129,7 +129,7 @@ impl Lane {
             l,
             DetailPage {
                 header,
-                actions: ActionGroup::none(),
+                actions: ActionGroup::default(),
                 stepper: None,
                 tabs: Some(tabs),
                 body,

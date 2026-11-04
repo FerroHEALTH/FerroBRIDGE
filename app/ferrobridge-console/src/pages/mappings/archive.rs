@@ -104,7 +104,7 @@ pub fn page(visit: &Visit, imported: Option<&(ImportPost, ImportAnswer)>) -> Dra
             crumbs: vec![Crumb::new(tr(l, Msg::MappingSet), MAPPINGS)],
             ..Header::default()
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let input = h(format!(
         r#"<input id="import-archive" name="archive" type="file" accept=".zip,application/zip" class="fui-input" form="{FORM}" required>"#

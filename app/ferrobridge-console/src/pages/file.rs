@@ -17,7 +17,7 @@ use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::i18n::Phrase;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
@@ -27,7 +27,7 @@ use ferrohealth_ui::view::diagnostics::{FileFindings, diagnostics};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::state::Mark;
 use ferrohealth_ui::view::surface::{
-    Crumb, Header, definitions, facts_row, page_heading, panel_sections, panel_sections_card,
+    Container, Crumb, Header, definitions, facts_row, page_heading, panel_sections_card,
     source_split,
 };
 use ferrohealth_ui::view::tabs::{Tab, binder};
@@ -214,7 +214,7 @@ fn drawn(
 /// Check a draft for a provisioned one, and none for a file not shown.
 fn actions_of(l: &Locale, path: &str, shown: bool, read_only: bool) -> ActionGroup {
     if !shown {
-        return ActionGroup::none();
+        return ActionGroup::default();
     }
     let (glyph, words) = if read_only {
         (Glyph::LIST_CHECKS, Msg::CheckDraft)
@@ -409,13 +409,14 @@ fn program_panel(l: &Locale, program: &Program, listing: &[Listed]) -> Html {
                 .unwrap_or_default();
             h(format!(
                 "<tr>{}{}{}</tr>",
-                title_cell(href.as_deref(), t(&model.name), None),
+                title_cell(None, href.as_deref(), t(&model.name), None),
                 cell(file, model.file.as_deref().map(code).unwrap_or_default()),
                 cell(owner, owner_tag),
             ))
         })
         .collect::<Html>();
     let models = data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::ColModels),
         columns: &columns,
         sorting: Sorting::default(),
@@ -444,7 +445,7 @@ fn program_panel(l: &Locale, program: &Program, listing: &[Listed]) -> Html {
         (tr(l, Msg::FlowOperations), code("$tofhir, $toopenehr")),
     ]);
     let count = u64::try_from(program.models.len()).unwrap_or(u64::MAX);
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         section(l, tr(l, Msg::CompiledProgram), None, facts),
         section(l, tr(l, Msg::ColModels), Some(count), models),
         section(l, tr(l, Msg::ColSearch), None, search),
@@ -478,12 +479,13 @@ fn used_by(l: &Locale, path: &str, state: &EngineState) -> Html {
                 let href = crate::pages::mappings::program_href(program);
                 h(format!(
                     "<tr>{}{}</tr>",
-                    title_cell(href.as_deref(), t(&program.context), None),
+                    title_cell(None, href.as_deref(), t(&program.context), None),
                     cell(resource, t(&program.resource_type)),
                 ))
             })
             .collect::<Html>();
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &tr(l, Msg::UsedBy),
             columns: &columns,
             sorting: Sorting::default(),

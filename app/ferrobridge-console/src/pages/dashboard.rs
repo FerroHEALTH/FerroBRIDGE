@@ -18,7 +18,7 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
@@ -27,11 +27,10 @@ use ferrohealth_ui::view::flow::{
     EdgeRule, Flow, FlowCard, FlowEdge, FlowLane, FlowRule, FlowState, flow, rule_button,
     rule_dialog,
 };
+use ferrohealth_ui::view::layout::{Arrangement, Gap, stack_at};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::{badge, pill};
-use ferrohealth_ui::view::surface::{
-    Header, Stat, page_heading, stack, stat_card_marked, stat_grid, titled_panel,
-};
+use ferrohealth_ui::view::surface::{Header, Stat, page_heading, stat_card_marked, titled_panel};
 
 use crate::app::{CONNECTIONS, Drawn, FACADE, HL7V2, MAPPINGS, OMOP};
 use crate::locale::messages::Msg;
@@ -83,7 +82,7 @@ fn drawn(
             ),
             ..Header::default()
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let (Ok(Outcome::Shown(info)), Ok(Outcome::Shown(readiness))) = (info, readiness) else {
         let fault = match (info, readiness) {
@@ -104,7 +103,10 @@ fn drawn(
     let attention = attention(l, info, readiness).unwrap_or_default();
     let notice = if off { operator_off(l) } else { Html::empty() };
     let flow = flow_panel(l, info, readiness, running);
-    header.then(stack(Html::join([cards, notice, attention, flow])))
+    header.then(stack_at(
+        Gap::Loose,
+        Html::join([cards, notice, attention, flow]),
+    ))
 }
 
 /// The three stat cards: the contexts loaded, the running load's errors and
@@ -115,7 +117,7 @@ fn stats(l: &Locale, state: Option<&EngineState>, readiness: &Readiness, off: bo
         None => unknown_cards(l, off),
     };
     let upstreams = upstreams_card(l, readiness);
-    stat_grid(Html::join([contexts, load, upstreams]))
+    Arrangement::StatGrid.wrap(Html::join([contexts, load, upstreams]))
 }
 
 /// The contexts and running load cards over the running load `state`.
@@ -288,6 +290,7 @@ fn attention(l: &Locale, _info: &Info, readiness: &Readiness) -> Option<Html> {
             h(format!(
                 "<tr>{}{}{}{}</tr>",
                 title_cell(
+                    None,
                     Some(&indicator_href(name)),
                     t(indicator_name(l, name)),
                     None
@@ -300,6 +303,7 @@ fn attention(l: &Locale, _info: &Info, readiness: &Readiness) -> Option<Html> {
         .collect::<Html>();
     let count = u64::try_from(down.len()).unwrap_or(u64::MAX);
     let table = data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::AttentionCaption),
         columns: &columns,
         sorting: Sorting::default(),

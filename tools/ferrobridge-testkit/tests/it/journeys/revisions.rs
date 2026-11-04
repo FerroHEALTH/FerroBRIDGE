@@ -49,7 +49,7 @@ async fn a_save_is_a_revision_and_the_baseline_rolls_it_back() -> Result<(), Box
         browser.at(&stack.url("/mappings/revisions/1")).await?;
         loaded(browser).await?;
         browser
-            .element(By::XPath(format!("//*[contains(., '-type: context') and contains(., '{path}')]")))
+            .element(By::XPath(format!("//*[contains(@class, 'fui-diff-removed') and contains(., 'type: context')]//ancestor::section[contains(., '{path}')]")))
             .await?;
         browser
             .element(By::Id("apply-reason"))
