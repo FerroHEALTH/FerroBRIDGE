@@ -1,0 +1,1 @@
+- `eehrxf`: `Project::with_context(name)` narrows a shipped mapping project to one of its context mappings, so `Mapping::compile_project` compiles that context alone from the embedded files and a run over a template two contexts map has one program to select (the MPD project's request and dispense). A name the project does not compile is refused with `mappings::UnknownContext`.

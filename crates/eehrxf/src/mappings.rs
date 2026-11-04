@@ -9,7 +9,8 @@
 //! crate runs the same files the crate's tests run. A [`Project`] names its
 //! files, in loading order, and the context mappings to compile from them;
 //! [`crate::mapping::Mapping::compile_project`] compiles them from their
-//! text with no file written, and [`Project::write_to`] writes them where a
+//! text with no file written, [`Project::with_context`] narrows a project to
+//! one of its contexts, and [`Project::write_to`] writes them where a
 //! system keeps its mappings for [`crate::mapping::Mapping::compile`]. No
 //! specification governs where a mapping is shipped: our own design.
 
@@ -25,6 +26,17 @@ pub struct Project {
     contexts: &'static [&'static str],
     files: &'static [File],
     accounted: &'static [&'static str],
+}
+
+/// A context mapping a project does not compile, named to
+/// [`Project::with_context`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("the {project} project compiles no context mapping named `{context}`")]
+pub struct UnknownContext {
+    /// The project's directory.
+    pub project: &'static str,
+    /// The context name asked for.
+    pub context: String,
 }
 
 /// One shipped mapping file: its file name and its YAML text.
@@ -48,6 +60,33 @@ impl Project {
     #[must_use]
     pub const fn contexts(&self) -> &'static [&'static str] {
         self.contexts
+    }
+
+    /// Returns this project narrowed to its one context mapping `name`, so
+    /// [`crate::mapping::Mapping::compile_project`] compiles that context alone
+    /// from the same files.
+    ///
+    /// A project whose contexts map one template, as `MPD`'s request and
+    /// dispense contexts do, compiles one of them this way, so a run over that
+    /// template has one program to select.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnknownContext`] when the project compiles no context mapping
+    /// named `name`.
+    pub fn with_context(self, name: &str) -> Result<Self, UnknownContext> {
+        let contexts = self.contexts;
+        let chosen = contexts
+            .iter()
+            .find(|held| **held == name)
+            .ok_or_else(|| UnknownContext {
+                project: self.directory,
+                context: name.to_owned(),
+            })?;
+        Ok(Self {
+            contexts: std::slice::from_ref(chosen),
+            ..self
+        })
     }
 
     /// Returns the project's files, in loading order.
