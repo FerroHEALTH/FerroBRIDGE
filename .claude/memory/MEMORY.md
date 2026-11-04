@@ -63,7 +63,7 @@
 - [End-to-end gate](e2e-gate.md): container tests run only with
   `FERROBRIDGE_E2E=1` through the testkit harness; images pinned by digest and
   checked by the versions guard; 2026-09-12
-- [Merge queue and signed commits](merge-queue-signed.md) — main merges through the merge queue since 2026-10-17; arm with gh pr merge --auto, never update-branch --rebase
+- [Merge queue and signed commits](merge-queue-signed.md): main merges through the merge queue since 2026-10-17; arm with gh pr merge --auto, never update-branch --rebase
 - [Release tag is mine](release-tag-is-mine.md): the session merges every release PR (auto-merge), pushes every tag without a local preflight, and approves every `crates-io` environment; nothing in a cut waits on the owner
 - [Upstream reports carry no milestone](upstream-reports-no-milestone.md): an upstream-report issue is never in a milestone; the in-repo decision it forces is a separate, milestoned issue
 - [Upstream reports stay here](upstream-reports-stay-here.md): the issue is the record; nothing is filed on external trackers and no owner-action issue for filing is created
@@ -71,25 +71,38 @@
 - [openEHR crates are the model](openehr-crates-are-the-model.md): never restate RM, AM, BASE or FLAT knowledge; `|raw` writes and `openehr_rm::v1_2::model` lookups; owner flag 2026-09-25, #241
 - [Legacy standards are first class](legacy-standards-first-class.md): the bridge spans the oldest wire formats (HL7 v2.x first) to the newest; built in from the start and scheduled into the current milestone; owner 2026-09-25, research on #248
 
-- [openehr-its rest-client upstream](openehr-its-rest-client-upstream.md) — the generated client since 0.0.71; the #293 workarounds went at 0.0.72
-- [HL7 v2 test corpora](hl7v2-test-corpora.md) — the vendored v2 message sets, their licences, and that no real traffic is public
-- [File-length rule](file-length-rule.md) — hand-written .rs ≤ 1000 lines, split at 750 into module folders; guard with ratchet allow-list (#351)
-- [Repo moved to FerroHEALTH](repo-moved-to-ferrohealth.md) — 2026-10-01 transfer; ghcr.io/ferrohealth image, org board #3, what keeps the old owner
+- [openehr-its rest-client upstream](openehr-its-rest-client-upstream.md): the generated client since 0.0.71; the #293 workarounds went at 0.0.72
+- [HL7 v2 test corpora](hl7v2-test-corpora.md): the vendored v2 message sets, their licences, and that no real traffic is public
+- [File-length rule](file-length-rule.md): hand-written .rs ≤ 1000 lines, split at 750 into module folders; guard with ratchet allow-list (#351)
+- [Repo moved to FerroHEALTH](repo-moved-to-ferrohealth.md): 2026-10-01 transfer; ghcr.io/ferrohealth image, org board #3, what keeps the old owner
 - [Native issue types and fields](native-issue-types-and-priority.md): type, priority and effort are the native issue type and the FerroHEALTH Priority and Effort fields, set with scripts/gh/fields.sh; bug, enhancement and P0 to P3 retired; owner 2026-10-08 (#416)
 - [Remove worktrees after merge](remove-worktrees-after-merge.md): remove each worktree, its branches and its target/ as soon as its PR merges, in every FerroHEALTH repository; cargo clean the locked ones; owner 2026-10-15 and 2026-10-19
-- [Worktree target dir](worktree-target-dir.md) — each worktree builds into its own target/; a shared CARGO_TARGET_DIR mixes two checkouts' builds; 2026-10-19
-- [PR merge watch](pr-merge-watch.md) — watch every PR until merged with scripts/gh/watch-prs.sh; fix red checks, conflicts and BEHIND at once; owner 2026-10-15
-- [Worker wait loops](worker-wait-loops.md) — worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
-- [PR backlog discipline](pr-backlog-discipline.md) — several open PRs are fine if each merges cleanly; no stacked PRs, overlapping work in sequence, every open PR tracked to its merge; owner 2026-10-17
-- [Autonomous loop](autonomous-loop.md) — never stop, never wait idle, never ask the owner; keep working the issues while PRs drain; owner 2026-10-17
+- [Worktree target dir](worktree-target-dir.md): each worktree builds into its own target/; a shared CARGO_TARGET_DIR mixes two checkouts' builds; 2026-10-19
+- [PR merge watch](pr-merge-watch.md): watch every PR until merged with scripts/gh/watch-prs.sh; fix red checks, conflicts and BEHIND at once; owner 2026-10-15
+- [Worker wait loops](worker-wait-loops.md): worker briefs forbid self-matching pgrep waits; find and kill stuck shells by working directory; owner 2026-10-16
+- [PR backlog discipline](pr-backlog-discipline.md): several open PRs are fine if each merges cleanly; no stacked PRs, overlapping work in sequence, every open PR tracked to its merge; owner 2026-10-17
+- [Autonomous loop](autonomous-loop.md): never stop, never wait idle, never ask the owner; keep working the issues while PRs drain; owner 2026-10-17
 - [FerroUI](ferroui.md): one shared UI component library for every console, pinned Cargo dependency, server-rendered since 0.6 (#510), owner sign-off to migrate the siblings; owner 2026-10-18
-- [One milestone at a time](one-milestone-at-a-time.md) — every worker on the current milestone until it is cut; an externally blocked straggler moves to the next
+- [One milestone at a time](one-milestone-at-a-time.md): every worker on the current milestone until it is cut; an externally blocked straggler moves to the next
 - [Release closes milestone](release-closes-milestone.md): release.yml refuses a tag whose milestone is missing or not empty and closes it after every leg; check it after a manual or recovery release; owner 2026-10-19 (#983)
 - [Worker scratch subfolders](worker-scratch-subfolders.md): each worker writes scratch files under its own scratchpad subfolder, never the root; check a file is yours before `--body-file` and re-read the PR body after; 2026-10-20 (#1021)
-- [Admin bypass stays](admin-bypass-stays.md) — the org-admin bypass on main stays in every family repo; never remove it, and no worker merges through it; owner 2026-10-21
+- [Admin bypass stays](admin-bypass-stays.md): the org-admin bypass on main stays in every family repo; never remove it, and no worker merges through it; owner 2026-10-21
 - [Family toolchain](family-toolchain.md): newest stable Rust as toolchain, the toolchain minus one as MSRV (1.99.1 and 1.98 on 2026-10-21); check the Rust blog first; never lower an MSRV; owner 2026-10-21
 - [Worktrees in the repo](worktrees-in-repo.md): every worktree at <repo>/.claude/worktrees/<name>, never a sibling folder; owner 2026-10-21
 - [Console redesign program](console-redesign-program.md): design-first, PIX, FED, BRIDGE, TERM, then EHR, the orchestrator reviews and moves on, then FerroUI finished across 0.3.0 to 0.3.2 before one lockstep console rollout (FerroUI#161, v0.4.0); owner 2026-10-21 and 2026-10-22
 - [Reactive console UI](reactive-console-ui.md): superseded by the owner on
   2026-10-29 (FerroUI #510): server-rendered consoles, plain script modules,
   no WebAssembly; a navigation is one document
+- [No workflows for workers](no-workflows-for-workers.md): start workers with the Agent tool only, since a workflow agent cannot be messaged; owner 2026-11-01
+- [No compatibility shims](no-compat-shims.md): refactors break APIs freely, leave no deprecated/alias/re-export/stub, and run bottom-up (crates, then app); owner 2026-11-01
+- [Check open PRs proactively](check-open-prs-proactively.md): list every open PR for conflicts and failing checks after each merge and hand-back, fix a red main first, keep a watcher running, and work the issue list autonomously; owner 2026-11-01
+- [Product focus](focus-ferroehr-refactor.md): from 2026-11-02 every product is open; keep all five worker slots busy across them
+- [FerroEHR has no production installs](ferroehr-no-production-installs.md): as of 2026-11-01 nobody runs FerroEHR in production; skip data-preserving upgrade work for old data unless the owner says otherwise
+- [Ratchet PR without a token](ratchet-pr-no-token.md): close and reopen FerroEHR's daily ratchet PR so CI runs; no PAT secret
+- [Preflight the merge commit before tagging](preflight-merge-commit-before-tag.md): run preflight.sh on the release merge commit before any FerroEHR tag; rc8 and rc9 burnt on 2026-11-02
+- [Ten worker slots](worker-cap-ten.md): from 2026-11-03 up to 10 concurrent workers, replacing the cap of 5
+- [Always a next milestone](next-milestone-always.md): every repo keeps a milestone after the active one, for work that cannot finish in time
+- [Tag and approve releases autonomously](release-tag-and-approve-autonomously.md): sign and push release tags and approve the crates-io gate without asking
+- [Workers never idle on the merge queue](workers-never-idle-on-merge-queue.md): start the next independent issue while a PR waits in a queue
+- [Decide, do not ask](decide-dont-ask.md): make tracker, design and release calls yourself and act; ask the owner only when a tool is refused
+- [Workers own every open PR](workers-own-every-open-pr.md): drive all your open PRs to merge; the watcher shepherds auto-merge and bot PRs
