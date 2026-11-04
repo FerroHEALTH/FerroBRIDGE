@@ -1,0 +1,145 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- Synthetic: an International Patient Summary shape, a COMPOSITION whose
+-- content holds two overlays of the CKM SECTION.adhoc.v1 told apart by a fixed
+-- name, "Notes" holding the synthetic note and "Alerts" the synthetic alert,
+-- each at most once.
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_named_sections.v1.0.0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"published">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"A synthetic composition authored for the FerroBRIDGE tests">
+        >
+    >
+
+definition
+    COMPOSITION[at0000] matches {
+        content matches {
+            use_archetype SECTION[at0001, openEHR-EHR-SECTION.adhoc-ferrobridge_notes.v1] occurrences matches {0..1}
+            use_archetype SECTION[at0002, openEHR-EHR-SECTION.adhoc-ferrobridge_alerts.v1] occurrences matches {0..1}
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000"] = <
+                text = <"Named sections">
+                description = <"A synthetic composition authored for the FerroBRIDGE tests">
+            >
+            ["at0001"] = <
+                text = <"Notes">
+                description = <"The notes section">
+            >
+            ["at0002"] = <
+                text = <"Alerts">
+                description = <"The alerts section">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-SECTION.adhoc-ferrobridge_notes.v1.0.0
+
+specialize
+    openEHR-EHR-SECTION.adhoc.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"A synthetic section authored for the FerroBRIDGE tests">
+        >
+    >
+
+definition
+    SECTION[at0000.1] matches {
+        name matches {
+            DV_TEXT matches {
+                value matches {"Notes"}
+            }
+        }
+        items matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.ferrobridge_note.v1] occurrences matches {0..1}
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Notes">
+                description = <"Notes">
+            >
+            ["at0000.2"] = <
+                text = <"Synthetic note">
+                description = <"Synthetic note">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-SECTION.adhoc-ferrobridge_alerts.v1.0.0
+
+specialize
+    openEHR-EHR-SECTION.adhoc.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"A synthetic section authored for the FerroBRIDGE tests">
+        >
+    >
+
+definition
+    SECTION[at0000.1] matches {
+        name matches {
+            DV_TEXT matches {
+                value matches {"Alerts"}
+            }
+        }
+        items matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.ferrobridge_alert.v1] occurrences matches {0..1}
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Alerts">
+                description = <"Alerts">
+            >
+            ["at0000.2"] = <
+                text = <"Synthetic alert">
+                description = <"Synthetic alert">
+            >
+        >
+    >

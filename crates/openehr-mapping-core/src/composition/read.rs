@@ -309,7 +309,7 @@ impl WebTemplateIndex {
         for segment in &path.segments {
             let mut identity = segment.clone();
             identity.predicate.position = None;
-            let candidates = openehr_rm::v1_2::paths::select_children(current, &identity);
+            let candidates = select_children(current, &identity);
             let nth = segment
                 .predicate
                 .position
@@ -347,7 +347,7 @@ impl WebTemplateIndex {
             // position picks among the elements the node's identity selects.
             let mut identity = segment.clone();
             identity.predicate.position = None;
-            let candidates = openehr_rm::v1_2::paths::select_children(current, &identity);
+            let candidates = select_children(current, &identity);
             let index = segment
                 .predicate
                 .position
@@ -471,4 +471,38 @@ fn position_segment(path: &RmPath) -> Option<usize> {
         .iter()
         .rposition(|segment| segment.predicate.archetype_node_id.is_some())
         .or_else(|| path.segments.len().checked_sub(1))
+}
+
+/// The children of `node` a path segment selects.
+///
+/// A root point records its archetype id in `archetype_node_id` (openEHR RM
+/// common, the `LOCATABLE` class), and an ADL 2 template records the full
+/// release (`openEHR-EHR-INSTRUCTION.medication_order.v3.0.0`) where the
+/// `aqlPath` names the interface form, so an archetype id that selects no
+/// child exactly selects the children it names in its interface form.
+fn select_children<'a>(node: &'a Value, segment: &PathSegment) -> Vec<&'a Value> {
+    let exact = openehr_rm::v1_2::paths::select_children(node, segment);
+    let Some(wanted) = segment.predicate.archetype_node_id.as_deref() else {
+        return exact;
+    };
+    if !exact.is_empty() {
+        return exact;
+    }
+    let children = match node.get(&segment.attribute) {
+        Some(Value::Array(items)) => items.iter().collect(),
+        Some(single) => vec![single],
+        None => Vec::new(),
+    };
+    children
+        .into_iter()
+        .filter(|child| {
+            child
+                .get("archetype_node_id")
+                .and_then(Value::as_str)
+                .is_some_and(|carried| crate::index::matching::node_id_matches(wanted, carried))
+                && segment.predicate.name_value.as_deref().is_none_or(|name| {
+                    child.pointer("/name/value").and_then(Value::as_str) == Some(name)
+                })
+        })
+        .collect()
 }

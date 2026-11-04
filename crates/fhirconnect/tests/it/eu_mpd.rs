@@ -83,7 +83,7 @@ const MEDICATION_EU_MPD: &str = "http://hl7.eu/fhir/mpd/StructureDefinition/Medi
 /// Builds the index over the ADL 2 operational template of FerroBRIDGE's
 /// medication template, compiled from the vendored CKM archetypes.
 fn medication_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
-    let mut repository = ArchetypeRepository::new();
+    let mut repository = ArchetypeRepository::default();
     for (file, source) in CKM_MEDICATION_ARCHETYPES {
         let archetype = openehr_adl::assemble::parse_artefact(source, Dialect::Adl14)
             .map_err(|errors| format!("{file}: {errors:?}"))?;

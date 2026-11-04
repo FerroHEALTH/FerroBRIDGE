@@ -108,14 +108,16 @@ fn round_trip(
 fn a_tail_below_a_generic_interval_node_compiles() -> Result<(), Box<dyn Error>> {
     // RM 1.1.0 data_types §DV_INTERVAL: `lower` and `upper` are of the
     // parameter `T`, so `/lower` below `DV_INTERVAL<DV_QUANTITY>` is a
-    // DV_QUANTITY and runs the DV_QUANTITY.adoc §Quantity cell.
+    // DV_QUANTITY and runs the DV_QUANTITY.adoc §Quantity cell. The Web
+    // Template carries each part as a node of its own (ITS-REST
+    // simplified_formats master05 §DV_INTERVAL).
     let program = compiled_against(
         "ferrobridge_interval_tail",
         &interval_template("DV_QUANTITY")?,
     )?;
     let rendered = program.to_string();
     assert!(
-        rendered.contains("DV_INTERVAL<DV_QUANTITY> tail lower\n    derived Quantity"),
+        rendered.contains("/items[at0002]/value/lower DV_QUANTITY\n    derived Quantity"),
         "the bound converts as a quantity: {rendered}"
     );
     Ok(())
