@@ -1,0 +1,55 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- Synthetic: a second at-coded EVALUATION, so the two named sections of
+-- named_sections.adlt each hold an entry of their own.
+archetype (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-EVALUATION.ferrobridge_alert.v1.0.0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"published">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"A synthetic alert authored for the FerroBRIDGE tests">
+            keywords = <"synthetic">
+        >
+    >
+
+definition
+    EVALUATION[at0000] matches {
+        data matches {
+            ITEM_TREE[at0001] matches {
+                items matches {
+                    ELEMENT[at0002] occurrences matches {1..1} matches {
+                        value matches {
+                            DV_TEXT matches {*}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000"] = <
+                text = <"Synthetic alert">
+                description = <"A synthetic alert authored for the FerroBRIDGE tests">
+            >
+            ["at0001"] = <
+                text = <"Tree">
+                description = <"The item tree of the synthetic alert">
+            >
+            ["at0002"] = <
+                text = <"Alert text">
+                description = <"The one text element of the synthetic alert">
+            >
+        >
+    >

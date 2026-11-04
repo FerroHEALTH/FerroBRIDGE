@@ -80,7 +80,7 @@ const VACCINE: &str = "SYN-VACCINE-0001";
 
 /// The ADL 2 operational template of the patient summary template.
 fn template() -> Result<TemplateSource, Box<dyn Error>> {
-    let mut repository = ArchetypeRepository::new();
+    let mut repository = ArchetypeRepository::default();
     for (file, source) in CKM_MEDICATION_ARCHETYPES {
         let archetype = openehr_adl::assemble::parse_artefact(source, Dialect::Adl14)
             .map_err(|errors| format!("{file}: {errors:?}"))?;
