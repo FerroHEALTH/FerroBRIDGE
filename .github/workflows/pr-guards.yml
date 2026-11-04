@@ -112,9 +112,12 @@ jobs:
             [ -n "${run}" ] && break
             sleep 10
           done
+          # A label set as the pull request opens fires this event before CI
+          # has a run on the head; the guards read their labels when they run,
+          # so that run reads this label itself and nothing is stale (#1556).
           if [ -z "${run}" ]; then
-            echo "::error::no CI run on ${HEAD} to re-run ${guards[*]} in"
-            exit 1
+            echo "no CI run on ${HEAD} yet; the run that starts on it reads ${LABEL} itself"
+            exit 0
           fi
 
           handled=" "
