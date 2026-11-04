@@ -563,3 +563,72 @@ fn every_read_going_into_openehr_names_its_resource() -> Result<(), Box<dyn Erro
     }
     Ok(())
 }
+
+/// Returns the FHIR paths the run of the manual-read fixture into openEHR
+/// read, over the synthetic `Condition` with its verification status `code`.
+fn manual_reads(code: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let mut input: serde_json::Value =
+        serde_json::from_str(ferrobridge_testkit::fixtures::R4_CONDITION)?;
+    *input
+        .pointer_mut("/verificationStatus/coding/0/code")
+        .ok_or("the synthetic Condition's verification status code")? =
+        serde_json::Value::from(code);
+    let program = compiled("ferrobridge_manual_read")?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &template()?,
+        &Value::from_serde_json(input),
+        &Seams::default(),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    Ok(inbound
+        .reads()
+        .iter()
+        .filter_map(Location::fhir)
+        .map(String::from)
+        .collect())
+}
+
+#[test]
+fn an_admitted_manual_entry_reads_the_element_it_stands_for() -> Result<(), Box<dyn Error>> {
+    // manual.adoc: the FHIR paths of an entry build the element it stands for,
+    // so going into openEHR the admitted entry carries that element.
+    let reads = manual_reads("confirmed")?;
+    assert!(
+        reads
+            .iter()
+            .any(|read| read.starts_with("Condition.verificationStatus.coding")),
+        "{reads:?}"
+    );
+    assert!(
+        !reads
+            .iter()
+            .any(|read| read.starts_with("Condition.clinicalStatus")),
+        "the refused entry read nothing: {reads:?}"
+    );
+    assert!(
+        !reads.iter().any(|read| read.starts_with("Condition.note")),
+        "the entry that runs out of openEHR only read nothing: {reads:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_manual_entry_its_condition_refuses_reads_nothing() -> Result<(), Box<dyn Error>> {
+    let reads = manual_reads("refuted")?;
+    assert!(
+        reads
+            .iter()
+            .any(|read| read.starts_with("Condition.clinicalStatus.coding")),
+        "{reads:?}"
+    );
+    assert!(
+        !reads
+            .iter()
+            .any(|read| read.starts_with("Condition.verificationStatus")),
+        "the refused entry read nothing: {reads:?}"
+    );
+    Ok(())
+}

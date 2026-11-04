@@ -72,6 +72,9 @@ mappings:
 
   # NOTE: openEHR RM data_types §DV_ORDERED: `normal_range` is the one normal range of the
   # quantity, and R4 Observation.referenceRange.type assumes the normal range when absent.
+  # NOTE: KDS_Laborbericht OPT, the analyte cluster 0..* with `items[at0001]` 1..1: the bounds
+  # merge into the DV_QUANTITY `analyteMeasurement` writes, where a mapping of their own onto
+  # `items[at0001]` writes a second value with no `magnitude`, which the RM refuses.
   - name: "referenceRange"
     extension: "append"
     appendTo: "analyteMeasurement"

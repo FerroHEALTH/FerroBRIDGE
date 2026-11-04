@@ -61,7 +61,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return Ok(());
         }
         match self.direction {
-            Direction::FhirToOpenehr => self.manual_openehr(mapping, entry, binding),
+            Direction::FhirToOpenehr => {
+                self.manual_reads(entry, binding);
+                self.manual_openehr(mapping, entry, binding)
+            }
             Direction::OpenehrToFhir => self.manual_fhir(mapping, entry, binding),
         }
     }
@@ -84,6 +87,23 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Target::Fhir(_) => None,
             });
         self.locate_targets(fhir, &binding.fhir, openehr)
+    }
+
+    /// Records as read each FHIR path of a manual entry that writes going into
+    /// openEHR, at the binding's occurrence.
+    ///
+    /// The FHIR paths of an entry name the element the entry stands for
+    /// (`types-of-mappings/concept-type/manual.adoc`), so an admitted entry
+    /// carries that element. An entry with no FHIR path reads nothing. No
+    /// specification defines a read: our own design.
+    fn manual_reads(&mut self, entry: &Manual, binding: &Binding) {
+        for path in entry.fhir() {
+            let Target::Fhir(ref target) = *path.target() else {
+                continue;
+            };
+            let location = self.locate_targets(Some(target.as_ref()), &binding.fhir, None);
+            self.reads.push(location);
+        }
     }
 
     /// Returns whether the input-side conditions admit a manual entry.

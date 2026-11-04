@@ -15,7 +15,12 @@
 # attributes the reference model or the template do not carry
 # (`$composition/perfomer`, `$archetype/other_participations` without a
 # performer form, `context/end_time`) and are left out, as are the category
-# and status tables, which the EU extension writes.
+# and status tables, which the EU extension writes. The published `basedOn`
+# method (published lines 430 to 446) is left out too: the EU extension
+# `ferrobridge_eu_laboratory_result` maps `DiagnosticReport.basedOn` to the
+# test request identifier `protocol[at0004]/items[at0094]/items[at0063]` and
+# back as a `Reference` to a `ServiceRequest`, the type
+# `DiagnosticReport-eu-lab` gives it.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
