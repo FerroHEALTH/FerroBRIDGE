@@ -42,8 +42,9 @@ resources are the authority for what it emits (`.claude/rules/codegen.md`).
   `SearchParamType` enum over the codes every version uses.
 - The `v2` root set (`src/v2/`, #253) reads the HL7 v2 definitions that
   `scripts/vendor/v2ig.sh` fetches into the ignored `vendor/hl7-v2ig/` and
-  emits `crates/hl7v2-types`: `v2::corpus` (the manifest-less loader over the
-  directories `roots` declares), `roots::V2RootSet` (every message structure,
+  emits `crates/hl7v2-types`: `v2::fetched` (a fetched tree opened at its
+  pinned commit, the refusals both v2 trees share), `v2::corpus` (the
+  manifest-less loader over the directories `roots` declares), `roots::V2RootSet` (every message structure,
   segment, data type and message definition), `v2::lower` (the differential
   read as the snapshot, the position-prefixed id rule, the extensions, the
   component tables, and each message definition linked to its structure by
