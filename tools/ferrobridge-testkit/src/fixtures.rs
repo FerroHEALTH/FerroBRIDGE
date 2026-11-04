@@ -10,8 +10,9 @@
 //!
 //! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`],
 //! [`KDS_PERSON_OPT`], [`KDS_LABORAUFTRAG_OPT`] and [`KDS_LABORBERICHT_OPT`]
-//! are published operational templates and [`CKM_MEDICATION_ARCHETYPES`] and [`CKM_LIBRARY_ARCHETYPES`]
-//! published archetypes, vendored verbatim with their provenance beside
+//! are published operational templates and [`CKM_MEDICATION_ARCHETYPES`],
+//! [`CKM_LIBRARY_ARCHETYPES`] and [`CKM_HIGHMED_ARCHETYPES`] published
+//! archetypes, vendored verbatim with their provenance beside
 //! them: a template or an archetype carries constraints, never patient
 //! content.
 //! [`KDS_DIAGNOSE_CONDITION`] is synthetic, and names the profile and the
@@ -254,32 +255,79 @@ pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 13] = [
     ckm_medication!("openEHR-EHR-SECTION.immunisation_list.v0.adl"),
 ];
 
-/// FerroBRIDGE's ADL 2 template for the FHIRconnect mapping library's
-/// model mappings, with its template overlay.
+/// One FerroBRIDGE library template as `(template identifier, source)`.
+macro_rules! library_template {
+    ($slug:literal) => {
+        (
+            concat!(
+                "openEHR-EHR-COMPOSITION.ferrobridge_library_",
+                $slug,
+                ".v1.0.0"
+            ),
+            include_str!(concat!(
+                "../fixtures/adl2/library/ferrobridge_library_",
+                $slug,
+                ".adlt"
+            )),
+        )
+    };
+}
+
+/// FerroBRIDGE's ADL 2 templates for the FHIRconnect mapping library's
+/// model mappings, as `(template identifier, source)`.
 ///
-/// A report `COMPOSITION` holding `EVALUATION.gender.v1`, whose open
-/// protocol slot holds `CLUSTER.device.v1`, at-coded with the ADL 1.4 codes of
-/// [`CKM_LIBRARY_ARCHETYPES`]. A suite builds the ADL 2 operational template
-/// from the two at test time. The template identifier is
-/// [`FERROBRIDGE_LIBRARY_REPORT_TEMPLATE_ID`].
-pub const FERROBRIDGE_LIBRARY_REPORT_TEMPLATE: &str =
-    include_str!("../fixtures/adl2/library/ferrobridge_library_report.adlt");
+/// Each is rooted at a composition archetype a library model maps, at-coded
+/// with the ADL 1.4 codes of [`CKM_LIBRARY_ARCHETYPES`],
+/// [`CKM_HIGHMED_ARCHETYPES`] and [`CKM_MEDICATION_ARCHETYPES`]: the report
+/// holds the gender evaluation with the device cluster in its open protocol
+/// slot, the health summary holds an ad hoc section with the absence and
+/// global exclusion evaluations, and the report result, medication list,
+/// encounter and person compositions each hold the gender evaluation. A suite
+/// builds the ADL 2 operational templates at test time.
+pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 6] = [
+    library_template!("report"),
+    library_template!("report_result"),
+    library_template!("medication_list"),
+    library_template!("encounter"),
+    library_template!("person"),
+    library_template!("health_summary"),
+];
 
-/// The template identifier [`FERROBRIDGE_LIBRARY_REPORT_TEMPLATE`] declares.
-pub const FERROBRIDGE_LIBRARY_REPORT_TEMPLATE_ID: &str =
-    "openEHR-EHR-COMPOSITION.ferrobridge_library_report.v1.0.0";
-
-/// The three published CKM archetypes of
-/// [`FERROBRIDGE_LIBRARY_REPORT_TEMPLATE`]: the report composition, the
-/// gender evaluation and the device cluster.
+/// The seven international CKM archetypes of the library templates.
+///
+/// They are the report, report result and medication list compositions, the
+/// absence, global exclusion and gender evaluations, and the device cluster
+/// of [`FERROBRIDGE_LIBRARY_TEMPLATES`].
 ///
 /// `scripts/vendor/ckm-library.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 3] = [
+pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 7] = [
     ckm_library!("openEHR-EHR-COMPOSITION.report.v1.adl"),
+    ckm_library!("openEHR-EHR-COMPOSITION.report-result.v1.adl"),
+    ckm_library!("openEHR-EHR-COMPOSITION.medication_list.v1.adl"),
+    ckm_library!("openEHR-EHR-EVALUATION.absence.v2.adl"),
+    ckm_library!("openEHR-EHR-EVALUATION.exclusion_global.v1.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.gender.v1.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.device.v1.adl"),
+];
+
+/// The two published `HiGHmed` CKM archetypes of
+/// [`FERROBRIDGE_LIBRARY_TEMPLATES`]: the encounter (`fall`) and person
+/// compositions.
+///
+/// `scripts/vendor/ckm-highmed.sh` fetches them at the German CKM mirror
+/// commit `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records
+/// their source and each archetype's own licence.
+pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 2] = [
+    (
+        "openEHR-EHR-COMPOSITION.fall.v1.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.fall.v1.adl"),
+    ),
+    (
+        "openEHR-EHR-COMPOSITION.person.v0.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.person.v0.adl"),
+    ),
 ];
 
 /// A synthetic FLAT composition of [`KDS_PERSON_OPT`]: one person with a

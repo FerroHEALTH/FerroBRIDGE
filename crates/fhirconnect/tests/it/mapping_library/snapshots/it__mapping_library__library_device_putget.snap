@@ -1,5 +1,5 @@
 ---
-source: crates/fhirconnect/tests/it/mapping_library.rs
+source: crates/fhirconnect/tests/it/mapping_library/mod.rs
 expression: declared
 ---
 {
@@ -11,7 +11,11 @@ expression: declared
     "the engine filled /territory"
   ],
   "second_leg": [],
-  "lost": [],
-  "added": [],
+  "lost": [
+    "deviceName[0].type = \"user-friendly-name\""
+  ],
+  "added": [
+    "note[1].text = \"A synthetic device.\""
+  ],
   "changed": []
 }

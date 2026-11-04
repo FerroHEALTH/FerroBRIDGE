@@ -40,6 +40,10 @@ item="CKM library archetypes (fixture)"
 dest="tools/ferrobridge-testkit/fixtures/ckm/library"
 paths=(
   "local/archetypes/composition/openEHR-EHR-COMPOSITION.report.v1.adl"
+  "local/archetypes/composition/openEHR-EHR-COMPOSITION.report-result.v1.adl"
+  "local/archetypes/composition/openEHR-EHR-COMPOSITION.medication_list.v1.adl"
+  "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.absence.v2.adl"
+  "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.exclusion_global.v1.adl"
   "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.gender.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.device.v1.adl"
 )

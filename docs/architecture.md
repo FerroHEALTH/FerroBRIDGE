@@ -697,6 +697,22 @@ is silent:**
   1.4 states at the slot node (`C_ARCHETYPE_ROOT.template_id`); a different
   one is refused as a template mismatch, and a slot node that states none is a
   warning, because the rule cannot be decided there (#886).
+- The `start` archetype is the one template node whose node id names it. A
+  template specialises its root archetype and its operational template stays
+  specialised (AM Release-2.3.0 AOM2, §3.6.4 `TEMPLATE` `Inv_is_specialised`,
+  §3.6.6 `OPERATIONAL_TEMPLATE` `Specialisation_validity`), so the template
+  root also carries every archetype its lineage names, and a composition
+  model (`composition-element.adoc`) starts at it (#1550). An OPT 1.4 root
+  carries the composition archetype as its own node id. An OPT2 root carries
+  the template's own id (OPT2 master04 §Web Template Metadata), so
+  `WebTemplateIndex` keeps the lineage beside it: the `parent_archetype_id`
+  the OPT2 states, or the lineage a caller holding the template source passes
+  (`WebTemplateIndex::with_root_lineage`), since `openehr-adl`'s `create_opt`
+  writes an OPT that states no parent (master02). Ids are never rewritten.
+  An OPT2 a CDR serves with no parent stated leaves a composition model
+  unstartable there, refused as an unresolved archetype root. FHIRconnect
+  v1.0.0 is silent on how a model's archetype matches a specialising root:
+  our own design.
 - The version selectors the specification lacks (which `metadata.version` of a
   name loads; `spec.openEhrConfig.revision` against the OPT; `profile.version`
   against the instance; `template.sem_ver` against the OPT) are a refusal at
@@ -2982,6 +2998,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | FHIR path handling | own bidirectional path model over the `Value` tree with the element table; every expression classified writable or read-only at load | `with.fhir` is written; `^` is not FHIRPath; no crate writes; the retired connector's reverse path silently wrote nothing | a FHIRPath evaluator (all read-only, heavy) |
 | Engine surface | `$tofhir` and `$toopenehr` per the REST API chapter, at the pinned specification commit, ahead of the facade | the specification's own conformance surface; no CDR needed; an external facade can call it | facade only |
 | openEHR wire | canonical JSON; Web Template built locally from the OPT; FLAT only at the operations edge | canonical is mandatory in ITS-REST; `WebTemplate` does not deserialise; node ids are server-specific; the REST API requires both serialisations | FLAT on the CDR wire; fetching `wt+json` |
+| Composition start on an OPT2 | the template root carries the archetypes its lineage names, kept on the index from the OPT2's `parent_archetype_id` or passed by a caller holding the template source; ids are never rewritten (section 4.3, #1550) | a template and its OPT are specialised (AM Release-2.3.0 AOM2 §3.6.4, §3.6.6); FHIRconnect v1.0.0 is silent: our own design | rewriting the root node id to the parent archetype; refusing composition models against every OPT2 |
 | Template generations | both ADL 1.4 and ADL 2, resolved `adl1.4` then `adl2` on one id, decoded into two OPT types, built into one `WebTemplate` (section 3) | owner requirement 2026-09-12; the Simplified Formats seam is generation-neutral; ITS-REST 1.1.0 serves both | ADL 1.4 only; a second pipeline per generation |
 | ADL 2 fetch form | `Accept: application/json`, AOM2 canonical JSON into `openehr-am`'s `OperationalTemplate` | the server already compiled the OPT2; ADL 2 source would cost the parser, the flattener and a repository | `text/plain` source through `openehr-adl` |
 | Node-id code space | at-coded templates only; an id-coded ADL 2 template is refused naming the code space | mapping paths are at-coded; ADL 2.4 requires at-codes for openEHR-RM systems; the builder reads no `alternative_ids` | silent non-resolution; a speculative at-to-id translation |
