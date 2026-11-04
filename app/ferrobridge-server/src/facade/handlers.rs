@@ -51,9 +51,7 @@ use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
-
-/// The refusal a handler short-circuits with, already rendered.
-pub(crate) use crate::facade::reply::Refusal;
+use crate::facade::reply::Refusal;
 
 /// `GET [base]/metadata`: the `CapabilityStatement` of the loaded programs.
 ///
@@ -257,9 +255,8 @@ async fn document(
         facade,
         access,
         &facade.client_for(headers),
+        (headers, uri),
         &id,
-        headers,
-        uri,
     )
     .await
 }
@@ -628,7 +625,7 @@ fn not_supported(resource_type: &str) -> Refusal {
         StatusCode::NOT_FOUND,
         Issue::error(IssueType::NotSupported).diagnosing(format!(
             "no loaded mapping answers for {resource_type}; GET {}/metadata names the types this server supports",
-            crate::facade::BASE_PATH
+            crate::mount::BASE_PATH
         )),
     )
 }

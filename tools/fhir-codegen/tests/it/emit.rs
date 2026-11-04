@@ -114,7 +114,7 @@ fn check_reports_edited_missing_and_stale_files() {
     fs::remove_file(src.join("r4b/meta.rs")).expect("remove");
     fs::write(src.join("r4b/stale.rs"), "// stale\n").expect("stale");
     match emit(&r4b_only(dir.path(), true)) {
-        Err(EmitError::Drift { paths }) => {
+        Err(EmitError::Tree(generated_tree::TreeError::Drift { paths })) => {
             assert_eq!(
                 paths,
                 vec![

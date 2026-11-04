@@ -17,9 +17,11 @@ mod audit;
 mod auth;
 mod change_feed;
 mod credentials;
+pub mod document;
 pub mod error;
 mod events;
 mod fhir_outbound;
+pub mod hl7v2;
 mod omop_incremental;
 mod resolve;
 pub mod section;
@@ -34,6 +36,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+
+use crate::aql::CheckedQuery;
+use crate::cdr::query::PageSize;
+use crate::change_feed::ReaderName;
+use omocl::engine::concept::VocabularyAliases;
+use omop_cdm::derived;
+use omop_cdm::writer::input::VisitConcepts;
 
 use error::Error;
 use resolve::resolve_cdm;
@@ -228,7 +237,7 @@ impl Config {
     /// [`Error::Missing`], [`Error::Client`]) each naming the key that carries
     /// the fault, and [`Error::Auth`] and [`Error::Credentials`] naming the rule
     /// of `ferrohealth-smart` a section breaks. Returns [`Error::Mappings`]
-    /// over [`crate::mappings::Error::NoTemplateSource`] when the operations
+    /// over [`error::NoTemplateSource`] when the operations
     /// are enabled and `[mappings] directory` is set with neither
     /// `[mappings] templates` nor `[cdr]`, so the refusal comes before any
     /// network call.
@@ -240,9 +249,9 @@ impl Config {
             && self.cdr.is_none()
         {
             return Err(Error::Mappings {
-                source: Box::new(crate::mappings::Error::NoTemplateSource {
+                source: error::NoTemplateSource {
                     directory: directory.clone(),
-                }),
+                },
             });
         }
         if self.server.caller_rate.is_some() {
@@ -323,7 +332,7 @@ impl Config {
             },
             configuration: if serves && self.operator.enabled {
                 Some(
-                    crate::operator::configuration::document(self, jiff::Timestamp::now())
+                    document::document(self, jiff::Timestamp::now())
                         .map_err(|source| Error::Render { source })?,
                 )
             } else {
@@ -375,7 +384,7 @@ pub struct Hl7v2Settings {
     /// Whether an `AE` or an `AR` also logs the counted outcomes.
     pub log_outcomes: bool,
     /// The sending facilities the face accepts; empty accepts any.
-    pub senders: Vec<crate::hl7v2::Sender>,
+    pub senders: Vec<hl7v2::Sender>,
 }
 
 /// The settings the run path holds, with every secret already read.
@@ -395,7 +404,7 @@ pub struct Settings {
     /// The OMOP CDM database, when the lane is on.
     pub cdm: Option<CdmSettings>,
     /// The OMOP ETL job, when it is configured.
-    pub etl: Option<crate::etl::EtlSettings>,
+    pub etl: Option<EtlSettings>,
     /// The directory the mapping files are read from, when one is configured.
     pub mapping_directory: Option<PathBuf>,
     /// The directory the OMOCL mapping files are read from, when one is
@@ -419,7 +428,7 @@ pub struct Settings {
     /// The AMQP publisher of the commit events, when it is on.
     pub events: Option<crate::events::Settings>,
     /// The incremental OMOP load, when it is on.
-    pub omop_incremental: Option<crate::etl::incremental::Settings>,
+    pub omop_incremental: Option<OmopIncrementalSettings>,
     /// The outbound FHIR lane, when it is on.
     pub fhir_outbound: Option<crate::outbound::Settings>,
     /// The FHIRconnect operations lane.
@@ -427,7 +436,7 @@ pub struct Settings {
     /// The installation report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
     /// The operator API, when it is mounted.
-    pub operator: Option<crate::operator::OperatorSettings>,
+    pub operator: Option<OperatorSettings>,
     /// The access-record lane, when it is on.
     pub audit: Option<crate::audit::Settings>,
     /// The running configuration the operator API answers, when it is
@@ -474,6 +483,65 @@ pub struct OperationsSettings {
     pub composition_language: Option<String>,
     /// The composition territory, as an ISO 3166-1 alpha-2 code.
     pub composition_territory: Option<String>,
+}
+
+/// The operator API, resolved from `[operator]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperatorSettings {
+    /// The writable directory console saves go to, when one is configured.
+    pub mapping_dir: Option<PathBuf>,
+}
+
+/// The derived visits a run writes before the compositions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisitSettings {
+    /// The checked visit query.
+    pub query: CheckedQuery,
+    /// The concepts every visit carries.
+    pub concepts: VisitConcepts,
+}
+
+/// The `[etl]` section, resolved: the checked queries and the concepts the
+/// deployment configures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EtlSettings {
+    /// The checked composition query, which `etl run` needs and `etl fhir`
+    /// does not read.
+    pub compositions: Option<CheckedQuery>,
+    /// How many rows one page of either query asks for.
+    pub page_size: PageSize,
+    /// The `*_type_concept_id` the mapper writes: the provenance of the
+    /// records, which the deployment knows.
+    pub type_concept_id: i32,
+    /// The `period_type_concept_id` of every observation period.
+    pub observation_period_type_concept_id: i32,
+    /// The visit derivation, when configured.
+    pub visits: Option<VisitSettings>,
+    /// What the run does with a composition the CDR reports deleted.
+    pub deletions: DeletionPolicy,
+    /// The OHDSI `vocabulary_id` each terminology id is looked up under.
+    pub aliases: VocabularyAliases,
+    /// Whether `etl run` runs the quality checks after the load.
+    pub quality_checks: bool,
+    /// Which rows of the derived tables a run rebuilds.
+    pub derived_tables: derived::Scope,
+}
+
+/// What a run does with a composition the CDR reports deleted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DeletionPolicy {
+    /// Removes the composition's rows, links and watermark.
+    #[default]
+    Remove,
+    /// Lists the composition in the run report and keeps its rows.
+    Report,
+}
+
+/// The incremental load, resolved from `[omop_incremental]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OmopIncrementalSettings {
+    /// The reader name the load follows the change feed under.
+    pub reader: ReaderName,
 }
 
 #[cfg(test)]

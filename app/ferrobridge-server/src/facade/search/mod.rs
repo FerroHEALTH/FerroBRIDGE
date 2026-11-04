@@ -214,7 +214,7 @@ impl Catalog {
 /// type and template another declaration answers, or states another parameter
 /// set than its type's first declaration.
 pub fn load(directory: &Path, programs: &Programs) -> Result<Catalog, DeclarationError> {
-    let files = crate::walk::files(directory, declaration::is_declaration).map_err(
+    let files = crate::walk::files(directory, crate::walk::is_declaration).map_err(
         |crate::walk::Error { path, source }| DeclarationError::Read { file: path, source },
     )?;
     load_files(&files, programs)

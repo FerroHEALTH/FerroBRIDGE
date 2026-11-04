@@ -17,6 +17,7 @@
 //! A disabled facade mounts no route, so a request answers `404` rather than
 //! `403`: capability is not authorisation.
 
+pub mod audit;
 pub mod capability;
 pub mod commit;
 pub mod compartment;
@@ -53,16 +54,9 @@ use crate::cdr::CdrClient;
 use crate::facade::identity::claims::Claims;
 use crate::facade::identity::store::Store;
 use crate::facade::programs::Programs;
+use crate::mount::BASE_PATH;
 use crate::terminology::Translator;
 use ferrohealth_usage_report::window::Window;
-
-/// The path every facade route sits under.
-///
-/// The FHIR service base is `[base]` of the R4 HTTP chapter
-/// (<https://hl7.org/fhir/R4/http.html>), and this deployment mounts it at
-/// `/fhir` so the health routes and the FHIRconnect operations keep their own
-/// space (no specification governs the mount point: our own design).
-pub const BASE_PATH: &str = "/fhir";
 
 /// What one facade deployment was configured with.
 #[derive(Debug, Clone)]

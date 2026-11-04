@@ -19,6 +19,7 @@
 //! names the resource server it is for (RFC 9068 §4), and the CDR is reached
 //! with the bridge's own credential (`crate::credentials`).
 
+use crate::mount::BASE_PATH;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -41,9 +42,6 @@ use ferrohealth_smart::resource::introspection::IntrospectionError;
 use ferrohealth_smart::resource::introspection::IntrospectionSettings;
 use ferrohealth_smart::resource::introspection::Introspector;
 use fhir_types::r4::schema::SCHEMAS;
-
-use crate::facade::BASE_PATH;
-use crate::facade::capability::Security;
 
 /// The operator scope a deployment that names none uses.
 ///
@@ -310,6 +308,22 @@ impl Smart {
             revoke: metadata.revocation_endpoint.clone(),
         }
     }
+}
+
+/// The authorization server that guards the facade, as `rest.security`
+/// states it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Security {
+    /// The authorization endpoint, when the server has one.
+    pub authorize: Option<String>,
+    /// The token endpoint.
+    pub token: String,
+    /// The dynamic registration endpoint, when the server has one.
+    pub register: Option<String>,
+    /// The token introspection endpoint, when the server has one.
+    pub introspect: Option<String>,
+    /// The token revocation endpoint, when the server has one.
+    pub revoke: Option<String>,
 }
 
 /// Returns the routes of the discovery document.

@@ -206,7 +206,7 @@ async fn keep(
 /// Returns [`JobError::Connection`] and [`JobError::Resolver`] when the
 /// resolver's connection cannot be prepared or opened.
 pub(crate) async fn mapper(
-    etl: &crate::etl::EtlSettings,
+    etl: &crate::config::EtlSettings,
     cdm: &crate::config::CdmSettings,
     set: omocl::model::load::MappingSet,
 ) -> Result<(OmoclMapper<CdmVocabulary>, CdmPool), JobError> {
@@ -248,7 +248,7 @@ async fn foreign_step(writer: &CdmWriter, report: &mut RunReport) -> Result<(), 
 /// Runs the quality checks over the tables `report` names when `etl` asks
 /// for them, and adds their verdicts to it.
 async fn quality_step(
-    etl: &crate::etl::EtlSettings,
+    etl: &crate::config::EtlSettings,
     pool: &CdmPool,
     report: &mut RunReport,
 ) -> Result<(), JobError> {

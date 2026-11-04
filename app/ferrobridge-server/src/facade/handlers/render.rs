@@ -31,7 +31,6 @@ use url::Url;
 
 use crate::facade::Facade;
 use crate::facade::engine;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::complete;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::created::CreatedIdentities;
@@ -40,6 +39,7 @@ use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::status;
 use crate::terminology::{Direction, Session};
 use ferrohealth_usage_report::window::Window;
@@ -87,6 +87,30 @@ pub(crate) struct Origin<'a> {
     pub(crate) usage: &'a Window,
     /// The demographics endpoint every party reference resolves through.
     pub(crate) demographics: &'a dyn Demographics,
+}
+
+impl<'a> Origin<'a> {
+    /// Returns the origin of the content of version `version`, ITS-REST URL
+    /// `source`, bound to `id`, with the facade's identity map, usage window
+    /// and demographics endpoint.
+    #[must_use]
+    pub(crate) fn new(
+        facade: &'a Facade,
+        id: &'a FhirResourceId,
+        version: &'a ObjectVersionId,
+        source: &'a Url,
+        subject: Option<&'a Value>,
+    ) -> Self {
+        Self {
+            id,
+            version,
+            source,
+            subject,
+            store: facade.store(),
+            usage: facade.usage(),
+            demographics: facade.demographics(),
+        }
+    }
 }
 
 impl<'a> Origin<'a> {

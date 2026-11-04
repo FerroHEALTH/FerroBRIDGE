@@ -14,6 +14,7 @@ use openehr_its::rest::generated::ehr::client::ContributionGetOutcome;
 use openehr_rm::v1_2::common::change_control::contribution::Contribution;
 use openehr_rm::v1_2::composition::composition::Composition;
 
+use crate::cause::chain;
 use crate::cdr::Returned;
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
@@ -23,7 +24,6 @@ use crate::facade::identity::record::ConsumedSource;
 use crate::facade::identity::record::SourceVersion;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::outcome::chain;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;

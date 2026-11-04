@@ -240,6 +240,45 @@ impl fmt::Display for DiagnosticCode {
     }
 }
 
+/// Renders the values a key admits as a comma-separated backticked list, the
+/// form both languages' refusals name them in.
+#[must_use]
+pub fn render_admitted(admitted: &[&str]) -> String {
+    admitted
+        .iter()
+        .map(|value| format!("`{value}`"))
+        .collect::<Vec<String>>()
+        .join(", ")
+}
+
+/// A closed set of diagnostic codes a language crate defines.
+///
+/// Every spelling is in the [`LanguageCode`] alphabet, lowercase ASCII
+/// letters, digits and hyphens, and the implementing crate pins that with a
+/// test over every code it defines; the conversion into a [`DiagnosticCode`]
+/// relies on it.
+pub trait LanguageCodes: Copy {
+    /// The code as a diagnostic writes it.
+    fn spelling(self) -> &'static str;
+}
+
+impl<C: LanguageCodes> From<C> for DiagnosticCode {
+    /// # Panics
+    ///
+    /// Never in practice. Every spelling a [`LanguageCodes`] implementor
+    /// returns is in the alphabet [`LanguageCode::new`] admits, which its
+    /// crate's `every_code_is_a_language_code` test asserts over every code.
+    #[expect(
+        clippy::expect_used,
+        reason = "each implementor's spellings are fixed and pinned by its every_code_is_a_language_code test"
+    )]
+    fn from(code: C) -> Self {
+        let language = LanguageCode::new(code.spelling())
+            .expect("a language crate's code should be a language code");
+        Self::Language(language)
+    }
+}
+
 /// One step of a path into the document model.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(untagged)]

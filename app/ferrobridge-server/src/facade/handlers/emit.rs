@@ -20,11 +20,11 @@ use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
 use crate::facade::engine;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::complete;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
 use crate::facade::ingest::Refused;
+use crate::facade::reply::Refusal;
 
 /// One resource a composition version maps to.
 #[derive(Debug, Clone)]
@@ -78,7 +78,7 @@ pub(crate) async fn resources_of(
     else {
         return Ok(Vec::new());
     };
-    let canonical = read::canonical(facade, ehr_id, composition, &template_id)?;
+    let canonical = read::version::canonical(facade, ehr_id, composition, &template_id)?;
     let source = render::composition_url(client.base_url(), ehr_id, version)?;
     let subject = render::subject_of(facade, ehr_id)?;
     let programs = facade.programs();

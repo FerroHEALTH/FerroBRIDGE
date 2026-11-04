@@ -43,7 +43,7 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::etl::EtlSettings;
+use crate::config::EtlSettings;
 use crate::etl::Mapper;
 use crate::etl::MappingContext;
 use crate::etl::RunError;
@@ -205,7 +205,7 @@ impl FhirSide<'_> {
             .pointer("/meta/lastUpdated")
             .and_then(Value::as_str)
             .unwrap_or(self.now);
-        crate::state::run_settings(
+        crate::operations::run_settings(
             self.device,
             self.composer,
             self.language,

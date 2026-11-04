@@ -12,8 +12,7 @@
 
 use core::fmt;
 
-use openehr_mapping_core::diagnostic::DiagnosticCode;
-use openehr_mapping_core::diagnostic::LanguageCode;
+use openehr_mapping_core::diagnostic::LanguageCodes;
 
 /// A refusal the FHIRconnect model layer raises.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -138,51 +137,10 @@ impl ModelCode {
     }
 }
 
-impl fmt::Display for ModelCode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
+impl LanguageCodes for ModelCode {
+    fn spelling(self) -> &'static str {
+        self.as_str()
     }
-}
-
-impl From<ModelCode> for DiagnosticCode {
-    /// # Panics
-    ///
-    /// Never in practice. Every spelling [`ModelCode::as_str`] returns is
-    /// lowercase ASCII letters and hyphens, which is the alphabet
-    /// [`LanguageCode::new`] admits, and `every_code_is_a_language_code` in
-    /// this module asserts that over [`ModelCode::all`].
-    #[expect(
-        clippy::expect_used,
-        reason = "the code alphabet is fixed by as_str and pinned by every_code_is_a_language_code"
-    )]
-    fn from(code: ModelCode) -> Self {
-        let language =
-            LanguageCode::new(code.as_str()).expect("a model code should be a language code");
-        Self::Language(language)
-    }
-}
-
-/// Why a JSON Schema document could not be compiled into a validator.
-#[derive(Debug, thiserror::Error)]
-pub enum SchemaError {
-    /// The schema document is not JSON.
-    #[error("the {schema} schema is not JSON")]
-    Json {
-        /// Which schema failed.
-        schema: SchemaKind,
-        /// The underlying failure.
-        #[source]
-        source: serde_json::Error,
-    },
-    /// The schema document is JSON but is not a usable JSON Schema.
-    #[error("the {schema} schema does not compile")]
-    Compile {
-        /// Which schema failed.
-        schema: SchemaKind,
-        /// The underlying failure.
-        #[source]
-        source: Box<jsonschema::ValidationError<'static>>,
-    },
 }
 
 /// Which of the two FHIRconnect mapping schemas is in play.
@@ -229,7 +187,8 @@ mod tests {
         for code in ModelCode::all() {
             assert!(
                 LanguageCode::new(code.as_str()).is_ok(),
-                "the code `{code}` is outside the language-code alphabet"
+                "the code `{}` is outside the language-code alphabet",
+                code.as_str()
             );
         }
     }

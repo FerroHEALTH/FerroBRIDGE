@@ -120,7 +120,7 @@ the testkit tool crate. Beside it:
   template and its HL7 v2 and mapping counters, validated against the
   vendored schema in the tests.
   `src/audit/` is the bridge's own access record behind `[audit]` (#1377):
-  the layer inside the guard that writes one Regulation (EU) 2025/327 Annex
+  the access-record lane, whose layer inside the guard (`facade::audit`) writes one Regulation (EU) 2025/327 Annex
   II 3.2 record per facade access through `ehds-logging`, the `reach` every
   CDR read and write adds its template ids to, the HL7 v2 face's system
   import record, and the `ihe-atna` spool and forwarder that send each BALP
@@ -250,6 +250,10 @@ the testkit tool crate. Beside it:
 - `tools/forwarders`: the forwarder ratchet's detector (#1414), which parses
   the hand-written Rust with `syn` and lists each function whose whole body
   forwards to one other call, for `scripts/checks/forwarders.sh`.
+- `tools/generated-tree`: what both generators share about a generated tree
+  (#1417): writing the rendered files, formatting them with the pinned
+  `rustfmt`, reading them back, and the drift comparison with the committed
+  tree.
 - `tools/ferrobridge-testkit`: the test-support crate, a path-only
   dev-dependency (#78). `containers` starts PostgreSQL and the reference CDR
   behind the `FERROBRIDGE_E2E` gate, with every image pinned by digest in
@@ -299,7 +303,7 @@ the testkit tool crate. Beside it:
   claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate
   bump rule; `favicon-sync.sh`, the book theme favicon against the brand mark;
   `usage-report-off.sh`, every launcher of the server in a test lane with the
-  usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)` or a pending subcommand's issue
+  usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)`
   that the tracker reports closed;
   `changelog-released.sh`, every released changelog section against its tag;
   `changelog-structure.sh` and `changelog-security.sh`, the Keep a Changelog

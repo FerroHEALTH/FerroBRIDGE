@@ -105,6 +105,7 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "fhir-codegen" },
   { allow = ["BUSL-1.1"], crate = "omop-cdm-codegen" },
   { allow = ["BUSL-1.1"], crate = "forwarders" },
+  { allow = ["BUSL-1.1"], crate = "generated-tree" },
 ]
 
 [bans]

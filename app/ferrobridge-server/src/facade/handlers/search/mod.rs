@@ -41,7 +41,6 @@ use crate::facade::Facade;
 use crate::facade::engine;
 use crate::facade::engine::entry::Entry;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
 use crate::facade::handlers::search::total::Accuracy;
@@ -57,6 +56,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::search::Declared;
 use crate::facade::search::aql;
 use crate::facade::search::aql::Conditions;
@@ -125,7 +125,7 @@ async fn search(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotSupported).diagnosing(format!(
                 "no search is declared for {resource_type}; GET {}/metadata names the interactions each type supports",
-                crate::facade::BASE_PATH
+                crate::mount::BASE_PATH
             )),
         ));
     };
@@ -199,7 +199,7 @@ async fn search(
     let body = bundle::searchset(&envelope, &matches).map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(crate::facade::outcome::chain(&error)),
+            Issue::error(IssueType::Exception).diagnosing(crate::cause::chain(&error)),
         )
     })?;
     tracing::info!(
@@ -511,7 +511,8 @@ fn read_row(
         .and_then(|value| serde_json::to_string(value).ok())
         .and_then(|value| openehr_its::json::from_canonical_json::<Composition>(&value).ok())
         .ok_or_else(|| malformed_row(position, "composition"))?;
-    let canonical = read::canonical(facade, &ehr_id, &composition, plan.declared.template_id())?;
+    let canonical =
+        read::version::canonical(facade, &ehr_id, &composition, plan.declared.template_id())?;
     Ok(Row {
         ehr_id,
         version,

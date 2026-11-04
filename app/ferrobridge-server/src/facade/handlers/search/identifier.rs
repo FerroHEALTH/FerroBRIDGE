@@ -21,11 +21,11 @@ use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
 use crate::facade::ehr;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::write;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::search::identifier;
 use crate::facade::search::value::Token;
 use crate::facade::status;
@@ -93,7 +93,7 @@ async fn ehr_of_party(
         }
         Err(error) => Err(reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(crate::facade::outcome::chain(&error)),
+            Issue::error(IssueType::Exception).diagnosing(crate::cause::chain(&error)),
         )),
     }
 }

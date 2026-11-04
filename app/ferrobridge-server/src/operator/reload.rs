@@ -23,11 +23,11 @@ use crate::check::Templates;
 use crate::facade::Facade;
 use crate::facade::programs::Programs;
 use crate::facade::search::Catalog;
+use crate::operations::OperationsLane;
 use crate::operator::files;
 use crate::operator::files::Language;
 use crate::operator::files::Root;
 use crate::operator::snapshot::Snapshot;
-use crate::state::OperationsLane;
 
 /// Why a set did not replace the running one.
 #[derive(Debug, thiserror::Error)]
@@ -122,9 +122,7 @@ impl Reloader {
         let mut push = |language: Language, wire: &str, path: PathBuf| {
             let list = match language {
                 Language::Omocl => &mut sources.omocl,
-                Language::Fhirconnect
-                    if crate::facade::search::declaration::is_declaration(Path::new(wire)) =>
-                {
+                Language::Fhirconnect if crate::walk::is_declaration(Path::new(wire)) => {
                     &mut sources.declarations
                 }
                 Language::Fhirconnect => &mut sources.fhirconnect,
@@ -221,9 +219,11 @@ impl Reloader {
                     (None, Some(client)) => {
                         crate::mappings::load_files_from_cdr(directory, fhirconnect, client).await
                     }
-                    (None, None) => Err(crate::mappings::Error::NoTemplateSource {
-                        directory: directory.to_path_buf(),
-                    }),
+                    (None, None) => Err(crate::mappings::Error::NoTemplateSource(
+                        crate::config::error::NoTemplateSource {
+                            directory: directory.to_path_buf(),
+                        },
+                    )),
                 }
                 .map_err(ReloadError::Operations)?,
             ),
@@ -259,10 +259,8 @@ impl Reloader {
 /// one that does not bind as `report` plus its diagnostic.
 fn bind(report: &Report, files: &[PathBuf], programs: &Programs) -> Result<Catalog, ReloadError> {
     crate::facade::search::load_files(files, programs).map_err(|error| {
-        let diagnostic = crate::mappings::compile::search_declaration(
-            error.file(),
-            crate::facade::outcome::chain(&error),
-        );
+        let diagnostic =
+            crate::mappings::compile::search_declaration(error.file(), crate::cause::chain(&error));
         ReloadError::Rejected(Box::new(report.clone().with_diagnostic(diagnostic)))
     })
 }

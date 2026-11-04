@@ -7,8 +7,14 @@
 //! validator reads JSON, so each projects the loader's positioned tree into
 //! `serde_json::Value` for the validation call and maps every error's instance
 //! pointer back onto the tree to position its diagnostic. Both halves live
-//! here once; nothing downstream sees the projection.
+//! here once, with the draft-07 compilation of a schema document and the
+//! validation step that turns each schema error into a diagnostic; nothing
+//! downstream sees the projection.
 
+use std::path::Path;
+
+use crate::diagnostic::Diagnostic;
+use crate::diagnostic::DiagnosticCode;
 use crate::diagnostic::ModelPath;
 use crate::position::Position;
 use crate::value::MappingValue;
@@ -83,6 +89,90 @@ pub fn locate(root: &PositionedValue, pointer: &str) -> (ModelPath, Position) {
         }
     }
     (path, position)
+}
+
+/// Why a JSON Schema document could not be compiled into a validator.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum SchemaError {
+    /// The schema document is not JSON.
+    #[error("the {schema} schema is not JSON")]
+    Json {
+        /// The schema's name, as the message renders it.
+        schema: &'static str,
+        /// The underlying failure.
+        #[source]
+        source: serde_json::Error,
+    },
+    /// The schema document is JSON but is not a usable JSON Schema.
+    #[error("the {schema} schema does not compile")]
+    Compile {
+        /// The schema's name, as the message renders it.
+        schema: &'static str,
+        /// The underlying failure.
+        #[source]
+        source: Box<jsonschema::ValidationError<'static>>,
+    },
+}
+
+/// Compiles the schema document `source`, named `schema` in an error, as
+/// draft-07, the draft every schema of both languages declares in its
+/// `$schema` keyword.
+///
+/// # Errors
+///
+/// Returns [`SchemaError::Json`] when the document is not JSON and
+/// [`SchemaError::Compile`] when it is not a usable draft-07 schema.
+pub fn compile(source: &str, schema: &'static str) -> Result<jsonschema::Validator, SchemaError> {
+    let document: serde_json::Value =
+        serde_json::from_str(source).map_err(|source| SchemaError::Json { schema, source })?;
+    jsonschema::draft7::options()
+        .build(&document)
+        .map_err(|source| SchemaError::Compile {
+            schema,
+            source: Box::new(source),
+        })
+}
+
+/// Validates the positioned `document` of `file` against `validator`.
+///
+/// The returned list is empty when the document validates, and otherwise
+/// carries one diagnostic per schema error under `code`, its message the
+/// error after `label`, positioned at the YAML node the error is about and
+/// carrying its model path. A document holding a number JSON cannot represent
+/// is one diagnostic at that number.
+#[must_use]
+pub fn validate(
+    validator: &jsonschema::Validator,
+    file: &Path,
+    document: &PositionedValue,
+    code: &DiagnosticCode,
+    label: &str,
+) -> Vec<Diagnostic> {
+    let instance = match to_json(document) {
+        Ok(instance) => instance,
+        Err(position) => {
+            return vec![
+                Diagnostic::error(
+                    file,
+                    code.clone(),
+                    "the document holds a number JSON cannot represent, so it cannot be \
+                     validated against a JSON Schema",
+                )
+                .with_position(position),
+            ];
+        }
+    };
+    validator
+        .iter_errors(&instance)
+        .map(|error| {
+            let pointer = error.instance_path().to_string();
+            let (path, position) = locate(document, &pointer);
+            Diagnostic::error(file, code.clone(), format!("{label}: {error}"))
+                .with_position(position)
+                .with_model_path(path)
+        })
+        .collect()
 }
 
 #[cfg(test)]

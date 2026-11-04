@@ -7,14 +7,14 @@
 //! No specification governs the load: our own design.
 
 use super::Config;
+use super::OmopIncrementalSettings;
 use super::error::Error;
 use crate::change_feed::ReaderName;
-use crate::etl::incremental::Settings;
 
 /// Returns the load `config` turns on, refused without the change feed,
 /// `[etl]`, `[cdm]` or an OMOCL directory it runs over, without a reader
 /// name, or under the events lane's reader; `None` while it is off.
-pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
+pub(super) fn resolve(config: &Config) -> Result<Option<OmopIncrementalSettings>, Error> {
     let section = &config.omop_incremental;
     if !section.enabled {
         return Ok(None);
@@ -52,5 +52,5 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             value: section.reader.clone(),
         });
     }
-    Ok(Some(Settings { reader }))
+    Ok(Some(OmopIncrementalSettings { reader }))
 }

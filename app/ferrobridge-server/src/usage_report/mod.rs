@@ -58,7 +58,7 @@ pub const MAPPING_FAILURES: &str = "mapping_failures";
 #[must_use]
 pub fn identity() -> Identity {
     Identity {
-        version: crate::state::VERSION.to_owned(),
+        version: crate::build_info::VERSION.to_owned(),
         git_sha: report_git_sha(crate::build_info::COMMIT),
         licence: LicenceGrant::NonCommercial,
     }

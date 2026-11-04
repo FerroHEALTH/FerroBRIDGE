@@ -32,25 +32,6 @@ use serde::Deserialize;
 
 use crate::facade::search::declaration::file::ParameterFile;
 
-/// The suffixes a search declaration's file name ends in.
-///
-/// The FHIRconnect loader reads every `.yml` and `.yaml` file of the mapping
-/// tree, so a declaration carries a second extension both walkers skip.
-pub const DECLARATION_SUFFIXES: [&str; 2] = [".search.yml", ".search.yaml"];
-
-/// Whether `path` names a search declaration rather than a mapping file.
-#[must_use]
-pub fn is_declaration(path: &Path) -> bool {
-    path.file_name()
-        .and_then(std::ffi::OsStr::to_str)
-        .map(str::to_ascii_lowercase)
-        .is_some_and(|name| {
-            DECLARATION_SUFFIXES
-                .iter()
-                .any(|suffix| name.ends_with(suffix))
-        })
-}
-
 /// One search declaration file, as written.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]

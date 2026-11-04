@@ -43,7 +43,7 @@ use crate::facade::search::Catalog;
 use crate::facade::search::declaration;
 use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::party::PartySearch;
-use crate::state;
+use crate::smart::Security;
 
 /// The FHIR release this facade speaks.
 ///
@@ -142,22 +142,6 @@ pub enum Chains {
     None,
     /// `<subject parameter>.identifier` is supported.
     Identifier,
-}
-
-/// The authorization server that guards the facade, as `rest.security`
-/// states it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Security {
-    /// The authorization endpoint, when the server has one.
-    pub authorize: Option<String>,
-    /// The token endpoint.
-    pub token: String,
-    /// The dynamic registration endpoint, when the server has one.
-    pub register: Option<String>,
-    /// The token introspection endpoint, when the server has one.
-    pub introspect: Option<String>,
-    /// The token revocation endpoint, when the server has one.
-    pub revoke: Option<String>,
 }
 
 /// Everything beside the programs that shapes the statement.
@@ -274,8 +258,8 @@ pub fn statement_of(
             crate::facade::media::JSON.into(),
         ],
         software: Some(CapabilityStatementSoftware {
-            name: state::PRODUCT.into(),
-            version: Some(state::VERSION.into()),
+            name: crate::build_info::PRODUCT.into(),
+            version: Some(crate::build_info::VERSION.into()),
             ..CapabilityStatementSoftware::default()
         }),
         implementation: Some(

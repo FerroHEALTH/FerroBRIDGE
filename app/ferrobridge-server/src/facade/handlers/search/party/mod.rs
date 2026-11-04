@@ -31,7 +31,6 @@ use openehr_its::rest::generated::query::ResultSetRow;
 
 use crate::cdr::CdrClient;
 use crate::facade::Facade;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::write;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::outcome::Issue;
@@ -40,6 +39,7 @@ use crate::facade::party;
 use crate::facade::party::Held;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::search::bundle;
 use crate::facade::search::bundle::Match;
 use crate::facade::search::criteria::Handling;
@@ -85,7 +85,7 @@ pub(super) async fn search(
                 StatusCode::NOT_FOUND,
                 Issue::error(IssueType::NotSupported).diagnosing(format!(
                     "no search is declared for {resource_type}; GET {}/metadata names the interactions each type supports",
-                    crate::facade::BASE_PATH
+                    crate::mount::BASE_PATH
                 )),
             )
         })?;
@@ -292,7 +292,7 @@ fn answer(
     let body = bundle::searchset(&envelope, &found.matches).map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(crate::facade::outcome::chain(&error)),
+            Issue::error(IssueType::Exception).diagnosing(crate::cause::chain(&error)),
         )
     })?;
     tracing::info!(

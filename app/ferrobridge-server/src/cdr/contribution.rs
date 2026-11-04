@@ -47,14 +47,14 @@ impl CdrClient {
         for version in &contribution.versions {
             if let Some(Versionable::Composition(ref composition)) = version.data {
                 let touch = if version.preceding_version_uid.is_some() {
-                    crate::audit::reach::Touch::Updated
+                    crate::cdr::reach::Touch::Updated
                 } else {
-                    crate::audit::reach::Touch::Created
+                    crate::cdr::reach::Touch::Created
                 };
-                crate::audit::reach::touched(
+                crate::cdr::reach::touched(
                     touch,
                     Some(ehr_id),
-                    crate::audit::reach::composition(composition, None),
+                    crate::cdr::reach::composition(composition, None),
                 );
             }
         }

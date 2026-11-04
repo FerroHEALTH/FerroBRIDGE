@@ -135,14 +135,6 @@ pub struct Compiled {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-impl Compiled {
-    /// Whether no context was refused.
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.refusals.is_empty()
-    }
-}
-
 /// Builds the index of every `.opt` file under `directory`.
 ///
 /// A file that does not build is a `template-build` diagnostic on that file,
@@ -233,11 +225,11 @@ pub async fn cdr_templates(
             ),
             TemplateCause::Unusable(error) if matches!(**error, Error::CdrTemplate { .. }) => (
                 DiagnosticCode::TemplateBuild,
-                crate::facade::outcome::chain(error.as_ref()),
+                crate::cause::chain(error.as_ref()),
             ),
             TemplateCause::Unusable(error) => (
                 language(UNKNOWN_TEMPLATE),
-                crate::facade::outcome::chain(error.as_ref()),
+                crate::cause::chain(error.as_ref()),
             ),
             TemplateCause::NotProvided => (language(UNKNOWN_TEMPLATE), String::new()),
         };

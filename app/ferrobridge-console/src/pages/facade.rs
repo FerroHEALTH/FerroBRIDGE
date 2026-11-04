@@ -22,19 +22,17 @@ use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
-use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::code::{Code, code_viewer};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{Header, definitions, facts_row, panel_sections};
-use ferrohealth_ui::view::tabs::{Tab, TabRow};
-use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
+use ferrohealth_ui::view::surface::{definitions, facts_row, panel_sections};
 
 use crate::app::{Drawn, FACADE, MAPPINGS, PLAYGROUND};
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, link, t};
 use crate::model::{Loaded, Outcome};
+use crate::pages::lane::Lane;
 use crate::pages::parts::{faulted, refused, section};
 use crate::pages::settings::rows;
 use crate::visit::Visit;
@@ -51,32 +49,24 @@ const TABS: [(&str, Msg); 4] = [
 /// The tabs of a facade that is off.
 const OFF_TABS: [&str; 2] = ["overview", "settings"];
 
-/// The page of the tab `key`.
-fn tab_href(key: &str) -> String {
-    if key == "overview" {
-        String::from(FACADE)
-    } else {
-        format!("{FACADE}/{key}")
-    }
-}
+/// The page.
+const LANE: Lane = Lane {
+    path: FACADE,
+    title: Msg::FhirFacade,
+    tabs: &TABS,
+    on: Msg::FacadeOnSubtitle,
+    off: Msg::FacadeOffSubtitle,
+};
 
 /// The FHIR facade, on the tab the route names.
 pub async fn page(visit: &Visit) -> Drawn {
-    let tab = visit.segment(1).unwrap_or("overview").to_owned();
-    if !TABS.iter().any(|(key, _)| *key == tab) {
+    let Some((tab, info, readiness, configuration)) = LANE.open(visit).await else {
         return crate::pages::errors::not_found(visit);
-    }
-    let info = visit.reads.info().await;
-    let readiness = visit.reads.readiness().await;
+    };
     let capability = visit.reads.capability().await;
     let state = visit.reads.running().await;
     let smart = if tab == "security" {
         Some(visit.reads.smart().await)
-    } else {
-        None
-    };
-    let configuration = if tab == "settings" {
-        Some(visit.reads.configuration().await)
     } else {
         None
     };
@@ -130,35 +120,9 @@ struct Answers<'a> {
 fn settings_panel(l: &Locale, configuration: Option<&Loaded<Configuration>>) -> Html {
     match configuration {
         Some(configuration) => {
-            crate::pages::settings::tab(l, configuration, &rows::FACADE, &tab_href("settings"))
+            crate::pages::settings::tab(l, configuration, &rows::FACADE, &LANE.href("settings"))
         }
         None => Html::empty(),
-    }
-}
-
-/// The page's header, for a facade that is `on` or off.
-fn header(l: &Locale, on: bool) -> Header {
-    Header {
-        title: tr(l, Msg::FhirFacade).into(),
-        subtitle: Some(
-            tr(
-                l,
-                if on {
-                    Msg::FacadeOnSubtitle
-                } else {
-                    Msg::FacadeOffSubtitle
-                },
-            )
-            .into(),
-        ),
-        subtitle_view: None,
-        crumbs: Vec::new(),
-        mono: false,
-        badge: Some(if on {
-            state(Mark::Ok, tr(l, Msg::StateOn), None)
-        } else {
-            badge(Tone::Neutral, tr(l, Msg::StateOff))
-        }),
     }
 }
 
@@ -173,41 +137,25 @@ fn drawn(l: &Locale, tab: &str, answers: &Answers<'_>) -> Html {
         configuration,
         base,
     } = *answers;
-    let info = match info {
-        Ok(Outcome::Shown(info)) => info,
-        Ok(Outcome::Refused(refusal)) => return refused(l, refusal),
-        Err(fault) => return faulted(l, fault, &tab_href(tab)),
+    let info = match LANE.shown(l, info, tab) {
+        Ok(info) => info,
+        Err(page) => return page,
     };
     let on = lane_on(info, "facade");
-    let header = header(l, on);
+    let header = LANE.header(l, on);
     if !on {
         let body = if tab == "settings" {
             settings_panel(l, configuration)
         } else {
             list_empty(
                 tr(l, Msg::FacadeOff),
-                Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
+                Some((tr(l, Msg::SeeItsSettings), LANE.href("settings"))),
             )
         };
-        let tabs = TabRow {
-            label: tr(l, Msg::FhirFacade),
-            tabs: TABS
-                .iter()
-                .filter(|(key, _)| OFF_TABS.contains(key))
-                .map(|(key, words)| Tab::new(*key, tab_href(key), tr(l, *words)))
-                .collect(),
-            current: tab.to_owned(),
-        };
-        return detail_page(
-            l,
-            DetailPage {
-                header,
-                actions: ActionGroup::none(),
-                stepper: None,
-                tabs: Some(tabs),
-                body,
-            },
-        );
+        let tabs = LANE.tab_row(l, tab, |key, drawn| {
+            OFF_TABS.contains(&key).then_some(drawn)
+        });
+        return Lane::page(l, header, tabs, body);
     }
     let statement = match capability {
         Ok(Outcome::Shown(statement)) => Some(statement),
@@ -217,39 +165,22 @@ fn drawn(l: &Locale, tab: &str, answers: &Answers<'_>) -> Html {
         "capability" => match capability {
             Ok(Outcome::Shown(statement)) => capability_panel(l, statement, running),
             Ok(Outcome::Refused(refusal)) => refused(l, refusal),
-            Err(fault) => faulted(l, fault, &tab_href(tab)),
+            Err(fault) => faulted(l, fault, &LANE.href(tab)),
         },
         "security" => security_panel(l, smart),
         "settings" => settings_panel(l, configuration),
         _ => overview(l, base, info, readiness, statement, running),
     };
-    let tabs = TabRow {
-        label: tr(l, Msg::FhirFacade),
-        tabs: TABS
-            .iter()
-            .map(|(key, words)| {
-                let drawn = Tab::new(*key, tab_href(key), tr(l, *words));
-                match (*key, capability) {
-                    ("capability", Ok(Outcome::Shown(statement))) => drawn.count(
-                        u64::try_from(resources(statement).len()).unwrap_or(u64::MAX),
-                        tr(l, *words),
-                    ),
-                    _ => drawn,
-                }
-            })
-            .collect(),
-        current: tab.to_owned(),
-    };
-    detail_page(
-        l,
-        DetailPage {
-            header,
-            actions: ActionGroup::none(),
-            stepper: None,
-            tabs: Some(tabs),
-            body,
-        },
-    )
+    let tabs = LANE.tab_row(l, tab, |key, drawn| {
+        Some(match (key, capability) {
+            ("capability", Ok(Outcome::Shown(statement))) => drawn.count(
+                u64::try_from(resources(statement).len()).unwrap_or(u64::MAX),
+                tr(l, Msg::TabCapability),
+            ),
+            _ => drawn,
+        })
+    });
+    Lane::page(l, header, tabs, body)
 }
 
 /// The resources of `statement`'s server `rest` blocks.
@@ -501,7 +432,7 @@ fn security_panel(l: &Locale, smart: Option<&Loaded<serde_json::Value>>) -> Html
             list_empty(tr(l, Msg::NoSmart), None),
         ),
         Some(Ok(Outcome::Refused(refusal))) => refused(l, refusal),
-        Some(Err(fault)) => faulted(l, fault, &tab_href("security")),
+        Some(Err(fault)) => faulted(l, fault, &LANE.href("security")),
         None => Html::empty(),
     };
     panel_sections(body)

@@ -46,12 +46,12 @@ use crate::cdr::demographic::Demographic;
 use crate::cdr::error::Upstream;
 use crate::cdr::ids::versioned_object_uid;
 use crate::facade::Facade;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::write::refuse;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::status;
 use crate::terminology::Direction;
 
@@ -124,7 +124,7 @@ pub(crate) fn party_id(resource_type: &str, id: &str) -> Result<HierObjectId, Re
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!(
                 "{resource_type}/{id} names no party: {}",
-                crate::facade::outcome::chain(&error)
+                crate::cause::chain(&error)
             )),
         )
     })
@@ -256,10 +256,10 @@ pub(crate) fn accept(
     id: &str,
     held: &Held,
 ) -> Result<CanonicalParty, Refusal> {
-    crate::audit::reach::touched(
-        crate::audit::reach::Touch::Read,
+    crate::cdr::reach::touched(
+        crate::cdr::reach::Touch::Read,
         None,
-        crate::audit::reach::canonical(&held.value),
+        crate::cdr::reach::canonical(&held.value),
     );
     let template = held
         .value
@@ -282,7 +282,7 @@ pub(crate) fn accept(
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "the {LABEL} answered {resource_type}/{id} with a party the template does not \
                  admit: {}",
-                crate::facade::outcome::chain(&error)
+                crate::cause::chain(&error)
             )),
         )
     })

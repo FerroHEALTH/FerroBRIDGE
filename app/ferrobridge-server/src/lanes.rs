@@ -14,9 +14,9 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
-use crate::config::{self, Settings};
+use crate::config::{self, OperatorSettings, Settings};
 use crate::serve_until;
-use crate::state::{self, AppState};
+use crate::state::AppState;
 use crate::terminology::Translator;
 use crate::{cdr, change_feed, check, events, facade, hl7v2, operator, smart, startup};
 use ferrohealth_health::lifecycle::Lifecycle;
@@ -40,7 +40,7 @@ impl Started {
     pub(crate) fn announce(&self) {
         startup::log(&self.lanes);
         tracing::info!(
-            version = state::VERSION,
+            version = crate::build_info::VERSION,
             indicators = self.state.health().names().join(","),
             "ferrobridge starting"
         );
@@ -476,7 +476,7 @@ fn set_counts(lanes: &mut [startup::Lane], name: &str, counts: startup::MappingC
 
 /// Returns what the operations lane compiled: one program per context, over
 /// the distinct templates the programs name.
-fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
+fn operation_counts(lane: &crate::operations::OperationsLane) -> startup::MappingCounts {
     let set = lane.programs();
     let programs = set.programs();
     let contexts: std::collections::BTreeSet<&str> = programs
@@ -502,9 +502,9 @@ fn operation_counts(lane: &state::OperationsLane) -> startup::MappingCounts {
 /// (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
-    operator_settings: &operator::OperatorSettings,
+    operator_settings: &OperatorSettings,
     facade: Option<Arc<facade::Facade>>,
-    operations: Option<Arc<state::OperationsLane>>,
+    operations: Option<Arc<crate::operations::OperationsLane>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 

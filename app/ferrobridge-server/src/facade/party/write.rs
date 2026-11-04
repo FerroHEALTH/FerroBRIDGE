@@ -34,7 +34,6 @@ use crate::facade::Facade;
 use crate::facade::commit::Change;
 use crate::facade::commit::Committer;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::read::parse;
 use crate::facade::handlers::write::same_id;
 use crate::facade::outcome::Issue;
@@ -44,6 +43,7 @@ use crate::facade::party::read::class_of;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
 use crate::facade::reply::Header;
+use crate::facade::reply::Refusal;
 use crate::terminology::Direction;
 
 /// `POST [base]/{type}` of a party type.
@@ -201,7 +201,7 @@ fn commit(
     .map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(crate::facade::outcome::chain(&error)),
+            Issue::error(IssueType::Exception).diagnosing(crate::cause::chain(&error)),
         )
     })
 }
@@ -230,7 +230,7 @@ fn preceding(headers: &HeaderMap, latest: &ObjectVersionId) -> Result<ObjectVers
     let tree = VersionTreeId::new(tag).map_err(|error| {
         unreadable(format!(
             "the If-Match header names no version: {}",
-            crate::facade::outcome::chain(&error)
+            crate::cause::chain(&error)
         ))
     })?;
     Ok(ObjectVersionId::compose(
@@ -249,11 +249,11 @@ async fn commit_party(
     over: Option<(&str, &ObjectVersionId)>,
 ) -> Result<ObjectVersionId, Refusal> {
     let touch = if over.is_some() {
-        crate::audit::reach::Touch::Updated
+        crate::cdr::reach::Touch::Updated
     } else {
-        crate::audit::reach::Touch::Created
+        crate::cdr::reach::Touch::Created
     };
-    crate::audit::reach::touched(touch, None, crate::audit::reach::canonical(party.value()));
+    crate::cdr::reach::touched(touch, None, crate::cdr::reach::canonical(party.value()));
     macro_rules! write_as {
         ($typed:ty, $create:ident, $created:ident, $update:ident, $updated:ident) => {{
             use openehr_its::rest::generated::demographic::client::$created;

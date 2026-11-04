@@ -50,14 +50,8 @@ pub enum Error {
     },
     /// The operations lane has a mapping directory and nowhere to take its
     /// templates from.
-    #[error(
-        "[mappings] directory {} is set with no [mappings] templates and no [cdr]: the FHIRconnect operations have no template to compile against",
-        directory.display()
-    )]
-    NoTemplateSource {
-        /// The mapping directory that was configured.
-        directory: PathBuf,
-    },
+    #[error(transparent)]
+    NoTemplateSource(#[from] crate::config::error::NoTemplateSource),
     /// A template the CDR served did not build a Web Template.
     #[error("the template `{template}` the CDR served did not load")]
     CdrTemplate {
@@ -174,9 +168,11 @@ pub async fn load_configured(
     }
     match (settings.mapping_directory.as_deref(), cdr) {
         (Some(directory), Some(client)) => load_from_cdr(directory, client).await.map(Some),
-        (Some(directory), None) => Err(Error::NoTemplateSource {
-            directory: directory.to_path_buf(),
-        }),
+        (Some(directory), None) => Err(Error::NoTemplateSource(
+            crate::config::error::NoTemplateSource {
+                directory: directory.to_path_buf(),
+            },
+        )),
         (None, _) => Ok(None),
     }
 }
