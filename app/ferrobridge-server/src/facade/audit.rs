@@ -41,9 +41,9 @@ use http::StatusCode;
 use secrecy::SecretString;
 
 use crate::audit::AccessLog;
-use crate::audit::reach::Reach;
-use crate::audit::reach::Reached;
 use crate::cdr::ids::EhrId;
+use crate::cdr::reach::Reach;
+use crate::cdr::reach::Reached;
 use crate::facade::Facade;
 use crate::facade::guard::Interaction;
 use crate::facade::outcome::Issue;
@@ -89,7 +89,7 @@ pub async fn record(
     let Some(asked) = asked(&request) else {
         return next.run(request).await;
     };
-    let place = match recording.log.sink.reserve().await {
+    let place = match recording.log.sink().reserve().await {
         Ok(place) => place,
         Err(error) => {
             tracing::warn!(error = %crate::chain(&error), "an access was refused: its record has no place");
@@ -217,7 +217,7 @@ impl Recording {
         };
         let categories = self
             .log
-            .categories
+            .categories()
             .classify(&Evidence::reached(basis, reached.objects()));
         // NOTE: Regulation (EU) 2025/327 Annex II 3.2(e): every datum the facade reaches is
         // the CDR's, so the CDR is the one origin of an access that reached any.
@@ -225,7 +225,7 @@ impl Recording {
             Vec::new()
         } else {
             vec![Origin {
-                endpoint: Some(self.log.origin.clone()),
+                endpoint: Some(self.log.origin().to_owned()),
                 node: None,
                 system_id: None,
                 status: None,
@@ -237,8 +237,8 @@ impl Recording {
         };
         let recorded = jiff::Timestamp::now();
         let keys = || origins.iter().filter_map(Origin::key);
-        let retention = self.log.retention.retain(recorded, &categories, keys());
-        let labels = self.log.labels.label(&categories, keys());
+        let retention = self.log.retention().retain(recorded, &categories, keys());
+        let labels = self.log.labels().label(&categories, keys());
         AccessRecord {
             action,
             recorded,
@@ -251,7 +251,7 @@ impl Recording {
                     .ehrs()
                     .iter()
                     .map(|ehr_id| EhrAt {
-                        endpoint: self.log.origin.clone(),
+                        endpoint: self.log.origin().to_owned(),
                         ehr_id: ehr_id.clone(),
                         patient: self.patient_of(ehr_id),
                     })

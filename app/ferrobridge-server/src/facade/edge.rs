@@ -28,10 +28,10 @@ use axum::response::Response;
 use ferrohealth_server::refusal::RefusalBody;
 use http::StatusCode;
 
-use crate::facade::BASE_PATH;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
+use crate::mount::BASE_PATH;
 
 /// The limits the edge answers name in their diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

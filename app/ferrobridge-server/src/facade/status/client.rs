@@ -41,7 +41,7 @@ pub(super) fn of_generated_error(error: &ClientError) -> Answer {
             CREDENTIALS,
             format!(
                 "no credential for the openEHR service could be obtained: {}",
-                crate::facade::outcome::chain(source)
+                crate::cause::chain(source)
             ),
         ),
         ClientError::Transport { .. } => Answer::new(
@@ -82,7 +82,7 @@ pub(super) fn renewal_answer(renewal: &RenewalError) -> Answer {
         CREDENTIALS,
         format!(
             "no credential for the openEHR service could be obtained: {}",
-            crate::facade::outcome::chain(renewal)
+            crate::cause::chain(renewal)
         ),
     )
 }

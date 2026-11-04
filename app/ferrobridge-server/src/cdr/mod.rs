@@ -24,6 +24,7 @@ mod ehr;
 pub mod error;
 pub mod ids;
 pub mod query;
+pub mod reach;
 pub mod template;
 mod transport;
 
