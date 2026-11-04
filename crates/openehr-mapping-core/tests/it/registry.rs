@@ -55,7 +55,7 @@ fn yaml_files(directory: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
 #[test]
 fn the_mapping_library_refuses_its_repeated_names() -> Result<(), Box<dyn Error>> {
     let root = repo_root().canonicalize()?;
-    let mut registry = MappingRegistry::new();
+    let mut registry = MappingRegistry::default();
     let mut refusals: BTreeMap<String, usize> = BTreeMap::new();
 
     for file in yaml_files(&root.join("docs/specs/fhirconnect-mapping-lib"))? {
@@ -103,7 +103,7 @@ fn the_mapping_library_refuses_its_repeated_names() -> Result<(), Box<dyn Error>
 #[test]
 fn the_omocl_corpus_has_no_repeated_name() -> Result<(), Box<dyn Error>> {
     let root = repo_root().canonicalize()?;
-    let mut registry = MappingRegistry::new();
+    let mut registry = MappingRegistry::default();
     let mut refused = Vec::new();
     for file in yaml_files(&root.join("docs/specs/omocl"))? {
         let Ok(document) = loader::load_file(file) else {

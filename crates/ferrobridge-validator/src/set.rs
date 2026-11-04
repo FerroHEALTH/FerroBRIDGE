@@ -154,29 +154,6 @@ pub enum ResolveError {
     },
 }
 
-impl PackageSet<R4> {
-    /// Reads every package at `paths` (`.tgz` files or unpacked directories)
-    /// and builds the set, read as R4.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`LoadError`] when a package cannot be read, or as
-    /// [`PackageSet::new`] does.
-    pub fn load<P: AsRef<Path>>(paths: impl IntoIterator<Item = P>) -> Result<Self, LoadError> {
-        Self::load_release(paths)
-    }
-
-    /// Builds the set from packages already read, checking the closure, read
-    /// as R4.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`LoadError`] as [`PackageSet::new_release`] does.
-    pub fn new(packages: Vec<Package>) -> Result<Self, LoadError> {
-        Self::new_release(packages)
-    }
-}
-
 impl<R: Release> PackageSet<R> {
     /// Reads every package at `paths` (`.tgz` files or unpacked directories)
     /// and builds the set, read as the release `R`.
@@ -184,15 +161,13 @@ impl<R: Release> PackageSet<R> {
     /// # Errors
     ///
     /// Returns [`LoadError`] when a package cannot be read, or as
-    /// [`PackageSet::new_release`] does.
-    pub fn load_release<P: AsRef<Path>>(
-        paths: impl IntoIterator<Item = P>,
-    ) -> Result<Self, LoadError> {
+    /// [`PackageSet::new`] does.
+    pub fn load<P: AsRef<Path>>(paths: impl IntoIterator<Item = P>) -> Result<Self, LoadError> {
         let packages = paths
             .into_iter()
             .map(|path| Package::read(path.as_ref()))
             .collect::<Result<Vec<_>, _>>()?;
-        Self::new_release(packages)
+        Self::new(packages)
     }
 
     /// Builds the set from packages already read, checking the closure, read
@@ -207,7 +182,7 @@ impl<R: Release> PackageSet<R> {
     /// Returns [`LoadError::DuplicatePackage`] for a name and version given
     /// twice, and [`LoadError::MissingDependency`] naming the first dependency
     /// the set does not hold.
-    pub fn new_release(mut packages: Vec<Package>) -> Result<Self, LoadError> {
+    pub fn new(mut packages: Vec<Package>) -> Result<Self, LoadError> {
         packages.sort_by(|a, b| {
             a.name()
                 .cmp(b.name())
@@ -558,6 +533,7 @@ mod tests {
 
     use super::PackageId;
     use super::PackageSet;
+    use super::R4;
     use super::version_satisfies;
 
     #[test]
@@ -595,7 +571,7 @@ mod tests {
                 paths.push(path);
             }
         }
-        let set = PackageSet::load(paths).expect("the EU closure");
+        let set = PackageSet::<R4>::load(paths).expect("the EU closure");
         let eps = set
             .packages()
             .iter()

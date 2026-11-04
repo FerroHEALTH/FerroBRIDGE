@@ -23,12 +23,13 @@
 //! ```no_run
 //! use ferrobridge_term::client::Client;
 //! use ferrobridge_term::config::{Config, WireVersion};
+//! use ferrobridge_validator::release::R4;
 //! use ferrobridge_validator::set::PackageSet;
 //! use ferrobridge_validator::validate::Validator;
 //! use fhir_types::codec::Value;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let set = PackageSet::load(["vendor/hl7.fhir.r4.core"])?;
+//! let set = PackageSet::<R4>::load(["vendor/hl7.fhir.r4.core"])?;
 //! let patient: Value = serde_json::from_str(r#"{"resourceType": "Patient", "gender": "female"}"#)?;
 //! let mut report = Validator::new(&set).validate(&patient)?;
 //! let client = Client::new(Config::new("https://tx.example.org/r4".parse()?, WireVersion::R4))?;

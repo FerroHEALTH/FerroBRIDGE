@@ -337,7 +337,7 @@ fn a_profile_version_the_program_does_not_pin_is_refused() -> Result<(), Box<dyn
     let claimed = vec![String::from(
         "http://example.org/fhir/StructureDefinition/ferrobridge-diagnosis|2.0.0",
     )];
-    let error = select_by_profile(&programs, &claimed)
+    let error = select_by_profile(&programs, &claimed, None)
         .err()
         .ok_or("the instance claims another version")?;
     match error {

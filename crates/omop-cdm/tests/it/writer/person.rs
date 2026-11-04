@@ -102,18 +102,18 @@ async fn an_update_without_the_person_row_keeps_it_and_a_later_one_rewrites_it()
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     database
         .writer
-        .commit(&graph(OTHER, 1, None)?, &run)
+        .commit(&graph(OTHER, 1, None)?, &run, None)
         .await?;
     let client = reader(&database.postgres).await?;
     assert_eq!(vec![1970], births(&client).await?);
 
     database
         .writer
-        .commit(&graph(COMPOSITION, 2, None)?, &run)
+        .commit(&graph(COMPOSITION, 2, None)?, &run, None)
         .await?;
     assert_eq!(
         vec![1970],
@@ -124,7 +124,7 @@ async fn an_update_without_the_person_row_keeps_it_and_a_later_one_rewrites_it()
 
     database
         .writer
-        .commit(&graph(COMPOSITION, 3, Some(1971))?, &run)
+        .commit(&graph(COMPOSITION, 3, Some(1971))?, &run, None)
         .await?;
     assert_eq!(
         vec![1971],
@@ -145,11 +145,11 @@ async fn a_removal_keeps_the_person_while_another_composition_remains_and_then_r
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     database
         .writer
-        .commit(&graph(OTHER, 1, None)?, &run)
+        .commit(&graph(OTHER, 1, None)?, &run, None)
         .await?;
     let client = reader(&database.postgres).await?;
 
@@ -238,7 +238,7 @@ async fn a_person_with_no_person_source_gets_the_placeholder_row() -> Result<(),
     let mut database = database(PersonPolicy::CreateOnFirstSight).await?;
     database
         .writer
-        .commit(&graph(OTHER, 1, None)?, &RunId::new("run-1")?)
+        .commit(&graph(OTHER, 1, None)?, &RunId::new("run-1")?, None)
         .await?;
     let client = reader(&database.postgres).await?;
     assert_eq!(
@@ -266,7 +266,7 @@ async fn a_composition_writing_the_person_replaces_the_placeholder() -> Result<(
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(OTHER, 1, None)?, &run)
+        .commit(&graph(OTHER, 1, None)?, &run, None)
         .await?;
     let client = reader(&database.postgres).await?;
     let placeholder: i32 = client
@@ -276,7 +276,7 @@ async fn a_composition_writing_the_person_replaces_the_placeholder() -> Result<(
 
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     assert_eq!(vec![1970], births(&client).await?);
     let replaced: i32 = client
@@ -304,11 +304,11 @@ async fn the_existing_policy_takes_a_person_its_composition_writes() -> Result<(
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     database
         .writer
-        .commit(&graph(OTHER, 1, None)?, &run)
+        .commit(&graph(OTHER, 1, None)?, &run, None)
         .await?;
     let client = reader(&database.postgres).await?;
     assert_eq!(vec![1970], births(&client).await?);
@@ -325,7 +325,7 @@ async fn the_existing_policy_refuses_a_person_whose_row_is_gone() -> Result<(), 
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     let committed = database
         .writer
@@ -341,7 +341,7 @@ async fn the_existing_policy_refuses_a_person_whose_row_is_gone() -> Result<(), 
 
     let error = database
         .writer
-        .commit(&graph(OTHER, 1, None)?, &run)
+        .commit(&graph(OTHER, 1, None)?, &run, None)
         .await
         .expect_err("the person map names the EHR and no PERSON row does");
     assert!(
@@ -381,11 +381,11 @@ async fn two_compositions_of_one_ehr_both_write_the_person_and_the_newest_wins()
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     database
         .writer
-        .commit(&graph(OTHER, 1, Some(1980))?, &run)
+        .commit(&graph(OTHER, 1, Some(1980))?, &run, None)
         .await?;
     let client = reader(&database.postgres).await?;
     assert_eq!(
@@ -401,7 +401,7 @@ async fn two_compositions_of_one_ehr_both_write_the_person_and_the_newest_wins()
 
     database
         .writer
-        .commit(&graph(COMPOSITION, 2, Some(1971))?, &run)
+        .commit(&graph(COMPOSITION, 2, Some(1971))?, &run, None)
         .await?;
     assert_eq!(
         vec![1971],
@@ -431,11 +431,11 @@ async fn removing_either_writer_keeps_the_person_and_removing_both_removes_it()
         let run = RunId::new("run-1")?;
         database
             .writer
-            .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+            .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
             .await?;
         database
             .writer
-            .commit(&graph(OTHER, 1, Some(1980))?, &run)
+            .commit(&graph(OTHER, 1, Some(1980))?, &run, None)
             .await?;
         let client = reader(&database.postgres).await?;
         let second = if first == COMPOSITION {
@@ -501,11 +501,11 @@ async fn a_bridge_schema_of_an_earlier_release_takes_several_writers_after_init(
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     database
         .writer
-        .commit(&graph(OTHER, 1, Some(1980))?, &run)
+        .commit(&graph(OTHER, 1, Some(1980))?, &run, None)
         .await?;
     assert_eq!(2, person_writers(&client).await?);
     assert_eq!(vec![1980], births(&client).await?);
@@ -545,7 +545,7 @@ async fn removing_the_newest_writer_hands_the_person_row_to_the_newest_writer_th
     for (uid, year) in [(COMPOSITION, 1970), (OTHER, 1980), (THIRD, 1990)] {
         database
             .writer
-            .commit(&graph(uid, 1, Some(year))?, &run)
+            .commit(&graph(uid, 1, Some(year))?, &run, None)
             .await?;
     }
     let client = reader(&database.postgres).await?;
@@ -598,18 +598,18 @@ async fn a_newest_writer_that_stops_writing_the_person_hands_the_row_to_the_writ
     let run = RunId::new("run-1")?;
     database
         .writer
-        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run)
+        .commit(&graph(COMPOSITION, 1, Some(1970))?, &run, None)
         .await?;
     database
         .writer
-        .commit(&graph(OTHER, 1, Some(1980))?, &run)
+        .commit(&graph(OTHER, 1, Some(1980))?, &run, None)
         .await?;
     let client = reader(&database.postgres).await?;
     assert_eq!(vec![written_by(1980)], person_rows(&client).await?);
 
     database
         .writer
-        .commit(&graph(OTHER, 2, None)?, &run)
+        .commit(&graph(OTHER, 2, None)?, &run, None)
         .await?;
     assert_eq!(
         vec![written_by(1970)],
@@ -621,7 +621,7 @@ async fn a_newest_writer_that_stops_writing_the_person_hands_the_row_to_the_writ
 
     database
         .writer
-        .commit(&graph(OTHER, 3, Some(1985))?, &run)
+        .commit(&graph(OTHER, 3, Some(1985))?, &run, None)
         .await?;
     assert_eq!(
         vec![written_by(1985)],

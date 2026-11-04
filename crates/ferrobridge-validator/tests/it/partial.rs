@@ -11,6 +11,7 @@
 
 use ferrobridge_validator::issue::MessageId;
 use ferrobridge_validator::issue::Rule;
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use serde_json::json;
 
@@ -27,7 +28,7 @@ fn a_child_of_a_datatype_the_snapshot_omits_keeps_its_core_binding() -> TestResu
     // required to name-use in the core HumanName.
     let mut resource = patient();
     resource["name"][0]["use"] = json!("nickname-of-sorts");
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let against_core = validate(&set, &resource, None)?;
     assert_eq!(
         locations(&against_core, MessageId::NotInValueSet),

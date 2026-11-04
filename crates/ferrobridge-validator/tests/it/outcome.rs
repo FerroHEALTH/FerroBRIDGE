@@ -5,6 +5,7 @@
 //! report converts into an R4 `OperationOutcome`
 //! (<https://hl7.org/fhir/R4/operationoutcome.html>).
 
+use ferrobridge_validator::release::R4;
 use ferrobridge_validator::report::Constraint;
 use ferrobridge_validator::report::MESSAGE_SYSTEM;
 use ferrobridge_validator::report::Reason;
@@ -48,7 +49,7 @@ fn a_slice_without_a_value_at_its_discriminator_is_named_unevaluated() -> TestRe
 
 #[test]
 fn the_core_invariants_of_a_datatype_reached_are_evaluated_and_not_listed() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let report = validate(&set, &patient(), None)?;
     let listed: Vec<_> = report
         .unevaluated()
@@ -62,7 +63,7 @@ fn the_core_invariants_of_a_datatype_reached_are_evaluated_and_not_listed() -> T
 
 #[test]
 fn a_required_binding_the_core_package_enumerates_is_checked_and_not_listed() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let set_report = validate(
         &set,
         &json!({
@@ -184,7 +185,7 @@ fn the_outcome_encodes_as_r4_json() -> TestResult {
 
 #[test]
 fn the_target_profiles_of_a_reference_outside_the_resource_are_named_unevaluated() -> TestResult {
-    let set = PackageSet::load([core()])?;
+    let set = PackageSet::<R4>::load([core()])?;
     let mut resource = patient();
     resource["generalPractitioner"] = json!([{"reference": "Practitioner/p1"}]);
     let report = validate(&set, &resource, None)?;

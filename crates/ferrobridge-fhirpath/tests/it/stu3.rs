@@ -200,6 +200,8 @@ fn unescape_json_replaces_only_the_escapes() {
     );
     assert!(argument_error("'\\\\q'.unescape('json')"));
     assert!(argument_error("'\\\\ud83d'.unescape('json')"));
+    // RFC 8259 §7: `\u` takes four hexadecimal digits, and a sign is none.
+    assert!(argument_error("'\\\\u+041'.unescape('json')"));
 }
 
 #[test]

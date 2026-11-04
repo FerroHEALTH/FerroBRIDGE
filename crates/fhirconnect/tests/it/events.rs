@@ -63,7 +63,7 @@ pub(crate) fn events_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
 
 /// Compiles the events context and model against the events template.
 pub(crate) fn events_program(index: &WebTemplateIndex) -> Result<Arc<Program>, Box<dyn Error>> {
-    let mut set = MappingSet::new();
+    let mut set = MappingSet::default();
     for name in [
         "contexts/ferrobridge_events.context.yml",
         "model/ferrobridge_events.yml",
