@@ -9,6 +9,7 @@
 //! template the CDR does not serve refuses the start.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::mappings;
 use ferrobridge_server::state::AppState;
 use http::StatusCode;
@@ -32,7 +33,7 @@ const ADL2_ROUTE: &str = "/definition/template/adl2/ferrobridge.diagnose.v1";
 fn settings(
     text: &str,
 ) -> Result<ferrobridge_server::config::Settings, Box<dyn std::error::Error>> {
-    Ok(Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?)
+    Ok(Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?)
 }
 
 /// Returns a configuration with a CDR at `cdr` and the fixture mapping set.
@@ -212,7 +213,7 @@ async fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused()
     // is built or any CDR is called.
     let text = format!("[mappings]\ndirectory = \"{FIXTURES}\"\n\n[auth]\nenabled = false\n");
     let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .err()
         .ok_or("the operations lane has no template source")?;
     let ferrobridge_server::config::error::Error::Mappings { ref source } = error else {

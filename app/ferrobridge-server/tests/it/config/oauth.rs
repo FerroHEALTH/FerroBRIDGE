@@ -7,6 +7,7 @@
 
 use ferrobridge_server::cdr::config::CdrCredentials;
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrohealth_smart::client::{ClientAuth, ClientCredentials, Endpoint};
 use ferrohealth_smart::config::ConfigError;
@@ -48,7 +49,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     match Config::from_sources(Some(text), &BTreeMap::new()) {
         Err(error) => Ok(error),
         Ok(config) => Ok(config
-            .resolve()
+            .resolve(Process::Server)
             .err()
             .ok_or("the configuration should be refused")?),
     }
@@ -56,7 +57,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
 
 /// Returns the grant `text` resolves to.
 fn grant(text: &str) -> Result<ClientCredentials, Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
     match settings.cdr.ok_or("the CDR lane is on")?.credentials {
         Some(CdrCredentials::OAuth(oauth)) => Ok(*oauth),
         other => Err(format!("expected the OAuth grant, got {other:?}").into()),
@@ -152,7 +153,7 @@ fn a_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn std::err
             String::from("10000"),
         ),
     ]);
-    let settings = Config::from_sources(None, &environment)?.resolve()?;
+    let settings = Config::from_sources(None, &environment)?.resolve(Process::Server)?;
     match settings.cdr.ok_or("the CDR lane is on")?.credentials {
         Some(CdrCredentials::OAuth(oauth)) => {
             assert_eq!(Some("synthetic-secret"), exposed(&oauth));
@@ -460,7 +461,7 @@ fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn
             file.path()
         ),
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let terminology = settings.terminology.ok_or("the terminology lane is on")?;
     assert!(
         matches!(
@@ -498,7 +499,7 @@ fn the_terminology_grant_is_reachable_through_the_environment()
             String::from("synthetic-tx-secret"),
         ),
     ]);
-    let settings = Config::from_sources(None, &environment)?.resolve()?;
+    let settings = Config::from_sources(None, &environment)?.resolve(Process::Server)?;
     let terminology = settings.terminology.ok_or("the terminology lane is on")?;
     assert!(matches!(
         terminology.credentials,

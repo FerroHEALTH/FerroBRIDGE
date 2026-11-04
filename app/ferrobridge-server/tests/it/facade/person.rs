@@ -65,7 +65,7 @@ async fn person_harness_with(
     let set = programs::read_set(directory.path())?;
     let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let facade = Arc::new(Facade::new(
         compiled,
         handle(&store),

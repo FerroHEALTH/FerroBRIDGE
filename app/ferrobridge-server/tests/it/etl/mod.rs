@@ -17,7 +17,7 @@ mod run;
 mod sources;
 mod visit;
 
-use ferrobridge_server::aql::CheckedQuery;
+use ferrobridge_server::aql::{CheckedQuery, Query};
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::config::{DeletionPolicy, EtlSettings, VisitSettings};
@@ -306,13 +306,13 @@ fn client(cdr: &MockServer) -> Result<CdrClient, Box<dyn Error>> {
 /// Returns the settings of a run, with the visit derivation when `visits`.
 fn settings(visits: bool) -> Result<EtlSettings, Box<dyn Error>> {
     Ok(EtlSettings {
-        compositions: Some(CheckedQuery::compositions(COMPOSITIONS)?),
+        compositions: Some(CheckedQuery::new(Query::Compositions, COMPOSITIONS)?),
         page_size: ferrobridge_server::cdr::query::PageSize::new(100)?,
         type_concept_id: 32817,
         observation_period_type_concept_id: 32880,
         visits: if visits {
             Some(VisitSettings {
-                query: CheckedQuery::visits(VISITS)?,
+                query: CheckedQuery::new(Query::Visits, VISITS)?,
                 concepts: VisitConcepts {
                     visit_concept_id: 1001,
                     visit_type_concept_id: 32817,

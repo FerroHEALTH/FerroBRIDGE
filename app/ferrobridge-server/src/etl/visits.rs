@@ -149,7 +149,7 @@ pub fn group(query: &CheckedQuery, rows: &[Vec<serde_json::Value>]) -> Visits {
 #[cfg(test)]
 mod tests {
     use super::{group, moment, without_offset};
-    use crate::aql::CheckedQuery;
+    use crate::aql::{CheckedQuery, Query};
     use serde_json::json;
 
     /// A visit query with the four projections.
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn rows_group_by_ehr_and_source_from_the_first_start_to_the_last_end() {
-        let query = CheckedQuery::visits(VISITS).expect("the query checks");
+        let query = CheckedQuery::new(Query::Visits, VISITS).expect("the query checks");
         let rows = vec![
             vec![
                 json!("ehr-1"),

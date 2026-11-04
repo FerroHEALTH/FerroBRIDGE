@@ -99,7 +99,7 @@ async fn facade_answering(echo: Echo) -> Result<(MockServer, Facade), Box<dyn Er
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let facade = Facade::new(compiled, handle(&store), client(&cdr), settings());
     Ok((cdr, facade))
 }

@@ -141,21 +141,25 @@ impl CommitContext {
         }
         if let Some(audit) = self.audit.as_ref() {
             let mut lines = Vec::new();
-            let code = attribute("change_type", &audit.change_type.defining_code.code_string)?;
+            let code = quoted(
+                AUDIT_DETAILS_HEADER,
+                "change_type",
+                &audit.change_type.defining_code.code_string,
+            )?;
             lines.push(format!("change_type.code_string=\"{code}\""));
             if let Some(description) = audit.description.as_ref() {
                 let value = match description {
                     DvText::DvText(text) => &text.value,
                     DvText::DvCodedText(text) => &text.value,
                 };
-                let description = attribute("description", value)?;
+                let description = quoted(AUDIT_DETAILS_HEADER, "description", value)?;
                 lines.push(format!("description.value=\"{description}\""));
             }
             if let Some(committer) = committer_value(&audit.committer)? {
                 lines.push(committer);
             }
             if let Some(system_id) = audit.system_id.as_ref() {
-                let system_id = attribute("system_id", system_id)?;
+                let system_id = quoted(AUDIT_DETAILS_HEADER, "system_id", system_id)?;
                 lines.push(format!("system_id=\"{system_id}\""));
             }
             headers.audit_details = Some(
@@ -193,11 +197,6 @@ fn quoted(header: &'static str, kind: &'static str, text: &str) -> Result<String
     quotable(kind, text).map_err(|source| HeaderError::Attribute { header, source })
 }
 
-/// Returns `text` as a quoted attribute value of the audit header.
-fn attribute(kind: &'static str, text: &str) -> Result<String, HeaderError> {
-    quoted(AUDIT_DETAILS_HEADER, kind, text)
-}
-
 /// Returns the `committer` attribute list of an `openehr-audit-details` value,
 /// or `None` when the committer states neither a name nor an external
 /// reference.
@@ -213,7 +212,7 @@ fn committer_value(committer: &PartyProxy) -> Result<Option<String>, HeaderError
     };
     let mut parts = Vec::new();
     if let Some(name) = name {
-        let name = attribute("committer.name", name)?;
+        let name = quoted(AUDIT_DETAILS_HEADER, "committer.name", name)?;
         parts.push(format!("committer.name=\"{name}\""));
     }
     if let Some(reference) = external_ref {
@@ -224,9 +223,21 @@ fn committer_value(committer: &PartyProxy) -> Result<Option<String>, HeaderError
 
 /// Returns the `committer.external_ref` attributes of a `PARTY_REF`.
 fn external_ref_value(reference: &PartyRef) -> Result<String, HeaderError> {
-    let id = attribute("committer.external_ref.id", object_id_value(&reference.id))?;
-    let namespace = attribute("committer.external_ref.namespace", &reference.namespace)?;
-    let party_type = attribute("committer.external_ref.type", &reference.r#type)?;
+    let id = quoted(
+        AUDIT_DETAILS_HEADER,
+        "committer.external_ref.id",
+        object_id_value(&reference.id),
+    )?;
+    let namespace = quoted(
+        AUDIT_DETAILS_HEADER,
+        "committer.external_ref.namespace",
+        &reference.namespace,
+    )?;
+    let party_type = quoted(
+        AUDIT_DETAILS_HEADER,
+        "committer.external_ref.type",
+        &reference.r#type,
+    )?;
     Ok(format!(
         "committer.external_ref.id=\"{id}\",committer.external_ref.namespace=\"{namespace}\",committer.external_ref.type=\"{party_type}\""
     ))

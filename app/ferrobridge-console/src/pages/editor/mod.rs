@@ -87,7 +87,7 @@ pub async fn page(visit: &Visit, edited: Option<Edited>) -> Drawn {
             let Some(text) = file.text else {
                 return Drawn::shell(
                     title,
-                    crate::pages::parts::quiet(tr(l, Msg::FileNotUtf8), None),
+                    ferrohealth_ui::view::template::list::list_empty(tr(l, Msg::FileNotUtf8), None),
                 );
             };
             let listed = listing.iter().find(|each| each.path == path).cloned();

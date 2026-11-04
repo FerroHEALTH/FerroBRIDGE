@@ -7,6 +7,7 @@
 use ferrobridge_server::aql::AqlError;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::DeletionPolicy;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 
@@ -24,7 +25,7 @@ const VISITS: &str = "SELECT e/ehr_id/value AS ehr_id, c/name/value AS visit_sou
 
 /// Resolves `text`, returning the refusal.
 fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
-    match Config::from_sources(Some(text), &BTreeMap::new())?.resolve() {
+    match Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server) {
         Ok(_) => Err("the configuration resolved".into()),
         Err(error) => Ok(error),
     }
@@ -33,7 +34,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
 #[test]
 fn the_cdm_section_defaults_its_schemas_and_policy() -> Result<(), Box<dyn std::error::Error>> {
     let text = "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\n";
-    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
     let cdm = settings.cdm.as_ref().ok_or("the CDM lane is on")?;
     assert_eq!("cdm", cdm.schema.as_str());
     assert_eq!("ferrobridge", cdm.bridge_schema.as_str());
@@ -67,7 +68,7 @@ fn an_unknown_person_policy_refuses_to_boot() -> Result<(), Box<dyn std::error::
 
 #[test]
 fn an_etl_section_resolves_with_its_query_checked() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(32817, etl.type_concept_id);
     assert_eq!(32880, etl.observation_period_type_concept_id);
@@ -109,7 +110,7 @@ fn a_composition_query_without_its_projections_refuses_to_boot()
 fn a_composition_query_without_the_versioned_object_uid_boots()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = ETL.replace("vo/uid/value AS versioned_object_uid, ", "");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(
         None,
@@ -216,7 +217,7 @@ fn a_visit_query_naming_no_since_boots() -> Result<(), Box<dyn std::error::Error
     let text = format!(
         "{ETL}\n[etl.visits]\naql = \"{VISITS}\"\nvisit_concept_id = 9201\nvisit_type_concept_id = 32817\n"
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     let visits = etl.visits.as_ref().ok_or("the visits are configured")?;
     assert_eq!(Some(0), visits.query.column("ehr_id"));
@@ -293,7 +294,7 @@ fn a_page_size_of_zero_refuses_to_boot() -> Result<(), Box<dyn std::error::Error
 
 #[test]
 fn the_deletion_policy_defaults_to_remove() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(DeletionPolicy::Remove, etl.deletions);
     Ok(())
@@ -302,7 +303,7 @@ fn the_deletion_policy_defaults_to_remove() -> Result<(), Box<dyn std::error::Er
 #[test]
 fn the_report_deletion_policy_resolves() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{ETL}deletions = \"report\"\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(DeletionPolicy::Report, etl.deletions);
     Ok(())
@@ -329,7 +330,7 @@ fn with_aliases(table: &str) -> String {
 #[test]
 fn the_default_aliases_read_the_terminologies_the_laboratory_compositions_name()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!("LOINC", etl.aliases.vocabulary_of("LOINC"));
     assert_eq!("SNOMED", etl.aliases.vocabulary_of("SNOMED-CT"));
@@ -344,7 +345,7 @@ fn a_table_of_aliases_resolves_over_the_defaults() -> Result<(), Box<dyn std::er
          \"urn:oid:2.16.840.1.113883.6.1\" = \"LOINC\"\n\
          \"SNOMED-CT\" = \"FB-SNOMED\"",
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let aliases = &settings
         .etl
         .as_ref()
@@ -418,11 +419,11 @@ fn an_alias_that_is_no_string_refuses_to_boot() -> Result<(), Box<dyn std::error
 
 #[test]
 fn the_quality_checks_are_off_by_default_and_switch_on() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert!(!etl.quality_checks);
     let text = format!("{ETL}quality_checks = true\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert!(etl.quality_checks);
     Ok(())
@@ -440,7 +441,7 @@ fn pseudonymised(pseudonymisation: &str) -> String {
 fn the_pseudonymisation_is_off_until_its_section_is_present()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=disable\"\n";
-    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
     let cdm = settings.cdm.as_ref().ok_or("the CDM lane is on")?;
     assert!(cdm.pseudonymiser.is_none());
     Ok(())
@@ -455,7 +456,7 @@ fn a_pseudonymisation_key_file_is_read_and_its_pseudonyms_follow_the_key()
         "key_file = {:?}\ndate_shift_days = 30\n",
         file.path()
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let cdm = settings.cdm.as_ref().ok_or("the CDM lane is on")?;
     let pseudonymiser = cdm.pseudonymiser.as_ref().ok_or("pseudonymisation is on")?;
     let expected =
@@ -471,11 +472,11 @@ fn a_pseudonymisation_key_file_is_read_and_its_pseudonyms_follow_the_key()
 #[test]
 fn the_derived_tables_rebuild_the_owned_persons_unless_the_whole_table_is_named()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(ETL), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(omop_cdm::derived::Scope::OwnedPersons, etl.derived_tables);
     let text = format!("{ETL}derived_tables = \"whole_table\"\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let etl = settings.etl.as_ref().ok_or("the ETL is configured")?;
     assert_eq!(omop_cdm::derived::Scope::WholeTable, etl.derived_tables);
     Ok(())
@@ -508,7 +509,7 @@ fn an_unknown_derived_tables_scope_is_refused_naming_the_key()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{ETL}derived_tables = \"everything\"\n");
     let refusal = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .err()
         .ok_or("the scope is refused")?;
     assert!(

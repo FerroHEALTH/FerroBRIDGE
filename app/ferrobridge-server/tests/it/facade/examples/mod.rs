@@ -298,7 +298,7 @@ async fn trip(
     mount_history(&cdr, &[VERSION_ONE], COMMITTED).await;
     let facade = Arc::new(Facade::new(
         Programs::new(compiled.loaded.clone()),
-        handle(&Arc::new(MemoryStore::new())),
+        handle(&Arc::new(MemoryStore::default())),
         client(&cdr),
         compiled.context.settings(),
     ));

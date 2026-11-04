@@ -37,8 +37,9 @@ use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
-use crate::pages::parts::{faulted, quiet, refused, refused_operator, section};
+use crate::pages::parts::{faulted, refused, refused_operator, section};
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The events page, with the answer to the replay the operator just asked
 /// for when `replayed` holds one.
@@ -92,7 +93,7 @@ fn drawn(l: &Locale, events: &Loaded<Events>, replayed: Option<&ReplayAnswer>) -
             Some(&[]),
             with_answer(
                 shown,
-                quiet(
+                list_empty(
                     tr(l, Msg::EventsOff),
                     Some((tr(l, Msg::EventsOffLink), String::from(CONFIGURATION))),
                 ),
@@ -156,7 +157,7 @@ fn parked_table(l: &Locale, consumers: &[Consumer]) -> Html {
         .flat_map(|consumer| consumer.parked.iter().map(move |entry| (consumer, entry)))
         .collect();
     if parked.is_empty() {
-        return quiet(tr(l, Msg::EventsNoParked), None);
+        return list_empty(tr(l, Msg::EventsNoParked), None);
     }
     let columns = [
         Column::text("consumer", tr(l, Msg::ColConsumer)).role(Role::Title),
@@ -403,7 +404,7 @@ fn failures(l: &Locale, consumers: &[Consumer]) -> Html {
         })
         .collect();
     if failed.is_empty() {
-        return quiet(tr(l, Msg::EventsNoFailure), None);
+        return list_empty(tr(l, Msg::EventsNoFailure), None);
     }
     failed
         .into_iter()
@@ -420,7 +421,7 @@ fn failures(l: &Locale, consumers: &[Consumer]) -> Html {
 /// The queues the lane binds, or the line that it binds none.
 fn queues(l: &Locale, topology: &Topology) -> Html {
     if topology.queues.is_empty() {
-        return quiet(tr(l, Msg::EventsNoQueue), None);
+        return list_empty(tr(l, Msg::EventsNoQueue), None);
     }
     let columns = [
         Column::text("queue", tr(l, Msg::ColQueue)).role(Role::Title),

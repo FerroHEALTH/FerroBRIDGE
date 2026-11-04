@@ -32,10 +32,11 @@ use crate::locale::{tr, tr_with};
 use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::facade::indicator;
-use crate::pages::parts::{faulted, quiet, refused, refused_operator, section};
+use crate::pages::parts::{faulted, refused, refused_operator, section};
 use crate::pages::settings::rows;
 use crate::visit::Visit;
 use ferrohealth_health::document::Readiness;
+use ferrohealth_ui::view::template::list::list_empty;
 
 /// The tabs, each its key and its words.
 const TABS: [(&str, Msg); 3] = [
@@ -153,7 +154,7 @@ fn drawn(
             l,
             tab,
             header(false),
-            quiet(
+            list_empty(
                 tr(l, Msg::Hl7v2Off),
                 Some((tr(l, Msg::SeeItsSettings), tab_href("settings"))),
             ),
@@ -234,7 +235,7 @@ fn concept_maps(l: &Locale, directory: &Loaded<ConceptMaps>, href: &str) -> Html
     ]);
     let count = u64::try_from(directory.maps.len()).unwrap_or(u64::MAX);
     let table = if directory.maps.is_empty() {
-        quiet(tr(l, Msg::ConceptMapsNone), None)
+        list_empty(tr(l, Msg::ConceptMapsNone), None)
     } else {
         map_table(l, &directory.maps)
     };

@@ -272,7 +272,7 @@ async fn harness_built(
     facade_settings: Settings,
     search: Option<ferrobridge_server::facade::search::Limits>,
 ) -> Harness {
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let (cdr, facade) = facade_over(
         fixtures,
         facade_settings,
@@ -292,7 +292,7 @@ async fn harness_translating(
     limits: ferrobridge_server::facade::search::Limits,
     translator: Translator,
 ) -> Harness {
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let (cdr, facade) = facade_over(
         fixtures,
         settings(),

@@ -79,7 +79,7 @@ async fn credentialed() -> Result<Harness, Box<dyn Error>> {
     let bridge = CdrClient::new(
         &CdrConfig::new(format!("{}/", cdr.uri()).parse()?).with_basic("bridge", BRIDGE_CREDENTIAL),
     )?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let built = Facade::new(compiled, handle(&store), bridge, settings());
     let catalog = ferrobridge_server::facade::search::load(
         std::path::Path::new(FIXTURES),

@@ -69,7 +69,7 @@ use http::HeaderValue;
 use tokio::net::TcpListener;
 
 use crate::cli::Cli;
-use crate::config::{Config, Settings};
+use crate::config::{Config, Process, Settings};
 use crate::state::AppState;
 
 /// The exit code of a job that parses and does not run yet.
@@ -130,8 +130,8 @@ where
     }
     let config = Config::from_loaded(loaded);
     let resolved = match job {
-        Job::Serve => config.resolve(),
-        _ => config.resolve_job(),
+        Job::Serve => config.resolve(Process::Server),
+        _ => config.resolve(Process::Job),
     };
     let settings = match resolved {
         Ok(settings) => settings,
@@ -201,7 +201,7 @@ fn config_check(loaded: Loaded<Config>) -> ExitCode {
         }
     };
     println!("{report}");
-    match Config::from_loaded(loaded).resolve() {
+    match Config::from_loaded(loaded).resolve(Process::Server) {
         Ok(_settings) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("ferrobridge config check: {}", chain(&error));

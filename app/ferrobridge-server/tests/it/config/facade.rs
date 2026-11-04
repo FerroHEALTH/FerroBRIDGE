@@ -5,6 +5,7 @@
 //! subject link, and its refusals.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::facade::subject::IdForm;
 use ferrobridge_server::facade::subject::SubjectError;
@@ -12,7 +13,7 @@ use std::collections::BTreeMap;
 
 #[test]
 fn the_facade_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(
         settings.facade.is_none(),
         "the facade lane is off until [facade] enabled is set"
@@ -32,7 +33,7 @@ fn an_enabled_facade_resolves_its_policy_and_its_store() -> Result<(), Box<dyn s
         "composition_language = \"en\"\ncomposition_territory = \"GB\"\n",
     );
 
-    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!("https://bridge.invalid/fhir", facade.settings.base_url);
     assert_eq!(
@@ -61,7 +62,7 @@ fn an_ehr_policy_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dy
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("the policy is one of two values");
     match &error {
         Error::EhrPolicy { key, value } => {
@@ -80,7 +81,7 @@ fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
         "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_territory = \"GB\"\n";
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("a clinical record has no default language");
     match &error {
         Error::Missing { key } => assert_eq!("facade.composition_language", key),
@@ -95,14 +96,15 @@ const ENABLED: &str = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomp
 #[test]
 fn the_search_page_sizes_default_and_resolve_as_configured()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!(
         ferrobridge_server::facade::search::Limits::default(),
         facade.search
     );
     let text = format!("{ENABLED}search_count = 5\nsearch_count_max = 50\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!(5, facade.search.default_count);
     assert_eq!(50, facade.search.max_count);
@@ -121,7 +123,7 @@ fn a_search_page_size_no_page_can_hold_refuses_to_boot() -> Result<(), Box<dyn s
     ] {
         let text = format!("{ENABLED}{keys}");
         let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-            .resolve()
+            .resolve(Process::Server)
             .expect_err("the page size is refused");
         match &error {
             Error::SearchCount { key, .. } => assert_eq!(refused, key, "{keys}"),
@@ -135,7 +137,8 @@ fn a_search_page_size_no_page_can_hold_refuses_to_boot() -> Result<(), Box<dyn s
 fn by_default_the_facade_fetches_no_absolute_reference() -> Result<(), Box<dyn std::error::Error>> {
     // engine/references.adoc: "If not possible, the engine proceeds with the
     // mapping", so an empty allow-list is a deployment that fetches nothing.
-    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!(facade.references.fetch_bases(), []);
     assert_eq!(
@@ -151,7 +154,7 @@ fn the_reference_section_resolves_its_bases_and_its_depth() -> Result<(), Box<dy
     let text = format!(
         "{ENABLED}\n[facade.references]\nfetch_bases = [\"https://sender.invalid/fhir\"]\nmax_depth = 1\ntimeout_ms = 2500\n"
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     let bases: Vec<&str> = facade
         .references
@@ -170,7 +173,7 @@ fn the_reference_bases_are_set_from_the_environment() -> Result<(), Box<dyn std:
         String::from("FERROBRIDGE__FACADE__REFERENCES__FETCH_BASES"),
         String::from("[\"https://sender.invalid/fhir\"]"),
     )]);
-    let settings = Config::from_sources(Some(ENABLED), &environment)?.resolve()?;
+    let settings = Config::from_sources(Some(ENABLED), &environment)?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!(1, facade.references.fetch_bases().len());
     Ok(())
@@ -184,7 +187,7 @@ fn a_fetch_base_that_is_no_http_base_refuses_to_boot() -> Result<(), Box<dyn std
     ] {
         let text = format!("{ENABLED}\n[facade.references]\nfetch_bases = [\"{value}\"]\n");
         let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-            .resolve()
+            .resolve(Process::Server)
             .expect_err("only an http or https base is fetched from");
         match &error {
             Error::FetchBase { key, value: held } => {
@@ -205,7 +208,8 @@ fn an_unknown_reference_key_refuses_to_boot() {
 
 #[test]
 fn the_identifier_search_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert!(facade.identifier.is_none());
     Ok(())
@@ -215,7 +219,7 @@ fn the_identifier_search_is_off_by_default() -> Result<(), Box<dyn std::error::E
 fn the_identifier_search_takes_the_observed_query_when_on() -> Result<(), Box<dyn std::error::Error>>
 {
     let text = format!("{ENABLED}\n[facade.identifier_search]\nenabled = true\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let identifier = settings
         .facade
         .ok_or("the facade lane is on")?
@@ -239,7 +243,7 @@ fn the_identifier_search_is_set_from_the_environment() -> Result<(), Box<dyn std
             ),
         ),
     ]);
-    let settings = Config::from_sources(Some(ENABLED), &environment)?.resolve()?;
+    let settings = Config::from_sources(Some(ENABLED), &environment)?.resolve(Process::Server)?;
     let identifier = settings
         .facade
         .ok_or("the facade lane is on")?
@@ -264,7 +268,7 @@ fn an_identifier_query_binding_no_parameter_refuses_to_boot()
     ] {
         let text = format!("{ENABLED}\n[facade.identifier_search]\nenabled = true\n{extra}");
         let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-            .resolve()
+            .resolve(Process::Server)
             .expect_err("a query must bind what the facade hands it");
         match &error {
             Error::IdentifierQuery { key, .. } => assert_eq!(refused, key, "{extra}"),
@@ -289,7 +293,8 @@ const PARTY_QUERY: &str =
 
 #[test]
 fn the_party_search_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(ENABLED), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert!(facade.party_search.is_none());
     Ok(())
@@ -300,7 +305,7 @@ fn the_party_search_takes_one_query_per_type() -> Result<(), Box<dyn std::error:
     let text = format!(
         "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\nquery = \"{PARTY_QUERY}\"\n"
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let search = settings
         .facade
         .ok_or("the facade lane is on")?
@@ -321,7 +326,7 @@ fn the_party_search_takes_one_query_per_type() -> Result<(), Box<dyn std::error:
 fn a_party_search_with_no_type_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!("{ENABLED}\n[facade.party_search]\nenabled = true\n");
     let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("a party search needs a type");
     assert!(
         matches!(&error, Error::Missing { key } if key == "facade.party_search.types"),
@@ -346,7 +351,7 @@ fn a_party_query_binding_no_parameter_refuses_to_boot() -> Result<(), Box<dyn st
             "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\n{extra}"
         );
         let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-            .resolve()
+            .resolve(Process::Server)
             .expect_err("a query must bind what the facade hands it");
         match &error {
             Error::IdentifierQuery { key, .. } => assert_eq!(refused, key, "{extra}"),
@@ -363,7 +368,7 @@ fn a_party_type_takes_a_name_query_alone() -> Result<(), Box<dyn std::error::Err
     let text = format!(
         "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Practitioner]\nname_query = \"SELECT p/uid/value FROM PERSON p WHERE n LIKE $name\"\n"
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let search = settings
         .facade
         .ok_or("the facade lane is on")?
@@ -382,7 +387,7 @@ fn a_name_query_binding_no_name_refuses_to_boot() -> Result<(), Box<dyn std::err
         "{ENABLED}\n[facade.party_search]\nenabled = true\n[facade.party_search.types.Patient]\nname_query = \"SELECT p/uid/value FROM PERSON p WHERE n LIKE $name_lower\"\n"
     );
     let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("a name query must bind $name");
     assert!(
         matches!(&error, Error::IdentifierQuery { key, .. } if key == "facade.party_search.types.Patient.name_query"),
@@ -408,7 +413,8 @@ fn facade_with(extra: &str) -> String {
 #[test]
 fn the_subject_link_defaults_to_the_reference_form_and_a_person()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     let link = &facade.settings.subject;
     assert_eq!("ferrobridge", link.namespace());
@@ -425,7 +431,7 @@ fn the_subject_link_takes_the_cdr_owners_namespace_form_and_type()
         "subject_id_form = \"logical_id\"\n",
         "subject_type = \"PARTY\"\n",
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     let link = &facade.settings.subject;
     assert_eq!("fhir_facade", link.namespace());
@@ -439,11 +445,12 @@ fn the_subject_link_takes_the_cdr_owners_namespace_form_and_type()
 #[test]
 fn the_ehr_status_identifier_system_is_unset_until_a_deployment_names_one()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!(None, facade.settings.ehr_status_system);
     let text = facade_with("ehr_status_identifier_system = \"urn:oid:2.999.1\"\n");
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!(
         Some("urn:oid:2.999.1"),
@@ -458,7 +465,7 @@ fn a_subject_type_outside_type_validity_refuses_to_boot() -> Result<(), Box<dyn 
     // BASE base_types PARTY_REF §Invariants, Type_validity: PATIENT is no party type.
     let text = facade_with("subject_type = \"PATIENT\"\n");
     let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("the type is one of the BASE party types");
     match &error {
         Error::Subject { key, source } => {
@@ -478,7 +485,7 @@ fn a_subject_namespace_breaking_the_object_ref_rule_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = facade_with("subject_namespace = \"9-local\"\n");
     let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("the namespace starts with a letter");
     match &error {
         Error::Subject { key, source } => {
@@ -495,7 +502,7 @@ fn a_subject_id_form_the_facade_does_not_know_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = facade_with("subject_id_form = \"pseudonym\"\n");
     let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("the form is one of three values");
     match &error {
         Error::SubjectIdForm { key, value } => {
@@ -519,7 +526,8 @@ fn the_subject_link_keys_are_set_from_the_environment() -> Result<(), Box<dyn st
             String::from("GROUP"),
         ),
     ]);
-    let settings = Config::from_sources(Some(&facade_with("")), &environment)?.resolve()?;
+    let settings =
+        Config::from_sources(Some(&facade_with("")), &environment)?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!(IdForm::Uuid, facade.settings.subject.form());
     assert_eq!("GROUP", facade.settings.subject.party_type());

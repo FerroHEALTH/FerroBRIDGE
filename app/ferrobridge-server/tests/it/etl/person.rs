@@ -7,6 +7,7 @@
 //! FLAT fixture.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::report::RunReport;
 use ferrobridge_server::etl::{RunOptions, run};
 use ferrobridge_testkit::containers::{self, Postgres};
@@ -156,7 +157,7 @@ fn configured_aliases(table: &str) -> Result<VocabularyAliases, Box<dyn Error>> 
          [etl.vocabulary_aliases]\n{table}\n",
         super::COMPOSITIONS
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     Ok(settings.etl.ok_or("the ETL is configured")?.aliases)
 }
 

@@ -588,11 +588,9 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<super::EtlSettings, Error> {
     let compositions = if etl.aql.is_empty() {
         None
     } else {
-        Some(query_of(
-            "etl.aql",
-            &etl.aql,
-            crate::aql::CheckedQuery::compositions,
-        )?)
+        Some(query_of("etl.aql", &etl.aql, |text| {
+            crate::aql::CheckedQuery::new(crate::aql::Query::Compositions, text)
+        })?)
     };
     let page_size =
         crate::cdr::query::PageSize::new(etl.page_size).map_err(|source| Error::PageSize {
@@ -604,11 +602,9 @@ pub(super) fn resolve_etl(etl: &Etl) -> Result<super::EtlSettings, Error> {
         .as_ref()
         .map(|visits| {
             Ok::<_, Error>(super::VisitSettings {
-                query: query_of(
-                    "etl.visits.aql",
-                    &visits.aql,
-                    crate::aql::CheckedQuery::visits,
-                )?,
+                query: query_of("etl.visits.aql", &visits.aql, |text| {
+                    crate::aql::CheckedQuery::new(crate::aql::Query::Visits, text)
+                })?,
                 concepts: omop_cdm::writer::input::VisitConcepts {
                     visit_concept_id: required(
                         "etl.visits.visit_concept_id",
