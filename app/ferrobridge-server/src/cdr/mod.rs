@@ -98,11 +98,6 @@ impl Prefer {
             Self::Representation => "return=representation",
         }
     }
-
-    /// Returns the header value as the generated parameter structs carry it.
-    fn param(self) -> String {
-        String::from(self.as_str())
-    }
 }
 
 /// What a successful state-changing call returned, per the [`Prefer`] it was

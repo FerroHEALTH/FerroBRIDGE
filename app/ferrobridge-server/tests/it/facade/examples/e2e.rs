@@ -74,7 +74,7 @@ async fn the_first_passing_facade_examples_round_trip_through_a_real_cdr()
         let compiled = compile(context).await?;
         let facade = Arc::new(Facade::new(
             Programs::new(compiled.loaded.clone()),
-            handle(&Arc::new(MemoryStore::new())),
+            handle(&Arc::new(MemoryStore::default())),
             CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?))?,
             Settings {
                 ehr_policy: Policy::CreateOnFirstWrite,

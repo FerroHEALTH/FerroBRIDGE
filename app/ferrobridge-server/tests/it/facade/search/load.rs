@@ -203,7 +203,7 @@ async fn a_required_subject_refuses_a_search_that_names_none() -> Result<(), Box
     let set = programs::read_set(Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client(&base.cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let facade = Facade::new(compiled, handle(&store), client(&base.cdr), settings())
         .with_search(catalog, Limits::default());
     let harness = Harness {
@@ -249,7 +249,7 @@ async fn two_programs_over_one_template_answer_one_entry_per_composition()
         "both programs compile over the one template"
     );
     let catalog = search::load(directory.path(), &compiled)?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     store.record_ehr(
         &PersonId::new("http://example.org/fhir", SUBJECT)?,
         &EhrId::new(EHR_ID)?,

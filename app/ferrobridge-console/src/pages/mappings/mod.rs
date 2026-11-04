@@ -40,10 +40,11 @@ use crate::markup::{code, h, t};
 use crate::model::{Loaded, Outcome};
 use crate::pages::mappings::files::files_body;
 use crate::pages::parts::{
-    by_file, diagnostics_state, edit_href, faulted, file_href, owner_tag, quiet, refused_operator,
-    short, tally, wire_path,
+    by_file, diagnostics_state, edit_href, faulted, file_href, owner_tag, refused_operator, short,
+    tally, wire_path,
 };
 use crate::visit::Visit;
+use ferrohealth_ui::view::template::list::list_empty;
 
 pub mod archive;
 mod files;
@@ -260,7 +261,7 @@ fn drawn(
         None => (running_report(l, state), None),
     };
     if listing.is_empty() {
-        let empty = quiet(
+        let empty = list_empty(
             tr(l, Msg::SetEmpty),
             Some((tr(l, Msg::WriteFirstFile), String::from(NEW_FILE))),
         );
@@ -354,7 +355,7 @@ fn tab_card(
         "revisions" => (revisions::listing(l, revisions), None),
         "diagnostics" => (
             if state.diagnostics.is_empty() {
-                quiet(tr(l, Msg::NoDiagnostics), None)
+                list_empty(tr(l, Msg::NoDiagnostics), None)
             } else {
                 diagnostics_by_file(l, &tr(l, Msg::TabDiagnostics), &by_file(&state.diagnostics))
             },
@@ -459,7 +460,7 @@ fn contexts_table(l: &Locale, state: &EngineState, listing: &[Listed]) -> Html {
     ];
     let [_, resource, template, models, search, owner, word, _] = &columns;
     if state.contexts.is_empty() {
-        return quiet(
+        return list_empty(
             tr(l, Msg::NoContexts),
             Some((tr(l, Msg::WriteFirstFile), String::from(NEW_FILE))),
         );
@@ -525,7 +526,7 @@ fn contexts_table(l: &Locale, state: &EngineState, listing: &[Listed]) -> Html {
 /// The OMOCL files of the running set.
 fn omocl_table(l: &Locale, state: &EngineState, listing: &[Listed]) -> Html {
     if state.omocl.files.is_empty() {
-        return quiet(tr(l, Msg::NoOmocl), None);
+        return list_empty(tr(l, Msg::NoOmocl), None);
     }
     let columns = [
         Column::text("file", tr(l, Msg::ColFile)).role(Role::Title),
@@ -574,7 +575,7 @@ pub fn template_id(template: &Template) -> &str {
 /// The templates the running set compiled against.
 fn templates_table(l: &Locale, state: &EngineState) -> Html {
     if state.templates.is_empty() {
-        return quiet(tr(l, Msg::NoTemplates), None);
+        return list_empty(tr(l, Msg::NoTemplates), None);
     }
     let columns = [
         Column::text("template", tr(l, Msg::ColTemplate))

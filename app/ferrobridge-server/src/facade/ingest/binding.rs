@@ -187,7 +187,7 @@ impl Ingest<'_> {
         inbound: &Inbound,
         provenance: &Provenance,
     ) -> Result<Engined, Refused> {
-        self.run_consuming(program, inbound, provenance)
+        self.run_linking(program, inbound, provenance, None)
             .await
             .map_err(|error| engine_refusal(&error))
     }
@@ -203,24 +203,14 @@ impl Ingest<'_> {
         inbound: &Inbound,
         provenance: &Provenance,
     ) -> Result<(CanonicalComposition, String), EngineError> {
-        self.run_consuming(program, inbound, provenance)
+        self.run_linking(program, inbound, provenance, None)
             .await
             .map(|engined| (engined.composition, engined.instant))
     }
 
     /// Runs the engine as [`Ingest::run`] does, and also returns the literal
     /// references whose resources a `slotContext` consumed
-    /// (`fhirconnect::engine::outcome::Outcome::consumed`).
-    pub(super) async fn run_consuming(
-        &self,
-        program: &Loaded,
-        inbound: &Inbound,
-        provenance: &Provenance,
-    ) -> Result<Engined, EngineError> {
-        self.run_linking(program, inbound, provenance, None).await
-    }
-
-    /// Runs the engine as [`Ingest::run_consuming`] does, answering each
+    /// (`fhirconnect::engine::outcome::Outcome::consumed`), answering each
     /// linked composition through `linked`; with none, a `link` that names a
     /// resource refuses.
     pub(super) async fn run_linking(

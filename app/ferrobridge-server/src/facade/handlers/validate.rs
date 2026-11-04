@@ -106,7 +106,7 @@ pub(crate) async fn validate(
     let resolved = crate::facade::references::resolve(facade, &client, inbound.document()).await;
     // NOTE: R4 operation-resource-validate.html: validation changes nothing, so a linked
     // composition is answered with the probe URI and never committed (our own design).
-    let linker = crate::facade::ingest::linked::Linker::probing();
+    let linker = crate::facade::ingest::linked::Linker::default();
     let built = match facade
         .translator()
         .run(Direction::ToOpenehr, |terminology| {

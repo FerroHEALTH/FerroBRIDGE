@@ -20,6 +20,7 @@ use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::change_feed::follow::{Consumer, Polling};
 use ferrobridge_server::change_feed::{ChangeFeed, Event, PageSize, ReaderName, Settings, Source};
+use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::incremental::Incremental;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures::LABORATORY_REPORT_OPT;
@@ -131,7 +132,7 @@ async fn case() -> Result<Case, Box<dyn Error>> {
     let settings = ferrobridge_server::config::Config::from_loaded(
         ferrobridge_server::config::Config::load(Some(&config), &[])?,
     )
-    .resolve()?;
+    .resolve(Process::Server)?;
     let load = Incremental::start(&settings, client.clone()).await?;
     Ok(Case {
         cdr,

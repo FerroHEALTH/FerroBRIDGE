@@ -4,6 +4,7 @@
 //! The file: every section read, and the lanes it turns on.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
@@ -14,7 +15,7 @@ use super::FULL;
 #[test]
 fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn std::error::Error>>
 {
-    let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(FULL), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!("0.0.0.0:9000", settings.server.listen.to_string());
     assert_eq!(
         Duration::from_millis(1000),
@@ -68,7 +69,7 @@ fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn
 #[test]
 fn the_operations_lane_is_on_by_default_and_names_its_own_device()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(None, &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(settings.operations.enabled);
     assert!(
         settings.mappings.is_none(),
@@ -85,7 +86,7 @@ fn the_operations_lane_is_on_by_default_and_names_its_own_device()
 fn a_mappings_section_with_no_directory_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let file = "[mappings]\ntemplates = \"/srv/templates\"\n";
     let error = Config::from_sources(Some(file), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .err()
         .ok_or("a section present with no directory is refused")?;
     assert!(
@@ -100,7 +101,7 @@ fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused_at_resolve()
 -> Result<(), Box<dyn std::error::Error>> {
     let file = "[mappings]\ndirectory = \"/srv/mappings\"\n";
     let error = Config::from_sources(Some(file), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .err()
         .ok_or("the operations lane has no template source")?;
     let Error::Mappings { ref source } = error else {
@@ -127,7 +128,7 @@ fn a_mapping_directory_with_neither_templates_nor_a_cdr_is_refused_at_resolve()
 fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn std::error::Error>>
 {
     let text = "[mappings]\nomocl = \"/srv/omocl\"\n";
-    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(
         Some(std::path::Path::new("/srv/omocl")),
         settings.omocl_directory.as_deref()
@@ -143,7 +144,7 @@ fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn
 fn the_display_fallback_is_off_unless_the_terminology_lane_turns_it_on()
 -> Result<(), Box<dyn std::error::Error>> {
     let lane = "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\n";
-    let off = Config::from_sources(Some(lane), &BTreeMap::new())?.resolve()?;
+    let off = Config::from_sources(Some(lane), &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(
         !off.display_fallback,
         "a code the server does not know refuses"
@@ -152,13 +153,13 @@ fn the_display_fallback_is_off_unless_the_terminology_lane_turns_it_on()
         Some(&format!("{lane}display_fallback = true\n")),
         &BTreeMap::new(),
     )?
-    .resolve()?;
+    .resolve(Process::Server)?;
     assert!(on.display_fallback);
     let from_environment = Config::from_sources(
         Some(lane),
         &super::env("FERROBRIDGE__TERMINOLOGY__DISPLAY_FALLBACK", "true"),
     )?
-    .resolve()?;
+    .resolve(Process::Server)?;
     assert!(from_environment.display_fallback);
     Ok(())
 }
@@ -175,7 +176,8 @@ fn the_terminology_lane_accepts_each_release_the_client_speaks()
         let text = format!(
             "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\nwire_version = \"{spelled}\"\n"
         );
-        let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+        let settings =
+            Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
         let terminology = settings.terminology.as_ref().ok_or("the lane is on")?;
         assert_eq!(expected, terminology.wire_version, "{spelled}");
     }

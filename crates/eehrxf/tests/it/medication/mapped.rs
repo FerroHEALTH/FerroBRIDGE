@@ -20,6 +20,7 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use eehrxf::mapping::Mapping;
+use eehrxf::mapping::identified;
 use eehrxf::mappings::MPD;
 use eehrxf::medication::Medicinal;
 use eehrxf::medication::dispensation::Dispense;
@@ -44,12 +45,17 @@ use openehr_base::v1_3::base_types::identification::locatable_ref::LocatableRef;
 use openehr_mapping_core::template::TemplateSource;
 
 use super::fixtures::profiles;
+use crate::support::emit;
 
 /// The request context of FerroBRIDGE's MPD project.
 const REQUEST: &str = "ferrobridge_eu_mpd_request.context";
 
 /// The dispense context of FerroBRIDGE's MPD project.
 const DISPENSE: &str = "ferrobridge_eu_mpd_dispense.context";
+
+/// The base the written collections name their entries under, in the
+/// `example.org` domain RFC 6761 §6.5 reserves.
+const BASE: &str = "https://ehr.example.org/fhir";
 
 /// The remaining-dispensations extension of `eehrxf`.
 const REMAINING: &str = "https://ferrobridge.eu/fhir/StructureDefinition/remaining-dispensations";
@@ -227,6 +233,34 @@ fn round_trip(
         .map(Json::to_json)
         .collect::<Result<Vec<_>, _>>()?;
     Ok((composition.composition().to_owned(), resources))
+}
+
+/// Receives `resource` through `context`, maps the composition back out and
+/// writes the `collection` Bundle the mapping answers to the directory
+/// `EEHRXF_EMIT_DIR` names as `name`, for a run of HL7's FHIR Validator.
+fn emit_mapped(
+    context: &str,
+    resource: &serde_json::Value,
+    name: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mapping = mapping(context)?;
+    let received = ReceivedResources::read(&collection(resource))?;
+    let composition = mapping.resources_to_openehr(&received, &settings())?;
+    let committed = committed(composition.composition())?;
+    let context = CallContext::new().with_patient(Reference {
+        reference: Some("Patient/synthetic-patient".into()),
+        ..Reference::default()
+    });
+    let answer = mapping.to_fhir_with(&committed, &settings(), context)?;
+    let collection = identified(answer.bundle(), BASE)?;
+    assert!(
+        collection
+            .entry
+            .iter()
+            .all(|entry| entry.full_url.is_some()),
+        "R4 Bundle.entry.fullUrl: every entry of an exchanged collection is named"
+    );
+    emit(name, &serde_json::to_string(&collection)?)
 }
 
 /// Returns `composition` as a CDR serves it once committed, with the version
@@ -512,4 +546,16 @@ fn the_embedded_project_compiles_as_its_files_do() -> Result<(), Box<dyn Error>>
         from_disk.contexts().collect::<Vec<_>>()
     );
     Ok(())
+}
+
+// FHIR R4 Resource.meta.profile: every mapped resource claims its MPD profile, and the
+// validator lane holds each claim.
+#[test]
+fn the_mapped_prescription_is_written_for_the_validator() -> Result<(), Box<dyn Error>> {
+    emit_mapped(REQUEST, &request(), "eehrxf-mpd-prescription")
+}
+
+#[test]
+fn the_mapped_dispense_is_written_for_the_validator() -> Result<(), Box<dyn Error>> {
+    emit_mapped(DISPENSE, &dispense(), "eehrxf-mpd-dispense")
 }

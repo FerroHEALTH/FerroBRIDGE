@@ -217,7 +217,7 @@ async fn harness(search: Option<PartySearch>) -> Result<(MockServer, Arc<Facade>
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
     programs::check_party_search(&compiled, search.as_ref())?;
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let facade =
         Facade::new(compiled, handle(&store), client, settings()).with_party_search(search);
     Ok((cdr, Arc::new(facade)))

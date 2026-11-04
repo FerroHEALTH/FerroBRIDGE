@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::smart::OPERATOR_SCOPE;
 use ferrobridge_server::smart::SmartSettings;
@@ -29,7 +30,7 @@ const MINIMAL: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org
 fn settings(text: &str) -> Result<Option<SmartSettings>, Box<dyn std::error::Error>> {
     Ok(
         Config::from_sources(Some(&format!("{GUARDED}{text}")), &BTreeMap::new())?
-            .resolve()?
+            .resolve(Process::Server)?
             .auth,
     )
 }
@@ -39,7 +40,7 @@ fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
     match Config::from_sources(Some(&format!("{GUARDED}{text}")), &BTreeMap::new()) {
         Err(error) => Ok(error),
         Ok(config) => Ok(config
-            .resolve()
+            .resolve(Process::Server)
             .err()
             .ok_or("the configuration should be refused")?),
     }
@@ -87,7 +88,7 @@ fn enabled_false_turns_auth_off() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn a_server_that_serves_no_guarded_surface_resolves_no_resource_server()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(""), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(""), &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(settings.auth.is_none());
     Ok(())
 }
@@ -239,7 +240,7 @@ fn the_environment_turns_auth_on() -> Result<(), Box<dyn std::error::Error>> {
         ),
     ]);
     let auth = Config::from_sources(None, &environment)?
-        .resolve()?
+        .resolve(Process::Server)?
         .auth
         .ok_or("auth is on")?;
     assert_eq!("https://as.example.org", auth.issuers[0].issuer);
@@ -247,7 +248,7 @@ fn the_environment_turns_auth_on() -> Result<(), Box<dyn std::error::Error>> {
         String::from("FERROBRIDGE__AUTH__ENABLED"),
         String::from("false"),
     )]);
-    let settings = Config::from_sources(Some(GUARDED), &off)?.resolve()?;
+    let settings = Config::from_sources(Some(GUARDED), &off)?.resolve(Process::Server)?;
     assert!(settings.auth.is_none());
     Ok(())
 }

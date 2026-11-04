@@ -4,6 +4,7 @@
 //! The refusals to boot on an unknown key, a wrong type or a bad value.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use std::collections::BTreeMap;
 
@@ -79,7 +80,7 @@ fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
     }
 
     let url = Config::from_sources(Some("[cdr]\nbase_url = \"not a url\"\n"), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("that is not a URL");
     match &url {
         Error::Url { key, .. } => assert_eq!("cdr.base_url", key),
@@ -90,7 +91,7 @@ fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
         Some("[terminology]\nbase_url = \"http://tx.invalid/r5\"\nwire_version = \"r5\"\n"),
         &BTreeMap::new(),
     )?
-    .resolve()
+    .resolve(Process::Server)
     .expect_err("this client does not speak R5");
     match &release {
         Error::WireVersion { key, value } => {
@@ -110,7 +111,7 @@ fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
 fn a_section_that_is_present_and_names_no_url_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
     let error = Config::from_sources(Some("[cdr]\ntimeout_ms = 1000\n"), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("a CDR lane with no base URL cannot start");
     match &error {
         Error::Missing { key } => assert_eq!("cdr.base_url", key),
@@ -126,7 +127,7 @@ fn a_caller_rate_refuses_to_boot_because_the_bridge_limits_no_caller()
         Some("[server.caller_rate]\nrequests_per_second = 5\nburst = 10\n"),
         &BTreeMap::new(),
     )?
-    .resolve()
+    .resolve(Process::Server)
     .expect_err("no caller rate is applied");
     assert!(matches!(error, Error::CallerRate), "{error:?}");
     Ok(())

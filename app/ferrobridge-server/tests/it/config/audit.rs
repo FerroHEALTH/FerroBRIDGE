@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 
 use super::refusal;
@@ -36,7 +37,7 @@ fn the_audit_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> 
     assert_eq!(2_000, config.audit.write_timeout_ms);
     assert!(
         Config::from_sources(Some(FACADE), &BTreeMap::new())?
-            .resolve()?
+            .resolve(Process::Server)?
             .audit
             .is_none()
     );
@@ -48,7 +49,7 @@ fn an_enabled_lane_resolves_every_key() -> Result<(), Box<dyn std::error::Error>
     let text = lane(&format!(
         "{COMPLETE}retry_max_ms = 5000\nmax_records = 50\nmax_bytes = 4096\nwrite_timeout_ms = 300\nsource_id = \"bridge-1\"\nsite = \"ward-4\"\n\n[audit.categories.templates]\n\"Synthetic Summary.v1\" = [\"Patient-Summaries\"]\n\"Synthetic Admin.v1\" = \"none\"\n\n[audit.categories.archetypes]\n\"openEHR-EHR-COMPOSITION.report.v1\" = [\"Laboratory-Reports\"]\n"
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let audit = settings.audit.ok_or("the lane is on")?;
     assert_eq!(
         "https://arr.example.org/fhir/AuditEvent",
@@ -72,7 +73,8 @@ fn an_enabled_lane_resolves_every_key() -> Result<(), Box<dyn std::error::Error>
 #[test]
 fn the_bridge_names_itself_by_the_facade_system_id_by_default()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(&lane(COMPLETE)), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(&lane(COMPLETE)), &BTreeMap::new())?.resolve(Process::Server)?;
     let audit = settings.audit.ok_or("the lane is on")?;
     assert_eq!("FerroBRIDGE", audit.source_id);
     Ok(())
@@ -85,7 +87,7 @@ fn the_environment_sets_the_repository() -> Result<(), Box<dyn std::error::Error
         String::from("FERROBRIDGE__AUDIT__BASE_URL"),
         String::from("https://arr.example.org/r4/"),
     )]);
-    let settings = Config::from_sources(Some(&text), &environment)?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &environment)?.resolve(Process::Server)?;
     let audit = settings.audit.ok_or("the lane is on")?;
     assert_eq!(
         "https://arr.example.org/r4/AuditEvent",
@@ -103,7 +105,7 @@ fn the_basic_password_reads_from_a_file() -> Result<(), Box<dyn std::error::Erro
         "{COMPLETE}\n[audit.credentials]\nuser = \"bridge\"\npassword_file = \"{}\"\n",
         file.display()
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(
         format!("{:?}", settings.audit.ok_or("the lane is on")?.feed).contains("credentials: true"),
         "the repository is reached with a credential"
@@ -166,7 +168,7 @@ fn a_cleartext_repository_is_refused_unless_accepted() -> Result<(), Box<dyn std
     );
     assert!(
         Config::from_sources(Some(&accepted), &BTreeMap::new())?
-            .resolve()?
+            .resolve(Process::Server)?
             .audit
             .is_some()
     );

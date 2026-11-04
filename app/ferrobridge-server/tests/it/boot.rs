@@ -11,6 +11,7 @@
 //! governs the wait: our own design.
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::{Config, Settings};
 use http::StatusCode;
 use std::collections::BTreeMap;
@@ -41,7 +42,7 @@ fn settings(cdr: &MockServer) -> Result<Settings, Box<dyn Error>> {
         "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n\n[usage_report]\nenabled = false\n",
         cdr.uri()
     );
-    Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?)
+    Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?)
 }
 
 /// Mounts `response` on the template route of `cdr`.

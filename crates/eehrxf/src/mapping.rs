@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::Path;
 
 use fhir_types::codec::{Json, Object, Value};
-use fhir_types::r4::bundle::Bundle;
+use fhir_types::r4::bundle::{Bundle, BundleEntry};
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
@@ -396,6 +396,88 @@ fn claim(bundle: &mut Bundle, resource_type: &str, profile: &str) -> Result<(), 
     }
 }
 
+/// Names every entry of `bundle`, the `collection` a mapping run answers, by
+/// the `fullUrl` `{base}/{type}/{id}`, so the collection a system exchanges
+/// identifies each resource it holds.
+///
+/// A resource with no `id`, such as the run's `Provenance`, takes the first
+/// free `{type}-{n}` id, its type in lower case. The relative references the
+/// run wrote between its resources resolve against `base`
+/// (<https://hl7.org/fhir/R4/bundle.html#references>).
+///
+/// # Errors
+///
+/// [`MappingError::Identify`] when a resource cannot be encoded or read
+/// back.
+// NOTE: FHIR R4 Bundle.entry.fullUrl "SHALL have a value" outside a POST and an operation's
+// unidentified results; an exchanged collection is neither, so every entry is named.
+pub fn identified(bundle: &Bundle, base: &str) -> Result<Bundle, MappingError> {
+    let mut objects = Vec::with_capacity(bundle.entry.len());
+    for resource in bundle
+        .entry
+        .iter()
+        .filter_map(|entry| entry.resource.as_ref())
+    {
+        objects.push(Json::to_json(resource).map_err(identify_error)?);
+    }
+    let mut taken: std::collections::BTreeSet<String> = objects
+        .iter()
+        .filter_map(|object| {
+            Some(format!(
+                "{}/{}",
+                text(object, "resourceType")?,
+                text(object, "id")?
+            ))
+        })
+        .collect();
+    let mut named = bundle.clone();
+    named.entry.clear();
+    for mut object in objects {
+        let kind = text(&object, "resourceType")
+            .unwrap_or("Resource")
+            .to_owned();
+        let id = if let Some(id) = text(&object, "id") {
+            id.to_owned()
+        } else {
+            // NOTE: no specification governs a free id: our own design; the collection holds
+            // fewer named resources than the range, so one of its ids is free.
+            let stem = kind.to_ascii_lowercase();
+            let id = (1..=taken.len().saturating_add(1))
+                .map(|n| format!("{stem}-{n}"))
+                .find(|id| !taken.contains(&format!("{kind}/{id}")))
+                .ok_or_else(|| identify_error(Unnamed))?;
+            taken.insert(format!("{kind}/{id}"));
+            object.insert(String::from("id"), Value::String(id.clone()));
+            id
+        };
+        let resource = Resource::from_json(&object, &mut fhir_types::codec::Path::root(&kind))
+            .map_err(identify_error)?;
+        named.entry.push(BundleEntry {
+            full_url: Some(format!("{base}/{kind}/{id}").into()),
+            resource: Some(resource),
+            ..BundleEntry::default()
+        });
+    }
+    Ok(named)
+}
+
+/// Why a resource of a collection takes no free id.
+#[derive(Debug, thiserror::Error)]
+#[error("no free id is left for a resource that carries none")]
+struct Unnamed;
+
+/// The naming failure `source`.
+fn identify_error(source: impl std::error::Error + Send + Sync + 'static) -> MappingError {
+    MappingError::Identify {
+        source: Box::new(source),
+    }
+}
+
+/// The string member `name` of `object`.
+fn text<'a>(object: &'a Object, name: &str) -> Option<&'a str> {
+    object.get(name).and_then(Value::as_str)
+}
+
 /// The claim failure `source`.
 fn claim_error(source: impl std::error::Error + Send + Sync + 'static) -> MappingError {
     MappingError::Claim {
@@ -463,6 +545,13 @@ pub enum MappingError {
         /// The engine's refusal.
         #[source]
         source: Box<OperationError>,
+    },
+    /// A resource of a run's collection could not be named by its `fullUrl`.
+    #[error("a mapped resource cannot be named in its collection")]
+    Identify {
+        /// The encoding failure.
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// The mapped resource could not claim the profile its context maps to.
     #[error("the mapped resource cannot claim its profile")]

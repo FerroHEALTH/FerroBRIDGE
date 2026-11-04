@@ -63,7 +63,7 @@ async fn translating(
     fixtures: &tempfile::TempDir,
     server: &MockServer,
 ) -> Result<Harness, Box<dyn Error>> {
-    let store = Arc::new(MemoryStore::new());
+    let store = Arc::new(MemoryStore::default());
     let (cdr, facade) = facade_over(
         fixtures.path().to_str().ok_or("a UTF-8 temporary path")?,
         settings(),

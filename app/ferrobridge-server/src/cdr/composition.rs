@@ -59,7 +59,7 @@ impl CdrClient {
         let client = self.call(HeaderMap::new())?;
         let params = CompositionCreateParams {
             ehr_id: String::from(ehr_id.as_str()),
-            prefer: Some(prefer.param()),
+            prefer: Some(String::from(prefer.as_str())),
             accept: None,
             content_type: None,
             openehr_item_tag: None,
@@ -104,7 +104,7 @@ impl CdrClient {
             ehr_id: String::from(ehr_id.as_str()),
             uid_based_id: String::from(versioned_object_uid.value()),
             if_match: if_match_value(preceding),
-            prefer: Some(prefer.param()),
+            prefer: Some(String::from(prefer.as_str())),
             accept: None,
             content_type: None,
             openehr_item_tag: None,

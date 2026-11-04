@@ -54,7 +54,7 @@ async fn the_facade_commits_a_condition_and_reads_it_back_from_a_real_cdr()
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -136,7 +136,7 @@ async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cd
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -424,7 +424,7 @@ async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr() -> Result
     let set = programs::read_set(directory.path())?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -577,7 +577,7 @@ async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let facade = Arc::new(Facade::new(
         programs,
         store,
