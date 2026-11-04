@@ -4,6 +4,7 @@
 //! The `[events]` section: off until enabled, every key, and every refusal.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
@@ -28,7 +29,7 @@ fn the_events_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>>
     let config = Config::from_sources(None, &BTreeMap::new())?;
     assert!(!config.events.enabled);
     assert_eq!(30_000, config.events.confirm_timeout_ms);
-    assert!(config.resolve()?.events.is_none());
+    assert!(config.resolve(Process::Server)?.events.is_none());
     Ok(())
 }
 
@@ -38,7 +39,7 @@ fn an_enabled_lane_resolves_every_key_and_feeds_the_change_feed()
     let text = lane(&format!(
         "{COMPLETE}confirm_timeout_ms = 5000\nqueues = [{{ name = \"analytics\", binding = \"COMPOSITION.*.*\" }}, {{ name = \"all\", binding = \"#\" }}]\n"
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let events = settings.events.ok_or("the lane is on")?;
     assert!(
         settings.change_feed.is_some(),
@@ -62,7 +63,7 @@ fn tls_upgrades_an_amqp_url_in_any_case() -> Result<(), Box<dyn std::error::Erro
             .replace("amqp://", "AMQP://")
             .replace("reader", "tls = true\nreader"),
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let events = settings.events.ok_or("the lane is on")?;
     assert_eq!(
         "amqps://bridge:synthetic@broker.invalid:5672/%2f",
@@ -80,7 +81,7 @@ fn the_broker_url_reads_from_a_file() -> Result<(), Box<dyn std::error::Error>> 
         "reader = \"ferrobridge\"\nexchange = \"ferroehr.events\"\nurl_file = \"{}\"\n",
         file.display()
     ));
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let events = settings.events.ok_or("the lane is on")?;
     assert_eq!(
         "amqps://bridge:from-file@broker.invalid:5671/%2f",

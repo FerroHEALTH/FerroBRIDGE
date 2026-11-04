@@ -25,7 +25,7 @@ mod pairing;
 mod plan;
 mod reconcile;
 pub(crate) mod refusal;
-mod single;
+pub(crate) mod single;
 mod transaction;
 
 use plan::{Mapped, Mapping, Partition, Pending, Placed, Recorded, Scope, Standing};
@@ -240,7 +240,7 @@ pub enum Delivery {
 #[derive(Debug)]
 pub enum Recognised {
     /// The map consumed no version of the source's `id`: the create runs
-    /// [`Ingest::ingest_resource`], which also finishes the binding a
+    /// `Ingest::ingest_resource`, which also finishes the binding a
     /// transaction left undone.
     Unknown,
     /// The source repeats one the map consumed, so nothing is committed and

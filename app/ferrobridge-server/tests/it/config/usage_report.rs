@@ -5,6 +5,7 @@
 //! key, the environment switch, and every refusal.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrohealth_usage_report::section::{Deployment, ENDPOINT};
 use std::collections::BTreeMap;
@@ -15,7 +16,7 @@ use super::env;
 #[test]
 fn the_report_is_on_by_default_with_no_state_directory() -> Result<(), Box<dyn std::error::Error>> {
     let report = Config::from_sources(None, &BTreeMap::new())?
-        .resolve()?
+        .resolve(Process::Server)?
         .usage_report;
     assert!(report.enabled);
     assert_eq!(ENDPOINT, report.endpoint.url().as_str());
@@ -34,7 +35,7 @@ fn every_usage_report_key_is_read_from_the_file() -> Result<(), Box<dyn std::err
         "deployment = \"compose\"\n",
     );
     let report = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()?
+        .resolve(Process::Server)?
         .usage_report;
     assert!(!report.enabled);
     assert_eq!(
@@ -52,14 +53,14 @@ fn every_usage_report_key_is_read_from_the_file() -> Result<(), Box<dyn std::err
 #[test]
 fn the_environment_switches_the_report_off() -> Result<(), Box<dyn std::error::Error>> {
     let report = Config::from_sources(None, &env("FERROBRIDGE__USAGE_REPORT__ENABLED", "false"))?
-        .resolve()?
+        .resolve(Process::Server)?
         .usage_report;
     assert!(!report.enabled);
     let report = Config::from_sources(
         None,
         &env("FERROBRIDGE__USAGE_REPORT__STATE_DIR", "/srv/state"),
     )?
-    .resolve()?
+    .resolve(Process::Server)?
     .usage_report;
     assert_eq!(Some(Path::new("/srv/state")), report.state_dir.as_deref());
     Ok(())

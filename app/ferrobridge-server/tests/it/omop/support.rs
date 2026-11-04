@@ -11,6 +11,7 @@ use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::commit::CommitContext;
 use ferrobridge_server::cdr::ids::{EhrId, template_id, versioned_object_uid};
+use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::RunOptions;
 use ferrobridge_server::etl::report::RunReport;
 use ferrobridge_testkit::containers::{Cdr, Postgres};
@@ -472,7 +473,7 @@ pub(super) async fn etl_run(config: &Path) -> Result<RunReport, Box<dyn Error>> 
     let settings = ferrobridge_server::config::Config::from_loaded(
         ferrobridge_server::config::Config::load(Some(config), &[])?,
     )
-    .resolve()?;
+    .resolve(Process::Server)?;
     Ok(ferrobridge_server::etl::job::run(&settings, &RunOptions::default()).await?)
 }
 

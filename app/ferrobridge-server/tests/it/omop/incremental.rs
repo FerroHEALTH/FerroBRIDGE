@@ -19,6 +19,7 @@ use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::{EhrId, versioned_object_uid};
 use ferrobridge_server::change_feed::follow::Consumer;
 use ferrobridge_server::change_feed::{ChangedVersion, Domain, Event, Position, Seq};
+use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::incremental::Incremental;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures::LABORATORY_REPORT_OPT;
@@ -97,7 +98,7 @@ async fn a_batch_run_after_the_incremental_load_leaves_the_cdm_as_it_was()
     let settings = ferrobridge_server::config::Config::from_loaded(
         ferrobridge_server::config::Config::load(Some(&config), &[])?,
     )
-    .resolve()?;
+    .resolve(Process::Server)?;
     let load = Incremental::start(&settings, client.clone()).await?;
 
     let mut seq = 0;

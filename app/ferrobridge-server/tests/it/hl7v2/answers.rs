@@ -347,7 +347,7 @@ async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<
     facade_settings.ehr_policy = Policy::CreateOnFirstWrite;
     let facade = Arc::new(Facade::new(
         compiled,
-        Arc::new(MemoryStore::new()),
+        Arc::new(MemoryStore::default()),
         client,
         facade_settings,
     ));

@@ -339,7 +339,7 @@ async fn replay_parked(
 /// keeps, newest first; `404` when the bridge has no `[cdm]`.
 async fn etl_runs(State(history): State<Option<Arc<crate::etl::history::Store>>>) -> Response {
     let Some(history) = history else {
-        return no_history();
+        return refuse(Kind::NotFound, NO_HISTORY);
     };
     match history.runs().await {
         Ok(runs) => axum::Json(runs).into_response(),
@@ -354,7 +354,7 @@ async fn etl_run(
     Path(run_id): Path<String>,
 ) -> Response {
     let Some(history) = history else {
-        return no_history();
+        return refuse(Kind::NotFound, NO_HISTORY);
     };
     // NOTE: no specification governs this: our own design; a run id is a UUID the job
     // formed, so any other path segment names no run and never reaches the database.
@@ -372,13 +372,8 @@ async fn etl_run(
     }
 }
 
-/// Returns the `404` of a bridge that keeps no run history.
-fn no_history() -> Response {
-    refuse(
-        Kind::NotFound,
-        "this bridge has no CDM database to keep a run history in",
-    )
-}
+/// The `404` of a bridge that keeps no run history.
+const NO_HISTORY: &str = "this bridge has no CDM database to keep a run history in";
 
 /// Returns the `503` of a run history that could not be read, its cause
 /// logged.
@@ -463,7 +458,7 @@ fn read_mapping(operator: &Operator, path: &str) -> Response {
             return unreadable(&crate::walk::Error { path, source });
         }
         Err(files::PathError::UnknownRoot | files::PathError::Step | files::PathError::Absent) => {
-            return absent();
+            return refuse(Kind::NotFound, NO_MAPPING_FILE);
         }
     };
     match std::fs::read(located.path()) {
@@ -479,7 +474,9 @@ fn read_mapping(operator: &Operator, path: &str) -> Response {
             )
                 .into_response()
         }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => absent(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            refuse(Kind::NotFound, NO_MAPPING_FILE)
+        }
         Err(error) => unreadable(&crate::walk::Error {
             path: located.path().to_path_buf(),
             source: error,
@@ -500,10 +497,8 @@ async fn blocking(work: impl FnOnce() -> Response + Send + 'static) -> Response 
     }
 }
 
-/// Returns the `404` of a path that names no mapping file.
-fn absent() -> Response {
-    refuse(Kind::NotFound, "no mapping file is at this path")
-}
+/// The `404` of a path that names no mapping file.
+const NO_MAPPING_FILE: &str = "no mapping file is at this path";
 
 /// Returns the `500` of a mapping directory that could not be read.
 fn unreadable(error: &crate::walk::Error) -> Response {

@@ -105,7 +105,7 @@ fn top_bar(
     let operator = visit
         .operator
         .clone()
-        .unwrap_or_else(|| crate::app::unnamed_operator(locale));
+        .unwrap_or_else(|| tr(locale, Msg::Operator));
     let menu = user_menu(
         locale,
         UserMenu {

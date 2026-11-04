@@ -11,6 +11,7 @@
 //! harness. No specification governs `cdm init`: our own design.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_testkit::containers::{self, Postgres};
 use ferrobridge_testkit::tls::{TlsError, TlsMaterial};
@@ -21,7 +22,7 @@ use std::process::Output;
 
 /// Resolves `text`, returning the refusal.
 fn refusal(text: &str) -> Result<Error, Box<dyn std::error::Error>> {
-    match Config::from_sources(Some(text), &BTreeMap::new())?.resolve() {
+    match Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server) {
         Ok(_) => Err("the configuration resolved".into()),
         Err(error) => Ok(error),
     }
@@ -110,7 +111,8 @@ fn every_libpq_mode_that_never_falls_back_resolves() -> Result<(), Box<dyn std::
         SslMode::VerifyFull,
     ] {
         let text = format!("[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode={mode}\"\n");
-        let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+        let settings =
+            Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
         let cdm = settings.cdm.ok_or("the CDM lane is on")?;
         assert_eq!(mode, cdm.connection.ssl_mode());
     }
@@ -198,7 +200,8 @@ observation_period_type_concept_id = 32880
 
 #[test]
 fn the_etl_lane_reports_the_sslmode_and_no_credential() -> Result<(), Box<dyn std::error::Error>> {
-    let settings = Config::from_sources(Some(ETL_OVER_TLS), &BTreeMap::new())?.resolve()?;
+    let settings =
+        Config::from_sources(Some(ETL_OVER_TLS), &BTreeMap::new())?.resolve(Process::Server)?;
     let lanes = ferrobridge_server::startup::lanes(&settings);
     let etl = lanes
         .iter()
@@ -285,7 +288,7 @@ fn a_ca_file_is_read_at_configuration() -> Result<(), Box<dyn std::error::Error>
         "[cdm]\nurl = \"postgres://db.invalid/cdm?sslmode=verify-full\"\ntls_ca_file = {:?}\n",
         file.path()
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let cdm = settings.cdm.ok_or("the CDM lane is on")?;
     assert!(cdm.connection.has_ca(), "the CA was not read");
     Ok(())

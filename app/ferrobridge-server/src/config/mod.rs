@@ -141,6 +141,17 @@ pub struct Config {
     provenance: Provenance,
 }
 
+/// The process a configuration tree is resolved for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Process {
+    /// `serve`, which holds the resource server and reads `[auth]` when it
+    /// serves a surface `[auth]` guards.
+    Server,
+    /// A job that serves no HTTP surface (`cdm init`, `etl run`, `mapping
+    /// check`).
+    Job,
+}
+
 impl Config {
     /// Reads the configuration of the running process: the file `path`
     /// names, or the one `FERROBRIDGE_CONFIG` names, the environment and the
@@ -203,10 +214,12 @@ impl Config {
             || (self.operations.enabled && self.mappings.directory.is_some())
     }
 
-    /// Resolves this tree into the settings `serve` holds.
+    /// Resolves this tree into the settings `process` holds.
     ///
     /// Every `_file` sibling is read here, so a secret reaches the process
-    /// once, at boot, and never sits in the configuration tree.
+    /// once, at boot, and never sits in the configuration tree. A
+    /// [`Process::Job`] holds no resource server, so `[auth]` is neither read
+    /// nor required and [`Error::Auth`] is never returned.
     ///
     /// # Errors
     /// Returns [`Error::Conflict`] when a value and its `_file` sibling are
@@ -219,23 +232,8 @@ impl Config {
     /// are enabled and `[mappings] directory` is set with neither
     /// `[mappings] templates` nor `[cdr]`, so the refusal comes before any
     /// network call.
-    pub fn resolve(&self) -> Result<Settings, Error> {
-        self.resolve_serving(true)
-    }
-
-    /// Resolves this tree into the settings of a job that serves no HTTP
-    /// surface (`cdm init`, `etl run`, `mapping check`), which holds no
-    /// resource server, so `[auth]` is neither read nor required.
-    ///
-    /// # Errors
-    /// Returns every [`Error`] [`Config::resolve`] returns but [`Error::Auth`].
-    pub fn resolve_job(&self) -> Result<Settings, Error> {
-        self.resolve_serving(false)
-    }
-
-    /// Resolves this tree, reading `[auth]` when `serves` and a surface it
-    /// guards is served.
-    fn resolve_serving(&self, serves: bool) -> Result<Settings, Error> {
+    pub fn resolve(&self, process: Process) -> Result<Settings, Error> {
+        let serves = process == Process::Server;
         if let Some(directory) = self.mappings.directory.as_ref()
             && self.operations.enabled
             && self.mappings.templates.is_none()

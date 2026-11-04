@@ -4,6 +4,7 @@
 //! The `_file` secrets and the credentials sections.
 
 use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrohealth_smart::config::ConfigError;
 use secrecy::ExposeSecret;
@@ -19,7 +20,7 @@ fn a_secret_file_sibling_is_read_at_boot() -> Result<(), Box<dyn std::error::Err
         file.path()
     );
 
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
     match cdr.credentials.as_ref() {
         Some(ferrobridge_server::cdr::config::CdrCredentials::Basic { password, .. }) => {
@@ -40,7 +41,7 @@ fn a_cdm_url_file_sibling_is_read_at_boot() -> Result<(), Box<dyn std::error::Er
     writeln!(file, "postgres://bridge@db.invalid/cdm?sslmode=disable")?;
     let text = format!("[cdm]\nurl_file = {:?}\n", file.path());
 
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve()?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(
         Some("postgres://bridge@db.invalid/cdm?sslmode=disable"),
         settings.cdm.as_ref().map(|cdm| cdm.url.expose_secret())
@@ -60,7 +61,7 @@ fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dy
     let text = "[cdm]\nurl = \"postgres://bridge@db.invalid/cdm?sslmode=verify-full\"\n";
 
     let error = Config::from_sources(Some(text), &environment)?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("the file holds no certificate");
     assert!(
         matches!(&error, Error::CdmConnection { key, .. } if key == "cdm.tls_ca_file"),
@@ -78,7 +79,7 @@ fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn 
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("a secret set twice is a boot error");
     match &error {
         Error::Credentials { section, source }
@@ -100,7 +101,7 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn std
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("an unreadable secret is a boot error");
     match &error {
         Error::Credentials { section, source }
@@ -126,7 +127,7 @@ fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn std::error:
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("basic authentication needs both halves");
     match &error {
         Error::Credentials { section, source }
@@ -168,7 +169,7 @@ fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn std::error:
         "[cdr.credentials]\npassword = \"p\"\n",
     );
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
-        .resolve()
+        .resolve(Process::Server)
         .expect_err("basic authentication needs both halves");
     assert!(
         matches!(
@@ -198,7 +199,7 @@ fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
     );
     let config = Config::from_sources(Some(text), &BTreeMap::new())?;
     let tree = format!("{config:?}");
-    let settings = format!("{:?}", config.resolve()?);
+    let settings = format!("{:?}", config.resolve(Process::Server)?);
     for rendered in [&tree, &settings] {
         for secret in [
             "synthetic-cdr-password",
@@ -224,7 +225,7 @@ fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree()
     );
     let config = Config::from_sources(Some(text), &BTreeMap::new())?;
     let tree = format!("{config:?}");
-    let settings = format!("{:?}", config.resolve()?);
+    let settings = format!("{:?}", config.resolve(Process::Server)?);
     assert!(
         !tree.contains("synthetic-client-secret"),
         "the client secret reached the Debug rendering of the tree"
