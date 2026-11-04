@@ -30,11 +30,17 @@
 #       --milestone, --label as usual) and sets type, priority and effort on
 #       it; prints the URL. A token that may not read the organisation's
 #       issue types files the issue with its labels alone and says so on
-#       stderr, so a scheduled lane reports its finding either way.
+#       stderr, so a scheduled lane reports its finding either way. A step
+#       that fails after the issue is filed names the issue and the
+#       commands that finish it.
+#   Every gh call is asked again while it fails or answers no JSON, up to
+#   FIELDS_ATTEMPTS times (default 4), the wait doubling from
+#   FIELDS_BACKOFF seconds (default 1). `gh issue create` is asked once.
 #   scripts/gh/fields.sh --self-test
-#       Drives `new` against a stub gh, with the organisation answering and
-#       with the empty answer a workflow token gets, and proves that every
-#       usage error touches nothing.
+#       Drives `new` against a stub gh, with the organisation answering,
+#       with the empty answer a workflow token gets, with a failure that
+#       recovers and with ones that do not, and proves that every usage
+#       error touches nothing.
 #   No argument, an unknown command or a wrong operand count, --help
 #   included, prints this usage and exits 2 before any gh call.
 
@@ -56,11 +62,12 @@ usage() {
 # that holds no token for this repository.
 self_test() {
   command -v jq >/dev/null 2>&1 || die "jq is not installed"
-  local work stub created calls types fields create
+  local work stub created calls flaky types fields create failures mutation
   work="$(mktemp -d)"
   stub="$work/bin"
   created="$work/created"
   calls="$work/calls"
+  flaky="$work/flaky"
   mkdir -p "$stub"
   cat > "$stub/gh" <<'STUB'
 #!/usr/bin/env bash
@@ -70,6 +77,20 @@ self_test() {
 # received where the test reads it.
 set -euo pipefail
 printf '%s\n' "$*" >> "$GH_STUB_CALLS"
+# The first GH_STUB_FLAKY_LEFT GraphQL calls fail as GitHub does under load,
+# by turns a 502 and an HTML page in place of JSON.
+if [[ "${1:-} ${2:-}" = "api graphql" ]]; then
+  left="$(cat "$GH_STUB_FLAKY_LEFT")"
+  if (( left > 0 )); then
+    printf '%s\n' "$((left - 1))" > "$GH_STUB_FLAKY_LEFT"
+    if (( left % 2 )); then
+      echo "HTTP 502: Bad Gateway" >&2
+      exit 1
+    fi
+    printf '%s\n' '<html>Bad Gateway</html>'
+    exit 0
+  fi
+fi
 filter=""
 previous=""
 for argument in "$@"; do
@@ -92,6 +113,10 @@ case "${1:-} ${2:-}" in
   "api graphql")
     case "$*" in
       *updateIssueIssueType*)
+        if [[ "${GH_STUB_MUTATION:-ok}" != "ok" ]]; then
+          printf '%s\n' '<html>Bad Gateway</html>'
+          exit 0
+        fi
         emit '{"data":{"updateIssueIssueType":{"issue":{"issueType":{"name":"Bug"}}}}}'
         ;;
       *setIssueFieldValue*)
@@ -133,8 +158,11 @@ STUB
     local name=$1 code=$2 rc=0
     shift 2
     : > "$calls"
+    : > "$created"
+    printf '%s\n' "$failures" > "$flaky"
     PATH="$stub:$PATH" GH_STUB_CREATED="$created" GH_STUB_CALLS="$calls" \
       GH_STUB_TYPES="$types" GH_STUB_FIELDS="$fields" GH_STUB_CREATE="$create" \
+      GH_STUB_FLAKY_LEFT="$flaky" GH_STUB_MUTATION="$mutation" FIELDS_BACKOFF=0 \
       bash "$0" "$@" > "$work/out" 2> "$work/err" || rc=$?
     if [[ "$rc" -ne "$code" ]]; then
       echo "gh-fields: self-test failed: $name exited $rc, wanted $code." >&2
@@ -163,6 +191,8 @@ STUB
   types='{"data":{"organization":{"issueTypes":{"nodes":[{"id":"IT_bug","name":"Bug","isEnabled":true}]}}}}'
   fields='{"data":{"organization":{"issueFields":{"nodes":[{"id":"IF_priority","name":"Priority","options":[{"id":"OPT_high","name":"High"}]},{"id":"IF_effort","name":"Effort","options":[{"id":"OPT_low","name":"Low"}]}]}}}}'
   create=ok
+  failures=0
+  mutation=ok
 
   local answering_case="an organisation that answers"
   run "$answering_case" 0 new bug high low --title t --body b
@@ -173,6 +203,30 @@ STUB
 
   run "a type the organisation does not carry" 1 new dragon high low --title t --body b
   said "a type the organisation does not carry" "$work/err" "no enabled issue type named 'Dragon'"
+
+  # Three failed answers in a row are asked again within the four attempts.
+  failures=3
+  run "a failure that recovers" 0 new bug high low --title t --body b
+  said "a failure that recovers" "$work/out" "#4242 has effort Low"
+
+  # A GitHub that never answers stops the run before anything is filed.
+  failures=99
+  run "a failure that does not recover" 1 new bug high low --title t --body b
+  said "a failure that does not recover" "$work/err" "failed 4 times"
+  if [[ -s "$created" ]]; then
+    echo "gh-fields: self-test failed: a failure that does not recover filed an issue." >&2
+    exit 1
+  fi
+  failures=0
+
+  # A failure after the create names the issue and the steps that finish it.
+  mutation=fail
+  run "a failure after the create" 1 new bug high low --title t --body b
+  said "a failure after the create" "$work/err" "#4242 is filed"
+  said "a failure after the create" "$work/err" "scripts/gh/fields.sh type 4242 bug"
+  said "a failure after the create" "$work/err" "scripts/gh/fields.sh priority 4242 high"
+  said "a failure after the create" "$work/err" "scripts/gh/fields.sh effort 4242 low"
+  mutation=ok
 
   # The answer the default GITHUB_TOKEN of a workflow gets: `organization` is
   # null rather than an error, so a lane that trusted it would stop before it
@@ -236,7 +290,32 @@ esac
 command -v gh >/dev/null 2>&1 || die "the GitHub CLI (gh) is not installed"
 command -v jq >/dev/null 2>&1 || die "jq is not installed"
 
-REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)" ||
+ATTEMPTS="${FIELDS_ATTEMPTS:-4}"
+BACKOFF="${FIELDS_BACKOFF:-1}"
+[[ "$ATTEMPTS" =~ ^[1-9][0-9]*$ ]] || die "FIELDS_ATTEMPTS must be a positive integer, not '$ATTEMPTS'"
+[[ "$BACKOFF" =~ ^[0-9]+$ ]] || die "FIELDS_BACKOFF must be a whole number of seconds, not '$BACKOFF'"
+
+# gh_json ARGS…: the JSON answer of `gh ARGS…`, asked again while the call
+# fails or answers something that is no JSON, as GitHub does on a 502. A
+# GraphQL error is JSON and comes back as it is, for the caller to refuse.
+gh_json() {
+  local attempt=1 wait="$BACKOFF" out
+  while :; do
+    if out="$(gh "$@" 2>/dev/null)" && printf '%s' "$out" | jq -e . >/dev/null 2>&1; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    if ((attempt >= ATTEMPTS)); then
+      echo "gh-fields: gh $1 $2 failed $attempt times" >&2
+      return 1
+    fi
+    sleep "$wait"
+    attempt=$((attempt + 1))
+    wait=$((wait * 2))
+  done
+}
+
+REPO="$(gh_json repo view --json nameWithOwner | jq -r .nameWithOwner)" ||
   die "could not resolve the current repository (run inside a gh-authenticated clone)"
 OWNER="${REPO%%/*}"
 NAME="${REPO##*/}"
@@ -249,8 +328,8 @@ titled() {
 
 issue_id() {
   local number="$1" id
-  id="$(gh api graphql -f query='query($o:String!,$n:String!,$i:Int!){ repository(owner:$o,name:$n){ issue(number:$i){ id } } }' \
-    -f o="$OWNER" -f n="$NAME" -F i="$number" --jq '.data.repository.issue.id' 2>/dev/null)" ||
+  id="$(gh_json api graphql -f query='query($o:String!,$n:String!,$i:Int!){ repository(owner:$o,name:$n){ issue(number:$i){ id } } }' \
+    -f o="$OWNER" -f n="$NAME" -F i="$number" | jq -r '.data.repository.issue.id')" ||
     die "could not resolve issue #$number"
   [[ -n "$id" && "$id" != "null" ]] || die "no issue #$number in $REPO"
   printf '%s' "$id"
@@ -259,8 +338,8 @@ issue_id() {
 type_id() {
   local kind="$1" want id
   want="$(titled "$kind")"
-  id="$(gh api graphql -f query='query($o:String!){ organization(login:$o){ issueTypes(first:20){ nodes{ id name isEnabled } } } }' \
-    -f o="$OWNER" 2>/dev/null | jq -r --arg w "$want" '.data.organization.issueTypes.nodes[] | select(.name==$w and .isEnabled) | .id')" ||
+  id="$(gh_json api graphql -f query='query($o:String!){ organization(login:$o){ issueTypes(first:20){ nodes{ id name isEnabled } } } }' \
+    -f o="$OWNER" | jq -r --arg w "$want" '.data.organization.issueTypes.nodes[] | select(.name==$w and .isEnabled) | .id')" ||
     die "could not read the issue types of $OWNER"
   [[ -n "$id" ]] || die "$OWNER has no enabled issue type named '$want' (the set is Bug, Feature, Task)"
   printf '%s' "$id"
@@ -271,8 +350,8 @@ type_id() {
 field_option() {
   local field="$1" level="$2" want out
   want="$(titled "$level")"
-  out="$(gh api graphql -f query='query($o:String!){ organization(login:$o){ issueFields(first:20){ nodes{ ... on IssueFieldSingleSelect{ id name options{ id name } } } } } }' \
-    -f o="$OWNER" 2>/dev/null | jq -r --arg fl "$field" --arg w "$want" '.data.organization.issueFields.nodes[] | select(.name==$fl) | .id as $f | .options[] | select(.name==$w) | "\($f) \(.id)"')" ||
+  out="$(gh_json api graphql -f query='query($o:String!){ organization(login:$o){ issueFields(first:20){ nodes{ ... on IssueFieldSingleSelect{ id name options{ id name } } } } } }' \
+    -f o="$OWNER" | jq -r --arg fl "$field" --arg w "$want" '.data.organization.issueFields.nodes[] | select(.name==$fl) | .id as $f | .options[] | select(.name==$w) | "\($f) \(.id)"')" ||
     die "could not read the issue fields of $OWNER"
   [[ -n "$out" ]] || die "$OWNER has no $field option named '$want' (Priority: Urgent, High, Medium, Low; Effort: High, Medium, Low)"
   printf '%s' "$out"
@@ -282,9 +361,10 @@ set_type() {
   local n="$1" kind="$2" iid tid got
   iid="$(issue_id "$n")"
   tid="$(type_id "$kind")"
-  got="$(gh api graphql -f query='mutation($i:ID!,$t:ID!){ updateIssueIssueType(input:{issueId:$i,issueTypeId:$t}){ issue{ issueType{ name } } } }' \
-    -f i="$iid" -f t="$tid" --jq '.data.updateIssueIssueType.issue.issueType.name')" ||
+  got="$(gh_json api graphql -f query='mutation($i:ID!,$t:ID!){ updateIssueIssueType(input:{issueId:$i,issueTypeId:$t}){ issue{ issueType{ name } } } }' \
+    -f i="$iid" -f t="$tid" | jq -r '.data.updateIssueIssueType.issue.issueType.name')" ||
     die "setting the type of #$n failed"
+  [[ -n "$got" && "$got" != "null" ]] || die "setting the type of #$n failed"
   echo "ok: #$n is a $got"
 }
 
@@ -293,8 +373,8 @@ set_field() {
   local n="$1" field="$2" level="$3" iid fid oid got
   iid="$(issue_id "$n")"
   read -r fid oid <<<"$(field_option "$field" "$level")"
-  got="$(gh api graphql -f query='mutation($i:ID!,$f:ID!,$o:ID!){ setIssueFieldValue(input:{issueId:$i,issueFields:[{fieldId:$f,singleSelectOptionId:$o}]}){ issue{ issueFieldValues(first:10){ nodes{ ... on IssueFieldSingleSelectValue{ field{ ... on IssueFieldSingleSelect{ name } } value } } } } } }' \
-    -f i="$iid" -f f="$fid" -f o="$oid" 2>/dev/null | jq -r --arg fl "$field" '[.data.setIssueFieldValue.issue.issueFieldValues.nodes[] | select(.field.name==$fl) | .value] | first')" ||
+  got="$(gh_json api graphql -f query='mutation($i:ID!,$f:ID!,$o:ID!){ setIssueFieldValue(input:{issueId:$i,issueFields:[{fieldId:$f,singleSelectOptionId:$o}]}){ issue{ issueFieldValues(first:10){ nodes{ ... on IssueFieldSingleSelectValue{ field{ ... on IssueFieldSingleSelect{ name } } value } } } } } }' \
+    -f i="$iid" -f f="$fid" -f o="$oid" | jq -r --arg fl "$field" '[.data.setIssueFieldValue.issue.issueFieldValues.nodes[] | select(.field.name==$fl) | .value] | first')" ||
     die "setting the $field of #$n failed"
   [[ -n "$got" && "$got" != "null" ]] || die "setting the $field of #$n failed"
   echo "ok: #$n has $(printf '%s' "$field" | tr '[:upper:]' '[:lower:]') $got"
@@ -302,21 +382,40 @@ set_field() {
 
 show() {
   local n="$1"
-  gh api graphql -f query='query($o:String!,$n:String!,$i:Int!){ repository(owner:$o,name:$n){ issue(number:$i){ number title issueType{ name } issueFieldValues(first:10){ nodes{ ... on IssueFieldSingleSelectValue{ field{ ... on IssueFieldSingleSelect{ name } } value } } } labels(first:20){ nodes{ name } } milestone{ title } } } }' \
-    -f o="$OWNER" -f n="$NAME" -F i="$n" \
-    --jq '.data.repository.issue | "#\(.number)  \(.title)\n  type:      \(.issueType.name // "none")\n  priority:  \([.issueFieldValues.nodes[] | select(.field.name=="Priority") | .value] | first // "none")\n  effort:    \([.issueFieldValues.nodes[] | select(.field.name=="Effort") | .value] | first // "none")\n  labels:    \([.labels.nodes[].name] | join(", "))\n  milestone: \(.milestone.title // "none")"' ||
+  gh_json api graphql -f query='query($o:String!,$n:String!,$i:Int!){ repository(owner:$o,name:$n){ issue(number:$i){ number title issueType{ name } issueFieldValues(first:10){ nodes{ ... on IssueFieldSingleSelectValue{ field{ ... on IssueFieldSingleSelect{ name } } value } } } labels(first:20){ nodes{ name } } milestone{ title } } } }' \
+    -f o="$OWNER" -f n="$NAME" -F i="$n" |
+    jq -r '.data.repository.issue | "#\(.number)  \(.title)\n  type:      \(.issueType.name // "none")\n  priority:  \([.issueFieldValues.nodes[] | select(.field.name=="Priority") | .value] | first // "none")\n  effort:    \([.issueFieldValues.nodes[] | select(.field.name=="Effort") | .value] | first // "none")\n  labels:    \([.labels.nodes[].name] | join(", "))\n  milestone: \(.milestone.title // "none")"' ||
     die "could not read #$n"
 }
 
 # Whether this token may read the organisation's issue types at all. The
 # default GITHUB_TOKEN of a workflow may not, and GraphQL answers
-# `organization: null` rather than an error, so the read is a probe.
+# `organization: null` rather than an error, so the read is a probe. A
+# probe GitHub never answers stops the run, so a lost answer never files
+# the issue without its fields.
 fields_readable() {
-  local answer=no
-  answer="$(gh api graphql -f query='query($o:String!){ organization(login:$o){ issueTypes(first:20){ nodes{ id } } } }' \
-    -f o="$OWNER" 2>/dev/null |
-    jq -r 'if (.data.organization.issueTypes.nodes | type) == "array" then "yes" else "no" end')" || answer=no
+  local answer
+  answer="$(gh_json api graphql -f query='query($o:String!){ organization(login:$o){ issueTypes(first:20){ nodes{ id } } } }' \
+    -f o="$OWNER" |
+    jq -r 'if (.data.organization.issueTypes.nodes | type) == "array" then "yes" else "no" end')" ||
+    die "could not read the issue types of $OWNER"
   [[ "$answer" == "yes" ]]
+}
+
+# The issue `new` filed and the steps still owed to it, which the exit trap
+# names when a step fails.
+FILED=""
+FINISH=()
+
+finish_note() {
+  local rc=$? step
+  if [[ "$rc" -ne 0 && -n "$FILED" && "${#FINISH[@]}" -gt 0 ]]; then
+    echo "gh-fields: #$FILED is filed but not finished; finish it with:" >&2
+    for step in "${FINISH[@]}"; do
+      echo "  scripts/gh/fields.sh $step" >&2
+    done
+  fi
+  return 0
 }
 
 new() {
@@ -334,11 +433,20 @@ new() {
   type_id "$kind" >/dev/null
   field_option Priority "$level" >/dev/null
   field_option Effort "$effort" >/dev/null
-  url="$(gh issue create "$@")" || die "gh issue create failed"
+  # The create is asked once: a create that answered with no URL may still
+  # have filed the issue, and asking again would file a second.
+  url="$(gh issue create "$@")" || die "gh issue create failed; check whether the issue was filed before you run this again"
   n="${url##*/}"
+  [[ "$n" =~ ^[0-9]+$ ]] || die "gh issue create answered '$url', which names no issue"
+  FILED="$n"
+  FINISH=("type $n $kind" "priority $n $level" "effort $n $effort")
+  trap finish_note EXIT
   set_type "$n" "$kind"
+  FINISH=("${FINISH[@]:1}")
   set_field "$n" Priority "$level"
+  FINISH=("${FINISH[@]:1}")
   set_field "$n" Effort "$effort"
+  FINISH=()
   echo "$url"
 }
 
