@@ -40,13 +40,18 @@ CI `fhir-validator` job holds them to HL7 Europe MPD 1.0.0. `$tofhir` maps no
 resource from a composition that holds no occurrence of the context's start
 archetype. The operator console moves to FerroUI 0.6.6 and draws a mapping
 revision's changes as a line diff. The model layer FHIRconnect and OMOCL
-share moves into `openehr-mapping-core`.
+share moves into `openehr-mapping-core`. The laboratory project carries a
+received result's reference range and its order into openEHR and back, and
+names each received element it carries nowhere. The `openehr-*` crates move
+to 0.0.128, which accepts an ADL 2 template's sections of one archetype told
+apart by name.
 
-Three changes move a consumer's code. The published crates drop their
+Four changes move a consumer's code. The published crates drop their
 forwarding functions, and the longest modules are split by concern, which
 moves public items to new paths (both listed under Changed). `fhirconnect`'s
 `$tofhir` over a composition without the start archetype answers
 `EngineError::NotApplicable` where it mapped one resource from the root.
+The published crates require `openehr-* ^0.0.128`.
 
 ### Added
 
@@ -67,6 +72,18 @@ moves public items to new paths (both listed under Changed). `fhirconnect`'s
   sources (`crosswalk::patient_summary::SOURCES`): an entry is placed by the
   template section that holds it, so a composition with a vaccine and a
   medicine puts each in its own section (#1323).
+- `eehrxf`'s laboratory project carries a received result's reference range
+  into the `normal_range` of its quantity and back out, and the order a
+  report answers into the `KDS_Laborbericht` test request details by its
+  identifier. A project now accounts for received elements
+  (`Project::accounted`, `Mapping::accounting`): each received instance of
+  one that the run carries into no structured element, such as a typed
+  reference range or the order a result answers, is a `warning` issue in
+  the composition's `OperationOutcome`. `ReceiveMappingError` gains
+  `Original`. `fhirconnect` resolves a path below a polymorphic `ELEMENT`
+  to the one value alternative whose class carries its tail, reads a bound
+  below `normal_range` as the quantity's own class, and names the resource
+  of each `Location` (`Location::resource`, `Type/id`) (#1481).
 
 ### Changed
 
@@ -142,6 +159,14 @@ moves public items to new paths (both listed under Changed). `fhirconnect`'s
   answers it. The six section codes none of that material names (18842-5,
   48767-8, 57080-4, 77599-9, 81338-6, LP173421-1) and the imaging priority
   category still carry no display (#1499).
+- A composition of an ADL 2 template that holds several sections of one
+  archetype, told apart by their fixed names as the International Patient
+  Summary's `SECTION.adhoc.v1` sections are, is accepted and each entry
+  reads from its own section. Before, the composition check counted the
+  sections as one node and refused it with "too many occurrences". The
+  `openehr-*` crates move from 0.0.116 to 0.0.128, which carries the fix, so
+  the next `eehrxf`, `fhirconnect`, `openehr-mapping-core` and `ferrobridge-
+  hl7v2` publish requires `openehr-* ^0.0.128` (#1487).
 
 ## [0.0.16] - 2026-11-03
 
