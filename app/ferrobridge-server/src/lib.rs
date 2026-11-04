@@ -17,7 +17,6 @@ pub mod audit;
 pub mod banner;
 pub mod boot;
 pub mod build_info;
-pub mod cause;
 pub mod cdr;
 pub mod change_feed;
 pub mod check;
@@ -62,6 +61,7 @@ use ferrohealth_config::loader::Loaded;
 use ferrohealth_server::cli::{Common, ConfigCommand};
 use ferrohealth_server::health::Health;
 use ferrohealth_server::healthcheck::Outcome;
+use ferrohealth_server::run::chain;
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::{Drained, ServeError};
 use ferrohealth_server::stack::{self, StackPolicy};
@@ -475,18 +475,6 @@ fn clap_exit(error: &clap::Error) -> u8 {
         print!("{error}");
         0
     }
-}
-
-/// Returns `error` and every cause behind it as one line.
-pub(crate) fn chain(error: &dyn std::error::Error) -> String {
-    let mut line = error.to_string();
-    let mut cause = error.source();
-    while let Some(source) = cause {
-        line.push_str(": ");
-        line.push_str(&source.to_string());
-        cause = source.source();
-    }
-    line
 }
 
 /// Builds the HTTP application over `state` inside the family's stack.

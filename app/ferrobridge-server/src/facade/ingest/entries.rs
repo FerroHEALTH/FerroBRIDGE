@@ -11,7 +11,6 @@ use fhirconnect::resolve::select::SelectError;
 use http::StatusCode;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::cause::chain;
 use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -21,6 +20,7 @@ use crate::facade::request::patient_person;
 use crate::facade::request::person_by_identifier;
 use crate::facade::subject::IdForm;
 use crate::facade::subject::SubjectLink;
+use ferrohealth_server::run::chain;
 
 use super::Consumed;
 use super::Ingest;

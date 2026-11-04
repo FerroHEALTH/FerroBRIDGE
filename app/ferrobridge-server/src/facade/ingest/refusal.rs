@@ -7,7 +7,6 @@
 use fhirconnect::engine::traverse::error::EngineError;
 use http::StatusCode;
 
-use crate::cause::chain;
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::ContributionUid;
 use crate::facade::ehr;
@@ -16,6 +15,7 @@ use crate::facade::identity::store::StoreError;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::status;
+use ferrohealth_server::run::chain;
 
 use super::Mapped;
 use super::Refused;

@@ -160,7 +160,7 @@ fn result_json(result: &CheckResult) -> Value {
             .subcategory
             .map(omop_cdm::quality::definitions::KahnSubcategory::as_str),
         "context": result.context.as_str(),
-        "error": result.error.as_ref().map(|error| crate::chain(error)),
+        "error": result.error.as_ref().map(|error| ferrohealth_server::run::chain(error)),
         "checkId": result.check_id,
         "failed": u8::from(result.failed),
         "passed": u8::from(result.passed),

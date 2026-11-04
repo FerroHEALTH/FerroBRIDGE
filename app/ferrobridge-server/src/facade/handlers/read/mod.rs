@@ -413,7 +413,7 @@ pub(crate) fn version_tree(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!(
                 "{resource_type}/{id} has no version {vid}: {}",
-                crate::cause::chain(&error)
+                ferrohealth_server::run::chain(&error)
             )),
         )
     })
@@ -434,7 +434,7 @@ pub(crate) fn parse(body: &[u8], resource_type: &str) -> Result<Inbound, Refusal
             }
             _ => (StatusCode::BAD_REQUEST, IssueType::Invalid, None),
         };
-        let mut issue = Issue::error(code).diagnosing(crate::cause::chain(&error));
+        let mut issue = Issue::error(code).diagnosing(ferrohealth_server::run::chain(&error));
         if let Some(path) = location {
             issue = issue.at(path);
         }
@@ -451,7 +451,7 @@ pub(crate) fn internal_id(id: &str) -> Result<FhirResourceId, Refusal> {
     FhirResourceId::new(id).map_err(|error| {
         reply::refusal(
             StatusCode::NOT_FOUND,
-            Issue::error(IssueType::NotFound).diagnosing(crate::cause::chain(&error)),
+            Issue::error(IssueType::NotFound).diagnosing(ferrohealth_server::run::chain(&error)),
         )
     })
 }

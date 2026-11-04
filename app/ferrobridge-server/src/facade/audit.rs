@@ -92,7 +92,7 @@ pub async fn record(
     let place = match recording.log.sink().reserve().await {
         Ok(place) => place,
         Err(error) => {
-            tracing::warn!(error = %crate::chain(&error), "an access was refused: its record has no place");
+            tracing::warn!(error = %ferrohealth_server::run::chain(&error), "an access was refused: its record has no place");
             return unrecorded("the access could not be recorded, so it was not made");
         }
     };
@@ -102,7 +102,7 @@ pub async fn record(
     match place.store(record).await {
         Ok(()) => response,
         Err(error) => {
-            tracing::warn!(error = %crate::chain(&error), "an answer was withheld: its access record could not be stored");
+            tracing::warn!(error = %ferrohealth_server::run::chain(&error), "an answer was withheld: its access record could not be stored");
             unrecorded("the access record could not be stored, so the answer is withheld")
         }
     }
@@ -283,7 +283,7 @@ impl Recording {
             }]),
             Ok(None) => PatientLookup::NotFound,
             Err(error) => {
-                tracing::warn!(error = %crate::chain(&error), "the identity map could not name the patient of an access record");
+                tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the identity map could not name the patient of an access record");
                 PatientLookup::Unavailable
             }
         }

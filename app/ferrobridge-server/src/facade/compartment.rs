@@ -113,7 +113,7 @@ pub fn admit_ehr(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "the identity map could not be read: {}",
-                crate::cause::chain(&error)
+                ferrohealth_server::run::chain(&error)
             )),
         )
     })?;

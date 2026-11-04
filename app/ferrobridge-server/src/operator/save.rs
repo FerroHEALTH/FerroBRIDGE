@@ -358,7 +358,7 @@ impl IntoResponse for Failure {
             ),
             Self::Write(_) | Self::Read(_) | Self::Task(_) | Self::Store(_) => {
                 tracing::error!(
-                    error = crate::cause::chain(&self),
+                    error = ferrohealth_server::run::chain(&self),
                     "an operator save could not reach the file system"
                 );
                 refuse(
@@ -568,7 +568,7 @@ where
 /// Returns the `503` of a reload an upstream or the file system stopped.
 pub(crate) fn unavailable(error: &ReloadError) -> Response {
     tracing::error!(
-        error = crate::cause::chain(error),
+        error = ferrohealth_server::run::chain(error),
         "the mapping set could not be reloaded"
     );
     refuse(

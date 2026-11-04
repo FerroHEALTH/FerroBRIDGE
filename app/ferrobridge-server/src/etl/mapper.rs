@@ -269,7 +269,7 @@ impl<S: ConceptSource> OmoclMapper<S> {
             &seams,
         )
         .await
-        .map_err(|error| Refusal::new(crate::chain(&error)))?;
+        .map_err(|error| Refusal::new(ferrohealth_server::run::chain(&error)))?;
         Ok(outcome.into_parts().0)
     }
 }

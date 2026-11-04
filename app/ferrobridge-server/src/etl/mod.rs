@@ -253,7 +253,7 @@ async fn template_of(
         Err(error @ crate::mappings::Error::TemplateFetch { .. }) => {
             Err(RunError::Template(Box::new(error)))
         }
-        Err(error) => Ok(Err(Refusal::new(crate::chain(&error)))),
+        Err(error) => Ok(Err(Refusal::new(ferrohealth_server::run::chain(&error)))),
     }
 }
 
@@ -516,7 +516,7 @@ pub(crate) async fn commit_one<M: Mapper>(
         }
         Err(error) if writer.is_closed() => Err(RunError::Database(error)),
         Err(error) => {
-            let refusal = Refusal::new(crate::chain(&error));
+            let refusal = Refusal::new(ferrohealth_server::run::chain(&error));
             report.engine_outcomes(Some(read.source), graph.report());
             report.composition_refused(Some(read.source), &refusal);
             Ok(Some(refusal))
@@ -544,7 +544,7 @@ async fn composition<M: Mapper>(
     };
     let canonical = match index.accept(value) {
         Ok(canonical) => canonical,
-        Err(error) => return Ok(Err(Refusal::new(crate::chain(&error)))),
+        Err(error) => return Ok(Err(Refusal::new(ferrohealth_server::run::chain(&error)))),
     };
     let Some(windows) = read.windows else {
         return Ok(map(mapper, read, &canonical, &index, None)

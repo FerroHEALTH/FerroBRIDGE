@@ -395,7 +395,7 @@ async fn info_json(
         )
             .into_response(),
         Err(error) => {
-            tracing::warn!(error = %crate::command::chain(&error), "the bridge's info could not be read");
+            tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the bridge's info could not be read");
             StatusCode::BAD_GATEWAY.into_response()
         }
     }

@@ -1937,9 +1937,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-config"
-version = "0.2.6"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fb490bb6126a8536e8ee377284d746cc14f7c42423c4d7ec58e6e3d16a3c4c2"
+checksum = "ab89a62803c75b674b29fdac122a8214d116e4bc36041c78dcc56624177e4db8"
 dependencies = [
  "ferrohealth-secret",
  "percent-encoding",
@@ -1973,9 +1973,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2734ed374ea7976e079e1c17dfcaa469c5e6268c319164af0844d29053f1d42d"
+checksum = "9a5250dd38dd1dc1487cc099d49aea99100bab7cff180757e4e7589d43316e20"
 dependencies = [
  "axum",
  "clap",
@@ -2052,9 +2052,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-telemetry"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2520fcd3daaf7053226ae5fc5107471d277f4dac94907eea9536c7583805a2c"
+checksum = "56c1c97e78bf3437209be78f32928ce36361f80990137a81a21de57ece511d35"
 dependencies = [
  "axum",
  "ferrohealth-secret",

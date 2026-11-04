@@ -16,7 +16,6 @@ use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVer
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::cause::chain;
 use crate::cdr::Returned;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::versioned_object_uid;
@@ -35,6 +34,7 @@ use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;
 use crate::terminology::Direction;
+use ferrohealth_server::run::chain;
 
 use super::Delivery;
 use super::Ingest;

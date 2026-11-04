@@ -149,8 +149,8 @@ ferrohealth-secret = "=0.2.0"
 # The family's configuration loader (FerroSYS): the file, the `FERROBRIDGE__`
 # environment and its aliases, `--set`, strict with the closest known key, the
 # provenance of every key and the `config check` rendering. Verified against
-# crates.io on 2026-10-27 (0.2.6).
-ferrohealth-config = "=0.2.6"
+# crates.io on 2026-11-04 (0.2.8).
+ferrohealth-config = "=0.2.8"
 # The family's health document, indicator registry and process lifecycle
 # (FerroSYS). The default build is the document alone, which the operator
 # console reads; the server takes `registry`. Verified against crates.io on
@@ -161,12 +161,12 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body. Verified against
-# crates.io on 2026-10-31 (0.4.2).
-ferrohealth-server = { version = "=0.4.2", default-features = false }
+# crates.io on 2026-11-04 (0.4.3).
+ferrohealth-server = { version = "=0.4.3", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
-# the request log and the panic line. Verified against crates.io on 2026-10-27
-# (0.2.2).
-ferrohealth-telemetry = { version = "=0.2.2", default-features = false }
+# the request log and the panic line. Verified against crates.io on 2026-11-04
+# (0.2.4).
+ferrohealth-telemetry = { version = "=0.2.4", default-features = false }
 # The family's installation report to FerroPULSE (FerroSYS): envelope v2, the
 # latency window the request log fills and the start and daily reporter.
 # Verified against crates.io on 2026-10-27 (0.2.0).
