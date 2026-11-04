@@ -67,6 +67,12 @@ const OBSERVATION_RESULTSLAB_EU_LAB: &str =
 /// The canonical URL of the laboratory specimen profile.
 const SPECIMEN_EU_LAB: &str = "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab";
 
+/// The laboratory result context of the laboratory project.
+const RESULT_CONTEXT: &str = "ferrobridge_eu_laboratory.context";
+
+/// The report composition context of the laboratory project.
+const COMPOSITION_CONTEXT: &str = "ferrobridge_eu_lab_composition.context";
+
 /// The instant every run is stamped with, so nothing reads a clock.
 const NOW: &str = "2026-03-02T10:00:00Z";
 
@@ -82,10 +88,11 @@ fn files() -> Vec<PathBuf> {
         .collect()
 }
 
-/// The shipped laboratory project compiled against `KDS_Laborbericht`.
+/// The laboratory result context of the shipped project, compiled from its
+/// files on disk against `KDS_Laborbericht`.
 fn mapping() -> Result<Mapping, Box<dyn Error>> {
     Ok(
-        Mapping::compile(KDS_LABORBERICHT_OPT, &files(), LABORATORY.contexts())?
+        Mapping::compile(KDS_LABORBERICHT_OPT, &files(), &[RESULT_CONTEXT])?
             .accounting(LABORATORY.accounted()),
     )
 }
@@ -345,12 +352,30 @@ fn the_shipped_project_compiles_against_the_published_template() -> Result<(), B
         .collect();
     assert_eq!(
         contexts,
-        [(
-            "ferrobridge_eu_laboratory.context",
-            "KDS_Laborbericht",
-            DIAGNOSTIC_REPORT_EU_LAB
-        )]
+        [(RESULT_CONTEXT, "KDS_Laborbericht", DIAGNOSTIC_REPORT_EU_LAB)]
     );
+    Ok(())
+}
+
+#[test]
+fn the_project_lists_its_two_contexts_and_compiles_each_from_its_embedded_files()
+-> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        LABORATORY.contexts(),
+        &[RESULT_CONTEXT, COMPOSITION_CONTEXT]
+    );
+    let template = TemplateSource::opt14(KDS_LABORBERICHT_OPT)?;
+    for (name, profile) in [
+        (RESULT_CONTEXT, DIAGNOSTIC_REPORT_EU_LAB),
+        (COMPOSITION_CONTEXT, LAB_COMPOSITION),
+    ] {
+        let mapping = Mapping::compile_project(&template, &LABORATORY.with_context(name)?)?;
+        let contexts: Vec<_> = mapping
+            .contexts()
+            .map(|context| (context.name, context.template, context.profile))
+            .collect();
+        assert_eq!(contexts, [(name, "KDS_Laborbericht", profile)]);
+    }
     Ok(())
 }
 
@@ -581,8 +606,10 @@ fn the_report_identifier_the_template_holds_one_of_is_declared_lost() -> Result<
 
 #[test]
 fn the_embedded_project_compiles_and_maps_as_its_files_do() -> Result<(), Box<dyn Error>> {
-    let embedded =
-        Mapping::compile_project(&TemplateSource::opt14(KDS_LABORBERICHT_OPT)?, &LABORATORY)?;
+    let embedded = Mapping::compile_project(
+        &TemplateSource::opt14(KDS_LABORBERICHT_OPT)?,
+        &LABORATORY.with_context(RESULT_CONTEXT)?,
+    )?;
     let from_disk = mapping()?;
     assert_eq!(
         embedded.contexts().collect::<Vec<_>>(),
