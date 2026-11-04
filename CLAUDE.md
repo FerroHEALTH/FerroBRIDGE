@@ -300,7 +300,8 @@ the testkit tool crate. Beside it:
   `watch-prs.sh`, `queue-stuck.sh`, `labels.sh`, `migrate-fields.sh`).
 - `scripts/checks/`: the committed guards. `comment-style.sh`; `versions.sh`,
   which fails when a file disagrees with the `docs/VERSIONS.md` pin matrix or
-  claims a licence other than `BUSL-1.1`; `crate-version-guard.sh`, the crate
+  claims a licence other than `BUSL-1.1`, or a manifest repeats a dependency's
+  version in a verified-on note; `crate-version-guard.sh`, the crate
   bump rule; `favicon-sync.sh`, the book theme favicon against the brand mark;
   `usage-report-off.sh`, every launcher of the server in a test lane with the
   usage report switched off; `todo-issues.sh`, which fails a `TODO(#N)`

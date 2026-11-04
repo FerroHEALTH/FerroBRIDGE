@@ -70,6 +70,10 @@
 #                          first-party file claims MIT or Apache-2.0 as its
 #                          own, crates/fhir-types and crates/hl7v2-types
 #                          excepted (Apache-2.0).
+#  12. manifest notes     no Cargo.toml repeats a dependency's version in a
+#                          "verified against crates.io" note, which a
+#                          Dependabot bump leaves behind: the requirement is
+#                          the one statement of the version (#1557).
 #
 # Usage:
 #   scripts/checks/versions.sh
@@ -955,6 +959,15 @@ if [ -f LICENSE ]; then
 else
   note "no LICENSE yet, skipped"
 fi
+
+echo "== manifest notes (Cargo.toml comments <-> their requirements)"
+noted=0
+while IFS= read -r hit; do
+  [ -n "$hit" ] || continue
+  bad "a verified-on note repeats a version its requirement states, at $hit"
+  noted=1
+done < <(git grep -n -i -E '^[[:space:]]*#.*verified([[:space:]]|$)' -- ':(glob)**/Cargo.toml' ':(glob,exclude)**/vendor/**' || true)
+[ "$noted" -eq 0 ] && note "OK: no manifest repeats a dependency's version in a verified-on note"
 
 echo
 if [ "$fail" -ne 0 ]; then
