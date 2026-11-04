@@ -71,7 +71,13 @@ the composition's `OperationOutcome`, and the original document still
 holds both.
 
 A result's reference range maps into the `normal_range` of its quantity,
-both bounds with their units, and back out as `referenceRange`. R4 reads a
+both bounds with their units, and back out as `referenceRange`. The range
+mapping is appended under `analyteMeasurement`, the mapping that writes the
+analyte value. `KDS_Laborbericht` allows any number of analyte clusters and
+exactly one value element `items[at0001]` in each, and `analyteMeasurement`
+writes that `DV_QUANTITY` whole, so the bounds merge into it as its
+children. A mapping of its own onto `items[at0001]` would write a second
+value with no `magnitude`, which the reference model refuses. R4 reads a
 range with no `type` as the normal range, so only such a range maps; the
 order a report answers maps by its identifier into the template's test
 request details (`protocol[at0004]/items[at0094]/items[at0063]`), which
