@@ -7,8 +7,8 @@ use std::error::Error;
 use std::process::{Command, Output};
 use std::sync::Arc;
 
-use ferrobridge_server::EXIT_CONFIG;
 use ferrohealth_health::registry::Registry;
+use ferrohealth_server::run::EXIT_CONFIG;
 
 use crate::support;
 
@@ -53,7 +53,7 @@ fn config_check_names_a_refused_key_and_exits_seventy_eight() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_eq!(
-        Some(i32::from(EXIT_CONFIG)),
+        Some(i32::from(EXIT_CONFIG.get())),
         output.status.code(),
         "{stderr}"
     );
@@ -71,7 +71,7 @@ fn config_check_reports_a_refusal_the_resolution_finds() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_eq!(
-        Some(i32::from(EXIT_CONFIG)),
+        Some(i32::from(EXIT_CONFIG.get())),
         output.status.code(),
         "{stderr}"
     );

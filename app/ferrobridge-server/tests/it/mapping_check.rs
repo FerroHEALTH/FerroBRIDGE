@@ -4,9 +4,10 @@
 //! `ferrobridge mapping check` and the checker module it shares with the
 //! operator API, over the testkit template and synthetic mapping files.
 
+use ferrobridge_server::EXIT_CHECK_UNAVAILABLE;
 use ferrobridge_server::check::{self, Inputs, Templates};
 use ferrobridge_server::config::Process;
-use ferrobridge_server::{EXIT_CHECK_UNAVAILABLE, EXIT_CONFIG};
+use ferrohealth_server::run::EXIT_CONFIG;
 use openehr_mapping_core::diagnostic::Severity;
 use std::path::Path;
 use wiremock::matchers;
@@ -427,7 +428,7 @@ fn nothing_to_check_exits_seventy_eight() -> Result<(), Box<dyn std::error::Erro
         .args(["mapping", "check"])
         .env_remove("FERROBRIDGE_CONFIG")
         .output()?;
-    assert_eq!(Some(i32::from(EXIT_CONFIG)), output.status.code());
+    assert_eq!(Some(i32::from(EXIT_CONFIG.get())), output.status.code());
     let stderr = String::from_utf8(output.stderr)?;
     assert!(stderr.contains("[mappings]"), "{stderr}");
     Ok(())
@@ -560,7 +561,7 @@ fn the_vocabulary_check_without_a_cdm_section_refuses_to_start()
     let output = tree.run(&["--vocabulary"])?;
     let stderr = String::from_utf8(output.stderr)?;
     assert_eq!(
-        Some(i32::from(EXIT_CONFIG)),
+        Some(i32::from(EXIT_CONFIG.get())),
         output.status.code(),
         "{stderr}"
     );

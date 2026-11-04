@@ -121,7 +121,7 @@ fn a_log_format_outside_the_three_exits_seventy_eight() {
         .output()
         .expect("the binary runs");
     assert_eq!(
-        Some(i32::from(ferrobridge_server::EXIT_CONFIG)),
+        Some(i32::from(ferrohealth_server::run::EXIT_CONFIG.get())),
         output.status.code(),
         "a refused format is EX_CONFIG"
     );

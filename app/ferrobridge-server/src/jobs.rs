@@ -4,8 +4,8 @@
 //! The batch jobs beside `serve`: `cdm init`, `vocab load`, `etl run` and
 //! `mapping check`.
 //!
-//! Each builds its own runtime, does its one job and prints what it did for
-//! the operator. No specification governs the job output: our own design.
+//! Each runs on the run path's runtime, does its one job and prints what it
+//! did for the operator. No specification governs the job output: our own design.
 
 use crate::config;
 use crate::config::Settings;
@@ -26,17 +26,14 @@ use crate::etl;
     clippy::print_stdout,
     reason = "what the job found and did is its output, written to stdout for the operator"
 )]
-pub(crate) fn cdm_init_command(
+pub(crate) async fn cdm_init_command(
     cdm: &config::CdmSettings,
     with_constraints: bool,
 ) -> anyhow::Result<()> {
     use anyhow::Context;
     use omop_cdm::database::{self, CONSTRAINTS_FILE, Init};
 
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async {
+    async {
         tracing::info!(
             schema = %cdm.schema,
             ssl_mode = %cdm.connection.ssl_mode(),
@@ -115,7 +112,8 @@ pub(crate) fn cdm_init_command(
             "the CDM schema and the bridge schema are in place"
         );
         Ok(())
-    })
+    }
+    .await
 }
 
 /// Loads the Athena vocabulary download in `directory` into the vocabulary
@@ -128,7 +126,7 @@ pub(crate) fn cdm_init_command(
     clippy::print_stdout,
     reason = "what the job loaded is its output, written to stdout for the operator"
 )]
-pub(crate) fn vocab_load_command(
+pub(crate) async fn vocab_load_command(
     cdm: &config::CdmSettings,
     directory: &std::path::Path,
     schema: &str,
@@ -139,10 +137,7 @@ pub(crate) fn vocab_load_command(
     let schema = omop_cdm::ddl::SchemaName::new(schema)
         .with_context(|| format!("the schema name {schema}"))?;
     let export = Export::read(directory)?;
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async {
+    async {
         tracing::info!(
             schema = %schema,
             directory = %directory.display(),
@@ -175,21 +170,19 @@ pub(crate) fn vocab_load_command(
             ),
         }
         Ok(())
-    })
+    }
+    .await
 }
 
 /// Runs the OMOP ETL once and prints its report as text and as JSON.
 ///
 /// The job itself is [`etl::job::run`], which a test drives with a
 /// configuration of its own.
-pub(crate) fn etl_run_command(
+pub(crate) async fn etl_run_command(
     settings: &Settings,
     options: &etl::RunOptions,
 ) -> anyhow::Result<()> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    shown(runtime.block_on(etl::job::run(settings, options)))
+    shown(etl::job::run(settings, options).await)
 }
 
 /// Prints the report of a finished run as text and as JSON, also when its
@@ -222,17 +215,14 @@ fn shown(outcome: Result<etl::report::RunReport, etl::job::JobError>) -> anyhow:
     clippy::print_stdout,
     reason = "the check result is the job's output, written to stdout for the operator"
 )]
-pub(crate) fn dq_check_command(
+pub(crate) async fn dq_check_command(
     cdm: &config::CdmSettings,
     format: crate::cli::ReportFormat,
 ) -> anyhow::Result<bool> {
     use anyhow::Context;
 
     let plan = crate::quality::plan(None).context("planning the checks")?;
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async {
+    async {
         let pool = omop_cdm::database::CdmPool::connect(
             sqlx::postgres::PgPoolOptions::new().max_connections(1),
             cdm.connection
@@ -251,18 +241,19 @@ pub(crate) fn dq_check_command(
             }
         }
         Ok(run.clean())
-    })
+    }
+    .await
 }
 
 /// Loads the FHIR resources at `input` into the CDM once and prints the
 /// report as text and as JSON.
 ///
 /// The job itself is [`etl::job::run_fhir`].
-pub(crate) fn etl_fhir_command(settings: &Settings, input: &std::path::Path) -> anyhow::Result<()> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    shown(runtime.block_on(etl::job::run_fhir(settings, input)))
+pub(crate) async fn etl_fhir_command(
+    settings: &Settings,
+    input: &std::path::Path,
+) -> anyhow::Result<()> {
+    shown(etl::job::run_fhir(settings, input).await)
 }
 
 /// Checks the OMOCL literals of `files` against the vocabulary of the `cdm`
@@ -309,7 +300,7 @@ pub(crate) enum CheckFailure {
     clippy::print_stdout,
     reason = "the check report is the job's output, written to stdout for the operator"
 )]
-pub(crate) fn mapping_check_command(
+pub(crate) async fn mapping_check_command(
     settings: &Settings,
     format: crate::cli::ReportFormat,
     vocabulary: bool,
@@ -327,14 +318,9 @@ pub(crate) fn mapping_check_command(
     };
     let inputs =
         crate::check::inputs(settings, cdr.as_ref()).map_err(CheckFailure::Configuration)?;
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .context("building the runtime")
-        .map_err(CheckFailure::Run)?;
     let omocl = inputs.omocl.map(std::path::Path::to_path_buf);
-    let mut report = runtime
-        .block_on(crate::check::check(inputs))
+    let mut report = crate::check::check(inputs)
+        .await
         .context("checking the mapping set")
         .map_err(CheckFailure::Run)?;
     if vocabulary {
@@ -351,8 +337,8 @@ pub(crate) fn mapping_check_command(
                 ));
             }
         };
-        let diagnostics = runtime
-            .block_on(vocabulary_diagnostics(cdm, &files))
+        let diagnostics = vocabulary_diagnostics(cdm, &files)
+            .await
             .map_err(CheckFailure::Run)?;
         for diagnostic in diagnostics {
             report = report.with_diagnostic(diagnostic);
