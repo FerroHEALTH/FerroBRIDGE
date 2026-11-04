@@ -13,9 +13,8 @@ use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::reference::Reference;
 
-use crate::document::{
-    Authorship, Companion, Document, DocumentError, Kind, REPORT_ID, URN_SYSTEM, coding, reference,
-};
+use crate::document::form::{Authorship, Companion, Kind};
+use crate::document::{Document, DocumentError, REPORT_ID, URN_SYSTEM, coding, reference};
 
 impl Document {
     /// Writes the form's type, categories and authors on `composition`, with

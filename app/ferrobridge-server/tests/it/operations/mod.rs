@@ -19,7 +19,7 @@ use axum::Router;
 use axum::body::Body;
 use ferrobridge_server::config::MappingSettings;
 use ferrobridge_server::mappings;
-use ferrobridge_server::operations::OperationsLane;
+use ferrobridge_server::operations::lane::OperationsLane;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::terminology::Translator;
 use ferrohealth_health::registry::Registry;

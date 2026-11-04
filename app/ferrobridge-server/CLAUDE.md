@@ -126,7 +126,8 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   `single` (the single create and update), `transaction` and `entries` (the
   Bundle), `reconcile` (a delivery an earlier one committed or consumed),
   `pairing` (a contribution's versions to the entries sent, with the content
-  tie-break), `claim`, `binding` (the engine run and the identity record) and
+  tie-break), `plan` (each mapped entry, where it is placed and what stands
+  recorded for it), `claim`, `binding` (the engine run and the identity record) and
   `refusal`; the public types stay in `mod.rs`.
 - **The HL7 v2 face (`src/hl7v2/`) is a face, never a second pipeline.** It
   owns the MLLP listener, the message's span and the acknowledgment; the

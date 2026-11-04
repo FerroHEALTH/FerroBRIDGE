@@ -15,8 +15,8 @@ use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
-use crate::engine::rm::Carried;
 use crate::engine::rm::RmValue;
+use crate::engine::rm::carried::Carried;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::derive;
 use crate::resolve::program::hierarchy::Preprocessor;
@@ -438,7 +438,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let node = input.node();
         if !input.tail().segments.is_empty() {
             let segments = tail_segments(input);
-            let (_class, carried) = rm::carried(input.tail_class(), &segments)
+            let (_class, carried) = rm::carried::carried(input.tail_class(), &segments)
                 .ok_or_else(|| unsupported_tail(mapping, input))?;
             if input.on_element() && segments == [rm::null_flavour::NULL_FLAVOUR] {
                 return rm::null_flavour::null_flavour_of(&value, node.aql_path().as_str())

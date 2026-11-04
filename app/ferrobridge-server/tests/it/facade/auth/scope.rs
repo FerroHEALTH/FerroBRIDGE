@@ -11,7 +11,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use axum::body::Body;
-use ferrobridge_server::operations::OperationsLane;
+use ferrobridge_server::operations::lane::OperationsLane;
 use ferrobridge_server::smart::Smart;
 use ferrobridge_server::state::AppState;
 use ferrohealth_health::registry::Registry;

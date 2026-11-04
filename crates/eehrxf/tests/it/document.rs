@@ -16,9 +16,9 @@ use std::error::Error;
 use std::io::Read;
 use std::path::PathBuf;
 
-use eehrxf::document::{
-    Document, DocumentError, EmptyReason, LOINC, PATIENT_SUMMARY, SLOTS, Section, slot,
-};
+use eehrxf::document::form::{SLOTS, slot};
+use eehrxf::document::section::{EmptyReason, Section};
+use eehrxf::document::{Document, DocumentError, LOINC, PATIENT_SUMMARY};
 use eehrxf::mapping::Mapping;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::device::{Device, DeviceDeviceName};

@@ -238,8 +238,8 @@ impl<'a> Compiler<'a> {
             (false, _) => &segments,
         };
         let class = target.tail_class();
-        let carried = crate::engine::rm::carried(class, written)
-            .is_some_and(|(_, held)| !manual || held == crate::engine::rm::Carried::Text);
+        let carried = crate::engine::rm::carried::carried(class, written)
+            .is_some_and(|(_, held)| !manual || held == crate::engine::rm::carried::Carried::Text);
         if carried {
             return;
         }

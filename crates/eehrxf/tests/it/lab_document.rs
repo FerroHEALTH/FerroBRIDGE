@@ -17,7 +17,8 @@ use std::io::Read;
 use eehrxf::document::laboratory::{
     LAB_BUNDLE, LAB_SLOTS, LABORATORY_REPORT, LABORATORY_REPORT_FORM,
 };
-use eehrxf::document::{Document, DocumentError, LOINC, Section};
+use eehrxf::document::section::Section;
+use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::diagnostic_report::DiagnosticReport;
@@ -304,7 +305,7 @@ fn a_laboratory_report_without_its_report_is_refused() -> Result<(), Box<dyn Err
 fn a_section_of_another_form_or_a_report_the_form_holds_none_of_is_refused()
 -> Result<(), Box<dyn Error>> {
     let mut lab = document()?;
-    let problems = eehrxf::document::slot("sectionProblems").ok_or("the problems slot")?;
+    let problems = eehrxf::document::form::slot("sectionProblems").ok_or("the problems slot")?;
     assert!(matches!(
         lab.with_section(Section::new(problems, Vec::new())),
         Err(DocumentError::Foreign {

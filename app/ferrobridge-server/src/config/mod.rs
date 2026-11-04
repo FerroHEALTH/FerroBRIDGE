@@ -378,7 +378,7 @@ pub struct Hl7v2Settings {
     /// none, by resource type.
     pub profiles: BTreeMap<String, String>,
     /// How long a connection and a frame may wait on the peer.
-    pub timeouts: ferrobridge_hl7v2::mllp::Timeouts,
+    pub timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts,
     /// The largest message one frame may carry, in bytes.
     pub frame_limit: usize,
     /// Whether an `AE` or an `AR` also logs the counted outcomes.

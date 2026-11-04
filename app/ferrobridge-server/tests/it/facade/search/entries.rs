@@ -409,8 +409,8 @@ pub(super) async fn tofhir_ids(
     template: &str,
     composition: &serde_json::Value,
 ) -> Result<Vec<String>, Box<dyn Error>> {
-    let answer = super::super::tofhir(fixtures, template, composition).await?;
-    Ok(super::super::ids_of_type(&answer, "Condition"))
+    let answer = super::super::tofhir::tofhir(fixtures, template, composition).await?;
+    Ok(super::super::tofhir::ids_of_type(&answer, "Condition"))
 }
 
 // NOTE: FHIRconnect v1.0.0 `engine/id-management.adoc` §Deterministic IDs: one

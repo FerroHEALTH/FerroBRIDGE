@@ -6,7 +6,7 @@
 //! §2.10.3.2: "all messages are acknowledged in the response batch").
 
 use ferrobridge_hl7v2::batch;
-use ferrobridge_hl7v2::mllp::Connection;
+use ferrobridge_hl7v2::mllp::listener::Connection;
 
 use crate::hl7v2::Face;
 use crate::hl7v2::stamped::Stamped;

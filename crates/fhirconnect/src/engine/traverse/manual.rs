@@ -15,8 +15,8 @@ use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
-use crate::engine::rm::Carried;
 use crate::engine::rm::RmValue;
+use crate::engine::rm::carried::Carried;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::mapping::Mapping;
@@ -152,7 +152,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             } else {
                 &segments
             };
-            if rm::carried(target.node().rm_type(), written)
+            if rm::carried::carried(target.node().rm_type(), written)
                 .is_none_or(|(_, held)| held != Carried::Text)
             {
                 return Err(EngineError::UnsupportedTail {

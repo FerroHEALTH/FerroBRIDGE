@@ -476,7 +476,7 @@ fn set_counts(lanes: &mut [startup::Lane], name: &str, counts: startup::MappingC
 
 /// Returns what the operations lane compiled: one program per context, over
 /// the distinct templates the programs name.
-fn operation_counts(lane: &crate::operations::OperationsLane) -> startup::MappingCounts {
+fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::MappingCounts {
     let set = lane.programs();
     let programs = set.programs();
     let contexts: std::collections::BTreeSet<&str> = programs
@@ -504,7 +504,7 @@ async fn build_operator(
     settings: &Settings,
     operator_settings: &OperatorSettings,
     facade: Option<Arc<facade::Facade>>,
-    operations: Option<Arc<crate::operations::OperationsLane>>,
+    operations: Option<Arc<crate::operations::lane::OperationsLane>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 

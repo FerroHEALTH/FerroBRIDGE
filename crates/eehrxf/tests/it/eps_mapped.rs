@@ -23,7 +23,9 @@ use std::path::PathBuf;
 use eehrxf::crosswalk::patient_summary::{
     PATIENT_SUMMARY, PATIENT_SUMMARY_TEMPLATE, SOURCES, Source,
 };
-use eehrxf::document::{Document, EPS_BUNDLE, EmptyReason, Section, slot};
+use eehrxf::document::form::slot;
+use eehrxf::document::section::{EmptyReason, Section};
+use eehrxf::document::{Document, EPS_BUNDLE};
 use eehrxf::mapping::{Mapping, MappingError};
 use eehrxf::mappings::EPS;
 use eehrxf::receive::ReceivedDocument;

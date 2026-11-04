@@ -8,7 +8,7 @@ use axum::body::Body;
 use ferrobridge_server::facade::identity::FhirResourceId;
 use ferrobridge_server::facade::identity::derive;
 use ferrobridge_server::facade::identity::store::Store;
-use fhirconnect::engine::seam::IdentityRequest;
+use fhirconnect::engine::seam::identity::IdentityRequest;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -363,7 +363,7 @@ async fn a_reference_target_takes_one_id_on_the_facade_and_on_tofhir_in_every_ve
         &with_evidence(),
     );
     for version in [VERSION_ONE, &VERSION_ONE.replace("::1", "::2")] {
-        let answer = super::tofhir_with(
+        let answer = super::tofhir::tofhir_with(
             CREATED,
             &[
                 "ferrobridge_created_reference.context.yml",
@@ -375,7 +375,7 @@ async fn a_reference_target_takes_one_id_on_the_facade_and_on_tofhir_in_every_ve
         .await?;
         assert_eq!(
             vec![id.clone()],
-            super::ids_of_type(&answer, "Observation"),
+            super::tofhir::ids_of_type(&answer, "Observation"),
             "{version}"
         );
     }
@@ -397,7 +397,7 @@ async fn a_further_split_occurrence_takes_one_id_on_the_facade_and_on_tofhir()
     let request = IdentityRequest::new("Condition", "Condition", "ferrobridge_created_split")
         .with_occurrence(vec![2]);
     let created = derive::created_id(&binding, &request);
-    let answer = super::tofhir_with(
+    let answer = super::tofhir::tofhir_with(
         CREATED,
         &[
             "ferrobridge_created_split.context.yml",
@@ -412,7 +412,7 @@ async fn a_further_split_occurrence_takes_one_id_on_the_facade_and_on_tofhir()
             String::from(parent_id.as_str()),
             String::from(created.as_str())
         ],
-        super::ids_of_type(&answer, "Condition"),
+        super::tofhir::ids_of_type(&answer, "Condition"),
         "{answer}"
     );
     Ok(())

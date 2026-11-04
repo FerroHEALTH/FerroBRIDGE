@@ -21,7 +21,7 @@ use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::SkipReason;
 use fhirconnect::engine::outcome::Warning;
-use fhirconnect::engine::seam::DerivedIdentity;
+use fhirconnect::engine::seam::identity::DerivedIdentity;
 use fhirconnect::resolve::program::Program;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;

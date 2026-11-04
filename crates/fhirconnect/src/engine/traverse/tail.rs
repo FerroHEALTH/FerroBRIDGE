@@ -23,9 +23,9 @@ use crate::engine::lens::scalar::IntegerLens;
 use crate::engine::lens::scalar::RealLens;
 use crate::engine::outcome::Warning;
 use crate::engine::rm;
-use crate::engine::rm::Carried;
 use crate::engine::rm::RmError;
 use crate::engine::rm::RmValue;
+use crate::engine::rm::carried::Carried;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::target::FhirTarget;
@@ -140,7 +140,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<(), EngineError> {
         let node = openehr.node();
         let segments = tail_segments(openehr);
-        let (class, carried) = rm::carried(openehr.tail_class(), &segments)
+        let (class, carried) = rm::carried::carried(openehr.tail_class(), &segments)
             .ok_or_else(|| unsupported_tail(mapping, openehr))?;
         let refuse_rm = |source: RmError| EngineError::Rm {
             mapping: String::from(mapping.name()),

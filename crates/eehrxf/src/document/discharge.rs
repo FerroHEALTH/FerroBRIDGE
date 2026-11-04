@@ -8,7 +8,8 @@
 //! reports on, in the language `Bundle.language` states.
 
 use crate::crosswalk::discharge::HDR_COMPOSITION;
-use crate::document::{Authorship, Code, EU_CORE_PATIENT, Form, Kind, LOINC, Slot};
+use crate::document::form::{Authorship, Code, Form, Kind, Slot};
+use crate::document::{EU_CORE_PATIENT, LOINC};
 
 /// The canonical URL of the HL7 Europe Hospital Discharge Report `Bundle`
 /// profile.

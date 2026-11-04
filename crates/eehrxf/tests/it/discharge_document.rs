@@ -17,7 +17,8 @@ use std::io::Read;
 use eehrxf::document::discharge::{
     DISCHARGE_REPORT_FORM, DISCHARGE_SUMMARY, HDR_BUNDLE, HDR_ENCOUNTER, HDR_SLOTS,
 };
-use eehrxf::document::{Document, DocumentError, LOINC, Section};
+use eehrxf::document::section::Section;
+use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::encounter::Encounter;
 use fhir_types::r4::human_name::HumanName;

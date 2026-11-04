@@ -367,7 +367,7 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
         unmapped,
         ehr_policy,
         profiles,
-        timeouts: ferrobridge_hl7v2::mllp::Timeouts {
+        timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts {
             idle: timeout_of(hl7v2.idle_timeout_ms),
             frame: timeout_of(hl7v2.frame_timeout_ms),
         },
