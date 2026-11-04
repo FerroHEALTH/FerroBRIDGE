@@ -51,9 +51,7 @@ use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
-
-/// The refusal a handler short-circuits with, already rendered.
-pub(crate) use crate::facade::reply::Refusal;
+use crate::facade::reply::Refusal;
 
 /// `GET [base]/metadata`: the `CapabilityStatement` of the loaded programs.
 ///

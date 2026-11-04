@@ -14,7 +14,10 @@
 # Only a commit or push in a checkout of this repository is judged, in that
 # checkout (lib/target.sh). Runs scripts/checks/crate-version-guard.sh against
 # the merge base with origin/main: WORKTREE for a `git commit`, so the staged change is what is
-# checked, and HEAD for a `git push`, where the commits already exist. Exit 2
+# checked, and HEAD for a `git push`, where the commits already exist. While a
+# merge is in progress the base is the merge base of origin/main and
+# MERGE_HEAD, so what the merge brings in from main is never judged as this
+# branch's change. Exit 2
 # blocks the tool call and returns the guard's findings; every other path is a
 # quiet exit 0.
 
@@ -59,7 +62,11 @@ cd "$repo_root" || exit 0
 
 # No origin/main to compare against (a fresh clone with no fetch, a detached
 # checkout) means no base, and a guard with no base has nothing to say.
-base="$(git merge-base origin/main HEAD 2> /dev/null)" || exit 0
+if merging="$(git rev-parse -q --verify MERGE_HEAD 2> /dev/null)"; then
+  base="$(git merge-base origin/main "$merging" 2> /dev/null)" || exit 0
+else
+  base="$(git merge-base origin/main HEAD 2> /dev/null)" || exit 0
+fi
 [ -n "$base" ] || exit 0
 
 findings="$(bash "$guard" "$base" "$head" 2>&1)" || {
