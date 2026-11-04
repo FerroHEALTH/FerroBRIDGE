@@ -69,3 +69,19 @@ composition's `FEEDER_AUDIT.original_content`.
 (`dr-comp-identifier`), so the run keeps one, declares the other lost in
 the composition's `OperationOutcome`, and the original document still
 holds both.
+
+A result's reference range maps into the `normal_range` of its quantity,
+both bounds with their units, and back out as `referenceRange`. R4 reads a
+range with no `type` as the normal range, so only such a range maps; the
+order a report answers maps by its identifier into the template's test
+request details (`protocol[at0004]/items[at0094]/items[at0063]`), which
+`KDS_Laborbericht` annotates with `DiagnosticReport.basedOn`, and comes
+back as a `Reference` to a `ServiceRequest`.
+
+The laboratory project accounts for `DiagnosticReport.basedOn`,
+`Observation.basedOn` and `Observation.referenceRange`
+(`LABORATORY.accounted()`). Each received instance of one that the run
+carries into no structured element is a `warning` issue in the
+composition's `OperationOutcome`, its `expression` the element's path: a
+range with a `type`, a range's `text`, the order a result answers, or an
+order named by `reference` alone. The original document still holds them.

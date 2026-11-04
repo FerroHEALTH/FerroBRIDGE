@@ -85,6 +85,13 @@ fn located(loss: Loss, fhir: Option<&str>, openehr: Option<&str>) -> Warning {
     Warning::new(loss, location)
 }
 
+/// Returns `warning` located in the input resource `reference`, the
+/// `Type/id` the run read its FHIR element in.
+fn in_resource(warning: &Warning, reference: &str) -> Warning {
+    let location = warning.location().clone().with_resource(reference);
+    Warning::new(warning.loss().clone(), location)
+}
+
 /// Returns every text and number a JSON document carries, except its
 /// `resourceType`, which a FHIRPath names as its root.
 fn carried(value: &serde_json::Value, found: &mut Vec<String>) {
@@ -202,24 +209,34 @@ fn every_loss_going_into_openehr_names_both_places() -> Result<(), Box<dyn Error
     )?;
     let comment = format!("{DATA}/items[at0069]/value");
     let recorded = format!("{DATA}/items[at0077]/value");
+    let resource = format!(
+        "Condition/{}",
+        input["id"].as_str().ok_or("the synthetic Condition's id")?
+    );
     assert_eq!(
         inbound.warnings(),
         [
-            located(
-                Loss::LastOfMany {
-                    path: comment.clone(),
-                    dropped: 1,
-                },
-                Some("Condition.bodySite"),
-                Some(&comment),
+            in_resource(
+                &located(
+                    Loss::LastOfMany {
+                        path: comment.clone(),
+                        dropped: 1,
+                    },
+                    Some("Condition.bodySite"),
+                    Some(&comment),
+                ),
+                &resource,
             ),
-            located(
-                Loss::Skipped {
-                    mapping: String::from("recordedOutboundOnly"),
-                    reason: SkipReason::Unidirectional,
-                },
-                Some("Condition.recordedDate"),
-                Some(&recorded),
+            in_resource(
+                &located(
+                    Loss::Skipped {
+                        mapping: String::from("recordedOutboundOnly"),
+                        reason: SkipReason::Unidirectional,
+                    },
+                    Some("Condition.recordedDate"),
+                    Some(&recorded),
+                ),
+                &resource,
             ),
             located(
                 Loss::Defaulted {
@@ -520,5 +537,29 @@ fn the_kds_round_trip_locates_its_one_way_rows_and_its_skips() -> Result<(), Box
     assert_rendered(outbound.warnings());
     assert_no_value(&input, inbound.warnings());
     assert_no_value(&input, outbound.warnings());
+    Ok(())
+}
+
+#[test]
+fn every_read_going_into_openehr_names_its_resource() -> Result<(), Box<dyn Error>> {
+    let input = condition_with_sites()?;
+    let program = compiled("ferrobridge_located")?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &template()?,
+        &Value::from_serde_json(input.clone()),
+        &Seams::default(),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    let resource = format!(
+        "Condition/{}",
+        input["id"].as_str().ok_or("the synthetic Condition's id")?
+    );
+    assert!(!inbound.reads().is_empty(), "the run read the Condition");
+    for read in inbound.reads() {
+        assert_eq!(read.resource(), Some(resource.as_str()), "{read:?}");
+    }
     Ok(())
 }

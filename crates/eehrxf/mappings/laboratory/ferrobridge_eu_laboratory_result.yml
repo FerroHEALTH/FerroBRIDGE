@@ -255,3 +255,31 @@ mappings:
           targetAttribute: "status"
           operator: "one of"
           criteria: "unknown"
+
+  # KDS_Laborbericht annotates the order filler's identifier (protocol at0094/at0063)
+  # with DiagnosticReport.basedOn, and DiagnosticReport-eu-lab types basedOn as a
+  # Reference(ServiceRequest-eu-lab), so the order travels as a logical reference.
+  - name: "basedOn"
+    extension: "add"
+    with:
+      fhir: "$resource.basedOn"
+      openehr: "$archetype/protocol[at0004]/items[at0094]"
+    # KDS_Laborbericht requires the identifier (at0063, occurrences 1..1) in the
+    # test request details it holds.
+    fhirCondition:
+      targetRoot: "$resource.basedOn"
+      targetAttribute: "identifier"
+      operator: "not empty"
+    followedBy:
+      mappings:
+        - name: "orderIdentifier"
+          with:
+            fhir: "identifier"
+            openehr: "items[at0063]"
+        - name: "orderType"
+          unidirectional: "openEHR->fhir"
+          manual:
+            - name: "serviceRequest"
+              fhir:
+                - path: "type"
+                  value: "ServiceRequest"

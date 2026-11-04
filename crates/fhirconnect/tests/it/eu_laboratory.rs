@@ -24,6 +24,7 @@ use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::engine::traverse::to_openehr;
 use fhirconnect::model::load::load_set;
+use fhirconnect::model::load::load_set_from_text;
 use fhirconnect::model::semantic::StaticMappingCodes;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
@@ -97,6 +98,103 @@ fn the_eu_laboratory_context_compiles_against_the_published_template() -> Result
     assert_eq!(program.resource().as_str(), "DiagnosticReport");
     insta::assert_snapshot!("eu_laboratory_program", program.to_string());
     Ok(())
+}
+
+/// An extension of the analyte that names `tail` below the polymorphic
+/// analyte result, `items[at0001]`, which `KDS_Laborbericht` admits as a
+/// `DV_QUANTITY`, a `DV_CODED_TEXT` or a `DV_TEXT`.
+fn tail_extension(tail: &str) -> String {
+    format!(
+        "grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_analyte_tail
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: CLUSTER.laboratory_test_analyte.v1
+mappings:
+  - name: \"tail\"
+    extension: \"add\"
+    with:
+      fhir: \"$resource.note.text\"
+      openehr: \"$archetype/items[at0001]/value/{tail}\"
+"
+    )
+}
+
+/// Compiles the shipped context with the analyte extension `extension`
+/// beside the shipped ones.
+fn compiled_with_tail(extension: &str) -> Result<Arc<Program>, Vec<String>> {
+    let index = kds_laborbericht_template().map_err(|error| vec![error.to_string()])?;
+    let mut files: Vec<(String, String)> = SHIPPED_LABORATORY
+        .iter()
+        .map(|file| {
+            let path = format!("{SHIPPED}/laboratory/{file}");
+            std::fs::read_to_string(&path).map(|text| (path, text))
+        })
+        .collect::<Result<_, _>>()
+        .map_err(|error| vec![error.to_string()])?;
+    if let Some((_, context)) = files.first_mut() {
+        *context = context.replace(
+            "    - \"ferrobridge_eu_laboratory_specimen\"",
+            "    - \"ferrobridge_eu_laboratory_specimen\"\n    - \"ferrobridge_analyte_tail\"",
+        );
+    }
+    files.push((
+        String::from("ferrobridge_analyte_tail.yml"),
+        String::from(extension),
+    ));
+    let set = load_set_from_text(files, &StaticMappingCodes::default()).map_err(|diagnostics| {
+        diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message().to_owned())
+            .collect::<Vec<_>>()
+    })?;
+    let name = MappingName::new(CONTEXT).map_err(|error| vec![error.to_string()])?;
+    compile(
+        &set,
+        &name,
+        &index,
+        &SCHEMAS,
+        &StaticMappingCodes::default(),
+    )
+    .map_err(|diagnostics| {
+        diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message().to_owned())
+            .collect()
+    })
+}
+
+// NOTE: openEHR RM data_types §DV_ORDERED: `normal_range` is an attribute of an ordered value,
+// so of the three alternatives the quantity alone carries it, and a path below it compiles.
+#[test]
+fn a_tail_one_value_alternative_carries_selects_that_alternative() -> Result<(), Box<dyn Error>> {
+    let program = compiled_with_tail(&tail_extension("normal_range/lower/units"))
+        .map_err(|diagnostics| diagnostics.join("; "))?;
+    let rendered = program.to_string();
+    assert!(
+        rendered.contains("DV_QUANTITY tail normal_range/lower/units"),
+        "the quantity alternative carries the tail: {rendered}"
+    );
+    Ok(())
+}
+
+// NOTE: openEHR RM data_types §DV_TEXT: `DV_CODED_TEXT` inherits `value`, so two alternatives
+// carry the tail and the path stays ambiguous.
+#[test]
+fn a_tail_several_value_alternatives_carry_stays_ambiguous() {
+    let refused = compiled_with_tail(&tail_extension("value"))
+        .err()
+        .unwrap_or_default();
+    assert!(
+        refused
+            .iter()
+            .any(|message| message.contains("names 3 nodes")),
+        "the ambiguous tail is refused: {refused:?}"
+    );
 }
 
 /// A synthetic serum specimen in the shape `Specimen-eu-lab` constrains: the

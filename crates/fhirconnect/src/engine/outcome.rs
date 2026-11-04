@@ -207,6 +207,11 @@ impl<T> Outcome<T> {
 /// `/content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude`.
 /// It carries node ids and the template's own names, never an instance value.
 ///
+/// [`Location::resource`] names the resource the FHIR element lies in as
+/// `Type/id` (<https://hl7.org/fhir/R4/references.html>, a relative literal
+/// reference), when that resource carries an id, so two resources of one type
+/// a run reads are told apart.
+///
 /// Either side is `None` where the loss has no element there: a composition
 /// field the engine defaulted has no FHIR element, and a mapping with no
 /// `with.openehr` has no openEHR node. No specification governs the shape:
@@ -215,6 +220,7 @@ impl<T> Outcome<T> {
 pub struct Location {
     fhir: Option<String>,
     openehr: Option<String>,
+    resource: Option<String>,
 }
 
 impl Location {
@@ -230,6 +236,21 @@ impl Location {
     pub fn with_openehr(mut self, path: impl Into<String>) -> Self {
         self.openehr = Some(path.into());
         self
+    }
+
+    /// Returns this location with `reference` as the resource its FHIR
+    /// element lies in.
+    #[must_use]
+    pub fn with_resource(mut self, reference: impl Into<String>) -> Self {
+        self.resource = Some(reference.into());
+        self
+    }
+
+    /// Returns the resource the FHIR element lies in, as `Type/id`, when the
+    /// resource carries an id.
+    #[must_use]
+    pub fn resource(&self) -> Option<&str> {
+        self.resource.as_deref()
     }
 
     /// Returns the FHIRPath of the FHIR element, when the loss has one.
@@ -249,8 +270,9 @@ impl Location {
 ///
 /// Match on [`Warning::loss`] for what was lost and read
 /// [`Warning::location`] for where. The location never carries a value, so a
-/// consumer can log it without clinical content. The [`fmt::Display`] text is
-/// the loss's own.
+/// consumer can log it without clinical content: its paths name elements and
+/// nodes, and its resource the logical id the resource is addressed by. The
+/// [`fmt::Display`] text is the loss's own.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Warning {
     loss: Loss,
