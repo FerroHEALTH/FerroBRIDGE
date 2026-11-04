@@ -21,7 +21,7 @@ use crate::mappings::files::{Language, Root};
 use crate::operator::Operator;
 use crate::operator::reload::{Prepared, ReloadError};
 use crate::operator::revisions::{BRIDGE, Entry};
-use crate::operator::save::{Failure, Precondition};
+use crate::operator::save::{Failure, OnBlockingThread, Precondition};
 
 /// How an apply ended, short of a failure to reach the disk.
 #[derive(Debug)]
@@ -144,9 +144,13 @@ impl Operator {
     ///
     /// Returns what [`Operator::prepare_over`] returns, the rejection's
     /// report already shown.
-    pub fn check_staged(&self, staged: &Staged) -> Result<Prepared, Checked> {
+    pub(crate) fn check_staged(
+        &self,
+        thread: &OnBlockingThread,
+        staged: &Staged,
+    ) -> Result<Prepared, Checked> {
         let roots = staged.roots(self);
-        match self.prepare_over(&roots, None) {
+        match self.prepare_over(thread, &roots, None) {
             Ok(prepared) => Ok(prepared),
             Err(ReloadError::Rejected(report)) => Err(Checked::Rejected(
                 crate::operator::load_report_over(&report, &roots, None),
@@ -161,6 +165,7 @@ impl Operator {
     /// the apply beside the outcome.
     pub(crate) fn apply_blocking(
         &self,
+        thread: &OnBlockingThread,
         id: &str,
         precondition: &Precondition,
         author: &str,
@@ -195,7 +200,7 @@ impl Operator {
             .ok_or(Failure::UnknownRevision)?;
         let contents = store.contents(&target).map_err(Failure::Store)?;
         let staged = Staged::write(mapping_dir, &contents)?;
-        match self.check_staged(&staged) {
+        match self.check_staged(thread, &staged) {
             Ok(_prepared) => {}
             Err(Checked::Rejected(report)) => return Ok((running, Applied::Rejected { report })),
             Err(Checked::Unavailable(error)) => {
@@ -204,7 +209,7 @@ impl Operator {
         }
         staged.swap_into(mapping_dir).map_err(Failure::Write)?;
         drop(staged);
-        let prepared = match self.prepare(None) {
+        let prepared = match self.prepare(thread, None) {
             Ok(prepared) => prepared,
             Err(error) => return Ok((running, Applied::Unreloaded { error })),
         };

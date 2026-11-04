@@ -576,6 +576,37 @@ async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<()
     Ok(())
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_check_save_and_reload_handlers_prepare_the_set_from_a_runtime_worker()
+-> Result<(), Box<dyn Error>> {
+    let case = Case::new().await?;
+    let response = case
+        .send(
+            Request::post("/operator/mappings/check?path=fhirconnect/ferrobridge_console.yml")
+                .body(Body::from(MODEL))?,
+        )
+        .await?;
+    assert_eq!(StatusCode::OK, response.status());
+    let report: serde_json::Value = serde_json::from_slice(&bytes(response).await?)?;
+    assert!(report["clean"].is_boolean(), "{report}");
+    let response = case.create("ferrobridge_console.yml", MODEL).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    let response = case
+        .create("ferrobridge_console.context.yml", CONTEXT)
+        .await?;
+    assert_eq!(StatusCode::OK, response.status());
+    let response = case
+        .send(Request::post("/operator/reload").body(Body::empty())?)
+        .await?;
+    assert_eq!(StatusCode::OK, response.status());
+    assert!(
+        case.declared_types()
+            .await?
+            .contains(&String::from("Observation"))
+    );
+    Ok(())
+}
+
 #[test]
 fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
 -> Result<(), Box<dyn Error>> {
