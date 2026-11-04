@@ -11,16 +11,20 @@ use std::error::Error;
 
 use ferrobridge_console::server::ConsoleState;
 use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
+use ferrohealth_session::clock::{Clock, ManualClock};
 use ferrohealth_ui::view::session::Left;
 use http::StatusCode;
 
 use crate::support::{
-    Captured, OPERATOR_REFRESH, OPERATOR_TOKEN, ORIGIN, configuration, console, get_with,
+    Captured, OPERATOR_REFRESH, OPERATOR_TOKEN, ORIGIN, configuration, console_on, get_with,
     held_token, occupancy, send, set_cookies, sign_in,
 };
 
 /// The bridge address of a console whose tests never need the bridge.
 const NO_BRIDGE: &str = "http://127.0.0.1:9/";
+
+/// The second since the Unix epoch a manual session clock starts at.
+const START: i64 = 1_800_000_000;
 
 /// A path every request in these tests asks for: a page the console does not
 /// serve, so no bridge is asked and the answer is quick.
@@ -31,8 +35,18 @@ const PAGE: &str = "/no-such-page";
 async fn due_session(
     session: &str,
 ) -> Result<(Provider, ConsoleState, axum::Router, String), Box<dyn Error>> {
+    due_session_on(session, Clock::system()).await
+}
+
+/// A session as [`due_session`] signs it in, in a store that counts every
+/// lifetime on `clock`.
+async fn due_session_on(
+    session: &str,
+    clock: Clock,
+) -> Result<(Provider, ConsoleState, axum::Router, String), Box<dyn Error>> {
     let provider = Provider::start().await?;
-    let (state, service) = console(&configuration(&provider, NO_BRIDGE, "", session)).await?;
+    let (state, service) =
+        console_on(&configuration(&provider, NO_BRIDGE, "", session), clock).await?;
     let cookie = sign_in(
         &service,
         &provider,
@@ -188,18 +202,22 @@ async fn a_provider_that_fails_on_its_side_leaves_the_session_to_try_again()
 async fn the_absolute_timeout_ends_a_session_whatever_its_refresh_token()
 -> Result<(), Box<dyn Error>> {
     const IDLE: u32 = 3;
-    let signed_in = std::time::Instant::now();
-    let (provider, state, service, cookie) =
-        due_session(&format!("idle_timeout_s = {IDLE}\nabsolute_timeout_s = 8")).await?;
+    let time = ManualClock::new(START);
+    let (provider, state, service, cookie) = due_session_on(
+        &format!("idle_timeout_s = {IDLE}\nabsolute_timeout_s = 8"),
+        time.clock(),
+    )
+    .await?;
+    let mut extended_for: u32 = 0;
     provider
         .answer_refresh(OPERATOR_REFRESH, &refreshed("synthetic-access-2", None))
         .await?;
     // NOTE: no specification governs this: our own design; the session watch's extension
     // keeps the idle timeout from ending the session and sends no refresh.
     let left = loop {
-        // The session counts whole wall-clock seconds: one extension a second stays
-        // inside the idle timeout whatever second it starts in.
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        // One extension a second stays inside the idle timeout.
+        time.advance(1);
+        extended_for += 1;
         let extend = http::Request::post("/session")
             .header("cookie", &cookie)
             .header("origin", ORIGIN)
@@ -221,10 +239,10 @@ async fn the_absolute_timeout_ends_a_session_whatever_its_refresh_token()
         }
     };
     assert!(
-        signed_in.elapsed() > std::time::Duration::from_secs(IDLE.into()),
+        extended_for > IDLE,
         "the extensions kept the session past its idle timeout"
     );
-    tokio::time::sleep(std::time::Duration::from_secs((left.absolute + 1).into())).await;
+    time.advance(i64::from(left.absolute) + 1);
     send(&service, get_with(PAGE, &cookie)?).await?;
     assert_eq!(None, held_token(&state, &cookie)?);
     assert_eq!(
