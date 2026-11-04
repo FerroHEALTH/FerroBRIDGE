@@ -770,7 +770,8 @@ jobs:
       # eehrxf has no default feature, so its suites run with every feature on.
       # The suites that hold a patient summary or a laboratory report
       # document to the vendored profiles also write it under
-      # EEHRXF_EMIT_DIR, for the fhir-validator job.
+      # EEHRXF_EMIT_DIR, and so does the one that maps a prescription and a
+      # dispense to their MPD collections, for the fhir-validator job.
       - if: contains(matrix.packages, 'eehrxf')
         env:
           EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents

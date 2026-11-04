@@ -166,17 +166,6 @@ impl CheckName {
         self.description().sql_file
     }
 
-    /// Returns whether the Dashboard's not-applicable rules read this check's
-    /// results, one of the three they need present
-    /// (DQD v2.9.0 `R/calculateNotApplicableStatus.R` lines 35 to 43).
-    #[must_use]
-    pub fn feeds_not_applicable(self) -> bool {
-        matches!(
-            self,
-            Self::CdmTable | Self::CdmField | Self::MeasureValueCompleteness
-        )
-    }
-
     /// Returns whether the check probes for a table or field rather than
     /// counting rows, so that a missing one fails the check instead of being
     /// an error.

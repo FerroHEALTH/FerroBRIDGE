@@ -24,13 +24,13 @@ use openehr_its::rest::generated::demographic::client::VersionedPartyRevisionHis
 use crate::cdr::Answered;
 use crate::facade::Facade;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::Refusal;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
 use crate::facade::reply::Header;
+use crate::facade::reply::Refusal;
 
 /// `GET [base]/{type}/{id}` of a party type.
 pub(crate) async fn read(

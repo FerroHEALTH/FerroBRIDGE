@@ -20,11 +20,11 @@ use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
 use crate::facade::engine;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::complete;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
 use crate::facade::ingest::Refused;
+use crate::facade::reply::Refusal;
 
 /// One resource a composition version maps to.
 #[derive(Debug, Clone)]

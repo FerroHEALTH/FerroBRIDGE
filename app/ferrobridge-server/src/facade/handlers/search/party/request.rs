@@ -13,7 +13,7 @@
 //! design.
 
 use crate::facade::Facade;
-use crate::facade::handlers::Refusal;
+use crate::facade::reply::Refusal;
 use crate::facade::search::criteria::CURSOR;
 use crate::facade::search::criteria::Handling;
 use crate::facade::search::cursor;

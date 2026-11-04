@@ -46,12 +46,12 @@ use crate::cdr::demographic::Demographic;
 use crate::cdr::error::Upstream;
 use crate::cdr::ids::versioned_object_uid;
 use crate::facade::Facade;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::write::refuse;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
+use crate::facade::reply::Refusal;
 use crate::facade::status;
 use crate::terminology::Direction;
 

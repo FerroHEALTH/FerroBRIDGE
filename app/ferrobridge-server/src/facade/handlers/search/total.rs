@@ -12,13 +12,13 @@ use std::collections::BTreeSet;
 
 use crate::cdr::CdrClient;
 use crate::facade::Facade;
-use crate::facade::handlers::Refusal;
 use crate::facade::handlers::search::Plan;
 use crate::facade::handlers::search::malformed_answer;
 use crate::facade::handlers::search::matched;
 use crate::facade::handlers::search::read_row;
 use crate::facade::handlers::search::render_entry;
 use crate::facade::handlers::search::rows_of;
+use crate::facade::reply::Refusal;
 use crate::facade::search::aql;
 use crate::facade::search::aql::Conditions;
 use crate::facade::search::criteria::Criteria;
