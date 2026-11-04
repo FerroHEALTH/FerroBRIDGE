@@ -46,6 +46,8 @@ use serde_json::Value;
 
 use super::support::{emit, lab};
 
+mod accounted;
+
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
 const BASE: &str = "https://gateway.example.org/fhir";
@@ -82,11 +84,10 @@ fn files() -> Vec<PathBuf> {
 
 /// The shipped laboratory project compiled against `KDS_Laborbericht`.
 fn mapping() -> Result<Mapping, Box<dyn Error>> {
-    Ok(Mapping::compile(
-        KDS_LABORBERICHT_OPT,
-        &files(),
-        LABORATORY.contexts(),
-    )?)
+    Ok(
+        Mapping::compile(KDS_LABORBERICHT_OPT, &files(), LABORATORY.contexts())?
+            .accounting(LABORATORY.accounted()),
+    )
 }
 
 /// The run settings: a synthetic engine device, a fixed instant and the
@@ -151,7 +152,21 @@ fn result() -> Value {
             "unit": "mg/dL",
             "system": "http://unitsofmeasure.org",
             "code": "mg/dL"
-        }
+        },
+        "referenceRange": [{
+            "low": {
+                "value": 120,
+                "unit": "mg/dL",
+                "system": "http://unitsofmeasure.org",
+                "code": "mg/dL"
+            },
+            "high": {
+                "value": 200,
+                "unit": "mg/dL",
+                "system": "http://unitsofmeasure.org",
+                "code": "mg/dL"
+            }
+        }]
     })
 }
 
@@ -166,6 +181,10 @@ fn report() -> Value {
             "system": "http://example.org/fhir/sid/ferrobridge-lab-reports",
             "value": "synthetic-report-0001"
         }],
+        "basedOn": [{"type": "ServiceRequest", "identifier": {
+            "system": "http://example.org/fhir/sid/ferrobridge-lab-orders",
+            "value": "synthetic-order-0001"
+        }}],
         "status": "final",
         "code": {"coding": [{
             "system": "http://loinc.org",
@@ -231,14 +250,20 @@ fn chemistry(results: Vec<String>) -> Result<Section, Box<dyn Error>> {
 
 /// The synthetic laboratory report document a member sends.
 fn received_text() -> Result<String, Box<dyn Error>> {
+    received_text_of(&result(), &report())
+}
+
+/// The synthetic laboratory report document of `report`, which names the
+/// result `result` and the synthetic specimen.
+fn received_text_of(result: &Value, report: &Value) -> Result<String, Box<dyn Error>> {
     let (mut document, _, _) = lab_document("urn:uuid:5b0c3f7e-0000-4000-8000-00000000b001")?;
     let urls = document.add(&[
-        resource("Observation", &result())?,
+        resource("Observation", result)?,
         resource("Specimen", &specimen())?,
     ])?;
     let result_url = urls.first().ok_or("the result's fullUrl")?.clone();
     document.with_section(chemistry(vec![result_url])?)?;
-    let Resource::DiagnosticReport(report) = resource("DiagnosticReport", &report())? else {
+    let Resource::DiagnosticReport(report) = resource("DiagnosticReport", report)? else {
         return Err("the synthetic report is no DiagnosticReport".into());
     };
     document.with_report(*report)?;
@@ -403,9 +428,23 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         after.pointer("/effectiveDateTime"),
         "{result}"
     );
+    let received_result = only(&input, "Observation")?;
+    for pointer in [
+        "/valueQuantity/value",
+        "/valueQuantity/code",
+        "/valueQuantity/system",
+        "/referenceRange",
+    ] {
+        assert_eq!(
+            result.pointer(pointer),
+            received_result.pointer(pointer),
+            "{pointer}: {result}"
+        );
+    }
     assert_eq!(
-        result.pointer("/valueQuantity/value"),
-        only(&input, "Observation")?.pointer("/valueQuantity/value")
+        after.pointer("/basedOn"),
+        before.pointer("/basedOn"),
+        "the order the report answers survives: {after}"
     );
     // FHIR R4 Quantity qty-3: a code carries its system, UCUM for a laboratory value.
     for pointer in [

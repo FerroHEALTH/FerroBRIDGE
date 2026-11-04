@@ -34,7 +34,7 @@ const MINIMAL: &str = include_str!("../fixtures/adl2/minimal_evaluation.adls");
 fn adl2_index() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let note = parse_artefact(NOTE, Dialect::Adl2).map_err(|errors| format!("{errors:?}"))?;
     let minimal = parse_artefact(MINIMAL, Dialect::Adl2).map_err(|errors| format!("{errors:?}"))?;
-    let mut repository = ArchetypeRepository::new();
+    let mut repository = ArchetypeRepository::default();
     repository.insert(note);
     let template = create_opt(&minimal, &repository)?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt2 {

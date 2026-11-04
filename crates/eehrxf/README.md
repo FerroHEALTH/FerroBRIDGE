@@ -85,7 +85,10 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   `Mapping::to_openehr` maps the document into one canonical composition
   through FHIRconnect and keeps the document in the composition's
   `FEEDER_AUDIT.original_content`; `ReceivedComposition::model` is the
-  composition as the RM model holds it.
+  composition as the RM model holds it. A received instance of an element
+  the mapping accounts for (`Mapping::accounting`, `Project::accounted`)
+  that the run carries into no structured element is a `warning` issue in
+  `ReceivedComposition::outcome`.
 - `terminology` (feature `fhir-r4`): the terminology rules. With `openehr`,
   `transcode` turns an openEHR text item into FHIR codings and narrative: a
   code in a preferred system as recorded, a `TERM_MAPPING` of match `=` as a

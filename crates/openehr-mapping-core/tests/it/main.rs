@@ -16,6 +16,7 @@ mod embedded;
 mod example;
 mod header;
 mod malformed;
+mod named_sections;
 mod ordinals;
 mod party;
 mod party_build;

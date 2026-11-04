@@ -17,13 +17,14 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// One shipped FHIRconnect project: its directory, its files and the
-/// context mappings to compile from them.
+/// One shipped FHIRconnect project: its directory, its files, the context
+/// mappings to compile from them and the received elements it accounts for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Project {
     directory: &'static str,
     contexts: &'static [&'static str],
     files: &'static [File],
+    accounted: &'static [&'static str],
 }
 
 /// One shipped mapping file: its file name and its YAML text.
@@ -53,6 +54,16 @@ impl Project {
     #[must_use]
     pub const fn files(&self) -> &'static [File] {
         self.files
+    }
+
+    /// Returns the received elements the project accounts for, each a
+    /// FHIRPath of element names rooted at a resource type: a received
+    /// instance of one that the run carries into no structured element is
+    /// declared in the run's `OperationOutcome`
+    /// ([`crate::mapping::Mapping::accounting`]).
+    #[must_use]
+    pub const fn accounted(&self) -> &'static [&'static str] {
+        self.accounted
     }
 
     /// Writes every file of the project into `directory`, which must exist,
@@ -119,6 +130,7 @@ pub const MPD: Project = Project {
         shipped!("mpd", "ferrobridge_medication.v1.yml"),
         shipped!("mpd", "ferrobridge_eu_mpd_dispense.yml"),
     ],
+    accounted: &[],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
@@ -147,6 +159,16 @@ pub const LABORATORY: Project = Project {
         shipped!("laboratory", "ferrobridge_eu_lab_composition.yml"),
         shipped!("laboratory", "ferrobridge_eu_lab_composition_report.yml"),
     ],
+    // NOTE: no specification governs this: our own design; a result read without its
+    // reference range or the order it answers is misread, so each loss of one is declared.
+    accounted: &[
+        "DiagnosticReport.basedOn.reference",
+        "DiagnosticReport.basedOn.identifier",
+        "DiagnosticReport.basedOn.display",
+        "DiagnosticReport.basedOn.extension",
+        "Observation.basedOn",
+        "Observation.referenceRange",
+    ],
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.
@@ -173,4 +195,5 @@ pub const EPS: Project = Project {
         shipped!("eps", "ferrobridge_eu_eps_immunization.context.yml"),
         shipped!("eps", "ferrobridge_medication.v1.Immunization.yml"),
     ],
+    accounted: &[],
 };
