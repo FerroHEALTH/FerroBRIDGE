@@ -240,7 +240,7 @@ pub const OUTBOUND_REFUSED: Row = Row {
 /// document.
 #[must_use]
 pub fn of_outbound_refusal(error: &fhirconnect::engine::traverse::error::EngineError) -> Answer {
-    Answer::new(OUTBOUND_REFUSED, crate::cause::chain(error))
+    Answer::new(OUTBOUND_REFUSED, ferrohealth_server::run::chain(error))
 }
 
 /// Returns the answer a CDR refusal of an extension query renders as.

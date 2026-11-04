@@ -229,7 +229,7 @@ pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
             })
         }
         BridgeError::Transport { .. } => {
-            tracing::error!(error = %crate::command::chain(error), "the bridge could not be reached");
+            tracing::error!(error = %ferrohealth_server::run::chain(error), "the bridge could not be reached");
             Err(ViewError::Unreachable)
         }
         BridgeError::TooLarge { .. }
@@ -237,7 +237,7 @@ pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
         | BridgeError::NotAnObject
         | BridgeError::Document { .. }
         | BridgeError::Decode { .. } => {
-            tracing::error!(error = %crate::command::chain(error), "the bridge answered a body this console cannot read");
+            tracing::error!(error = %ferrohealth_server::run::chain(error), "the bridge answered a body this console cannot read");
             Err(ViewError::Unreadable)
         }
         BridgeError::Path => Ok(Refusal::Invalid {
@@ -253,7 +253,7 @@ pub fn refusal(error: &BridgeError) -> Result<Refusal, ViewError> {
         | BridgeError::Token
         | BridgeError::Encode { .. }
         | BridgeError::Number { .. } => {
-            tracing::error!(error = %crate::command::chain(error), "a request to the bridge could not be sent");
+            tracing::error!(error = %ferrohealth_server::run::chain(error), "a request to the bridge could not be sent");
             Err(ViewError::Unavailable)
         }
     }

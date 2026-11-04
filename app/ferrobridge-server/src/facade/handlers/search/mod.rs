@@ -199,7 +199,7 @@ async fn search(
     let body = bundle::searchset(&envelope, &matches).map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(crate::cause::chain(&error)),
+            Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),
         )
     })?;
     tracing::info!(

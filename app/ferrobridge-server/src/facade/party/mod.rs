@@ -124,7 +124,7 @@ pub(crate) fn party_id(resource_type: &str, id: &str) -> Result<HierObjectId, Re
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!(
                 "{resource_type}/{id} names no party: {}",
-                crate::cause::chain(&error)
+                ferrohealth_server::run::chain(&error)
             )),
         )
     })
@@ -282,7 +282,7 @@ pub(crate) fn accept(
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "the {LABEL} answered {resource_type}/{id} with a party the template does not \
                  admit: {}",
-                crate::cause::chain(&error)
+                ferrohealth_server::run::chain(&error)
             )),
         )
     })

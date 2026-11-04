@@ -66,7 +66,7 @@ async fn resource_of(body: axum::body::Body) -> Result<Option<Resource>, Issue> 
         .map_err(|error| {
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "the entry's answer could not be read: {}",
-                crate::cause::chain(&error)
+                ferrohealth_server::run::chain(&error)
             ))
         })?;
     if bytes.is_empty() {
@@ -88,7 +88,7 @@ async fn resource_of(body: axum::body::Body) -> Result<Option<Resource>, Issue> 
         .to_owned();
     Resource::from_json(&object, &mut Path::root(&resource_type))
         .map(Some)
-        .map_err(|error| unreadable(crate::cause::chain(&error)))
+        .map_err(|error| unreadable(ferrohealth_server::run::chain(&error)))
 }
 
 /// Returns the `fullUrl` of a resource an entry answered, when it names its

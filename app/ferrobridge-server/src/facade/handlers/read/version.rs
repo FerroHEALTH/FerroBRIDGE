@@ -203,7 +203,7 @@ pub(crate) async fn version_of_etag(
             StatusCode::BAD_REQUEST,
             Issue::error(IssueType::Invalid).diagnosing(format!(
                 "If-Match carries `{bare}`, which is neither a versionId nor an openEHR version id: {}",
-                crate::cause::chain(&error)
+                ferrohealth_server::run::chain(&error)
             )),
         )
     })?;

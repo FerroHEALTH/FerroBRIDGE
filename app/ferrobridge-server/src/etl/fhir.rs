@@ -280,7 +280,7 @@ fn bundle_of(resource: &Value) -> Result<fhir_types::r4::bundle::Bundle, String>
         .map_err(|error| {
             format!(
                 "the resource does not read as FHIR R4: {}",
-                crate::chain(&error)
+                ferrohealth_server::run::chain(&error)
             )
         })
 }
@@ -324,9 +324,9 @@ pub fn composition_of(side: &FhirSide<'_>, resource: &Value) -> Outcome {
     ) {
         Ok(transformed) => transformed,
         Err(error @ OperationError::Select { .. }) => {
-            return Outcome::Unmapped(crate::chain(&error));
+            return Outcome::Unmapped(ferrohealth_server::run::chain(&error));
         }
-        Err(error) => return Outcome::Refused(crate::chain(&error)),
+        Err(error) => return Outcome::Refused(ferrohealth_server::run::chain(&error)),
     };
     let warnings = transformed.warnings().to_vec();
     let reads = transformed.reads().to_vec();
@@ -457,7 +457,13 @@ async fn load_one<M: Mapper>(
     };
     let canonical = match index.accept(composition) {
         Ok(canonical) => canonical,
-        Err(error) => return Ok(refused(report, Some(&source), &crate::chain(&error))),
+        Err(error) => {
+            return Ok(refused(
+                report,
+                Some(&source),
+                &ferrohealth_server::run::chain(&error),
+            ));
+        }
     };
     let graph = match mapper
         .map(&SourceComposition {
@@ -500,7 +506,11 @@ async fn load_one<M: Mapper>(
         Err(error) if writer.is_closed() => Err(RunError::Database(error)),
         Err(error) => {
             report.engine_outcomes(Some(&source), graph.report());
-            Ok(refused(report, Some(&source), &crate::chain(&error)))
+            Ok(refused(
+                report,
+                Some(&source),
+                &ferrohealth_server::run::chain(&error),
+            ))
         }
     }
 }

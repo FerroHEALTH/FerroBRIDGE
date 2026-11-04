@@ -12,7 +12,8 @@
 # before it reaches a pull request (the OWASP CI/CD Security Cheat Sheet's
 # third-party-code control). Every entry sits at 7 days or more, the floor
 # zizmor's `dependabot-cooldown` audit enforces, and the audit runs over this
-# file in CI (#34).
+# file in CI (#34). The cargo entry exempts the FerroHEALTH family's own
+# crates, which are first-party code.
 #
 # SECURITY updates are exempt by design: Dependabot applies no cooldown to
 # advisory-driven bumps, so an advisory still arrives immediately. That is what
@@ -52,26 +53,37 @@ updates:
     labels:
       - "dependencies"
       - "no-changelog"
+    # Daily, so a release of a FerroHEALTH family crate reaches a PR the day
+    # after it is published; every other crate still waits out its cooldown.
     schedule:
-      interval: "weekly"
+      interval: "daily"
     # Longer for a major than for an action: a compromised crate executes in
     # the build and ships in the binary, which is the higher-consequence case.
     cooldown:
       default-days: 7
       semver-major-days: 14
+      # Our own crates, published through Trusted Publishing: a cooldown only keeps us behind.
+      exclude:
+        - "ferrohealth-*"
+        - "openehr-*"
+        - "ihe-*"
+        - "ehds-*"
     open-pull-requests-limit: 10
     groups:
-      # ONE weekly PR for every minor and patch bump; lockstep families (serde,
+      # The crates of the FerroHEALTH family, which the products pin exactly:
+      # ferrohealth-* (FerroSYS, FerroAUTH, FerroUI), openehr-* (FerroEHR's
+      # lockstep 0.0.x line, where every bump counts as a major) and ihe-*
+      # and ehds-* (FerroAUDIT). ONE PR moves the family together, since a
+      # family crate often requires another's new version. It stands first
+      # so a family crate never lands in the group below.
+      ferrohealth-family:
+        patterns: ["ferrohealth-*", "openehr-*", "ihe-*", "ehds-*"]
+      # ONE PR for every other minor and patch bump; lockstep families (serde,
       # axum and tower) bump together inside it by construction. MAJORS stay
       # individual: a semver major in shipped code is a real review.
       cargo-minor-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
-      # The openehr-* crates are one lockstep line on 0.0.x, where every bump
-      # counts as a major and would otherwise open one PR per crate, none of
-      # which builds alone. One PR moves the family.
-      openehr:
-        patterns: ["openehr-*"]
     commit-message:
       prefix: "deps"
 

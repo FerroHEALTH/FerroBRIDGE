@@ -4,12 +4,11 @@
 //! The run path of the `ferrobridge-console` binary: the command line parsed,
 //! the configuration read, and each job run to its exit code.
 
-use std::error::Error;
-use std::fmt::Write as _;
 use std::process::ExitCode;
 
 use clap::Parser;
 use ferrohealth_server::cli::{Common, ConfigCommand};
+use ferrohealth_server::run::chain;
 use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 
 use crate::cli::Cli;
@@ -231,20 +230,4 @@ async fn serve(settings: Settings) -> ExitCode {
         tracing::warn!(%error, "the telemetry did not flush");
     }
     code
-}
-
-/// Renders `error` with every cause in its chain, colon-separated.
-#[must_use]
-pub fn chain(error: &dyn Error) -> String {
-    let mut text = error.to_string();
-    let mut source = error.source();
-    while let Some(cause) = source {
-        // NOTE: no specification governs this: our own design; writing to a
-        // String cannot fail, so the result carries nothing.
-        if write!(text, ": {cause}").is_err() {
-            break;
-        }
-        source = cause.source();
-    }
-    text
 }

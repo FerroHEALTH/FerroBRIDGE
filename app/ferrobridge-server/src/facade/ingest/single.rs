@@ -11,7 +11,6 @@ use openehr_its::rest::generated::ehr::client::CompositionUpdateOutcome;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::cause::chain;
 use crate::cdr::Prefer;
 use crate::cdr::ids::EhrId;
 use crate::facade::commit;
@@ -23,6 +22,7 @@ use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use ferrohealth_server::run::chain;
 
 use super::Ingest;
 use super::Provenance;

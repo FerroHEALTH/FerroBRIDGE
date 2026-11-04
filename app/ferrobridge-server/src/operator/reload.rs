@@ -259,8 +259,10 @@ impl Reloader {
 /// one that does not bind as `report` plus its diagnostic.
 fn bind(report: &Report, files: &[PathBuf], programs: &Programs) -> Result<Catalog, ReloadError> {
     crate::facade::search::load_files(files, programs).map_err(|error| {
-        let diagnostic =
-            crate::mappings::compile::search_declaration(error.file(), crate::cause::chain(&error));
+        let diagnostic = crate::mappings::compile::search_declaration(
+            error.file(),
+            ferrohealth_server::run::chain(&error),
+        );
         ReloadError::Rejected(Box::new(report.clone().with_diagnostic(diagnostic)))
     })
 }

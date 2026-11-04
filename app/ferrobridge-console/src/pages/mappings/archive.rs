@@ -85,7 +85,7 @@ pub async fn export(
         )
             .into_response(),
         Err(error) => {
-            tracing::warn!(error = %crate::command::chain(&error), "a revision could not be exported");
+            tracing::warn!(error = %ferrohealth_server::run::chain(&error), "a revision could not be exported");
             StatusCode::BAD_GATEWAY.into_response()
         }
     }

@@ -352,7 +352,7 @@ impl Face {
             Some((log, _)) => match log.recorder().reserve().await {
                 Ok(place) => place,
                 Err(error) => {
-                    tracing::warn!(error = %crate::chain(&error), "a message was refused: its import record has no place");
+                    tracing::warn!(error = %ferrohealth_server::run::chain(&error), "a message was refused: its import record has no place");
                     return (Settled::Unrecorded, tally);
                 }
             },
@@ -368,7 +368,7 @@ impl Face {
                 tally.committed = ingested.committed().count();
                 tally.skipped = ingested.skipped().count();
                 if let Err(error) = self.record(place, message, peer, &ingested).await {
-                    tracing::warn!(error = %crate::chain(&error), "a committed message is not acknowledged: its import record could not be stored");
+                    tracing::warn!(error = %ferrohealth_server::run::chain(&error), "a committed message is not acknowledged: its import record could not be stored");
                     return (Settled::Unrecorded, tally);
                 }
                 (Settled::Ingested(Box::new(ingested)), tally)

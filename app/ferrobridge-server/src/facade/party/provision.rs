@@ -16,7 +16,6 @@
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 
-use crate::cause::chain;
 use crate::cdr::CdrClient;
 use crate::cdr::ids::versioned_object_uid;
 use crate::facade::Facade;
@@ -27,6 +26,7 @@ use crate::facade::ingest::refusal::ehr_refusal;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply::Refusal;
+use ferrohealth_server::run::chain;
 
 /// The party resource type that is the subject of an EHR.
 const PATIENT: &str = "Patient";
