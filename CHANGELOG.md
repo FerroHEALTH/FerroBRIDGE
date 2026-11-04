@@ -25,6 +25,33 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.18] - 2026-11-04
+
+A short release that closes the one-owner reshape. A FHIRconnect `manual`
+entry that writes into openEHR records the reads of the FHIR elements it
+names, so `eehrxf` no longer declares such an element lost. The `eehrxf`
+imaging and discharge codings carry the displays the HL7 Europe EU Health
+Data API package gives them, and one named context of an `eehrxf` mapping
+project compiles alone. The operator console runs on `ferrohealth-session`
+0.2.2. `eehrxf` 0.1.151 removes the public constant
+`document::imaging::PRIORITY_CATEGORY`: a consumer uses
+`category::PRIORITY_SYSTEM`, which holds the same URL. The crate line moves
+one patch per change, a breaking one included, so a consumer pins it
+exactly.
+
+### Added
+
+- `eehrxf`: `Project::with_context(name)` narrows a shipped mapping project to one of its context mappings, so `Mapping::compile_project` compiles that context alone from the embedded files and a run over a template two contexts map has one program to select (the MPD project's request and dispense). A name the project does not compile is refused with `mappings::UnknownContext` (#1527).
+
+### Changed
+
+- The operator console runs on `ferrohealth-session` 0.2.2. `[oidc] resolve` reaches the provider's host at a fixed address, and `[oidc.tls]` names the client certificate the console presents to its provider (RFC 8705 §2) and the lowest TLS version of that connection. `POST /logout` goes to the provider's end-session endpoint only when the ended session holds an ID Token, so a Basic sign-out returns to the console's signed-out page (#1521).
+
+### Fixed
+
+- `fhirconnect`: a `manual` entry that writes going into openEHR records a read of each FHIR element its paths name, at the occurrence its mapping binds, so `Outcome::reads` no longer leaves out an element a status table carried. An entry its `fhirCondition` refuses, or one that runs out of openEHR only, records none. `eehrxf` no longer declares such an element lost once a project accounts for it (#1518).
+- `eehrxf`: the imaging form's `Medical-Imaging` priority category and the discharge report's `18842-5` section now carry the display the vendored HL7 Europe EU Health Data API 1.0.0-ballot gives them, and the imaging report category `85430-7` takes that guide's value-set display, `Diagnostic imaging report`, over an example's. `document::imaging::PRIORITY_CATEGORY` is removed: use `category::PRIORITY_SYSTEM`, the same URL. Five section codes no vendored HL7 Europe, MyHealth@EU or Xt-EHR material gives a display (`81338-6`, `57080-4`, `77599-9`, `48767-8`, `LP173421-1`) still carry none (#1523).
+
 ## [0.0.17] - 2026-11-04
 
 The interoperability-component release. `eehrxf` feeds the patient
@@ -5869,7 +5896,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.17...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.18...HEAD
+[0.0.18]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.17...v0.0.18
 [0.0.17]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.14...v0.0.15

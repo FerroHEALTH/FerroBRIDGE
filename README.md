@@ -138,7 +138,7 @@ shared libraries: FerroAUTH, FerroAUDIT and FerroUI.
 
 ## Quick start
 
-The latest release is [v0.0.17](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.17), cut on 2026-11-04.
+The latest release is [v0.0.18](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.18), cut on 2026-11-04.
 Download its `compose.yaml`, create the four secret files it reads (empty
 for a lane you leave off), and start the bridge:
 
@@ -159,7 +159,7 @@ Every lane is off until you configure it: set `FERROBRIDGE__CDR__BASE_URL`
 to reach your openEHR record server and `FERROBRIDGE__TERMINOLOGY__BASE_URL`
 for your terminology server. The header of `compose.yaml` names every
 setting, and the `cdm` and `console` profiles add an OMOP database and the
-operator console. The image is `ghcr.io/ferrohealth/ferrobridge:0.0.17`.
+operator console. The image is `ghcr.io/ferrohealth/ferrobridge:0.0.18`.
 [Configuring the server](https://ferrobridge.eu/docs/operate/configuration.html)
 and [the container image](https://ferrobridge.eu/docs/operate/container.html)
 continue from here.
