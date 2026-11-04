@@ -28,7 +28,6 @@
 //! files ([`revisions`]), with the export of a revision as a ZIP and the
 //! import of one as an unapplied revision. No specification governs the operator surface: our own design.
 
-pub mod files;
 pub mod guard;
 pub mod reload;
 pub mod revisions;
@@ -53,7 +52,8 @@ use axum::routing::post;
 use http::StatusCode;
 use http::header;
 
-use crate::operator::files::Root;
+use crate::mappings::files;
+use crate::mappings::files::Root;
 use crate::operator::snapshot::Snapshot;
 use crate::problem::{Kind, refuse};
 

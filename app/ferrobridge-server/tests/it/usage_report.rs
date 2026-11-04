@@ -21,7 +21,7 @@ use ferrobridge_hl7v2::ack::Code;
 use ferrobridge_server::startup::{Lane, MappingCounts};
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::usage_report::{
-    identity, record_acknowledgment, record_mapping_failure, record_message,
+    Reported, identity, record_acknowledgment, record_mapping_failure, record_message,
 };
 use ferrobridge_server::with_middleware;
 use ferrohealth_health::registry::{Check, HealthIndicator, Outcome, Registry};
@@ -175,13 +175,13 @@ fn prepared(config: &UsageReportSection) -> Prepared {
     reporter::prepare(config, None).expect("the report runs")
 }
 
-fn reporter_over(config: &UsageReportSection, state: Arc<AppState>) -> Reporter<AppState> {
+fn reporter_over(config: &UsageReportSection, state: &AppState) -> Reporter<Reported> {
     let window = Arc::clone(state.usage_window());
     Reporter::new(
         config,
         identity(),
         prepared(config),
-        state,
+        Arc::new(state.reported()),
         window,
         Instant::now(),
     )
@@ -209,7 +209,7 @@ fn the_validator_admits_every_valid_example_and_refuses_every_invalid_one() {
 async fn the_start_report_is_exactly_the_v2_envelope() {
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), "https://report.ferropulse.eu/v1/report");
-    let reporter = reporter_over(&config, state());
+    let reporter = reporter_over(&config, &state());
     let report = serde_json::to_value(reporter.start_report().await).expect("serializes");
     assert_eq!(
         stable(report),
@@ -242,7 +242,7 @@ async fn the_start_report_is_exactly_the_v2_envelope() {
 async fn a_server_with_no_lane_reports_an_empty_status_and_an_empty_window() {
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), "https://report.ferropulse.eu/v1/report");
-    let reporter = reporter_over(&config, support::state());
+    let reporter = reporter_over(&config, &support::state());
     let report = serde_json::to_value(reporter.daily_report().await).expect("serializes");
     let report = stable(report);
     assert_eq!(report["status"], json!({ "lanes": [], "auth": false }));
@@ -272,7 +272,7 @@ async fn the_daily_report_counts_hl7v2_messages_and_mapping_failures() {
     record_mapping_failure(window);
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), "https://report.ferropulse.eu/v1/report");
-    let reporter = reporter_over(&config, Arc::clone(&state));
+    let reporter = reporter_over(&config, &state);
     let report = stable(serde_json::to_value(reporter.daily_report().await).expect("serializes"));
     let window = &report["metrics"]["window_24h"];
     assert_eq!(window["requests_bucket"], json!("1-100"));
@@ -339,7 +339,7 @@ async fn the_daily_report_counts_requests_by_route_group_and_never_by_path() {
 
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), "https://report.ferropulse.eu/v1/report");
-    let reporter = reporter_over(&config, Arc::clone(&state));
+    let reporter = reporter_over(&config, &state);
     let report = serde_json::to_value(reporter.daily_report().await).expect("serializes");
     let rendered = report.to_string();
     assert!(
@@ -392,7 +392,7 @@ async fn the_start_report_reaches_the_collector_once_per_ten_minutes() {
         .await;
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), &format!("{}/v1/report", collector.uri()));
-    let reporter = reporter_over(&config, state());
+    let reporter = reporter_over(&config, &state());
     let first = reporter.send_start().await.expect("sent");
     assert_eq!(first, StartOutcome::Sent(StatusCode::NO_CONTENT));
     let again = reporter.send_start().await.expect("decided");
@@ -431,7 +431,7 @@ async fn a_daily_report_the_collector_answers_ends_its_window_even_when_refused(
         StatusCode::OK,
         Duration::from_millis(2),
     );
-    let reporter = reporter_over(&config, Arc::clone(&state));
+    let reporter = reporter_over(&config, &state);
     let status = reporter.send_daily().await.expect("answered");
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(state.usage_window().take().requests(), 0);
@@ -465,7 +465,7 @@ async fn a_daily_report_that_reaches_no_collector_keeps_its_window() {
         StatusCode::OK,
         Duration::from_millis(2),
     );
-    let reporter = reporter_over(&config, Arc::clone(&state));
+    let reporter = reporter_over(&config, &state);
     let error = reporter.send_daily().await.expect_err("nothing listens");
     assert!(
         matches!(error, reporter::ReportError::Request(_)),
@@ -502,10 +502,14 @@ fn start_logs_the_boot_line_and_sends_the_start_report() {
             .await;
         let dir = tempfile::tempdir().expect("tempdir");
         let config = config(dir.path(), &format!("{}/v1/report", collector.uri()));
-        let handle =
-            ferrobridge_server::usage_report::start(&config, state(), Instant::now(), None)
-                .await
-                .expect("the report runs");
+        let handle = ferrobridge_server::usage_report::start(
+            &config,
+            state().reported(),
+            Instant::now(),
+            None,
+        )
+        .await
+        .expect("the report runs");
         let deadline = Instant::now() + Duration::from_secs(10);
         while collector
             .received_requests()
@@ -534,7 +538,7 @@ fn a_ci_environment_keeps_the_report_off_and_writes_nothing() {
         let config = config(&state_dir, "https://report.ferropulse.eu/v1/report");
         let handle = ferrobridge_server::usage_report::start(
             &config,
-            state(),
+            state().reported(),
             Instant::now(),
             Some("GITHUB_ACTIONS"),
         )
@@ -562,9 +566,14 @@ fn a_switched_off_report_says_so_and_sends_nothing() {
             ..config(dir.path(), "https://report.ferropulse.eu/v1/report")
         };
         assert!(
-            ferrobridge_server::usage_report::start(&config, state(), Instant::now(), None)
-                .await
-                .is_none()
+            ferrobridge_server::usage_report::start(
+                &config,
+                state().reported(),
+                Instant::now(),
+                None
+            )
+            .await
+            .is_none()
         );
     });
     let text = logs.text();

@@ -13,7 +13,7 @@ use crate::config::Settings;
 use crate::etl::mapper::{CdmVocabulary, MapperError, OmoclMapper, read_roots};
 use crate::etl::report::RunReport;
 use crate::etl::{RunError, RunOptions};
-use crate::operator::files::{Language, Root};
+use crate::mappings::files::{Language, Root};
 use ferrobridge_operator_api::etl::RunKind;
 use omop_cdm::database::{CdmPool, ConnectError};
 use omop_cdm::graph::key::EmptyIdentifier;

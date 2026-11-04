@@ -21,10 +21,10 @@ use openehr_mapping_core::diagnostic::Severity;
 
 use crate::check::Report;
 use crate::mappings::compile::TemplateOrigin;
-use crate::operator::files;
-use crate::operator::files::Language;
-use crate::operator::files::Owner;
-use crate::operator::files::Root;
+use crate::mappings::files;
+use crate::mappings::files::Language;
+use crate::mappings::files::Owner;
+use crate::mappings::files::Root;
 
 /// The running load: the boot check's report and the search declaration
 /// each context answers searches with.

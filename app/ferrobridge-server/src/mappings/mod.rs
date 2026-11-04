@@ -13,6 +13,7 @@
 //! share. No specification governs where the files live: our own design.
 
 pub mod compile;
+pub mod files;
 
 use std::path::Path;
 use std::path::PathBuf;

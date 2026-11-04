@@ -40,10 +40,10 @@ use openehr_mapping_core::index::WebTemplateIndex;
 
 use crate::etl::Mapper;
 use crate::etl::SourceComposition;
-use crate::operator::files::Language;
-use crate::operator::files::Located;
-use crate::operator::files::Owner;
-use crate::operator::files::Root;
+use crate::mappings::files::Language;
+use crate::mappings::files::Located;
+use crate::mappings::files::Owner;
+use crate::mappings::files::Root;
 
 /// Why the OMOCL mapping set could not be read.
 #[derive(Debug, thiserror::Error)]
@@ -117,7 +117,7 @@ pub fn read_set(directory: &Path) -> Result<MappingSet, MapperError> {
 /// and [`MapperError::Mappings`] with every diagnostic when a file does not
 /// load.
 pub fn read_roots(roots: &[Root]) -> Result<MappingSet, MapperError> {
-    let located: Vec<Located> = crate::operator::files::list(roots)
+    let located: Vec<Located> = crate::mappings::files::list(roots)
         .map_err(|crate::walk::Error { path, source }| MapperError::Read { path, source })?
         .into_iter()
         .filter(|file| file.language() == Language::Omocl)

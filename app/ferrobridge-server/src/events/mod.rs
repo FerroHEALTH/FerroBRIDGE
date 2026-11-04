@@ -51,6 +51,26 @@ pub struct Settings {
     pub confirm_timeout: Duration,
 }
 
+impl Settings {
+    /// Returns the AMQP topology these settings declare, as the operator API
+    /// reports it.
+    #[must_use]
+    pub fn topology(&self) -> ferrobridge_operator_api::events::Topology {
+        ferrobridge_operator_api::events::Topology {
+            exchange: self.exchange.clone(),
+            routing_key: String::from(ROUTING_KEY),
+            queues: self
+                .queues
+                .iter()
+                .map(|queue| ferrobridge_operator_api::events::Queue {
+                    name: queue.name.clone(),
+                    binding: queue.binding.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
 /// One durable queue bound to the exchange.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Queue {

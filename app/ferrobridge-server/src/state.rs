@@ -379,13 +379,6 @@ impl AppState {
         self.operations.as_deref()
     }
 
-    /// Returns why the operations are not served, which matters only while
-    /// [`Self::operations`] is `None`.
-    #[must_use]
-    pub const fn operations_off(&self) -> OperationsOff {
-        self.operations_off
-    }
-
     /// Returns a shared handle on the operations lane, for the reload that
     /// swaps its programs.
     #[must_use]
@@ -429,6 +422,28 @@ impl AppState {
     #[must_use]
     pub const fn usage_window(&self) -> &Arc<ferrohealth_usage_report::window::Window> {
         &self.usage
+    }
+
+    /// Returns what the routes of the FHIRconnect operations read.
+    #[must_use]
+    pub fn served_operations(&self) -> crate::operations::Served {
+        crate::operations::Served::new(
+            self.operations.clone(),
+            self.operations_off,
+            Arc::clone(&self.usage),
+        )
+    }
+
+    /// Returns what the usage report reads of this process.
+    #[must_use]
+    pub fn reported(&self) -> crate::usage_report::Reported {
+        crate::usage_report::Reported::new(
+            self.lanes.clone(),
+            self.health.clone(),
+            self.lifecycle.clone(),
+            self.auth.is_some(),
+            Arc::clone(&self.usage),
+        )
     }
 }
 

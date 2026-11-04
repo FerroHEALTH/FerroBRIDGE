@@ -79,16 +79,19 @@ fn report(password: &str) -> Result<(tempfile::TempDir, Report, u64), Box<dyn Er
         reader: ReaderName::new("ferrobridge-second")?,
         following: Following::new("change-feed-second"),
     })
-    .with_events(Settings {
-        reader,
-        url: SecretString::from(format!("amqp://bridge:{password}@broker.invalid/%2f")),
-        exchange: String::from("ferroehr.events"),
-        queues: vec![Queue {
-            name: String::from("ferroehr.events.analytics"),
-            binding: String::from("COMPOSITION.*.*"),
-        }],
-        confirm_timeout: Duration::from_secs(30),
-    });
+    .with_topology(
+        Settings {
+            reader,
+            url: SecretString::from(format!("amqp://bridge:{password}@broker.invalid/%2f")),
+            exchange: String::from("ferroehr.events"),
+            queues: vec![Queue {
+                name: String::from("ferroehr.events.analytics"),
+                binding: String::from("COMPOSITION.*.*"),
+            }],
+            confirm_timeout: Duration::from_secs(30),
+        }
+        .topology(),
+    );
     Ok((dir, report, id))
 }
 

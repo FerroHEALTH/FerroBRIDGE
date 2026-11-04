@@ -228,7 +228,7 @@ async fn start_change_feed(
                 reader: lane.reader.clone(),
                 following: following.clone(),
             })
-            .with_events(lane.clone());
+            .with_topology(lane.topology());
         started.push(StartedFeed {
             feed: Arc::clone(&feed),
             reader: lane.reader.clone(),
@@ -519,14 +519,14 @@ async fn build_operator(
     };
     let mut roots = Vec::new();
     if let Some(directory) = settings.mapping_directory.as_ref() {
-        roots.push(operator::files::Root::new(
-            operator::files::Language::Fhirconnect,
+        roots.push(crate::mappings::files::Root::new(
+            crate::mappings::files::Language::Fhirconnect,
             directory.clone(),
         ));
     }
     if let Some(directory) = settings.omocl_directory.as_ref() {
-        roots.push(operator::files::Root::new(
-            operator::files::Language::Omocl,
+        roots.push(crate::mappings::files::Root::new(
+            crate::mappings::files::Language::Omocl,
             directory.clone(),
         ));
     }

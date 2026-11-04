@@ -13,7 +13,7 @@ use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::job::{missing_section, omocl_roots};
 use ferrobridge_server::etl::mapper::{MapperError, read_roots};
-use ferrobridge_server::operator::files::{Language, Owner};
+use ferrobridge_server::mappings::files::{Language, Owner};
 
 /// The OMOCL corpus cluster files the cases copy.
 const CLUSTERS: &str = concat!(
@@ -111,12 +111,12 @@ fn without_the_operator_api_only_the_provisioned_tree_is_read() -> Result<(), Bo
         Some(Owner::Provisioned),
         roots
             .first()
-            .map(ferrobridge_server::operator::files::Root::owner)
+            .map(ferrobridge_server::mappings::files::Root::owner)
     );
     let bare = Config::from_sources(Some(""), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(
         omocl_roots(&bare),
-        Vec::<ferrobridge_server::operator::files::Root>::new()
+        Vec::<ferrobridge_server::mappings::files::Root>::new()
     );
     assert_eq!(Some("an [etl] section"), missing_section(&bare));
     Ok(())

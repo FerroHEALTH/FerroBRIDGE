@@ -42,8 +42,8 @@ pub struct Report {
     dead_letters: Arc<DeadLetters>,
     /// The consumers, in the order they started.
     followers: Vec<Follower>,
-    /// The events lane, when it runs.
-    events: Option<crate::events::Settings>,
+    /// The AMQP topology of the events lane, when it runs.
+    topology: Option<document::Topology>,
 }
 
 /// What a replay request found.
@@ -67,7 +67,7 @@ impl Report {
             source,
             dead_letters,
             followers: Vec::new(),
-            events: None,
+            topology: None,
         }
     }
 
@@ -78,11 +78,10 @@ impl Report {
         self
     }
 
-    /// Returns this report with the AMQP topology of the events lane
-    /// `settings`.
+    /// Returns this report with the AMQP topology of the events lane.
     #[must_use]
-    pub fn with_events(mut self, settings: crate::events::Settings) -> Self {
-        self.events = Some(settings);
+    pub fn with_topology(mut self, topology: document::Topology) -> Self {
+        self.topology = Some(topology);
         self
     }
 
@@ -98,18 +97,7 @@ impl Report {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(document::Events {
             consumers,
-            topology: self.events.as_ref().map(|settings| document::Topology {
-                exchange: settings.exchange.clone(),
-                routing_key: String::from(crate::events::ROUTING_KEY),
-                queues: settings
-                    .queues
-                    .iter()
-                    .map(|queue| document::Queue {
-                        name: queue.name.clone(),
-                        binding: queue.binding.clone(),
-                    })
-                    .collect(),
-            }),
+            topology: self.topology.clone(),
         })
     }
 

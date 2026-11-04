@@ -15,8 +15,8 @@
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read as _, Write as _};
 
-use crate::operator::files;
-use crate::operator::files::Language;
+use crate::mappings::files;
+use crate::mappings::files::Language;
 
 /// The most entries an import reads.
 pub const MAX_ENTRIES: usize = 4096;

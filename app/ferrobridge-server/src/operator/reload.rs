@@ -23,10 +23,10 @@ use crate::check::Templates;
 use crate::facade::Facade;
 use crate::facade::programs::Programs;
 use crate::facade::search::Catalog;
+use crate::mappings::files;
+use crate::mappings::files::Language;
+use crate::mappings::files::Root;
 use crate::operations::lane::OperationsLane;
-use crate::operator::files;
-use crate::operator::files::Language;
-use crate::operator::files::Root;
 use crate::operator::snapshot::Snapshot;
 
 /// Why a set did not replace the running one.

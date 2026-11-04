@@ -505,7 +505,7 @@ pub(crate) fn chain(error: &dyn std::error::Error) -> String {
 pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
-        .merge(operations::router(Arc::clone(&state)));
+        .merge(operations::router(state.served_operations()));
     if let Some(smart) = state.auth() {
         routes = routes.merge(smart::routes(smart));
         if let Some(operator) = state.operator() {
