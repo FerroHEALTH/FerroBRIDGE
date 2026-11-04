@@ -167,7 +167,7 @@ classify() {
     # Read by the testkit's screenshot guard: every console screenshot and
     # every book page that shows one.
     website/book/src/*) echo "only ferrobridge-testkit" ;;
-    scripts/checks/affected.sh | scripts/checks/fast.sh) echo ci ;;
+    scripts/checks/affected.sh | scripts/checks/fast.sh | scripts/checks/featured.sh) echo ci ;;
     .github/*) echo inert ;;
     .claude/* | website/* | assets/* | docker/* | fuzz/* | scripts/gh/* | scripts/release/*) echo inert ;;
     docs/ci-cd.md | docs/release.md | docs/post-market.md) echo inert ;;

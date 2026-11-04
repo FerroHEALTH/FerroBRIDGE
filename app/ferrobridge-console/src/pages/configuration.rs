@@ -72,7 +72,7 @@ fn drawn(l: &Locale, tab: &str, configuration: &Loaded<Configuration>) -> Html {
     let configuration = match configuration {
         Ok(Outcome::Shown(configuration)) => configuration,
         failed => {
-            let heading = page_heading(l, header(l), ActionGroup::none());
+            let heading = page_heading(l, header(l), ActionGroup::default());
             let body = match failed {
                 Ok(Outcome::Refused(refusal)) => refused_operator(l, refusal),
                 Err(fault) => faulted(l, fault, &tab_href(tab)),
@@ -89,7 +89,7 @@ fn drawn(l: &Locale, tab: &str, configuration: &Loaded<Configuration>) -> Html {
         l,
         SettingsPage {
             header: header(l),
-            actions: ActionGroup::none(),
+            actions: ActionGroup::default(),
             source: Source::File {
                 file: file_of(configuration),
                 how: How::Dialog(Cow::Borrowed(HOW_DIALOG)),

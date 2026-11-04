@@ -20,7 +20,7 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
@@ -28,7 +28,7 @@ use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::notice::{Announce, notice_text};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{Header, definitions, panel_sections};
+use ferrohealth_ui::view::surface::{Container, Header, definitions};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
 use crate::actions::{ReplayAnswer, ReplayPost};
@@ -138,7 +138,11 @@ fn drawn(l: &Locale, events: &Loaded<Events>, replayed: Option<&ReplayAnswer>) -
                 queues(l, topology),
             ));
     }
-    page_with(l, Some(consumers), with_answer(shown, panel_sections(body)))
+    page_with(
+        l,
+        Some(consumers),
+        with_answer(shown, Container::PanelSections.wrap(body)),
+    )
 }
 
 /// `body` after the answer `shown`, when there is one.
@@ -182,7 +186,7 @@ fn parked_table(l: &Locale, consumers: &[Consumer]) -> Html {
         .map(|(consumer, entry)| {
             h(format!(
                 "<tr>{}{}{}{}{}{}{}</tr>",
-                title_cell(None, t(&consumer.name), Some(code(&consumer.reader))),
+                title_cell(None, None, t(&consumer.name), Some(code(&consumer.reader))),
                 cell(
                     position_column,
                     positions(l, std::slice::from_ref(&entry.position))
@@ -209,6 +213,7 @@ fn parked_table(l: &Locale, consumers: &[Consumer]) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::EventsParked),
         columns: &columns,
         sorting: Sorting::default(),
@@ -281,7 +286,7 @@ fn page_with(l: &Locale, consumers: Option<&[Consumer]>, body: Html) -> Html {
                 mono: false,
                 badge: badge_of,
             },
-            actions: ActionGroup::none(),
+            actions: ActionGroup::default(),
             stepper: None,
             tabs: None,
             body,
@@ -313,7 +318,7 @@ fn consumer_table(l: &Locale, consumers: &[Consumer]) -> Html {
         .map(|consumer| {
             h(format!(
                 "<tr>{}{}{}{}{}{}</tr>",
-                title_cell(None, t(&consumer.name), Some(code(&consumer.reader))),
+                title_cell(None, None, t(&consumer.name), Some(code(&consumer.reader))),
                 cell(source_column, t(source_words(l, consumer.source))),
                 cell(position_column, positions(l, &consumer.positions)),
                 cell(state_column, consumer_state(l, consumer.state)),
@@ -336,6 +341,7 @@ fn consumer_table(l: &Locale, consumers: &[Consumer]) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::EventsConsumers),
         columns: &columns,
         sorting: Sorting::default(),
@@ -434,12 +440,13 @@ fn queues(l: &Locale, topology: &Topology) -> Html {
         .map(|queue| {
             h(format!(
                 "<tr>{}{}</tr>",
-                title_cell(None, code(&queue.name), None),
+                title_cell(None, None, code(&queue.name), None),
                 cell(binding, code(&queue.binding)),
             ))
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::EventsQueues),
         columns: &columns,
         sorting: Sorting::default(),

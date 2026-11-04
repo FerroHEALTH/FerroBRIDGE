@@ -159,7 +159,7 @@ fn drawn(
             subtitle: Some(tr(l, Msg::PlaygroundSubtitle).into()),
             ..Header::default()
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let off = operations_off(l, info);
     let (post, notice) = match (ran, example) {

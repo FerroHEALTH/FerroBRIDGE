@@ -23,7 +23,7 @@ use ferrobridge_operator_api::configuration::{Configuration, Entry, SecretState,
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::tone::Tone;
-use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
+use ferrohealth_ui::view::dialog::{Explanation, Width, info_dialog};
 use ferrohealth_ui::view::layout::bullet_list;
 use ferrohealth_ui::view::secret;
 use ferrohealth_ui::view::secret::secret_state;
@@ -138,7 +138,7 @@ fn muted(words: String) -> Html {
 /// Returns `held` drawn as `shape`.
 fn value(l: &Locale, held: &Value, shape: Shape) -> Html {
     match (held, shape) {
-        (Value::Secret(state), _) => secret_state(l, &shown(state)),
+        (Value::Secret(state), _) => secret_state(l, &shown(state), None),
         (Value::Boolean(on), _) => switch(l, *on),
         (Value::Integer(millis), Shape::Millis) => t(duration(l, *millis)),
         (Value::Integer(bytes), Shape::Bytes) => t(size(l, *bytes)),
@@ -287,6 +287,7 @@ pub fn how_dialog(l: &Locale) -> Html {
             title: tr(l, Msg::HowTitle).into(),
         },
         body,
+        Width::Wide,
     )
 }
 
@@ -296,7 +297,7 @@ mod tests {
 
     #[test]
     fn a_duration_reads_in_seconds_where_it_is_whole_seconds() {
-        let l = &ferrohealth_ui::i18n::Locale::english();
+        let l = &ferrohealth_ui::i18n::Locale::default();
         assert_eq!("30 s", duration(l, 30_000));
         assert_eq!("250 ms", duration(l, 250));
         assert_eq!("0 ms", duration(l, 0));
@@ -304,7 +305,7 @@ mod tests {
 
     #[test]
     fn a_size_reads_in_its_largest_whole_binary_unit() {
-        let l = &ferrohealth_ui::i18n::Locale::english();
+        let l = &ferrohealth_ui::i18n::Locale::default();
         assert_eq!("1 MiB", size(l, 1024 * 1024));
         assert_eq!("64 KiB", size(l, 64 * 1024));
         assert_eq!("1000 bytes", size(l, 1000));

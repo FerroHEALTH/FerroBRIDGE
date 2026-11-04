@@ -17,13 +17,13 @@ use ferrohealth_health::document::{Readiness, State};
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::state::{Mark, state};
-use ferrohealth_ui::view::surface::{Crumb, Header, definitions, page_heading, panel_sections};
+use ferrohealth_ui::view::surface::{Container, Crumb, Header, definitions, page_heading};
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 use ferrohealth_ui::view::template::list::{ListCard, list_card};
@@ -150,7 +150,7 @@ fn list(
             subtitle: Some(tr(l, Msg::ConnectionsSubtitle).into()),
             ..Header::default()
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let (info, readiness) = match (info, readiness) {
         (Ok(Outcome::Shown(info)), Ok(Outcome::Shown(readiness))) => (info, readiness),
@@ -192,6 +192,7 @@ fn list(
             h(format!(
                 "<tr>{}{}{}{}{}</tr>",
                 title_cell(
+                    None,
                     Some(&format!("{CONNECTIONS}/{name}")),
                     t(indicator_name(l, name)),
                     None
@@ -204,6 +205,7 @@ fn list(
         })
         .collect::<Html>();
     let table = data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::Connections),
         columns: &columns,
         sorting: Sorting::default(),
@@ -329,7 +331,7 @@ fn detail(
             crate::pages::settings::tab(l, configuration, &rows, &tab_href(name, tab))
         }
         None if found.is_none() => list_empty(tr(l, Msg::UpstreamNotConfigured), None),
-        None => panel_sections(Html::join([
+        None => Container::PanelSections.wrap(Html::join([
             warning
                 .map(|warning| ferrohealth_ui::view::surface::panel_section(l, None, warning))
                 .unwrap_or_default(),
@@ -356,7 +358,7 @@ fn detail(
                 mono: false,
                 badge: Some(badge),
             },
-            actions: ActionGroup::none(),
+            actions: ActionGroup::default(),
             stepper: None,
             tabs: Some(tabs),
             body,

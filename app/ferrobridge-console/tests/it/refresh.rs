@@ -11,6 +11,7 @@ use std::error::Error;
 
 use ferrobridge_console::server::ConsoleState;
 use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
+use ferrohealth_ui::view::session::Left;
 use http::StatusCode;
 
 use crate::support::{
@@ -186,23 +187,44 @@ async fn a_provider_that_fails_on_its_side_leaves_the_session_to_try_again()
 #[tokio::test]
 async fn the_absolute_timeout_ends_a_session_whatever_its_refresh_token()
 -> Result<(), Box<dyn Error>> {
+    const IDLE: u32 = 3;
+    let signed_in = std::time::Instant::now();
     let (provider, state, service, cookie) =
-        due_session("idle_timeout_s = 3\nabsolute_timeout_s = 4").await?;
+        due_session(&format!("idle_timeout_s = {IDLE}\nabsolute_timeout_s = 8")).await?;
     provider
         .answer_refresh(OPERATOR_REFRESH, &refreshed("synthetic-access-2", None))
         .await?;
     // NOTE: no specification governs this: our own design; the session watch's extension
     // keeps the idle timeout from ending the session and sends no refresh.
-    for _ in 0..2 {
-        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    let left = loop {
+        // The session counts whole wall-clock seconds: one extension a second stays
+        // inside the idle timeout whatever second it starts in.
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         let extend = http::Request::post("/session")
             .header("cookie", &cookie)
             .header("origin", ORIGIN)
             .body(axum::body::Body::empty())?;
-        let (extended, _body) = send(&service, extend).await?;
-        assert_eq!(StatusCode::OK, extended.status(), "the session lives");
-    }
-    tokio::time::sleep(std::time::Duration::from_millis(1600)).await;
+        let (extended, body) = send(&service, extend).await?;
+        assert_eq!(
+            StatusCode::OK,
+            extended.status(),
+            "the session lives: {body}"
+        );
+        let left: Left = serde_json::from_str(&body)?;
+        assert_eq!(
+            IDLE.min(left.absolute),
+            left.idle,
+            "the idle timeout starts again"
+        );
+        if left.absolute <= 2 {
+            break left;
+        }
+    };
+    assert!(
+        signed_in.elapsed() > std::time::Duration::from_secs(IDLE.into()),
+        "the extensions kept the session past its idle timeout"
+    );
+    tokio::time::sleep(std::time::Duration::from_secs((left.absolute + 1).into())).await;
     send(&service, get_with(PAGE, &cookie)?).await?;
     assert_eq!(None, held_token(&state, &cookie)?);
     assert_eq!(

@@ -16,11 +16,11 @@ use ferrobridge_operator_api::hl7v2::{ConceptMap, ConceptMaps, Ends, Kind, Origi
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::state::{Mark, state};
-use ferrohealth_ui::view::surface::{definitions, facts_row, panel_sections};
+use ferrohealth_ui::view::surface::{Container, definitions, facts_row};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
 use crate::app::{Drawn, HL7V2};
@@ -145,15 +145,17 @@ fn drawn(
         l,
         DetailPage {
             header: header(true),
-            actions: ActionGroup::none(),
+            actions: ActionGroup::default(),
             stepper: None,
             tabs: Some(LANE.tab_row(l, tab, |_, drawn| Some(drawn))),
-            body: panel_sections(section(l, tr(l, Msg::Listener), None, facts).then(section(
-                l,
-                tr(l, Msg::Mapping),
-                None,
-                mapping,
-            ))),
+            body: Container::PanelSections.wrap(
+                section(l, tr(l, Msg::Listener), None, facts).then(section(
+                    l,
+                    tr(l, Msg::Mapping),
+                    None,
+                    mapping,
+                )),
+            ),
         },
     )
 }
@@ -181,7 +183,7 @@ fn concept_maps(l: &Locale, directory: &Loaded<ConceptMaps>, href: &str) -> Html
     } else {
         map_table(l, &directory.maps)
     };
-    panel_sections(
+    Container::PanelSections.wrap(
         section(l, tr(l, Msg::ConceptMapDirectory), None, facts).then(section(
             l,
             tr(l, Msg::TabConceptMaps),
@@ -218,6 +220,7 @@ fn map_table(l: &Locale, maps: &[ConceptMap]) -> Html {
                 "<tr>{}{}{}{}{}{}{}</tr>",
                 title_cell(
                     None,
+                    None,
                     t(map.title.as_deref().unwrap_or(&map.id)),
                     Some(code(&map.id))
                 ),
@@ -231,6 +234,7 @@ fn map_table(l: &Locale, maps: &[ConceptMap]) -> Html {
         })
         .collect::<Html>();
     data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &tr(l, Msg::TabConceptMaps),
         columns: &columns,
         sorting: Sorting::default(),
