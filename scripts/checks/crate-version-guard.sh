@@ -174,7 +174,8 @@ changed_paths() {
   if [[ "$head" = "WORKTREE" ]]; then git diff --name-only "$base" --; else git diff --name-only "$base" "$head" --; fi
 }
 head_file() {
-  if [[ "$head" = "WORKTREE" ]]; then cat "$1"; else git show "$head:$1"; fi
+  local file="$1"
+  if [[ "$head" = "WORKTREE" ]]; then cat "$file"; else git show "$head:$file"; fi
 }
 
 changed="$(changed_paths)"
@@ -201,11 +202,13 @@ fi
 # queued change whose version the queue base already reached would publish
 # different content under one version.
 version_above() {
-  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]]
+  local candidate="$1" base_version="$2"
+  [[ "$candidate" != "$base_version" ]] && [[ "$(printf '%s\n%s\n' "$candidate" "$base_version" | sort -V | tail -n 1)" = "$candidate" ]]
 }
 
 package_field() {
-  awk -F'"' -v key="$1" '/^\[package\]/{p=1} p && $0 ~ "^" key " = " {print $2; exit}'
+  local field="$1"
+  awk -F'"' -v key="$field" '/^\[package\]/{p=1} p && $0 ~ "^" key " = " {print $2; exit}'
 }
 
 fail=0

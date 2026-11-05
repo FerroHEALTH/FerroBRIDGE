@@ -72,6 +72,8 @@ readonly E2E_PACKAGES="omop-cdm ferrobridge-server ferrobridge-term ferrobridge-
 # then filtered, so a member always lands in the same shard and its cache.
 readonly TEST_SHARDS=4
 readonly LINT_SHARDS=3
+# The jq program that lists the workspace members of a `cargo metadata` graph.
+readonly MEMBER_NAMES='[.members[].name] | join(" ")'
 test_weight() {
   case "$1" in
     fhir-codegen) echo 58 ;;
@@ -147,7 +149,8 @@ badge_corpus() {
 # line), or `member` (it lies under crates/, app/ or tools/ and maps to the
 # member owning it).
 classify() {
-  case "$1" in
+  local path="$1"
+  case "$path" in
     Cargo.toml) echo manifest ;;
     Cargo.lock) echo lock ;;
     # Read by one test of the testkit, which checks the digests it records.
@@ -194,8 +197,8 @@ classify() {
     # conformance tests and scripts/checks/conformance.sh alone: a corpus's
     # list and badge by the one package that measures it, the script and the
     # README block by every conformance package.
-    conformance/badges/*) corpus_class "$(badge_corpus "$1")" ;;
-    conformance/*/*) corpus_class "$(cut -d/ -f2 <<<"$1")" ;;
+    conformance/badges/*) corpus_class "$(badge_corpus "$path")" ;;
+    conformance/*/*) corpus_class "$(cut -d/ -f2 <<<"$path")" ;;
     conformance/* | scripts/checks/conformance.sh | README.md) echo "packages $(conformance_packages)" ;;
     scripts/checks/sqlx-offline.sh) echo "packages omop-cdm" ;;
     # The exchange-format validator lane judges the documents the eehrxf
@@ -226,6 +229,7 @@ classify() {
 # in `dev` as a dev-dependency, and in `reads` that b's source names a's
 # directory in a string literal (it reads a's files).
 reads_in() {
+  local repo_dir="$1"
   # Every string literal in a Rust source of the working tree of the
   # repository at $1 that names a member directory, as `file<TAB>dir`:
   # tracked and untracked files alike, ignored files left out, so a file not
@@ -237,10 +241,10 @@ reads_in() {
   local excluded=(':(exclude)crates/fhir-types/src' ':(exclude)crates/hl7v2-types/src'
     ':(exclude)crates/omop-cdm/src/generated')
   {
-    git -C "$1" grep --untracked -oE '"[^"]*(crates|tools|app)/[A-Za-z0-9_-]+' -- '*.rs' \
+    git -C "$repo_dir" grep --untracked -oE '"[^"]*(crates|tools|app)/[A-Za-z0-9_-]+' -- '*.rs' \
       "${excluded[@]}" |
       sed -E 's#^([^:]*):.*[^A-Za-z0-9_-]((crates|tools|app)/[A-Za-z0-9_-]+)$#\1'$'\t''\2#'
-    git -C "$1" grep --untracked -oE '"/?\.\./[A-Za-z0-9_-]+' -- \
+    git -C "$repo_dir" grep --untracked -oE '"/?\.\./[A-Za-z0-9_-]+' -- \
       'crates/*.rs' 'tools/*.rs' 'app/*.rs' "${excluded[@]}" |
       sed -nE 's#^((crates|tools|app)/[^:]*):"/?\.\./([A-Za-z0-9_-]+)$#\1'$'\t''\2/\3#p'
   } | sort -u || true
@@ -325,7 +329,8 @@ matrix() {
 }
 
 has() {
-  case " $1 " in *" $2 "*) return 0 ;; *) return 1 ;; esac
+  local list="$1" item="$2"
+  case " $list " in *" $item "*) return 0 ;; *) return 1 ;; esac
 }
 
 # Prints the outputs for a set of affected members.
@@ -374,7 +379,8 @@ manifest_diff() {
   fi
 }
 lock_at() {
-  if [[ "$1" = old ]]; then
+  local side="$1"
+  if [[ "$side" = old ]]; then
     git show "$base:Cargo.lock"
   elif [[ "$worktree" = true ]]; then
     cat Cargo.lock
@@ -389,7 +395,7 @@ lock_at() {
 # requirement, a profile or a lint, reaches everything.
 manifest_effect() {
   local graph="$1" names line name members
-  members="$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
+  members="$(jq -r "$MEMBER_NAMES" <<<"$graph")"
   names=""
   while IFS= read -r line; do
     case "$line" in
@@ -419,7 +425,7 @@ lock_entries() {
 # third-party crate and reaches everything.
 lock_effect() {
   local graph="$1" old new name version source names="" members
-  members="$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
+  members="$(jq -r "$MEMBER_NAMES" <<<"$graph")"
   old="$(lock_at old | lock_entries)" || { echo ALL; return; }
   new="$(lock_at new | lock_entries)" || { echo ALL; return; }
   while read -r name version source; do
@@ -461,6 +467,7 @@ affected_of() {
       packages\ *) seeds+=" ${class#packages }" ;;
       only\ *) only+=" ${class#only }" ;;
       member) members+="$path"$'\n' ;;
+      *) ;;
     esac
   done <<<"$paths"
   if [[ -n "$members" ]]; then
@@ -488,34 +495,37 @@ self_test() {
   # that must be reached and `-member` tokens that must not, so a new
   # dependency edge does not break a check that is not about it.
   check() {
-    got="$(printf '%s\n' "$2" | affected_of "$graph" "$3" 2>/dev/null)"
-    case "$4" in
+    local case_label="$1" case_changed="$2" case_base="$3" case_want="$4"
+    got="$(printf '%s\n' "$case_changed" | affected_of "$graph" "$case_base" 2>/dev/null)"
+    case "$case_want" in
       ALL | "")
-        if [[ "$got" != "$4" ]]; then
-          echo "self-test: $1: expected '$4', got '$got'" >&2
+        if [[ "$got" != "$case_want" ]]; then
+          echo "self-test: $case_label: expected '$case_want', got '$got'" >&2
           failures=$((failures + 1))
         fi
         return
         ;;
+      *) ;;
     esac
     if [[ "$got" = ALL ]]; then
-      echo "self-test: $1: expected '$4', got ALL" >&2
+      echo "self-test: $case_label: expected '$case_want', got ALL" >&2
       failures=$((failures + 1))
       return
     fi
-    for want in $4; do
+    for want in $case_want; do
       case "$want" in
         +*) has "$got" "${want#+}" && continue ;;
         -*) has "$got" "${want#-}" || continue ;;
+        *) ;;
       esac
-      echo "self-test: $1: expected $want, got '$got'" >&2
+      echo "self-test: $case_label: expected $want, got '$got'" >&2
       failures=$((failures + 1))
     done
   }
   # The manifest and lockfile readers answer from these instead of git.
   local diff_text="" lock_old="" lock_new=""
   manifest_diff() { printf '%s\n' "$diff_text"; }
-  lock_at() { if [[ "$1" = old ]]; then printf '%s\n' "$lock_old"; else printf '%s\n' "$lock_new"; fi; }
+  lock_at() { local side="$1"; if [[ "$side" = old ]]; then printf '%s\n' "$lock_old"; else printf '%s\n' "$lock_new"; fi; }
   local q='"'
   # The versions below are synthetic (9.9.x for a member, 8.8.x for a
   # third-party crate), never a live pin.
@@ -647,7 +657,7 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "an HL7 v2 family badge reaches only the HL7 v2 package" "conformance/badges/hl7v2-family-adt.json" false \
     "+ferrobridge-hl7v2 -ferrobridge-server -fhirconnect -ferrobridge-testkit"
   local all_members
-  all_members="$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
+  all_members="$(jq -r "$MEMBER_NAMES" <<<"$graph")"
   # Every member lands in exactly one shard of each full matrix.
   local kind listed
   for kind in test_weight:"$TEST_SHARDS" lint_weight:"$LINT_SHARDS"; do
@@ -718,7 +728,7 @@ done
 command -v jq >/dev/null 2>&1 || die "jq is not installed"
 graph="$(graph)"
 if [[ "$all" = true ]]; then
-  emit "$graph" true "$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
+  emit "$graph" true "$(jq -r "$MEMBER_NAMES" <<<"$graph")"
   exit 0
 fi
 [[ -n "$base" ]] || usage
@@ -730,7 +740,7 @@ else
 fi
 packages="$(printf '%s\n' "$changed" | affected_of "$graph" "$local_mode")"
 if [[ "$packages" = ALL ]]; then
-  emit "$graph" true "$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
+  emit "$graph" true "$(jq -r "$MEMBER_NAMES" <<<"$graph")"
 else
   emit "$graph" false "$packages"
 fi

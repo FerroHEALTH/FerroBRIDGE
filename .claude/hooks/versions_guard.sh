@@ -36,9 +36,11 @@ base="$(basename "$file_path")"
 watched=0
 case "$rel" in
 docs/VERSIONS.md | docs/architecture.md | LICENSE | NOTICE | Cargo.toml | rust-toolchain.toml | CITATION.cff | compose.yaml | README.md) watched=1 ;;
+  *) ;;
 esac
 case "$base" in
 VERSIONS.md | architecture.md | LICENSE | NOTICE | rust-toolchain.toml | CITATION.cff | compose.yaml | README.md | Dockerfile) watched=1 ;;
+  *) ;;
 esac
 
 [[ "$watched" -eq 1 ]] || exit 0

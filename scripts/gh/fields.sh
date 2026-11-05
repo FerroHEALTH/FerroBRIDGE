@@ -221,11 +221,12 @@ STUB
 
   # A failure after the create names the issue and the steps that finish it.
   mutation=fail
-  run "a failure after the create" 1 new bug high low --title t --body b
-  said "a failure after the create" "$work/err" "#4242 is filed"
-  said "a failure after the create" "$work/err" "scripts/gh/fields.sh type 4242 bug"
-  said "a failure after the create" "$work/err" "scripts/gh/fields.sh priority 4242 high"
-  said "a failure after the create" "$work/err" "scripts/gh/fields.sh effort 4242 low"
+  local after_create="a failure after the create"
+  run "$after_create" 1 new bug high low --title t --body b
+  said "$after_create" "$work/err" "#4242 is filed"
+  said "$after_create" "$work/err" "scripts/gh/fields.sh type 4242 bug"
+  said "$after_create" "$work/err" "scripts/gh/fields.sh priority 4242 high"
+  said "$after_create" "$work/err" "scripts/gh/fields.sh effort 4242 low"
   mutation=ok
 
   # The answer the default GITHUB_TOKEN of a workflow gets: `organization` is

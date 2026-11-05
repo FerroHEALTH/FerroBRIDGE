@@ -34,10 +34,11 @@ die() {
 
 # Prints the SHA-256 of FILE, with the tool the platform has.
 digest_of() {
+  local file="$1"
   if command -v sha256sum > /dev/null; then
-    sha256sum "$1" | cut -d' ' -f1
+    sha256sum "$file" | cut -d' ' -f1
   else
-    shasum -a 256 "$1" | cut -d' ' -f1
+    shasum -a 256 "$file" | cut -d' ' -f1
   fi
 }
 
@@ -50,15 +51,17 @@ verify() {
 
 # Downloads URL into FILE.
 fetch() {
-  curl --fail --silent --show-error --location --retry 3 --output "$2" "$1"
+  local url="$1" output="$2"
+  curl --fail --silent --show-error --location --retry 3 --output "$output" "$url"
 }
 
 # Prints the URL the API lists for the pinned version of PRODUCT (chrome or
 # chromedriver) on PLATFORM, from the API answer in FILE.
 url_of() {
-  jq -r --arg version "$chrome_version" --arg product "$1" --arg platform "$2" \
+  local product="$1" platform="$2" listing="$3"
+  jq -r --arg version "$chrome_version" --arg product "$product" --arg platform "$platform" \
     '.versions[] | select(.version == $version) | .downloads[$product][]?
-      | select(.platform == $platform) | .url' "$3"
+      | select(.platform == $platform) | .url' "$listing"
 }
 
 # Fetches PRODUCT for PLATFORM into DIR, checks it against DIGEST, and

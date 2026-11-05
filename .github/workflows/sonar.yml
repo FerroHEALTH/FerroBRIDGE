@@ -85,7 +85,7 @@ jobs:
               *) packages+="${packages:+ }$p" ;;
             esac
           done
-          has() { case " $packages " in *" $1 "*) echo true ;; *) echo false ;; esac; }
+          has() { local name="$1"; case " $packages " in *" $name "*) echo true ;; *) echo false ;; esac; }
           if [ -n "$packages" ]; then coverage=true; else coverage=false; fi
           examples=false
           for p in ferrobridge-testkit ferrobridge-server ferrobridge-validator; do

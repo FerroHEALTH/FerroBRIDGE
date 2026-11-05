@@ -134,7 +134,8 @@ mktemp_vars=" "
 
 # Prints the simple commands of $1, as TOKENIZER describes.
 tokenize() {
-  printf '%s' "$1" | perl -e "$TOKENIZER"
+  local command_text="$1"
+  printf '%s' "$command_text" | perl -e "$TOKENIZER"
 }
 
 # Records every word of the form NAME=$(mktemp -d …) among the arguments.
@@ -152,6 +153,7 @@ collect_mktemp() {
         --directory) mktemp_vars+="$name " ;;
         --*) ;;
         -*d*) mktemp_vars+="$name " ;;
+        *) ;;
       esac
     done
   done
@@ -160,9 +162,10 @@ collect_mktemp() {
 # Succeeds when $1, the part of a path under a temporary root, names
 # something below that root: not empty, no . or .. step, no leading glob.
 safe_rest() {
-  [[ -n "$1" ]] || return 1
-  [[ "/$1/" == */../* || "/$1/" == */./* ]] && return 1
-  case "$1" in [*?[]*) return 1 ;; esac
+  local rest="$1"
+  [[ -n "$rest" ]] || return 1
+  [[ "/$rest/" == */../* || "/$rest/" == */./* ]] && return 1
+  case "$rest" in [*?[]*) return 1 ;; *) ;; esac
   return 0
 }
 
@@ -208,7 +211,7 @@ allowed_target() {
 check_protected() {
   local t base
   for t in "$@"; do
-    case "$t" in -*) continue ;; esac
+    case "$t" in -*) continue ;; *) ;; esac
     base="${t%/}"
     base="${base##*/}"
     case "$base" in
@@ -216,6 +219,7 @@ check_protected() {
         echo "BLOCKED: LICENSE (the Business Source License 1.1, the project licence) and CLAUDE.md (the working discipline) must not be deleted."
         return 2
         ;;
+      *) ;;
     esac
   done
   return 0
@@ -238,6 +242,7 @@ judge_rm() {
           [[ "$t" == *f* ]] && force=1
           continue
           ;;
+        *) ;;
       esac
     fi
     targets+=("$t")
@@ -337,10 +342,12 @@ judge_command() {
             done
             judge_command "${w[@]:$start:$((j - start))}" || return $?
             ;;
+          *) ;;
         esac
         j=$((j + 1))
       done
       ;;
+    *) ;;
   esac
   return 0
 }
@@ -348,9 +355,10 @@ judge_command() {
 # Prints the reason and returns 2 when a simple command of the shell text $1
 # deletes what the delete rules refuse.
 judge_string() {
+  local command_text="$1"
   local rec
   local -a cmds=() words
-  IFS=$'\x1e' read -r -d '' -a cmds < <(tokenize "$1") || true
+  IFS=$'\x1e' read -r -d '' -a cmds < <(tokenize "$command_text") || true
   for rec in "${cmds[@]+"${cmds[@]}"}"; do
     words=()
     IFS=$'\x1f' read -r -d '' -a words < <(printf '%s' "$rec") || true
@@ -397,6 +405,7 @@ check_push() {
         echo "BLOCKED: force-push touching main or master is forbidden (CLAUDE.md hard rule)."
         return 2
         ;;
+      *) ;;
     esac
     [[ "$dst" =~ ^($BRANCH_TYPES)/ ]] && named=1
   done
@@ -409,8 +418,9 @@ check_push() {
 
 # Prints the reason and returns 2 when the command $1 must be blocked.
 verdict() {
+  local command_text="$1"
   mktemp_vars=" "
-  judge_string "$1"
+  judge_string "$command_text"
 }
 
 # Runs every case: a command and the exit status the hook must give it. A

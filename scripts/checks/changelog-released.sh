@@ -29,15 +29,17 @@ readonly FIRST_CHECKED=0.0.9
 # The section of version $2 in file $1: its heading through the line before
 # the next version heading or the first link reference.
 section() {
-  awk -v v="$2" 'BEGIN { h = "## [" v "]" }
+  local changelog="$1" version="$2"
+  awk -v v="$version" 'BEGIN { h = "## [" v "]" }
     index($0, h) == 1 { p = 1; print; next }
     p && (/^## \[/ || /^\[[^]]+\]: /) { exit }
-    p' "$1"
+    p' "$changelog"
 }
 
 # 0 when version $1 is at or after FIRST_CHECKED.
 checked() {
-  [[ "$(printf '%s\n%s\n' "$FIRST_CHECKED" "$1" | sort -V | head -n1)" = "$FIRST_CHECKED" ]]
+  local version="$1"
+  [[ "$(printf '%s\n%s\n' "$FIRST_CHECKED" "$version" | sort -V | head -n1)" = "$FIRST_CHECKED" ]]
 }
 
 fail=0

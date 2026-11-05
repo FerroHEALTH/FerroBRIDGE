@@ -49,7 +49,8 @@ readonly CRATES=(
 
 # The `[package]` table's own `version` in one member's manifest.
 manifest_version() {
-  awk -F'"' '/^\[package\]/{p=1} p && /^version = /{print $2; exit}' "crates/$1/Cargo.toml"
+  local crate="$1"
+  awk -F'"' '/^\[package\]/{p=1} p && /^version = /{print $2; exit}' "crates/$crate/Cargo.toml"
 }
 
 # cargo colours the status word, so "Uploaded" is followed by a reset sequence
