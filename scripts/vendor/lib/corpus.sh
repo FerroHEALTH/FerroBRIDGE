@@ -162,6 +162,45 @@ corpus_take() {
   done
 }
 
+# The committer date of commit $2 of $1, as GitHub records it.
+corpus_commit_date() {
+  corpus_api "https://api.github.com/repos/$1/commits/$2" |
+    jq -r '.commit.committer.date // empty'
+}
+
+# Copies each named path of $1 at commit $2 into $3, one file at a time from
+# raw.githubusercontent.com, for a repository too large to fetch whole. Each
+# file's git blob id is checked against the tree GitHub records for the
+# commit, which is the proof that the bytes on disk are the pinned ones.
+corpus_take_raw() {
+  local repo="$1" commit="$2" dest="$3" path dir listing want scratch
+  shift 3
+  scratch="$(mktemp -d)"
+  for path in "$@"; do
+    dir="$(dirname "$path")"
+    if [ ! -f "$scratch/$dir.tsv" ]; then
+      mkdir -p "$(dirname "$scratch/$dir.tsv")"
+      listing="$(corpus_api "https://api.github.com/repos/$repo/git/trees/$commit:$([ "$dir" = . ] || printf '%s' "$dir")")" \
+        || die "$repo at $commit has no directory $dir"
+      jq -r '.tree[] | select(.type == "blob") | [.path, .sha] | @tsv' <<< "$listing" > "$scratch/$dir.tsv"
+    fi
+    want="$(awk -F'\t' -v f="$(basename "$path")" '$1 == f { print $2; exit }' "$scratch/$dir.tsv")"
+    [ -n "$want" ] || die "$repo at $commit has no file $path"
+    corpus_take_raw_one "$repo" "$commit" "$dest" "$path" "$want"
+  done
+  rm -rf "$scratch"
+}
+
+# Downloads one file of corpus_take_raw and checks its blob id against $5.
+corpus_take_raw_one() {
+  local repo="$1" commit="$2" dest="$3" path="$4" want="$5" got
+  mkdir -p "$dest/$(dirname "$path")"
+  corpus_download "https://raw.githubusercontent.com/$repo/$commit/$path" "$dest/$path" \
+    || die "download of $path failed"
+  got="$(corpus_blob_id "$dest/$path")"
+  [ "$got" = "$want" ] || die "$path has blob id $got, the commit records $want"
+}
+
 corpus_sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 # The git blob id of a file: the object name git records for those bytes
