@@ -1,0 +1,26 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/clusters.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "the engine filled /composer",
+    "the engine filled /context/start_time",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [],
+  "added": [
+    "class.display = \"IMP\"",
+    "type[0].coding[0].display = \"abteilungskontakt\"",
+    "type[0].coding[1].display = \"normalstationaer\""
+  ],
+  "changed": [
+    "type[0].coding[0].system: \"http://fhir.de/CodeSystem/Kontaktebene\" became \"http://fhir.de/CodeSystem/kontaktebene\""
+  ]
+}

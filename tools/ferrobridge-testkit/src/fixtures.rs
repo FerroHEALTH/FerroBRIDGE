@@ -282,15 +282,17 @@ macro_rules! library_template {
 /// holds the gender evaluation with the device cluster in its open protocol
 /// slot, the health summary holds an ad hoc section with the absence and
 /// global exclusion evaluations, and the report result, medication list,
-/// encounter and person compositions each hold the gender evaluation. A suite
-/// builds the ADL 2 operational templates at test time.
-pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 6] = [
+/// encounter and person compositions each hold the gender evaluation; the
+/// clusters template holds the status and organisation clusters no library
+/// file slots. A suite builds the ADL 2 operational templates at test time.
+pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 7] = [
     library_template!("report"),
     library_template!("report_result"),
     library_template!("medication_list"),
     library_template!("encounter"),
     library_template!("person"),
     library_template!("health_summary"),
+    library_template!("clusters"),
 ];
 
 /// The seven international CKM archetypes of the library templates.
@@ -312,14 +314,15 @@ pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 7] = [
     ckm_library!("openEHR-EHR-CLUSTER.device.v1.adl"),
 ];
 
-/// The two published `HiGHmed` CKM archetypes of
+/// The five published `HiGHmed` CKM archetypes of
 /// [`FERROBRIDGE_LIBRARY_TEMPLATES`]: the encounter (`fall`) and person
-/// compositions.
+/// compositions, and the medication status, observation status and
+/// organization clusters.
 ///
 /// `scripts/vendor/ckm-highmed.sh` fetches them at the German CKM mirror
 /// commit `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records
 /// their source and each archetype's own licence.
-pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 2] = [
+pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 5] = [
     (
         "openEHR-EHR-COMPOSITION.fall.v1.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.fall.v1.adl"),
@@ -327,6 +330,18 @@ pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 2] = [
     (
         "openEHR-EHR-COMPOSITION.person.v0.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.person.v0.adl"),
+    ),
+    (
+        "openEHR-EHR-CLUSTER.medication_status_fhir.v0.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-CLUSTER.medication_status_fhir.v0.adl"),
+    ),
+    (
+        "openEHR-EHR-CLUSTER.observation_status_fhir.v1.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-CLUSTER.observation_status_fhir.v1.adl"),
+    ),
+    (
+        "openEHR-EHR-CLUSTER.organization.v0.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-CLUSTER.organization.v0.adl"),
     ),
 ];
 

@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its medication substance model, which slots the
+# library's substance model at the administered medication cluster (#1551).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_substance.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Substance"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_medication.v1.0.0"
+  archetypes:
+    - "ferrobridge_medication_substance"
+  start: "ferrobridge_medication_substance"

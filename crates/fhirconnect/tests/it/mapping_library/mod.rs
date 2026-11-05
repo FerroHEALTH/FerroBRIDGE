@@ -11,6 +11,7 @@
 //! archetypes its source specialises, is carried into the index, because
 //! `create_opt` writes an OPT that states no parent.
 
+mod clusters;
 mod compositions;
 mod medication;
 
@@ -202,8 +203,8 @@ pub(crate) fn library_chains() -> Result<Vec<crate::support::Chain>, Box<dyn Err
             program(REPORT, "ferrobridge_library_device.context", DEVICE, &[])?.0,
         ),
     ];
+    chains.extend(clusters::chains()?);
     chains.extend(compositions::chains()?);
-    chains.push((medication::FILES, medication::program()?));
     Ok(chains)
 }
 
