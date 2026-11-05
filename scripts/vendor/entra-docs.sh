@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: BUSL-1.1
 # scripts/vendor/entra-docs.sh
 #
-# Vendors the Microsoft identity platform on-behalf-of flow the facade's
-# onward exchange cites (FerroHEALTH/FerroBRIDGE#1582) into
-# docs/specs/entra-docs/: the flow page with the two include files and the
-# figure it links, and the repository's README, LICENSE and LICENSE-CODE,
+# Vendors the Microsoft identity platform pages the facade's onward exchange
+# cites (FerroHEALTH/FerroBRIDGE#1582) into docs/specs/entra-docs/: the
+# on-behalf-of flow page with the two include files and the figure it links,
+# the access token claims reference (the v2.0 `aud` claim), and the repository's README, LICENSE and LICENSE-CODE,
 # from MicrosoftDocs/entra-docs at the commit the "Microsoft Entra
 # documentation" row of docs/VERSIONS.md pins, the commit FerroHEALTH/
 # FerroAUTH vendors. The repository is large, so each file is fetched on its
@@ -40,6 +40,7 @@ paths=(
   README.md
   LICENSE
   LICENSE-CODE
+  "$base/access-token-claims-reference.md"
   "$base/v2-oauth2-on-behalf-of-flow.md"
   "$base/includes/remind-not-to-relay-token-nonaud.md"
   "$base/includes/remind-not-to-validate-access-tokens.md"
@@ -64,6 +65,9 @@ grep -q '^ *MIT License' "$tmp/tree/LICENSE" || die "LICENSE no longer holds the
 grep -q '^The MIT License (MIT)' "$tmp/tree/LICENSE-CODE" || die "LICENSE-CODE no longer holds the MIT text"
 grep -q 'requested_token_use' "$tmp/tree/$base/v2-oauth2-on-behalf-of-flow.md" ||
   die "the on-behalf-of page no longer names requested_token_use"
+grep -qF 'In v2.0 tokens, this value is always the client ID of the API.' \
+  "$tmp/tree/$base/access-token-claims-reference.md" ||
+  die "the access token claims reference no longer states the v2.0 aud"
 
 rm -rf "$dest"
 mkdir -p "$dest"
@@ -84,7 +88,7 @@ cat > "$dest/PROVENANCE.md" << PROV
 <!-- This file describes vendored third-party material; the bytes beside it
      keep their upstream licence, not the licence of this repository. -->
 
-# Provenance: the Microsoft identity platform on-behalf-of flow
+# Provenance: the Microsoft identity platform documents
 
 Vendored verbatim by \`scripts/vendor/entra-docs.sh\`. Never edit a file
 here: change the pin in docs/VERSIONS.md and re-run the script.
@@ -110,13 +114,17 @@ here: change the pin in docs/VERSIONS.md and re-run the script.
 - Files: $files
 - Tree digest (sha256 over the sorted per-file \`sha256  path\` listing,
   \`PROVENANCE.md\` excluded): \`$digest\`
-- Read by: FerroHEALTH/FerroBRIDGE#1582 (the \`on_behalf_of\` onward grant)
+- Read by: FerroHEALTH/FerroBRIDGE#1582 (the \`on_behalf_of\` onward grant,
+  and the \`aud\` of the system lane's own token)
 
 ## What is taken
 
+\`$base/access-token-claims-reference.md\` ("Access token claims
+reference", whose \`aud\` row states the v2.0 audience) and
 \`$base/v2-oauth2-on-behalf-of-flow.md\` ("Microsoft identity platform and
 OAuth2.0 On-Behalf-Of flow"), with the two include files and the one figure
-it links. The other pages and media of the repository are not taken.
+the flow page links. The other pages and media of the repository are not
+taken.
 
 | File | sha256 | git blob id |
 |---|---|---|$rows
