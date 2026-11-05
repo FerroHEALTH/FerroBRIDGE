@@ -1,0 +1,143 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! A received discharge report: the document examples the vendored HL7
+//! Europe Hospital Discharge Report 1.0.0 package publishes, read, of their
+//! category and checked against `bundle-eu-hdr` and `composition-eu-hdr`.
+
+#![expect(
+    clippy::panic_in_result_fn,
+    reason = "a test asserts, and returns its setup errors"
+)]
+
+use std::error::Error;
+use std::io::Read;
+
+use eehrxf::category::Category;
+use eehrxf::crosswalk::discharge::HDR_COMPOSITION;
+use eehrxf::document::discharge::{DISCHARGE_SUMMARY, HDR_BUNDLE};
+use eehrxf::receive::ReceivedDocument;
+use eehrxf::receive::category::{DocumentType, LOINC, Uncategorised};
+use eehrxf::receive::conform::{CheckError, FindingKind};
+use flate2::read::GzDecoder;
+
+use crate::support::{hdr, hdr_package};
+
+/// Every document `Bundle` example of the HDR package, by its member path.
+const EXAMPLES: [&str; 5] = [
+    "package/examples/Bundle-DischargeBundle-Novak-Petr-Subsections.json",
+    "package/examples/Bundle-HDR-Luigi-De-Luca-Example.json",
+    "package/examples/Bundle-HDR-Paolo-Marcheschi-Example.json",
+    "package/examples/Bundle-HDR-Reijer-Wolff-Example.json",
+    "package/examples/Bundle-bundle-swart.json",
+];
+
+/// Returns the text of the member `path` of the vendored HDR package.
+fn example(path: &str) -> Result<String, Box<dyn Error>> {
+    let mut archive = tar::Archive::new(GzDecoder::new(std::fs::File::open(hdr_package())?));
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        if entry.path()?.to_string_lossy() == path {
+            let mut text = String::new();
+            entry.read_to_string(&mut text)?;
+            return Ok(text);
+        }
+    }
+    Err(format!("the HDR package holds no {path}").into())
+}
+
+#[test]
+fn every_example_document_is_in_the_package() -> Result<(), Box<dyn Error>> {
+    let mut archive = tar::Archive::new(GzDecoder::new(std::fs::File::open(hdr_package())?));
+    let mut bundles = Vec::new();
+    for entry in archive.entries()? {
+        let path = entry?.path()?.to_string_lossy().into_owned();
+        if path.starts_with("package/examples/Bundle-") {
+            bundles.push(path);
+        }
+    }
+    bundles.sort();
+    assert_eq!(bundles, EXAMPLES, "the suite reads every Bundle example");
+    Ok(())
+}
+
+#[test]
+fn the_discharge_report_is_received_with_the_hdr_profiles() -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        Category::Discharge.document_type(),
+        Some(DocumentType {
+            system: LOINC,
+            code: DISCHARGE_SUMMARY,
+        })
+    );
+    let profiles = Category::Discharge
+        .profiles()
+        .ok_or("the category is received")?;
+    assert_eq!(profiles.bundle, HDR_BUNDLE);
+    assert_eq!(profiles.composition, HDR_COMPOSITION);
+    Ok(())
+}
+
+#[test]
+fn every_example_is_a_discharge_report_that_keeps_its_text() -> Result<(), Box<dyn Error>> {
+    for path in EXAMPLES {
+        let text = example(path)?;
+        let document = ReceivedDocument::read(&text).map_err(|error| format!("{path}: {error}"))?;
+        assert_eq!(document.original(), text, "{path}");
+        assert_eq!(document.category()?, Category::Discharge, "{path}");
+    }
+    Ok(())
+}
+
+#[test]
+fn every_example_conforms_to_the_hdr_document_profiles() -> Result<(), Box<dyn Error>> {
+    let (bundle, composition) = (hdr(HDR_BUNDLE)?, hdr(HDR_COMPOSITION)?);
+    for path in EXAMPLES {
+        let document = ReceivedDocument::read(&example(path)?)?;
+        document
+            .check(&bundle, &composition)
+            .map_err(|error| format!("{path}: {error:?}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn a_discharge_report_without_its_encounter_is_found() -> Result<(), Box<dyn Error>> {
+    let text = example("package/examples/Bundle-HDR-Paolo-Marcheschi-Example.json")?;
+    let mut tree: serde_json::Value = serde_json::from_str(&text)?;
+    let composition = tree
+        .pointer_mut("/entry/0/resource")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("the Composition entry")?;
+    assert!(
+        composition.remove("encounter").is_some(),
+        "the example names its encounter"
+    );
+    let document = ReceivedDocument::read(&serde_json::to_string(&tree)?)?;
+    match document.check(&hdr(HDR_BUNDLE)?, &hdr(HDR_COMPOSITION)?) {
+        Err(CheckError::NonConformant { findings }) => {
+            assert!(
+                findings
+                    .iter()
+                    .any(|finding| finding.element == "Composition.encounter"
+                        && matches!(finding.kind, FindingKind::TooFew { .. })),
+                "{findings:?}"
+            );
+            Ok(())
+        }
+        other => Err(format!("the document without its encounter passed: {other:?}").into()),
+    }
+}
+
+#[test]
+fn a_discharge_code_in_another_system_names_no_category() -> Result<(), Box<dyn Error>> {
+    let text = example("package/examples/Bundle-HDR-Paolo-Marcheschi-Example.json")?;
+    let mut tree: serde_json::Value = serde_json::from_str(&text)?;
+    let coding = tree
+        .pointer_mut("/entry/0/resource/type/coding/0/system")
+        .ok_or("the Composition.type coding")?;
+    *coding = serde_json::Value::from("http://example.org/loinc");
+    let document = ReceivedDocument::read(&serde_json::to_string(&tree)?)?;
+    assert_eq!(document.category(), Err(Uncategorised::Unknown));
+    Ok(())
+}
