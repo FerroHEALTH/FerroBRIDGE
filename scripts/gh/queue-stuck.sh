@@ -115,16 +115,18 @@ STUB
   }
   # said NAME FILE NEEDLE: the case left that text in FILE.
   said() {
-    if ! grep -qF -- "$3" "$2"; then
-      echo "queue-stuck: self-test failed: $1 did not say '$3'." >&2
+    local label="$1" file="$2" text="$3"
+    if ! grep -qF -- "$text" "$file"; then
+      echo "queue-stuck: self-test failed: $label did not say '$text'." >&2
       cat "$work/out" "$work/err" "$calls" >&2
       exit 1
     fi
   }
   # never NAME NEEDLE: the case made no gh call holding NEEDLE.
   never() {
-    if grep -qF -- "$2" "$calls"; then
-      echo "queue-stuck: self-test failed: $1 called gh with '$2'." >&2
+    local label="$1" text="$2"
+    if grep -qF -- "$text" "$calls"; then
+      echo "queue-stuck: self-test failed: $label called gh with '$text'." >&2
       cat "$calls" >&2
       exit 1
     fi
@@ -147,11 +149,12 @@ STUB
   entries='{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[
     {"position":1,"state":"AWAITING_CHECKS","enqueuedAt":"2026-01-01T00:00:00Z","headCommit":{"oid":"a1","checkSuites":{"totalCount":3}},"pullRequest":{"id":"PR_1","number":11}},
     {"position":2,"state":"QUEUED","enqueuedAt":"2026-01-01T00:00:00Z","headCommit":null,"pullRequest":{"id":"PR_42","number":42}}]}}}}}'
-  run "a stuck entry, dry run" 3
-  said "a stuck entry, dry run" "$work/out" "stuck: #42"
-  said "a stuck entry, dry run" "$work/out" "would dequeue #42 and arm auto-merge again"
-  never "a stuck entry, dry run" "dequeuePullRequest"
-  never "a stuck entry, dry run" "pr merge"
+  local dry_run_case="a stuck entry, dry run"
+  run "$dry_run_case" 3
+  said "$dry_run_case" "$work/out" "stuck: #42"
+  said "$dry_run_case" "$work/out" "would dequeue #42 and arm auto-merge again"
+  never "$dry_run_case" "dequeuePullRequest"
+  never "$dry_run_case" "pr merge"
 
   run "a stuck entry younger than the threshold" 0 --minutes 90
   said "a stuck entry younger than the threshold" "$work/out" "no stuck entry"

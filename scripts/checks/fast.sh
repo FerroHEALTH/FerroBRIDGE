@@ -64,7 +64,7 @@ else
   out="$(scripts/checks/affected.sh --base "$base" --worktree --local)"
 fi
 
-get() { printf '%s\n' "$out" | sed -n "s/^$1=//p"; }
+get() { local key="$1"; printf '%s\n' "$out" | sed -n "s/^$key=//p"; }
 packages="$(get packages)"
 if [[ -z "$packages" ]]; then
   echo "fast: the change reaches no package; nothing to run"
@@ -80,7 +80,8 @@ run() {
 }
 
 has() {
-  case " $1 " in *" $2 "*) return 0 ;; *) return 1 ;; esac
+  local list="$1" item="$2"
+  case " $list " in *" $item "*) return 0 ;; *) return 1 ;; esac
 }
 
 # The build-time corpora, for the packages whose tests read them.

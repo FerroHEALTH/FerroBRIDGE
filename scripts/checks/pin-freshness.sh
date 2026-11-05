@@ -50,7 +50,8 @@ mdbook-mermaid	badboy/mdbook-mermaid"
 # The second cell of the matrix row whose first cell is $1, with the backticks
 # stripped.
 matrix_cell() {
-  awk -F'|' -v want="$1" '
+  local row_label="$1"
+  awk -F'|' -v want="$row_label" '
     NF >= 3 {
       label = $2; value = $3
       gsub(/`/, "", label); gsub(/^[ \t]+|[ \t]+$/, "", label)
@@ -78,7 +79,8 @@ cell_held() {
 
 # The version the matrix row whose first cell is $1 pins.
 matrix_pin() {
-  matrix_cell "$1" | cell_version
+  local row_label="$1"
+  matrix_cell "$row_label" | cell_version
 }
 
 # The newest version a registry metadata document on stdin names: its
@@ -109,10 +111,11 @@ chrome_stable() {
 # The line one pin LABEL at PINNED gets against the newest release LATEST read
 # from SOURCE: `current` when they are equal, `STALE` when they differ.
 verdict() {
-  if [[ "$2" = "$3" ]]; then
-    printf 'current    %s %s (%s)\n' "$1" "$2" "$4"
+  local pin_name="$1" pinned_version="$2" newest_version="$3" source="$4"
+  if [[ "$pinned_version" = "$newest_version" ]]; then
+    printf 'current    %s %s (%s)\n' "$pin_name" "$pinned_version" "$source"
   else
-    printf 'STALE      %s: pinned %s, newest upstream release %s (%s)\n' "$1" "$2" "$3" "$4"
+    printf 'STALE      %s: pinned %s, newest upstream release %s (%s)\n' "$pin_name" "$pinned_version" "$newest_version" "$source"
   fi
 }
 
@@ -121,8 +124,9 @@ verdict() {
 self_test() {
   local failures=0 got
   expect() {
-    if [[ "$2" != "$1" ]]; then
-      printf 'pin-freshness: self-test: %s gave "%s", wanted "%s"\n' "$3" "$2" "$1" >&2
+    local expected="$1" actual="$2" case_label="$3"
+    if [[ "$actual" != "$expected" ]]; then
+      printf 'pin-freshness: self-test: %s gave "%s", wanted "%s"\n' "$case_label" "$actual" "$expected" >&2
       failures=$((failures + 1))
     fi
   }
@@ -229,7 +233,8 @@ HL7 v2 legacy tables (NIST IGAMT export, never committed)	usnistgov/igamt-hl7Too
 # The first 40-hex commit in the second cell of the matrix row whose first cell
 # is $1.
 matrix_commit() {
-  awk -F'|' -v want="$1" '
+  local row_label="$1"
+  awk -F'|' -v want="$row_label" '
     NF >= 3 {
       label = $2; value = $3
       gsub(/`/, "", label); gsub(/^[ \t]+|[ \t]+$/, "", label)

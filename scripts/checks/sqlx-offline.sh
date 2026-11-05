@@ -41,8 +41,9 @@ case "${1:-}" in
 esac
 
 require() {
-  if ! command -v "$1" > /dev/null; then
-    echo "error: $1 is not on PATH" >&2
+  local tool="$1"
+  if ! command -v "$tool" > /dev/null; then
+    echo "error: $tool is not on PATH" >&2
     exit 2
   fi
 }

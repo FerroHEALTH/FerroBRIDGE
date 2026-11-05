@@ -85,6 +85,7 @@ case "$file_path" in
     }
   fi
   ;;
+  *) ;;
 esac
 
 exit 0

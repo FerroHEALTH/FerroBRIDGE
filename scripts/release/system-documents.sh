@@ -64,10 +64,11 @@ pin() {
 
 # The pin key of a page's revision date.
 revised_key() {
-  case "$1" in
+  local page_name="$1"
+  case "$page_name" in
     information-sheet) echo INFORMATION_SHEET_REVISED ;;
     instructions-for-use) echo INSTRUCTIONS_FOR_USE_REVISED ;;
-    *) die "unknown page '$1' (information-sheet or instructions-for-use)" ;;
+    *) die "unknown page '$page_name' (information-sheet or instructions-for-use)" ;;
   esac
 }
 
@@ -221,6 +222,7 @@ facts() {
       echo "- **PostgreSQL:** $(version 'image:PostgreSQL image'), the database the OMOP CDM is tested on."
       echo "- **The openEHR CDR:** any CDR that serves openEHR ITS-REST $(version 'first:openEHR ITS-REST'); FerroEHR ${ehr} is the one this release is tested against."
       ;;
+    *) ;;
   esac
 }
 
@@ -303,8 +305,9 @@ check_notes() {
 self_test() {
   local tmp fails=0 tag out revised_sheet revised_ifu
   expect() {
-    if [[ "$2" != "$3" ]]; then
-      echo "self-test: $1: got '$2', want '$3'" >&2
+    local label="$1" got="$2" want="$3"
+    if [[ "$got" != "$want" ]]; then
+      echo "self-test: $label: got '$got', want '$want'" >&2
       fails=$((fails + 1))
     fi
   }
@@ -404,7 +407,8 @@ self_test() {
 # A relative path argument is the caller's, so it is resolved against the
 # directory the script was started from.
 absolute() {
-  if [[ "$1" == /* ]]; then printf '%s\n' "$1"; else printf '%s\n' "$caller_dir/$1"; fi
+  local path="$1"
+  if [[ "$path" == /* ]]; then printf '%s\n' "$path"; else printf '%s\n' "$caller_dir/$path"; fi
 }
 
 case "${1:-}" in

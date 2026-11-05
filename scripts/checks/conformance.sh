@@ -88,9 +88,10 @@ readonly PACKAGES=("${packages[@]}")
 
 # The package and the test name of corpus $1, or status 1 for no such corpus.
 test_of() {
+  local corpus_name="$1"
   local row
   for row in "${CORPUS_TESTS[@]}"; do
-    if [[ "${row%% *}" = "$1" ]]; then
+    if [[ "${row%% *}" = "$corpus_name" ]]; then
       echo "${row#* }"
       return 0
     fi
@@ -192,7 +193,8 @@ colour_of() {
 
 # The badge JSON of a label and k passing out of n.
 fraction_badge() {
-  jq -cn --arg label "$1" --arg message "$2 / $3" --arg color "$(colour_of "$2" "$3")" \
+  local label="$1" passed="$2" total="$3"
+  jq -cn --arg label "$label" --arg message "$passed / $total" --arg color "$(colour_of "$passed" "$total")" \
     '{schemaVersion: 1, label: $label, message: $message, color: $color}'
 }
 
@@ -210,12 +212,13 @@ failed=0
 # Writes badge $1 as $2 under --update, else compares it with the file and
 # names $3, what the badge is rendered from, when they disagree.
 emit_badge() {
-  local badge="$BADGES/$1.json"
+  local badge_name="$1" document="$2" source="$3"
+  local badge="$BADGES/$badge_name.json"
   if [[ "$mode" = update ]]; then
     mkdir -p "$BADGES"
-    printf '%s\n' "$2" >"$badge"
-  elif [[ ! -f "$badge" ]] || [[ "$(cat "$badge")" != "$2" ]]; then
-    echo "conformance: $badge disagrees with $3; run $0 --update"
+    printf '%s\n' "$document" >"$badge"
+  elif [[ ! -f "$badge" ]] || [[ "$(cat "$badge")" != "$document" ]]; then
+    echo "conformance: $badge disagrees with $source; run $0 --update"
     if [[ "$mode" = check ]]; then failed=1; fi
   fi
 }
@@ -248,16 +251,18 @@ if [[ -z "$only" || "$only" = validator-agreement ]] && ! scripts/vendor/profile
 fi
 # Runs the conformance tests of package $1 that filter $2 selects.
 measure() {
-  if ! cargo nextest run --locked -p "$1" --no-tests=fail --no-fail-fast -E "$2"; then
-    echo "conformance: a $1 corpus test failed; a case its list records no longer passes"
+  local test_package="$1" test_filter="$2"
+  if ! cargo nextest run --locked -p "$test_package" --no-tests=fail --no-fail-fast -E "$test_filter"; then
+    echo "conformance: a $test_package corpus test failed; a case its list records no longer passes"
     failed=1
   fi
 }
 
 # Runs the one test that measures corpus $1.
 measure_corpus() {
+  local corpus_name="$1"
   local package test
-  read -r package test < <(test_of "$1")
+  read -r package test < <(test_of "$corpus_name")
   measure "$package" "test(/(^|::)${test}\$/)"
 }
 
@@ -340,7 +345,8 @@ badges_measured() {
   # cases whose field $1 is $2.
   hl7v2_cases="$(jq -c -s '[.[].cases[]]' "$OUT/hl7v2.json" "$OUT/hl7v2-smoke.json")"
   fraction_of() {
-    jq -r --arg field "$1" --arg value "$2" \
+    local field="$1" value="$2"
+    jq -r --arg field "$field" --arg value "$value" \
       '[.[] | select(.[$field] == $value)] | "\([.[] | select(.passed)] | length) \(length)"' \
       <<<"$hl7v2_cases"
   }

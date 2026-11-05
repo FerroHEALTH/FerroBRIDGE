@@ -60,9 +60,9 @@ while IFS= read -r number; do
   while IFS=$'\t' read -r n location; do
     [[ "$n" = "$number" ]] || continue
     if [[ "$state" = CLOSED ]]; then
-      echo "::error file=${location%%:*},line=${location##*:}::$location names #$number, which is closed: point it at the open issue that carries the work, or remove it."
+      echo "::error file=${location%%:*},line=${location##*:}::$location names #$number, which is closed: point it at the open issue that carries the work, or remove it." >&2
     else
-      echo "::error file=${location%%:*},line=${location##*:}::$location names #$number, which the tracker does not answer as an open issue."
+      echo "::error file=${location%%:*},line=${location##*:}::$location names #$number, which the tracker does not answer as an open issue." >&2
     fi
   done <<< "$records"
 done < <(cut -f1 <<< "$records" | sort -un)
