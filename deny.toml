@@ -13,7 +13,11 @@ version = 2
 # Fail on any RustSec advisory. Add exceptions explicitly, dated, and each
 # naming the event that deletes it.
 yanked = "deny"
-ignore = []
+ignore = [
+  # https://rustsec.org/advisories/RUSTSEC-2026-0440 (2026-11-05). Deleted
+  # when testcontainers, the only carrier, stops depending on the crate.
+  { id = "RUSTSEC-2026-0440", reason = "astral-tokio-tar is unmaintained; reached only through testcontainers, a dev-dependency of ferrobridge-testkit that starts the end-to-end containers, and absent from every shipped artifact" },
+]
 
 [licenses]
 version = 2

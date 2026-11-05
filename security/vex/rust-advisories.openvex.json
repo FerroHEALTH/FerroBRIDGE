@@ -3,8 +3,64 @@
   "@id": "https://ferrobridge.eu/vex/rust-dependency-advisories",
   "author": "Cadasto B.V.",
   "role": "vendor",
-  "statements": [],
-  "timestamp": "2026-10-23T00:00:00Z",
+  "statements": [
+    {
+      "ferrobridge:reachability": {
+        "direct_dependents": [
+          "testcontainers"
+        ],
+        "package": "astral-tokio-tar",
+        "workspace_roots": [
+          "eehrxf",
+          "ferrobridge-console",
+          "ferrobridge-fhirpath",
+          "ferrobridge-hl7v2",
+          "ferrobridge-operator-api",
+          "ferrobridge-server",
+          "ferrobridge-term",
+          "ferrobridge-testkit",
+          "ferrobridge-validator",
+          "fhirconnect",
+          "omocl",
+          "omop-cdm",
+          "openehr-mapping-core"
+        ]
+      },
+      "impact_statement": "An UNMAINTAINED-crate advisory, not a vulnerability: Astral ended maintenance on 2026-11-03 and RustSec records no flaw and no patched version. `astral-tokio-tar` reaches the build only through `testcontainers`, which `ferrobridge-testkit` uses to start PostgreSQL and the reference CDR for the end-to-end tests (`cargo tree -i astral-tokio-tar`), and every other workspace member reaches it only as a dev-dependency through that test-support crate. The server binary and the console binary do not link it (`cargo tree -i astral-tokio-tar -p ferrobridge-server -e normal,build` is empty), so it is absent from the artifacts this document describes. Re-evaluate on the next testcontainers release.",
+      "justification": "vulnerable_code_not_present",
+      "products": [
+        {
+          "@id": "pkg:cargo/ferrobridge-server",
+          "subcomponents": [
+            {
+              "@id": "pkg:cargo/astral-tokio-tar"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/ferrobridge",
+          "subcomponents": [
+            {
+              "@id": "pkg:cargo/astral-tokio-tar"
+            }
+          ]
+        },
+        {
+          "@id": "pkg:oci/ferrobridge-console",
+          "subcomponents": [
+            {
+              "@id": "pkg:cargo/astral-tokio-tar"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "vulnerability": {
+        "name": "RUSTSEC-2026-0440"
+      }
+    }
+  ],
+  "timestamp": "2026-11-05T00:00:00Z",
   "tooling": "scripts/security/vex-generate.sh from security/vex/rust-advisories.toml + deny.toml",
-  "version": 1
+  "version": 2
 }
