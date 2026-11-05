@@ -801,6 +801,24 @@ ours:
   and `instant` in the server's zone and truncated fractional seconds until
   3.0.0 and 3.0.1; the matrix pins `Z`, `+00:00`, `+01:00` and sub-second
   precision as byte-identical round trips.
+- **A pair the data-type chapter does not write is a load refusal.** An
+  untyped mapping whose openEHR class has a row in the pair table and whose
+  FHIR type that row does not hold is refused at load as
+  `fc-unpaired-types`, naming file and line, and so is a data value mapped
+  onto a resource root; a mapping that only runs out of openEHR may read a
+  class through a row it inherits (`DV_CODED_TEXT.adoc`: "Inherits from
+  DV_TEXT"). A `reference` written into a choice element whose type the path
+  does not name is refused as `fc-reference-into-choice`, since FHIR names a
+  choice by the type it holds (<https://hl7.org/fhir/R4/formats.html#choice>).
+  Each of these failed only on the first run that carried the element before
+  (#1566).
+- **`instant` pairs with `DV_DATE_TIME`: our own design.** `DV_DATE_TIME.adoc`
+  lists `dateTime` and `Period` and no `instant`. The R4 package's lexical
+  form of `instant` is a strict subset of that of `dateTime`, so going into
+  openEHR the value moves as a `dateTime` does, with no condition; going out
+  of openEHR a `DV_DATE_TIME` that is not a valid `instant` is refused with
+  the part it lacks (a full date and time of day, the seconds, or an
+  offset). The specification is asked to list the pair.
 - **A `DV_PROPORTION` that is not a percentage is a refusal, not an invented
   extension.** FHIR `Quantity` cannot carry a denominator, so only a percent
   has a faithful representation. The reference engine now emits two extension

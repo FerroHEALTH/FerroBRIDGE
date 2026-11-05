@@ -108,6 +108,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             other @ (FhirValue::String(_)
             | FhirValue::Date(_)
             | FhirValue::DateTime(_)
+            | FhirValue::Instant(_)
             | FhirValue::Boolean(_)
             | FhirValue::Period(_)
             | FhirValue::Reference(_)

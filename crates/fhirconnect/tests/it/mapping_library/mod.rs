@@ -194,16 +194,10 @@ fn models(program: &Program) -> Vec<&str> {
 /// Compiles every context of this suite that compiles and returns each with
 /// the published files it loads, relative to the vendored library.
 pub(crate) fn library_chains() -> Result<Vec<crate::support::Chain>, Box<dyn Error>> {
-    let mut chains = vec![
-        (
-            GENDER,
-            program(REPORT, "ferrobridge_library_gender.context", GENDER, &[])?.0,
-        ),
-        (
-            DEVICE,
-            program(REPORT, "ferrobridge_library_device.context", DEVICE, &[])?.0,
-        ),
-    ];
+    let mut chains = vec![(
+        GENDER,
+        program(REPORT, "ferrobridge_library_gender.context", GENDER, &[])?.0,
+    )];
     chains.extend(clusters::chains()?);
     chains.extend(compositions::chains()?);
     chains.push(ips::chain()?);
@@ -236,12 +230,42 @@ fn the_gender_evaluation_compiles_onto_patient() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// `device.v1.yml:32` and `:77` map the `string`s
+/// `Device.udiCarrier.deviceIdentifier` and `Device.distinctIdentifier` onto
+/// `DV_IDENTIFIER` nodes, which `types-of-mappings/data-type/DV_IDENTIFIER.adoc`
+/// pairs with `Identifier` only, so the model is refused at load (#101).
 #[test]
-fn the_device_cluster_compiles_onto_device() -> Result<(), Box<dyn Error>> {
-    let (program, _) = program(REPORT, "ferrobridge_library_device.context", DEVICE, &[])?;
-    assert_eq!(program.resource().as_str(), "Device");
-    assert_eq!(models(&program), ["CLUSTER.device.v1"]);
-    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
+fn the_device_cluster_is_refused_at_load() -> Result<(), Box<dyn Error>> {
+    let Err(diagnostics) = compiled(REPORT, "ferrobridge_library_device.context", DEVICE, &[])?
+    else {
+        return Err("the device cluster compiles".into());
+    };
+    let mut rows: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            format!(
+                "{}:{} {}",
+                diagnostic
+                    .file()
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                diagnostic
+                    .position()
+                    .map_or_else(String::new, |position| position.line().to_string()),
+                diagnostic.code()
+            )
+        })
+        .collect();
+    rows.sort();
+    rows.dedup();
+    assert_eq!(
+        rows,
+        [
+            "device.v1.yml:32 fc-unpaired-types",
+            "device.v1.yml:77 fc-unpaired-types"
+        ]
+    );
     Ok(())
 }
 
@@ -251,27 +275,5 @@ fn putget_holds_on_a_synthetic_patient_gender() -> Result<(), Box<dyn Error>> {
     let patient = serde_json::json!({"resourceType": "Patient", "gender": "female"});
     let declared = laws::putget(&program, &index, &patient, &laws::untouched)?;
     insta::assert_json_snapshot!("library_gender_putget", declared);
-    Ok(())
-}
-
-/// The library maps `Device.note.text` twice, as `description` onto
-/// `items[at0002]` and as `note` onto `items[at0008]`, so the one note is
-/// written to both elements and reads back as two; `deviceName.type` is
-/// mapped by no method of the file.
-#[test]
-fn putget_holds_on_a_synthetic_device() -> Result<(), Box<dyn Error>> {
-    let (program, index) = program(REPORT, "ferrobridge_library_device.context", DEVICE, &[])?;
-    let device = serde_json::json!({
-        "resourceType": "Device",
-        "deviceName": [{"name": "Synthetic analyser", "type": "user-friendly-name"}],
-        "type": {"text": "Synthetic analyser type"},
-        "manufacturer": "Synthetic Manufacturer",
-        "serialNumber": "SYN-SERIAL-0001",
-        "modelNumber": "SYN-MODEL-0001",
-        "lotNumber": "SYN-LOT-0001",
-        "note": [{"text": "A synthetic device."}]
-    });
-    let declared = laws::putget(&program, &index, &device, &laws::untouched)?;
-    insta::assert_json_snapshot!("library_device_putget", declared);
     Ok(())
 }

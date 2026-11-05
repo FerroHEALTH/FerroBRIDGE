@@ -26,6 +26,7 @@ use crate::engine::lens::coded_text::CodedTextLens;
 use crate::engine::lens::count::CountLens;
 use crate::engine::lens::date::DateLens;
 use crate::engine::lens::date_time::DateTimeLens;
+use crate::engine::lens::date_time::InstantLens;
 use crate::engine::lens::date_time::PeriodStartLens;
 use crate::engine::lens::duration::DurationLens;
 use crate::engine::lens::encapsulated::EncapsulatedLens;
@@ -114,6 +115,9 @@ pub fn get(
         }
         (RmValue::DateTime(date), FhirKind::DateTime) => {
             DateTimeLens.get(date.as_ref()).map(FhirValue::DateTime)
+        }
+        (RmValue::DateTime(date), FhirKind::Instant) => {
+            InstantLens.get(date.as_ref()).map(FhirValue::Instant)
         }
         (RmValue::DateTime(date), FhirKind::Period) => PeriodStartLens
             .get(date.as_ref())
@@ -277,6 +281,9 @@ pub fn put(
             .map(RmValue::Boolean),
         ("DV_DATE_TIME", FhirValue::DateTime(date)) => DateTimeLens
             .put(date, held_date_time(existing))
+            .map(|date| RmValue::DateTime(Box::new(date))),
+        ("DV_DATE_TIME", FhirValue::Instant(instant)) => InstantLens
+            .put(instant, held_date_time(existing))
             .map(|date| RmValue::DateTime(Box::new(date))),
         ("DV_DATE_TIME", FhirValue::Period(period)) => PeriodStartLens
             .put(period.as_ref(), held_date_time(existing))

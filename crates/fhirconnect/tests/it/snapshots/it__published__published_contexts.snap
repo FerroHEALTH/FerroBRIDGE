@@ -43,6 +43,7 @@ projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
   left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
+    model/cluster/org.openehr/case_identification.v0.yml:16 error fc-unpaired-types
     model/cluster/org.openehr/specimen.v1.yml:101 warning fc-excluded-template-node
     model/cluster/org.openehr/specimen.v1.yml:139 warning fc-excluded-template-node
     model/cluster/org.openehr/specimen.v1.yml:19 warning fc-excluded-template-node
@@ -61,6 +62,7 @@ projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.context.yaml
     model/composition/org.openehr/request.v1.ServiceRequest.yml:66 error fc-unknown-template-node
     model/composition/org.openehr/request.v1.ServiceRequest.yml:68 error fc-unknown-template-node
     model/instruction/org.openehr/service_request.v1.yml:34 error fc-unknown-template-node
+    model/instruction/org.openehr/service_request.v1.yml:47 error fc-unpaired-types
     projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:108 error fc-unknown-extension-target
     projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:17 error fc-archetype-mismatch
     projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml:54 error fc-uncarried-tail
@@ -76,6 +78,7 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
   left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
+    model/cluster/org.openehr/case_identification.v0.yml:16 error fc-unpaired-types
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:109 error fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:131 error fc-uncarried-tail
     model/cluster/org.openehr/laboratory_test_analyte.v1.yml:153 error fc-uncarried-tail
@@ -97,6 +100,8 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/cluster/org.openehr/specimen.v1.yml:200 error fc-unknown-template-node
     model/cluster/org.openehr/specimen.v1.yml:202 error fc-unknown-template-node
     model/cluster/org.openehr/specimen.v1.yml:204 error fc-unknown-template-node
+    model/cluster/org.openehr/specimen.v1.yml:93 error fc-unpaired-types
+    model/cluster/org.openehr/specimen.v1.yml:98 error fc-unpaired-types
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:119 error fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:121 error fc-unknown-template-node
     model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:123 error fc-unknown-template-node
@@ -114,6 +119,7 @@ projects/org.highmed/KDS/laborbericht/KDS_laborbericht.context.yaml
     model/observation/org.openehr/laboratory_test_result.v1.yml:61 error fc-unknown-template-node
     model/observation/org.openehr/laboratory_test_result.v1.yml:77 error fc-uncarried-tail
     model/observation/org.openehr/laboratory_test_result.v1.yml:79 error fc-uncarried-tail
+    projects/org.highmed/KDS/laborbericht/KDS_composition.yml:42 error fc-unpaired-types
     projects/org.highmed/KDS/laborbericht/KDS_composition.yml:65 error fc-nested-extension-method
     projects/org.highmed/KDS/laborbericht/KDS_laborbericht.yml:56 error fc-unknown-extension-target
 projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
@@ -127,7 +133,9 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
   left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
+    model/cluster/org.openehr/case_identification.v0.yml:16 error fc-unpaired-types
     model/cluster/org.openehr/medication.v2.substance.yml:19 error fc-unknown-template-node
+    model/cluster/org.openehr/medication.v2.substance.yml:43 error fc-reference-into-choice
     model/cluster/org.openehr/medication.v2.substance.yml:74 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.substance.yml:74 warning fc-excluded-template-node
     model/cluster/org.openehr/medication.v2.yml:102 error fc-unknown-template-node
@@ -135,6 +143,7 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
     model/cluster/org.openehr/medication.v2.yml:112 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:23 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:23 warning fc-excluded-template-node
+    model/cluster/org.openehr/medication.v2.yml:25 error fc-unpaired-types
     model/cluster/org.openehr/medication.v2.yml:28 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:28 warning fc-excluded-template-node
     model/cluster/org.openehr/medication.v2.yml:40 error fc-unknown-template-node
@@ -142,23 +151,33 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
     model/cluster/org.openehr/medication.v2.yml:45 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:45 warning fc-excluded-template-node
     model/cluster/org.openehr/medication.v2.yml:50 error fc-unknown-template-node
+    model/cluster/org.openehr/medication.v2.yml:62 error fc-unpaired-types
     model/cluster/org.openehr/medication.v2.yml:65 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:70 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:70 warning fc-excluded-template-node
+    model/cluster/org.openehr/medication.v2.yml:72 error fc-reference-into-choice
     model/cluster/org.openehr/medication.v2.yml:83 error fc-slot-depth
+    model/cluster/org.openehr/medication.v2.yml:85 error fc-reference-into-choice
     model/cluster/org.openehr/medication.v2.yml:96 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:97 error fc-archetype-mismatch
     model/cluster/org.openehr/timing_daily.v1.yml:26 error fc-unknown-fhir-element
+    model/cluster/org.openehr/timing_daily.v1.yml:29 error fc-unpaired-types
+    model/cluster/org.openehr/timing_non_daily.yml:29 error fc-unpaired-types
     model/observation/org.openehr/medication_statement.v0.yml:107 warning fc-excluded-template-node
     model/observation/org.openehr/medication_statement.v0.yml:121 warning fc-duplicate-method-name
     model/observation/org.openehr/medication_statement.v0.yml:44 error fc-uncarried-tail
     model/observation/org.openehr/medication_statement.v0.yml:44 warning fc-anchor-without-children
     model/observation/org.openehr/medication_statement.v0.yml:76 error fc-unknown-template-node
+    model/observation/org.openehr/medication_statement.v0.yml:79 error fc-reference-into-choice
+    projects/org.highmed/KDS/medikationseintrag/KDS_composition.yml:40 error fc-unpaired-types
+    projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:122 error fc-reference-into-choice
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:132 error fc-unknown-template-node
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:133 error fc-slot-depth
+    projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:134 error fc-reference-into-choice
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:144 error fc-unknown-template-node
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:145 error fc-archetype-mismatch
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:169 error fc-unknown-template-node
+    projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:24 error fc-unpaired-types
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:28 error fc-unknown-template-node
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:31 error fc-unknown-template-node
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:40 error fc-unknown-template-node
@@ -271,6 +290,7 @@ projects/org.highmed/KDS/vitalstatus/KDS_Vitalstatus.context.yaml
   left out model/evaluation/org.openehr/cause_of_death.v1.yml (error fc-extension-method-outside-model)
   left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
+    model/cluster/org.openehr/case_identification.v0.yml:16 error fc-unpaired-types
     model/composition/org.openehr/report.v1.Observation.yml:101 error fc-unknown-template-node
     model/composition/org.openehr/report.v1.Observation.yml:103 error fc-unknown-template-node
     model/composition/org.openehr/report.v1.Observation.yml:108 error fc-unknown-fhir-element
@@ -303,6 +323,7 @@ projects/org.highmed/KDS/vitalstatus/KDS_Vitalstatus.context.yaml
     model/evaluation/org.openehr/vital_status.v1.yml:67 error fc-uncarried-tail
     model/evaluation/org.openehr/vital_status.v1.yml:69 error fc-uncarried-tail
     model/evaluation/org.openehr/vital_status.v1.yml:97 warning fc-duplicate-method-name
+    projects/org.highmed/KDS/vitalstatus/KDS_composition.yml:40 error fc-unpaired-types
 projects/org.openehr/EEHRxF/lab/bundle/lab.context.yml
   left out model/action/org.openehr/informed_consent.v0.yml (error fc-unknown-mapping-reference)
   left out model/action/org.openehr/procedure.v1.yml (error fc-condition-target-root-mismatch)

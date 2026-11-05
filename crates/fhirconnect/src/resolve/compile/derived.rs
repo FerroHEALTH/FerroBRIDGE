@@ -179,22 +179,11 @@ impl<'a> Compiler<'a> {
                 self.derived_target(file, fhir, EXTENSION_VALUE, position, path)?
             }
             Location::Complex(_) | Location::Primitive(_) | Location::Attribute => {
-                let code = fhir.resolved().type_code()?;
-                let text = matches!(
-                    *fhir.resolved().location(),
-                    Location::Primitive(ValueKind::Text) | Location::Attribute
-                );
-                let pair = derive::element(class, code, text);
-                if openehr.leaf_class().is_none()
-                    && !derive::pairs(class).is_empty()
-                    && !derive::pairs_in(class, pair, direction)
-                {
-                    self.unpaired(file, (fhir, openehr), class, code, position, path);
-                    return None;
-                }
-                return Some(Derived::Element(pair));
+                return self.element_pair(file, sides, class, position, path);
             }
-            Location::Resource if openehr.leaf_class().is_none() && !derive::pairs(class).is_empty() => {
+            Location::Resource
+                if openehr.leaf_class().is_none() && !derive::pairs(class).is_empty() =>
+            {
                 let resource = fhir.resolved().leaf();
                 self.unpaired(file, (fhir, openehr), class, resource, position, path);
                 return None;
@@ -234,6 +223,38 @@ impl<'a> Compiler<'a> {
             read,
             write: Some(Alternative::new(code, written)),
         })
+    }
+
+    /// Derives the pair of an element that is no choice and no extension,
+    /// refusing one no page of the data-type chapter pairs with `class`.
+    fn element_pair(
+        &mut self,
+        file: &'a ModelMappingFile,
+        sides: Sides<'_>,
+        class: &str,
+        position: Position,
+        path: &ModelPath,
+    ) -> Option<Derived> {
+        let Sides {
+            fhir,
+            openehr,
+            direction,
+            ..
+        } = sides;
+        let code = fhir.resolved().type_code()?;
+        let text = matches!(
+            *fhir.resolved().location(),
+            Location::Primitive(ValueKind::Text) | Location::Attribute
+        );
+        let pair = derive::element(class, code, text);
+        if openehr.leaf_class().is_none()
+            && !derive::pairs(class).is_empty()
+            && !derive::pairs_in(class, pair, direction)
+        {
+            self.unpaired(file, (fhir, openehr), class, code, position, path);
+            return None;
+        }
+        Some(Derived::Element(pair))
     }
 
     /// Refuses a mapping whose openEHR `class` and FHIR `named` type no page

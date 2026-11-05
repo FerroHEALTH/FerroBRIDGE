@@ -340,6 +340,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             FhirKind::String
             | FhirKind::Date
             | FhirKind::DateTime
+            | FhirKind::Instant
             | FhirKind::Time
             | FhirKind::Url => {
                 let element = target.resolved().leaf();

@@ -45,7 +45,9 @@ pub const PAIRS: &[(&str, &[&str])] = &[
     ("DV_CODED_TEXT", &["CodeableConcept", "Coding"]),
     ("CODE_PHRASE", &["Coding"]),
     ("DV_DATE", &["date"]),
-    ("DV_DATE_TIME", &["dateTime", "Period"]),
+    // NOTE: no specification governs this: our own design, DV_DATE_TIME.adoc lists no instant,
+    // and the R4 lexical form of instant is a strict subset of dateTime's (datatypes.html#primitive).
+    ("DV_DATE_TIME", &["dateTime", "Period", "instant"]),
     ("DV_INTERVAL<DV_DATE_TIME>", &["Period"]),
     ("DV_INTERVAL<DV_QUANTITY>", &["Range"]),
     ("DV_INTERVAL", &["Period", "Range"]),
@@ -147,9 +149,9 @@ pub fn pairs_in(class: &str, code: &str, direction: Option<Direction>) -> bool {
         return true;
     }
     direction == Some(Direction::OpenehrToFhir)
-        && PAIRS.iter().any(|&(row, codes)| {
-            row != class && model::is_a(class, row) && codes.contains(&code)
-        })
+        && PAIRS
+            .iter()
+            .any(|&(row, codes)| row != class && model::is_a(class, row) && codes.contains(&code))
 }
 
 /// Returns the FHIR type codes `class` converts with, empty for a class no

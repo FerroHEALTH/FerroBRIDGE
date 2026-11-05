@@ -10,14 +10,16 @@
 //! recursion descends while the template carries a node and ends where it
 //! carries none (#1551; FHIRconnect v1.0.0 is silent: our own design).
 //!
-//! Neither model counts as reached (#101). `medication.v2.yml:96` slots the
-//! substance one constituent too deep, so a template nesting two
-//! constituents compiles it at the wrong cluster. FerroBRIDGE's substance
-//! model enters the substance model at the administered cluster itself,
-//! where it compiles, and its ingredient reference at
-//! `medication.v2.substance.yml:45` writes the choice element
-//! `Substance.ingredient.substance[x]` without naming its type, which the
-//! run refuses.
+//! Neither model counts as reached (#101), and both are refused at load.
+//! `medication.v2.yml:25` maps the `Ratio` `Medication.amount` onto a
+//! `DV_QUANTITY`, which `types-of-mappings/data-type/DV_QUANTITY.adoc` does
+//! not pair, and `:72` and `:85` write a `reference` into the choice
+//! `Medication.ingredient.item[x]` without naming its type. `:96` slots the
+//! substance one constituent too deep. `medication.v2.substance.yml:43`
+//! writes its ingredient `reference` into the choice
+//! `Substance.ingredient.substance[x]` the same way. The recursion is pinned
+//! by the refusals each template depth raises: past these the template's
+//! nesting adds or removes only the template-node refusals.
 
 use core::error::Error;
 use std::fmt::Write;
@@ -25,24 +27,17 @@ use std::sync::Arc;
 
 use ferrobridge_testkit::fixtures::CKM_MEDICATION_ARCHETYPES;
 use fhir_types::r4::schema::SCHEMAS;
-use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::library::Library;
-use fhirconnect::engine::seam::Seams;
-use fhirconnect::engine::traverse::error::EngineError;
-use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use fhirconnect::resolve::program::SLOT_DEPTH_LIMIT;
-use fhirconnect::tree::error::WriteError;
 use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
-use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 
-use super::models;
 use super::set;
 
 /// The template the medication context names.
@@ -202,66 +197,10 @@ fn compiled(depth: usize) -> Result<Result<Arc<Program>, Vec<Diagnostic>>, Box<d
     ))
 }
 
-/// Compiles the medication context against a template nesting two
-/// constituents.
-fn program() -> Result<Arc<Program>, Box<dyn Error>> {
-    compiled(2)?.map_err(|diagnostics| crate::resolve::render(&diagnostics).into())
-}
-
-/// Compiles the substance context against the template nesting one
-/// constituent, and returns the program with its index.
-fn substance() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
-    let index = template(1)?;
-    let set = set(SUBSTANCE, SUBSTANCE_FIXTURES)?;
-    let program = compile(
-        &set,
-        &MappingName::new(SUBSTANCE_CONTEXT)?,
-        &index,
-        &SCHEMAS,
-        &Library,
-    )
-    .map_err(|diagnostics| crate::resolve::render(&diagnostics))?;
-    Ok((program, index))
-}
-
-#[test]
-fn the_medication_clusters_compile_through_their_recursion() -> Result<(), Box<dyn Error>> {
-    let program = program()?;
-    assert_eq!(program.resource().as_str(), "MedicationAdministration");
-    assert_eq!(
-        models(&program),
-        [
-            "ferrobridge_medication_administration",
-            "CLUSTER.medication.v2",
-            "CLUSTER.medication.v2.substance"
-        ]
-    );
-    Ok(())
-}
-
-#[test]
-fn the_recursion_ends_where_the_template_stops_nesting() -> Result<(), Box<dyn Error>> {
-    for depth in [2, 3] {
-        if let Err(diagnostics) = compiled(depth)? {
-            return Err(format!(
-                "the template nesting {depth} constituents: {}",
-                crate::resolve::render(&diagnostics)
-            )
-            .into());
-        }
-    }
-    Ok(())
-}
-
-/// `medication.v2.yml:96` slots the substance at the constituent's
-/// constituent, where its sibling at `:83` names the constituent itself (#101),
-/// so a template that nests one constituent carries no node there.
-#[test]
-fn one_constituent_refuses_the_substance_two_levels_down() -> Result<(), Box<dyn Error>> {
-    let Err(diagnostics) = compiled(1)? else {
-        return Err("the substance compiled one level short".into());
-    };
-    let rows: Vec<String> = diagnostics
+/// Returns the refusals of `diagnostics` as sorted, distinct
+/// `file:line code` rows.
+fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
+    let mut rows: Vec<String> = diagnostics
         .iter()
         .map(|diagnostic| {
             format!(
@@ -278,7 +217,68 @@ fn one_constituent_refuses_the_substance_two_levels_down() -> Result<(), Box<dyn
             )
         })
         .collect();
-    assert_eq!(rows, ["medication.v2.yml:96 fc-unknown-template-node"]);
+    rows.sort();
+    rows.dedup();
+    rows
+}
+
+/// The refusals the medication model raises at every depth the template
+/// nests it to (#101).
+const LIBRARY_REFUSALS: [&str; 3] = [
+    "medication.v2.yml:25 fc-unpaired-types",
+    "medication.v2.yml:72 fc-reference-into-choice",
+    "medication.v2.yml:85 fc-reference-into-choice",
+];
+
+/// Returns the refusals of the medication context against the template
+/// nesting `depth` constituents.
+fn refused(depth: usize) -> Result<Vec<String>, Box<dyn Error>> {
+    match compiled(depth)? {
+        Ok(_) => Err(format!("the template nesting {depth} constituents compiles").into()),
+        Err(diagnostics) => Ok(rows(&diagnostics)),
+    }
+}
+
+/// Compiles the substance context against the template nesting one
+/// constituent and returns its refusals.
+fn substance() -> Result<Vec<String>, Box<dyn Error>> {
+    let index = template(1)?;
+    let set = set(SUBSTANCE, SUBSTANCE_FIXTURES)?;
+    match compile(
+        &set,
+        &MappingName::new(SUBSTANCE_CONTEXT)?,
+        &index,
+        &SCHEMAS,
+        &Library,
+    ) {
+        Ok(_) => Err("the substance context compiles".into()),
+        Err(diagnostics) => Ok(rows(&diagnostics)),
+    }
+}
+
+#[test]
+fn the_recursion_ends_where_the_template_stops_nesting() -> Result<(), Box<dyn Error>> {
+    // Two and three constituents raise no template-node refusal: the
+    // recursion descends while the template carries a node. With two, `:96`
+    // enters the substance at the deepest cluster, where its ingredients are
+    // left out; with three, they compile and `:43` is refused.
+    assert_eq!(refused(2)?, LIBRARY_REFUSALS, "2 constituents");
+    let mut deeper: Vec<&str> = LIBRARY_REFUSALS.to_vec();
+    deeper.push("medication.v2.substance.yml:43 fc-reference-into-choice");
+    deeper.sort_unstable();
+    assert_eq!(refused(3)?, deeper, "3 constituents");
+    Ok(())
+}
+
+/// `medication.v2.yml:96` slots the substance at the constituent's
+/// constituent, where its sibling at `:83` names the constituent itself (#101),
+/// so a template that nests one constituent carries no node there.
+#[test]
+fn one_constituent_refuses_the_substance_two_levels_down() -> Result<(), Box<dyn Error>> {
+    let mut expected: Vec<&str> = LIBRARY_REFUSALS.to_vec();
+    expected.push("medication.v2.yml:96 fc-unknown-template-node");
+    expected.sort_unstable();
+    assert_eq!(refused(1)?, expected);
     Ok(())
 }
 
@@ -323,107 +323,15 @@ fn a_recursion_past_the_depth_limit_refuses() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// FerroBRIDGE's substance model enters `medication.v2.substance.yml` at the
+/// administered cluster; its line 43 writes the ingredient `reference` into
+/// the choice `Substance.ingredient.substance[x]` without naming its type,
+/// so it is refused at load (#101).
 #[test]
-fn the_substance_compiles_at_the_administered_cluster() -> Result<(), Box<dyn Error>> {
-    let (program, _) = substance()?;
-    assert_eq!(program.resource().as_str(), "Substance");
+fn the_substance_ingredient_reference_is_refused_at_load() -> Result<(), Box<dyn Error>> {
     assert_eq!(
-        models(&program),
-        [
-            "ferrobridge_medication_substance",
-            "CLUSTER.medication.v2.substance"
-        ]
-    );
-    Ok(())
-}
-
-/// Returns a synthetic composition of the one-constituent template: the
-/// administered cluster named `Synthetic combination`, and its constituent
-/// when `constituent` holds.
-fn substance_composition(
-    index: &WebTemplateIndex,
-    constituent: bool,
-) -> Result<CanonicalComposition, Box<dyn Error>> {
-    let mut flat = serde_json::json!({
-        "composition/language|code": "en",
-        "composition/language|terminology": "ISO_639-1",
-        "composition/territory|code": "NL",
-        "composition/territory|terminology": "ISO_3166-1",
-        "composition/composer|name": "FerroBRIDGE synthetic composer",
-        "composition/category|code": "433",
-        "composition/category|value": "event",
-        "composition/category|terminology": "openehr",
-        "composition/context/start_time": "2026-10-01T09:00:00Z",
-        "composition/context/setting|code": "238",
-        "composition/context/setting|value": "other care",
-        "composition/context/setting|terminology": "openehr",
-        "composition/slot/time": "2026-10-01T09:00:00Z",
-        "composition/slot/ism_transition/current_state|code": "526",
-        "composition/slot/ism_transition/current_state|value": "planned",
-        "composition/slot/ism_transition/current_state|terminology": "openehr",
-        "composition/slot/ism_transition/careflow_step|code": "at0109",
-        "composition/slot/ism_transition/careflow_step|value": "Medication recommended",
-        "composition/slot/ism_transition/careflow_step|terminology": "local",
-        "composition/slot/slot/name": "Synthetic combination"
-    });
-    if constituent && let Some(object) = flat.as_object_mut() {
-        object.insert(
-            String::from("composition/slot/slot/slot/name"),
-            serde_json::json!("Synthetic constituent"),
-        );
-    }
-    let serde_json::Value::Object(flat) = flat else {
-        return Err("the FLAT composition is no object".into());
-    };
-    Ok(index.build_from_flat(&flat, crate::laws::NOW)?)
-}
-
-/// Going out of openEHR, the substance is the administered cluster.
-#[test]
-fn the_substance_reads_the_administered_cluster() -> Result<(), Box<dyn Error>> {
-    let (program, index) = substance()?;
-    let outbound = to_fhir(
-        &program,
-        &SCHEMAS,
-        &index,
-        &substance_composition(&index, false)?,
-        &Seams::default(),
-        &CallContext::new(),
-    )?;
-    let substance = outbound
-        .value()
-        .to_serde_json(&mut fhir_types::codec::Path::root("Substance"))?;
-    assert_eq!(
-        substance.pointer("/code/text"),
-        Some(&serde_json::json!("Synthetic combination"))
-    );
-    Ok(())
-}
-
-/// `medication.v2.substance.yml:45` writes the ingredient reference into the
-/// choice element `Substance.ingredient.substance[x]` without naming its type
-/// (#101), so a constituent going out of openEHR refuses.
-#[test]
-fn the_substance_ingredient_reference_refuses_going_out() -> Result<(), Box<dyn Error>> {
-    let (program, index) = substance()?;
-    let outcome = to_fhir(
-        &program,
-        &SCHEMAS,
-        &index,
-        &substance_composition(&index, true)?,
-        &Seams::default(),
-        &CallContext::new(),
-    );
-    let Err(EngineError::Write {
-        mapping, source, ..
-    }) = outcome
-    else {
-        return Err("the ingredient went out of openEHR".into());
-    };
-    assert_eq!(mapping, "ingredients.substanceSubstance");
-    assert!(
-        matches!(*source, WriteError::UnresolvedChoice { ref element } if element == "Substance.ingredient.substance[x]"),
-        "{source}"
+        substance()?,
+        ["medication.v2.substance.yml:43 fc-reference-into-choice"]
     );
     Ok(())
 }
