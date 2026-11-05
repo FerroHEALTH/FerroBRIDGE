@@ -38,7 +38,7 @@ has every change of every release.
 
 ## Next
 
-The milestone after v0.0.20:
+The milestones after v0.0.20, each one theme:
 
 1. **v0.0.21, the mapping library and the remaining categories.** Every
    mapping of the published FHIRconnect library passing, the discharge and
