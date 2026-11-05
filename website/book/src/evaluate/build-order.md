@@ -35,12 +35,13 @@ has every change of every release.
 | [v0.0.18](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.18) | 2026-11-04 | The close of the one-owner reshape: a FHIRconnect `manual` entry records the reads of the FHIR elements it writes into openEHR, the `eehrxf` imaging and discharge codings carry the displays of the HL7 Europe EU Health Data API package, one named context of an `eehrxf` mapping project compiles alone, and the operator console runs on `ferrohealth-session` 0.2.2 with a client certificate toward its provider. |
 | [v0.0.19](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.19) | 2026-11-04 | Family upkeep: the server and the operator console on `ferrohealth-config` 0.2.8, `ferrohealth-server` 0.4.3 and `ferrohealth-telemetry` 0.2.4, both binaries on the FerroSYS run path, and the FerroHEALTH family crates moved together by one daily Dependabot group. The `eehrxf` EPS project lists its immunisations context beside the medication summary. |
 | [v0.0.20](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.20) | 2026-11-05 | Toward the FHIRconnect mapping library: a composition model starts a context compiled against an ADL 2 operational template through the lineage of its root, a `slotArchetype` may name a model already on its slot chain, and the `eehrxf` laboratory project lists its composition context beside the laboratory result. |
+| [v0.0.21](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.21) | 2026-11-05 | Correctness on the way to the FHIRconnect mapping library: a template over a specialised ADL 1.4 composition archetype carries one `context`, and the compiler refuses at load a mapping whose types no data-type page pairs and a `reference` into an untyped choice, which failed only on their first run before. |
 
 ## Next
 
-The milestones after v0.0.20, each one theme:
+The milestones after v0.0.21, each one theme:
 
-1. **v0.0.21, the mapping library and the remaining categories.** Every
+1. **v0.0.22, the mapping library and the remaining categories.** Every
    mapping of the published FHIRconnect library passing, the discharge and
    imaging categories mapped from openEHR once their templates are
    published, and the patient summary re-checked against the adopted
