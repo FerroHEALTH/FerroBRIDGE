@@ -11,6 +11,8 @@
 #[cfg(feature = "patient-summary")]
 mod category;
 mod conform;
+#[cfg(feature = "discharge")]
+mod discharge;
 mod faithful;
 #[cfg(feature = "openehr")]
 mod openehr;

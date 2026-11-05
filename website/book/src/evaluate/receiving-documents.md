@@ -67,7 +67,13 @@ document, so a patient identifier never reaches an error message or a log
 line through one. `ReceivedDocument::category` names the priority category
 whose document profile fixes a `Composition.type` coding of the document,
 and `Category::profiles` the profiles a document of that category is held
-to.
+to. Three categories are received: a patient summary held to
+`bundle-eu-eps` and `composition-eu-eps`, a laboratory report held to
+`Bundle-eu-lab` and `Composition-eu-lab`, and a discharge report, whose
+`composition-eu-hdr` fixes `Composition.type` to LOINC `34105-7`, held to
+`bundle-eu-hdr` and `composition-eu-hdr` of HL7 Europe Hospital Discharge
+Report 1.0.0. Every document example the HDR package publishes is read and
+passes the structural check below.
 
 ## The structural check
 
@@ -86,8 +92,12 @@ not evaluated, never passed in silence.
 `Bundle` profile of its category, for a patient summary `bundle-eu-eps` of
 `hl7.fhir.eu.eps` 1.0.0-ballot, with
 [`ferrobridge-validator`](https://docs.rs/ferrobridge-validator), over a
-package set that holds the profile and its whole dependency closure. It
-holds the document, at every occurrence of every element in play, to what
+package set that holds the profile and its whole dependency closure. A
+discharge report is not yet validated this way: `hl7.fhir.eu.hdr` 1.0.0
+depends on `xtehr.eu.ehds.models` 1.0.0, a FHIR R5 package whose own
+closure reaches the R5 core package, which an R4 package set cannot hold.
+The validation holds the document, at every occurrence of every element in
+play, to what
 FHIR R4 has a validator check
 ([validation](https://hl7.org/fhir/R4/validation.html),
 [profiling](https://hl7.org/fhir/R4/profiling.html)):

@@ -81,7 +81,8 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   constraint it cannot evaluate listed. `ReceivedDocument::category` names
   the priority category whose document profile fixes a `Composition.type`
   coding of the document, and `Category::profiles` the profiles a document
-  of it is held to. With `openehr`,
+  of it is held to: the patient summary, the laboratory report and the
+  discharge report are received. With `openehr`,
   `Mapping::to_openehr` maps the document into one canonical composition
   through FHIRconnect and keeps the document in the composition's
   `FEEDER_AUDIT.original_content`; `ReceivedComposition::model` is the
