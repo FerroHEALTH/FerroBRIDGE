@@ -412,12 +412,12 @@ fn inbound(
     .map(|outcome| outcome.value().clone())
 }
 
-/// The published gender model compiles, and its one method maps the `code`
-/// `Patient.gender` onto the `DV_CODED_TEXT` `items[at0022]`, a conversion
-/// `types-of-mappings/data-type/DV_CODED_TEXT.adoc` §STRING calls not
-/// possible, so a run that carries a gender refuses with no cell.
+/// The published gender model maps the `code` `Patient.gender` onto the
+/// `DV_CODED_TEXT` `items[at0022]` of `KDS_Person`, a pair
+/// `types-of-mappings/data-type/DV_CODED_TEXT.adoc` does not write, so the
+/// compiler refuses it at load, naming the file and line.
 #[test]
-fn the_published_gender_model_refuses_a_gender_at_run() -> Result<(), Box<dyn Error>> {
+fn the_published_gender_model_refuses_a_gender_at_load() -> Result<(), Box<dyn Error>> {
     let files: Vec<String> = PUBLISHED
         .iter()
         .chain(&["model/evaluation/org.openehr/gender.v1.yml"])
@@ -430,23 +430,19 @@ fn the_published_gender_model_refuses_a_gender_at_run() -> Result<(), Box<dyn Er
         )
         .collect();
     let set = load_set(files, &StaticMappingCodes::default()).map_err(|d| render(&d))?;
-    let index = kds_person_template()?;
-    let program = compile(
+    let diagnostics = compile(
         &set,
         &MappingName::new(CONTEXT)?,
-        &index,
+        &kds_person_template()?,
         &SCHEMAS,
         &StaticMappingCodes::default(),
     )
-    .map_err(|diagnostics| render(&diagnostics))?;
-    let Err(error) = inbound(&program, &index, kds_patient()?) else {
-        return Err("a gender is expected to be refused by the published model".into());
-    };
-    let source = Error::source(&error).map(ToString::to_string);
-    assert_eq!(
-        source.as_deref(),
-        Some("no data-type cell pairs DV_CODED_TEXT with string going fhir->openehr"),
-        "{error}"
+    .err()
+    .ok_or("the published gender model compiles")?;
+    assert!(
+        rows(&diagnostics).contains(&String::from("gender.v1.yml:17 error fc-unpaired-types")),
+        "{:?}",
+        rows(&diagnostics)
     );
     Ok(())
 }

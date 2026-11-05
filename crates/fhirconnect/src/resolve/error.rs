@@ -61,6 +61,12 @@ pub enum ResolveCode {
     /// A mapping with no `type` key writes a choice element that admits no
     /// data-type pair of the node's class.
     UnderivedAlternative,
+    /// A mapping with no `type` key pairs an openEHR class with a FHIR type
+    /// no page of the data-type chapter pairs in a direction it runs.
+    UnpairedTypes,
+    /// A `reference` writes a choice element whose type its path does not
+    /// name.
+    ReferenceIntoChoice,
     /// An openEHR path names a tail below a node that no FLAT part of the
     /// node's class carries.
     UncarriedTail,
@@ -167,6 +173,8 @@ impl ResolveCode {
             Self::ReadOnlyFhirWrite => "fc-read-only-fhir-write",
             Self::AnchorWithoutChildren => "fc-anchor-without-children",
             Self::UnderivedAlternative => "fc-underived-alternative",
+            Self::UnpairedTypes => "fc-unpaired-types",
+            Self::ReferenceIntoChoice => "fc-reference-into-choice",
             Self::UncarriedTail => "fc-uncarried-tail",
             Self::MalformedOpenehrPath => "fc-malformed-openehr-path",
             Self::UnknownTemplateNode => "fc-unknown-template-node",
@@ -224,6 +232,8 @@ impl ResolveCode {
             Self::ReadOnlyFhirWrite,
             Self::AnchorWithoutChildren,
             Self::UnderivedAlternative,
+            Self::UnpairedTypes,
+            Self::ReferenceIntoChoice,
             Self::UncarriedTail,
             Self::MalformedOpenehrPath,
             Self::UnknownTemplateNode,

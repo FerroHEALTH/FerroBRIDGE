@@ -65,6 +65,7 @@ pub mod uri;
 
 use core::fmt;
 
+use crate::engine::lens::date_time::InstantShortfall;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::model::ast::keyword::Direction;
 
@@ -213,6 +214,13 @@ pub enum LensError {
         kind: &'static str,
         /// The direction the engine ran.
         direction: Direction,
+    },
+    /// A `DV_DATE_TIME` going out as an `instant` lacks a part the `instant`
+    /// requires.
+    #[error("DV_DATE_TIME against instant going openEHR->FHIR needs {shortfall}")]
+    NotAnInstant {
+        /// What the value lacks.
+        shortfall: InstantShortfall,
     },
     /// A `DV_PROPORTION` that is not a percentage, with no named carrier.
     ///
