@@ -28,6 +28,7 @@ set -u
 # higher version at each position. Any other hunk keeps its markers. Every
 # capture is copied before the next match, which would overwrite it.
 merge_versions() {
+  local file="$1"
   perl -0pi -e '
     sub newer { my @a = split /\./, $_[0]; my @b = split /\./, $_[1];
       for my $i (0 .. 2) { my $c = $a[$i] <=> $b[$i]; return $c if $c } 0 }
@@ -41,7 +42,7 @@ merge_versions() {
       $ours =~ s{\d+\.\d+\.\d+}{ my ($o, $t) = ($ov[$i], $tv[$i]); $i++;
         newer($o, $t) >= 0 ? $o : $t }ge;
       $ours }
-    s{<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n}{pick($1, $2, $&)}gse' "$1"
+    s{<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n}{pick($1, $2, $&)}gse' "$file"
 }
 # The checks of the newest run of each workflow, from `gh pr checks --json
 # name,bucket,link,workflow`; a check whose link names no Actions run is kept.
@@ -196,6 +197,7 @@ while [[ ${#left[@]} -gt 0 ]]; do
       DIRTY)
         if resolve_merge "$p"; then echo "resolved merge #$p"; next+=("$p"); continue
         else echo "CONFLICT #$p"; exit 2; fi ;;
+      *) ;;
     esac
     # gh exits non-zero while a check is pending or red and still prints them.
     verdict=$(gh pr checks "$p" --json name,bucket,link,workflow 2>/dev/null | judge) || verdict="1	"

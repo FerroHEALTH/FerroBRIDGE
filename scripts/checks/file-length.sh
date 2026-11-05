@@ -49,7 +49,7 @@ self_test() {
   mkdir -p "$tmp/repo/scripts/checks" "$tmp/repo/src"
   cp "$guard" "$tmp/repo/scripts/checks/file-length.sh"
   git -C "$tmp/repo" init -q
-  lines() { seq "$2" | sed 's/^/\/\/ /' >"$tmp/repo/src/$1"; }
+  lines() { local name="$1" count="$2"; seq "$count" | sed 's/^/\/\/ /' >"$tmp/repo/src/$name"; }
   allow() {
     printf '# header\n' >"$tmp/repo/$ALLOW"
     [[ "$#" -eq 0 ]] || printf '%s\n' "$@" >>"$tmp/repo/$ALLOW"
@@ -65,7 +65,7 @@ self_test() {
       failures=$((failures + 1))
     fi
   }
-  entry() { awk -v p="src/$1" '$1 !~ /^#/ && $2 == p { print $1 }' "$tmp/repo/$ALLOW"; }
+  entry() { local name="$1"; awk -v p="src/$name" '$1 !~ /^#/ && $2 == p { print $1 }' "$tmp/repo/$ALLOW"; }
 
   lines big.rs 900; allow "900 src/big.rs #1"; track
   expect 0 "a listed file at its count passes"
@@ -129,15 +129,17 @@ fi
 # A template under a generator's src/templates/ is the text of one generated
 # file, embedded verbatim, so it is generated output in source form.
 hand_written() {
-  case "$1" in */vendor/*|*/src/templates/*) return 1 ;; esac
-  ! head -n1 "$1" | grep -q '@generated'
+  local candidate="$1"
+  case "$candidate" in */vendor/*|*/src/templates/*) return 1 ;; *) ;; esac
+  ! head -n1 "$candidate" | grep -q '@generated'
 }
 
 # The allow-list entry of a path, as "<lines> <tag>", or nothing (bash 3.2 has
 # no associative arrays, so the list is read per lookup).
 listed() {
+  local listed_path="$1"
   [[ -f "$ALLOW" ]] || return 0
-  awk -v p="$1" '$1 !~ /^#/ && $2 == p { print $1, $3 }' "$ALLOW"
+  awk -v p="$listed_path" '$1 !~ /^#/ && $2 == p { print $1, $3 }' "$ALLOW"
 }
 
 fail=0
@@ -148,7 +150,7 @@ breaches=()
 # A listed path that no longer exists was split away: a fall.
 if [[ "$mode" != files ]] && [[ -f "$ALLOW" ]]; then
   while IFS=' ' read -r first path _; do
-    case "$first" in ''|\#*) continue ;; esac
+    case "$first" in ''|\#*) continue ;; *) ;; esac
     [[ -f "$path" ]] && continue
     fell=$((fell + 1))
   done < "$ALLOW"

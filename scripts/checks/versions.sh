@@ -82,6 +82,11 @@
 
 set -euo pipefail
 
+# The root manifest table that carries the workspace version and edition.
+readonly WORKSPACE_PACKAGE='[workspace.package]'
+# What a check that reads the pin matrix notes before the matrix exists.
+readonly NO_MATRIX='no docs/VERSIONS.md yet, skipped'
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
@@ -95,7 +100,8 @@ bad() {
 # The first whitespace-separated token of the second cell of the markdown table
 # row whose first cell is ITEM, with surrounding spaces and backticks removed.
 pin_of() {
-  awk -F'|' -v item="$1" '
+  local item_name="$1" source_file="$2"
+  awk -F'|' -v item="$item_name" '
     NF >= 3 {
       k = $2; v = $3
       gsub(/`/, "", k); gsub(/`/, "", v)
@@ -103,12 +109,13 @@ pin_of() {
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
       if (k == item) { split(v, w, /[[:space:]]/); print w[1]; exit }
     }
-  ' "$2"
+  ' "$source_file"
 }
 
 # The value of KEY inside TOML table TABLE, unquoted.
 toml_val() {
-  awk -v table="$1" -v key="$2" '
+  local toml_table="$1" toml_key="$2" toml_file="$3"
+  awk -v table="$toml_table" -v key="$toml_key" '
     /^[[:space:]]*\[/ { h = $0; gsub(/[[:space:]]/, "", h); f = (h == table); next }
     f && $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
       if (match($0, /"[^"]*"/)) { print substr($0, RSTART + 1, RLENGTH - 2); exit }
@@ -116,13 +123,14 @@ toml_val() {
       gsub(/[[:space:]]/, "")
       print; exit
     }
-  ' "$3"
+  ' "$toml_file"
 }
 
 # The version requirement of dependency NAME in the root Cargo.toml, in either
 # the `name = "x.y.z"` or the `name = { version = "x.y.z" }` form.
 manifest_req() {
-  awk -v name="$1" '
+  local crate_name="$1"
+  awk -v name="$crate_name" '
     $0 ~ "^[[:space:]]*" name "[[:space:]]*=" {
       if (match($0, /version[[:space:]]*=[[:space:]]*"[^"]+"/)) {
         s = substr($0, RSTART, RLENGTH)
@@ -139,7 +147,8 @@ manifest_req() {
 # two spaces of indentation and its own keys at four, which is what the exact
 # prefix comparisons below rely on.
 action_default() {
-  awk -v key="  $1:" '
+  local input="$1" action_file="$2"
+  awk -v key="  $input:" '
     $0 == key { inside = 1; next }
     inside && index($0, "    default:") == 1 {
       sub(/^[[:space:]]*default:[[:space:]]*/, "")
@@ -149,7 +158,7 @@ action_default() {
       exit
     }
     inside && $0 ~ /^[^[:space:]]/ { exit }
-  ' "$2"
+  ' "$action_file"
 }
 
 echo "== specification pins (docs/architecture.md <-> docs/VERSIONS.md)"
@@ -194,7 +203,7 @@ if [[ -f docs/VERSIONS.md ]]; then
     [[ "$strays" -eq 0 ]] && note "OK: every hand-written openehr_rm path names $generation"
   fi
 else
-  note "no docs/VERSIONS.md yet, skipped"
+  note "$NO_MATRIX"
 fi
 
 echo "== model crate pins (docs/architecture.md <-> docs/VERSIONS.md <-> Cargo.toml)"
@@ -269,8 +278,8 @@ else
 fi
 
 if [[ -f Cargo.toml ]]; then
-  edition="$(toml_val "[workspace.package]" edition Cargo.toml)"
-  msrv="$(toml_val "[workspace.package]" rust-version Cargo.toml)"
+  edition="$(toml_val "$WORKSPACE_PACKAGE" edition Cargo.toml)"
+  msrv="$(toml_val "$WORKSPACE_PACKAGE" rust-version Cargo.toml)"
   resolver="$(toml_val "[workspace]" resolver Cargo.toml)"
   check_row() {
     local label="$1" found="$2" row="$3"
@@ -307,7 +316,7 @@ if [[ -f CITATION.cff ]]; then
     note "OK: CITATION.cff and docs/VERSIONS.md both name $cff"
   fi
   if [[ -f Cargo.toml ]]; then
-    cargo_ver="$(toml_val "[workspace.package]" version Cargo.toml)"
+    cargo_ver="$(toml_val "$WORKSPACE_PACKAGE" version Cargo.toml)"
     if [[ -z "$cargo_ver" ]]; then
       bad "root Cargo.toml has no [workspace.package] version"
     elif [[ -n "$cff" ]] && [[ "$cff" != "$cargo_ver" ]]; then
@@ -323,7 +332,7 @@ else
 fi
 
 echo "== release pages (README.md, website/ <-> CHANGELOG.md and the product version)"
-release_ver="$(toml_val "[workspace.package]" version Cargo.toml 2>/dev/null || true)"
+release_ver="$(toml_val "$WORKSPACE_PACKAGE" version Cargo.toml 2>/dev/null || true)"
 release_date=""
 if [[ -n "$release_ver" ]] && [[ -f CHANGELOG.md ]]; then
   release_date="$(sed -nE "s/^## \\[${release_ver//./\\.}\\] - ([0-9]{4}-[0-9]{2}-[0-9]{2})\$/\\1/p" CHANGELOG.md | head -n1)"
@@ -331,7 +340,8 @@ fi
 # The release a page claims, or the claims, one per line: each pattern is
 # matched against the page with its lines joined, so a claim may wrap.
 page_claims() {
-  tr '\n' ' ' <"$1" | grep -oE "$2" || true
+  local page="$1" pattern="$2"
+  tr '\n' ' ' <"$page" | grep -oE "$pattern" || true
 }
 release_claim() {
   local file="$1" what="$2" pattern="$3" expected="$4" claims claim
@@ -392,9 +402,10 @@ if [[ -f .github/workflows/ci.yml ]]; then
   # The version each analyzer is pinned to in the workflow: an installer
   # `tool: name@version` line, or the tag of a digest-pinned image.
   ci_tool_pin() {
-    case "$1" in
+    local tool_name="$1"
+    case "$tool_name" in
     zizmor | shellcheck | sqlx-cli)
-      sed -nE "s|^[[:space:]]*tool:[[:space:]]*$1@([^[:space:]]+).*|\1|p" \
+      sed -nE "s|^[[:space:]]*tool:[[:space:]]*$tool_name@([^[:space:]]+).*|\1|p" \
         .github/workflows/ci.yml | head -n1
       ;;
     actionlint)
@@ -405,6 +416,7 @@ if [[ -f .github/workflows/ci.yml ]]; then
       sed -nE 's|^[[:space:]]*hadolint/hadolint:v([^@[:space:]]+)@sha256:.*|\1|p' \
         .github/workflows/ci.yml | head -n1
       ;;
+    *) ;;
     esac
   }
   for tool in zizmor actionlint shellcheck hadolint sqlx-cli; do
@@ -509,7 +521,8 @@ echo "== operator console journeys (ci.yml, Cargo.toml, scripts/release/journey-
 if [[ -f app/ferrobridge-console/Cargo.toml ]]; then
   # The value of the first `NAME="..."` assignment in FILE.
   shell_pin() {
-    sed -nE "s|^$1=\"([^\"]+)\".*|\1|p" "$2" | head -n1
+    local variable="$1" script_file="$2"
+    sed -nE "s|^$variable=\"([^\"]+)\".*|\1|p" "$script_file" | head -n1
   }
   # Compares FOUND, read from WHERE, with the docs/VERSIONS.md row ROW.
   console_pin() {
@@ -579,7 +592,8 @@ if [[ -f "$harness" ]] && [[ -f docs/VERSIONS.md ]]; then
   # The repository, tag and digest of the PinnedImage literal named CONST,
   # composed into the one reference the matrix row carries.
   image_pin_of() {
-    awk -v name="$1" '
+    local image_name="$1" source_file="$2"
+    awk -v name="$image_name" '
       $0 ~ "^pub const " name ": PinnedImage = PinnedImage \\{" { inside = 1; next }
       inside {
         if ($0 ~ /^\};/) { exit }
@@ -588,7 +602,7 @@ if [[ -f "$harness" ]] && [[ -f docs/VERSIONS.md ]]; then
         if (match($0, /digest: "[^"]+"/)) { digest = substr($0, RSTART + 9, RLENGTH - 10) }
       }
       END { if (repo != "" && tag != "" && digest != "") print repo ":" tag "@" digest }
-    ' "$2"
+    ' "$source_file"
   }
 
   agreed=0
@@ -661,7 +675,7 @@ if [[ -f compose.yaml ]] && [[ -f docs/VERSIONS.md ]]; then
   else
     note "OK: the quickstart pulls $tags"
     if [[ -f Cargo.toml ]]; then
-      workspace_ver="$(toml_val "[workspace.package]" version Cargo.toml)"
+      workspace_ver="$(toml_val "$WORKSPACE_PACKAGE" version Cargo.toml)"
       if [[ -z "$workspace_ver" ]]; then
         note "root Cargo.toml has no [workspace.package] version yet, skipped"
       elif [[ "$tags" != "$workspace_ver" ]]; then
@@ -693,7 +707,8 @@ echo "== vendored corpora (docs/specs/*/PROVENANCE.md and the vendored fixtures 
 # A corpus row carries the repository and its commit or immutable tag in one
 # cell, so this reads the whole cell rather than its first token.
 pin_cell_of() {
-  awk -F'|' -v item="$1" '
+  local item_name="$1" source_file="$2"
+  awk -F'|' -v item="$item_name" '
     NF >= 3 {
       k = $2; v = $3
       gsub(/`/, "", k); gsub(/`/, "", v)
@@ -701,18 +716,19 @@ pin_cell_of() {
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
       if (k == item) { print v; exit }
     }
-  ' "$2"
+  ' "$source_file"
 }
 
 # The reference a pin cell names: its first 40-hex token, else the token after
 # the word `tag`, else the token after the words `pin-set digest`, which a
 # corpus pinned file by file carries (scripts/vendor/lib/pinned.sh).
 pinned_ref_of() {
+  local text="$1"
   awk '{
     for (i = 1; i <= NF; i++) if ($i ~ /^[0-9a-f]{40}$/) { print $i; exit }
     for (i = 1; i < NF; i++) if ($i == "tag") { t = $(i + 1); gsub(/[,.;:]+$/, "", t); print t; exit }
     for (i = 1; i + 1 < NF; i++) if ($i == "pin-set" && $(i + 1) == "digest") { t = $(i + 2); gsub(/[,.;:]+$/, "", t); print t; exit }
-  }' <<< "$1"
+  }' <<< "$text"
 }
 
 corpora="docs/specs/fhirconnect|FHIRconnect specification source
@@ -795,7 +811,7 @@ if [[ -f docs/VERSIONS.md ]]; then
   done <<< "$corpora"
   [[ "$agreed" -eq "$expected" ]] && note "OK: all $expected corpus provenance stamps name their pin"
 else
-  note "no docs/VERSIONS.md yet, skipped"
+  note "$NO_MATRIX"
 fi
 
 echo "== FHIR packages (tools/fhir-codegen/vendor/*/PROVENANCE.md <-> docs/VERSIONS.md)"
@@ -833,7 +849,7 @@ if [[ -f docs/VERSIONS.md ]]; then
     note "OK: all $expected FHIR package provenance stamps record their pinned version"
   fi
 else
-  note "no docs/VERSIONS.md yet, skipped"
+  note "$NO_MATRIX"
 fi
 
 echo "== Profile packages (docs/specs/fhir-packages/*/PROVENANCE.md <-> docs/VERSIONS.md)"
@@ -877,7 +893,7 @@ if [[ -f docs/VERSIONS.md ]]; then
     note "OK: all $expected profile package provenance stamps record their pinned version, count and digest"
   fi
 else
-  note "no docs/VERSIONS.md yet, skipped"
+  note "$NO_MATRIX"
 fi
 
 echo "== FHIR examples packages (tools/ferrobridge-testkit/vendor/*/PROVENANCE.md <-> docs/VERSIONS.md)"
@@ -920,7 +936,7 @@ if [[ -f docs/VERSIONS.md ]]; then
     note "OK: all $expected FHIR examples provenance stamps record their pinned version, count and digest"
   fi
 else
-  note "no docs/VERSIONS.md yet, skipped"
+  note "$NO_MATRIX"
 fi
 
 echo "== licence (LICENSE <-> SPDX headers, manifests, badges, labels)"

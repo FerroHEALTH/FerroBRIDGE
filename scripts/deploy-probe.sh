@@ -72,7 +72,8 @@ ROWS=""
 # One JSON string body: backslashes, quotes and control characters escaped
 # (RFC 8259 §7), newlines folded to spaces.
 json_string() {
-  printf '%s' "$1" | tr '\r\n\t' '   ' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+  local text="$1"
+  printf '%s' "$text" | tr '\r\n\t' '   ' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
 # request <method> <path> [curl args...]: prints the status code, or 000 when
@@ -89,7 +90,8 @@ request() {
 }
 
 body_has() {
-  grep -q -- "$1" "$WORK/body"
+  local needle="$1"
+  grep -q -- "$needle" "$WORK/body"
 }
 
 # The part of a classification every probe shares: no answer, a refused
@@ -189,7 +191,8 @@ lane_finding() {
 }
 
 expected_of() {
-  printf '%s\n' "$EXPECT" | awk -F= -v l="$1" '$1 == l { v = $2 } END { print v }'
+  local label="$1"
+  printf '%s\n' "$EXPECT" | awk -F= -v l="$label" '$1 == l { v = $2 } END { print v }'
 }
 
 report() {
@@ -242,9 +245,10 @@ report() {
 }
 
 probe_json() {
+  local label="$1"
   local first=1 l f p e
   while IFS=$'\t' read -r l f p e; do
-    [[ "$l" = "$1" ]] || continue
+    [[ "$l" = "$label" ]] || continue
     [[ "$first" -eq 1 ]] || printf ','
     first=0
     printf '{"probe":"%s","finding":"%s","evidence":"%s"}' \
@@ -319,9 +323,11 @@ GET /health/info 200 {}'
   check() {
     local name="$1" code="$2" needle="$3" routes="$4" rc=0
     shift 4
-    local envs=()
-    while [[ "$#" -gt 0 ]] && [[ "$1" != "--" ]]; do
-      envs+=("$1")
+    local envs=() arg
+    while [[ "$#" -gt 0 ]]; do
+      arg="$1"
+      [[ "$arg" != "--" ]] || break
+      envs+=("$arg")
       shift
     done
     [[ "$#" -gt 0 ]] && shift

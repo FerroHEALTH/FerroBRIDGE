@@ -17,9 +17,10 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 repo() {
-  git init -q "$1"
-  git -C "$1" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m base
-  git -C "$1" update-ref refs/remotes/origin/main HEAD
+  local repo_dir="$1"
+  git init -q "$repo_dir"
+  git -C "$repo_dir" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m base
+  git -C "$repo_dir" update-ref refs/remotes/origin/main HEAD
 }
 repo "$work/ours"
 repo "$work/theirs"
@@ -38,15 +39,16 @@ done
 failures=0
 # expect <hook> <want-exit> <payload>
 expect() {
+  local hook="$1" want="$2" payload="$3"
   local got=0
-  CLAUDE_PROJECT_DIR="$work/ours" bash "$hooks/$1" <<<"$3" >/dev/null 2>&1 || got=$?
-  if [[ "$got" -ne "$2" ]]; then
-    echo "FAIL: $1 exited $got, want $2, for: $3" >&2
+  CLAUDE_PROJECT_DIR="$work/ours" bash "$hooks/$hook" <<<"$payload" >/dev/null 2>&1 || got=$?
+  if [[ "$got" -ne "$want" ]]; then
+    echo "FAIL: $hook exited $got, want $want, for: $payload" >&2
     failures=$((failures + 1))
   fi
 }
-bash_call() { jq -cn --arg c "$1" --arg d "$2" '{cwd: $d, tool_input: {command: $c}}'; }
-edit_call() { jq -cn --arg f "$1" '{tool_input: {file_path: $f}}'; }
+bash_call() { local command_text="$1" dir="$2"; jq -cn --arg c "$command_text" --arg d "$dir" '{cwd: $d, tool_input: {command: $c}}'; }
+edit_call() { local file_path="$1"; jq -cn --arg f "$file_path" '{tool_input: {file_path: $f}}'; }
 
 g=crate_version_bump_guard.sh
 expect "$g" 2 "$(bash_call 'git commit -m x' "$work/ours")"

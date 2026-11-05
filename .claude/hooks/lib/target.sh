@@ -18,8 +18,9 @@ hook_repo_root() {
 # The absolute git common directory of the checkout holding directory $1, or
 # nothing when $1 is in no checkout. Worktrees of one repository share it.
 common_dir_of() {
-  [[ -d "$1" ]] || return 0
-  git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true
+  local dir="$1"
+  [[ -d "$dir" ]] || return 0
+  git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true
 }
 
 # Whether directory $1 is in a checkout of this repository.
@@ -32,7 +33,8 @@ in_this_repository() {
 
 # The top-level directory of the checkout holding directory $1.
 toplevel_of() {
-  git -C "$1" rev-parse --show-toplevel 2>/dev/null || true
+  local dir="$1"
+  git -C "$dir" rev-parse --show-toplevel 2>/dev/null || true
 }
 
 # Expands a leading `~` and the variables `$NAME`, `${NAME}` in the path $1,
@@ -44,6 +46,7 @@ expand_path() {
   case "$path" in
   \~) path="$HOME" ;;
   \~/*) path="$HOME/${path#\~/}" ;;
+    *) ;;
   esac
   while [[ "$path" =~ \$\{?([A-Za-z_][A-Za-z0-9_]*)\}? ]]; do
     name="${BASH_REMATCH[1]}"
@@ -91,7 +94,8 @@ GIT_COMMIT_OR_PUSH='git([[:space:]]+(-[Cc][[:space:]]+[^[:space:]]+|--?[A-Za-z][
 # Prints `commit` or `push`, the first of the two the command text $1 runs, or
 # nothing.
 git_commit_or_push() {
-  if [[ "$1" =~ $GIT_COMMIT_OR_PUSH ]]; then
+  local command_text="$1"
+  if [[ "$command_text" =~ $GIT_COMMIT_OR_PUSH ]]; then
     printf '%s\n' "${BASH_REMATCH[3]}"
   fi
 }
