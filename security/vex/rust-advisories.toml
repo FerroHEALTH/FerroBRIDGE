@@ -59,8 +59,8 @@
 id = "https://ferrobridge.eu/vex/rust-dependency-advisories"
 author = "Cadasto B.V."
 role = "vendor"
-timestamp = "2026-10-23T00:00:00Z"
-version = 1
+timestamp = "2026-11-05T00:00:00Z"
+version = 2
 
 # What the statements are about: the released server binary, the bridge image
 # built from it, and the operator console image. The server artifacts carry the
@@ -77,3 +77,42 @@ products = [
 # Every id here MUST appear in `deny.toml`'s `[advisories].ignore`, and every id
 # there MUST appear here. The generator enforces both directions.
 
+[[accepted]]
+id = "RUSTSEC-2026-0440"
+crate = "astral-tokio-tar"
+carriers = ["testcontainers"]
+workspace_roots = [
+  "eehrxf",
+  "ferrobridge-console",
+  "ferrobridge-fhirpath",
+  "ferrobridge-hl7v2",
+  "ferrobridge-operator-api",
+  "ferrobridge-server",
+  "ferrobridge-term",
+  "ferrobridge-testkit",
+  "ferrobridge-validator",
+  "fhirconnect",
+  "omocl",
+  "omop-cdm",
+  "openehr-mapping-core",
+]
+status = "not_affected"
+justification = "component_not_present"
+impact = """
+The advisory is informational: Astral ended maintenance of \
+`astral-tokio-tar` on 2026-11-03 and no version is patched. Its one \
+carrier is `testcontainers` 0.28.0, which `ferrobridge-testkit`, the \
+test-support crate (`publish = false`), uses to start the PostgreSQL \
+server and the reference CDR the end-to-end tests run against. Every \
+workspace root above reaches it only through a dev-dependency on \
+`ferrobridge-testkit` or on `testcontainers`, so the crate is in none of \
+the products. `cargo tree -p ferrobridge-server` and `cargo tree -p \
+ferrobridge-console` over normal and build edges, all features and all \
+targets, find no `astral-tokio-tar` node (`ferrobridge-server` takes \
+`testcontainers` as a dev-dependency only), and the server binary, the \
+`ferrobridge` image and the `ferrobridge-console` image are built from \
+exactly those graphs. No release of `testcontainers` leaves the crate \
+(0.28.0 requires ^0.6.1 and the upstream main branch requires 0.7.0). \
+Re-evaluate when a `testcontainers` release drops the dependency, or if \
+`ferrobridge-testkit` ever becomes a normal dependency of a shipped crate.\
+"""
