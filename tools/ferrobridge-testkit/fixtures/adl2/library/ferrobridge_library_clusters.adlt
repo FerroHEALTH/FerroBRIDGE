@@ -1,11 +1,13 @@
 -- SPDX-FileCopyrightText: Cadasto B.V.
 -- SPDX-License-Identifier: BUSL-1.1
 -- FerroBRIDGE's template for the FHIRconnect mapping library cluster models
--- no library file slots, over five published CKM archetypes
+-- FerroBRIDGE models slot, over eight published CKM archetypes
 -- (fixtures/ckm/library, fixtures/ckm/medication, fixtures/ckm/highmed): a
--- report COMPOSITION whose context holds CLUSTER.observation_status_fhir.v1
--- and CLUSTER.organization.v0, and whose content holds ACTION.medication.v1
--- with CLUSTER.medication_status_fhir.v0 in its open protocol slot. No
+-- report COMPOSITION whose context holds CLUSTER.observation_status_fhir.v1,
+-- CLUSTER.organization.v0, CLUSTER.entry_category.v0,
+-- CLUSTER.identifier_fhir.v0 and CLUSTER.case_identification.v0, and whose
+-- content holds ACTION.medication.v1 with CLUSTER.medication_status_fhir.v0
+-- in its open protocol slot. No
 -- specification governs this template: our own design, carrying the
 -- archetypes the mappings name. Node identifiers are at-coded, the ADL 1.4
 -- codes of the CKM sources.
@@ -36,6 +38,9 @@ definition
         /context/other_context[at0001]/items matches {
             use_archetype CLUSTER[at0006.1, openEHR-EHR-CLUSTER.observation_status_fhir.v1]
             use_archetype CLUSTER[at0006.2, openEHR-EHR-CLUSTER.organization.v0]
+            use_archetype CLUSTER[at0006.3, openEHR-EHR-CLUSTER.entry_category.v0]
+            use_archetype CLUSTER[at0006.4, openEHR-EHR-CLUSTER.identifier_fhir.v0]
+            use_archetype CLUSTER[at0006.5, openEHR-EHR-CLUSTER.case_identification.v0]
         }
         /content matches {
             use_archetype ACTION[at0000.2, openEHR-EHR-ACTION.medication-ferrobridge.v1]
@@ -56,6 +61,18 @@ terminology
             ["at0006.2"] = <
                 text = <"Organization">
                 description = <"Organization">
+            >
+            ["at0006.3"] = <
+                text = <"Entry category">
+                description = <"Entry category">
+            >
+            ["at0006.4"] = <
+                text = <"Identifier">
+                description = <"Identifier">
+            >
+            ["at0006.5"] = <
+                text = <"Case identification">
+                description = <"Case identification">
             >
             ["at0000.2"] = <
                 text = <"Medication management">

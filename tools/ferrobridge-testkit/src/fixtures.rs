@@ -283,8 +283,8 @@ macro_rules! library_template {
 /// slot, the health summary holds an ad hoc section with the absence and
 /// global exclusion evaluations, and the report result, medication list,
 /// encounter and person compositions each hold the gender evaluation; the
-/// clusters template holds the status and organisation clusters no library
-/// file slots. A suite builds the ADL 2 operational templates at test time.
+/// clusters template holds the clusters that FerroBRIDGE models slot. A
+/// suite builds the ADL 2 operational templates at test time.
 pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 7] = [
     library_template!("report"),
     library_template!("report_result"),
@@ -295,16 +295,16 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 7] = [
     library_template!("clusters"),
 ];
 
-/// The seven international CKM archetypes of the library templates.
+/// The eight international CKM archetypes of the library templates.
 ///
 /// They are the report, report result and medication list compositions, the
-/// absence, global exclusion and gender evaluations, and the device cluster
-/// of [`FERROBRIDGE_LIBRARY_TEMPLATES`].
+/// absence, global exclusion and gender evaluations, and the device and case
+/// identification clusters of [`FERROBRIDGE_LIBRARY_TEMPLATES`].
 ///
 /// `scripts/vendor/ckm-library.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 7] = [
+pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 8] = [
     ckm_library!("openEHR-EHR-COMPOSITION.report.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.report-result.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.medication_list.v1.adl"),
@@ -312,17 +312,19 @@ pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 7] = [
     ckm_library!("openEHR-EHR-EVALUATION.exclusion_global.v1.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.gender.v1.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.device.v1.adl"),
+    ckm_library!("openEHR-EHR-CLUSTER.case_identification.v0.adl"),
 ];
 
-/// The five published `HiGHmed` CKM archetypes of
-/// [`FERROBRIDGE_LIBRARY_TEMPLATES`]: the encounter (`fall`) and person
-/// compositions, and the medication status, observation status and
-/// organization clusters.
+/// The seven published `HiGHmed` CKM archetypes of the library templates.
+///
+/// They are the encounter (`fall`) and person compositions, and the entry
+/// category, FHIR identifier, medication status, observation status and
+/// organization clusters of [`FERROBRIDGE_LIBRARY_TEMPLATES`].
 ///
 /// `scripts/vendor/ckm-highmed.sh` fetches them at the German CKM mirror
 /// commit `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records
 /// their source and each archetype's own licence.
-pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 5] = [
+pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 7] = [
     (
         "openEHR-EHR-COMPOSITION.fall.v1.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.fall.v1.adl"),
@@ -330,6 +332,14 @@ pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 5] = [
     (
         "openEHR-EHR-COMPOSITION.person.v0.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.person.v0.adl"),
+    ),
+    (
+        "openEHR-EHR-CLUSTER.entry_category.v0.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-CLUSTER.entry_category.v0.adl"),
+    ),
+    (
+        "openEHR-EHR-CLUSTER.identifier_fhir.v0.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-CLUSTER.identifier_fhir.v0.adl"),
     ),
     (
         "openEHR-EHR-CLUSTER.medication_status_fhir.v0.adl",

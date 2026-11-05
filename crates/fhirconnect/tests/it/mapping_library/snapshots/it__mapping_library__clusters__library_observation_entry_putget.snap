@@ -1,0 +1,20 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/clusters.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "the engine filled /composer",
+    "the engine filled /context/start_time",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [
+    "code.text = \"Synthetic observation\"",
+    "status = \"final\""
+  ],
+  "added": [],
+  "changed": []
+}

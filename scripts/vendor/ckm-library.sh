@@ -46,6 +46,7 @@ paths=(
   "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.exclusion_global.v1.adl"
   "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.gender.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.device.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.case_identification.v0.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"

@@ -40,6 +40,8 @@ dest="tools/ferrobridge-testkit/fixtures/ckm/highmed"
 paths=(
   "local/archetypes/composition/openEHR-EHR-COMPOSITION.fall.v1.adl"
   "local/archetypes/composition/openEHR-EHR-COMPOSITION.person.v0.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.entry_category.v0.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.identifier_fhir.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.medication_status_fhir.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.observation_status_fhir.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.organization.v0.adl"
