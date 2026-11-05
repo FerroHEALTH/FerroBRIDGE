@@ -174,7 +174,8 @@ fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
 fn several_issuers_read_each_over_the_sections_defaults() -> Result<(), Box<dyn std::error::Error>>
 {
     let auth = settings(concat!(
-        "[auth]\naudience = [\"https://bridge.example.org/fhir\"]\nclock_skew_seconds = 30\n\n",
+        "[auth]\naudience = [\"https://bridge.example.org/fhir\"]\nclock_skew_seconds = 30\n",
+        "role_claims = []\n\n",
         "[[auth.issuer]]\nissuer = \"https://one.example.org\"\n\n",
         "[[auth.issuer]]\nissuer = \"https://two.example.org\"\nclock_skew_seconds = 10\n",
     ))?
@@ -186,6 +187,83 @@ fn several_issuers_read_each_over_the_sections_defaults() -> Result<(), Box<dyn 
     assert_eq!(
         vec![String::from("https://bridge.example.org/fhir")],
         auth.issuers[1].audience
+    );
+    Ok(())
+}
+
+/// Two trusted issuers, with `extra` in the `[auth]` table above them.
+fn two_issuers(extra: &str) -> String {
+    format!(
+        concat!(
+            "[auth]\naudience = [\"https://bridge.example.org/fhir\"]\n{}\n",
+            "[[auth.issuer]]\nissuer = \"https://one.example.org\"\n\n",
+            "[[auth.issuer]]\nissuer = \"https://two.example.org\"\n",
+        ),
+        extra
+    )
+}
+
+#[test]
+fn several_issuers_refuse_the_default_role_claims() -> Result<(), Box<dyn std::error::Error>> {
+    // NOTE: GHSA-pfgx-xq28-2629, a bare path would read roles from every
+    // trusted issuer's tokens, so beside two the default refuses the start.
+    let error = refusal(&two_issuers(""))?;
+    assert!(
+        matches!(
+            rule(&error),
+            Some(ConfigError::Unqualified { key: "auth.role_claims", entry }) if entry == "roles"
+        ),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn several_issuers_refuse_a_bare_scopeless_subject() -> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal(&two_issuers(
+        "role_claims = []\nscopeless_subjects = [\"svc-ferrofed\"]\n",
+    ))?;
+    assert!(
+        matches!(
+            rule(&error),
+            Some(ConfigError::Unqualified { key: "auth.scopeless_subjects", entry })
+                if entry == "svc-ferrofed"
+        ),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_entry_naming_an_untrusted_issuer_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal(&two_issuers(concat!(
+        "role_claims = []\n",
+        "scopeless_subjects = [\"https://three.example.org#svc-ferrofed\"]\n",
+    )))?;
+    assert!(
+        matches!(
+            rule(&error),
+            Some(ConfigError::UnknownIssuer { key: "auth.scopeless_subjects", issuer })
+                if issuer == "https://three.example.org"
+        ),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_qualified_entry_holds_for_its_issuer_alone() -> Result<(), Box<dyn std::error::Error>> {
+    let auth = settings(&two_issuers(concat!(
+        "scopeless_subjects = [\"https://one.example.org#svc-ferrofed\"]\n",
+        "role_claims = [\"https://two.example.org#realm_access.roles\"]\n",
+    )))?
+    .ok_or("auth is on")?;
+    assert!(auth.issuers[0].scopeless_subjects.contains("svc-ferrofed"));
+    assert!(auth.issuers[1].scopeless_subjects.is_empty());
+    assert_eq!(Vec::<String>::new(), auth.issuers[0].role_claims);
+    assert_eq!(
+        vec![String::from("realm_access.roles")],
+        auth.issuers[1].role_claims
     );
     Ok(())
 }
