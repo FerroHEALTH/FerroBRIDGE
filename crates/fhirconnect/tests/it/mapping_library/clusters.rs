@@ -199,14 +199,85 @@ fn diagnosis_use() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     )
 }
 
+/// Returns the synthetic `Encounter` whose contact type the contact type
+/// cluster maps.
+fn contact_type_encounter() -> serde_json::Value {
+    serde_json::json!({
+        "resourceType": "Encounter",
+        "class": {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            "code": "IMP"
+        },
+        "type": [{
+            "coding": [
+                {"system": "http://fhir.de/CodeSystem/Kontaktebene", "code": "abteilungskontakt"},
+                {"system": "http://fhir.de/CodeSystem/kontaktart-de", "code": "normalstationaer"}
+            ]
+        }]
+    })
+}
+
+/// Returns the synthetic `Observation` whose category and identifier the
+/// entry clusters map.
+fn observation_entry() -> serde_json::Value {
+    serde_json::json!({
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {"text": "Synthetic observation"},
+        "category": [{
+            "coding": [{"system": "http://example.org/fhir/CodeSystem/synthetic-category", "code": "SYN-CAT", "display": "Synthetic category"}],
+            "text": "A synthetic category"
+        }],
+        "identifier": [{"system": "http://example.org/fhir/sid/synthetic-observation", "value": "SYN-OBS-0001"}]
+    })
+}
+
+/// Returns the synthetic `Encounter` whose diagnosis use the diagnosis type
+/// cluster maps.
+fn diagnosis_encounter() -> serde_json::Value {
+    serde_json::json!({
+        "resourceType": "Encounter",
+        "reasonCode": [{
+            "coding": [{"system": "http://example.org/fhir/CodeSystem/synthetic-problem", "code": "SYN-PROBLEM", "display": "A synthetic problem"}]
+        }],
+        "diagnosis": [{
+            "use": {
+                "coding": [
+                    {"system": "http://terminology.hl7.org/CodeSystem/diagnosis-role", "code": "AD"},
+                    {"system": "http://fhir.de/CodeSystem/DiagnoseTyp", "code": "surgery-diagnosis"}
+                ]
+            }
+        }]
+    })
+}
+
+/// Returns `program` with the published `files` it reaches when `PutGet`
+/// over `resource` changes no value it carries back, and nothing when it
+/// does: a run that rewrites a value is no pass.
+fn counted(
+    files: &'static [&'static str],
+    (program, index): (Arc<Program>, WebTemplateIndex),
+    resource: &serde_json::Value,
+) -> Result<Option<crate::support::Chain>, Box<dyn Error>> {
+    let declared = laws::putget(&program, &index, resource, &laws::untouched)?;
+    let unchanged = declared
+        .get("changed")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(Vec::is_empty);
+    Ok(unchanged.then_some((files, program)))
+}
+
 /// Compiles the contexts of this module whose clusters run and returns each
-/// with the published files it reaches.
+/// whose `PutGet` changes nothing, with the published files it reaches.
 pub(super) fn chains() -> Result<Vec<crate::support::Chain>, Box<dyn Error>> {
-    Ok(vec![
-        (CONTACT_TYPE, contact_type()?.0),
-        (ENTRY, entry()?.0),
-        (DIAGNOSIS_USE, diagnosis_use()?.0),
-    ])
+    Ok([
+        counted(CONTACT_TYPE, contact_type()?, &contact_type_encounter())?,
+        counted(ENTRY, entry()?, &observation_entry())?,
+        counted(DIAGNOSIS_USE, diagnosis_use()?, &diagnosis_encounter())?,
+    ]
+    .into_iter()
+    .flatten()
+    .collect())
 }
 
 /// Returns a synthetic report composition of the library clusters template:
@@ -409,23 +480,12 @@ fn the_medication_status_refuses_going_in() -> Result<(), Box<dyn Error>> {
 /// `kontaktTyp.yml:24` selects the contact level coding by the system
 /// `http://fhir.de/CodeSystem/Kontaktebene` and `:34` writes it back as
 /// `http://fhir.de/CodeSystem/kontaktebene`, so the system comes back as
-/// another string than the one the condition selected (#101).
+/// another string than the one the condition selected (#101), and the corpus
+/// does not count the file.
 #[test]
 fn putget_holds_on_a_synthetic_contact_type() -> Result<(), Box<dyn Error>> {
     let (program, index) = contact_type()?;
-    let encounter = serde_json::json!({
-        "resourceType": "Encounter",
-        "class": {
-            "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
-            "code": "IMP"
-        },
-        "type": [{
-            "coding": [
-                {"system": "http://fhir.de/CodeSystem/Kontaktebene", "code": "abteilungskontakt"},
-                {"system": "http://fhir.de/CodeSystem/kontaktart-de", "code": "normalstationaer"}
-            ]
-        }]
-    });
+    let encounter = contact_type_encounter();
     let declared = laws::putget(&program, &index, &encounter, &laws::untouched)?;
     insta::assert_json_snapshot!("library_contact_type_putget", declared);
     Ok(())
@@ -450,16 +510,7 @@ fn the_entry_clusters_compile_onto_observation() -> Result<(), Box<dyn Error>> {
 #[test]
 fn putget_holds_on_a_synthetic_observation_entry() -> Result<(), Box<dyn Error>> {
     let (program, index) = entry()?;
-    let observation = serde_json::json!({
-        "resourceType": "Observation",
-        "status": "final",
-        "code": {"text": "Synthetic observation"},
-        "category": [{
-            "coding": [{"system": "http://example.org/fhir/CodeSystem/synthetic-category", "code": "SYN-CAT", "display": "Synthetic category"}],
-            "text": "A synthetic category"
-        }],
-        "identifier": [{"system": "http://example.org/fhir/sid/synthetic-observation", "value": "SYN-OBS-0001"}]
-    });
+    let observation = observation_entry();
     let declared = laws::putget(&program, &index, &observation, &laws::untouched)?;
     insta::assert_json_snapshot!("library_observation_entry_putget", declared);
     Ok(())
@@ -530,21 +581,18 @@ fn the_diagnosis_type_cluster_compiles_onto_encounter() -> Result<(), Box<dyn Er
 #[test]
 fn putget_holds_on_a_synthetic_diagnosis_use() -> Result<(), Box<dyn Error>> {
     let (program, index) = diagnosis_use()?;
-    let encounter = serde_json::json!({
-        "resourceType": "Encounter",
-        "reasonCode": [{
-            "coding": [{"system": "http://example.org/fhir/CodeSystem/synthetic-problem", "code": "SYN-PROBLEM", "display": "A synthetic problem"}]
-        }],
-        "diagnosis": [{
-            "use": {
-                "coding": [
-                    {"system": "http://terminology.hl7.org/CodeSystem/diagnosis-role", "code": "AD"},
-                    {"system": "http://fhir.de/CodeSystem/DiagnoseTyp", "code": "surgery-diagnosis"}
-                ]
-            }
-        }]
-    });
+    let encounter = diagnosis_encounter();
     let declared = laws::putget(&program, &index, &encounter, &laws::untouched)?;
     insta::assert_json_snapshot!("library_diagnosis_use_putget", declared);
+    Ok(())
+}
+
+#[test]
+fn the_contact_type_is_not_counted_while_its_system_changes() -> Result<(), Box<dyn Error>> {
+    let chain = counted(CONTACT_TYPE, contact_type()?, &contact_type_encounter())?;
+    assert!(
+        chain.is_none(),
+        "the contact type counted with a changed system"
+    );
     Ok(())
 }

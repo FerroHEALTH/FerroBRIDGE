@@ -22,6 +22,7 @@ use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::resolve::program::Program;
+use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
 
@@ -35,7 +36,7 @@ const CONTEXT: &str = "ferrobridge_library_ips_medication.context";
 
 /// The published files the program reaches: the sub-context and its section
 /// extension.
-pub(super) const FILES: &[&str] = &[
+const FILES: &[&str] = &[
     "projects/org.openehr/IPS/medication/IPS_medication.context.yml",
     "projects/org.openehr/IPS/medication/IPS_medication_section.yml",
 ];
@@ -49,7 +50,7 @@ const MODELS: &[&str] = &[
 
 /// Compiles the medication context against the library health summary
 /// template.
-pub(super) fn medication() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+fn medication() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     let files: Vec<&str> = FILES.iter().chain(MODELS).copied().collect();
     program(
         HEALTH_SUMMARY,
@@ -60,6 +61,52 @@ pub(super) fn medication() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn E
             "ferrobridge_ips_medication.yml",
         ],
     )
+}
+
+/// Returns a synthetic composition of the library health summary template
+/// whose section holds one absence statement.
+fn medication_composition(
+    index: &WebTemplateIndex,
+) -> Result<CanonicalComposition, Box<dyn Error>> {
+    let flat = serde_json::json!({
+        "library_health_summary/language|code": "en",
+        "library_health_summary/language|terminology": "ISO_639-1",
+        "library_health_summary/territory|code": "NL",
+        "library_health_summary/territory|terminology": "ISO_3166-1",
+        "library_health_summary/composer|name": "FerroBRIDGE synthetic composer",
+        "library_health_summary/category|code": "433",
+        "library_health_summary/category|value": "event",
+        "library_health_summary/category|terminology": "openehr",
+        "library_health_summary/context/start_time": "2026-10-01T09:00:00Z",
+        "library_health_summary/context/setting|code": "238",
+        "library_health_summary/context/setting|value": "other care",
+        "library_health_summary/context/setting|terminology": "openehr",
+        "library_health_summary/section/absence_of_information/language|code": "en",
+        "library_health_summary/section/absence_of_information/language|terminology": "ISO_639-1",
+        "library_health_summary/section/absence_of_information/encoding|code": "UTF-8",
+        "library_health_summary/section/absence_of_information/encoding|terminology": "IANA_character-sets",
+        "library_health_summary/section/absence_of_information/absence_statement": "No synthetic medication"
+    });
+    let serde_json::Value::Object(flat) = flat else {
+        return Err("the FLAT composition is no object".into());
+    };
+    Ok(index.build_from_flat(&flat, crate::laws::NOW)?)
+}
+
+/// Compiles the medication context and runs it out of openEHR over the
+/// synthetic composition, and returns it with the published files it
+/// reaches: a context counts once it runs.
+pub(super) fn chain() -> Result<crate::support::Chain, Box<dyn Error>> {
+    let (program, index) = medication()?;
+    to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &medication_composition(&index)?,
+        &Seams::default(),
+        &CallContext::new(),
+    )?;
+    Ok((FILES, program))
 }
 
 #[test]
@@ -102,29 +149,7 @@ fn the_sub_context_template_is_undecided() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_medication_section_goes_out_with_its_title_and_code() -> Result<(), Box<dyn Error>> {
     let (program, index) = medication()?;
-    let flat = serde_json::json!({
-        "library_health_summary/language|code": "en",
-        "library_health_summary/language|terminology": "ISO_639-1",
-        "library_health_summary/territory|code": "NL",
-        "library_health_summary/territory|terminology": "ISO_3166-1",
-        "library_health_summary/composer|name": "FerroBRIDGE synthetic composer",
-        "library_health_summary/category|code": "433",
-        "library_health_summary/category|value": "event",
-        "library_health_summary/category|terminology": "openehr",
-        "library_health_summary/context/start_time": "2026-10-01T09:00:00Z",
-        "library_health_summary/context/setting|code": "238",
-        "library_health_summary/context/setting|value": "other care",
-        "library_health_summary/context/setting|terminology": "openehr",
-        "library_health_summary/section/absence_of_information/language|code": "en",
-        "library_health_summary/section/absence_of_information/language|terminology": "ISO_639-1",
-        "library_health_summary/section/absence_of_information/encoding|code": "UTF-8",
-        "library_health_summary/section/absence_of_information/encoding|terminology": "IANA_character-sets",
-        "library_health_summary/section/absence_of_information/absence_statement": "No synthetic medication"
-    });
-    let serde_json::Value::Object(flat) = flat else {
-        return Err("the FLAT composition is no object".into());
-    };
-    let composition = index.build_from_flat(&flat, crate::laws::NOW)?;
+    let composition = medication_composition(&index)?;
     let outbound = to_fhir(
         &program,
         &SCHEMAS,
