@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its medication administration model, which slots
+# the library's medication cluster, a cluster whose constituents are
+# medication clusters again (#1551).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_medication.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/MedicationAdministration"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_medication.v1.0.0"
+  archetypes:
+    - "ferrobridge_medication_administration"
+  start: "ferrobridge_medication_administration"

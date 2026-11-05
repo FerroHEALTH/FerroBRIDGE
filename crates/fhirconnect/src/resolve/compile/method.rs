@@ -21,6 +21,7 @@ use crate::model::ast::keyword::Variable;
 use crate::resolve::error::ResolveCode;
 use crate::resolve::extensions::Node;
 use crate::resolve::extensions::diagnostic;
+use crate::resolve::program::SLOT_DEPTH_LIMIT;
 use crate::resolve::program::binding::ResourceType;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::manual::ManualPath;
@@ -172,20 +173,14 @@ impl<'a> Compiler<'a> {
             ));
             return Method::Value;
         };
-        if scope.chain.contains(slot.value()) {
-            let chain: Vec<&str> = scope.chain.iter().map(MappingName::as_str).collect();
+        if let Some(message) = slot_depth(slot.value(), scope) {
             self.diagnostics.push(diagnostic(
                 file.file(),
                 owner,
-                ResolveCode::SlotCycle,
+                ResolveCode::SlotDepth,
                 slot.position(),
                 &at,
-                format!(
-                    "`{}` slots `{}`, which is already on the chain {}",
-                    owner,
-                    slot.value(),
-                    chain.join(" -> ")
-                ),
+                format!("`{owner}` slots {message}"),
             ));
             return Method::Value;
         }
@@ -213,6 +208,8 @@ impl<'a> Compiler<'a> {
         }
         let mut chain = scope.chain.clone();
         chain.push(slot.value().clone());
+        let mut entered_at = scope.entered_at.clone();
+        entered_at.push(scope.openehr.clone());
         let inner = Scope {
             archetype: scope.openehr.clone(),
             direction: slotted
@@ -228,6 +225,7 @@ impl<'a> Compiler<'a> {
                 .map(|url| url.value().clone()),
             prefix: String::new(),
             chain,
+            entered_at,
             ..scope.clone()
         };
         let merged = self.merge(slotted);
@@ -582,6 +580,45 @@ fn refused_entry(context: &MappingName) -> Method {
         preprocessors: Vec::new(),
         mappings: Vec::new(),
     }
+}
+
+/// Returns why a slot of `model` under `scope` is refused as too deep, `None`
+/// when the recursion may go on.
+///
+/// A re-entry at no place below the one the model was entered at can never
+/// end, and a chain may enter one model at most [`SLOT_DEPTH_LIMIT`] times.
+/// No specification governs a recursive slot: our own design.
+fn slot_depth(model: &MappingName, scope: &Scope) -> Option<String> {
+    let depth = scope
+        .chain
+        .iter()
+        .filter(|entered| *entered == model)
+        .count();
+    let previous = scope
+        .chain
+        .iter()
+        .zip(&scope.entered_at)
+        .rev()
+        .find(|(entered, _)| *entered == model)
+        .map(|(_, at)| at);
+    let descends = previous.is_none_or(|at| {
+        scope.openehr.segments.len() > at.segments.len()
+            && scope.openehr.segments.starts_with(&at.segments)
+    });
+    let chain: Vec<&str> = scope.chain.iter().map(MappingName::as_str).collect();
+    let chain = chain.join(" -> ");
+    if !descends {
+        return Some(format!(
+            "`{model}` again on the chain {chain} at no place below the one it was entered at, \
+             so the recursion never ends"
+        ));
+    }
+    (depth >= SLOT_DEPTH_LIMIT).then(|| {
+        format!(
+            "`{model}` a {}th time on the chain {chain}, past the limit of {SLOT_DEPTH_LIMIT}",
+            depth.saturating_add(1)
+        )
+    })
 }
 
 /// Whether `mapping` slots a composition model: a `slotArchetype` at

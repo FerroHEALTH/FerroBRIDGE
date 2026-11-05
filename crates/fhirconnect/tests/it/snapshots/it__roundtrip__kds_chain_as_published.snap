@@ -5,7 +5,7 @@ expression: rows(&diagnostics)
 [
   "KDS_anatomical_location.yml:15 error fc-unknown-fhir-element",
   "KDS_problem_diagnose.yml:100 warning fc-duplicate-method-name",
-  "KDS_problem_diagnose.yml:241 error fc-slot-cycle",
+  "KDS_problem_diagnose.yml:241 error fc-slot-depth",
   "KDS_problem_diagnose.yml:32 error fc-nested-extension-method",
   "KDS_problem_qualifier.yml:30 error fc-uncarried-tail",
   "KDS_problem_qualifier.yml:52 error fc-uncarried-tail",

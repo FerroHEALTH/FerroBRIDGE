@@ -115,6 +115,9 @@ struct Scope {
     prefix: String,
     /// The model mappings on the slot chain, the start first.
     chain: Vec<MappingName>,
+    /// The archetype path each model on the chain was entered at, in the
+    /// order of `chain`.
+    entered_at: Vec<RmPath>,
     /// Whether the walk is inside a context entered through `slotContext`,
     /// where a slot of a composition model is skipped.
     nested: bool,
@@ -330,6 +333,7 @@ impl<'a> Compiler<'a> {
             resource: resource.clone(),
             fhir: root_expression(),
             archetype: archetype.clone(),
+            entered_at: vec![archetype.clone()],
             openehr: archetype,
             direction: start.spec().unidirectional.as_ref().map(|d| *d.value()),
             enclosing: Vec::new(),

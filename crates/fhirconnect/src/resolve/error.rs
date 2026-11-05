@@ -85,8 +85,9 @@ pub enum ResolveCode {
     /// The template carries no node for the archetype a model mapping
     /// declares, or carries more than one.
     UnresolvedArchetypeRoot,
-    /// A `slotArchetype` names a model mapping already in the slot chain.
-    SlotCycle,
+    /// A slot chain enters one model mapping more often than
+    /// [`crate::resolve::program::SLOT_DEPTH_LIMIT`] admits.
+    SlotDepth,
     /// A mapping carries two mapping methods that exclude each other.
     ConflictingMappingMethods,
     /// A `hierarchy.split` `create` names no element the engine creates.
@@ -175,7 +176,7 @@ impl ResolveCode {
             Self::ArchetypeMismatch => "fc-archetype-mismatch",
             Self::ArchetypeRevisionMismatch => "fc-archetype-revision-mismatch",
             Self::UnresolvedArchetypeRoot => "fc-unresolved-archetype-root",
-            Self::SlotCycle => "fc-slot-cycle",
+            Self::SlotDepth => "fc-slot-depth",
             Self::ConflictingMappingMethods => "fc-conflicting-mapping-methods",
             Self::UnknownSplitCreate => "fc-unknown-split-create",
             Self::MalformedContextValue => "fc-malformed-context-value",
@@ -232,7 +233,7 @@ impl ResolveCode {
             Self::ArchetypeMismatch,
             Self::ArchetypeRevisionMismatch,
             Self::UnresolvedArchetypeRoot,
-            Self::SlotCycle,
+            Self::SlotDepth,
             Self::ConflictingMappingMethods,
             Self::UnknownSplitCreate,
             Self::MalformedContextValue,
@@ -300,8 +301,8 @@ mod tests {
     #[test]
     fn a_code_renders_as_its_diagnostic_code() {
         assert_eq!(
-            DiagnosticCode::from(ResolveCode::SlotCycle).to_string(),
-            "fc-slot-cycle"
+            DiagnosticCode::from(ResolveCode::SlotDepth).to_string(),
+            "fc-slot-depth"
         );
     }
 }
