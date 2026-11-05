@@ -25,6 +25,30 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.20] - 2026-11-05
+
+Two steps toward the whole FHIRconnect mapping library. A composition model
+can start a context compiled against an ADL 2 operational template, read
+through the lineage of the template root, and a `slotArchetype` may name a
+model already on its slot chain, as the library's medication cluster does.
+The `eehrxf` laboratory project lists its composition context beside the
+laboratory result. Two calls break: `fhirconnect` 0.1.221 renames
+`EngineError::SlotCycle` to `EngineError::SlotDepth` (and the diagnostic
+`fc-slot-cycle` to `fc-slot-depth`), and in `eehrxf` 0.1.156
+`Mapping::compile_project(&LABORATORY)` compiles both contexts, so a consumer
+narrows the project with `LABORATORY.with_context(..)` first. The crate line
+moves one patch per change, a breaking one included, so a consumer pins it
+exactly.
+
+### Added
+
+- `fhirconnect` and `openehr-mapping-core`: a composition model (`COMPOSITION.report.v1.Condition` and its kin) can be the `start` of a context compiled against an ADL 2 operational template. The template root carries every archetype its lineage names (AOM2 §3.6.4, §3.6.6), which `WebTemplateIndex` keeps from the OPT2's `parent_archetype_id`, or from `WebTemplateIndex::with_root_lineage` when the caller holds the template source and the OPT states no parent. `WebTemplateIndex::root_lineage` reads it. An OPT2 that states no parent and is given no lineage still refuses a composition start as an unresolved archetype root (#1550).
+
+### Changed
+
+- `eehrxf`: the laboratory mapping project lists `ferrobridge_eu_lab_composition.context` beside its laboratory result context, so `Project::with_context` compiles the `Composition-eu-lab` context from the embedded files. Both contexts map `KDS_Laborbericht`, so `Mapping::compile_project(&LABORATORY)` now compiles two programs, and a run that used it for the laboratory report narrows the project first: `LABORATORY.with_context("ferrobridge_eu_laboratory.context")` (#1544).
+- `fhirconnect`: a `slotArchetype` may name a model already on its slot chain, as the mapping library's medication cluster does for its constituents. The compiler follows the recursion while the template carries a node, ends it where the template stops nesting the chain's archetype, and refuses a chain that enters one model more than `resolve::program::SLOT_DEPTH_LIMIT` (8) times or re-enters it at no deeper place. The diagnostic `fc-slot-cycle` is replaced by `fc-slot-depth`, and `EngineError::SlotCycle` by `EngineError::SlotDepth`, which carries the limit: a consumer that matches either changes to the new name (#1551).
+
 ## [0.0.19] - 2026-11-04
 
 A family upkeep release. The server and the operator console move to
@@ -5914,7 +5938,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.19...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.20...HEAD
+[0.0.20]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.19...v0.0.20
 [0.0.19]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.18...v0.0.19
 [0.0.18]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.17...v0.0.18
 [0.0.17]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.16...v0.0.17

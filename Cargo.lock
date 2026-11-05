@@ -1701,7 +1701,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-console"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1792,7 +1792,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-server"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1883,7 +1883,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-testkit"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -2119,7 +2119,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-codegen"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "anyhow",
  "clap",
@@ -2320,7 +2320,7 @@ dependencies = [
 
 [[package]]
 name = "forwarders"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -2469,7 +2469,7 @@ dependencies = [
 
 [[package]]
 name = "generated-tree"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "tempfile",
  "thiserror",
@@ -3838,7 +3838,7 @@ dependencies = [
 
 [[package]]
 name = "omop-cdm-codegen"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "anyhow",
  "clap",
