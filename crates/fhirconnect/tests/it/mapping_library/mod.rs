@@ -13,6 +13,7 @@
 
 mod clusters;
 mod compositions;
+mod ips;
 mod medication;
 
 use core::error::Error;
@@ -205,6 +206,7 @@ pub(crate) fn library_chains() -> Result<Vec<crate::support::Chain>, Box<dyn Err
     ];
     chains.extend(clusters::chains()?);
     chains.extend(compositions::chains()?);
+    chains.push((ips::FILES, ips::medication()?.0));
     Ok(chains)
 }
 

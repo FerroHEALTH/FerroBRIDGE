@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's root context over the library's health summary model, which
+# enters the library's IPS medication sub-context (#1546). The published
+# IPS.context.yml does not compile against the template it names (#101), so
+# this context enters the one sub-context against the library health
+# summary template built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_ips_medication.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Composition"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_health_summary.v1.0.0"
+  archetypes:
+    - "COMPOSITION.health_summary.v1"
+  extensions:
+    - "ferrobridge_ips_medication"
+  contexts:
+    - "IPS_medication.context"
+  start: "COMPOSITION.health_summary.v1"
