@@ -535,15 +535,25 @@ holds the count each file may still hold, a rise fails the `stray-literals`
 job, and a fall passes with a one-line note. A pull request that moves strings
 to the catalogs therefore leaves the baseline alone, and two such pull requests
 never conflict on it. `.github/workflows/ratchet-tighten.yml` writes the fall
-down instead: once a day and on dispatch it checks that nothing rose on `main`,
-runs the guard's `--update`, and opens one pull request that holds only the
-baseline, or moves its open one; when nothing fell it closes that pull
-request or deletes a branch no pull request was opened from (#1593). It commits
-through the Git Data REST API, so GitHub signs the commit, and it never pushes
-to `main`. A pull request opened with the workflow token starts no checks, so
-the lane reads a `RATCHET_TIGHTEN_TOKEN` secret (a token with contents and
-pull-requests write) when one is set, and otherwise says in the pull request
-body to close and reopen it (#1363, the rule FerroEHR adopted in
+down instead. Once a day and on dispatch it checks that nothing rose on
+`main`, runs each guard's `--update`, and pushes one branch,
+`chore/ratchet-tighten`, that holds only the lowered ratchet files. GitHub
+Actions may not open a pull request in this repository and the owner keeps it
+that way, so the run ends with a notice and the pull request body in its step
+summary, and a maintainer opens the pull request from the branch (#1396).
+
+The counts hold only for the commit they were measured on, so the lane also
+runs on every push to `main` while a tightening pull request is open or the
+hand-off branch exists (#1590, #1593). It moves the pull request or the branch
+to the counts measured at the pushed commit, dispatches CI on the moved branch
+(a push with the workflow token starts no `pull_request` run), and arms
+auto-merge on the pull request again. When nothing falls there any more, or a
+guard fails there, it closes the pull request and deletes its branch, or
+deletes a branch no pull request was opened from. A push never creates the
+branch; only the schedule and a dispatch do.
+
+The lane commits through the Git Data REST API, so GitHub signs the commit,
+and it never pushes to `main` (#1363, the rule FerroEHR adopted in
 FerroHEALTH/FerroEHR#4554). No specification governs this: our own design.
 
 The duplication guard (`scripts/checks/duplication.sh`), the file-length
