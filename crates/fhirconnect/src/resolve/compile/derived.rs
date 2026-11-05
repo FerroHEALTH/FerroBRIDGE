@@ -184,7 +184,20 @@ impl<'a> Compiler<'a> {
                     *fhir.resolved().location(),
                     Location::Primitive(ValueKind::Text) | Location::Attribute
                 );
-                return Some(Derived::Element(derive::element(class, code, text)));
+                let pair = derive::element(class, code, text);
+                if openehr.leaf_class().is_none()
+                    && !derive::pairs(class).is_empty()
+                    && !derive::pairs_in(class, pair, direction)
+                {
+                    self.unpaired(file, (fhir, openehr), class, code, position, path);
+                    return None;
+                }
+                return Some(Derived::Element(pair));
+            }
+            Location::Resource if openehr.leaf_class().is_none() && !derive::pairs(class).is_empty() => {
+                let resource = fhir.resolved().leaf();
+                self.unpaired(file, (fhir, openehr), class, resource, position, path);
+                return None;
             }
             Location::PrimitiveElement | Location::Resource | Location::Deferred => return None,
         };
@@ -221,6 +234,36 @@ impl<'a> Compiler<'a> {
             read,
             write: Some(Alternative::new(code, written)),
         })
+    }
+
+    /// Refuses a mapping whose openEHR `class` and FHIR `named` type no page
+    /// of the data-type chapter pairs
+    /// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/data-type/`),
+    /// so it fails at load and never on the run that first carries it.
+    fn unpaired(
+        &mut self,
+        file: &'a ModelMappingFile,
+        (fhir, openehr): (&FhirTarget, &OpenehrTarget),
+        class: &str,
+        named: &str,
+        position: Position,
+        path: &ModelPath,
+    ) {
+        self.diagnostics.push(diagnostic(
+            file.file(),
+            file.header().name().value(),
+            ResolveCode::UnpairedTypes,
+            position,
+            path,
+            format!(
+                "`{}` ({named}) is mapped onto the {class} node `{}`, and the data-type chapter \
+                 pairs {class} only with {}; a `manual`, a `mappingCode` or a path to a paired \
+                 element says how to carry it",
+                fhir.expression(),
+                openehr.path(),
+                derive::pairs(class).join(", ")
+            ),
+        ));
     }
 
     /// Returns the value alternative of a polymorphic `ELEMENT` the FHIR

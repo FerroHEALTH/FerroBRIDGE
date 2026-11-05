@@ -21,6 +21,7 @@ use fhir_types::schema::ValueKind;
 use openehr_rm::v1_2::model;
 
 use crate::model::ast::keyword::DataType;
+use crate::model::ast::keyword::Direction;
 
 /// The FHIR type codes each openEHR class converts with, in the order the
 /// class's page of the data-type chapter lists them.
@@ -130,6 +131,25 @@ pub fn attribute_class(rm_type: &str, attribute: &model::RmAttribute) -> &'stati
     model::class(argument)
         .filter(|class| model::is_a(class.name, declared))
         .map_or(declared, |class| class.name)
+}
+
+/// Answers whether `class` pairs with the FHIR type `code` in every
+/// direction a mapping of `direction` runs.
+///
+/// A pair of the class's own row runs both ways. A mapping that only runs
+/// out of openEHR may also read a class through a row of a class it
+/// inherits from, since a `DV_CODED_TEXT` "inherits from `DV_TEXT`"
+/// (`types-of-mappings/data-type/DV_CODED_TEXT.adoc`) and reads as its text;
+/// going in, the inherited row cannot fill what the class adds.
+#[must_use]
+pub fn pairs_in(class: &str, code: &str, direction: Option<Direction>) -> bool {
+    if pairs(class).contains(&code) {
+        return true;
+    }
+    direction == Some(Direction::OpenehrToFhir)
+        && PAIRS.iter().any(|&(row, codes)| {
+            row != class && model::is_a(class, row) && codes.contains(&code)
+        })
 }
 
 /// Returns the FHIR type codes `class` converts with, empty for a class no

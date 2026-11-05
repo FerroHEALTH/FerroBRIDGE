@@ -29,6 +29,7 @@ use crate::resolve::program::target::Attachment;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::resolve::program::target::Target;
+use crate::tree::element::Location;
 
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Derivation;
@@ -189,6 +190,23 @@ impl<'a> Compiler<'a> {
             .collect();
         let method_kind = self.method(node, &inner, path);
         let method_kind = self.ports(node, method_kind, openehr.as_ref(), &inner, path);
+        if let (Method::Reference { .. }, Some(target)) = (&method_kind, &fhir)
+            && matches!(*target.resolved().location(), Location::Choice(_))
+        {
+            self.diagnostics.push(diagnostic(
+                file.file(),
+                owner,
+                ResolveCode::ReferenceIntoChoice,
+                method.position,
+                &path.field("with").field("fhir"),
+                format!(
+                    "`{}` is a choice element, which FHIR names by the type it holds \
+                     (<https://hl7.org/fhir/R4/formats.html#choice>), so a `reference` writes \
+                     into it only where the path names the type, as `as(Reference)` does",
+                    target.expression()
+                ),
+            ));
+        }
         let followed_by = self.mappings(&node.followed_by, &inner);
         let data_type = with.and_then(|with| with.data_type.as_ref().map(|kind| *kind.value()));
         let plain =
