@@ -72,42 +72,7 @@ impl<'i, R: Release> Walk<'_, '_, 'i, R> {
                 }
             }
             Kind::Complex(name) => {
-                let Some(value) = occurrence.value else {
-                    return Ok(());
-                };
-                let location = &occurrence.location;
-                if name == "Reference" {
-                    self.reference(value, location);
-                }
-                if field.content_reference.is_none() && name == "Extension" {
-                    let placement = if field.name == "modifierExtension" {
-                        Placement::Modifier
-                    } else if schema.name == "Extension" {
-                        Placement::Child
-                    } else {
-                        Placement::Extension
-                    };
-                    return self.extension(value, placement, cursor, target, location);
-                }
-                let inline = field.content_reference.is_some()
-                    || cursor.structure.has_children(id)
-                    || type_named(R::schemas(), name)?.path.contains('.');
-                let profiles = profiles_for(target.element, name);
-                let subject = Subject::Complex { value, name };
-                if !profiles.is_empty()
-                    && !self.type_profiles(cursor, target, subject, &profiles, location)?
-                    && !inline
-                {
-                    return Ok(());
-                }
-                let inner = if let Some(reference) = field.content_reference {
-                    Cursor::new(Arc::clone(&cursor.structure), reference)
-                } else if inline {
-                    Cursor::new(Arc::clone(&cursor.structure), id)
-                } else {
-                    Cursor::new(self.validator.core(name)?, name)
-                };
-                self.complex(value, name, &inner, location)?;
+                self.complex_occurrence(schema, field, name, occurrence, cursor, target)?;
             }
             Kind::Resource => {
                 if let Some(value) = occurrence.value {
@@ -136,6 +101,56 @@ impl<'i, R: Release> Walk<'_, '_, 'i, R> {
             Kind::Choice(_) => {}
         }
         Ok(())
+    }
+
+    /// Walks a datatype or backbone element, or an extension, against the
+    /// cursor and the profiles its type names.
+    fn complex_occurrence(
+        &mut self,
+        schema: &'static TypeSchema,
+        field: &'static FieldSchema,
+        name: &'static str,
+        occurrence: &Occurrence<'i>,
+        cursor: &Cursor<R>,
+        target: Held<'_, R>,
+    ) -> Result<(), ValidateError> {
+        let id = target.id;
+        let Some(value) = occurrence.value else {
+            return Ok(());
+        };
+        let location = &occurrence.location;
+        if name == "Reference" {
+            self.reference(value, location);
+        }
+        if field.content_reference.is_none() && name == "Extension" {
+            let placement = if field.name == "modifierExtension" {
+                Placement::Modifier
+            } else if schema.name == "Extension" {
+                Placement::Child
+            } else {
+                Placement::Extension
+            };
+            return self.extension(value, placement, cursor, target, location);
+        }
+        let inline = field.content_reference.is_some()
+            || cursor.structure.has_children(id)
+            || type_named(R::schemas(), name)?.path.contains('.');
+        let profiles = profiles_for(target.element, name);
+        let subject = Subject::Complex { value, name };
+        if !profiles.is_empty()
+            && !self.type_profiles(cursor, target, subject, &profiles, location)?
+            && !inline
+        {
+            return Ok(());
+        }
+        let inner = if let Some(reference) = field.content_reference {
+            Cursor::new(Arc::clone(&cursor.structure), reference)
+        } else if inline {
+            Cursor::new(Arc::clone(&cursor.structure), id)
+        } else {
+            Cursor::new(self.validator.core(name)?, name)
+        };
+        self.complex(value, name, &inner, location)
     }
 
     /// Walks a resource inside another: its type against its element's types,

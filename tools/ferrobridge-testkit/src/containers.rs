@@ -585,63 +585,6 @@ async fn await_readiness(url: &str) -> Result<(), HarnessError> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{
-        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, cdr_request, terminology_request,
-    };
-
-    #[test]
-    fn every_pin_names_a_tag_and_a_digest() {
-        for image in [POSTGRES, CDR, CDR_POSTGRES, TERMINOLOGY] {
-            assert!(!image.tag.is_empty(), "{} has no tag", image.repository);
-            assert!(
-                image.digest.starts_with("sha256:"),
-                "{} is not pinned by a sha256 digest",
-                image.repository
-            );
-        }
-    }
-
-    #[test]
-    fn a_reference_is_the_repository_tag_and_digest() {
-        let image = PinnedImage {
-            repository: "postgres",
-            tag: "16.15",
-            digest: "sha256:0000",
-        };
-        assert_eq!("postgres:16.15@sha256:0000", image.reference());
-    }
-
-    #[test]
-    fn the_cdr_starts_with_its_usage_report_off() {
-        let request = cdr_request("postgres://cdr".to_owned(), "net".to_owned());
-        let usage_report = request
-            .env_vars()
-            .find(|(name, _)| name == "FERROEHR__USAGE_REPORT__ENABLED")
-            .map(|(_, value)| value.into_owned());
-        assert_eq!(
-            Some("false".to_owned()),
-            usage_report,
-            "a test CDR must not send a usage report"
-        );
-    }
-
-    #[test]
-    fn the_terminology_server_starts_with_its_usage_report_off() {
-        let request = terminology_request();
-        let usage_report = request
-            .env_vars()
-            .find(|(name, _)| name == "FERROTERM__USAGE_REPORT__ENABLED")
-            .map(|(_, value)| value.into_owned());
-        assert_eq!(
-            Some("false".to_owned()),
-            usage_report,
-            "a test terminology server must not send a usage report"
-        );
-    }
-}
-
 /// The AMQP port of the broker image.
 const AMQP_PORT: u16 = 5672;
 
@@ -698,4 +641,61 @@ pub async fn rabbitmq() -> Result<RabbitMq, HarnessError> {
         url: format!("amqp://guest:guest@{host}:{port}/%2f"),
         container,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, cdr_request, terminology_request,
+    };
+
+    #[test]
+    fn every_pin_names_a_tag_and_a_digest() {
+        for image in [POSTGRES, CDR, CDR_POSTGRES, TERMINOLOGY] {
+            assert!(!image.tag.is_empty(), "{} has no tag", image.repository);
+            assert!(
+                image.digest.starts_with("sha256:"),
+                "{} is not pinned by a sha256 digest",
+                image.repository
+            );
+        }
+    }
+
+    #[test]
+    fn a_reference_is_the_repository_tag_and_digest() {
+        let image = PinnedImage {
+            repository: "postgres",
+            tag: "16.15",
+            digest: "sha256:0000",
+        };
+        assert_eq!("postgres:16.15@sha256:0000", image.reference());
+    }
+
+    #[test]
+    fn the_cdr_starts_with_its_usage_report_off() {
+        let request = cdr_request("postgres://cdr".to_owned(), "net".to_owned());
+        let usage_report = request
+            .env_vars()
+            .find(|(name, _)| name == "FERROEHR__USAGE_REPORT__ENABLED")
+            .map(|(_, value)| value.into_owned());
+        assert_eq!(
+            Some("false".to_owned()),
+            usage_report,
+            "a test CDR must not send a usage report"
+        );
+    }
+
+    #[test]
+    fn the_terminology_server_starts_with_its_usage_report_off() {
+        let request = terminology_request();
+        let usage_report = request
+            .env_vars()
+            .find(|(name, _)| name == "FERROTERM__USAGE_REPORT__ENABLED")
+            .map(|(_, value)| value.into_owned());
+        assert_eq!(
+            Some("false".to_owned()),
+            usage_report,
+            "a test terminology server must not send a usage report"
+        );
+    }
 }

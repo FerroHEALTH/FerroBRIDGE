@@ -109,7 +109,7 @@ fn count_with_extension(files: &[PathBuf], extensions: &[&str]) -> usize {
         .iter()
         .filter(|path| {
             path.extension()
-                .and_then(|ext| ext.to_str())
+                .and_then(std::ffi::OsStr::to_str)
                 .is_some_and(|ext| extensions.contains(&ext))
         })
         .count()

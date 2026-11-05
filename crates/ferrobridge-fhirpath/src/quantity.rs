@@ -383,7 +383,7 @@ impl Quantity {
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
         static FORM: LazyLock<Option<Regex>> = LazyLock::new(|| {
-            Regex::new(r"^((?:\+|-)?\d+(?:\.\d+)?)\s*(?:'([^']+)'|([a-zA-Z]+))?$").ok()
+            Regex::new(r"^([+-]?\d+(?:\.\d+)?)\s*(?:'([^']+)'|([a-zA-Z]+))?$").ok()
         });
         let captures = FORM.as_ref()?.captures(text)?;
         let value = captures.get(1)?.as_str();

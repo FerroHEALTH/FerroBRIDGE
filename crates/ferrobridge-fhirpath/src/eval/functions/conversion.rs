@@ -16,11 +16,10 @@ use crate::temporal::{Date, DateTime, Time};
 use crate::value::{Collection, Item};
 
 /// `(\+|-)?\d+`, the integer form of N1 §5.5.3.
-static INTEGER: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"^(\+|-)?\d+$").ok());
+static INTEGER: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"^[+-]?\d+$").ok());
 
 /// `(\+|-)?\d+(\.\d+)?`, the decimal form of N1 §5.5.6.
-static DECIMAL: LazyLock<Option<Regex>> =
-    LazyLock::new(|| Regex::new(r"^(\+|-)?\d+(\.\d+)?$").ok());
+static DECIMAL: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"^[+-]?\d+(\.\d+)?$").ok());
 
 /// Whether `text` matches one of the forms above.
 fn matches(form: &LazyLock<Option<Regex>>, text: &str) -> bool {

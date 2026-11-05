@@ -407,45 +407,36 @@ async fn page(
     start: Position,
     size: u32,
 ) -> Result<(Vec<Match>, Option<Position>), Refusal> {
-    let mut matches = Vec::new();
-    let mut room = usize::try_from(size).unwrap_or(usize::MAX);
+    let mut tally = Tally {
+        matches: Vec::new(),
+        room: usize::try_from(size).unwrap_or(usize::MAX),
+        skip: start.skip,
+    };
     let mut offset = start.offset;
-    let mut skip = start.skip;
     for (index, plan) in plans.iter().enumerate().skip(start.declaration) {
         let Some(conditions) = plan.conditions.as_ref() else {
             offset = 0;
-            skip = 0;
+            tally.skip = 0;
             continue;
         };
         let mut held: BTreeSet<(String, usize)> = BTreeSet::new();
         let mut current = Reading::default();
         loop {
-            let fetch = i64::try_from(room.saturating_add(1)).unwrap_or(i64::MAX);
+            let fetch = i64::try_from(tally.room.saturating_add(1)).unwrap_or(i64::MAX);
             let request = aql::rows_request(conditions, &plan.order, offset, fetch);
             let rows = rows_of(client, &request, status::of_query_refusal).await?;
             for (position, row) in rows.iter().enumerate() {
                 let at = offset.saturating_add(i64::try_from(position).unwrap_or(i64::MAX));
                 let read = read_row(facade, plan, row, position)?;
-                if current.version != read.version.value() {
-                    current = Reading {
-                        version: read.version.value().to_owned(),
-                        first_row: at,
-                        answered: 0,
-                    };
-                }
+                current.follow(read.version.value(), at);
                 for entry in matched(plan, &read, row, position)? {
                     if !held.insert((current.version.clone(), entry.ordinal())) {
                         continue;
                     }
                     for unit in render_entry(facade, client, plan, &read, &entry).await? {
-                        if skip > 0 {
-                            skip = skip.saturating_sub(1);
-                            current.answered = current.answered.saturating_add(1);
-                            continue;
-                        }
-                        if room == 0 {
+                        if !tally.take(unit, &mut current) {
                             return Ok((
-                                matches,
+                                tally.matches,
                                 Some(Position {
                                     declaration: index,
                                     offset: current.first_row,
@@ -453,9 +444,6 @@ async fn page(
                                 }),
                             ));
                         }
-                        matches.push(unit);
-                        current.answered = current.answered.saturating_add(1);
-                        room = room.saturating_sub(1);
                     }
                 }
             }
@@ -466,9 +454,40 @@ async fn page(
             offset = offset.saturating_add(fetched);
         }
         offset = 0;
-        skip = 0;
+        tally.skip = 0;
     }
-    Ok((matches, None))
+    Ok((tally.matches, None))
+}
+
+/// What a page holds and has still to pass over.
+#[derive(Debug)]
+struct Tally {
+    /// The resources the page answers.
+    matches: Vec<Match>,
+    /// How many more the page holds.
+    room: usize,
+    /// How many resources still to pass over, already answered by an
+    /// earlier page.
+    skip: usize,
+}
+
+impl Tally {
+    /// Counts one resource of the composition `current` reads: passes over
+    /// it, or answers it, or returns `false` when the page has no room left.
+    fn take(&mut self, unit: Match, current: &mut Reading) -> bool {
+        if self.skip > 0 {
+            self.skip = self.skip.saturating_sub(1);
+            current.answered = current.answered.saturating_add(1);
+            return true;
+        }
+        if self.room == 0 {
+            return false;
+        }
+        self.matches.push(unit);
+        current.answered = current.answered.saturating_add(1);
+        self.room = self.room.saturating_sub(1);
+        true
+    }
 }
 
 /// The composition a page is reading the rows of.
@@ -480,6 +499,20 @@ struct Reading {
     first_row: i64,
     /// How many of its entries this page answered or skipped.
     answered: usize,
+}
+
+impl Reading {
+    /// Starts on the composition of `version` at the row `at`, unless it is
+    /// the one being read.
+    fn follow(&mut self, version: &str, at: i64) {
+        if self.version != version {
+            *self = Self {
+                version: version.to_owned(),
+                first_row: at,
+                answered: 0,
+            };
+        }
+    }
 }
 
 /// One row, read.

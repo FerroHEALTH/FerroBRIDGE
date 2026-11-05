@@ -42,7 +42,7 @@ fn search_parameters(dir: &std::path::Path) -> Vec<Value> {
         .map(|entry| entry.expect("a directory entry").path())
         .filter(|path| {
             path.file_name()
-                .and_then(|name| name.to_str())
+                .and_then(std::ffi::OsStr::to_str)
                 .is_some_and(|name| name.starts_with("SearchParameter-"))
         })
         .collect();

@@ -21,7 +21,7 @@ use fhir_types::schema::Schemas;
 use super::{Model, TypeKind, primitive_types};
 
 /// The STU3 primitive types, read once from the table.
-static PRIMITIVES: LazyLock<BTreeMap<&'static str, TypeKind>> =
+static PRIMITIVES: LazyLock<BTreeMap<&str, TypeKind>> =
     LazyLock::new(|| primitive_types(&fhir_types::stu3::schema::SCHEMAS));
 
 /// The FHIR STU3 type model.
