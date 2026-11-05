@@ -47,11 +47,11 @@ pub trait Release:
     type CodeSystem: CodeSystemRead + Json + fmt::Debug + Send + Sync;
 
     /// The release's name in messages, `R4` or `STU3`.
-    const NAME: &'static str;
+    const NAME: &str;
 
     /// The codes an extension's definition types its contexts with: R4
     /// `extension-context-type`, STU3 `extension-context`.
-    const CONTEXT_TYPES: &'static [&'static str];
+    const CONTEXT_TYPES: &[&str];
 
     /// The release's element table.
     fn schemas() -> &'static Schemas;
@@ -73,8 +73,8 @@ impl Release for R4 {
     type ValueSet = fhir_types::r4::value_set::ValueSet;
     type CodeSystem = fhir_types::r4::code_system::CodeSystem;
 
-    const NAME: &'static str = "R4";
-    const CONTEXT_TYPES: &'static [&'static str] = &["fhirpath", "element", "extension"];
+    const NAME: &str = "R4";
+    const CONTEXT_TYPES: &[&str] = &["fhirpath", "element", "extension"];
 
     fn schemas() -> &'static Schemas {
         &fhir_types::r4::schema::SCHEMAS
@@ -101,8 +101,8 @@ impl Release for Stu3 {
     type ValueSet = fhir_types::stu3::value_set::ValueSet;
     type CodeSystem = fhir_types::stu3::code_system::CodeSystem;
 
-    const NAME: &'static str = "STU3";
-    const CONTEXT_TYPES: &'static [&'static str] = &["resource", "datatype", "extension"];
+    const NAME: &str = "STU3";
+    const CONTEXT_TYPES: &[&str] = &["resource", "datatype", "extension"];
 
     fn schemas() -> &'static Schemas {
         &fhir_types::stu3::schema::SCHEMAS

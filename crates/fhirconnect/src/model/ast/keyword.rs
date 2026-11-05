@@ -38,7 +38,7 @@ pub enum Direction {
 
 impl Direction {
     /// Every spelling the specification writes.
-    pub const ADMITTED: &'static [&'static str] = &["openehr->fhir", "fhir->openehr"];
+    pub const ADMITTED: &[&str] = &["openehr->fhir", "fhir->openehr"];
 
     /// Returns the spelling the specification writes.
     #[must_use]
@@ -95,7 +95,7 @@ pub enum ExtensionMethod {
 
 impl ExtensionMethod {
     /// Every spelling the schema enum admits.
-    pub const ADMITTED: &'static [&'static str] = &["add", "append", "overwrite"];
+    pub const ADMITTED: &[&str] = &["add", "append", "overwrite"];
 
     /// Returns the spelling the schema enum fixes.
     #[must_use]
@@ -157,7 +157,7 @@ pub enum ContextScope {
 
 impl ContextScope {
     /// Every spelling the schema enum admits.
-    pub const ADMITTED: &'static [&'static str] = &["root", "sub"];
+    pub const ADMITTED: &[&str] = &["root", "sub"];
 
     /// Returns the spelling the schema enum fixes.
     #[must_use]
@@ -229,7 +229,7 @@ pub enum DataType {
 
 impl DataType {
     /// Every spelling the schema enum admits.
-    pub const ADMITTED: &'static [&'static str] = &[
+    pub const ADMITTED: &[&str] = &[
         "NONE",
         "QUANTITY",
         "DATETIME",
@@ -315,8 +315,7 @@ pub enum ConditionOperator {
 
 impl ConditionOperator {
     /// Every spelling the operator table writes.
-    pub const ADMITTED: &'static [&'static str] =
-        &["one of", "not of", "empty", "not empty", "type"];
+    pub const ADMITTED: &[&str] = &["one of", "not of", "empty", "not empty", "type"];
 
     /// Returns the spelling the operator table writes.
     #[must_use]
@@ -398,7 +397,7 @@ pub enum Variable {
 
 impl Variable {
     /// Every variable name the table lists, without the leading `$`.
-    pub const ADMITTED: &'static [&'static str] = &[
+    pub const ADMITTED: &[&str] = &[
         "resource",
         "fhirRoot",
         "archetype",

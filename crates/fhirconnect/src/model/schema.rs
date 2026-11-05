@@ -144,7 +144,7 @@ pub mod strict {
 }
 
 /// Holds the crate's own schema text so a caller can name the source file.
-static STRICT_SOURCES: LazyLock<[(SchemaKind, &'static str); 2]> = LazyLock::new(|| {
+static STRICT_SOURCES: LazyLock<[(SchemaKind, &str); 2]> = LazyLock::new(|| {
     [
         (SchemaKind::Model, strict::MODEL_SCHEMA),
         (SchemaKind::Context, strict::CONTEXT_SCHEMA),

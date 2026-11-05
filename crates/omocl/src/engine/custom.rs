@@ -91,7 +91,7 @@ pub struct FactRelationshipCustomConverter;
 
 impl FactRelationshipCustomConverter {
     /// The name the library writes.
-    pub const NAME: &'static str = "FactRelationshipCustomConverter";
+    pub const NAME: &str = "FactRelationshipCustomConverter";
 }
 
 impl CustomConverter for FactRelationshipCustomConverter {

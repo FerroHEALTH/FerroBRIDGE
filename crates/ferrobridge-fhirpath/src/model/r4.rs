@@ -11,7 +11,7 @@ use fhir_types::schema::Schemas;
 use super::{Model, TypeKind, primitive_types};
 
 /// The R4 primitive types, read once from the table.
-static PRIMITIVES: LazyLock<BTreeMap<&'static str, TypeKind>> =
+static PRIMITIVES: LazyLock<BTreeMap<&str, TypeKind>> =
     LazyLock::new(|| primitive_types(&fhir_types::r4::schema::SCHEMAS));
 
 /// The FHIR R4 type model.

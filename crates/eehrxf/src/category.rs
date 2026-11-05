@@ -64,7 +64,7 @@ pub struct Root {
 
 impl Category {
     /// Every category this build carries, in the order of Art 14(1).
-    pub const ENABLED: &'static [Self] = &[
+    pub const ENABLED: &[Self] = &[
         #[cfg(feature = "patient-summary")]
         Self::PatientSummary,
         #[cfg(feature = "prescription")]

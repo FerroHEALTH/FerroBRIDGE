@@ -62,7 +62,7 @@ pub enum Target {
 
 impl Target {
     /// Every target, in declaration order.
-    pub const ALL: &'static [Self] = &[
+    pub const ALL: &[Self] = &[
         Self::Measurement,
         Self::Observation,
         Self::DrugExposure,
@@ -134,7 +134,7 @@ pub enum EntityType {
 
 impl EntityType {
     /// Every spelling a `type` admits, in declaration order.
-    pub const ADMITTED: &'static [&'static str] = &[
+    pub const ADMITTED: &[&str] = &[
         "Measurement",
         "Observation",
         "DrugExposure",

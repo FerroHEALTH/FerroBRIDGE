@@ -478,7 +478,7 @@ impl Corpus {
                 .is_some_and(|extension| extension.eq_ignore_ascii_case("json"));
             json && path
                 .file_name()
-                .and_then(|name| name.to_str())
+                .and_then(std::ffi::OsStr::to_str)
                 .is_some_and(|name| name.starts_with("ConceptMap-"))
         });
         paths.sort();

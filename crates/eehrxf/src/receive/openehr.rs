@@ -391,85 +391,6 @@ pub enum SubjectInsertionError {
     },
 }
 
-#[cfg(test)]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "a test asserts, and returns its setup errors"
-)]
-mod tests {
-    use std::error::Error;
-
-    use openehr_rm::v1_2::composition::composition::Composition;
-
-    use super::{ReceivedComposition, SubjectInsertionError};
-
-    /// A synthetic composition whose `content` member is `content`.
-    fn composition(content: &str) -> Result<ReceivedComposition, Box<dyn Error>> {
-        let text = format!(
-            r#"{{
-  "_type": "COMPOSITION",
-  "name": {{ "_type": "DV_TEXT", "value": "Synthetic" }},
-  "archetype_node_id": "openEHR-EHR-COMPOSITION.synthetic.v1",
-  "archetype_details": {{
-    "_type": "ARCHETYPED",
-    "archetype_id": {{ "_type": "ARCHETYPE_ID", "value": "openEHR-EHR-COMPOSITION.synthetic.v1" }},
-    "template_id": {{ "_type": "TEMPLATE_ID", "value": "synthetic.v1" }},
-    "rm_version": "1.1.0"
-  }},
-  "language": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "ISO_639-1" }}, "code_string": "en" }},
-  "territory": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "ISO_3166-1" }}, "code_string": "NL" }},
-  "category": {{ "_type": "DV_CODED_TEXT", "value": "persistent", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "openehr" }}, "code_string": "431" }} }},
-  "composer": {{ "_type": "PARTY_SELF" }}{content}
-}}"#
-        );
-        let model: Composition = serde_json::from_str(&text)?;
-        Ok(ReceivedComposition {
-            composition: serde_json::to_string(&model)?,
-            model,
-            template_id: String::from("synthetic.v1"),
-            outcome: None,
-        })
-    }
-
-    #[test]
-    fn a_composition_with_no_entry_cannot_carry_the_mark() -> Result<(), Box<dyn Error>> {
-        let refused = composition("")?.inserted_by_subject();
-        assert!(
-            matches!(refused, Err(SubjectInsertionError::NoEntry)),
-            "{refused:?}"
-        );
-        let empty = composition(
-            r#",
-  "content": [{ "_type": "SECTION", "name": { "_type": "DV_TEXT", "value": "Empty" }, "archetype_node_id": "openEHR-EHR-SECTION.synthetic.v1" }]"#,
-        )?;
-        let refused = empty.inserted_by_subject();
-        assert!(
-            matches!(refused, Err(SubjectInsertionError::NoEntry)),
-            "a section with no entry carries no mark: {refused:?}"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_generic_entry_cannot_carry_the_mark() -> Result<(), Box<dyn Error>> {
-        let generic = composition(
-            r#",
-  "content": [{
-    "_type": "GENERIC_ENTRY",
-    "name": { "_type": "DV_TEXT", "value": "Legacy" },
-    "archetype_node_id": "openEHR-EHR-GENERIC_ENTRY.synthetic.v1",
-    "data": { "_type": "ELEMENT", "name": { "_type": "DV_TEXT", "value": "Item" }, "archetype_node_id": "at0001" }
-  }]"#,
-        )?;
-        let refused = generic.inserted_by_subject();
-        assert!(
-            matches!(refused, Err(SubjectInsertionError::GenericEntry)),
-            "{refused:?}"
-        );
-        Ok(())
-    }
-}
-
 impl ReceivedComposition {
     /// Returns this composition with every `ACTION` it holds naming the
     /// `INSTRUCTION` that caused it, for a received dispense of an order the
@@ -606,4 +527,83 @@ pub enum ReceiveMappingError {
         #[source]
         source: serde_json::Error,
     },
+}
+
+#[cfg(test)]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "a test asserts, and returns its setup errors"
+)]
+mod tests {
+    use std::error::Error;
+
+    use openehr_rm::v1_2::composition::composition::Composition;
+
+    use super::{ReceivedComposition, SubjectInsertionError};
+
+    /// A synthetic composition whose `content` member is `content`.
+    fn composition(content: &str) -> Result<ReceivedComposition, Box<dyn Error>> {
+        let text = format!(
+            r#"{{
+  "_type": "COMPOSITION",
+  "name": {{ "_type": "DV_TEXT", "value": "Synthetic" }},
+  "archetype_node_id": "openEHR-EHR-COMPOSITION.synthetic.v1",
+  "archetype_details": {{
+    "_type": "ARCHETYPED",
+    "archetype_id": {{ "_type": "ARCHETYPE_ID", "value": "openEHR-EHR-COMPOSITION.synthetic.v1" }},
+    "template_id": {{ "_type": "TEMPLATE_ID", "value": "synthetic.v1" }},
+    "rm_version": "1.1.0"
+  }},
+  "language": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "ISO_639-1" }}, "code_string": "en" }},
+  "territory": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "ISO_3166-1" }}, "code_string": "NL" }},
+  "category": {{ "_type": "DV_CODED_TEXT", "value": "persistent", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "openehr" }}, "code_string": "431" }} }},
+  "composer": {{ "_type": "PARTY_SELF" }}{content}
+}}"#
+        );
+        let model: Composition = serde_json::from_str(&text)?;
+        Ok(ReceivedComposition {
+            composition: serde_json::to_string(&model)?,
+            model,
+            template_id: String::from("synthetic.v1"),
+            outcome: None,
+        })
+    }
+
+    #[test]
+    fn a_composition_with_no_entry_cannot_carry_the_mark() -> Result<(), Box<dyn Error>> {
+        let refused = composition("")?.inserted_by_subject();
+        assert!(
+            matches!(refused, Err(SubjectInsertionError::NoEntry)),
+            "{refused:?}"
+        );
+        let empty = composition(
+            r#",
+  "content": [{ "_type": "SECTION", "name": { "_type": "DV_TEXT", "value": "Empty" }, "archetype_node_id": "openEHR-EHR-SECTION.synthetic.v1" }]"#,
+        )?;
+        let refused = empty.inserted_by_subject();
+        assert!(
+            matches!(refused, Err(SubjectInsertionError::NoEntry)),
+            "a section with no entry carries no mark: {refused:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_generic_entry_cannot_carry_the_mark() -> Result<(), Box<dyn Error>> {
+        let generic = composition(
+            r#",
+  "content": [{
+    "_type": "GENERIC_ENTRY",
+    "name": { "_type": "DV_TEXT", "value": "Legacy" },
+    "archetype_node_id": "openEHR-EHR-GENERIC_ENTRY.synthetic.v1",
+    "data": { "_type": "ELEMENT", "name": { "_type": "DV_TEXT", "value": "Item" }, "archetype_node_id": "at0001" }
+  }]"#,
+        )?;
+        let refused = generic.inserted_by_subject();
+        assert!(
+            matches!(refused, Err(SubjectInsertionError::GenericEntry)),
+            "{refused:?}"
+        );
+        Ok(())
+    }
 }

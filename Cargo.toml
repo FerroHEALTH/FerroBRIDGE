@@ -86,18 +86,18 @@ generated-tree = { path = "tools/generated-tree" }
 ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.141" }
 # Published from this workspace and consumed by the published
 # ferrobridge-validator, so the requirement carries both a path and a version.
-ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.131" }
+ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.132" }
 # Published from this workspace and consumed by the published eehrxf, so the
 # requirement carries both a path and a version.
-ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "0.1.144" }
+ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "0.1.145" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
-ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.183" }
+ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "0.1.184" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version.
-fhirconnect = { path = "crates/fhirconnect", version = "0.1.224" }
+fhirconnect = { path = "crates/fhirconnect", version = "0.1.225" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }

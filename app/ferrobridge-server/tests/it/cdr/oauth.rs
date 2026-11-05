@@ -76,7 +76,7 @@ fn credential_refusal(error: &CdrError) -> Result<&TokenError, Box<dyn Error>> {
         return Err(format!("expected a credentials refusal, got {source:?}").into());
     };
     Error::source(source)
-        .and_then(|cause| cause.downcast_ref::<Arc<TokenError>>())
+        .and_then(<dyn Error>::downcast_ref::<Arc<TokenError>>)
         .map(AsRef::as_ref)
         .ok_or_else(|| "the refusal carries the token error".into())
 }

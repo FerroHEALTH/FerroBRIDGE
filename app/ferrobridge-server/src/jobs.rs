@@ -192,6 +192,8 @@ pub(crate) async fn etl_run_command(
     reason = "the run report is the job's output, written to stdout for the operator"
 )]
 fn shown(outcome: Result<etl::report::RunReport, etl::job::JobError>) -> anyhow::Result<()> {
+    use anyhow::Context;
+
     let (report, refused) = match outcome {
         Ok(report) => (report, None),
         Err(etl::job::JobError::Record { report, source }) => (*report, Some(source)),
@@ -199,13 +201,12 @@ fn shown(outcome: Result<etl::report::RunReport, etl::job::JobError>) -> anyhow:
     };
     println!("{report}");
     println!("{}", serde_json::to_string_pretty(&report)?);
-    match refused {
-        None => Ok(()),
-        Some(source) => Err(anyhow::Error::new(source).context(format!(
+    refused.map_or(Ok(()), Err).with_context(|| {
+        format!(
             "keeping the report of run {} in the run history",
             report.run_id
-        ))),
-    }
+        )
+    })
 }
 
 /// Runs every ported Data Quality Dashboard check against the configured

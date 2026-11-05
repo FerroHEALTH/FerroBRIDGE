@@ -136,7 +136,7 @@ fn module_dir(file: &Path) -> PathBuf {
     let parent = file.parent().unwrap_or(Path::new(""));
     let name = file
         .file_name()
-        .and_then(|name| name.to_str())
+        .and_then(std::ffi::OsStr::to_str)
         .unwrap_or("");
     let in_bin = parent.file_name().is_some_and(|dir| dir == "bin");
     if matches!(name, "lib.rs" | "main.rs" | "mod.rs") || in_bin {

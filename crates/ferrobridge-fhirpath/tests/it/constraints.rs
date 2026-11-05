@@ -74,7 +74,7 @@ fn constraints(package: &str) -> BTreeSet<Constraint> {
         let is_definition = is_json
             && path
                 .file_name()
-                .and_then(|name| name.to_str())
+                .and_then(std::ffi::OsStr::to_str)
                 .is_some_and(|name| name.starts_with("StructureDefinition-"));
         if is_definition {
             collect(&path, &mut found);

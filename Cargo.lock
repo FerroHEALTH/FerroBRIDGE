@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.1.159"
+version = "0.1.160"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1749,7 +1749,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.1.131"
+version = "0.1.132"
 dependencies = [
  "base64 0.23.1",
  "chumsky",
@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.183"
+version = "0.1.184"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1928,7 +1928,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.144"
+version = "0.1.145"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -2158,7 +2158,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.224"
+version = "0.1.225"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",

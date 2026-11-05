@@ -44,7 +44,7 @@ pub struct FirstPartyConverters;
 
 impl FirstPartyConverters {
     /// The names of the first-party converters.
-    pub const NAMES: &'static [&'static str] = &["FactRelationshipCustomConverter"];
+    pub const NAMES: &[&str] = &["FactRelationshipCustomConverter"];
 }
 
 impl ConverterRegistry for FirstPartyConverters {

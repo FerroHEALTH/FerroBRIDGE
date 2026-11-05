@@ -157,7 +157,7 @@ fn yaml_under(directory: &Path, found: &mut Vec<String>) -> Result<(), Box<dyn E
         }
         let is_yaml = path
             .extension()
-            .and_then(|extension| extension.to_str())
+            .and_then(std::ffi::OsStr::to_str)
             .is_some_and(|extension| extension == "yml" || extension == "yaml");
         if is_yaml {
             found.push(relative(&path));

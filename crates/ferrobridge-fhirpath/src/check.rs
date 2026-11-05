@@ -372,44 +372,7 @@ impl Checker<'_> {
             "iif" => &[0, 1, 2],
             _ => &[],
         };
-        if name == "iif"
-            && let Some(Expr::Literal(literal)) = args.first()
-        {
-            let found = match literal {
-                Literal::Boolean(_) => None,
-                Literal::String(_) => Some("String"),
-                Literal::Integer(_) => Some("Integer"),
-                Literal::Decimal(_) => Some("Decimal"),
-                Literal::Date(_) => Some("Date"),
-                Literal::DateTime(_) => Some("DateTime"),
-                Literal::Time(_) => Some("Time"),
-                Literal::Quantity(..) => Some("Quantity"),
-            };
-            if let Some(found) = found {
-                return Err(SemanticError::Criterion {
-                    function: "iif",
-                    found,
-                });
-            }
-        }
-        if name == "toString"
-            && let Some(types) = from
-            && !types.is_empty()
-            && types
-                .iter()
-                .all(|ty| !ty.is_primitive() && !is_a(self.model, ty, "Quantity"))
-        {
-            // NOTE: N1 §5.5.8 toString() takes a primitive or a Quantity (R4 §2.9.1.3); N1 §11
-            // lets a compiler refuse an input no reachable type of which it takes.
-            return Err(SemanticError::Input {
-                function: "toString",
-                type_name: types
-                    .iter()
-                    .map(|ty| ty.name)
-                    .collect::<Vec<_>>()
-                    .join(" | "),
-            });
-        }
+        self.refuse_inputs(from, name, args)?;
         let mut outputs = Vec::new();
         for (index, arg) in args.iter().enumerate() {
             let typed_argument = matches!(name, "ofType" | "as" | "is") && index == 0;
@@ -449,5 +412,49 @@ impl Checker<'_> {
             },
             _ => None,
         })
+    }
+
+    /// Refuses an `iif` criterion or a `toString` input the function never
+    /// takes.
+    fn refuse_inputs(&self, from: &Reach, name: &str, args: &[Expr]) -> Result<(), SemanticError> {
+        if name == "iif"
+            && let Some(Expr::Literal(literal)) = args.first()
+        {
+            let found = match literal {
+                Literal::Boolean(_) => None,
+                Literal::String(_) => Some("String"),
+                Literal::Integer(_) => Some("Integer"),
+                Literal::Decimal(_) => Some("Decimal"),
+                Literal::Date(_) => Some("Date"),
+                Literal::DateTime(_) => Some("DateTime"),
+                Literal::Time(_) => Some("Time"),
+                Literal::Quantity(..) => Some("Quantity"),
+            };
+            if let Some(found) = found {
+                return Err(SemanticError::Criterion {
+                    function: "iif",
+                    found,
+                });
+            }
+        }
+        if name == "toString"
+            && let Some(types) = from
+            && !types.is_empty()
+            && types
+                .iter()
+                .all(|ty| !ty.is_primitive() && !is_a(self.model, ty, "Quantity"))
+        {
+            // NOTE: N1 §5.5.8 toString() takes a primitive or a Quantity (R4 §2.9.1.3); N1 §11
+            // lets a compiler refuse an input no reachable type of which it takes.
+            return Err(SemanticError::Input {
+                function: "toString",
+                type_name: types
+                    .iter()
+                    .map(|ty| ty.name)
+                    .collect::<Vec<_>>()
+                    .join(" | "),
+            });
+        }
+        Ok(())
     }
 }

@@ -142,7 +142,7 @@ fn fixture_rows() -> Result<Vec<(String, u64)>, Box<dyn Error>> {
     let mut rows = Vec::new();
     for entry in std::fs::read_dir(vocabulary::directory())? {
         let path = entry?.path();
-        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) else {
             continue;
         };
         if let Some(table) = name.strip_suffix(".csv") {
