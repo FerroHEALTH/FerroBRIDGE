@@ -25,6 +25,9 @@ use fhirconnect::model::load::load_set;
 use fhirconnect::model::schema::Schemas;
 use fhirconnect::model::schema::strict;
 use fhirconnect::model::semantic::StaticMappingCodes;
+use fhirconnect::resolve::program::Program;
+use fhirconnect::resolve::program::mapping::Mapping;
+use fhirconnect::resolve::program::mapping::Method;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::loader::load_str;
 
@@ -508,9 +511,38 @@ fn the_corpus_mapping_codes_pass_once_the_engine_registers_them() -> Result<(), 
     Ok(())
 }
 
+/// Returns the contexts `program` enters through `slotContext`, at any
+/// depth.
+fn entered_contexts(program: &Program) -> Vec<&str> {
+    let mut entered = Vec::new();
+    let mut stack: Vec<&Mapping> = program.mappings().iter().collect();
+    while let Some(mapping) = stack.pop() {
+        let nested = match *mapping.method() {
+            Method::SlotContext {
+                ref context,
+                ref mappings,
+                ..
+            } => {
+                entered.push(context.as_str());
+                mappings.as_slice()
+            }
+            Method::Reference { ref mappings, .. } | Method::Slot { ref mappings, .. } => {
+                mappings.as_slice()
+            }
+            Method::Value
+            | Method::Link { .. }
+            | Method::Programmed { .. }
+            | Method::Participation { .. } => &[][..],
+        };
+        stack.extend(nested.iter().chain(mapping.followed_by()));
+    }
+    entered
+}
+
 /// Returns every corpus file a program the suites compile reaches.
 ///
-/// A program reaches a model mapping it compiled and every extension it
+/// A program reaches its context, every context it enters through
+/// `slotContext`, a model mapping it compiled and every extension it
 /// applied to one. The programs are the diagnosis chain against the
 /// synthetic template, the KDS diagnosis, person and laboratory request
 /// project contexts against the published `KDS_Diagnose`, `KDS_Person` and
@@ -541,6 +573,7 @@ fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
     chains.extend(crate::published::published_chains()?);
     for (files, program) in chains {
         let mut names: Vec<&str> = vec![program.context().as_str()];
+        names.extend(entered_contexts(&program));
         for model in program.models() {
             names.push(model.name().as_str());
             names.extend(model.extensions().iter().map(MappingName::as_str));

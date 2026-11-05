@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of the library's health summary model, entering
+# the library's IPS medication sub-context at the ad hoc section
+# (types-of-mapping-files/sub-contexts.adoc, `slotContext`), as the
+# published IPS_composition.yml line 87 does under a section name the
+# library template carries (#1546).
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_ips_medication
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: COMPOSITION.health_summary.v1
+mappings:
+  - name: "sectionMedications"
+    extension: "add"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1]"
+    slotContext: "IPS_medication.context"

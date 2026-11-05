@@ -1,0 +1,31 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ips.rs
+expression: "document.pointer(\"/section\")"
+---
+[
+  {
+    "code": {
+      "coding": [
+        {
+          "code": "10160-0",
+          "display": "Medication List",
+          "system": "http://loinc.org"
+        }
+      ]
+    },
+    "emptyReason": {
+      "coding": [
+        {
+          "code": "unavailable",
+          "system": "http://terminology.hl7.org/CodeSystem/list-empty-reason"
+        }
+      ],
+      "text": "No synthetic medication"
+    },
+    "text": {
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Hot flushes</div>",
+      "status": "generated"
+    },
+    "title": "Active Medication List"
+  }
+]

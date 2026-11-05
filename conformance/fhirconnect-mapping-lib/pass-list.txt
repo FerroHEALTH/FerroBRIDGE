@@ -18,4 +18,6 @@ model/evaluation/org.openehr/gender.v1.yml
 model/evaluation/org.openehr/problem_diagnosis.v1.yml
 projects/org.highmed/KDS/person/KDS_Composition.yml
 projects/org.highmed/KDS/person/KDS_gender.yml
+projects/org.openehr/IPS/medication/IPS_medication.context.yml
+projects/org.openehr/IPS/medication/IPS_medication_section.yml
 total 129
