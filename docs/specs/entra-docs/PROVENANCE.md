@@ -1,7 +1,7 @@
 <!-- This file describes vendored third-party material; the bytes beside it
      keep their upstream licence, not the licence of this repository. -->
 
-# Provenance: the Microsoft identity platform on-behalf-of flow
+# Provenance: the Microsoft identity platform documents
 
 Vendored verbatim by `scripts/vendor/entra-docs.sh`. Never edit a file
 here: change the pin in docs/VERSIONS.md and re-run the script.
@@ -24,22 +24,27 @@ here: change the pin in docs/VERSIONS.md and re-run the script.
   Microsoft's. The README also states that the licences grant no right to
   Microsoft's names, logos or trademarks.
 - Layout: the upstream paths, unchanged
-- Files: 7
+- Files: 8
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `1783a2ca630f7ea7c18178e8fa6fac67fc1e978ac06976030d35d8eb85209cf7`
-- Read by: FerroHEALTH/FerroBRIDGE#1582 (the `on_behalf_of` onward grant)
+  `PROVENANCE.md` excluded): `f4c06bb33019f698cd3e70f409ded6b10ea56f74b81b1444a0c1a51020e6697b`
+- Read by: FerroHEALTH/FerroBRIDGE#1582 (the `on_behalf_of` onward grant,
+  and the `aud` of the system lane's own token)
 
 ## What is taken
 
+`docs/identity-platform/access-token-claims-reference.md` ("Access token claims
+reference", whose `aud` row states the v2.0 audience) and
 `docs/identity-platform/v2-oauth2-on-behalf-of-flow.md` ("Microsoft identity platform and
 OAuth2.0 On-Behalf-Of flow"), with the two include files and the one figure
-it links. The other pages and media of the repository are not taken.
+the flow page links. The other pages and media of the repository are not
+taken.
 
 | File | sha256 | git blob id |
 |---|---|---|
 | `LICENSE` | `c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383` | `9e841e7a26e4eb057b24511e7b92d42b257a80e5` |
 | `LICENSE-CODE` | `91f7258203fd43ba6d6f7f72b644eaedee9e3430f035c053beb6f34052f045e2` | `b17b032a43088ac7f3d2f3e34a2431c778a95e6f` |
 | `README.md` | `32355274e726eb8981b4478aef7917313395ff7ca7be1904488c4adf8b818584` | `79e2f6397e79e79fb4a7593bfc5e50f34d94d06d` |
+| `docs/identity-platform/access-token-claims-reference.md` | `e07447d46ab82957979f12b3caccaf9d07179c6556c7ffbde150d1f754f1e232` | `57501e33d517c90c2585fbae861a398a86239b6a` |
 | `docs/identity-platform/includes/remind-not-to-relay-token-nonaud.md` | `892a33662da6c0b4d87ea486dee262072cf156812f9ce125fa52a2a13f454dd7` | `ffe0ae884ba91176669a3ebe6219b9bf806f8564` |
 | `docs/identity-platform/includes/remind-not-to-validate-access-tokens.md` | `89490cd32926bba88c91caafc9d7154890c0d2eb8115e74f0d3a084c70a82e3c` | `cd036dd059795ede809e433d762fb9b53f812c68` |
 | `docs/identity-platform/media/v2-oauth2-on-behalf-of-flow/protocols-oauth-on-behalf-of-flow.png` | `7fcfe78747e818500fba66fa9a49355e8092941cac76e0bcaca9ccb409043258` | `f0e4276f30b3a674385f66bc2d3b74f4d57ef37e` |
