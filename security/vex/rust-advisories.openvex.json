@@ -26,8 +26,8 @@
           "openehr-mapping-core"
         ]
       },
-      "impact_statement": "An UNMAINTAINED-crate advisory, not a vulnerability: Astral ended maintenance on 2026-11-03 and RustSec records no flaw and no patched version. `astral-tokio-tar` reaches the build only through `testcontainers`, which `ferrobridge-testkit` uses to start PostgreSQL and the reference CDR for the end-to-end tests (`cargo tree -i astral-tokio-tar`), and every other workspace member reaches it only as a dev-dependency through that test-support crate. The server binary and the console binary do not link it (`cargo tree -i astral-tokio-tar -p ferrobridge-server -e normal,build` is empty), so it is absent from the artifacts this document describes. Re-evaluate on the next testcontainers release.",
-      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The advisory is informational: Astral ended maintenance of `astral-tokio-tar` on 2026-11-03 and no version is patched. Its one carrier is `testcontainers` 0.28.0, which `ferrobridge-testkit`, the test-support crate (`publish = false`), uses to start PostgreSQL and the reference CDR for the end-to-end tests. Every workspace root above reaches it only through a dev-dependency on `ferrobridge-testkit`, so the crate is in none of the three products: `cargo tree -i astral-tokio-tar -p ferrobridge-server` and `-p ferrobridge-console` over normal and build edges find no node, and the server binary, the `ferrobridge` image and the `ferrobridge-console` image are built from exactly those graphs. No release of `testcontainers` leaves the crate (0.28.0 requires ^0.6.1 and the upstream main branch requires 0.7.0). Re-evaluate when a `testcontainers` release drops the dependency, or if `ferrobridge-testkit` ever becomes a normal dependency of a shipped crate.",
+      "justification": "component_not_present",
       "products": [
         {
           "@id": "pkg:cargo/ferrobridge-server",
