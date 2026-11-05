@@ -357,7 +357,9 @@ the testkit tool crate. Beside it:
   every pin no Dependabot ecosystem covers against its newest upstream
   release each week. `ratchet-tighten.yml` lowers the ratchet baselines on
   `main` once a day through one pull request, since a pull request that
-  lowers a count passes the guard and leaves the baseline alone.
+  lowers a count passes the guard and leaves the baseline alone; each push
+  to `main` moves that pull request to the counts measured there, or closes
+  it when they no longer hold (#1590).
 - Root markdown: this file, `README.md`, and the community and governance set.
 
 When the workspace lands, each crate carries its own `CLAUDE.md` with
