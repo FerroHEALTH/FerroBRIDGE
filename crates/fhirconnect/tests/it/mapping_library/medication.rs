@@ -9,6 +9,15 @@
 //! archetype, as the CKM cluster's constituent slot (`at0138`) admits. The
 //! recursion descends while the template carries a node and ends where it
 //! carries none (#1551; FHIRconnect v1.0.0 is silent: our own design).
+//!
+//! Neither model counts as reached (#101). `medication.v2.yml:96` slots the
+//! substance one constituent too deep, so a template nesting two
+//! constituents compiles it at the wrong cluster. FerroBRIDGE's substance
+//! model enters the substance model at the administered cluster itself,
+//! where it compiles, and its ingredient reference at
+//! `medication.v2.substance.yml:45` writes the choice element
+//! `Substance.ingredient.substance[x]` without naming its type, which the
+//! run refuses.
 
 use core::error::Error;
 use std::fmt::Write;
@@ -16,12 +25,18 @@ use std::sync::Arc;
 
 use ferrobridge_testkit::fixtures::CKM_MEDICATION_ARCHETYPES;
 use fhir_types::r4::schema::SCHEMAS;
+use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::library::Library;
+use fhirconnect::engine::seam::Seams;
+use fhirconnect::engine::traverse::error::EngineError;
+use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
 use fhirconnect::resolve::program::SLOT_DEPTH_LIMIT;
+use fhirconnect::tree::error::WriteError;
 use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
+use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -37,7 +52,7 @@ const TEMPLATE: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_medication.v
 const CONTEXT: &str = "ferrobridge_library_medication.context";
 
 /// The two published medication cluster models.
-pub(super) const FILES: &[&str] = &[
+const FILES: &[&str] = &[
     "model/cluster/org.openehr/medication.v2.yml",
     "model/cluster/org.openehr/medication.v2.substance.yml",
 ];
@@ -48,6 +63,19 @@ const FIXTURES: &[&str] = &[
     "ferrobridge_medication_administration.yml",
     "ferrobridge_library_medication.context.yml",
 ];
+
+/// The published substance model.
+const SUBSTANCE: &[&str] = &["model/cluster/org.openehr/medication.v2.substance.yml"];
+
+/// FerroBRIDGE's medication substance model and its context, relative to
+/// the project directory.
+const SUBSTANCE_FIXTURES: &[&str] = &[
+    "ferrobridge_medication_substance.yml",
+    "ferrobridge_library_substance.context.yml",
+];
+
+/// The context this crate authored over the substance model.
+const SUBSTANCE_CONTEXT: &str = "ferrobridge_library_substance.context";
 
 /// The `language` and `description` sections every artefact of the template
 /// carries.
@@ -175,9 +203,25 @@ fn compiled(depth: usize) -> Result<Result<Arc<Program>, Vec<Diagnostic>>, Box<d
 }
 
 /// Compiles the medication context against a template nesting two
-/// constituents, for the corpus reach.
-pub(super) fn program() -> Result<Arc<Program>, Box<dyn Error>> {
+/// constituents.
+fn program() -> Result<Arc<Program>, Box<dyn Error>> {
     compiled(2)?.map_err(|diagnostics| crate::resolve::render(&diagnostics).into())
+}
+
+/// Compiles the substance context against the template nesting one
+/// constituent, and returns the program with its index.
+fn substance() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+    let index = template(1)?;
+    let set = set(SUBSTANCE, SUBSTANCE_FIXTURES)?;
+    let program = compile(
+        &set,
+        &MappingName::new(SUBSTANCE_CONTEXT)?,
+        &index,
+        &SCHEMAS,
+        &Library,
+    )
+    .map_err(|diagnostics| crate::resolve::render(&diagnostics))?;
+    Ok((program, index))
 }
 
 #[test]
@@ -275,6 +319,111 @@ fn a_recursion_past_the_depth_limit_refuses() -> Result<(), Box<dyn Error>> {
             .contains(&format!("past the limit of {SLOT_DEPTH_LIMIT}"))),
         "{}",
         crate::resolve::render(&diagnostics)
+    );
+    Ok(())
+}
+
+#[test]
+fn the_substance_compiles_at_the_administered_cluster() -> Result<(), Box<dyn Error>> {
+    let (program, _) = substance()?;
+    assert_eq!(program.resource().as_str(), "Substance");
+    assert_eq!(
+        models(&program),
+        [
+            "ferrobridge_medication_substance",
+            "CLUSTER.medication.v2.substance"
+        ]
+    );
+    Ok(())
+}
+
+/// Returns a synthetic composition of the one-constituent template: the
+/// administered cluster named `Synthetic combination`, and its constituent
+/// when `constituent` holds.
+fn substance_composition(
+    index: &WebTemplateIndex,
+    constituent: bool,
+) -> Result<CanonicalComposition, Box<dyn Error>> {
+    let mut flat = serde_json::json!({
+        "composition/language|code": "en",
+        "composition/language|terminology": "ISO_639-1",
+        "composition/territory|code": "NL",
+        "composition/territory|terminology": "ISO_3166-1",
+        "composition/composer|name": "FerroBRIDGE synthetic composer",
+        "composition/category|code": "433",
+        "composition/category|value": "event",
+        "composition/category|terminology": "openehr",
+        "composition/context/start_time": "2026-10-01T09:00:00Z",
+        "composition/context/setting|code": "238",
+        "composition/context/setting|value": "other care",
+        "composition/context/setting|terminology": "openehr",
+        "composition/slot/time": "2026-10-01T09:00:00Z",
+        "composition/slot/ism_transition/current_state|code": "526",
+        "composition/slot/ism_transition/current_state|value": "planned",
+        "composition/slot/ism_transition/current_state|terminology": "openehr",
+        "composition/slot/ism_transition/careflow_step|code": "at0109",
+        "composition/slot/ism_transition/careflow_step|value": "Medication recommended",
+        "composition/slot/ism_transition/careflow_step|terminology": "local",
+        "composition/slot/slot/name": "Synthetic combination"
+    });
+    if constituent && let Some(object) = flat.as_object_mut() {
+        object.insert(
+            String::from("composition/slot/slot/slot/name"),
+            serde_json::json!("Synthetic constituent"),
+        );
+    }
+    let serde_json::Value::Object(flat) = flat else {
+        return Err("the FLAT composition is no object".into());
+    };
+    Ok(index.build_from_flat(&flat, crate::laws::NOW)?)
+}
+
+/// Going out of openEHR, the substance is the administered cluster.
+#[test]
+fn the_substance_reads_the_administered_cluster() -> Result<(), Box<dyn Error>> {
+    let (program, index) = substance()?;
+    let outbound = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &substance_composition(&index, false)?,
+        &Seams::default(),
+        &CallContext::new(),
+    )?;
+    let substance = outbound
+        .value()
+        .to_serde_json(&mut fhir_types::codec::Path::root("Substance"))?;
+    assert_eq!(
+        substance.pointer("/code/text"),
+        Some(&serde_json::json!("Synthetic combination"))
+    );
+    Ok(())
+}
+
+/// `medication.v2.substance.yml:45` writes the ingredient reference into the
+/// choice element `Substance.ingredient.substance[x]` without naming its type
+/// (#101), so a constituent going out of openEHR refuses.
+#[test]
+fn the_substance_ingredient_reference_refuses_going_out() -> Result<(), Box<dyn Error>> {
+    let (program, index) = substance()?;
+    let outcome = to_fhir(
+        &program,
+        &SCHEMAS,
+        &index,
+        &substance_composition(&index, true)?,
+        &Seams::default(),
+        &CallContext::new(),
+    );
+    let Err(EngineError::Write {
+        mapping, source, ..
+    }) = outcome
+    else {
+        return Err("the ingredient went out of openEHR".into());
+    };
+    assert_eq!(mapping, "ingredients.substanceSubstance");
+    assert!(
+        matches!(*source, WriteError::UnresolvedChoice { ref element } if element == "Substance.ingredient.substance[x]"),
+        "{source}"
     );
     Ok(())
 }

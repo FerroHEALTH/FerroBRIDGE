@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's Observation model over the CKM report composition, slotting
+# the library's organization cluster from the composition context as the
+# Organization the performer references, which no library file slots
+# (#1546).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_report_organization
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.report.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+mappings:
+  - name: performer
+    with:
+      fhir: $resource.performer
+      openehr: $reference
+    reference:
+      resourceType: Organization
+      mappings:
+        - name: organization
+          with:
+            fhir: $fhirRoot
+            openehr: $archetype/context/other_context[at0001]/items[openEHR-EHR-CLUSTER.organization.v0]
+          slotArchetype: CLUSTER.organization.v0

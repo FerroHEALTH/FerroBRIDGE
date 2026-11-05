@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's Encounter model over the HiGHmed encounter composition,
+# slotting the library's contact type cluster from the composition context
+# onto Encounter.type, which no library file slots (#1546). No CKM mirror
+# holds CLUSTER.kontakttyp.v0, so it compiles against the published
+# KDS_Fall_einfach template, whose encounter class the model maps as well,
+# because the template makes it mandatory.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_encounter_contact_type
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.fall.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+mappings:
+  - name: type
+    with:
+      fhir: $resource.type
+      openehr: $archetype/context/other_context[at0001]/items[openEHR-EHR-CLUSTER.kontakttyp.v0]
+    slotArchetype: CLUSTER.kontakttyp.v0
+  - name: class
+    with:
+      fhir: $resource.class
+      openehr: $archetype/context/other_context[at0001]/items[at0004]

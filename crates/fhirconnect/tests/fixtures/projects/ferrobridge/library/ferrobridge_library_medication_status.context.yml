@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its model ferrobridge_medication_status, which
+# slots the library's medication status cluster (#1546).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_medication_status.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/MedicationAdministration"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_clusters.v1.0.0"
+  archetypes:
+    - "ferrobridge_medication_status"
+  start: "ferrobridge_medication_status"
