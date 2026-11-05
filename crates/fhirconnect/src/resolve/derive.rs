@@ -276,6 +276,7 @@ mod tests {
     use super::carried;
     use super::element;
     use super::type_argument;
+    use crate::model::ast::keyword::Direction;
     use openehr_rm::v1_2::model;
 
     #[test]
@@ -445,5 +446,26 @@ mod tests {
             "no cell carries a count interval"
         );
         assert_eq!(super::pairs("DV_INTERVAL<DV_QUANTITY>"), &["Range"]);
+    }
+
+    #[test]
+    fn a_coded_text_reads_through_the_text_row_only_going_out() {
+        // DV_CODED_TEXT.adoc: the class "inherits from `DV_TEXT`", whose row
+        // pairs `string`; going in, that row cannot fill the defining code.
+        assert!(super::pairs_in(
+            "DV_CODED_TEXT",
+            "string",
+            Some(Direction::OpenehrToFhir)
+        ));
+        assert!(!super::pairs_in(
+            "DV_CODED_TEXT",
+            "string",
+            Some(Direction::FhirToOpenehr)
+        ));
+        assert!(!super::pairs_in("DV_CODED_TEXT", "string", None));
+        assert!(
+            !super::pairs_in("DV_CODED_TEXT", "Period", Some(Direction::OpenehrToFhir)),
+            "no inherited row pairs a Period"
+        );
     }
 }
