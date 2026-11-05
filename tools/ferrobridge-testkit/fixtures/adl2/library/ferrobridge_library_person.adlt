@@ -1,0 +1,49 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library model mapping of
+-- COMPOSITION.person.v0, rooted at that archetype (fixtures/ckm/highmed). It holds
+-- EVALUATION.gender.v1, the smallest content an ADL 2 template definition
+-- admits. No specification governs this template: our own design. Node
+-- identifiers are at-coded, the ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_person.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.person.v0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library model mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.gender.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library person">
+                description = <"Library person">
+            >
+            ["at0000.2"] = <
+                text = <"Gender">
+                description = <"Gender">
+            >
+        >
+    >

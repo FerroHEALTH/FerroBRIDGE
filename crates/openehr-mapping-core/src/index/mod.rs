@@ -208,6 +208,8 @@ pub struct WebTemplateIndex {
     /// The options each `C_DV_ORDINAL` node constrains, keyed by the node's
     /// `aqlPath`.
     ordinals: BTreeMap<AqlPath, Vec<OrdinalOption>>,
+    /// The archetypes the template root specialises, the nearest first.
+    root_lineage: Vec<String>,
 }
 
 impl WebTemplateIndex {
@@ -233,6 +235,9 @@ impl WebTemplateIndex {
             index.embedded = embedded::embedded_templates(template);
             index.archetype_terms = terms::archetype_terms(template);
             index.ordinals = ordinals::ordinal_options(template);
+        }
+        if let TemplateSource::Opt2 { ref template, .. } = *source {
+            index.root_lineage = template.parent_archetype_id.iter().cloned().collect();
         }
         Ok(index)
     }
@@ -311,6 +316,7 @@ impl WebTemplateIndex {
             embedded: BTreeMap::new(),
             archetype_terms: BTreeMap::new(),
             ordinals: BTreeMap::new(),
+            root_lineage: Vec::new(),
         })
     }
 
@@ -341,6 +347,31 @@ impl WebTemplateIndex {
     #[must_use]
     pub const fn generation(&self) -> Generation {
         self.generation
+    }
+
+    /// Returns this index with the template root specialising `lineage`, the
+    /// nearest archetype first.
+    ///
+    /// A template specialises its root archetype and an operational template
+    /// stays specialised (AM Release-2.3.0 AOM2, §3.6.4 `TEMPLATE`
+    /// `Inv_is_specialised`, §3.6.6 `OPERATIONAL_TEMPLATE`
+    /// `Specialisation_validity`). [`WebTemplateIndex::build`] reads the
+    /// parent an OPT2 states; a caller holding the template source passes the
+    /// lineage here when the OPT it built states none.
+    #[must_use]
+    pub fn with_root_lineage(mut self, lineage: Vec<String>) -> Self {
+        self.root_lineage = lineage;
+        self
+    }
+
+    /// Returns the archetypes the template root specialises, the nearest
+    /// first, empty when the template states none.
+    ///
+    /// An OPT 1.4 root carries its composition archetype as its own node id,
+    /// so its lineage is always empty.
+    #[must_use]
+    pub fn root_lineage(&self) -> &[String] {
+        &self.root_lineage
     }
 
     /// Returns the template the operational template states it embeds at

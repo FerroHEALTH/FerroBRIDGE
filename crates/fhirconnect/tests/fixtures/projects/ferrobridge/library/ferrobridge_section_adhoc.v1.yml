@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A modified copy of model/section/org.openehr/adhoc.v1.yml, used under the
+# Apache License 2.0 of its source.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name is FerroBRIDGE's. The two conditions' `targetRoot`
+# becomes `$fhirRoot`: the published lines 25 and 36 write `$resource`, the
+# root resource (basics/Variables.adoc), where the section the slot entered is
+# meant, which is the parent FHIR path `$fhirRoot` names (#101).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_section_adhoc.v1
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-SECTION.adhoc.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/BackboneElement
+
+mappings:
+  - name: "emptyReason"
+    with:
+      fhir: "emptyReason"
+      openehr: "$archetype/items[openEHR-EHR-EVALUATION.absence.v2]"
+    slotArchetype: "EVALUATION.absence.v2"
+    fhirCondition:
+      targetRoot: "$fhirRoot"
+      targetAttribute: "emptyReason.coding.code"
+      operator: "not of"
+      criteria: "nilknown"
+
+  - name: "emptyReasonNilKnown" # after emptyReason; overwrites it if both apply, which is intended
+    with:
+      fhir: "emptyReason"
+      openehr: "$archetype/items[openEHR-EHR-EVALUATION.exclusion_global.v1]"
+    slotArchetype: "EVALUATION.exclusion_global.v1"
+    fhirCondition:
+      targetRoot: "$fhirRoot"
+      targetAttribute: "emptyReason.coding.code"
+      operator: "one of"
+      criteria: "nilknown"
+    openehrCondition:
+      targetRoot: "$archetype"
+      targetAttribute: "items[openEHR-EHR-EVALUATION.exclusion_global.v1]/data[at0001]/items[at0002]"
+      operator: "not empty"

@@ -4,7 +4,7 @@
 name = "fhirconnect"
 description = "The FHIRconnect mapping language for Rust: the mapping file model and its validation, context resolution into an immutable program, and the bidirectional interpreter between openEHR compositions and FHIR resources"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.219"
+version = "0.1.220"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -58,6 +58,9 @@ insta.workspace = true
 # Test-only: the HL7 Europe MPD round trip builds its ADL 2 operational
 # template from the vendored CKM archetypes and FerroBRIDGE's template.
 openehr-adl.workspace = true
+# Test-only: a template source states the archetype its root specialises
+# (AOM2 `parent_archetype_id`), which the suites read to carry the lineage.
+openehr-am.workspace = true
 proptest.workspace = true
 tempfile.workspace = true
 # The EHDS readiness matrix test reads docs/ehds/readiness.toml.

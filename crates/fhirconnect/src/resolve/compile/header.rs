@@ -318,16 +318,27 @@ impl<'a> Compiler<'a> {
             return None;
         };
         let template = self.template;
-        let found: Vec<&ResolvedNode> = template
+        // NOTE: AM Release-2.3.0 AOM2 §3.6.4 and §3.6.6: a template and its OPT specialise the
+        // root archetype, so the root carries every archetype its lineage names.
+        let lineage = template
+            .root_lineage()
+            .iter()
+            .find(|carried| node_id_matches(archetype.as_str(), carried));
+        let found: Vec<(&ResolvedNode, Option<&str>)> = template
             .nodes()
-            .filter(|node| {
-                node.node_id()
-                    .is_some_and(|carried| node_id_matches(archetype.as_str(), carried))
+            .filter_map(|node| match node.node_id() {
+                Some(carried) if node_id_matches(archetype.as_str(), carried) => {
+                    Some((node, Some(carried)))
+                }
+                _ if node.rm_path() == template.root().rm_path() => {
+                    lineage.map(|carried| (node, Some(carried.as_str())))
+                }
+                _ => None,
             })
             .collect();
-        if let [only] = *found.as_slice() {
+        if let [(only, carried)] = *found.as_slice() {
             let root = only.rm_path().clone();
-            self.check_revision(model, only.node_id());
+            self.check_revision(model, carried);
             return Some(root);
         }
         self.diagnostics.push(diagnostic(

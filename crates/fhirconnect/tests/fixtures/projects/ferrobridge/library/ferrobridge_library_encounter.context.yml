@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the mapping library model COMPOSITION.fall.v1.encounter, which no
+# published context starts at against a template built from the CKM
+# archetypes. It compiles the model verbatim against the library template
+# rooted at its composition archetype.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_encounter.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Encounter"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_encounter.v1.0.0"
+  archetypes:
+    - "COMPOSITION.fall.v1.encounter"
+  start: "COMPOSITION.fall.v1.encounter"

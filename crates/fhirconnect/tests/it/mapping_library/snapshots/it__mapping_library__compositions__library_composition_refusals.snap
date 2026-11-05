@@ -1,0 +1,98 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/compositions.rs
+expression: refused
+---
+{
+  "model/composition/org.openehr/report.v1.Condition.yml": [
+    "model/composition/org.openehr/report.v1.Condition.yml:74 fc-duplicate-method-name",
+    "model/composition/org.openehr/report.v1.Condition.yml:62 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:64 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:66 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:92 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:94 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:96 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:113 fc-uncarried-tail",
+    "model/composition/org.openehr/report.v1.Condition.yml:115 fc-uncarried-tail",
+    "model/composition/org.openehr/report.v1.Condition.yml:136 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:138 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Condition.yml:140 fc-unknown-template-node"
+  ],
+  "model/composition/org.openehr/report.v1.Observation.yml": [
+    "model/composition/org.openehr/report.v1.Observation.yml:81 fc-duplicate-method-name",
+    "model/composition/org.openehr/report.v1.Observation.yml:36 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:42 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:47 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:52 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:63 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:73 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:75 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:77 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:89 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:99 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:101 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:103 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:108 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:120 fc-uncarried-tail",
+    "model/composition/org.openehr/report.v1.Observation.yml:122 fc-uncarried-tail",
+    "model/composition/org.openehr/report.v1.Observation.yml:129 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:134 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:138 fc-unknown-fhir-element",
+    "model/composition/org.openehr/report.v1.Observation.yml:143 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:145 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:147 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Observation.yml:18 fc-unknown-fhir-element"
+  ],
+  "model/composition/org.openehr/report.v1.Procedure.yml": [
+    "model/composition/org.openehr/report.v1.Procedure.yml:32 fc-uncarried-tail",
+    "model/composition/org.openehr/report.v1.Procedure.yml:34 fc-uncarried-tail",
+    "model/composition/org.openehr/report.v1.Procedure.yml:56 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Procedure.yml:58 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Procedure.yml:60 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Procedure.yml:110 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Procedure.yml:112 fc-unknown-template-node",
+    "model/composition/org.openehr/report.v1.Procedure.yml:114 fc-unknown-template-node"
+  ],
+  "model/composition/org.highmed/fall.v1.Encounter.yml": [
+    "model/composition/org.highmed/fall.v1.Encounter.yml:55 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:57 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:59 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:78 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:80 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:82 fc-unknown-template-node"
+  ],
+  "model/composition/org.highmed/person.v1.Patient.yml": [
+    "model/composition/org.highmed/person.v1.Patient.yml:18 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:23 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:30 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:34 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:45 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:55 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:57 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:59 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:64 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:69 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:73 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:78 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:80 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:82 fc-unknown-template-node"
+  ],
+  "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml": [
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:21 fc-ambiguous-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:26 fc-ambiguous-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:37 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:42 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:60 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:62 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:64 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:70 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:75 fc-ambiguous-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:89 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:94 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:99 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:104 fc-ambiguous-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:115 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:119 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:121 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:123 fc-unknown-template-node"
+  ]
+}

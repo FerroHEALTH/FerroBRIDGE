@@ -78,3 +78,50 @@ fn the_adl2_twin_builds_the_content_paths_of_the_adl14_template() -> Result<(), 
     );
     Ok(())
 }
+
+/// Compiles the two ADL 2 sources into an operational template.
+fn adl2_opt() -> Result<
+    openehr_am::v2_4::aom2::archetype::operational_template::OperationalTemplate,
+    Box<dyn Error>,
+> {
+    let note = parse_artefact(NOTE, Dialect::Adl2).map_err(|errors| format!("{errors:?}"))?;
+    let minimal = parse_artefact(MINIMAL, Dialect::Adl2).map_err(|errors| format!("{errors:?}"))?;
+    let mut repository = ArchetypeRepository::default();
+    repository.insert(note);
+    Ok(create_opt(&minimal, &repository)?)
+}
+
+#[test]
+fn an_opt2_root_carries_the_parent_its_template_states() -> Result<(), Box<dyn Error>> {
+    // AM Release-2.3.0 AOM2 §3.6.6: an OPERATIONAL_TEMPLATE is specialised.
+    let mut opt = adl2_opt()?;
+    opt.parent_archetype_id = Some(String::from("openEHR-EHR-COMPOSITION.report.v1"));
+    let index = WebTemplateIndex::build(&TemplateSource::Opt2 {
+        template: Box::new(opt),
+        resolved_id: String::from("openEHR-EHR-COMPOSITION.minimal.v1.0.0"),
+    })?;
+    assert_eq!(index.root_lineage(), ["openEHR-EHR-COMPOSITION.report.v1"]);
+    Ok(())
+}
+
+#[test]
+fn an_opt2_that_states_no_parent_carries_the_lineage_a_caller_passes() -> Result<(), Box<dyn Error>>
+{
+    let index = WebTemplateIndex::build(&TemplateSource::Opt2 {
+        template: Box::new(adl2_opt()?),
+        resolved_id: String::from("openEHR-EHR-COMPOSITION.minimal.v1.0.0"),
+    })?;
+    assert_eq!(index.root_lineage().len(), 0, "{:?}", index.root_lineage());
+    let index = index.with_root_lineage(vec![
+        String::from("openEHR-EHR-COMPOSITION.report-result.v1"),
+        String::from("openEHR-EHR-COMPOSITION.report.v1"),
+    ]);
+    assert_eq!(
+        index.root_lineage(),
+        [
+            "openEHR-EHR-COMPOSITION.report-result.v1",
+            "openEHR-EHR-COMPOSITION.report.v1"
+        ]
+    );
+    Ok(())
+}

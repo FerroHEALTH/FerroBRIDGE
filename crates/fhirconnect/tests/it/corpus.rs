@@ -515,7 +515,7 @@ fn the_corpus_mapping_codes_pass_once_the_engine_registers_them() -> Result<(), 
 /// synthetic template, the KDS diagnosis, person and laboratory request
 /// project contexts against the published `KDS_Diagnose`, `KDS_Person` and
 /// `KDS_Laborauftrag` templates, the library's own model mappings against
-/// the library report template built from the CKM archetypes, and every
+/// the library templates built from the CKM archetypes, and every
 /// published context that compiles
 /// verbatim against the template it names. Each template carries the
 /// archetypes the files it reaches map.

@@ -1,0 +1,98 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library model mappings of
+-- COMPOSITION.health_summary.v1 and the section it holds
+-- (fixtures/ckm/medication, fixtures/ckm/library): one SECTION.adhoc.v1 holding
+-- EVALUATION.absence.v2 and EVALUATION.exclusion_global.v1. No specification
+-- governs this template: our own design. Node identifiers are at-coded, the
+-- ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_health_summary.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.health_summary.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library model mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype SECTION[at0000.2, openEHR-EHR-SECTION.adhoc-ferrobridge.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library health summary">
+                description = <"Library health summary">
+            >
+            ["at0000.2"] = <
+                text = <"Section">
+                description = <"Section">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-SECTION.adhoc-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-SECTION.adhoc.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library model mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    SECTION[at0000.1] matches {
+        /items matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.absence.v2]
+            use_archetype EVALUATION[at0000.3, openEHR-EHR-EVALUATION.exclusion_global.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Section">
+                description = <"Section">
+            >
+            ["at0000.2"] = <
+                text = <"Absence of information">
+                description = <"Absence of information">
+            >
+            ["at0000.3"] = <
+                text = <"Global exclusion">
+                description = <"Global exclusion">
+            >
+        >
+    >
