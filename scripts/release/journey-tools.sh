@@ -45,7 +45,7 @@ digest_of() {
 verify() {
   local file="$1" digest="$2" found
   found="$(digest_of "$file")"
-  [ "$found" = "$digest" ] || die "$file has SHA-256 $found, the pin is $digest"
+  [[ "$found" = "$digest" ]] || die "$file has SHA-256 $found, the pin is $digest"
 }
 
 # Downloads URL into FILE.
@@ -66,7 +66,7 @@ url_of() {
 install_one() {
   local product="$1" platform="$2" digest="$3" dir="$4" url zip
   url="$(url_of "$product" "$platform" "$dir/download/versions.json")"
-  [ -n "$url" ] || die "the Chrome for Testing API lists no $product $chrome_version for $platform"
+  [[ -n "$url" ]] || die "the Chrome for Testing API lists no $product $chrome_version for $platform"
   zip="$dir/download/$product-$platform.zip"
   fetch "$url" "$zip"
   verify "$zip" "$digest"
@@ -102,7 +102,7 @@ install() {
     *"ChromeDriver $chrome_version "*) ;;
     *) die "the unpacked chromedriver says '$said', not $chrome_version" ;;
   esac
-  [ -x "$chrome" ] || die "the Chrome zip holds no $chrome"
+  [[ -x "$chrome" ]] || die "the Chrome zip holds no $chrome"
   echo "journey-tools: Chrome for Testing and chromedriver $chrome_version are in $dir"
 }
 

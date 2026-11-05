@@ -31,7 +31,7 @@ else
   command_text="$payload"
 fi
 
-[ -n "${command_text:-}" ] || exit 0
+[[ -n "${command_text:-}" ]] || exit 0
 
 # shellcheck source=.claude/hooks/lib/target.sh
 . "$(dirname "$0")/lib/target.sh"
@@ -49,14 +49,14 @@ if command -v jq > /dev/null 2>&1; then
   cwd="$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)" || true
 fi
 target="$(command_target_dir "$command_text" "${cwd:-$(hook_repo_root)}")"
-[ -n "$target" ] || exit 0
+[[ -n "$target" ]] || exit 0
 in_this_repository "$target" || exit 0
 repo_root="$(toplevel_of "$target")"
-[ -n "$repo_root" ] || exit 0
+[[ -n "$repo_root" ]] || exit 0
 
 guard="$repo_root/scripts/checks/crate-version-guard.sh"
-[ -x "$guard" ] || exit 0
-[ -d "$repo_root/crates" ] || exit 0
+[[ -x "$guard" ]] || exit 0
+[[ -d "$repo_root/crates" ]] || exit 0
 
 cd "$repo_root" || exit 0
 
@@ -67,7 +67,7 @@ if merging="$(git rev-parse -q --verify MERGE_HEAD 2> /dev/null)"; then
 else
   base="$(git merge-base origin/main HEAD 2> /dev/null)" || exit 0
 fi
-[ -n "$base" ] || exit 0
+[[ -n "$base" ]] || exit 0
 
 findings="$(bash "$guard" "$base" "$head" 2>&1)" || {
   printf 'BLOCKED: a crates/* member changed its packaged content without moving its version.\n\n%s\n\n' "$findings" >&2

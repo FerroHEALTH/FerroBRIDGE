@@ -16,7 +16,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-if [ "$#" -eq 0 ]; then
+if [[ "$#" -eq 0 ]]; then
   echo "usage: scripts/checks/featured.sh <package>..." >&2
   exit 2
 fi

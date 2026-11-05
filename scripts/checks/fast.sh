@@ -43,9 +43,9 @@ all=false
 emit=true
 fetch=true
 dry=false
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
   case "$1" in
-    --base) [ $# -ge 2 ] || usage; base="$2"; shift 2 ;;
+    --base) [[ $# -ge 2 ]] || usage; base="$2"; shift 2 ;;
     --all) all=true; shift ;;
     --no-emit) emit=false; shift ;;
     --no-fetch) fetch=false; shift ;;
@@ -54,10 +54,10 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ "$all" = true ]; then
+if [[ "$all" = true ]]; then
   out="$(scripts/checks/affected.sh --all)"
 else
-  if [ -z "$base" ]; then
+  if [[ -z "$base" ]]; then
     base="$(git merge-base origin/main HEAD)" ||
       die "no merge base with origin/main; fetch it or pass --base <rev>"
   fi
@@ -66,7 +66,7 @@ fi
 
 get() { printf '%s\n' "$out" | sed -n "s/^$1=//p"; }
 packages="$(get packages)"
-if [ -z "$packages" ]; then
+if [[ -z "$packages" ]]; then
   echo "fast: the change reaches no package; nothing to run"
   exit 0
 fi
@@ -74,7 +74,7 @@ echo "fast: reached: $packages"
 
 run() {
   echo "+ $*"
-  if [ "$dry" = false ]; then
+  if [[ "$dry" = false ]]; then
     "$@"
   fi
 }
@@ -84,7 +84,7 @@ has() {
 }
 
 # The build-time corpora, for the packages whose tests read them.
-if [ "$fetch" = true ]; then
+if [[ "$fetch" = true ]]; then
   if has "$packages" fhir-codegen; then
     run scripts/vendor/v2ig.sh
     run scripts/vendor/v2-legacy.sh
@@ -125,20 +125,20 @@ docs=()
 for package in $packages; do
   if has "$libraries" "$package"; then docs+=(-p "$package"); fi
 done
-if [ "${#docs[@]}" -gt 0 ]; then
+if [[ "${#docs[@]}" -gt 0 ]]; then
   run cargo test --doc --locked "${docs[@]}"
 fi
 
 # The full-emit tests, in the profile the CI lane uses; the rest of the
 # fhir-codegen suite ran above.
-if [ "$(get codegen)" = true ] && [ "$emit" = true ]; then
+if [[ "$(get codegen)" = true ]] && [[ "$emit" = true ]]; then
   run env FERROBRIDGE_CODEGEN_EMIT=1 cargo nextest run --locked --cargo-profile emit \
     -p fhir-codegen --no-tests=fail -E 'test(/^(v2::)?emit::/)'
 fi
-if [ "$(get omop_codegen)" = true ]; then
+if [[ "$(get omop_codegen)" = true ]]; then
   run cargo run --locked -p omop-cdm-codegen -- emit --check
 fi
-if [ "$dry" = true ]; then
+if [[ "$dry" = true ]]; then
   echo "fast: dry run, nothing ran"
 else
   echo "fast: every step passed"

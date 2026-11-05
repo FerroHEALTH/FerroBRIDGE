@@ -109,7 +109,7 @@ chrome_stable() {
 # The line one pin LABEL at PINNED gets against the newest release LATEST read
 # from SOURCE: `current` when they are equal, `STALE` when they differ.
 verdict() {
-  if [ "$2" = "$3" ]; then
+  if [[ "$2" = "$3" ]]; then
     printf 'current    %s %s (%s)\n' "$1" "$2" "$4"
   else
     printf 'STALE      %s: pinned %s, newest upstream release %s (%s)\n' "$1" "$2" "$3" "$4"
@@ -121,7 +121,7 @@ verdict() {
 self_test() {
   local failures=0 got
   expect() {
-    if [ "$2" != "$1" ]; then
+    if [[ "$2" != "$1" ]]; then
       printf 'pin-freshness: self-test: %s gave "%s", wanted "%s"\n' "$3" "$2" "$1" >&2
       failures=$((failures + 1))
     fi
@@ -155,7 +155,7 @@ self_test() {
     [0-9]*.[0-9]*.[0-9]*.[0-9]*) ;;
     *) expect "a four-part version" "$got" "the Chrome for Testing row of $MATRIX" ;;
   esac
-  if [ "$failures" -gt 0 ]; then
+  if [[ "$failures" -gt 0 ]]; then
     echo "pin-freshness: self-test: $failures check(s) failed" >&2
     exit 1
   fi
@@ -177,10 +177,10 @@ esac
 stale=0
 unreadable=0
 while IFS=$'\t' read -r label repo; do
-  [ -n "$label" ] || continue
+  [[ -n "$label" ]] || continue
 
   pinned="$(matrix_pin "$label")"
-  if [ -z "$pinned" ]; then
+  if [[ -z "$pinned" ]]; then
     printf 'UNREADABLE %s: no pin row in %s\n' "$label" "$MATRIX"
     unreadable=1
     continue
@@ -196,7 +196,7 @@ while IFS=$'\t' read -r label repo; do
   latest="$tag"
   [[ $tag =~ ^v[0-9] ]] && latest="${tag#v}"
 
-  if [ "$pinned" = "$latest" ]; then
+  if [[ "$pinned" = "$latest" ]]; then
     printf 'current    %s %s (%s)\n' "$label" "$pinned" "$repo"
   else
     printf 'STALE      %s: pinned %s, newest upstream release %s (https://github.com/%s/releases/tag/%s)\n' \
@@ -238,10 +238,10 @@ matrix_commit() {
 }
 
 while IFS=$'\t' read -r label repo branch; do
-  [ -n "$label" ] || continue
+  [[ -n "$label" ]] || continue
 
   pinned="$(matrix_commit "$label")"
-  if [ -z "$pinned" ]; then
+  if [[ -z "$pinned" ]]; then
     printf 'UNREADABLE %s: no commit pin in %s\n' "$label" "$MATRIX"
     unreadable=1
     continue
@@ -253,7 +253,7 @@ while IFS=$'\t' read -r label repo branch; do
     continue
   fi
 
-  if [ "$pinned" = "$head" ]; then
+  if [[ "$pinned" = "$head" ]]; then
     printf 'current    %s %s (%s %s)\n' "$label" "$pinned" "$repo" "$branch"
   else
     printf 'STALE      %s: pinned %s, newest commit on %s %s (https://github.com/%s/commit/%s)\n' \
@@ -296,10 +296,10 @@ HL7 France FR Core	https://packages.fhir.org/hl7.fhir.fr.core"
 
 
 while IFS=$'\t' read -r label url; do
-  [ -n "$label" ] || continue
+  [[ -n "$label" ]] || continue
 
   pinned="$(matrix_pin "$label")"
-  if [ -z "$pinned" ]; then
+  if [[ -z "$pinned" ]]; then
     printf 'UNREADABLE %s: no pin row in %s\n' "$label" "$MATRIX"
     unreadable=1
     continue
@@ -312,9 +312,9 @@ while IFS=$'\t' read -r label url; do
   fi
 
   held="$(matrix_cell "$label" | cell_held)"
-  if [ "$pinned" = "$latest" ]; then
+  if [[ "$pinned" = "$latest" ]]; then
     printf 'current    %s %s (%s)\n' "$label" "$pinned" "$url"
-  elif [ -n "$held" ]; then
+  elif [[ -n "$held" ]]; then
     printf 'HELD       %s: pinned %s, the registry names %s latest, held: %s (%s)\n' "$label" "$pinned" "$latest" "$held" "$url"
   else
     printf 'STALE      %s: pinned %s, the registry names %s latest (%s)\n' "$label" "$pinned" "$latest" "$url"
@@ -323,7 +323,7 @@ while IFS=$'\t' read -r label url; do
 done <<< "$WATCHED_PACKAGES"
 
 pinned="$(matrix_pin "$CHROME_LABEL")"
-if [ -z "$pinned" ]; then
+if [[ -z "$pinned" ]]; then
   printf 'UNREADABLE %s: no pin row in %s\n' "$CHROME_LABEL" "$MATRIX"
   unreadable=1
 elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$CHROME_FEED" | chrome_stable 2>&1)"; then
@@ -332,8 +332,8 @@ elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$CHROME_FEED" | chrome_s
   unreadable=1
 else
   verdict "$CHROME_LABEL" "$pinned" "$latest" "$CHROME_FEED"
-  [ "$pinned" = "$latest" ] || stale=1
+  [[ "$pinned" = "$latest" ]] || stale=1
 fi
 
-[ "$unreadable" -eq 0 ] || exit 2
+[[ "$unreadable" -eq 0 ]] || exit 2
 exit "$stale"

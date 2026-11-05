@@ -90,7 +90,7 @@ for definition in crates/eehrxf/src/*/StructureDefinition-*.json; do
   cp "$definition" "$OUT/fhir/StructureDefinition/$id.json"
 done
 
-if roadmap > "$block" 2>/dev/null && [ -s "$block" ]; then
+if roadmap > "$block" 2>/dev/null && [[ -s "$block" ]]; then
   awk -v blockfile="$block" '
     /<!-- roadmap:begin -->/ { print; while ((getline line < blockfile) > 0) print line; skip = 1; next }
     /<!-- roadmap:end -->/ { skip = 0 }
