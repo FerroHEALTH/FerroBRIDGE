@@ -497,7 +497,10 @@ fn a_manual_path_no_flat_part_carries_is_refused_at_load() -> Result<(), Box<dyn
 /// warning beside the refusals is `problem_diagnosis.v1.yml` line 103, the
 /// `bodySite` node the template excludes, and the four `fc-uncarried-tail`
 /// rows are its lines 45, 47, 71 and 73, tails no FLAT part of
-/// `EVENT_CONTEXT` or `EVALUATION` carries.
+/// `EVENT_CONTEXT` or `EVALUATION` carries. The `fc-unpaired-types` row is
+/// `anatomical_location.v1.yml` line 27, a `string` onto the body site name
+/// at `items[at0001]`, a pair no page of the data-type chapter writes for
+/// that node's class.
 #[test]
 fn the_published_anatomical_location_slot_is_refused_naming_the_element()
 -> Result<(), Box<dyn Error>> {
@@ -518,7 +521,8 @@ fn the_published_anatomical_location_slot_is_refused_naming_the_element()
             "fc-uncarried-tail",
             "fc-uncarried-tail",
             "fc-uncarried-tail",
-            "fc-unknown-fhir-element"
+            "fc-unknown-fhir-element",
+            "fc-unpaired-types"
         ]
     );
     let named = diagnostics

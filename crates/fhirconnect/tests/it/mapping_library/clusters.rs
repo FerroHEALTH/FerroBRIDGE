@@ -11,33 +11,26 @@
 //! type and diagnosis type clusters compile against the published
 //! `KDS_Fall_einfach` template, which carries both.
 //!
-//! Four of them compile and do not run (#101), so the suite pins how each
-//! fails and counts none as reached: the two status clusters map a `code`
-//! onto a `DV_CODED_TEXT`, which `DV_CODED_TEXT.adoc` pairs with `Coding`
-//! and `CodeableConcept` only, the organization cluster maps its identifier
-//! text onto the slotted element itself, and the case identification
-//! cluster maps an `Identifier` onto a `DV_TEXT`, which `DV_TEXT.adoc`
-//! pairs with `String`, `Coding` and `CodeableConcept` only.
+//! Four of them are refused at load (#101), and the suite pins each refusal
+//! by file and line: the two status clusters map a `code` onto a
+//! `DV_CODED_TEXT`, which `DV_CODED_TEXT.adoc` pairs with `Coding` and
+//! `CodeableConcept` only, the organization cluster maps its identifier text
+//! onto the slotted element itself, and the case identification cluster maps
+//! an `Identifier` onto a `DV_TEXT`, which `DV_TEXT.adoc` pairs with
+//! `String`, `Coding` and `CodeableConcept` only.
 
 use core::error::Error;
 use std::sync::Arc;
 
-use fhir_types::codec::Value;
 use fhir_types::r4::schema::SCHEMAS;
-use fhirconnect::engine::context::CallContext;
-use fhirconnect::engine::lens::LensError;
 use fhirconnect::engine::library::Library;
-use fhirconnect::engine::seam::Seams;
-use fhirconnect::engine::traverse::error::EngineError;
-use fhirconnect::engine::traverse::to_fhir;
-use fhirconnect::engine::traverse::to_openehr;
 use fhirconnect::resolve::compile::compile;
 use fhirconnect::resolve::program::Program;
-use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::template::TemplateSource;
 
+use super::compiled;
 use super::models;
 use super::program;
 use super::set;
@@ -104,37 +97,33 @@ const KDS_FALL_EINFACH: &str = include_str!(concat!(
     "/../../tools/ferrobridge-testkit/fixtures/opt/kds-fall-einfach/KDS_Fall_einfach.opt"
 ));
 
-/// Compiles the report status context against the library clusters
-/// template.
-fn status() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
-    program(
-        CLUSTERS,
-        STATUS_CONTEXT,
-        OBSERVATION_STATUS,
-        &["ferrobridge_report_status.yml"],
-    )
-}
-
-/// Compiles the report organization context against the library clusters
-/// template.
-fn organization() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
-    program(
-        CLUSTERS,
-        ORGANIZATION_CONTEXT,
-        ORGANIZATION,
-        &["ferrobridge_report_organization.yml"],
-    )
-}
-
-/// Compiles the medication status context against the library clusters
-/// template.
-fn medication_status() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
-    program(
-        CLUSTERS,
-        MEDICATION_STATUS_CONTEXT,
-        MEDICATION_STATUS,
-        &["ferrobridge_medication_status.yml"],
-    )
+/// Compiles the FerroBRIDGE `context` over the published `files` and the
+/// FerroBRIDGE `model` against the library clusters template, and returns
+/// its refusals as sorted `file:line code` rows.
+fn refused(context: &str, files: &[&str], model: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let Err(diagnostics) = compiled(CLUSTERS, context, files, &[model])? else {
+        return Err(format!("{context} compiles").into());
+    };
+    let mut rows: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            format!(
+                "{}:{} {}",
+                diagnostic
+                    .file()
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                diagnostic
+                    .position()
+                    .map_or_else(String::new, |position| position.line().to_string()),
+                diagnostic.code()
+            )
+        })
+        .collect();
+    rows.sort();
+    rows.dedup();
+    Ok(rows)
 }
 
 /// Compiles the report entry context against the library clusters
@@ -145,16 +134,6 @@ fn entry() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
         ENTRY_CONTEXT,
         ENTRY,
         &["ferrobridge_report_entry.yml"],
-    )
-}
-
-/// Compiles the report case context against the library clusters template.
-fn case() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
-    program(
-        CLUSTERS,
-        CASE_CONTEXT,
-        CASE,
-        &["ferrobridge_report_case.yml"],
     )
 }
 
@@ -280,97 +259,6 @@ pub(super) fn chains() -> Result<Vec<crate::support::Chain>, Box<dyn Error>> {
     .collect())
 }
 
-/// Returns a synthetic report composition of the library clusters template:
-/// its context holds the observation status `Final` (`at0026`) and one
-/// organization.
-fn report_composition(index: &WebTemplateIndex) -> Result<CanonicalComposition, Box<dyn Error>> {
-    let flat = serde_json::json!({
-        "library_clusters/language|code": "en",
-        "library_clusters/language|terminology": "ISO_639-1",
-        "library_clusters/territory|code": "NL",
-        "library_clusters/territory|terminology": "ISO_3166-1",
-        "library_clusters/composer|name": "FerroBRIDGE synthetic composer",
-        "library_clusters/category|code": "433",
-        "library_clusters/category|value": "event",
-        "library_clusters/category|terminology": "openehr",
-        "library_clusters/context/start_time": "2026-10-01T09:00:00Z",
-        "library_clusters/context/setting|code": "238",
-        "library_clusters/context/setting|value": "other care",
-        "library_clusters/context/setting|terminology": "openehr",
-        "library_clusters/context/observation_status/value|code": "at0026",
-        "library_clusters/context/observation_status/value|value": "Final",
-        "library_clusters/context/observation_status/value|terminology": "local",
-        "library_clusters/context/observation_status/value_1": "Synthetic observation",
-        "library_clusters/context/organization/type": "Synthetic laboratory",
-        "library_clusters/context/organization/identifier": "SYN-ORG-0001",
-        "library_clusters/context/organization/name": "Synthetic Organization"
-    });
-    let serde_json::Value::Object(flat) = flat else {
-        return Err("the FLAT composition is no object".into());
-    };
-    Ok(index.build_from_flat(&flat, laws::NOW)?)
-}
-
-/// Asserts that `outcome` is the refusal of the status mapping going into
-/// openEHR because no data-type cell pairs `DV_CODED_TEXT` with the `code`.
-fn assert_status_refused<T>(outcome: Result<T, EngineError>) -> Result<(), Box<dyn Error>> {
-    let Err(EngineError::Cell {
-        mapping, source, ..
-    }) = outcome
-    else {
-        return Err("the status went into openEHR".into());
-    };
-    assert_eq!(mapping, "status", "the refused mapping");
-    assert!(
-        matches!(*source, LensError::NoCell { ref rm_type, kind: "string", .. } if rm_type == "DV_CODED_TEXT"),
-        "{source}"
-    );
-    Ok(())
-}
-
-#[test]
-fn the_observation_status_cluster_compiles_onto_observation() -> Result<(), Box<dyn Error>> {
-    let (program, _) = status()?;
-    assert_eq!(program.resource().as_str(), "Observation");
-    assert_eq!(
-        models(&program),
-        [
-            "ferrobridge_report_status",
-            "CLUSTER.observation_status_fhir.v1"
-        ]
-    );
-    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
-    Ok(())
-}
-
-#[test]
-fn the_organization_cluster_compiles_onto_the_performer() -> Result<(), Box<dyn Error>> {
-    let (program, _) = organization()?;
-    assert_eq!(program.resource().as_str(), "Observation");
-    assert_eq!(
-        models(&program),
-        ["ferrobridge_report_organization", "CLUSTER.organization.v0"]
-    );
-    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
-    Ok(())
-}
-
-#[test]
-fn the_medication_status_cluster_compiles_onto_medication_administration()
--> Result<(), Box<dyn Error>> {
-    let (program, _) = medication_status()?;
-    assert_eq!(program.resource().as_str(), "MedicationAdministration");
-    assert_eq!(
-        models(&program),
-        [
-            "ferrobridge_medication_status",
-            "CLUSTER.medication_status_fhir.v0"
-        ]
-    );
-    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
-    Ok(())
-}
-
 #[test]
 fn the_contact_type_cluster_compiles_onto_encounter() -> Result<(), Box<dyn Error>> {
     let (program, _) = contact_type()?;
@@ -386,95 +274,53 @@ fn the_contact_type_cluster_compiles_onto_encounter() -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-/// `organization.v0.yml:21` maps the identifier text onto `$fhirRoot`, the
-/// `Organization` the performer references, which no data-type cell writes,
-/// so going out the run refuses (#101).
+/// `observation_status_fhir.v1.yml:15` maps the `code` `Observation.status`
+/// onto a `DV_CODED_TEXT`, which `types-of-mappings/data-type/DV_CODED_TEXT.adoc`
+/// pairs with `CodeableConcept` and `Coding` only, so it is refused at load
+/// (#101).
 #[test]
-fn the_organization_identifier_refuses_going_out() -> Result<(), Box<dyn Error>> {
-    let (program, index) = organization()?;
-    let composition = report_composition(&index)?;
-    let outcome = to_fhir(
-        &program,
-        &SCHEMAS,
-        &index,
-        &composition,
-        &Seams::default(),
-        &CallContext::new(),
-    );
-    let Err(EngineError::UnknownElement { mapping, element }) = outcome else {
-        return Err("the organization went out of openEHR".into());
-    };
+fn the_observation_status_is_refused_at_load() -> Result<(), Box<dyn Error>> {
     assert_eq!(
-        (mapping.as_str(), element.as_str()),
-        ("orgaKey", "Organization")
+        refused(
+            STATUS_CONTEXT,
+            OBSERVATION_STATUS,
+            "ferrobridge_report_status.yml"
+        )?,
+        ["observation_status_fhir.v1.yml:15 fc-unpaired-types"]
     );
     Ok(())
 }
 
-/// `observation_status_fhir.v1.yml:17` maps the archetype's local status
-/// term onto `Observation.status`, a `code`, so going out the cell writes the
-/// term text, which is no FHIR observation status (#101).
+/// `medication_status_fhir.v0.yml:17` maps the `code`
+/// `MedicationAdministration.status` onto a `DV_CODED_TEXT`, which
+/// `DV_CODED_TEXT.adoc` does not pair, so it is refused at load (#101).
 #[test]
-fn the_observation_status_goes_out_as_its_term_text() -> Result<(), Box<dyn Error>> {
-    let (program, index) = status()?;
-    let composition = report_composition(&index)?;
-    let outbound = to_fhir(
-        &program,
-        &SCHEMAS,
-        &index,
-        &composition,
-        &Seams::default(),
-        &CallContext::new(),
-    )?;
-    let observation = outbound
-        .value()
-        .to_serde_json(&mut fhir_types::codec::Path::root("Observation"))?;
-    assert_eq!(observation.get("status"), Some(&serde_json::json!("Final")));
+fn the_medication_status_is_refused_at_load() -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        refused(
+            MEDICATION_STATUS_CONTEXT,
+            MEDICATION_STATUS,
+            "ferrobridge_medication_status.yml"
+        )?,
+        ["medication_status_fhir.v0.yml:17 fc-unpaired-types"]
+    );
     Ok(())
 }
 
-/// `observation_status_fhir.v1.yml:17` going in: no cell pairs the
-/// `DV_CODED_TEXT` with a `code` (`DV_CODED_TEXT.adoc`), so the run refuses
-/// (#101).
+/// `organization.v0.yml:21` maps the identifier text onto `$fhirRoot`, the
+/// `Organization` the performer references, and no data-type page pairs a
+/// `DV_TEXT` with a resource, so it is refused at load (#101).
 #[test]
-fn the_observation_status_refuses_going_in() -> Result<(), Box<dyn Error>> {
-    let (program, index) = status()?;
-    let observation = serde_json::json!({
-        "resourceType": "Observation",
-        "status": "final",
-        "code": {"text": "Synthetic observation"}
-    });
-    assert_status_refused(to_openehr(
-        &program,
-        &SCHEMAS,
-        &index,
-        &Value::from_serde_json(observation),
-        &Seams::default(),
-        &laws::defaults(),
-        &CallContext::new(),
-    ))
-}
-
-/// `medication_status_fhir.v0.yml:19` going in: no cell pairs the
-/// `DV_CODED_TEXT` with a `code` (`DV_CODED_TEXT.adoc`), so the run refuses
-/// (#101).
-#[test]
-fn the_medication_status_refuses_going_in() -> Result<(), Box<dyn Error>> {
-    let (program, index) = medication_status()?;
-    let administration = serde_json::json!({
-        "resourceType": "MedicationAdministration",
-        "status": "completed",
-        "statusReason": [{"text": "A synthetic status reason."}]
-    });
-    assert_status_refused(to_openehr(
-        &program,
-        &SCHEMAS,
-        &index,
-        &Value::from_serde_json(administration),
-        &Seams::default(),
-        &laws::defaults(),
-        &CallContext::new(),
-    ))
+fn the_organization_identifier_is_refused_at_load() -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        refused(
+            ORGANIZATION_CONTEXT,
+            ORGANIZATION,
+            "ferrobridge_report_organization.yml"
+        )?,
+        ["organization.v0.yml:21 fc-unpaired-types"]
+    );
+    Ok(())
 }
 
 /// `kontaktTyp.yml:24` selects the contact level coding by the system
@@ -516,49 +362,15 @@ fn putget_holds_on_a_synthetic_observation_entry() -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
-#[test]
-fn the_case_identification_cluster_compiles_onto_the_encounter_identifier()
--> Result<(), Box<dyn Error>> {
-    let (program, _) = case()?;
-    assert_eq!(
-        models(&program),
-        ["ferrobridge_report_case", "CLUSTER.case_identification.v0"]
-    );
-    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
-    Ok(())
-}
-
 /// `case_identification.v0.yml:16` maps the `Identifier` it is slotted at
-/// onto the `DV_TEXT` at `items[at0001]`, a pair `DV_TEXT.adoc` does not
-/// write, so going in the run refuses (#101).
+/// onto the `DV_TEXT` at `items[at0001]`, which `DV_TEXT.adoc` pairs with
+/// `String`, `Coding` and `CodeableConcept` only, so it is refused at load
+/// (#101).
 #[test]
-fn the_case_identifier_refuses_going_in() -> Result<(), Box<dyn Error>> {
-    let (program, index) = case()?;
-    let observation = serde_json::json!({
-        "resourceType": "Observation",
-        "status": "final",
-        "code": {"text": "Synthetic observation"},
-        "encounter": {"identifier": {"value": "SYN-CASE-0001"}}
-    });
-    let outcome = to_openehr(
-        &program,
-        &SCHEMAS,
-        &index,
-        &Value::from_serde_json(observation),
-        &Seams::default(),
-        &laws::defaults(),
-        &CallContext::new(),
-    );
-    let Err(EngineError::Cell {
-        mapping, source, ..
-    }) = outcome
-    else {
-        return Err("the case identifier went into openEHR".into());
-    };
-    assert_eq!(mapping, "identifierCaseParent", "the refused mapping");
-    assert!(
-        matches!(*source, LensError::NoCell { ref rm_type, kind: "Identifier", .. } if rm_type == "DV_TEXT"),
-        "{source}"
+fn the_case_identifier_is_refused_at_load() -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        refused(CASE_CONTEXT, CASE, "ferrobridge_report_case.yml")?,
+        ["case_identification.v0.yml:16 fc-unpaired-types"]
     );
     Ok(())
 }

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! `DV_DATE_TIME` against FHIR `dateTime` and `Period`.
+//! `DV_DATE_TIME` against FHIR `dateTime`, `instant` and `Period`.
 //!
 //! The cell is
 //! `docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/data-type/DV_DATE_TIME.adoc`.
@@ -17,6 +17,7 @@
 
 use fhir_types::r4::period::Period;
 use fhir_types::r4::primitives::DateTime;
+use fhir_types::r4::primitives::Instant;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
 
 use crate::engine::lens::Fallback;
@@ -27,6 +28,9 @@ use crate::model::ast::keyword::Direction;
 
 /// The name the `dateTime` cell carries in a diagnostic.
 pub const DATE_TIME_CELL: &str = "DV_DATE_TIME against dateTime";
+
+/// The name the `instant` cell carries in a diagnostic.
+pub const INSTANT_CELL: &str = "DV_DATE_TIME against instant";
 
 /// The name the `Period` cell carries in a diagnostic.
 pub const PERIOD_CELL: &str = "DV_DATE_TIME against Period";
@@ -62,6 +66,108 @@ impl Lens<DvDateTime, DateTime> for DateTimeLens {
 
     fn fallbacks(&self, _view: &DateTime) -> Vec<Fallback> {
         Vec::new()
+    }
+}
+
+/// `DV_DATE_TIME` against `instant`.
+///
+/// `DV_DATE_TIME.adoc` pairs `dateTime` and `Period` and lists no `instant`:
+/// no specification governs this pair, it is our own design. The R4
+/// package's lexical form of `instant` is a strict subset of the one of
+/// `dateTime` (<https://hl7.org/fhir/R4/datatypes.html#primitive>), so going
+/// into openEHR the value moves as a `dateTime` does, and going out of
+/// openEHR a value outside the `instant` form is refused with the part it
+/// lacks.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct InstantLens;
+
+impl Lens<DvDateTime, Instant> for InstantLens {
+    fn cell(&self) -> &'static str {
+        INSTANT_CELL
+    }
+
+    fn get(&self, source: &DvDateTime) -> Result<Instant, LensError> {
+        if source.value.is_empty() {
+            return Err(LensError::Missing {
+                cell: INSTANT_CELL,
+                attribute: "instant",
+                direction: Direction::OpenehrToFhir,
+            });
+        }
+        if Instant::check(&source.value).is_err() {
+            return Err(LensError::NotAnInstant {
+                shortfall: InstantShortfall::of(&source.value),
+            });
+        }
+        Ok(Instant::from(source.value.clone()))
+    }
+
+    fn put(&self, view: &Instant, existing: Option<&DvDateTime>) -> Result<DvDateTime, LensError> {
+        let value = text_of(Some(&view.value)).ok_or(LensError::Missing {
+            cell: INSTANT_CELL,
+            attribute: "DV_DATE_TIME.value",
+            direction: Direction::FhirToOpenehr,
+        })?;
+        Ok(instant(String::from(value), existing))
+    }
+
+    fn fallbacks(&self, _view: &Instant) -> Vec<Fallback> {
+        Vec::new()
+    }
+}
+
+/// What a `DV_DATE_TIME` lacks that an `instant` requires.
+///
+/// An `instant` is "known at least to the second" and carries an offset
+/// (<https://hl7.org/fhir/R4/datatypes.html#instant>).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstantShortfall {
+    /// The value names no full date and time of day.
+    PartialDate,
+    /// The time of day stops before the seconds.
+    NoSeconds,
+    /// The value carries no offset.
+    NoTimezone,
+    /// The value has every part and is still outside the lexical form.
+    OutsideForm,
+}
+
+impl InstantShortfall {
+    /// Returns what `value`, a text outside the `instant` form, lacks.
+    #[must_use]
+    pub fn of(value: &str) -> Self {
+        let Some((date, time)) = value.split_once('T') else {
+            return Self::PartialDate;
+        };
+        if date.len() < "YYYY-MM-DD".len() {
+            return Self::PartialDate;
+        }
+        let zone = time.find(['Z', '+', '-']);
+        let clock = zone.and_then(|at| time.get(..at)).unwrap_or(time);
+        if clock.matches(':').count() < 2 {
+            return Self::NoSeconds;
+        }
+        if zone.is_none() {
+            return Self::NoTimezone;
+        }
+        Self::OutsideForm
+    }
+
+    /// Returns the part the diagnostic names.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PartialDate => "a full date and time of day",
+            Self::NoSeconds => "the seconds",
+            Self::NoTimezone => "an offset",
+            Self::OutsideForm => "the lexical form of instant",
+        }
+    }
+}
+
+impl core::fmt::Display for InstantShortfall {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -136,6 +242,8 @@ pub(crate) fn instant(value: String, existing: Option<&DvDateTime>) -> DvDateTim
 mod tests {
     use super::DATE_TIME_CELL;
     use super::DateTimeLens;
+    use super::InstantLens;
+    use super::InstantShortfall;
     use super::PERIOD_CELL;
     use super::PeriodStartLens;
     use super::instant;
@@ -143,6 +251,7 @@ mod tests {
     use crate::engine::lens::LensError;
     use fhir_types::r4::period::Period;
     use fhir_types::r4::primitives::DateTime;
+    use fhir_types::r4::primitives::Instant;
     use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
     use proptest::prop_compose;
     use proptest::proptest;
@@ -261,5 +370,33 @@ mod tests {
             matches!(error, LensError::OneWay { cell, .. } if cell == PERIOD_CELL),
             "the refusal names the one-way cell: {error}"
         );
+    }
+
+    #[test]
+    fn an_instant_moves_byte_for_byte_both_ways() {
+        let form = "2026-09-13T10:00:00.123+02:00";
+        let source = InstantLens
+            .put(&Instant::from(form), None)
+            .expect("the view carries a value");
+        assert_eq!(source.value, form, "the openEHR value changed");
+        let view = InstantLens.get(&source).expect("the value is an instant");
+        assert_eq!(view.value.as_deref(), Some(form), "the instant changed");
+    }
+
+    #[test]
+    fn a_date_time_short_of_an_instant_is_refused_naming_what_it_lacks() {
+        for (form, shortfall) in [
+            ("2026-09", InstantShortfall::PartialDate),
+            ("2026-09-13", InstantShortfall::PartialDate),
+            ("2026-09-13T10:00Z", InstantShortfall::NoSeconds),
+            ("2026-09-13T10:00:00", InstantShortfall::NoTimezone),
+        ] {
+            let refused = InstantLens.get(&instant(String::from(form), None));
+            assert_eq!(
+                refused,
+                Err(LensError::NotAnInstant { shortfall }),
+                "{form}"
+            );
+        }
     }
 }

@@ -29,6 +29,7 @@ use crate::resolve::program::target::Attachment;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::resolve::program::target::Target;
+use crate::tree::element::Location;
 
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Derivation;
@@ -141,6 +142,37 @@ impl<'a> Compiler<'a> {
         true
     }
 
+    /// Refuses a `reference` written into a choice element whose type the
+    /// path does not name.
+    fn reference_into_choice(
+        &mut self,
+        node: &Node<'a>,
+        method_kind: &Method,
+        fhir: Option<&FhirTarget>,
+        path: &ModelPath,
+    ) {
+        let (Method::Reference { .. }, Some(target)) = (method_kind, fhir) else {
+            return;
+        };
+        if !matches!(*target.resolved().location(), Location::Choice(_)) {
+            return;
+        }
+        let file = node.origin;
+        self.diagnostics.push(diagnostic(
+            file.file(),
+            file.header().name().value(),
+            ResolveCode::ReferenceIntoChoice,
+            node.mapping.position,
+            &path.field("with").field("fhir"),
+            format!(
+                "`{}` is a choice element, which FHIR names by the type it holds \
+                 (<https://hl7.org/fhir/R4/formats.html#choice>), so a `reference` writes \
+                 into it only where the path names the type, as `as(Reference)` does",
+                target.expression()
+            ),
+        ));
+    }
+
     /// Compiles one mapping method and everything under it.
     fn mapping(&mut self, node: &Node<'a>, scope: &Scope, path: &ModelPath) -> Mapping {
         let file = node.origin;
@@ -189,6 +221,7 @@ impl<'a> Compiler<'a> {
             .collect();
         let method_kind = self.method(node, &inner, path);
         let method_kind = self.ports(node, method_kind, openehr.as_ref(), &inner, path);
+        self.reference_into_choice(node, &method_kind, fhir.as_ref(), path);
         let followed_by = self.mappings(&node.followed_by, &inner);
         let data_type = with.and_then(|with| with.data_type.as_ref().map(|kind| *kind.value()));
         let plain =

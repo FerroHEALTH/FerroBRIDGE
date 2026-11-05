@@ -27,6 +27,7 @@ use fhir_types::r4::primitives::Boolean;
 use fhir_types::r4::primitives::Date;
 use fhir_types::r4::primitives::DateTime;
 use fhir_types::r4::primitives::Decimal;
+use fhir_types::r4::primitives::Instant;
 use fhir_types::r4::primitives::Integer;
 use fhir_types::r4::primitives::PositiveInt;
 use fhir_types::r4::primitives::Time;
@@ -53,6 +54,8 @@ pub enum FhirKind {
     Date,
     /// A `dateTime`.
     DateTime,
+    /// An `instant`.
+    Instant,
     /// A `boolean`.
     Boolean,
     /// A `Coding`.
@@ -118,6 +121,7 @@ impl FhirKind {
             "string" => Some(Self::String),
             "date" => Some(Self::Date),
             "dateTime" => Some(Self::DateTime),
+            "instant" => Some(Self::Instant),
             "boolean" => Some(Self::Boolean),
             "Coding" => Some(Self::Coding),
             "CodeableConcept" => Some(Self::CodeableConcept),
@@ -176,6 +180,7 @@ impl FhirKind {
             Self::String => "string",
             Self::Date => "date",
             Self::DateTime => "dateTime",
+            Self::Instant => "instant",
             Self::Boolean => "boolean",
             Self::Coding => "Coding",
             Self::CodeableConcept => "CodeableConcept",
@@ -206,6 +211,8 @@ pub enum FhirValue {
     Date(Date),
     /// A `dateTime`.
     DateTime(DateTime),
+    /// An `instant`.
+    Instant(Instant),
     /// A `boolean`.
     Boolean(Boolean),
     /// A `Coding`.
@@ -283,6 +290,7 @@ impl FhirValue {
             Self::String(_) => FhirKind::String,
             Self::Date(_) => FhirKind::Date,
             Self::DateTime(_) => FhirKind::DateTime,
+            Self::Instant(_) => FhirKind::Instant,
             Self::Boolean(_) => FhirKind::Boolean,
             Self::Coding(_) => FhirKind::Coding,
             Self::CodeableConcept(_) => FhirKind::CodeableConcept,
@@ -325,6 +333,9 @@ impl FhirValue {
                 .map_err(refuse),
             FhirKind::DateTime => DateTime::from_json_parts(Some(value), None, &mut path)
                 .map(Self::DateTime)
+                .map_err(refuse),
+            FhirKind::Instant => Instant::from_json_parts(Some(value), None, &mut path)
+                .map(Self::Instant)
                 .map_err(refuse),
             FhirKind::Boolean => Boolean::from_json_parts(Some(value), None, &mut path)
                 .map(Self::Boolean)
@@ -406,6 +417,7 @@ impl FhirValue {
             Self::String(ref text) => primitive(text.value_json()),
             Self::Date(ref date) => primitive(date.value_json()),
             Self::DateTime(ref date) => primitive(date.value_json()),
+            Self::Instant(ref instant) => primitive(instant.value_json()),
             Self::Boolean(ref boolean) => primitive(boolean.value_json()),
             Self::Coding(ref coding) => complex(coding.to_json()),
             Self::CodeableConcept(ref concept) => complex(concept.to_json()),

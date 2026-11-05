@@ -4,6 +4,8 @@
 # condition per operator of the Conditions chapter, so the engine can evaluate
 # each of the five against the synthetic FHIR Condition of the testkit. Every
 # code system is example.org, which RFC 6761 section 6.5 reserves for examples.
+# The identifier methods write the identifier's value, the string
+# DV_TEXT.adoc pairs with the DV_TEXT nodes below them.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -21,22 +23,34 @@ mappings:
   - name: "identifierOneOf"
     with:
       fhir: "$resource.identifier"
-      openehr: "$archetype/data[at0001]/items[at0002]"
+      openehr: "$archetype/data[at0001]"
     fhirCondition:
       targetRoot: "$resource.identifier"
       targetAttribute: "system"
       operator: "one of"
       criteria: "http://example.org/fhir/sid/ferrobridge-condition"
+    followedBy:
+      mappings:
+        - name: "value"
+          with:
+            fhir: "value"
+            openehr: "items[at0002]"
 
   - name: "identifierNotOf"
     with:
       fhir: "$resource.identifier"
-      openehr: "$archetype/data[at0001]/items[at0005]"
+      openehr: "$archetype/data[at0001]"
     fhirCondition:
       targetRoot: "$resource.identifier"
       targetAttribute: "system"
       operator: "not of"
       criteria: "http://example.org/fhir/sid/ferrobridge-retired"
+    followedBy:
+      mappings:
+        - name: "value"
+          with:
+            fhir: "value"
+            openehr: "items[at0005]"
 
   - name: "bodySiteEmpty"
     with:

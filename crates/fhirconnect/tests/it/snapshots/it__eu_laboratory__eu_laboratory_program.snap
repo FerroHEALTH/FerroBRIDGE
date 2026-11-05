@@ -179,7 +179,7 @@ program ferrobridge_eu_laboratory.context
               mapping issued from CLUSTER.laboratory_test_analyte.v1
                 fhir $resource.issued -> Observation.issued primitive writable
                 openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0006] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0006]/value DV_DATE_TIME occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt]
-                derived string
+                derived instant
               mapping analyteMeasurement from CLUSTER.laboratory_test_analyte.v1
                 fhir $resource.value -> Observation.value[x] choice writable
                 openehr /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1]/items[at0001] -> /content[openEHR-EHR-OBSERVATION.laboratory_test_result.v1,'Laborbefund']/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.laboratory_test_analyte.v1,'Pro Laboranalyt']/items[at0001,'Messwert'] ELEMENT occurrences [laborbericht/laborbefund/any_event, laborbericht/laborbefund/any_event/pro_laboranalyt, laborbericht/laborbefund/any_event/pro_laboranalyt/messwert]
