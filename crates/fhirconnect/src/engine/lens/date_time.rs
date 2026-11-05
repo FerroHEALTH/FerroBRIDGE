@@ -242,6 +242,7 @@ pub(crate) fn instant(value: String, existing: Option<&DvDateTime>) -> DvDateTim
 mod tests {
     use super::DATE_TIME_CELL;
     use super::DateTimeLens;
+    use super::INSTANT_CELL;
     use super::InstantLens;
     use super::InstantShortfall;
     use super::PERIOD_CELL;
@@ -390,6 +391,8 @@ mod tests {
             ("2026-09-13", InstantShortfall::PartialDate),
             ("2026-09-13T10:00Z", InstantShortfall::NoSeconds),
             ("2026-09-13T10:00:00", InstantShortfall::NoTimezone),
+            ("2026-09T10:00:00Z", InstantShortfall::PartialDate),
+            ("2026-09-13T25:00:00Z", InstantShortfall::OutsideForm),
         ] {
             let refused = InstantLens.get(&instant(String::from(form), None));
             assert_eq!(
@@ -398,5 +401,49 @@ mod tests {
                 "{form}"
             );
         }
+    }
+
+    #[test]
+    fn the_refusal_names_the_part_an_instant_lacks() {
+        for (shortfall, part) in [
+            (InstantShortfall::PartialDate, "a full date and time of day"),
+            (InstantShortfall::NoSeconds, "the seconds"),
+            (InstantShortfall::NoTimezone, "an offset"),
+            (InstantShortfall::OutsideForm, "the lexical form of instant"),
+        ] {
+            let message = LensError::NotAnInstant { shortfall }.to_string();
+            assert!(message.ends_with(part), "{message}");
+        }
+    }
+
+    #[test]
+    fn an_instant_with_no_value_is_refused_both_ways_naming_the_cell() {
+        assert_eq!(InstantLens.cell(), INSTANT_CELL);
+        let out = InstantLens
+            .get(&instant(String::new(), None))
+            .expect_err("value is mandatory going out");
+        let back = InstantLens
+            .put(&Instant::default(), None)
+            .expect_err("value is mandatory going in");
+        for error in [out, back] {
+            assert!(
+                matches!(error, LensError::Missing { cell, .. } if cell == INSTANT_CELL),
+                "the refusal names the instant cell: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_instant_takes_no_one_way_row() {
+        let view = Instant::from("2026-09-13T10:00:00Z");
+        assert!(
+            InstantLens.fallbacks(&view).is_empty(),
+            "the instant cell records no fallback"
+        );
+        let held = instant(String::from("2026-09-13T09:00:00Z"), None);
+        let source = InstantLens
+            .put(&view, Some(&held))
+            .expect("the view carries a value");
+        assert_eq!(source.value, "2026-09-13T10:00:00Z", "the view wins");
     }
 }

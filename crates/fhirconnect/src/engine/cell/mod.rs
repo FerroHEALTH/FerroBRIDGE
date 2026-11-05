@@ -494,6 +494,22 @@ mod tests {
     }
 
     #[test]
+    fn a_date_time_against_an_instant_runs_its_cell_both_ways() {
+        let held = RmValue::from_canonical(
+            "DV_DATE_TIME",
+            "/synthetic",
+            &serde_json::json!({ "_type": "DV_DATE_TIME", "value": "2026-09-13T10:00:00+01:00" }),
+        )
+        .expect("a DV_DATE_TIME");
+        let view = get(&held, FhirKind::Instant, None).expect("the instant cell carries the pair");
+        assert_eq!(view.kind(), FhirKind::Instant);
+        let back =
+            put(&view, "DV_DATE_TIME", Some(&held), None, &[]).expect("the instant cell runs back");
+        assert_eq!(back.value, held, "the instant round trips");
+        assert!(back.fallbacks.is_empty(), "the cell took no one-way row");
+    }
+
+    #[test]
     fn a_pair_the_chapter_has_no_row_for_is_refused() {
         let error = get(&RmValue::CodePhrase(code()), FhirKind::Period, None)
             .expect_err("no row pairs a CODE_PHRASE with a Period");
