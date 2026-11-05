@@ -755,18 +755,35 @@ sends and what each refusal looks like.
 | `jwks_file` | none | A JWK Set file handed over out of band, read in place of the issuer's `jwks_uri`; the issuer's metadata is then not read |
 | `timeout_ms` | `10000` | How long one call to the authorization server may take |
 | `realm` | none | The `realm` every `WWW-Authenticate` challenge names |
-| `scopeless_subjects` | `[]` | The `sub` values whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope; any other scopeless token is refused with `403` |
+| `scopeless_subjects` | `[]` | The `sub` values whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope; any other scopeless token is refused with `403`. Beside several issuers each entry is written `<issuer>#<sub>`, the issuer exactly as its `[[auth.issuer]]` table names it, and admits that issuer's tokens alone; a bare entry, or one naming an issuer the section does not trust, refuses the start |
 | `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient`; each is one SMART App Launch 2.2.0 (Conformance, Capabilities) defines, or a full URI. `sso-openid-connect` also writes the issuer's `issuer`, which the document omits otherwise (Conformance, Metadata) |
 | `scopes_supported` | `[]` | The scopes the discovery document lists as `scopes_supported`; list only scopes the bridge honours, because "the server SHALL support all scopes listed here" (SMART App Launch 2.2.0, Conformance, Metadata). Empty omits the member |
 | `product_scope` | `__ferrobridge.operator` | The operator scope: it guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
 | `ca_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and under `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start |
-| `role_claims` | `["roles", "groups", "entitlements"]` | The claims a token's roles are read from, each a dotted path into the token's JSON (the default is the three RFC 9068 §2.2.3.1 names). A path with an empty step or with whitespace refuses the start. The bridge grants nothing by role: no route it guards asks for one, so the roles a token carries change no answer |
+| `role_claims` | `["roles", "groups", "entitlements"]` | The claims a token's roles are read from, each a dotted path into the token's JSON (the default is the three RFC 9068 §2.2.3.1 names). A path with an empty step or with whitespace refuses the start. The bridge grants nothing by role: no route it guards asks for one, so the roles a token carries change no answer. Beside several issuers each entry is written `<issuer>#<path>` and is read from that issuer's tokens alone, and a bare entry refuses the start, the default included: set `role_claims = []` or name each issuer |
 
 Each `[[auth.issuer]]` table takes `issuer` and any of `audience`,
 `algorithms`, `token_profile`, `clock_skew_seconds`, `jwks_max_age_seconds`,
 `jwks_refresh_interval_seconds` and `jwks_file`; a key a table leaves out is
 the section's. A token is checked by the issuer its `iss` names, and the
-discovery document and the `CapabilityStatement` name the first.
+discovery document and the `CapabilityStatement` name the first. A
+`sub` is unique only within its issuer (RFC 7519 §4.1.2), so
+`scopeless_subjects` and `role_claims` name the issuer of each entry, and a
+section with several tables states `role_claims` itself, since the default is
+bare and refused:
+
+```toml
+[auth]
+audience = ["https://bridge.example.org/fhir"]
+scopeless_subjects = ["https://auth.example.org/realms/clinic#service-account-ferrofed"]
+role_claims = []
+
+[[auth.issuer]]
+issuer = "https://auth.example.org/realms/clinic"
+
+[[auth.issuer]]
+issuer = "https://partner.example.net"
+```
 
 `[[auth.basic.users]]` tables admit HTTP Basic callers (RFC 7617) beside the
 tokens. Each table takes `user`, the Argon2id PHC string of the password as
