@@ -144,7 +144,7 @@ ferrohealth-secret = "=0.2.0"
 # The family's configuration loader (FerroSYS): the file, the `FERROBRIDGE__`
 # environment and its aliases, `--set`, strict with the closest known key, the
 # provenance of every key and the `config check` rendering.
-ferrohealth-config = "=0.2.8"
+ferrohealth-config = "=0.2.9"
 # The family's health document, indicator registry and process lifecycle
 # (FerroSYS). The default build is the document alone, which the operator
 # console reads; the server takes `registry`.
@@ -154,13 +154,13 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body.
-ferrohealth-server = { version = "=0.4.3", default-features = false }
+ferrohealth-server = { version = "=0.5.0", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
 # the request log and the panic line.
-ferrohealth-telemetry = { version = "=0.2.4", default-features = false }
+ferrohealth-telemetry = { version = "=0.2.5", default-features = false }
 # The family's installation report to FerroPULSE (FerroSYS): envelope v2, the
 # latency window the request log fills and the start and daily reporter.
-ferrohealth-usage-report = { version = "=0.2.0", default-features = false }
+ferrohealth-usage-report = { version = "=0.2.1", default-features = false }
 # The family's audit crates (FerroAUDIT): `ehds-logging` builds the EHDS access
 # record of Regulation (EU) 2025/327 Annex II 3.2 and its BALP `AuditEvent`
 # (`balp`), and `ihe-atna` spools it and sends it over the ITI-20 ATX: FHIR

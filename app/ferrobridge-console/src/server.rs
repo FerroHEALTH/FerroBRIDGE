@@ -292,13 +292,14 @@ async fn page(Extension(state): Extension<ConsoleState>, request: Request) -> Re
 /// carries no session in the first place; this check holds without it.
 fn same_origin_check(settings: &Settings) -> SameOrigin {
     let locale = settings.locale.clone();
-    let check = SameOrigin::new().with_body(Arc::new(move |_uri, _request_id, status, _reason| {
-        (
-            status,
-            tr_in(catalog(), &locale, Msg::ForeignRequestRefused),
-        )
-            .into_response()
-    }));
+    let check =
+        SameOrigin::default().with_body(Arc::new(move |_uri, _request_id, status, _reason| {
+            (
+                status,
+                tr_in(catalog(), &locale, Msg::ForeignRequestRefused),
+            )
+                .into_response()
+        }));
     let origin = settings
         .oidc
         .as_ref()
@@ -308,7 +309,7 @@ fn same_origin_check(settings: &Settings) -> SameOrigin {
         // opaque names none, which refuses every unsafe request lacking fetch metadata.
         Some(origin) => check
             .with_origin(&origin)
-            .unwrap_or_else(|_opaque| SameOrigin::new()),
+            .unwrap_or_else(|_opaque| SameOrigin::default()),
         None => check,
     }
 }
