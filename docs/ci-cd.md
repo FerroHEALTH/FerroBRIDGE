@@ -469,6 +469,10 @@ unchanged files, and none is attempted.
 already applied to `crates/omop-cdm/src/generated`. Before that, the
 copy-paste detector spent 625 of the scan's 968 seconds on the 4711
 generated files of `fhir-types` and `hl7v2-types` (run 39007151631).
+It also excludes every `.sql` file: they are PostgreSQL, and the analyzer
+reads `.sql` as Oracle PL/SQL. `sonar.coverage.exclusions` keeps the test
+code, `fuzz/` and the shell, CSS and JavaScript trees out of the coverage
+denominator; they stay analyzed for findings (#1572).
 A newer push to a pull request cancels its running analysis.
 
 **CodeQL.** The Rust analysis runs on a pull request only when the change

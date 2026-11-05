@@ -489,6 +489,32 @@ mod tests {
     }
 
     #[test]
+    fn an_instant_keeps_the_text_the_document_carried() {
+        let document = Value::String(String::from("2026-09-13T10:00:00.123+02:00"));
+        let value = FhirValue::read(FhirKind::Instant, "Observation.issued", &document)
+            .expect("the string reads as an instant");
+        assert_eq!(value.kind(), FhirKind::Instant);
+        assert_eq!(value.kind().as_str(), "instant");
+        assert_eq!(
+            value
+                .write("Observation.issued")
+                .expect("an instant has a JSON form"),
+            document,
+            "the fractional seconds and the offset survive"
+        );
+    }
+
+    #[test]
+    fn a_date_short_of_an_instant_names_the_element_and_the_kind() {
+        let document = Value::String(String::from("2026-09-13"));
+        let error = FhirValue::read(FhirKind::Instant, "Observation.issued", &document)
+            .expect_err("a date is no instant");
+        let message = error.to_string();
+        assert!(message.contains("Observation.issued"), "{message}");
+        assert!(message.contains("instant"), "{message}");
+    }
+
+    #[test]
     fn every_pair_the_resolver_derives_names_a_kind_the_cells_carry() {
         for &(class, codes) in crate::resolve::derive::PAIRS {
             for code in codes {
