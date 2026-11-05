@@ -77,20 +77,12 @@ expression: refused
     "model/composition/org.highmed/person.v1.Patient.yml:82 fc-unknown-template-node"
   ],
   "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml": [
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:21 fc-ambiguous-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:26 fc-ambiguous-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:37 fc-unknown-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:42 fc-unknown-template-node",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:37 fc-uncarried-tail",
+    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:39 fc-uncarried-tail",
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:60 fc-unknown-template-node",
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:62 fc-unknown-template-node",
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:64 fc-unknown-template-node",
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:70 fc-unknown-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:75 fc-ambiguous-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:89 fc-unknown-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:94 fc-unknown-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:99 fc-unknown-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:104 fc-ambiguous-template-node",
-    "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:115 fc-unknown-template-node",
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:119 fc-unknown-template-node",
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:121 fc-unknown-template-node",
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:123 fc-unknown-template-node"

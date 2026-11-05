@@ -17,6 +17,7 @@ use fhirconnect::engine::library::Library;
 use fhirconnect::resolve::compile::compile;
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
+use openehr_mapping_core::index::paths::AqlPath;
 
 use super::CORPUS;
 use super::compiled;
@@ -144,6 +145,24 @@ fn a_template_root_carries_the_lineage_its_source_states() -> Result<(), Box<dyn
     Ok(())
 }
 
+/// The ADL 1.4 `report-result.v1` restates the `context` of `report.v1`, so
+/// its template carries that context once (#1549).
+#[test]
+fn the_report_result_template_carries_one_context() -> Result<(), Box<dyn Error>> {
+    let index = template(REPORT_RESULT)?;
+    let contexts: Vec<&str> = index
+        .nodes()
+        .filter(|node| node.rm_type() == "EVENT_CONTEXT")
+        .map(|node| node.aql_path().as_str())
+        .collect();
+    assert_eq!(contexts, ["/context"]);
+    assert_eq!(
+        index.node(&AqlPath::new("/context"))?.rm_type(),
+        "EVENT_CONTEXT"
+    );
+    Ok(())
+}
+
 #[test]
 fn a_composition_model_with_no_lineage_finds_no_root() -> Result<(), Box<dyn Error>> {
     let index = template(MEDICATION_LIST)?.with_root_lineage(Vec::new());
@@ -210,9 +229,7 @@ fn the_health_summary_compiles_its_section_evaluations() -> Result<(), Box<dyn E
 /// Each finds its root through the template lineage and refuses only on the
 /// defects #101 records: `null_flavour` below a `DV_DATE_TIME` and a
 /// `PARTY_PROXY`, two methods of one name, FHIR elements the resource does
-/// not define, and a `participations` list walked as a tail. The report
-/// result is refused on `/context` twice as well, the flattening #1549
-/// holds.
+/// not define, and a `participations` list walked as a tail.
 #[test]
 fn the_defective_composition_models_refuse_as_pinned() -> Result<(), Box<dyn Error>> {
     let mut refused = serde_json::Map::new();
