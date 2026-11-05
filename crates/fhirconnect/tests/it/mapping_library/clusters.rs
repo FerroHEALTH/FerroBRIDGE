@@ -4,17 +4,20 @@
 //! The library's cluster models no library file slots, each slotted by a
 //! FerroBRIDGE model and compiled verbatim.
 //!
-//! The observation status, organization and medication status clusters
-//! compile against the library clusters template built from the CKM
-//! archetypes. No CKM mirror holds `CLUSTER.kontakttyp.v0`, so the contact
-//! type cluster compiles against the published `KDS_Fall_einfach` template,
-//! which carries it.
+//! The observation status, organization, medication status, entry category,
+//! FHIR identifier and case identification clusters compile against the
+//! library clusters template built from the CKM archetypes. No CKM mirror
+//! holds `CLUSTER.kontakttyp.v0` or `CLUSTER.diagnosetyp.v0`, so the contact
+//! type and diagnosis type clusters compile against the published
+//! `KDS_Fall_einfach` template, which carries both.
 //!
-//! Three of them compile and do not run (#101), so the suite pins how each
+//! Four of them compile and do not run (#101), so the suite pins how each
 //! fails and counts none as reached: the two status clusters map a `code`
 //! onto a `DV_CODED_TEXT`, which `DV_CODED_TEXT.adoc` pairs with `Coding`
-//! and `CodeableConcept` only, and the organization cluster maps its
-//! identifier text onto the slotted element itself.
+//! and `CodeableConcept` only, the organization cluster maps its identifier
+//! text onto the slotted element itself, and the case identification
+//! cluster maps an `Identifier` onto a `DV_TEXT`, which `DV_TEXT.adoc`
+//! pairs with `String`, `Coding` and `CodeableConcept` only.
 
 use core::error::Error;
 use std::sync::Arc;
@@ -59,6 +62,21 @@ const MEDICATION_STATUS: &[&str] = &["model/cluster/org.highmed/medication_statu
 /// The contact type cluster, which FerroBRIDGE's encounter model slots.
 const CONTACT_TYPE: &[&str] = &["model/cluster/org.highmed/kontaktTyp.yml"];
 
+/// The entry category and FHIR identifier clusters, which FerroBRIDGE's
+/// report entry model slots.
+const ENTRY: &[&str] = &[
+    "model/cluster/org.highmed/entry_category.v0.yml",
+    "model/cluster/org.highmed/identifier_fhir.v0.yml",
+];
+
+/// The case identification cluster, which FerroBRIDGE's report case model
+/// slots.
+const CASE: &[&str] = &["model/cluster/org.openehr/case_identification.v0.yml"];
+
+/// The diagnosis type cluster, which FerroBRIDGE's diagnosis use model
+/// slots.
+const DIAGNOSIS_USE: &[&str] = &["model/cluster/org.highmed/diagnoseTyp.yml"];
+
 /// The context over FerroBRIDGE's report status model.
 const STATUS_CONTEXT: &str = "ferrobridge_library_report_status.context";
 
@@ -70,6 +88,15 @@ const MEDICATION_STATUS_CONTEXT: &str = "ferrobridge_library_medication_status.c
 
 /// The context over FerroBRIDGE's encounter model.
 const CONTACT_TYPE_CONTEXT: &str = "ferrobridge_library_contact_type.context";
+
+/// The context over FerroBRIDGE's report entry model.
+const ENTRY_CONTEXT: &str = "ferrobridge_library_report_entry.context";
+
+/// The context over FerroBRIDGE's report case model.
+const CASE_CONTEXT: &str = "ferrobridge_library_report_case.context";
+
+/// The context over FerroBRIDGE's diagnosis use model.
+const DIAGNOSIS_USE_CONTEXT: &str = "ferrobridge_library_diagnosis_use.context";
 
 /// The published `KDS_Fall_einfach` operational template.
 const KDS_FALL_EINFACH: &str = include_str!(concat!(
@@ -110,21 +137,42 @@ fn medication_status() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error
     )
 }
 
-/// Compiles the contact type context against the published
-/// `KDS_Fall_einfach` template.
-fn contact_type() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+/// Compiles the report entry context against the library clusters
+/// template.
+fn entry() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+    program(
+        CLUSTERS,
+        ENTRY_CONTEXT,
+        ENTRY,
+        &["ferrobridge_report_entry.yml"],
+    )
+}
+
+/// Compiles the report case context against the library clusters template.
+fn case() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+    program(
+        CLUSTERS,
+        CASE_CONTEXT,
+        CASE,
+        &["ferrobridge_report_case.yml"],
+    )
+}
+
+/// Compiles the FerroBRIDGE context `context` over the published `files`
+/// and the FerroBRIDGE `model` against the published `KDS_Fall_einfach`
+/// template.
+fn kds_fall(
+    context: &str,
+    files: &[&str],
+    model: &str,
+) -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     let opt = openehr_its::opt14::from_xml(KDS_FALL_EINFACH)?;
     let index = WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(opt)))?;
-    let set = set(
-        CONTACT_TYPE,
-        &[
-            "ferrobridge_encounter_contact_type.yml",
-            "ferrobridge_library_contact_type.context.yml",
-        ],
-    )?;
+    let file = format!("{context}.yml");
+    let set = set(files, &[model, file.as_str()])?;
     let program = compile(
         &set,
-        &MappingName::new(CONTACT_TYPE_CONTEXT)?,
+        &MappingName::new(context)?,
         &index,
         &SCHEMAS,
         &Library,
@@ -133,10 +181,32 @@ fn contact_type() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     Ok((program, index))
 }
 
-/// Compiles the context of this module whose cluster runs and returns it
-/// with the published file it reaches.
+/// Compiles the contact type context against `KDS_Fall_einfach`.
+fn contact_type() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+    kds_fall(
+        CONTACT_TYPE_CONTEXT,
+        CONTACT_TYPE,
+        "ferrobridge_encounter_contact_type.yml",
+    )
+}
+
+/// Compiles the diagnosis use context against `KDS_Fall_einfach`.
+fn diagnosis_use() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+    kds_fall(
+        DIAGNOSIS_USE_CONTEXT,
+        DIAGNOSIS_USE,
+        "ferrobridge_encounter_diagnosis_use.yml",
+    )
+}
+
+/// Compiles the contexts of this module whose clusters run and returns each
+/// with the published files it reaches.
 pub(super) fn chains() -> Result<Vec<crate::support::Chain>, Box<dyn Error>> {
-    Ok(vec![(CONTACT_TYPE, contact_type()?.0)])
+    Ok(vec![
+        (CONTACT_TYPE, contact_type()?.0),
+        (ENTRY, entry()?.0),
+        (DIAGNOSIS_USE, diagnosis_use()?.0),
+    ])
 }
 
 /// Returns a synthetic report composition of the library clusters template:
@@ -358,5 +428,123 @@ fn putget_holds_on_a_synthetic_contact_type() -> Result<(), Box<dyn Error>> {
     });
     let declared = laws::putget(&program, &index, &encounter, &laws::untouched)?;
     insta::assert_json_snapshot!("library_contact_type_putget", declared);
+    Ok(())
+}
+
+#[test]
+fn the_entry_clusters_compile_onto_observation() -> Result<(), Box<dyn Error>> {
+    let (program, _) = entry()?;
+    assert_eq!(program.resource().as_str(), "Observation");
+    assert_eq!(
+        models(&program),
+        [
+            "ferrobridge_report_entry",
+            "CLUSTER.entry_category.v0",
+            "CLUSTER.identifier_fhir.v0"
+        ]
+    );
+    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
+    Ok(())
+}
+
+#[test]
+fn putget_holds_on_a_synthetic_observation_entry() -> Result<(), Box<dyn Error>> {
+    let (program, index) = entry()?;
+    let observation = serde_json::json!({
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {"text": "Synthetic observation"},
+        "category": [{
+            "coding": [{"system": "http://example.org/fhir/CodeSystem/synthetic-category", "code": "SYN-CAT", "display": "Synthetic category"}],
+            "text": "A synthetic category"
+        }],
+        "identifier": [{"system": "http://example.org/fhir/sid/synthetic-observation", "value": "SYN-OBS-0001"}]
+    });
+    let declared = laws::putget(&program, &index, &observation, &laws::untouched)?;
+    insta::assert_json_snapshot!("library_observation_entry_putget", declared);
+    Ok(())
+}
+
+#[test]
+fn the_case_identification_cluster_compiles_onto_the_encounter_identifier()
+-> Result<(), Box<dyn Error>> {
+    let (program, _) = case()?;
+    assert_eq!(
+        models(&program),
+        ["ferrobridge_report_case", "CLUSTER.case_identification.v0"]
+    );
+    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
+    Ok(())
+}
+
+/// `case_identification.v0.yml:16` maps the `Identifier` it is slotted at
+/// onto the `DV_TEXT` at `items[at0001]`, a pair `DV_TEXT.adoc` does not
+/// write, so going in the run refuses (#101).
+#[test]
+fn the_case_identifier_refuses_going_in() -> Result<(), Box<dyn Error>> {
+    let (program, index) = case()?;
+    let observation = serde_json::json!({
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {"text": "Synthetic observation"},
+        "encounter": {"identifier": {"value": "SYN-CASE-0001"}}
+    });
+    let outcome = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &Value::from_serde_json(observation),
+        &Seams::default(),
+        &laws::defaults(),
+        &CallContext::new(),
+    );
+    let Err(EngineError::Cell {
+        mapping, source, ..
+    }) = outcome
+    else {
+        return Err("the case identifier went into openEHR".into());
+    };
+    assert_eq!(mapping, "identifierCaseParent", "the refused mapping");
+    assert!(
+        matches!(*source, LensError::NoCell { ref rm_type, kind: "Identifier", .. } if rm_type == "DV_TEXT"),
+        "{source}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_diagnosis_type_cluster_compiles_onto_encounter() -> Result<(), Box<dyn Error>> {
+    let (program, _) = diagnosis_use()?;
+    assert_eq!(program.resource().as_str(), "Encounter");
+    assert_eq!(
+        models(&program),
+        [
+            "ferrobridge_encounter_diagnosis_use",
+            "CLUSTER.diagnosetyp.v0"
+        ]
+    );
+    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
+    Ok(())
+}
+
+#[test]
+fn putget_holds_on_a_synthetic_diagnosis_use() -> Result<(), Box<dyn Error>> {
+    let (program, index) = diagnosis_use()?;
+    let encounter = serde_json::json!({
+        "resourceType": "Encounter",
+        "reasonCode": [{
+            "coding": [{"system": "http://example.org/fhir/CodeSystem/synthetic-problem", "code": "SYN-PROBLEM", "display": "A synthetic problem"}]
+        }],
+        "diagnosis": [{
+            "use": {
+                "coding": [
+                    {"system": "http://terminology.hl7.org/CodeSystem/diagnosis-role", "code": "AD"},
+                    {"system": "http://fhir.de/CodeSystem/DiagnoseTyp", "code": "surgery-diagnosis"}
+                ]
+            }
+        }]
+    });
+    let declared = laws::putget(&program, &index, &encounter, &laws::untouched)?;
+    insta::assert_json_snapshot!("library_diagnosis_use_putget", declared);
     Ok(())
 }

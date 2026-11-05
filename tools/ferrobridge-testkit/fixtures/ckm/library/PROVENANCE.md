@@ -3,7 +3,7 @@
 
 # Provenance: the CKM archetypes of the FHIRconnect mapping library
 
-7 published archetypes of the openEHR Clinical Knowledge Manager,
+8 published archetypes of the openEHR Clinical Knowledge Manager,
 vendored verbatim by `scripts/vendor/ckm-library.sh`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -11,8 +11,8 @@ docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/openEHR/CKM-mirror>, the mirror of the international CKM
 - Pin: commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `ef3b633a30cd7b6f66d7c362b936e89fcdc85408b355718485777317b4f315b8`
-- Fetched: 2026-11-04
+  `PROVENANCE.md` excluded): `466dfd14575f82cc18d999c268b4cc4fe36e1635259f50dea50a352d884b437c`
+- Fetched: 2026-11-05
 - Upstream licence: Creative Commons Attribution-ShareAlike 3.0 Unported, the
   mirror's `LICENSE` file at the same commit, vendored beside this file
 - Use: the archetypes the FHIRconnect mapping library's model mappings
@@ -31,3 +31,4 @@ Files:
 - `openEHR-EHR-EVALUATION.exclusion_global.v1.adl` from `local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.exclusion_global.v1.adl`, sha256 `1acceb83c8b962abc10bb777eef32eb5bf7386a67890cbbfa19d10b988fd70e8`
 - `openEHR-EHR-EVALUATION.gender.v1.adl` from `local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.gender.v1.adl`, sha256 `00fe97854efddf97374753b04494551a29a034eba78b1c13b1591752bbc5f5f9`
 - `openEHR-EHR-CLUSTER.device.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.device.v1.adl`, sha256 `0da92215f0d8603a36ed778143c1b767e2993739c6b31e2da91497589ca12efa`
+- `openEHR-EHR-CLUSTER.case_identification.v0.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.case_identification.v0.adl`, sha256 `57a81376648a098b70bfd500e4db3f62d1acd2c48d52535004fde8f1aea55121`

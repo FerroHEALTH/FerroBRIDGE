@@ -1,0 +1,24 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/clusters.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "the engine filled /composer",
+    "the engine filled /context/start_time",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [],
+  "added": [
+    "diagnosis[0].use.coding[0].display = \"AD\"",
+    "diagnosis[0].use.coding[1].display = \"surgery-diagnosis\"",
+    "reasonCode[0].text = \"A synthetic problem\""
+  ],
+  "changed": []
+}

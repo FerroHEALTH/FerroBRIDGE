@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's Encounter model over the CKM problem diagnosis, slotting the
+# library's diagnosis type cluster onto Encounter.diagnosis.use, which the
+# library slots only from a KDS extension whose context does not compile
+# (#1546). No CKM mirror holds CLUSTER.diagnosetyp.v0, so it compiles
+# against the published KDS_Fall_einfach template, which holds the cluster
+# in its problem diagnosis, whose mandatory problem name the model maps from
+# the encounter's reason.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_encounter_diagnosis_use
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+mappings:
+  - name: diagnosisUse
+    with:
+      fhir: $resource.diagnosis.use
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.diagnosetyp.v0]
+    slotArchetype: CLUSTER.diagnosetyp.v0
+  - name: reason
+    with:
+      fhir: $resource.reasonCode
+      openehr: $archetype/data[at0001]/items[at0002]
