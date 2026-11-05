@@ -738,6 +738,10 @@ docs/specs/omocl|OMOCL corpus
 docs/specs/omop-cdm|OMOP CDM definitions and PostgreSQL DDL
 docs/specs/dqd|OHDSI Data Quality Dashboard
 docs/specs/its-rest|openEHR ITS-REST OpenAPI
+docs/specs/openehr-rm|openEHR Reference Model class definitions
+docs/specs/ietf-oauth|IETF OAuth RFCs
+docs/specs/entra-docs|Microsoft Entra documentation
+docs/specs/keycloak-docs|Keycloak documentation
 docs/specs/fhirpath-tests|FHIRPath test suite (R4)
 docs/specs/eu-xtehr-models|Xt-EHR EHDS Logical Information Models
 docs/specs/eu-hl7-base|HL7 Europe Base and Core
