@@ -25,6 +25,30 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.21] - 2026-11-05
+
+A correctness release on the way to the whole FHIRconnect mapping library.
+A template over a specialised ADL 1.4 composition archetype carries one
+`context`, so a mapping that names `$composition/context` resolves against
+it, and the compiler refuses at load the mappings that before failed only
+on their first run. Three changes break a consumer: `fhirconnect` 0.1.223
+refuses at load a mapping whose types no data-type page pairs
+(`fc-unpaired-types`) and a `reference` into a choice element the path does
+not type (`fc-reference-into-choice`), so a mapping set that loaded before
+can be refused now; `FhirKind` and `FhirValue` gain an `Instant` variant,
+which an exhaustive match adds; and `eehrxf` 0.1.158, `fhirconnect`
+0.1.223, `openehr-mapping-core` 0.1.143 and `ferrobridge-hl7v2` 0.1.182
+require `openehr-*` 0.0.129, so a consumer that pins the `openehr-*` crates
+moves them together. The crate line moves one patch per change, a breaking
+one included, so a consumer pins it exactly. Passing the whole mapping
+library (#1546) and the issues that wait on an upstream publication moved
+to v0.0.22.
+
+### Fixed
+
+- A template over an ADL 1.4 composition archetype that specialises another, as `openEHR-EHR-COMPOSITION.report-result.v1` specialises `report.v1`, carries one `/context` node, so a mapping that names `$composition/context` resolves against it. Before, the operational template held the composition's `context` twice and every such mapping was refused with `fc-ambiguous-template-node`. The `openehr-*` crates move from 0.0.128 to 0.0.129, which carries the fix, so the next `eehrxf`, `fhirconnect`, `openehr-mapping-core` and `ferrobridge-hl7v2` publish requires `openehr-* ^0.0.129` (#1549).
+- `fhirconnect`: the compiler refuses at load, naming file and line, an untyped mapping whose openEHR class and FHIR type no page of the data-type chapter pairs (`fc-unpaired-types`), a data value mapped onto a resource root (the same code), and a `reference` written into a choice element whose type the path does not name (`fc-reference-into-choice`). Each failed only on the first run that carried the element before. `instant` now pairs with `DV_DATE_TIME`, our own decision where `DV_DATE_TIME.adoc` lists no `instant`: going into openEHR it is total, and going out of openEHR a `DV_DATE_TIME` that is not a valid `instant` is refused with `LensError::NotAnInstant`, naming the part it lacks (`InstantShortfall`). `FhirKind` and `FhirValue` gain an `Instant` variant, which a consumer matching them exhaustively adds (#1566).
+
 ## [0.0.20] - 2026-11-05
 
 Two steps toward the whole FHIRconnect mapping library. A composition model
@@ -5938,7 +5962,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.20...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.21...HEAD
+[0.0.21]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.20...v0.0.21
 [0.0.20]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.19...v0.0.20
 [0.0.19]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.18...v0.0.19
 [0.0.18]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.17...v0.0.18
