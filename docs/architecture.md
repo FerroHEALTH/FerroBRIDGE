@@ -713,6 +713,19 @@ is silent:**
   unstartable there, refused as an unresolved archetype root. FHIRconnect
   v1.0.0 is silent on how a model's archetype matches a specialising root:
   our own design.
+- A `slotArchetype` may name a model already on its chain (#1551): a CKM
+  medication cluster's constituent is a medication cluster again
+  (`CLUSTER.medication.v2` `at0138`). A program is compiled against the
+  template's nodes, so the recursion is compiled along the template: it
+  descends while the template carries a node, and inside a chain that has
+  entered an archetype again a method whose first unreached step is an
+  archetype root of the chain is left out, since no composition can hold a
+  value there. Any other unreached place is refused. A re-entry at no place
+  below the one the model was entered at can never end, and a chain that
+  enters one model more than `SLOT_DEPTH_LIMIT` (8) times is refused
+  (`fc-slot-depth`); the engine holds the same limit as a backstop.
+  FHIRconnect v1.0.0 is silent on a recursive slot (`SlotArchetypes.adoc`):
+  our own design.
 - The version selectors the specification lacks (which `metadata.version` of a
   name loads; `spec.openEhrConfig.revision` against the OPT; `profile.version`
   against the instance; `template.sem_ver` against the OPT) are a refusal at
@@ -2998,6 +3011,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | FHIR path handling | own bidirectional path model over the `Value` tree with the element table; every expression classified writable or read-only at load | `with.fhir` is written; `^` is not FHIRPath; no crate writes; the retired connector's reverse path silently wrote nothing | a FHIRPath evaluator (all read-only, heavy) |
 | Engine surface | `$tofhir` and `$toopenehr` per the REST API chapter, at the pinned specification commit, ahead of the facade | the specification's own conformance surface; no CDR needed; an external facade can call it | facade only |
 | openEHR wire | canonical JSON; Web Template built locally from the OPT; FLAT only at the operations edge | canonical is mandatory in ITS-REST; `WebTemplate` does not deserialise; node ids are server-specific; the REST API requires both serialisations | FLAT on the CDR wire; fetching `wt+json` |
+| Recursive slots | a `slotArchetype` may name a model on its chain; compiled along the template, ended where the template stops nesting the chain's archetype, refused past `SLOT_DEPTH_LIMIT` (8) or when the re-entry does not descend (section 4.3, #1551) | the CKM medication cluster nests itself; the template bounds what a composition can hold; FHIRconnect v1.0.0 is silent: our own design | refusing every slot that names a model on the chain; recursing at run time over paths the program never resolved |
 | Composition start on an OPT2 | the template root carries the archetypes its lineage names, kept on the index from the OPT2's `parent_archetype_id` or passed by a caller holding the template source; ids are never rewritten (section 4.3, #1550) | a template and its OPT are specialised (AM Release-2.3.0 AOM2 §3.6.4, §3.6.6); FHIRconnect v1.0.0 is silent: our own design | rewriting the root node id to the parent archetype; refusing composition models against every OPT2 |
 | Template generations | both ADL 1.4 and ADL 2, resolved `adl1.4` then `adl2` on one id, decoded into two OPT types, built into one `WebTemplate` (section 3) | owner requirement 2026-09-12; the Simplified Formats seam is generation-neutral; ITS-REST 1.1.0 serves both | ADL 1.4 only; a second pipeline per generation |
 | ADL 2 fetch form | `Accept: application/json`, AOM2 canonical JSON into `openehr-am`'s `OperationalTemplate` | the server already compiled the OPT2; ADL 2 source would cost the parser, the flattener and a repository | `text/plain` source through `openehr-adl` |

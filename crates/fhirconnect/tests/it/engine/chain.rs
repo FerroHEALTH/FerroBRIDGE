@@ -19,6 +19,7 @@ use fhirconnect::engine::traverse::to_openehr;
 
 use fhirconnect::resolve::program::Program;
 use fhirconnect::resolve::program::ProgramParts;
+use fhirconnect::resolve::program::SLOT_DEPTH_LIMIT;
 use fhirconnect::resolve::program::binding::Pin;
 use fhirconnect::resolve::program::binding::ProfileBinding;
 use fhirconnect::resolve::program::binding::ProfileUrl;
@@ -259,15 +260,17 @@ fn the_same_chain_maps_when_the_required_child_is_carried() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_slot_chain_that_reaches_a_model_twice_refuses() -> Result<(), Box<dyn Error>> {
-    // SlotArchetypes.adoc lets a model mapping call another by name, so a
-    // chain can close on itself; the compiler refuses one and the engine
-    // asserts it rather than recursing.
+fn a_slot_chain_past_the_depth_limit_refuses() -> Result<(), Box<dyn Error>> {
+    // SlotArchetypes.adoc lets a model mapping call another by name, so a chain
+    // may enter one model again; past SLOT_DEPTH_LIMIT the engine refuses
+    // rather than recursing, the backstop of the compiler's own refusal.
     let index = template()?;
     let model = MappingName::new("ferrobridge_diagnose_minimal")?;
-    let inner = Mapping::new(slot_parts(&model, Vec::new()));
-    let outer = Mapping::new(slot_parts(&model, vec![inner]));
-    let program = cyclic_program(&model, vec![outer])?;
+    let mut nested = Mapping::new(slot_parts(&model, Vec::new()));
+    for _ in 0..SLOT_DEPTH_LIMIT {
+        nested = Mapping::new(slot_parts(&model, vec![nested]));
+    }
+    let program = cyclic_program(&model, vec![nested])?;
     let error = to_openehr(
         &program,
         &SCHEMAS,
@@ -277,10 +280,12 @@ fn a_slot_chain_that_reaches_a_model_twice_refuses() -> Result<(), Box<dyn Error
         &defaults(),
         &CallContext::new(),
     )
-    .expect_err("the chain reaches the same model twice");
+    .expect_err("the chain enters the same model past the limit");
+    let message = error.to_string();
     assert!(
-        error.to_string().contains("ferrobridge_diagnose_minimal"),
-        "the refusal names the model the chain reaches again: {error}"
+        message.contains("ferrobridge_diagnose_minimal")
+            && message.contains(&format!("past the limit of {SLOT_DEPTH_LIMIT}")),
+        "the refusal names the model and the limit: {message}"
     );
     Ok(())
 }

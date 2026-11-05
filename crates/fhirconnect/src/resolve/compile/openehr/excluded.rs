@@ -6,6 +6,7 @@
 use core::str::FromStr;
 
 use openehr_mapping_core::index::ResolvedNode;
+use openehr_mapping_core::index::matching::node_id_matches;
 use openehr_mapping_core::path::MappingPath;
 use openehr_mapping_core::position::Located;
 use openehr_rm::v1_2::model;
@@ -150,17 +151,9 @@ impl<'a> Compiler<'a> {
         self.template.at_rm_path(&prefix).ok()
     }
 
-    /// Returns why the template excludes the node `written` names, when it
-    /// does.
-    ///
-    /// The path is anchored and located as [`Compiler::openehr_target`] does,
-    /// with every other outcome left to it, so a path that fails for any other
-    /// reason is refused there with its own diagnostic.
-    pub(in crate::resolve::compile) fn excluded(
-        &self,
-        written: &Located<String>,
-        scope: &Scope,
-    ) -> Option<String> {
+    /// Returns the absolute path `written` names under `scope`, `None` when it
+    /// does not parse or is anchored at no openEHR path.
+    fn anchored(written: &Located<String>, scope: &Scope) -> Option<RmPath> {
         let parsed = MappingPath::from_str(written.value()).ok()?;
         let anchor = match parsed
             .variable()
@@ -175,11 +168,65 @@ impl<'a> Compiler<'a> {
             },
             Some(_) => return None,
         };
-        let resolved = parsed.resolve(&anchor).ok()?;
+        parsed.resolve(&anchor).ok()
+    }
+
+    /// Returns why the template excludes the node `written` names, when it
+    /// does.
+    ///
+    /// The path is anchored and located as [`Compiler::openehr_target`] does,
+    /// with every other outcome left to it, so a path that fails for any other
+    /// reason is refused there with its own diagnostic.
+    pub(in crate::resolve::compile) fn excluded(
+        &self,
+        written: &Located<String>,
+        scope: &Scope,
+    ) -> Option<String> {
+        let resolved = Self::anchored(written, scope)?;
         match self.locate(&resolved) {
             Err(LocateError::Excluded(message)) => Some(message),
             _ => None,
         }
+    }
+
+    /// Returns whether the place `written` names under `scope` lies where the
+    /// template stops nesting one of `archetypes`.
+    ///
+    /// It does when the template carries no node there and the first step it
+    /// carries no node for is an archetype root of one of `archetypes`. Any
+    /// other unreached place, a mistyped code or a wrong attribute, answers
+    /// `false`, so it is refused where [`Compiler::openehr_target`] locates it.
+    pub(in crate::resolve::compile) fn nesting_ends(
+        &self,
+        written: &Located<String>,
+        scope: &Scope,
+        archetypes: &[&str],
+    ) -> bool {
+        let Some(resolved) = Self::anchored(written, scope) else {
+            return false;
+        };
+        if !matches!(self.locate(&resolved), Err(LocateError::Unknown(_))) {
+            return false;
+        }
+        let unreached = (0..resolved.segments.len()).find(|&end| {
+            let prefix = RmPath {
+                absolute: resolved.absolute,
+                segments: resolved.segments.get(..=end).unwrap_or_default().to_vec(),
+            };
+            self.template.at_rm_path(&prefix).is_err()
+                && !self
+                    .interior
+                    .iter()
+                    .any(|interior| names_same_place(&prefix, interior))
+        });
+        unreached
+            .and_then(|end| resolved.segments.get(end))
+            .and_then(|segment| segment.predicate.archetype_node_id.as_deref())
+            .is_some_and(|carried| {
+                archetypes
+                    .iter()
+                    .any(|archetype| node_id_matches(archetype, carried))
+            })
     }
 }
 

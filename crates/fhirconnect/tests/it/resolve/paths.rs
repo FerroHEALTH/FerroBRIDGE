@@ -67,10 +67,13 @@ fn an_archetype_the_slot_does_not_carry_is_refused_naming_both() -> Result<(), B
     Ok(())
 }
 
+/// A model may slot itself (`SlotArchetypes.adoc` names no bar), and the
+/// recursion is refused when the re-entry is at no place below the one the
+/// model was entered at, because it can never end (#1551, our own design).
 #[test]
-fn a_slot_cycle_is_refused_naming_the_chain() -> Result<(), Box<dyn Error>> {
+fn a_slot_that_reenters_its_own_place_is_refused_naming_the_chain() -> Result<(), Box<dyn Error>> {
     let slot = "mappings:\n  - name: \"slot\"\n    with:\n      fhir: \"$resource\"\n      openehr: \"$archetype/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]\"\n    slotArchetype: \"CLUSTER.looping.v2\"\n";
-    let inner = "mappings:\n  - name: \"back\"\n    with:\n      fhir: \"$resource\"\n      openehr: \"$archetype\"\n    slotArchetype: \"EVALUATION.synthetic.v1\"\n";
+    let inner = "mappings:\n  - name: \"again\"\n    with:\n      fhir: \"$resource\"\n      openehr: \"$archetype\"\n    slotArchetype: \"CLUSTER.looping.v2\"\n";
     let files = [
         ("model.yml", start_model(slot)),
         (
@@ -87,10 +90,11 @@ fn a_slot_cycle_is_refused_naming_the_chain() -> Result<(), Box<dyn Error>> {
         ),
     ];
     let diagnostics = refusals(&borrow(&files), "synthetic.context")?;
-    assert_eq!(codes(&diagnostics), vec!["fc-slot-cycle"]);
+    assert_eq!(codes(&diagnostics), vec!["fc-slot-depth"]);
     let message = diagnostics.first().ok_or("one refusal")?.message();
     assert!(
-        message.contains("EVALUATION.synthetic.v1 -> CLUSTER.looping.v2"),
+        message.contains("EVALUATION.synthetic.v1 -> CLUSTER.looping.v2")
+            && message.contains("never ends"),
         "{message}"
     );
     Ok(())

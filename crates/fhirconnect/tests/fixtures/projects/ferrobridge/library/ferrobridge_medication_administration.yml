@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's smallest MedicationAdministration model over the CKM
+# medication ACTION: the one reference the library's
+# model/action/org.openehr/medication.v1.yml writes for the medication, which
+# slots the library's medication cluster. The library's own model does not
+# compile (#101), so this one starts the chain the medication clusters recurse
+# in (#1551).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_medication_administration
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ACTION.medication.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationAdministration
+mappings:
+  - name: medication
+    with:
+      fhir: $resource.medication
+      openehr: $reference
+    reference:
+      resourceType: Medication
+      mappings:
+        - name: medicationReference
+          with:
+            fhir: $fhirRoot
+            openehr: $archetype/description[at0017]/items[openEHR-EHR-CLUSTER.medication.v2]
+          slotArchetype: CLUSTER.medication.v2

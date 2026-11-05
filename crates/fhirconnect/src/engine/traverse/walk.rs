@@ -19,6 +19,7 @@ use crate::engine::rm::RmValue;
 use crate::engine::rm::carried::Carried;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::derive;
+use crate::resolve::program::SLOT_DEPTH_LIMIT;
 use crate::resolve::program::hierarchy::Preprocessor;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::mapping::Method;
@@ -502,10 +503,17 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 ..
             } => {
                 let name = String::from(model.as_str());
-                if self.chain.contains(&name) {
-                    return Err(EngineError::SlotCycle {
+                if self
+                    .chain
+                    .iter()
+                    .filter(|entered| **entered == name)
+                    .count()
+                    >= SLOT_DEPTH_LIMIT
+                {
+                    return Err(EngineError::SlotDepth {
                         chain: self.chain.join(" -> "),
                         model: name,
+                        limit: SLOT_DEPTH_LIMIT,
                     });
                 }
                 let bindings = self.bindings(mapping, parent, inputs)?;

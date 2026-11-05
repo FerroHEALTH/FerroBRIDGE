@@ -201,13 +201,16 @@ pub enum EngineError {
         /// The node the template requires.
         node: String,
     },
-    /// A slot chain reaches a model mapping it already entered.
-    #[error("the slot chain {chain} reaches {model} a second time")]
-    SlotCycle {
+    /// A slot chain enters one model mapping more often than
+    /// [`crate::resolve::program::SLOT_DEPTH_LIMIT`] admits.
+    #[error("the slot chain {chain} enters {model} past the limit of {limit}")]
+    SlotDepth {
         /// The chain as the traversal entered it.
         chain: String,
-        /// The model the chain reaches again.
+        /// The model the chain enters too often.
         model: String,
+        /// The most times one model may stand on a chain.
+        limit: usize,
     },
     /// A registered function did not produce a value.
     #[error("{mapping} could not run the function {code}")]

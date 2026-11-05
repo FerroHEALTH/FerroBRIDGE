@@ -12,6 +12,7 @@
 //! `create_opt` writes an OPT that states no parent.
 
 mod compositions;
+mod medication;
 
 use core::error::Error;
 use std::sync::Arc;
@@ -202,6 +203,7 @@ pub(crate) fn library_chains() -> Result<Vec<crate::support::Chain>, Box<dyn Err
         ),
     ];
     chains.extend(compositions::chains()?);
+    chains.push((medication::FILES, medication::program()?));
     Ok(chains)
 }
 

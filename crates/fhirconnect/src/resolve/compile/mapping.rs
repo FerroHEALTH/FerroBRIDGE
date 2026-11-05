@@ -3,8 +3,11 @@
 
 //! One mapping and its conditions.
 
+use std::collections::BTreeSet;
+
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
+use openehr_mapping_core::header::archetype::ArchetypeId;
 use openehr_mapping_core::header::metadata::MappingType;
 use openehr_mapping_core::position::Position;
 
@@ -31,6 +34,7 @@ use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Derivation;
 use crate::resolve::compile::Scope;
 use crate::resolve::compile::Site;
+use crate::resolve::compile::header::archetype_of;
 use crate::resolve::compile::method::slots_composition;
 use crate::resolve::compile::openehr::walks_below;
 
@@ -47,6 +51,7 @@ impl<'a> Compiler<'a> {
             // parent composition; if its `start` slots a composition model, that mapping is skipped".
             if (scope.nested && slots_composition(node.mapping))
                 || self.ignores_excluded(node, scope)
+                || self.ends_recursion(node, scope)
             {
                 continue;
             }
@@ -54,6 +59,37 @@ impl<'a> Compiler<'a> {
             compiled.push(self.mapping(node, scope, &path));
         }
         compiled
+    }
+
+    /// Returns whether a method ends a recursive slot where the template does.
+    ///
+    /// A slot chain may enter a model already on it
+    /// ([`crate::resolve::program::SLOT_DEPTH_LIMIT`]), and the recursion
+    /// descends while the template carries a node. Inside a chain that has
+    /// entered an archetype again (two models of one archetype, as a
+    /// medication and its substance are, count once each), a method whose
+    /// place lies where the template
+    /// stops nesting an archetype of the chain is where no composition can
+    /// hold a value, so it is left out with everything under it; any other
+    /// place the template does not carry is refused where it stands. No
+    /// specification governs a recursive slot: our own design.
+    fn ends_recursion(&self, node: &Node<'a>, scope: &Scope) -> bool {
+        let archetypes: Vec<&str> = scope
+            .chain
+            .iter()
+            .filter_map(|model| self.set.model(model))
+            .filter_map(archetype_of)
+            .map(ArchetypeId::as_str)
+            .collect();
+        let mut seen = BTreeSet::new();
+        if archetypes.iter().all(|archetype| seen.insert(*archetype)) {
+            return false;
+        }
+        node.mapping
+            .with
+            .as_ref()
+            .and_then(|with| with.openehr.as_ref())
+            .is_some_and(|written| self.nesting_ends(written, scope, &archetypes))
     }
 
     /// Returns whether a mapping method names a node the template excludes,

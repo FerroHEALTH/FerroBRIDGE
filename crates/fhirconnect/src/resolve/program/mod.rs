@@ -40,6 +40,15 @@ use crate::resolve::program::mapping::Method;
 use crate::resolve::program::mapping::render_preprocessor;
 use openehr_mapping_core::party::PartyClass;
 
+/// The most times one model mapping may stand on one slot chain.
+///
+/// A `slotArchetype` may name a model already on its chain, as a medication's
+/// constituent is itself a medication: the recursion descends while the
+/// template carries a node at the slot, ends where it carries none, and is
+/// refused past this depth. FHIRconnect v1.0.0 is silent on a recursive slot
+/// (`types-of-mappings/concept-type/SlotArchetypes.adoc`): our own design.
+pub const SLOT_DEPTH_LIMIT: usize = 8;
+
 /// One compiled context: the immutable program the interpreter runs.
 ///
 /// Nothing mutates a program after [`crate::resolve::compile`] returns it: the
