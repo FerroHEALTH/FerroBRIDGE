@@ -106,7 +106,7 @@ conformance_rows() {
   local rows
   rows="$(sed -n "s/^  '\([a-z0-9-]*\) \([a-z0-9-]*\) conformance_[a-z0-9_]*'\$/\1 \2/p" \
     scripts/checks/conformance.sh)"
-  [ -n "$rows" ] || die "scripts/checks/conformance.sh has no corpus table to read"
+  [[ -n "$rows" ]] || die "scripts/checks/conformance.sh has no corpus table to read"
   printf '%s\n' "$rows"
 }
 
@@ -121,7 +121,7 @@ conformance_packages() {
 corpus_class() {
   local package
   package="$(conformance_rows | awk -v corpus="$1" '$1 == corpus { print $2 }')"
-  if [ -n "$package" ]; then
+  if [[ -n "$package" ]]; then
     echo "only $package"
   else
     echo "packages $(conformance_packages)"
@@ -340,7 +340,7 @@ emit() {
   local flag
   echo "all=$all"
   echo "packages=$packages"
-  if [ -n "$packages" ]; then flag=true; else flag=false; fi
+  if [[ -n "$packages" ]]; then flag=true; else flag=false; fi
   echo "rust=$flag"
   if has "$packages" fhir-types; then flag=true; else flag=false; fi
   echo "fhir_types=$flag"
@@ -351,7 +351,7 @@ emit() {
   if has "$packages" omop-cdm; then flag=true; else flag=false; fi
   echo "sqlx=$flag"
   echo "conformance=$conformance"
-  if [ -n "$e2e" ]; then flag=true; else flag=false; fi
+  if [[ -n "$e2e" ]]; then flag=true; else flag=false; fi
   echo "e2e=$flag"
   echo "e2e_packages=$e2e"
   if has "$packages" ferrobridge-console || has "$packages" ferrobridge-server; then
@@ -367,16 +367,16 @@ emit() {
 # The zero-context diff of the root manifest, and the lockfile at the old or
 # the new end of the change.
 manifest_diff() {
-  if [ "$worktree" = true ]; then
+  if [[ "$worktree" = true ]]; then
     git diff -U0 "$base" -- Cargo.toml
   else
     git diff -U0 "$base" "$head" -- Cargo.toml
   fi
 }
 lock_at() {
-  if [ "$1" = old ]; then
+  if [[ "$1" = old ]]; then
     git show "$base:Cargo.lock"
-  elif [ "$worktree" = true ]; then
+  elif [[ "$worktree" = true ]]; then
     cat Cargo.lock
   else
     git show "$head:Cargo.lock"
@@ -398,7 +398,7 @@ manifest_effect() {
       *) continue ;;
     esac
     name="${line%% = \{ path = \"*}"
-    if [ "$name" = "$line" ] || ! has "$members" "$name"; then
+    if [[ "$name" = "$line" ]] || ! has "$members" "$name"; then
       echo ALL
       return
     fi
@@ -423,9 +423,9 @@ lock_effect() {
   old="$(lock_at old | lock_entries)" || { echo ALL; return; }
   new="$(lock_at new | lock_entries)" || { echo ALL; return; }
   while read -r name version source; do
-    [ -n "$name" ] || continue
+    [[ -n "$name" ]] || continue
     name="${name//\"/}"
-    if [ -n "$source" ] || [ -z "$version" ] || ! has "$members" "$name"; then
+    if [[ -n "$source" ]] || [[ -z "$version" ]] || ! has "$members" "$name"; then
       echo ALL
       return
     fi
@@ -447,15 +447,15 @@ affected_of() {
   # the pipe on a long list and fail its writer with SIGPIPE under pipefail.
   paths="$(cat)"
   while IFS= read -r path; do
-    [ -n "$path" ] || continue
+    [[ -n "$path" ]] || continue
     class="$(classify "$path")"
     case "$class" in
       inert) ;;
-      ci) if [ "$local_mode" = false ]; then everything "$path"; return; fi ;;
+      ci) if [[ "$local_mode" = false ]]; then everything "$path"; return; fi ;;
       global) everything "$path"; return ;;
       manifest | lock)
-        if [ "$class" = manifest ]; then effect="$(manifest_effect "$graph")"; else effect="$(lock_effect "$graph")"; fi
-        if [ "$effect" = ALL ]; then everything "$path"; return; fi
+        if [[ "$class" = manifest ]]; then effect="$(manifest_effect "$graph")"; else effect="$(lock_effect "$graph")"; fi
+        if [[ "$effect" = ALL ]]; then everything "$path"; return; fi
         seeds+=" $effect"
         ;;
       packages\ *) seeds+=" ${class#packages }" ;;
@@ -463,10 +463,10 @@ affected_of() {
       member) members+="$path"$'\n' ;;
     esac
   done <<<"$paths"
-  if [ -n "$members" ]; then
+  if [[ -n "$members" ]]; then
     local owner
     while IFS= read -r owner; do
-      if [ "$owner" = orphan ]; then everything "an orphan path under crates/, app/ or tools/"; return; fi
+      if [[ "$owner" = orphan ]]; then everything "an orphan path under crates/, app/ or tools/"; return; fi
       seeds+=" $owner"
     done < <(printf '%s' "$members" | owners "$graph")
   fi
@@ -491,14 +491,14 @@ self_test() {
     got="$(printf '%s\n' "$2" | affected_of "$graph" "$3" 2>/dev/null)"
     case "$4" in
       ALL | "")
-        if [ "$got" != "$4" ]; then
+        if [[ "$got" != "$4" ]]; then
           echo "self-test: $1: expected '$4', got '$got'" >&2
           failures=$((failures + 1))
         fi
         return
         ;;
     esac
-    if [ "$got" = ALL ]; then
+    if [[ "$got" = ALL ]]; then
       echo "self-test: $1: expected '$4', got ALL" >&2
       failures=$((failures + 1))
       return
@@ -515,7 +515,7 @@ self_test() {
   # The manifest and lockfile readers answer from these instead of git.
   local diff_text="" lock_old="" lock_new=""
   manifest_diff() { printf '%s\n' "$diff_text"; }
-  lock_at() { if [ "$1" = old ]; then printf '%s\n' "$lock_old"; else printf '%s\n' "$lock_new"; fi; }
+  lock_at() { if [[ "$1" = old ]]; then printf '%s\n' "$lock_old"; else printf '%s\n' "$lock_new"; fi; }
   local q='"'
   # The versions below are synthetic (9.9.x for a member, 8.8.x for a
   # third-party crate), never a live pin.
@@ -653,7 +653,7 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   for kind in test_weight:"$TEST_SHARDS" lint_weight:"$LINT_SHARDS"; do
     listed="$(matrix "$graph" "$all_members" "${kind#*:}" "${kind%%:*}" |
       jq -r '[.include[].packages | split(" ")[]] | sort | join(" ")')"
-    if [ "$listed" != "$(tr ' ' '\n' <<<"$all_members" | sort | tr '\n' ' ' | sed 's/ $//')" ]; then
+    if [[ "$listed" != "$(tr ' ' '\n' <<<"$all_members" | sort | tr '\n' ' ' | sed 's/ $//')" ]]; then
       echo "self-test: the ${kind%%:*} matrix does not hold every member once: $listed" >&2
       failures=$((failures + 1))
     fi
@@ -691,7 +691,7 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     echo "self-test: an ignored file was read: '$read_lines'" >&2
     failures=$((failures + 1))
   fi
-  if [ "$failures" -ne 0 ]; then
+  if [[ "$failures" -ne 0 ]]; then
     die "self-test: $failures check(s) failed"
   fi
   echo "affected: self-test passed"
@@ -703,10 +703,10 @@ head=HEAD
 worktree=false
 local_mode=false
 all=false
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
   case "$1" in
-    --base) [ $# -ge 2 ] || usage; base="$2"; shift 2 ;;
-    --head) [ $# -ge 2 ] || usage; head="$2"; shift 2 ;;
+    --base) [[ $# -ge 2 ]] || usage; base="$2"; shift 2 ;;
+    --head) [[ $# -ge 2 ]] || usage; head="$2"; shift 2 ;;
     --worktree) worktree=true; shift ;;
     --local) local_mode=true; shift ;;
     --all) all=true; shift ;;
@@ -717,19 +717,19 @@ done
 
 command -v jq >/dev/null 2>&1 || die "jq is not installed"
 graph="$(graph)"
-if [ "$all" = true ]; then
+if [[ "$all" = true ]]; then
   emit "$graph" true "$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
   exit 0
 fi
-[ -n "$base" ] || usage
+[[ -n "$base" ]] || usage
 
-if [ "$worktree" = true ]; then
+if [[ "$worktree" = true ]]; then
   changed="$(git diff --name-only "$base" -- && git ls-files --others --exclude-standard)"
 else
   changed="$(git diff --name-only "$base" "$head" --)"
 fi
 packages="$(printf '%s\n' "$changed" | affected_of "$graph" "$local_mode")"
-if [ "$packages" = ALL ]; then
+if [[ "$packages" = ALL ]]; then
   emit "$graph" true "$(jq -r '[.members[].name] | join(" ")' <<<"$graph")"
 else
   emit "$graph" false "$packages"

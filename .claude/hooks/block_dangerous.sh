@@ -160,7 +160,7 @@ collect_mktemp() {
 # Succeeds when $1, the part of a path under a temporary root, names
 # something below that root: not empty, no . or .. step, no leading glob.
 safe_rest() {
-  [ -n "$1" ] || return 1
+  [[ -n "$1" ]] || return 1
   [[ "/$1/" == */../* || "/$1/" == */./* ]] && return 1
   case "$1" in [*?[]*) return 1 ;; esac
   return 0
@@ -178,7 +178,7 @@ allowed_target() {
       [[ "$rest/" != */../* ]]
       return
     fi
-    if [ "$name" = TMPDIR ]; then
+    if [[ "$name" = TMPDIR ]]; then
       safe_rest "${rest#/}"
       return
     fi
@@ -190,7 +190,7 @@ allowed_target() {
   done
   local -a prefixes=(/tmp /private/tmp)
   p="${tmp_root%/}"
-  if [ -n "$p" ]; then
+  if [[ -n "$p" ]]; then
     prefixes+=("$p")
     [[ "$p" == /var/* ]] && prefixes+=("/private$p")
   fi
@@ -227,7 +227,7 @@ judge_rm() {
   local recursive=0 force=0 options=1 t
   local -a targets=()
   for t in "$@"; do
-    if [ "$options" -eq 1 ]; then
+    if [[ "$options" -eq 1 ]]; then
       case "$t" in
         --) options=0 && continue ;;
         --recursive) recursive=1 && continue ;;
@@ -243,10 +243,10 @@ judge_rm() {
     targets+=("$t")
   done
   check_protected "${targets[@]+"${targets[@]}"}" || return $?
-  if [ "$recursive" -eq 0 ] || [ "$force" -eq 0 ]; then
+  if [[ "$recursive" -eq 0 ]] || [[ "$force" -eq 0 ]]; then
     return 0
   fi
-  if [ "${#targets[@]}" -eq 0 ]; then
+  if [[ "${#targets[@]}" -eq 0 ]]; then
     echo "BLOCKED: a recursive forced delete must name its targets (block_dangerous hook)."
     return 2
   fi
@@ -265,7 +265,7 @@ judge_rm() {
 judge_command() {
   local -a w=("$@")
   local n=$# i=0 j word base
-  while [ "$i" -lt "$n" ]; do
+  while [[ "$i" -lt "$n" ]]; do
     word="${w[$i]}"
     case "$word" in
       '!' | '{' | '}' | then | do | else | elif | if | while | until | time | command | builtin | exec | nohup)
@@ -273,13 +273,13 @@ judge_command() {
         ;;
       sudo | doas | env | nice | xargs | timeout)
         i=$((i + 1))
-        while [ "$i" -lt "$n" ] && [[ "${w[$i]}" == -* || "${w[$i]}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do
+        while [[ "$i" -lt "$n" ]] && [[ "${w[$i]}" == -* || "${w[$i]}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do
           case "${w[$i]}" in
             -n | -P | -I | -L | -s | -d | -E | -u | -g | -C | -a | -k) i=$((i + 2)) ;;
             *) i=$((i + 1)) ;;
           esac
         done
-        [ "$word" = timeout ] && i=$((i + 1))
+        [[ "$word" = timeout ]] && i=$((i + 1))
         ;;
       *)
         [[ "$word" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || break
@@ -287,7 +287,7 @@ judge_command() {
         ;;
     esac
   done
-  [ "$i" -lt "$n" ] || return 0
+  [[ "$i" -lt "$n" ]] || return 0
   word="${w[$i]#\\}"
   base="${word##*/}"
   j=$((i + 1))
@@ -296,21 +296,21 @@ judge_command() {
       judge_rm "${w[@]:$j}" || return $?
       ;;
     git)
-      while [ "$j" -lt "$n" ] && [[ "${w[$j]}" == -* ]]; do
+      while [[ "$j" -lt "$n" ]] && [[ "${w[$j]}" == -* ]]; do
         case "${w[$j]}" in
           -C | -c) j=$((j + 2)) ;;
           *) j=$((j + 1)) ;;
         esac
       done
-      if [ "$j" -lt "$n" ] && [ "${w[$j]}" = rm ]; then
+      if [[ "$j" -lt "$n" ]] && [[ "${w[$j]}" = rm ]]; then
         check_protected "${w[@]:$((j + 1))}" || return $?
       fi
-      if [ "$j" -lt "$n" ] && [ "${w[$j]}" = push ]; then
+      if [[ "$j" -lt "$n" ]] && [[ "${w[$j]}" = push ]]; then
         check_push "${w[@]:$((j + 1))}" || return $?
       fi
       ;;
     trap)
-      if [ "$j" -lt "$n" ]; then
+      if [[ "$j" -lt "$n" ]]; then
         judge_string "${w[$j]}" || return $?
       fi
       ;;
@@ -318,8 +318,8 @@ judge_command() {
       judge_string "${w[*]:$j}" || return $?
       ;;
     bash | sh | zsh | dash | ksh)
-      while [ "$j" -lt "$n" ]; do
-        if [[ "${w[$j]}" =~ ^-[a-zA-Z]*c[a-zA-Z]*$ ]] && [ $((j + 1)) -lt "$n" ]; then
+      while [[ "$j" -lt "$n" ]]; do
+        if [[ "${w[$j]}" =~ ^-[a-zA-Z]*c[a-zA-Z]*$ ]] && [[ $((j + 1)) -lt "$n" ]]; then
           judge_string "${w[$((j + 1))]}" || return $?
           break
         fi
@@ -327,12 +327,12 @@ judge_command() {
       done
       ;;
     find)
-      while [ "$j" -lt "$n" ]; do
+      while [[ "$j" -lt "$n" ]]; do
         case "${w[$j]}" in
           -exec | -execdir | -ok | -okdir)
             local start=$((j + 1))
             j=$start
-            while [ "$j" -lt "$n" ] && [ "${w[$j]}" != ';' ] && [ "${w[$j]}" != '+' ]; do
+            while [[ "$j" -lt "$n" ]] && [[ "${w[$j]}" != ';' ]] && [[ "${w[$j]}" != '+' ]]; do
               j=$((j + 1))
             done
             judge_command "${w[@]:$start:$((j - start))}" || return $?
@@ -387,7 +387,7 @@ check_push() {
       *) refs+=("$word") ;;
     esac
   done
-  [ "$force" -eq 1 ] || return 0
+  [[ "$force" -eq 1 ]] || return 0
 
   for ref in "${refs[@]+"${refs[@]}"}"; do
     dst="${ref##*:}"
@@ -400,7 +400,7 @@ check_push() {
     esac
     [[ "$dst" =~ ^($BRANCH_TYPES)/ ]] && named=1
   done
-  if [ "$named" -eq 0 ]; then
+  if [[ "$named" -eq 0 ]]; then
     echo "BLOCKED: bare force-push refused. Force-push (prefer --force-with-lease) only an explicit conventional-type branch (feat/, fix/, chore/, docs/, refactor/, perf/, test/, ci/, build/, release/)."
     return 2
   fi
@@ -420,12 +420,12 @@ self_test() {
   repo_roots=(/tmp/ferro-repo)
   tmp_root=/var/folders/ab/T/
   while IFS=$'\t' read -r expected cmd; do
-    [ -n "$expected" ] || continue
+    [[ -n "$expected" ]] || continue
     count=$((count + 1))
     cmd="${cmd//\\n/$'\n'}"
     got=0
     verdict "$cmd" > /dev/null || got=$?
-    if [ "$got" != "$expected" ]; then
+    if [[ "$got" != "$expected" ]]; then
       echo "block_dangerous: FAIL: expected $expected, got $got: $cmd" >&2
       failed=1
     fi
@@ -519,13 +519,13 @@ self_test() {
 0	git commit -m "fix: refuse rm -rf build"
 0	rm -r build
 CASES
-  if [ "$failed" -ne 0 ]; then
+  if [[ "$failed" -ne 0 ]]; then
     exit 1
   fi
   echo "block_dangerous: self-test OK ($count cases)."
 }
 
-if [ "${1:-}" = "--self-test" ]; then
+if [[ "${1:-}" = "--self-test" ]]; then
   self_test
   exit 0
 fi
@@ -537,18 +537,18 @@ if command -v jq > /dev/null 2>&1; then
 else
   cmd="$payload"
 fi
-[ -n "${cmd:-}" ] || exit 0
+[[ -n "${cmd:-}" ]] || exit 0
 
 for dir in "${CLAUDE_PROJECT_DIR:-}" "$PWD"; do
-  [ -n "$dir" ] || continue
+  [[ -n "$dir" ]] || continue
   while IFS= read -r root; do
-    [ -n "$root" ] && repo_roots+=("$root")
+    [[ -n "$root" ]] && repo_roots+=("$root")
   done < <(git -C "$dir" rev-parse --path-format=absolute --show-toplevel --git-common-dir 2> /dev/null | sed 's#/\.git$##' || true)
 done
 
 status=0
 reason="$(verdict "$cmd")" || status=$?
-if [ "$status" -ne 0 ]; then
+if [[ "$status" -ne 0 ]]; then
   echo "$reason" >&2
   exit 2
 fi

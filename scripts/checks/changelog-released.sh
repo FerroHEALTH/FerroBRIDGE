@@ -37,7 +37,7 @@ section() {
 
 # 0 when version $1 is at or after FIRST_CHECKED.
 checked() {
-  [ "$(printf '%s\n%s\n' "$FIRST_CHECKED" "$1" | sort -V | head -n1)" = "$FIRST_CHECKED" ]
+  [[ "$(printf '%s\n%s\n' "$FIRST_CHECKED" "$1" | sort -V | head -n1)" = "$FIRST_CHECKED" ]]
 }
 
 fail=0
@@ -50,10 +50,10 @@ while IFS= read -r v; do
   if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
     rc=0
     git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1 || rc=$?
-    if [ "$rc" = 2 ]; then
+    if [[ "$rc" = 2 ]]; then
       echo "  $tag: not tagged yet, skipped"
       continue
-    elif [ "$rc" != 0 ]; then
+    elif [[ "$rc" != 0 ]]; then
       echo "  DRIFT: cannot ask origin for $tag (git ls-remote exit $rc)" >&2
       fail=1
       continue
@@ -76,7 +76,7 @@ while IFS= read -r v; do
   fi
 done < <(sed -nE 's/^## \[([0-9]+\.[0-9]+\.[0-9]+)\].*/\1/p' CHANGELOG.md)
 
-if [ "$fail" != 0 ]; then
+if [[ "$fail" != 0 ]]; then
   echo "changelog-released: a released section changed after its tag; move the entry to [Unreleased]" >&2
   exit 1
 fi

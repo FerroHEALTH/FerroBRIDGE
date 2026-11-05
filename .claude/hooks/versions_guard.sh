@@ -19,17 +19,17 @@ else
   file_path="$(printf '%s' "$payload" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
 fi
 
-[ -n "${file_path:-}" ] || exit 0
+[[ -n "${file_path:-}" ]] || exit 0
 
 # shellcheck source=.claude/hooks/lib/target.sh
 . "$(dirname "$0")/lib/target.sh"
 
 # An edit of a file in another repository is not this hook's (lib/target.sh);
 # a file of this repository is judged in its own checkout.
-[ -n "${file_path:-}" ] || exit 0
+[[ -n "${file_path:-}" ]] || exit 0
 in_this_repository "$(dirname "$file_path")" || exit 0
 repo_root="$(toplevel_of "$(dirname "$file_path")")"
-[ -n "$repo_root" ] || exit 0
+[[ -n "$repo_root" ]] || exit 0
 rel="${file_path#"$repo_root"/}"
 base="$(basename "$file_path")"
 
@@ -41,8 +41,8 @@ case "$base" in
 VERSIONS.md | architecture.md | LICENSE | NOTICE | rust-toolchain.toml | CITATION.cff | compose.yaml | README.md | Dockerfile) watched=1 ;;
 esac
 
-[ "$watched" -eq 1 ] || exit 0
-[ -x "$repo_root/scripts/checks/versions.sh" ] || exit 0
+[[ "$watched" -eq 1 ]] || exit 0
+[[ -x "$repo_root/scripts/checks/versions.sh" ]] || exit 0
 
 findings="$("$repo_root/scripts/checks/versions.sh" 2>&1)" || {
   printf '%s\n' "$findings" >&2

@@ -18,7 +18,7 @@ hook_repo_root() {
 # The absolute git common directory of the checkout holding directory $1, or
 # nothing when $1 is in no checkout. Worktrees of one repository share it.
 common_dir_of() {
-  [ -d "$1" ] || return 0
+  [[ -d "$1" ]] || return 0
   git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true
 }
 
@@ -27,7 +27,7 @@ in_this_repository() {
   local ours theirs
   ours="$(common_dir_of "$(hook_repo_root)")"
   theirs="$(common_dir_of "$1")"
-  [ -n "$ours" ] && [ "$ours" = "$theirs" ]
+  [[ -n "$ours" ]] && [[ "$ours" = "$theirs" ]]
 }
 
 # The top-level directory of the checkout holding directory $1.
@@ -48,10 +48,10 @@ expand_path() {
   while [[ "$path" =~ \$\{?([A-Za-z_][A-Za-z0-9_]*)\}? ]]; do
     name="${BASH_REMATCH[1]}"
     value="$(printf '%s\n' "$text" | sed -nE "s/(^|[;&|[:space:]])${name}=(\"([^\"]*)\"|'([^']*)'|([^[:space:];&|]*)).*/\3\4\5/p" | head -n1)"
-    if [ -z "$value" ]; then
+    if [[ -z "$value" ]]; then
       value="${!name:-}"
     fi
-    [ -n "$value" ] || return 0
+    [[ -n "$value" ]] || return 0
     path="${path/"${BASH_REMATCH[0]}"/$value}"
   done
   printf '%s\n' "$path"
@@ -74,7 +74,7 @@ command_target_dir() {
   dir="${dir#[\"\']}"
   dir="${dir%[\"\']}"
   dir="$(expand_path "$dir" "$text")"
-  [ -n "$dir" ] || return 0
+  [[ -n "$dir" ]] || return 0
   case "$dir" in
   /*) ;;
   *) dir="$cwd/$dir" ;;

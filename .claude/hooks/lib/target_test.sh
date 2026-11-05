@@ -40,7 +40,7 @@ failures=0
 expect() {
   local got=0
   CLAUDE_PROJECT_DIR="$work/ours" bash "$hooks/$1" <<<"$3" >/dev/null 2>&1 || got=$?
-  if [ "$got" -ne "$2" ]; then
+  if [[ "$got" -ne "$2" ]]; then
     echo "FAIL: $1 exited $got, want $2, for: $3" >&2
     failures=$((failures + 1))
   fi
@@ -85,12 +85,12 @@ recorded() {
   CLAUDE_PROJECT_DIR="$merge" bash "$hooks/$g" <<<"$(bash_call 'git commit -m x' "$merge")" >/dev/null 2>&1 || true
   cat "$work/base" 2>/dev/null || echo none
 }
-if [ "$(recorded)" != "$fork" ]; then
+if [[ "$(recorded)" != "$fork" ]]; then
   echo "FAIL: $g judged a commit outside a merge against $(recorded), want the merge base $fork" >&2
   failures=$((failures + 1))
 fi
 gitm merge -q origin/main >/dev/null 2>&1 || true
-if [ "$(recorded)" != "$main" ]; then
+if [[ "$(recorded)" != "$main" ]]; then
   echo "FAIL: $g judged a merge of main against $(recorded), want main itself $main" >&2
   failures=$((failures + 1))
 fi
@@ -107,7 +107,7 @@ expect versions_guard.sh 0 "$(edit_call "$work/theirs/README.md")"
 expect rust_fmt_clippy.sh 2 "$(edit_call "$work/ours/lib.rs")"
 expect rust_fmt_clippy.sh 0 "$(edit_call "$work/theirs/lib.rs")"
 
-if [ "$failures" -ne 0 ]; then
+if [[ "$failures" -ne 0 ]]; then
   echo "target_test: $failures case(s) failed" >&2
   exit 1
 fi

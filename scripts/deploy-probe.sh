@@ -81,7 +81,7 @@ request() {
   local method="$1" path="$2"
   shift 2
   local args=(-s -o "$WORK/body" -w '%{http_code}' --max-time "$TIMEOUT" -X "$method")
-  if [ -n "$TOKEN_FILE" ] && [ "${path#/fhir}" != "$path" ]; then
+  if [[ -n "$TOKEN_FILE" ]] && [[ "${path#/fhir}" != "$path" ]]; then
     args+=(-H "Authorization: Bearer $(tr -d '\r\n' < "$TOKEN_FILE")")
   fi
   : > "$WORK/body"
@@ -100,7 +100,7 @@ common() {
   case "$code" in
     000) echo "uncovered no HTTP answer within ${TIMEOUT}s" ;;
     401 | 403)
-      if [ -n "$TOKEN_FILE" ]; then
+      if [[ -n "$TOKEN_FILE" ]]; then
         echo "failing $code with the token supplied"
       else
         echo "uncovered $code: the lane is guarded and no token was supplied"
@@ -199,7 +199,7 @@ report() {
     finding="$(lane_finding "$lane")"
     want="$(expected_of "$lane")"
     printf '  %-11s %s' "$lane" "$finding"
-    [ -n "$want" ] && [ "$want" != "$finding" ] && printf '  (expected %s)' "$want"
+    [[ -n "$want" ]] && [[ "$want" != "$finding" ]] && printf '  (expected %s)' "$want"
     printf '\n'
     printf '%s' "$ROWS" | awk -F'\t' -v l="$lane" \
       '$1 == l { printf "      %-9s %-26s %s\n", $2, $3, $4 }'
@@ -208,12 +208,12 @@ report() {
       uncovered) any_uncovered=1 ;;
       *) ;;
     esac
-    if [ -n "$want" ] && [ "$want" != "$finding" ]; then
+    if [[ -n "$want" ]] && [[ "$want" != "$finding" ]]; then
       status=1
     fi
     unseen=""
     for f in $FINDINGS; do
-      [ "$f" = "$finding" ] || unseen="$unseen${unseen:+, }$f"
+      [[ "$f" = "$finding" ]] || unseen="$unseen${unseen:+, }$f"
     done
     json_lanes="$json_lanes${json_lanes:+,}{\"lane\":\"$lane\",\"finding\":\"$finding\",\"expected\":\"$want\",\"not_observed\":\"$unseen\",\"probes\":[$(probe_json "$lane")]}"
   done
@@ -222,14 +222,14 @@ report() {
     finding="$(lane_finding "$lane")"
     unseen=""
     for f in $FINDINGS; do
-      [ "$f" = "$finding" ] || unseen="$unseen${unseen:+, }$f"
+      [[ "$f" = "$finding" ]] || unseen="$unseen${unseen:+, }$f"
     done
     printf '    %-11s %s\n' "$lane" "$unseen"
   done
-  if [ "$status" -eq 0 ] && [ "$any_uncovered" -eq 1 ]; then
+  if [[ "$status" -eq 0 ]] && [[ "$any_uncovered" -eq 1 ]]; then
     status=3
   fi
-  if [ -n "$JSON_OUT" ]; then
+  if [[ -n "$JSON_OUT" ]]; then
     printf '{"base":"%s","exit":%d,"lanes":[%s]}\n' \
       "$(json_string "$BASE")" "$status" "$json_lanes" > "$JSON_OUT"
   fi
@@ -244,8 +244,8 @@ report() {
 probe_json() {
   local first=1 l f p e
   while IFS=$'\t' read -r l f p e; do
-    [ "$l" = "$1" ] || continue
-    [ "$first" -eq 1 ] || printf ','
+    [[ "$l" = "$1" ]] || continue
+    [[ "$first" -eq 1 ]] || printf ','
     first=0
     printf '{"probe":"%s","finding":"%s","evidence":"%s"}' \
       "$(json_string "$p")" "$f" "$(json_string "$e")"
@@ -320,19 +320,19 @@ GET /health/info 200 {}'
     local name="$1" code="$2" needle="$3" routes="$4" rc=0
     shift 4
     local envs=()
-    while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
+    while [[ "$#" -gt 0 ]] && [[ "$1" != "--" ]]; do
       envs+=("$1")
       shift
     done
-    [ "$#" -gt 0 ] && shift
+    [[ "$#" -gt 0 ]] && shift
     env PATH="$stub:$PATH" STUB_ROUTES="$routes" "${envs[@]}" \
       bash "$0" "$@" > "$work/out" 2> "$work/err" || rc=$?
-    if [ "$rc" -ne "$code" ]; then
+    if [[ "$rc" -ne "$code" ]]; then
       echo "deploy-probe: self-test failed: $name exited $rc, wanted $code." >&2
       cat "$work/out" "$work/err" >&2
       exit 1
     fi
-    if [ -n "$needle" ] && ! grep -qE -- "$needle" "$work/out"; then
+    if [[ -n "$needle" ]] && ! grep -qE -- "$needle" "$work/out"; then
       echo "deploy-probe: self-test failed: $name did not say '$needle'." >&2
       cat "$work/out" "$work/err" >&2
       exit 1
@@ -402,15 +402,15 @@ $ops_on" STUB_X=0 -- --json "$work/record.json" http://bridge.test
   echo "deploy-probe: self-test OK."
 }
 
-if [ "$#" -eq 1 ] && [ "$1" = "--self-test" ]; then
+if [[ "$#" -eq 1 ]] && [[ "$1" = "--self-test" ]]; then
   self_test
   exit 0
 fi
 
-while [ "$#" -gt 0 ]; do
+while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --expect)
-      [ "$#" -ge 2 ] || usage
+      [[ "$#" -ge 2 ]] || usage
       case "$2" in
         health=on | health=off | facade=on | facade=off | operations=on | operations=off) ;;
         *) die "--expect takes <health|facade|operations>=<on|off>, not '$2'" ;;
@@ -419,31 +419,31 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --json)
-      [ "$#" -ge 2 ] || usage
+      [[ "$#" -ge 2 ]] || usage
       JSON_OUT="$2"
       shift 2
       ;;
     --token-file)
-      [ "$#" -ge 2 ] || usage
-      [ -r "$2" ] || die "cannot read the token file '$2'"
+      [[ "$#" -ge 2 ]] || usage
+      [[ -r "$2" ]] || die "cannot read the token file '$2'"
       TOKEN_FILE="$2"
       shift 2
       ;;
     --timeout)
-      [ "$#" -ge 2 ] || usage
+      [[ "$#" -ge 2 ]] || usage
       case "$2" in '' | *[!0-9]*) die "--timeout takes whole seconds, not '$2'" ;; *) ;; esac
       TIMEOUT="$2"
       shift 2
       ;;
     http://* | https://*)
-      [ -z "$BASE" ] || usage
+      [[ -z "$BASE" ]] || usage
       BASE="${1%/}"
       shift
       ;;
     *) usage ;;
   esac
 done
-[ -n "$BASE" ] || usage
+[[ -n "$BASE" ]] || usage
 command -v curl > /dev/null 2>&1 || die "curl is not installed"
 
 run
