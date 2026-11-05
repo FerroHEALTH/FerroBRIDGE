@@ -537,7 +537,8 @@ to the catalogs therefore leaves the baseline alone, and two such pull requests
 never conflict on it. `.github/workflows/ratchet-tighten.yml` writes the fall
 down instead: once a day and on dispatch it checks that nothing rose on `main`,
 runs the guard's `--update`, and opens one pull request that holds only the
-baseline, or moves its open one; when nothing fell it does nothing. It commits
+baseline, or moves its open one; when nothing fell it closes that pull
+request or deletes a branch no pull request was opened from (#1593). It commits
 through the Git Data REST API, so GitHub signs the commit, and it never pushes
 to `main`. A pull request opened with the workflow token starts no checks, so
 the lane reads a `RATCHET_TIGHTEN_TOKEN` secret (a token with contents and
