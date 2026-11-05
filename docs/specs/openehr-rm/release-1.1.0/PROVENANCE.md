@@ -1,11 +1,14 @@
 <!-- This file describes vendored third-party material; the bytes beside it
      keep their upstream licence, not the licence of this repository. -->
 
-# Provenance: the openEHR Reference Model class definitions
+# Provenance: the openEHR Reference Model class definitions, Release 1.1.0
 
 Vendored verbatim by `scripts/vendor/openehr-rm.sh`. Never edit a file
 here: change the pin in docs/VERSIONS.md and re-run the script.
 
+- Generation: the released RM 1.1.0, FerroEHR's `spec_profile = "stable"`
+  and its generated `openehr_rm::v1_1`. The development generation is
+  vendored beside this tree in `../development/`.
 - Source: <https://github.com/openEHR/specifications-RM>, published at
   <https://specifications.openehr.org/releases/RM/Release-1.1.0/>
 - Pin: tag `Release-1.1.0`, which resolves to commit `355eb63e201c6b805c44c8809c70d63f79d54f92`; the
@@ -13,9 +16,9 @@ here: change the pin in docs/VERSIONS.md and re-run the script.
 - Fetched: 2026-11-05, each file from raw.githubusercontent.com at the commit
   and checked against the git blob id the commit records
 - Upstream licence: Creative Commons Attribution-ShareAlike 3.0 Unported,
-  the repository's `LICENSE` file, vendored beside this file. The files
-  are unmodified.
-- Layout: the upstream paths, unchanged
+  the repository's `LICENSE` file at the commit, vendored beside this
+  file. The files are unmodified.
+- Layout: the upstream paths of the commit, unchanged
 - Files: 6
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
   `PROVENANCE.md` excluded): `d3eddc481eac97288500fde9b9911e01fa1239e7c44856a67eb7eae6710f48fc`
