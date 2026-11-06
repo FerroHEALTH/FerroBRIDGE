@@ -36,15 +36,16 @@ has every change of every release.
 | [v0.0.19](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.19) | 2026-11-04 | Family upkeep: the server and the operator console on `ferrohealth-config` 0.2.8, `ferrohealth-server` 0.4.3 and `ferrohealth-telemetry` 0.2.4, both binaries on the FerroSYS run path, and the FerroHEALTH family crates moved together by one daily Dependabot group. The `eehrxf` EPS project lists its immunisations context beside the medication summary. |
 | [v0.0.20](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.20) | 2026-11-05 | Toward the FHIRconnect mapping library: a composition model starts a context compiled against an ADL 2 operational template through the lineage of its root, a `slotArchetype` may name a model already on its slot chain, and the `eehrxf` laboratory project lists its composition context beside the laboratory result. |
 | [v0.0.21](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.21) | 2026-11-05 | Correctness on the way to the FHIRconnect mapping library: a template over a specialised ADL 1.4 composition archetype carries one `context`, and the compiler refuses at load a mapping whose types no data-type page pairs and a `reference` into an untyped choice, which failed only on their first run before. |
+| [v0.0.22](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.22) | 2026-11-06 | Callers by kind: the bridge on `ferrohealth-smart` 0.9.0, every trusted issuer an `[[auth.issuer]]` table with its `kind` and profile, Basic credentials for people only, and `ferrobridge-term` released on the new token types. The `eehrxf` discharge and imaging reports mapped between openEHR and HL7 Europe and received, and a validator that holds a dependency of another FHIR release. |
 
 ## Next
 
-The milestones after v0.0.21, each one theme:
+The milestones after v0.0.22, each one theme:
 
-1. **v0.0.22, the mapping library and the remaining categories.** Every
-   mapping of the published FHIRconnect library passing, the discharge and
-   imaging categories mapped from openEHR once their templates are
-   published, and the patient summary re-checked against the adopted
+1. **v0.0.23, the request under its person.** Each facade request reaches
+   the CDR under a token exchanged for its caller, every mapping of the
+   published FHIRconnect library passing, the required document sections
+   held at assembly, and the patient summary re-checked against the adopted
    Art 15(1) act.
 
 ## How correctness is measured

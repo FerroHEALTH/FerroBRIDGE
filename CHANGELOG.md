@@ -25,6 +25,149 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.22] - 2026-11-06
+
+Callers by kind. The bridge moves to `ferrohealth-smart` 0.9.0 with
+`ferrohealth-session` 0.3.0 and FerroAUDIT 0.4.0: every trusted issuer is an
+`[[auth.issuer]]` table that names its `kind` and profile, a Basic
+credential is always a person's, and the audit line names the caller's
+kind. The configuration changes break: each entry below carries its upgrade
+step, and `config check` names the key to move. `ferrobridge-term` 0.1.143
+requires `ferrohealth-smart` 0.9.0, so a consumer moves both in one change;
+`eehrxf` 0.1.167, `ferrobridge-hl7v2` 0.1.186 and `ferrobridge-validator`
+0.1.149 follow it. `eehrxf` maps discharge and imaging reports between
+openEHR and HL7 Europe and receives both, and `ferrobridge-validator` holds
+a dependency of another FHIR release, which adds a `ResolveError` variant.
+A FHIRconnect mapping below a repeating anchor may name a node outside it.
+
+### Added
+
+- `eehrxf` maps discharge reports between openEHR and HL7 Europe Hospital
+  Discharge Report 1.0.0 through the shipped `HDR` project (features
+  `openehr` and `discharge`), over FerroBRIDGE's discharge report template,
+  a transfer of care summary over published CKM archetypes. The composition
+  maps to `composition-eu-hdr`, its context to the `encounter-eu-hdr` of the
+  stay, and each problem or diagnosis, procedure and medication order of its
+  three sections to a `condition-eu-core`, `procedure-eu-core` or
+  `medicationRequest-eu-core` entry of the section of the same name, with
+  one `Provenance` per run. `Document::with_mapped_composition` takes the
+  run into a `bundle-eu-hdr`, answering each mapped section placed in the
+  form's slot as a `MappedSection`, and `Mapping::to_openehr` maps a
+  received discharge report into one composition of the template.
+  `scripts/vendor/ckm-discharge.sh` vendors the three archetypes the
+  template adds to the CKM medication set (#1325).
+- `eehrxf` receives a discharge report: with the `discharge` feature,
+  `ReceivedDocument::category` names `Category::Discharge` for a document
+  whose `Composition.type` carries LOINC `34105-7`, the code
+  `composition-eu-hdr` of HL7 Europe Hospital Discharge Report 1.0.0 fixes,
+  and `Category::profiles` names `bundle-eu-hdr` and `composition-eu-hdr`
+  for `ReceivedDocument::check` (#1325).
+- `eehrxf` maps an imaging report between openEHR and the HL7 Europe Imaging Report 1.0.0-ballot document. The new `IMAGING` project (feature `imaging` with `openehr`) maps `OBSERVATION.imaging_exam_result.v1` to `DiagnosticReportEuImaging` and the `ImagingStudyEuImaging` it references, over FerroBRIDGE's ADL 2 imaging report template of published CKM archetypes. The modality and the study date, which the archetype holds in its event, are accounted losses. The testkit vendors the archetype through `scripts/vendor/ckm-imaging.sh`, and the EHDS readiness matrix lists both profiles (#1326).
+- `eehrxf` receives an imaging report: `ReceivedDocument::category` names the imaging category from the `Medical-Imaging` coding of `Composition.category`, which `CompositionEuImaging` requires while it leaves `Composition.type` open, and `Category::profiles` holds the document to `BundleReportEuImaging` and `CompositionEuImaging` of HL7 Europe Imaging Report 1.0.0-ballot. The new `Category::document_category` names the coding. A reference that names its target by `identifier` alone, with no `type`, is now admitted at an element whose R4 target types are listed and include no `Patient`, `Group` or `Resource`, such as the accession number the guide writes in `ImagingStudy.basedOn` (#1326).
+- `ferrobridge-validator` holds a dependency of another FHIR release, such as the FHIR 5.0.0 `xtehr.eu.ehds.models` that HL7 Europe Hospital Discharge Report 1.0.0 depends on, instead of refusing the package set: the package satisfies the dependency, its resources are never read, its own dependencies are not required, and a canonical only it defines is refused with the new `ResolveError::OtherRelease`. `Package::fhir_versions`, `PackageSet::other_releases` and the `Release::FHIR_VERSION` and `Release::CORE_PACKAGE` constants are new. `ResolveError` gains a variant, so a consumer that matches it exhaustively adds an arm. HDR 1.0.0, `hl7.terminology.r4` 7.4.0 and `xtehr.eu.ehds.models` 1.0.0 join the profile package pins, and a received discharge report validates through `ReceivedDocument::validate` (#1600).
+
+### Changed
+
+- `eehrxf`: the `Composition` of every document `Document::into_bundle`
+  writes now claims its form's `Composition` profile in `meta.profile`, so a
+  received document selects the FHIRconnect context that maps its
+  composition (#1325).
+- Every trusted authorization server is an `[[auth.issuer]]` table that
+  requires `kind` (`persons`, `patients`, `machines` or `federation`) and
+  holds every issuer setting itself: `audience`, `algorithms`,
+  `clock_skew_seconds`, the `jwks_*` keys, `timeout_ms`, `mode` with its
+  `[auth.issuer.introspection]` table, and `role_claims`. Each table takes a
+  `profile` (`rfc9068` by default, `entra`, `keycloak`, `okta` or `nl`) with
+  any profile key set over it, and a person's token of a `persons` issuer is
+  admitted only through a client listed in `first_party_clients` or
+  `delegates`. An issuer with `mode = "introspection"` now sits beside
+  issuers checked by their key sets. Upgrade step: write each issuer as an
+  `[[auth.issuer]]` table with its `kind`, move every section-level issuer key
+  onto each table it held for, list the clients your people sign in with
+  (the operator console's included) in `first_party_clients`, and under the
+  `keycloak` preset list each service account's `sub` in
+  `app_only = [{ subjects = [...] }]`. `config check` names the key to move (#1585).
+- `[auth] scopeless_subjects` entries are tables `{ issuer, sub }` and admit
+  a machine's token alone. Upgrade step: rewrite each string entry, bare or
+  `<issuer>#<sub>`, as a table naming its issuer (#1585).
+- The audit line of every facade and operator request carries three fields
+  more: the caller's `kind` (`person`, `patient`, `system`, `delegated` and
+  the other kinds of `ferrohealth-smart`), and `binding` and `party`, which
+  read `-` while the bridge binds no party. Upgrade step: a log pipeline that
+  holds the field set adds the three (#1585).
+- The quickstart `compose.yaml` mounts `./config` at `/etc/ferrobridge`
+  read-only and passes `FERROBRIDGE_CONFIG` through, so the `[[auth.issuer]]`
+  tables live in `config/ferrobridge.toml`; it no longer passes
+  `FERROBRIDGE__AUTH__ISSUER` and `FERROBRIDGE__AUTH__AUDIENCE`. The operator
+  console's Server and access tab counts the issuers and drops the Audience
+  row, which is now each issuer's (#1585).
+- A Basic credential of `[[auth.basic.users]]` is always a person's, never a
+  machine's, and a Basic user listing a `system/` scope refuses the start,
+  naming the user. Upgrade step: give each machine on Basic, such as an ETL
+  client, a client credentials client (RFC 6749 §4.4) of a `machines` or
+  `persons` issuer the section trusts, with the `system/` scopes it needs,
+  and keep on Basic only people, with `user/` scopes or the operator scope (#1585).
+- The bridge moves to `ferrohealth-smart` 0.9.0, with `ferrohealth-session`
+  0.3.0 for the operator console, `ihe-atna` and `ehds-logging` 0.4.0 for
+  the access-record lane, `ferrohealth-server` 0.5.1 and FerroUI 0.6.7, so
+  one copy of `ferrohealth-smart` builds into each binary. The access record
+  carries no party binding, actor chain or representation of the bridge's
+  own. `ferrobridge-term` 0.1.143 requires `ferrohealth-smart` 0.9.0 behind
+  its `smart` feature, and `smart::SmartToken` takes the 0.9.0 token
+  source: a consumer moves `ferrohealth-smart` to 0.9.0 and pins
+  `ferrobridge-term = "=0.1.143"` in one change (#1585).
+
+### Removed
+
+- The flat `[auth] issuer = "…"` form, the section-level issuer settings
+  (`audience`, `algorithms`, `clock_skew_seconds`, `jwks_max_age_seconds`,
+  `jwks_refresh_interval_seconds`, `jwks_file`, `timeout_ms`, `mode`,
+  `introspection`, `role_claims`), and `token_profile` at either level. Each
+  fails `config check` naming its replacement. Upgrade step: write an
+  `[[auth.issuer]]` table with its `kind` and move each key onto it; in place
+  of `token_profile = "jwt"`, select a `profile` or set `token_types`,
+  `required_claims` and the classification keys on the issuer table (#1585).
+
+### Fixed
+
+- A FHIRconnect mapping below a `followedBy` anchored at a repeating node can
+  name a node outside that anchor, by `../` or by an absolute `$archetype`
+  path, and inside a `reference` placed there: the FLAT build no longer
+  refuses it with an occurrence count mismatch, and the node keeps the
+  instance of only the repeating nodes it lies below (#1612).
+- `ferrobridge-validator`: an `Attachment.url` that resolves to an entry of a
+  document Bundle, by its `fullUrl` or relative to the holding entry's base,
+  now counts as a reference to that entry for the R4 documents.html §3.3.1
+  rule that a document holds only what its Composition references directly
+  or indirectly. A url that names no entry marks nothing. This is our reading
+  where the page is not explicit. The HL7 Europe Imaging Report
+  semi-structured example, whose PDF Binary is named only by
+  `DiagnosticReport.presentedForm.url`, now validates (#1614).
+- `ferrobridge-validator`: a dependency named by a patch range (`4.2.x`) is
+  no longer satisfied by a pre-release (`4.2.5-comment`) unless the range
+  names that label (`4.2.x-comment`), and the patch must be numeric. The
+  rule is the one `scripts/vendor/profile-packages.sh` pins a range by (#1615).
+
+### Security
+
+Shipped with functional changes because: the GHSA-pfgx-xq28-2629 fix reaches the bridge through `ferrohealth-smart`, and the 0.9.0 move this release makes for FerroEHR's `ferrobridge-term` replaces the very `scopeless_subjects` and `role_claims` shapes the 0.8.9 fix introduced, so a security-only patch would ship a configuration form the next release refuses; RUSTSEC-2026-0440 affects no shipped artefact (the VEX statement below records why).
+
+- RUSTSEC-2026-0440 (`astral-tokio-tar` is unmaintained, with no patched
+  version) does not affect FerroBRIDGE: `testcontainers` reaches the crate only
+  in the test harness, and the server binary, the `ferrobridge` image and the `ferrobridge-console` image do not contain it.
+  `deny.toml` accepts the advisory until a `testcontainers` release drops
+  the crate (`security/vex/rust-advisories.openvex.json`) (#1575).
+- `[auth] scopeless_subjects` and `role_claims` hold per issuer, through
+  `ferrohealth-smart` 0.8.9 (GHSA-pfgx-xq28-2629, CWE-863, CWE-639). Before
+  it, beside several `[[auth.issuer]]` tables both lists applied to every
+  trusted issuer's tokens: a token from any of them whose `sub` was listed
+  got system-wide access without a scope, and any of them could assert
+  roles. In this release each `scopeless_subjects` entry is a table
+  `{ issuer, sub }` and each issuer's `role_claims` sits on its own
+  `[[auth.issuer]]` table, so both hold for one issuer alone; an entry naming
+  an issuer the section does not trust refuses the start. Upgrade step: the
+  `[auth]` steps under Changed and Removed (#1586).
+
 ## [0.0.21] - 2026-11-05
 
 A correctness release on the way to the whole FHIRconnect mapping library.
@@ -5962,7 +6105,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.21...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.22...HEAD
+[0.0.22]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.21...v0.0.22
 [0.0.21]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.20...v0.0.21
 [0.0.20]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.19...v0.0.20
 [0.0.19]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.18...v0.0.19
