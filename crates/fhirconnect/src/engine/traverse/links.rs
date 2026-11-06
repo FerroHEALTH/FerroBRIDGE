@@ -109,7 +109,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         }
                     };
                     {
-                        let positions = self.family_positions(openehr, &binding);
+                        let positions = self.bound_positions(openehr, &binding);
                         let index = self.next_family(openehr, &positions, "_link");
                         self.families.extend(family::link(
                             openehr.node(),
@@ -241,7 +241,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         continue;
                     };
                     let identity = self.identity_of(mapping, literal)?;
-                    let positions = self.family_positions(openehr, &binding);
+                    let positions = self.bound_positions(openehr, &binding);
                     let index = self.next_family(openehr, &positions, list.family);
                     self.families.extend(family::participation(
                         openehr.node(),
@@ -315,25 +315,6 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok((target, openehr))
     }
 
-    /// Returns the positions a family on the target's node is written at.
-    fn family_positions(&self, target: &OpenehrTarget, bound: &Binding) -> Vec<RmPosition> {
-        let shared = bound.shared(target.occurrences());
-        target
-            .occurrences()
-            .iter()
-            .enumerate()
-            .map(|(depth, axis)| {
-                bound
-                    .openehr
-                    .get(..shared)
-                    .and_then(|held| held.get(depth))
-                    .copied()
-                    .or_else(|| self.pin(axis.as_str()))
-                    .unwrap_or_else(RmPosition::first)
-            })
-            .collect()
-    }
-
     /// Reads the entries of one family off the node instance `parent` binds,
     /// and returns them with one output binding each.
     ///
@@ -348,7 +329,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         parent: &Binding,
         read: impl FnOnce(&serde_json::Value) -> Result<Vec<E>, family::FamilyError>,
     ) -> Result<(Vec<Binding>, Vec<E>), EngineError> {
-        let positions = self.family_positions(openehr, parent);
+        let positions = self.bound_positions(openehr, parent);
         let Some(node) = self.node_value(mapping.name(), openehr, &positions)? else {
             return Ok((Vec::new(), Vec::new()));
         };

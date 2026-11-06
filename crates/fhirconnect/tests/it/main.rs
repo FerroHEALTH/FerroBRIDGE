@@ -35,6 +35,7 @@ mod readiness;
 mod repeated_start;
 mod resolve;
 mod roundtrip;
+mod split_outside;
 mod support;
 mod term_mapping;
 mod tree;

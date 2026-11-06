@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that puts each Observation.component
+# in an event of its own and slots the detail CLUSTER of that event, whose
+# model mapping splits a node outside the event (basics/path_operators.adoc).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_split_outside
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.ferrobridge_reading.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "reading"
+    with:
+      fhir: "$resource.component"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "time"
+          with:
+            fhir: "value.as(DateTime)"
+            openehr: "time"
+
+        - name: "detail"
+          with:
+            fhir: "code"
+            openehr: "data[at0003]/items[openEHR-EHR-CLUSTER.ferrobridge_detail.v1]"
+          slotArchetype: "ferrobridge_split_outside_detail"
+
+  - name: "status"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
