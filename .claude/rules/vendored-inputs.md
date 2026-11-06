@@ -22,9 +22,9 @@ licence, which forbids modified or derived copies (#459), FerroPULSE's report
 envelope v2 schema and its examples under
 `app/ferrobridge-server/tests/fixtures/ferropulse/` (#581), the five HL7 FHIR examples
 packages fetched at build time into `tools/ferrobridge-testkit/vendor/` (#373,
-#454; 680 MB unpacked, so never committed), the 21 FHIR package versions of the R4 profile
+#454; 680 MB unpacked, so never committed), the 35 FHIR package versions of the R4 profile
 validator fetched at build time into `docs/specs/fhir-packages/` by
-`scripts/vendor/profile-packages.sh` (#435; 650 MB unpacked, so never
+`scripts/vendor/profile-packages.sh` (#435; 970 MB unpacked, so never
 committed), and the two build-time
 trees under `tools/fhir-codegen/vendor/`: `hl7-v2ig/`, fetched by
 `scripts/vendor/v2ig.sh`, and `hl7-v2-legacy/`, fetched by
