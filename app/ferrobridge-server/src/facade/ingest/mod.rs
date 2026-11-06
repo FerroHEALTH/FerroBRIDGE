@@ -33,6 +33,7 @@ use plan::{Mapped, Mapping, Partition, Pending, Placed, Recorded, Scope, Standin
 use fhir_types::codec::Value;
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::demographics::NoDemographics;
+use fhirconnect::engine::origin::ItemId;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
@@ -437,6 +438,11 @@ pub struct Ingest<'a> {
     /// The system the content originated in, when it is named apart from
     /// the bridge.
     originating: Option<String>,
+    /// The identifiers of the item in the originating system, in place of the
+    /// source item's, when the face names them.
+    originating_items: Option<Vec<ItemId>>,
+    /// The identifiers of the item in the bridge, the feeder system.
+    feeder_items: Vec<ItemId>,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -468,6 +474,8 @@ impl<'a> Ingest<'a> {
             demographics: &NoDemographics,
             committer: Committer::Bridge,
             originating: None,
+            originating_items: None,
+            feeder_items: Vec::new(),
         }
     }
 
@@ -479,6 +487,18 @@ impl<'a> Ingest<'a> {
     #[must_use]
     pub fn with_originating_system(mut self, originating: Option<String>) -> Self {
         self.originating = originating;
+        self
+    }
+
+    /// Returns this ingest naming `originating` as the identifiers of the item
+    /// in the originating system (`originating_system_item_ids`) and `feeder`
+    /// as its identifiers in the bridge (`feeder_system_item_ids`), as a face
+    /// that received a message names its placer and filler numbers and its
+    /// control id.
+    #[must_use]
+    pub fn with_item_ids(mut self, originating: Vec<ItemId>, feeder: Vec<ItemId>) -> Self {
+        self.originating_items = Some(originating);
+        self.feeder_items = feeder;
         self
     }
 

@@ -85,11 +85,11 @@ fn indexed(name: &str, index: usize) -> Segment {
 /// `originating_system_audit.system_id` names the originating system when the
 /// origin names one apart and the bridge otherwise, `feeder_system_audit`
 /// names the bridge and is present when the two differ or a field was
-/// defaulted, the source resource travels as the one
-/// `originating_system_item_ids` entry with its `meta.versionId` as
-/// `originating_system_audit.version_id`, and each defaulted field travels as
-/// one `feeder_system_item_ids` entry whose `id` is the field's openEHR path,
-/// in `defaulted` order
+/// defaulted, the item ids the origin names, or else the source resource,
+/// travel as `originating_system_item_ids`, with the source its `meta.versionId` as
+/// `originating_system_audit.version_id`, and the origin's feeder item ids and
+/// then each defaulted field travel as `feeder_system_item_ids`, a field's
+/// `id` being its openEHR path, in `defaulted` order
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html#_feeder_audit_class>).
 /// The allocation of facts to attributes is our own design.
 #[must_use]
@@ -111,26 +111,44 @@ pub fn feeder_audit(root: &ResolvedNode, origin: &Origin, defaulted: &[String]) 
     };
     let source = origin.source();
     let audit = FeederAudit {
-        originating_system_item_ids: source.map(|source| {
-            vec![identifier(
-                source.id().unwrap_or(UNKNOWN_SOURCE),
-                source.resource_type(),
-                None,
-            )]
-        }),
-        feeder_system_item_ids: (!defaulted.is_empty()).then(|| {
-            defaulted
-                .iter()
-                .map(|field| identifier(field, DEFAULTED, Some(origin.system_id())))
-                .collect()
-        }),
+        originating_system_item_ids: match origin.originating_items() {
+            Some(items) => (!items.is_empty()).then(|| {
+                items
+                    .iter()
+                    .map(|item| identifier(&item.id, &item.kind, item.issuer.as_deref()))
+                    .collect()
+            }),
+            None => source.map(|source| {
+                vec![identifier(
+                    source.id().unwrap_or(UNKNOWN_SOURCE),
+                    source.resource_type(),
+                    None,
+                )]
+            }),
+        },
+        feeder_system_item_ids: (!defaulted.is_empty() || !origin.feeder_items().is_empty()).then(
+            || {
+                origin
+                    .feeder_items()
+                    .iter()
+                    .map(|item| identifier(&item.id, &item.kind, item.issuer.as_deref()))
+                    .chain(
+                        defaulted
+                            .iter()
+                            .map(|field| identifier(field, DEFAULTED, Some(origin.system_id()))),
+                    )
+                    .collect()
+            },
+        ),
         original_content: None,
         originating_system_audit: Box::new(details(
             origin.originating_system().unwrap_or(origin.system_id()),
             source.and_then(|source| source.version_id()),
         )),
-        feeder_system_audit: (!defaulted.is_empty() || origin.originating_system().is_some())
-            .then(|| Box::new(details(origin.system_id(), None))),
+        feeder_system_audit: (!defaulted.is_empty()
+            || !origin.feeder_items().is_empty()
+            || origin.originating_system().is_some())
+        .then(|| Box::new(details(origin.system_id(), None))),
     };
     vec![
         NodeValue::new(root, to_canonical_value(&audit))

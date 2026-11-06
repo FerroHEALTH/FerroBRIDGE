@@ -478,8 +478,9 @@ same identity and replay rules apply to it. Its entries are keyed by the
 message's MSH-10 and message type and their position in the Bundle, so a
 message sent again commits nothing and is answered `AA`, as its first delivery
 was. A message whose delivery overlaps another of the same message is refused
-and commits nothing. Each composition's `FEEDER_AUDIT` names the message where
-a resource would be named here. A subject reference to another entry of the
+and commits nothing. Each composition's `FEEDER_AUDIT` names the sending
+application, the order numbers and the message (see the HL7 v2 face page)
+where a resource would be named here. A subject reference to another entry of the
 Bundle is read through that entry: the person is the referenced resource's
 first `identifier`, the same pair a `subject.identifier` names.
 

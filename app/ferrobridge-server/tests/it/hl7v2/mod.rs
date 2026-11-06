@@ -400,7 +400,7 @@ impl Running {
     }
 
     /// Returns the bodies of the requests the CDR received on `path`.
-    async fn requests(&self, method: &str, path: &str) -> Vec<Vec<u8>> {
+    pub(crate) async fn requests(&self, method: &str, path: &str) -> Vec<Vec<u8>> {
         self.cdr
             .received_requests()
             .await
@@ -439,3 +439,4 @@ fn assert_counted(counts: &Counts, (aa, ae, ar): (u64, u64, u64), mapping_failur
 }
 
 mod answers;
+mod feeder_audit;

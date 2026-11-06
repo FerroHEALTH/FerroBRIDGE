@@ -24,6 +24,7 @@ pub mod answer;
 pub mod directory;
 pub mod edit;
 mod envelope;
+pub mod origin;
 mod stamped;
 
 use std::collections::BTreeMap;
@@ -343,6 +344,10 @@ impl Face {
         let mut bundle = mapped.into_bundle();
         edit::claim_profiles(&mut bundle, &self.profiles);
         edit::link_subjects(&mut bundle);
+        let sending = origin::sending_system(message);
+        let control_item =
+            origin::control_item(control.as_str(), message_type.as_str(), sending.as_deref());
+        let orders = origin::order_numbers(message);
         let provenance = Provenance::Item(SourceItem::message(control, message_type));
         let client = match crate::cdr::ids::RequestId::new(&stamped.control_id) {
             Ok(id) => self.facade.client().with_request_id(id),
@@ -361,6 +366,8 @@ impl Face {
         let outcome = self
             .facade
             .ingest_under(client, &self.settings)
+            .with_originating_system(sending)
+            .with_item_ids(orders, vec![control_item])
             .ingest_bundle(&bundle, self.unmapped, &provenance)
             .await;
         match outcome {

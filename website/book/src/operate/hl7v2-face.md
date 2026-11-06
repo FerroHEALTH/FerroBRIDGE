@@ -86,8 +86,14 @@ syntax in the variable. The section holds no secret.
 5. The Bundle's entries go through the ingest service as one transaction. The
    programs are selected as the facade selects them, and the subject is read
    from the `Patient` entry's first identifier. Each composition's
-   `FEEDER_AUDIT` names the message: its MSH-10 as the item id and its message
-   type (`ORU^R01`) as the item type.
+   `FEEDER_AUDIT` names where it came from: the sending application (MSH-3)
+   as `originating_system_audit.system_id` and the bridge as
+   `feeder_system_audit.system_id`; the placer and filler numbers (ORC-2,
+   ORC-3, OBR-2, OBR-3, typed `PLAC` and `FILL` from HL7 table 0203 and
+   issued by their namespace) as `originating_system_item_ids`; and MSH-10,
+   typed by the message type (`ORU^R01`), as the first
+   `feeder_system_item_ids` entry. A message without order numbers records
+   none.
 6. The acknowledgment is sent once the ingest settled, so `AA` means the CDR
    holds the message's compositions.
 
