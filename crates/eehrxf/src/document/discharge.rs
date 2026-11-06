@@ -8,7 +8,7 @@
 //! reports on, in the language `Bundle.language` states.
 
 use crate::crosswalk::discharge::HDR_COMPOSITION;
-use crate::document::form::{Authorship, Code, Form, Kind, Slot};
+use crate::document::form::{Authorship, Code, Form, Kind, SectionRule, Slot};
 use crate::document::{EU_CORE_PATIENT, LOINC};
 
 /// The canonical URL of the HL7 Europe Hospital Discharge Report `Bundle`
@@ -82,4 +82,9 @@ pub const DISCHARGE_REPORT_FORM: Form = Form {
     report: None,
     encounter: Some(HDR_ENCOUNTER),
     language: true,
+    // NOTE: composition-eu-hdr `cmp-hdr-2` (error): a discharge summary or a hospital course section.
+    rules: &[SectionRule::OneOf {
+        invariant: "cmp-hdr-2",
+        slices: &["sectionDischargeSummary", "sectionHospitalCourse"],
+    }],
 };

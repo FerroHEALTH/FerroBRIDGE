@@ -15,11 +15,12 @@
 use std::error::Error;
 use std::io::Read;
 
+use eehrxf::document::form::SectionRule;
 use eehrxf::document::imaging::{
     IMAGING_BUNDLE, IMAGING_CATEGORIES, IMAGING_REPORT, IMAGING_REPORT_FORM, IMAGING_SLOTS,
 };
-use eehrxf::document::section::Section;
-use eehrxf::document::{Document, LOINC};
+use eehrxf::document::section::{EmptyReason, Section};
+use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::device::Device;
@@ -174,9 +175,11 @@ fn document(code: Option<&str>) -> Result<Document, Box<dyn Error>> {
     let study = added.get(1).ok_or("the study's fullUrl")?.clone();
     for slot in IMAGING_SLOTS.iter().take(4) {
         let mut section = Section::new(slot, vec![format!("{}.", slot.title)]);
-        if slot.slice == "imagingstudy" {
-            section = section.with_entry(study.clone());
-        }
+        section = if slot.slice == "imagingstudy" {
+            section.with_entry(study.clone())
+        } else {
+            section.empty_because(EmptyReason::NilKnown)
+        };
         document.with_section(section)?;
     }
     document.with_report(DiagnosticReport {
@@ -298,5 +301,155 @@ fn a_report_with_no_code_is_typed_as_an_imaging_report() -> Result<(), Box<dyn E
     let report = the(&bundle, "DiagnosticReport")?;
     assert_eq!(composition["type"]["coding"][0]["code"], IMAGING_REPORT);
     assert_eq!(report["code"]["coding"][0]["code"], IMAGING_REPORT);
+    Ok(())
+}
+
+#[test]
+fn the_form_holds_every_section_to_eu_imaging_composition_1() -> Result<(), Box<dyn Error>> {
+    let composition = package_member("package/StructureDefinition-CompositionEuImaging.json")?;
+    let section = element(&composition, "Composition.section")?;
+    let invariant = section["constraint"]
+        .as_array()
+        .ok_or("the section's constraints")?
+        .iter()
+        .find(|constraint| constraint["key"] == "eu-imaging-composition-1")
+        .ok_or("eu-imaging-composition-1")?;
+    assert_eq!(invariant["severity"], "error");
+    let ruled: Vec<&str> = IMAGING_REPORT_FORM
+        .rules
+        .iter()
+        .filter_map(|rule| match rule {
+            SectionRule::Reasoned {
+                invariant: "eu-imaging-composition-1",
+                slices,
+            } => Some(slices.iter().copied()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    let slots: Vec<&str> = IMAGING_SLOTS.iter().map(|slot| slot.slice).collect();
+    assert_eq!(ruled, slots, "the invariant holds every section");
+    Ok(())
+}
+
+#[test]
+fn an_empty_imaging_section_without_a_reason_is_refused() -> Result<(), Box<dyn Error>> {
+    for slice in ["findings", "communication"] {
+        let mut document = document(Some(MR_BRAIN))?;
+        let slot = IMAGING_SLOTS
+            .iter()
+            .find(|slot| slot.slice == slice)
+            .ok_or("the slot")?;
+        document.with_section(Section::new(slot, vec![format!("{}.", slot.title)]))?;
+        let refused = document.into_bundle();
+        assert!(
+            matches!(
+                refused,
+                Err(DocumentError::Unreasoned {
+                    slice: refused_slice,
+                    invariant: "eu-imaging-composition-1",
+                }) if refused_slice == slice
+            ),
+            "{slice}: {refused:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn an_empty_required_imaging_section_without_a_reason_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut document = Document::of(
+        &IMAGING_REPORT_FORM,
+        BASE,
+        IDENTIFIER.to_owned(),
+        String::from("2026-10-25T12:00:00Z"),
+        String::from("Imaging report"),
+    );
+    document.with_patient(Patient {
+        id: Some(String::from("patient-1")),
+        ..Patient::default()
+    })?;
+    let order = IMAGING_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "order")
+        .ok_or("the order slot")?;
+    document.with_section(Section::new(order, vec![String::from("Order.")]))?;
+    document.with_report(DiagnosticReport {
+        id: Some(String::from("imaging-report")),
+        status: "final".into(),
+        ..DiagnosticReport::default()
+    })?;
+    let refused = document.into_bundle();
+    assert!(
+        matches!(
+            refused,
+            Err(DocumentError::Unreasoned {
+                slice: "order",
+                invariant: "eu-imaging-composition-1",
+            })
+        ),
+        "{refused:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_form_requires_every_section_slice_the_profile_requires() -> Result<(), Box<dyn Error>> {
+    let composition = package_member("package/StructureDefinition-CompositionEuImaging.json")?;
+    let required: Vec<&str> = composition["snapshot"]["element"]
+        .as_array()
+        .ok_or("a snapshot")?
+        .iter()
+        .filter(|element| element["min"].as_u64() >= Some(1))
+        .filter_map(|element| {
+            let slice = element["id"]
+                .as_str()?
+                .strip_prefix("Composition.section:")?;
+            (!slice.contains('.')).then_some(slice)
+        })
+        .collect();
+    let ruled: Vec<&str> = IMAGING_REPORT_FORM
+        .rules
+        .iter()
+        .filter_map(|rule| match rule {
+            SectionRule::Required { slices } => Some(slices.iter().copied()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(ruled, required);
+    assert_eq!(required.len(), 4, "{required:?}");
+    Ok(())
+}
+
+#[test]
+fn an_imaging_report_lacking_a_required_section_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut document = Document::of(
+        &IMAGING_REPORT_FORM,
+        BASE,
+        IDENTIFIER.to_owned(),
+        String::from("2026-10-25T12:00:00Z"),
+        String::from("Imaging report"),
+    );
+    document.with_patient(Patient {
+        id: Some(String::from("patient-1")),
+        ..Patient::default()
+    })?;
+    for slot in IMAGING_SLOTS.iter().take(3) {
+        document.with_section(
+            Section::new(slot, vec![format!("{}.", slot.title)])
+                .empty_because(EmptyReason::Unavailable),
+        )?;
+    }
+    document.with_report(DiagnosticReport {
+        id: Some(String::from("imaging-report")),
+        status: "final".into(),
+        ..DiagnosticReport::default()
+    })?;
+    let refused = document.into_bundle();
+    assert!(
+        matches!(refused, Err(DocumentError::Lacking { slice: "procedure" })),
+        "{refused:?}"
+    );
     Ok(())
 }
