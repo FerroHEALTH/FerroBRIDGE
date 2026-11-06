@@ -137,8 +137,7 @@ pub(crate) fn vendored(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
     any(
         feature = "patient-summary",
         feature = "laboratory",
-        feature = "prescription",
-        feature = "dispensation"
+        all(feature = "prescription", feature = "dispensation")
     )
 ))]
 const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
@@ -150,8 +149,7 @@ const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
     any(
         feature = "patient-summary",
         feature = "laboratory",
-        feature = "prescription",
-        feature = "dispensation"
+        all(feature = "prescription", feature = "dispensation")
     )
 ))]
 pub(crate) fn emit(name: &str, text: &str) -> Result<(), Box<dyn Error>> {

@@ -21,7 +21,8 @@ conformance-relevant decision.
 
 - One feature per Art 14(1) category and one per serialisation: `fhir-r4`
   compiles no openEHR crate, and `openehr` turns on `fhir-r4`. Every feature
-  builds and lints on its own (`cargo hack --each-feature`).
+  and every pair of features builds and lints
+  (`cargo hack --feature-powerset --depth 2`).
 - The crate depends on no logging component and on no application, so the
   two harmonised components stay independent of each other (Art 2(2)(n) and
   (o)). A gateway's routes, stored queries and access record live in the
