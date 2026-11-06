@@ -67,6 +67,14 @@ the method answers each section of the run placed in the form's slot by its
 LOINC code, with the `fullUrl` of each entry. A section whose code names no
 slot of the form, or an entry the run does not hold, is refused.
 
+`composition-eu-hdr` requires a discharge summary or a hospital course
+section (`cmp-hdr-2`). Both are narrative sections the document assembly
+writes from the paragraphs the system gives it, as the crosswalk records,
+so a system adds the hospital course with `Document::with_section` beside
+the mapped sections. `ReceivedDocument::validate` holds the whole document
+to `bundle-eu-hdr` and to the profile of every entry through
+`ferrobridge-validator`, and the suite validates a mapped report that way.
+
 ## Receiving a discharge report
 
 `ReceivedDocument::category` names a document whose `Composition.type`

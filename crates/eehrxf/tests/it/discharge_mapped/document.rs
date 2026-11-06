@@ -10,6 +10,7 @@
 
 use crate::support::emit;
 use crate::support::hdr;
+use crate::support::profile_set;
 use crate::support::vendored_base;
 use eehrxf::category::Category;
 use eehrxf::crosswalk::discharge::HDR_COMPOSITION;
@@ -18,6 +19,7 @@ use eehrxf::document::discharge::HDR_BUNDLE;
 use eehrxf::document::discharge::HDR_ENCOUNTER;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::conform::check_resource;
+use ferrobridge_term::client::Client;
 use fhir_types::codec::Json;
 use fhir_types::r4::bundle::Bundle;
 use serde_json::Value;
@@ -213,5 +215,23 @@ fn every_entry_of_the_mapped_report_meets_the_profile_it_claims() -> Result<(), 
         ],
         "every claimed profile of every entry is checked"
     );
+    Ok(())
+}
+
+#[test]
+fn the_mapped_report_validates_against_bundle_eu_hdr() -> Result<(), Box<dyn Error>> {
+    let Some(set) = profile_set()? else {
+        return Ok(());
+    };
+    let text = sent(
+        &mapping()?,
+        &full_report(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d115",
+    )?;
+    let document = ReceivedDocument::read(&text)?;
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime
+        .block_on(document.validate(&set, HDR_BUNDLE, None::<&Client>))
+        .map_err(|error| format!("{error:?}"))?;
     Ok(())
 }

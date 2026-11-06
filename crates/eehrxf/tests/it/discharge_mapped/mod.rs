@@ -16,7 +16,8 @@
 use std::error::Error;
 
 use eehrxf::document::Document;
-use eehrxf::document::discharge::DISCHARGE_REPORT_FORM;
+use eehrxf::document::discharge::{DISCHARGE_REPORT_FORM, HDR_SLOTS};
+use eehrxf::document::section::Section;
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::HDR;
 use ferrobridge_testkit::fixtures::{
@@ -424,6 +425,16 @@ fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String
             .with_patient(reference(&subject))
             .with_who(reference(&device)),
     )?;
+    // NOTE: composition-eu-hdr cmp-hdr-2 requires the discharge summary or the hospital course; the
+    // crosswalk has the document assembly write the course's narrative, which the system supplies.
+    let course = HDR_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "sectionHospitalCourse")
+        .ok_or("the hospital course slot")?;
+    document.with_section(Section::new(
+        course,
+        vec![String::from("A synthetic hospital course.")],
+    ))?;
     for section in document.with_mapped_composition(run.bundle())? {
         let paragraph = format!("{}.", section.slot.title);
         document.with_section(section.into_section(vec![paragraph]))?;
