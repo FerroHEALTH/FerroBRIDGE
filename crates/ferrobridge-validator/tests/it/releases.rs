@@ -69,7 +69,8 @@ fn a_package_reads_its_fhir_versions_under_either_name() -> TestResult {
     declare(&older, "fhir-version-list", json!(["3.0.2"]))?;
     assert_eq!(Package::read(older.path())?.fhir_versions(), ["3.0.2"]);
     let silent = package("example.c", "1.0.0", &[], &[])?;
-    assert!(Package::read(silent.path())?.fhir_versions().is_empty());
+    let none: [String; 0] = [];
+    assert_eq!(Package::read(silent.path())?.fhir_versions(), none);
     Ok(())
 }
 
