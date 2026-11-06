@@ -32,7 +32,11 @@ never a local struct.
   the resources are indexed from it and a directory's files are read on first
   use; without one, every JSON file is read for its header.
 - `set`: the closure check (a missing dependency is refused by name) and
-  canonical resolution, decoding each definition once.
+  canonical resolution, decoding each definition once. The set is read in
+  one release; a package whose `fhirVersions` name another release is held
+  unread, its own dependencies are not required, and a canonical only it
+  defines is `ResolveError::OtherRelease` (FHIR 6.0.0-ballot4 packages.html
+  §2.1.10.3, our own design where it is silent, upstream report #1604).
 - `issue` and `report`: the typed issue, the unevaluated list and the
   `OperationOutcome` conversion.
 - `validate`: the walk (`walk`: the object and member walk, `members` for
