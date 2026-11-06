@@ -11,7 +11,7 @@ use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 
 /// The smallest `[auth]` section that boots.
-const AUTH: &str = "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n";
+const AUTH: &str = "[auth]\nenabled = true\n\n[[auth.issuer]]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://bridge.example.org/fhir\"]\n";
 
 #[test]
 fn the_operator_api_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {

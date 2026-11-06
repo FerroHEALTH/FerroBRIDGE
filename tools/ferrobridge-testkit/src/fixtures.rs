@@ -11,9 +11,9 @@
 //! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`],
 //! [`KDS_PERSON_OPT`], [`KDS_LABORAUFTRAG_OPT`] and [`KDS_LABORBERICHT_OPT`]
 //! are published operational templates and [`CKM_MEDICATION_ARCHETYPES`],
-//! [`CKM_DISCHARGE_ARCHETYPES`], [`CKM_LIBRARY_ARCHETYPES`] and
-//! [`CKM_HIGHMED_ARCHETYPES`] published archetypes, vendored verbatim with
-//! their provenance beside them: a template or an archetype carries
+//! [`CKM_DISCHARGE_ARCHETYPES`], [`CKM_IMAGING_ARCHETYPES`], [`CKM_LIBRARY_ARCHETYPES`]
+//! and [`CKM_HIGHMED_ARCHETYPES`] published archetypes, vendored verbatim
+//! with their provenance beside them: a template or an archetype carries
 //! constraints, never patient content.
 //! [`KDS_DIAGNOSE_CONDITION`] is synthetic, and names the profile and the
 //! systems and extension URLs the published KDS mappings match on, because a
@@ -25,6 +25,16 @@ macro_rules! ckm_medication {
         (
             $file,
             include_str!(concat!("../fixtures/ckm/medication/", $file)),
+        )
+    };
+}
+
+/// One vendored CKM imaging archetype as `(file name, source)`.
+macro_rules! ckm_imaging {
+    ($file:literal) => {
+        (
+            $file,
+            include_str!(concat!("../fixtures/ckm/imaging/", $file)),
         )
     };
 }
@@ -492,6 +502,31 @@ pub const KDS_LABORAUFTRAG_SERVICE_REQUEST: &str =
 
 /// A synthetic FHIR R4 `Observation`.
 pub const R4_OBSERVATION: &str = include_str!("../fixtures/fhir/r4/observation.json");
+
+/// FerroBRIDGE's ADL 2 imaging report template.
+///
+/// A report result `COMPOSITION` holding one
+/// `OBSERVATION.imaging_exam_result.v1`, at-coded with the ADL 1.4 codes of
+/// [`CKM_LIBRARY_ARCHETYPES`] and [`CKM_IMAGING_ARCHETYPES`]. A suite builds
+/// the ADL 2 operational template from them at test time. The template
+/// identifier is [`FERROBRIDGE_IMAGING_TEMPLATE_ID`].
+pub const FERROBRIDGE_IMAGING_TEMPLATE: &str =
+    include_str!("../fixtures/adl2/ferrobridge_imaging_report.adlt");
+
+/// The template identifier [`FERROBRIDGE_IMAGING_TEMPLATE`] declares.
+pub const FERROBRIDGE_IMAGING_TEMPLATE_ID: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_imaging_report.v1.0.0";
+
+/// The published CKM archetype of [`FERROBRIDGE_IMAGING_TEMPLATE`] beside the
+/// report result composition of [`CKM_LIBRARY_ARCHETYPES`], as
+/// `(file name, ADL 1.4 source)`.
+///
+/// `scripts/vendor/ckm-imaging.sh` fetches it at the CKM mirror commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside it records its source
+/// and licence.
+pub const CKM_IMAGING_ARCHETYPES: [(&str, &str); 1] = [ckm_imaging!(
+    "openEHR-EHR-OBSERVATION.imaging_exam_result.v1.adl"
+)];
 
 #[cfg(test)]
 mod tests {

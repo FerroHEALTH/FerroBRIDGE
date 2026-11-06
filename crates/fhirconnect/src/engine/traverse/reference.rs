@@ -93,6 +93,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     let binding = Binding {
                         fhir: input.clone(),
                         openehr: parent.openehr.clone(),
+                        axes: parent.axes.clone(),
                         level: mapping.fhir().map_or(parent.level, FhirTarget::level),
                     };
                     self.enter_reference(mapping, input, resource, mappings, &binding)?;
@@ -162,6 +163,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let inner = Binding {
             fhir: Occurrence::default(),
             openehr: binding.openehr.clone(),
+            axes: binding.axes.clone(),
             level,
         };
         let ran = self.mappings(mappings, &inner);
@@ -280,6 +282,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let inner = Binding {
             fhir: Occurrence::default(),
             openehr: binding.openehr.clone(),
+            axes: binding.axes.clone(),
             level,
         };
         let ran = self.mappings(mappings, &inner);

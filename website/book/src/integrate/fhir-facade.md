@@ -94,13 +94,17 @@ token. The health routes stay open too. The token is a JWT signed by a key
 in the issuer's key set, with an `iss` equal to the issuer, an `aud` naming
 the audience, and an `exp`, `nbf` and `iat` that hold within the configured
 clock skew. Under the default `rfc9068` profile it also carries `typ: at+jwt`,
-`sub`, `client_id`, `iat` and `jti` (RFC 9068).
+`sub`, `client_id`, `iat` and `jti` (RFC 9068). The issuer's `kind` and
+profile decide who the caller is: a person through one of the deployment's
+own clients, a patient, a machine's client credentials token, or another
+party's person on a `federation` issuer. A Basic credential is always a
+person's; a machine never authenticates with one.
 
 | Answer | When | `WWW-Authenticate` |
 |---|---|---|
 | `401` | No credential, or one in a scheme the server does not admit | `Bearer`, and a `Basic realm="", charset="UTF-8"` challenge beside it when Basic users are configured |
 | `400` | Two credentials, or an `Authorization` value that is no credential | `Bearer error="invalid_request"` |
-| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience | `Bearer error="invalid_token"` |
+| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience, and a valid token that names no caller its issuer's kind admits | `Bearer error="invalid_token"` |
 | `401` | A Basic credential that does not hold, whatever the reason | `Basic realm="", charset="UTF-8"` |
 | `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope"` |
 | `403` | Any request to a route under `/fhir` the guard does not classify, before the token is read | none |
@@ -168,13 +172,17 @@ entry too, and an entry the token does not cover, or one outside a
 Every request under `/fhir` but the discovery document leaves one audit line
 on the `ferrohealth_smart::audit` log target, the record every FerroHEALTH
 product writes: the time, the token's `sub` or the Basic user as
-`principal`, the token's `client_id` and issuer, the scheme the credential
-arrived with as `via` (`bearer` or `basic`), the method, the matched route,
+`principal`, the token's `client_id` and issuer, the caller's `kind`
+(`person`, `patient`, `system`, `delegated` and the other kinds
+`ferrohealth-smart` names; a Basic user is always `person`), the scheme the
+credential arrived with as `via` (`bearer` or `basic`), what the login
+resolved to as `binding` and `party` (`-` while the bridge binds no party),
+the method, the matched route,
 what was addressed (`Condition/c-1`, or the type alone), the interaction,
 the status and the duration. Beside the log envelope its fields are exactly
 `at`, `request_id` (the `X-Request-Id` that ties the line to the request
-log), `principal`, `client`, `via`, `issuer`, `method`, `route`,
-`addressed`, `interaction`, `status` and `duration_ms`. A refused
+log), `principal`, `client`, `kind`, `via`, `issuer`, `binding`, `party`,
+`method`, `route`, `addressed`, `interaction`, `status` and `duration_ms`. A refused
 credential is recorded as `unauthenticated` with `via` `none`, and with
 `[auth]` off the principal reads `-` with `via` `open`. A batch leaves one
 line per entry, carrying the entry's interaction, what it addressed and its

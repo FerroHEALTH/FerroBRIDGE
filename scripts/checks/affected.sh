@@ -213,7 +213,7 @@ classify() {
     scripts/vendor/kds-*-opt.sh | scripts/vendor/lib/kds-opt.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
     # Write only the CKM archetypes under the testkit's fixtures, which the
     # templates the testkit carries read.
-    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh)
+    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh)
       echo "packages ferrobridge-testkit fhirconnect"
       ;;
     # The corpora only the eehrxf tests read, and the script that writes them.

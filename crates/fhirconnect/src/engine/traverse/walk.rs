@@ -319,7 +319,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<Vec<Vec<RmPosition>>, EngineError> {
         let axes = input.occurrences();
         let depth = axes.len();
-        let bound = parent.openehr.len().min(depth);
+        let bound = parent.shared(axes);
         let mut prefix: Vec<RmPosition> = parent.openehr.iter().take(bound).copied().collect();
         while let Some(pinned) = axes
             .get(prefix.len())

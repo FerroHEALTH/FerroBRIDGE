@@ -203,6 +203,11 @@ fn accessor(caller: &Caller) -> Accessor {
         purposes: Vec::new(),
         policies: Vec::new(),
         relayed: None,
+        // NOTE: no specification governs this: our own design; the bridge binds no
+        // party and relays no actor chain or representation of its own.
+        binding: None,
+        actors: Vec::new(),
+        represents: None,
     }
 }
 
