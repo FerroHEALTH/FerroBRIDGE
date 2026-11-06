@@ -145,7 +145,7 @@ ferrohealth-secret = "=0.2.0"
 # The family's configuration loader (FerroSYS): the file, the `FERROBRIDGE__`
 # environment and its aliases, `--set`, strict with the closest known key, the
 # provenance of every key and the `config check` rendering.
-ferrohealth-config = "=0.2.9"
+ferrohealth-config = "=0.2.10"
 # The family's health document, indicator registry and process lifecycle
 # (FerroSYS). The default build is the document alone, which the operator
 # console reads; the server takes `registry`.
@@ -238,7 +238,7 @@ zip = { version = "=9.1.3", default-features = false, features = ["deflate-flate
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script
 # modules with the router that serves them, shared by every FerroHEALTH
 # console. Pinned exactly, so the console moves to a new version deliberately.
-ferrohealth-ui = "=0.6.7"
+ferrohealth-ui = "=0.6.8"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -251,7 +251,7 @@ base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # with its idle and absolute lifetimes, the refresh, and the four routes with
 # the session watch FerroUI's pages ask. Pinned exactly, as a product pins
 # every shared crate; the console adds `axum`.
-ferrohealth-session = { version = "=0.3.0", default-features = false }
+ferrohealth-session = { version = "=0.3.1", default-features = false }
 # Test-only.
 wiremock = "0.6.5"
 # The operator console's browser journeys (#602): a WebDriver client in Rust
