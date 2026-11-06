@@ -241,3 +241,56 @@ fn an_originating_system_is_named_apart_from_the_feeder() -> Result<(), Box<dyn 
     );
     Ok(())
 }
+
+#[test]
+fn named_item_ids_replace_the_source_item_and_lead_the_feeder_ids() -> Result<(), Box<dyn Error>> {
+    // RM 1.1.0 common.html §FEEDER_AUDIT: `originating_system_item_ids` are
+    // "Identifiers used for the item in the originating system, e.g. filler
+    // and placer ids", and `feeder_system_item_ids` those of the feeder.
+    let program = compiled("ferrobridge_diagnose_minimal")?;
+    let index = template()?;
+    let placer = fhirconnect::engine::origin::ItemId {
+        id: String::from("PLC-1"),
+        kind: String::from("PLAC"),
+        issuer: Some(String::from("NORTHLAB")),
+    };
+    let control = fhirconnect::engine::origin::ItemId {
+        id: String::from("MSG-1"),
+        kind: String::from("ORU^R01"),
+        issuer: None,
+    };
+    let origin = Origin::new("ferrobridge.test")
+        .with_source(SourceItem::new("Condition").with_id("sender-1"))
+        .with_originating_items(vec![placer])
+        .with_feeder_items(vec![control]);
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_document()?,
+        &Seams::default(),
+        &defaults().with_origin(origin),
+        &CallContext::new(),
+    )?;
+    let audit = inbound
+        .value()
+        .value()
+        .get("feeder_audit")
+        .ok_or("the composition carries a FEEDER_AUDIT")?;
+    assert_eq!(
+        vec!["PLC-1"],
+        audit_ids(audit, "originating_system_item_ids")
+    );
+    assert_eq!(
+        Some("NORTHLAB"),
+        audit
+            .pointer("/originating_system_item_ids/0/issuer")
+            .and_then(serde_json::Value::as_str)
+    );
+    assert_eq!(
+        Some(&"MSG-1"),
+        audit_ids(audit, "feeder_system_item_ids").first(),
+        "the named feeder id comes before the defaulted fields"
+    );
+    Ok(())
+}

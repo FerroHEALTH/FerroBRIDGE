@@ -26,6 +26,22 @@ pub struct Origin {
     system_id: String,
     originating: Option<String>,
     source: Option<SourceItem>,
+    originating_items: Option<Vec<ItemId>>,
+    feeder_items: Vec<ItemId>,
+}
+
+/// One identifier of the item in a system, a `DV_IDENTIFIER` of `FEEDER_AUDIT`.
+///
+/// RM Common IM, `FEEDER_AUDIT.originating_system_item_ids`: "Identifiers used
+/// for the item in the originating system, e.g. filler and placer ids".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemId {
+    /// The identifier value.
+    pub id: String,
+    /// What the identifier is, `DV_IDENTIFIER.type`.
+    pub kind: String,
+    /// The authority that issued it, `DV_IDENTIFIER.issuer`, when known.
+    pub issuer: Option<String>,
 }
 
 impl Origin {
@@ -40,6 +56,8 @@ impl Origin {
             system_id: system_id.into(),
             originating: None,
             source: None,
+            originating_items: None,
+            feeder_items: Vec::new(),
         }
     }
 
@@ -68,6 +86,37 @@ impl Origin {
     #[must_use]
     pub fn originating_system(&self) -> Option<&str> {
         self.originating.as_deref()
+    }
+
+    /// Returns this origin naming `items` as the identifiers of the item in the
+    /// originating system, in place of the source item's type and id.
+    #[must_use]
+    pub fn with_originating_items(mut self, items: Vec<ItemId>) -> Self {
+        self.originating_items = Some(items);
+        self
+    }
+
+    /// Returns this origin naming `items` as identifiers of the item in the
+    /// feeder system, written before the fields the run defaulted
+    /// (`FEEDER_AUDIT.feeder_system_item_ids`).
+    #[must_use]
+    pub fn with_feeder_items(mut self, items: Vec<ItemId>) -> Self {
+        self.feeder_items = items;
+        self
+    }
+
+    /// Returns the identifiers of the item in the originating system the
+    /// caller named, when it named them apart from the source item.
+    #[must_use]
+    pub fn originating_items(&self) -> Option<&[ItemId]> {
+        self.originating_items.as_deref()
+    }
+
+    /// Returns the identifiers of the item in the feeder system the caller
+    /// named.
+    #[must_use]
+    pub fn feeder_items(&self) -> &[ItemId] {
+        &self.feeder_items
     }
 
     /// Returns the system the content passed through.

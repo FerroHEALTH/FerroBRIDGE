@@ -208,6 +208,26 @@ impl Ingest<'_> {
             .map(|engined| (engined.composition, engined.instant))
     }
 
+    /// Returns the origin a run of `inbound` records in its `FEEDER_AUDIT`: the
+    /// bridge, the source item `provenance` names, and what the face named
+    /// apart from it.
+    fn origin(
+        &self,
+        provenance: &Provenance,
+        inbound: &Inbound,
+    ) -> fhirconnect::engine::origin::Origin {
+        let origin = engine::origin_of(
+            self.settings,
+            provenance.source_for(inbound.document()),
+            self.originating.as_deref(),
+        )
+        .with_feeder_items(self.feeder_items.clone());
+        match self.originating_items.as_ref() {
+            Some(items) => origin.with_originating_items(items.clone()),
+            None => origin,
+        }
+    }
+
     /// Runs the engine as [`Ingest::run`] does, and also returns the literal
     /// references whose resources a `slotContext` consumed
     /// (`fhirconnect::engine::outcome::Outcome::consumed`), answering each
@@ -232,11 +252,7 @@ impl Ingest<'_> {
                     inbound.document(),
                     &now,
                     self.settings,
-                    engine::origin_of(
-                        self.settings,
-                        provenance.source_for(inbound.document()),
-                        self.originating.as_deref(),
-                    ),
+                    self.origin(provenance, inbound),
                     &linking(
                         Seams::default()
                             .with_functions(&Library)
