@@ -284,7 +284,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<Vec<Binding>, EngineError> {
         let parent = &self.scoped(mapping.fhir(), parent);
         let axes = self.output_axes(mapping);
-        let mut bound = parent_depth(parent, self.direction);
+        let mut bound = parent_depth(parent, mapping, self.direction);
         while axes.get(bound).is_some_and(|axis| self.pin(axis).is_some()) {
             bound = bound.saturating_add(1);
         }
@@ -318,7 +318,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         taken: Option<usize>,
     ) -> Result<Binding, EngineError> {
         let level = mapping.fhir().map_or(parent.level, FhirTarget::level);
-        let bound = parent_depth(parent, self.direction);
+        let bound = parent_depth(parent, mapping, self.direction);
         let mut indices: Vec<usize> = match self.direction {
             // NOTE: an openEHR position is 1-based and an instance index is
             // 0-based (Simplified Formats §Instance Indexing), so the parent's
@@ -384,15 +384,20 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 }
                 Ok(Binding {
                     fhir: input.clone(),
+                    axes: parent.axes_of(mapping.openehr(), positions.len()),
                     openehr: positions,
                     level,
                 })
             }
-            Direction::OpenehrToFhir => Ok(Binding {
-                fhir: Occurrence::new(indices),
-                openehr: rm_positions(mapping.name(), input.indices())?,
-                level,
-            }),
+            Direction::OpenehrToFhir => {
+                let openehr = rm_positions(mapping.name(), input.indices())?;
+                Ok(Binding {
+                    fhir: Occurrence::new(indices),
+                    axes: parent.axes_of(mapping.openehr(), openehr.len()),
+                    openehr,
+                    level,
+                })
+            }
         }
     }
 
@@ -426,9 +431,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
 }
 
 /// Returns how many axes of the output side the parent bound.
-fn parent_depth(parent: &Binding, direction: Direction) -> usize {
+///
+/// Going into openEHR those are the repeating nodes the mapping's node shares
+/// with the parent's, and every one the parent bound when it has no openEHR side.
+fn parent_depth(parent: &Binding, mapping: &Mapping, direction: Direction) -> usize {
     match direction {
-        Direction::FhirToOpenehr => parent.openehr.len(),
+        Direction::FhirToOpenehr => mapping.openehr().map_or(parent.openehr.len(), |target| {
+            parent.shared(target.occurrences())
+        }),
         Direction::OpenehrToFhir => parent.fhir.indices().len(),
     }
 }

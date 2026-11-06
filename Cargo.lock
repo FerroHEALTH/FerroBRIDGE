@@ -2159,7 +2159,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.225"
+version = "0.1.226"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",

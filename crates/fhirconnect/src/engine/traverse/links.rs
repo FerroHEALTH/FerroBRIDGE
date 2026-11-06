@@ -68,6 +68,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     let binding = Binding {
                         fhir: input.clone(),
                         openehr: parent.openehr.clone(),
+                        axes: parent.axes.clone(),
                         level: mapping.fhir().map_or(parent.level, FhirTarget::level),
                     };
                     let Some(literal) = self.reference_at(mapping, input)? else {
@@ -110,7 +111,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         }
                     };
                     {
-                        let positions = self.family_positions(openehr, &binding.openehr);
+                        let positions = self.family_positions(openehr, &binding);
                         let index = self.next_family(openehr, &positions, "_link");
                         self.families.extend(family::link(
                             openehr.node(),
@@ -128,7 +129,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Ok(bindings)
             }
             Direction::OpenehrToFhir => {
-                let positions = self.family_positions(openehr, &parent.openehr);
+                let positions = self.family_positions(openehr, parent);
                 let Some(node) = self.node_value(mapping.name(), openehr, &positions)? else {
                     return Ok(Vec::new());
                 };
@@ -229,6 +230,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     let binding = Binding {
                         fhir: input.clone(),
                         openehr: parent.openehr.clone(),
+                        axes: parent.axes.clone(),
                         level: mapping.fhir().map_or(parent.level, FhirTarget::level),
                     };
                     let value = self.fhir_value_at(mapping, input)?;
@@ -253,7 +255,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         continue;
                     };
                     let identity = self.identity_of(mapping, literal)?;
-                    let positions = self.family_positions(openehr, &binding.openehr);
+                    let positions = self.family_positions(openehr, &binding);
                     let index = self.next_family(openehr, &positions, list.family);
                     self.families.extend(family::participation(
                         openehr.node(),
@@ -273,7 +275,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Ok(bindings)
             }
             Direction::OpenehrToFhir => {
-                let positions = self.family_positions(openehr, &parent.openehr);
+                let positions = self.family_positions(openehr, parent);
                 let Some(node) = self.node_value(mapping.name(), openehr, &positions)? else {
                     return Ok(Vec::new());
                 };
@@ -338,14 +340,17 @@ impl<T: Table + ?Sized> Run<'_, T> {
     }
 
     /// Returns the positions a family on the target's node is written at.
-    fn family_positions(&self, target: &OpenehrTarget, bound: &[RmPosition]) -> Vec<RmPosition> {
+    fn family_positions(&self, target: &OpenehrTarget, bound: &Binding) -> Vec<RmPosition> {
+        let shared = bound.shared(target.occurrences());
         target
             .occurrences()
             .iter()
             .enumerate()
             .map(|(depth, axis)| {
                 bound
-                    .get(depth)
+                    .openehr
+                    .get(..shared)
+                    .and_then(|held| held.get(depth))
                     .copied()
                     .or_else(|| self.pin(axis.as_str()))
                     .unwrap_or_else(RmPosition::first)

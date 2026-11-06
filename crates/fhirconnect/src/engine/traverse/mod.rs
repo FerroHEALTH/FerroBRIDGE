@@ -207,9 +207,37 @@ struct Setting {
 struct Binding {
     fhir: Occurrence,
     openehr: Vec<RmPosition>,
+    /// The repeating openEHR nodes `openehr` holds an instance of, one per
+    /// position, outermost first.
+    axes: Vec<FlatId>,
     /// How many references deep the document the FHIR occurrence indexes
     /// lies, the program's own resource being `0`.
     level: usize,
+}
+
+impl Binding {
+    /// Returns how many of the leading repeating nodes of `axes` this
+    /// binding holds an instance of.
+    ///
+    /// A path may leave the node its parent is anchored at
+    /// (`basics/path_operators.adoc`, `../`), so only the repeating nodes the
+    /// two share keep the parent's instance; one the target does not lie
+    /// below binds nothing of it.
+    fn shared(&self, axes: &[FlatId]) -> usize {
+        self.axes
+            .iter()
+            .zip(axes)
+            .zip(&self.openehr)
+            .take_while(|&((held, wanted), _)| held == wanted)
+            .count()
+    }
+
+    /// Returns the repeating nodes of `target` the positions `held` name,
+    /// or the parent's when the mapping has no openEHR side.
+    fn axes_of(&self, target: Option<&OpenehrTarget>, held: usize) -> Vec<FlatId> {
+        let axes = target.map_or(self.axes.as_slice(), OpenehrTarget::occurrences);
+        axes.get(..held).unwrap_or(axes).to_vec()
+    }
 }
 
 /// A document a `reference` mapping left to run over the resource it
