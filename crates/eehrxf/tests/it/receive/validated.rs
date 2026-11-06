@@ -109,6 +109,7 @@ async fn validated(
     Ok(document.validate(set, profile, None::<&Client>).await)
 }
 
+#[cfg(any(feature = "patient-summary", feature = "laboratory"))]
 /// Validates every document example of `tarball` as a document of
 /// `category`, but the members `refused`, which their own tests hold, failing
 /// naming every one that does not pass; returns how many passed.

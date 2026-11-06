@@ -19,6 +19,11 @@ mod openehr;
 mod read;
 mod reference;
 mod subjects;
+#[cfg(any(
+    feature = "patient-summary",
+    feature = "laboratory",
+    feature = "imaging"
+))]
 mod validated;
 
 use std::error::Error;
