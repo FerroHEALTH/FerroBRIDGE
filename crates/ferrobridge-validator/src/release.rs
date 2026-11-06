@@ -49,6 +49,14 @@ pub trait Release:
     /// The release's name in messages, `R4` or `STU3`.
     const NAME: &str;
 
+    /// The major and minor version every FHIR version of the release
+    /// shares, `4.0` or `3.0`.
+    const FHIR_VERSION: &str;
+
+    /// The name of the release's core package, `hl7.fhir.r4.core` or
+    /// `hl7.fhir.r3.core`.
+    const CORE_PACKAGE: &str;
+
     /// The codes an extension's definition types its contexts with: R4
     /// `extension-context-type`, STU3 `extension-context`.
     const CONTEXT_TYPES: &[&str];
@@ -74,6 +82,8 @@ impl Release for R4 {
     type CodeSystem = fhir_types::r4::code_system::CodeSystem;
 
     const NAME: &str = "R4";
+    const FHIR_VERSION: &str = "4.0";
+    const CORE_PACKAGE: &str = "hl7.fhir.r4.core";
     const CONTEXT_TYPES: &[&str] = &["fhirpath", "element", "extension"];
 
     fn schemas() -> &'static Schemas {
@@ -102,6 +112,8 @@ impl Release for Stu3 {
     type CodeSystem = fhir_types::stu3::code_system::CodeSystem;
 
     const NAME: &str = "STU3";
+    const FHIR_VERSION: &str = "3.0";
+    const CORE_PACKAGE: &str = "hl7.fhir.r3.core";
     const CONTEXT_TYPES: &[&str] = &["resource", "datatype", "extension"];
 
     fn schemas() -> &'static Schemas {

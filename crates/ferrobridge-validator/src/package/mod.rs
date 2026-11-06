@@ -40,6 +40,7 @@ pub struct Package {
     name: String,
     version: String,
     dependencies: BTreeMap<String, String>,
+    fhir_versions: Vec<String>,
     source: PathBuf,
     resources: Vec<Resource>,
 }
@@ -129,6 +130,10 @@ struct Manifest {
     name: String,
     version: String,
     dependencies: Option<BTreeMap<String, String>>,
+    /// `fhirVersions`, named `fhir-version-list` in older packages
+    /// (packages.html §2.1.10.3).
+    #[serde(rename = "fhirVersions", alias = "fhir-version-list")]
+    fhir_versions: Option<Vec<String>>,
 }
 
 /// The fields of `.index.json` the set reads.
@@ -218,6 +223,7 @@ impl Package {
             name: manifest.name,
             version: manifest.version,
             dependencies: manifest.dependencies.unwrap_or_default(),
+            fhir_versions: manifest.fhir_versions.unwrap_or_default(),
             source: path.to_owned(),
             resources,
         })
@@ -239,6 +245,13 @@ impl Package {
     #[must_use]
     pub const fn dependencies(&self) -> &BTreeMap<String, String> {
         &self.dependencies
+    }
+
+    /// Returns the FHIR versions its manifest names in `fhirVersions` (or the
+    /// older `fhir-version-list`), empty when it names none.
+    #[must_use]
+    pub fn fhir_versions(&self) -> &[String] {
+        &self.fhir_versions
     }
 
     /// Returns the path the package was read from.

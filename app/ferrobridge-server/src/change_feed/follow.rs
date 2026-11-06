@@ -413,10 +413,21 @@ fn parked(
     Ok(true)
 }
 
+/// Returns how long to wait after the pass `done`: nothing after a full page
+/// that moved a cursor, so a backlog drains, and `idle` after any other, so
+/// a feed that gives no progress is never read again at once.
+fn wait_after(done: &Pass, idle: Duration) -> Duration {
+    if done.full && !done.acknowledged.is_empty() {
+        Duration::ZERO
+    } else {
+        idle
+    }
+}
+
 /// Follows the feed of `reader` with `consumer` until `stop` reads `true`.
 ///
-/// A full page is followed by the next read at once, a short one after
-/// `polling.idle`; a failed pass is logged, recorded on `following` and
+/// A full page that moved a cursor is followed by the next read at once,
+/// any other pass after `polling.idle`; a failed pass is logged, recorded on `following` and
 /// retried after a backoff that doubles up to `polling.max_backoff`. With
 /// `parking`, a poisoned event is parked on its bound (see [`pass`]).
 pub async fn follow(
@@ -451,11 +462,7 @@ pub async fn follow(
                         "a change-feed pass finished"
                     );
                 }
-                if done.full {
-                    Duration::ZERO
-                } else {
-                    polling.idle
-                }
+                wait_after(&done, polling.idle)
             }
             Err(error) => {
                 let reason = crate::indicators::reason(&error);
@@ -484,4 +491,50 @@ pub async fn follow(
         }
     }
     tracing::info!(consumer = consumer.name(), reader = %reader, "stopped following the change feed");
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::Pass;
+    use super::wait_after;
+    use crate::change_feed::Domain;
+    use crate::change_feed::Position;
+    use crate::change_feed::Seq;
+
+    const IDLE: Duration = Duration::from_secs(1);
+
+    #[test]
+    fn a_full_page_that_moved_a_cursor_is_read_again_at_once() {
+        let done = Pass {
+            read: 10,
+            acknowledged: vec![Position::Outbox {
+                domain: Domain::Clinical,
+                seq: Seq::new(10),
+            }],
+            full: true,
+        };
+        assert_eq!(Duration::ZERO, wait_after(&done, IDLE));
+    }
+
+    #[test]
+    fn a_full_page_that_moved_no_cursor_waits_the_idle_interval() {
+        let done = Pass {
+            read: 10,
+            acknowledged: Vec::new(),
+            full: true,
+        };
+        assert_eq!(IDLE, wait_after(&done, IDLE));
+    }
+
+    #[test]
+    fn a_short_or_empty_page_waits_the_idle_interval() {
+        let done = Pass {
+            read: 0,
+            acknowledged: Vec::new(),
+            full: false,
+        };
+        assert_eq!(IDLE, wait_after(&done, IDLE));
+    }
 }

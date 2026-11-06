@@ -6,6 +6,15 @@
 //! and `CodeSystems` they carry, resolved by canonical.
 //!
 //! Each resource decodes into the generated model of the set's [`Release`].
+//!
+//! The set is read in one FHIR release, as a dependency tree is resolved in
+//! the one FHIR version its core package dependency defines (FHIR
+//! 6.0.0-ballot4, packages.html §2.1.10.3, `dependencies`). A package whose
+//! `fhirVersions` name another release is held: it satisfies the dependency
+//! that names it, its resources are never read, its own dependencies are not
+//! required, and a canonical only it defines is refused with
+//! [`ResolveError::OtherRelease`]. The specification is silent on a
+//! dependency of another FHIR version, so that much is our own design.
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -36,6 +45,22 @@ pub struct PackageSet<R: Release = R4> {
     code_systems: BTreeMap<String, Vec<Entry<R::CodeSystem>>>,
     /// The dependency closure of each package, by position.
     closures: Vec<BTreeSet<PackageId>>,
+    /// The packages of another FHIR release, held and never read.
+    other_releases: Vec<Package>,
+    /// The resources the packages of another release define, by canonical
+    /// URL.
+    elsewhere: BTreeMap<String, Vec<Elsewhere>>,
+}
+
+/// One resource a package of another FHIR release defines.
+#[derive(Debug)]
+struct Elsewhere {
+    /// The `resourceType`.
+    type_name: String,
+    /// The business version, when the resource has one.
+    version: Option<String>,
+    /// The package, as `name#version`.
+    package: String,
 }
 
 /// One resource the set carries, decoded on first use.
@@ -141,6 +166,19 @@ pub enum ResolveError {
         #[source]
         source: serde_json::Error,
     },
+    /// The canonical names a resource only a package of another FHIR release
+    /// defines, which the set holds and does not read.
+    #[error(
+        "{canonical} is defined only in {package}, a package of another FHIR release than the {release} the set is read in"
+    )]
+    OtherRelease {
+        /// The canonical asked for.
+        canonical: String,
+        /// The package that defines it, as `name#version`.
+        package: String,
+        /// The release the set is read in, `R4` or `STU3`.
+        release: &'static str,
+    },
     /// The resource does not decode into the set's release model of its type.
     #[error("{canonical} in {package} does not decode into the release model of its type")]
     Decode {
@@ -175,7 +213,9 @@ impl<R: Release> PackageSet<R> {
     ///
     /// Every dependency a manifest names SHALL be listed, and a version
     /// whose patch is `x` accepts the highest patch present
-    /// (<https://hl7.org/fhir/packages.html>, §2.1.10.2).
+    /// (<https://hl7.org/fhir/packages.html>, §2.1.10.2). A package of
+    /// another FHIR release (see the module documentation) satisfies a
+    /// dependency on it and is otherwise held unread.
     ///
     /// # Errors
     ///
@@ -199,9 +239,13 @@ impl<R: Release> PackageSet<R> {
                 });
             }
         }
+        // NOTE: packages.html (6.0.0-ballot4) §2.1.10.3 is silent on a dependency of another
+        // FHIR version; no specification governs this: our own design, held and never read.
+        let (packages, other_releases): (Vec<Package>, Vec<Package>) =
+            packages.into_iter().partition(of_release::<R>);
         for package in &packages {
             for (dependency, wanted) in package.dependencies() {
-                let held = packages.iter().any(|candidate| {
+                let held = packages.iter().chain(&other_releases).any(|candidate| {
                     candidate.name() == dependency && version_satisfies(candidate.version(), wanted)
                 });
                 if !held {
@@ -245,13 +289,59 @@ impl<R: Release> PackageSet<R> {
         let closures = (0..packages.len())
             .map(|index| dependency_closure(&packages, index))
             .collect();
+        let mut elsewhere: BTreeMap<String, Vec<Elsewhere>> = BTreeMap::new();
+        for package in &other_releases {
+            for resource in package.resources() {
+                let Some(url) = &resource.url else { continue };
+                elsewhere.entry(url.clone()).or_default().push(Elsewhere {
+                    type_name: resource.type_name.clone(),
+                    version: resource.version.clone(),
+                    package: format!("{}#{}", package.name(), package.version()),
+                });
+            }
+        }
         Ok(Self {
             packages,
             structures,
             value_sets,
             code_systems,
             closures,
+            other_releases,
+            elsewhere,
         })
+    }
+
+    /// Returns the packages of another FHIR release the set holds and does
+    /// not read, sorted by name and version.
+    #[must_use]
+    pub fn other_releases(&self) -> &[Package] {
+        &self.other_releases
+    }
+
+    /// Turns `error`, a canonical of type `kind` the set does not carry,
+    /// into [`ResolveError::OtherRelease`] when a package of another release
+    /// defines it.
+    fn elsewhere(&self, error: ResolveError, kind: &str) -> ResolveError {
+        let ResolveError::NotFound { canonical } = error else {
+            return error;
+        };
+        let parsed = Canonical::parse(&canonical);
+        let found = self.elsewhere.get(parsed.url()).and_then(|held| {
+            held.iter().find(|resource| {
+                resource.type_name == kind
+                    && parsed
+                        .version()
+                        .is_none_or(|version| resource.version.as_deref() == Some(version))
+            })
+        });
+        match found {
+            Some(resource) => ResolveError::OtherRelease {
+                package: resource.package.clone(),
+                canonical,
+                release: R::NAME,
+            },
+            None => ResolveError::NotFound { canonical },
+        }
     }
 
     /// Returns the packages of the set, sorted by name and version.
@@ -317,6 +407,7 @@ impl<R: Release> PackageSet<R> {
             "StructureDefinition",
             self.closure(scope),
         )
+        .map_err(|error| self.elsewhere(error, "StructureDefinition"))
     }
 
     /// Resolves the `ValueSet` `canonical` names as referenced from `scope`.
@@ -332,6 +423,7 @@ impl<R: Release> PackageSet<R> {
             "ValueSet",
             self.closure(scope),
         )
+        .map_err(|error| self.elsewhere(error, "ValueSet"))
     }
 
     /// Resolves the `CodeSystem` `canonical` names as referenced from `scope`.
@@ -347,6 +439,7 @@ impl<R: Release> PackageSet<R> {
             "CodeSystem",
             self.closure(scope),
         )
+        .map_err(|error| self.elsewhere(error, "CodeSystem"))
     }
 
     /// Returns the dependency closure of the package `scope`.
@@ -514,17 +607,74 @@ fn order_versions(left: Option<&str>, right: Option<&str>) -> Ordering {
     }
 }
 
-/// Answers whether `version` satisfies the dependency version `wanted`: the
-/// same version, or the same major and minor when the patch of `wanted` is
-/// `x` (packages.html §2.1.10.2).
-fn version_satisfies(version: &str, wanted: &str) -> bool {
-    match wanted.strip_suffix(".x") {
-        Some(prefix) => version
-            .strip_prefix(prefix)
-            .and_then(|rest| rest.strip_prefix('.'))
-            .is_some_and(|patch| !patch.is_empty() && !patch.contains('.')),
-        None => version == wanted,
+/// Answers whether `package` is of the release `R`: its `fhirVersions`
+/// name a version of `R`, or, when it names none, it is `R`'s core package,
+/// or depends on it or on no core package at all (packages.html
+/// 6.0.0-ballot4 §2.1.10.3, `dependencies` and `fhirVersions`).
+fn of_release<R: Release>(package: &Package) -> bool {
+    let versions = package.fhir_versions();
+    if !versions.is_empty() {
+        return versions
+            .iter()
+            .any(|version| same_release(version, R::FHIR_VERSION));
     }
+    if is_core_package(package.name()) {
+        return package.name() == R::CORE_PACKAGE;
+    }
+    let mut cores = package
+        .dependencies()
+        .keys()
+        .filter(|name| is_core_package(name))
+        .peekable();
+    cores.peek().is_none() || cores.any(|name| name == R::CORE_PACKAGE)
+}
+
+/// Answers whether the FHIR version `version` has the major and minor
+/// `release`, as `4.0.1` has `4.0`.
+fn same_release(version: &str, release: &str) -> bool {
+    version
+        .strip_prefix(release)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
+}
+
+/// Answers whether `name` names a core package, `hl7.fhir.r<release>.core`
+/// (packages.html §2.1.10).
+fn is_core_package(name: &str) -> bool {
+    name.strip_prefix("hl7.fhir.r")
+        .and_then(|rest| rest.strip_suffix(".core"))
+        .is_some_and(|release| !release.is_empty() && !release.contains('.'))
+}
+
+/// Answers whether `version` satisfies the dependency version `wanted`: the
+/// same version, or, when the patch of `wanted` is `x`, the same major and
+/// minor with a numeric patch (packages.html §2.1.10.2) and the pre-release
+/// label `wanted` names after the `x`, or none when it names none.
+// NOTE: packages.html §2.1.10.2 is silent on pre-releases; no specification governs this: our
+// own design, the rule scripts/vendor/profile-packages.sh pins a range's resolution by.
+fn version_satisfies(version: &str, wanted: &str) -> bool {
+    let Some((prefix, range_label)) = patch_range(wanted) else {
+        return version == wanted;
+    };
+    let Some(rest) = version
+        .strip_prefix(prefix)
+        .and_then(|rest| rest.strip_prefix('.'))
+    else {
+        return false;
+    };
+    let (patch, label) = rest
+        .split_once('-')
+        .map_or((rest, None), |(patch, label)| (patch, Some(label)));
+    !patch.is_empty() && patch.bytes().all(|byte| byte.is_ascii_digit()) && label == range_label
+}
+
+/// Splits a patch range, `major.minor.x` with an optional `-label`, into its
+/// `major.minor` and its label; `None` for any other version.
+fn patch_range(wanted: &str) -> Option<(&str, Option<&str>)> {
+    if let Some(prefix) = wanted.strip_suffix(".x") {
+        return Some((prefix, None));
+    }
+    let (head, label) = wanted.split_once(".x-")?;
+    Some((head, Some(label)))
 }
 
 #[cfg(test)]
@@ -534,7 +684,27 @@ mod tests {
     use super::PackageId;
     use super::PackageSet;
     use super::R4;
+    use super::is_core_package;
+    use super::same_release;
     use super::version_satisfies;
+
+    #[test]
+    fn a_fhir_version_belongs_to_the_release_of_its_major_and_minor() {
+        assert!(same_release("4.0.1", "4.0"));
+        assert!(same_release("4.0", "4.0"));
+        assert!(!same_release("4.3.0", "4.0"));
+        assert!(!same_release("5.0.0", "4.0"));
+        assert!(!same_release("4.01", "4.0"));
+    }
+
+    #[test]
+    fn a_core_package_is_named_by_its_release() {
+        assert!(is_core_package("hl7.fhir.r4.core"));
+        assert!(is_core_package("hl7.fhir.r4b.core"));
+        assert!(!is_core_package("hl7.fhir.r4.examples"));
+        assert!(!is_core_package("hl7.fhir.uv.extensions.r4"));
+        assert!(!is_core_package("hl7.fhir.r.core"));
+    }
 
     #[test]
     fn a_patch_wildcard_accepts_any_patch_of_its_minor() {
@@ -542,6 +712,18 @@ mod tests {
         assert!(version_satisfies("4.0.1", "4.0.x"));
         assert!(!version_satisfies("4.1.0", "4.0.x"));
         assert!(!version_satisfies("4.0.1", "4.0.2"));
+    }
+
+    #[test]
+    fn a_patch_wildcard_takes_a_pre_release_only_when_it_names_the_label() {
+        assert!(!version_satisfies("4.2.5-comment", "4.2.x"));
+        assert!(!version_satisfies("4.2.0-ballot", "4.2.x"));
+        assert!(version_satisfies("4.2.5", "4.2.x"));
+        assert!(version_satisfies("4.2.0-ballot", "4.2.x-ballot"));
+        assert!(!version_satisfies("4.2.0", "4.2.x-ballot"));
+        assert!(!version_satisfies("4.2.0-comment", "4.2.x-ballot"));
+        assert!(!version_satisfies("4.2.a", "4.2.x"));
+        assert!(!version_satisfies("4.2.", "4.2.x"));
     }
 
     // scripts/vendor/profile-packages.sh fetches the EU trees at build time; the test
