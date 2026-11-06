@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.1.166"
+version = "0.1.167"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1928,7 +1928,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.148"
+version = "0.1.149"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",

@@ -89,7 +89,7 @@ ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.142" }
 ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.132" }
 # Published from this workspace and consumed by the published eehrxf, so the
 # requirement carries both a path and a version.
-ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "0.1.148" }
+ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "0.1.149" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.

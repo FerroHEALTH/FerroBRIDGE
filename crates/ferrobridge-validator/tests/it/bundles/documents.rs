@@ -139,6 +139,80 @@ fn a_stylesheet_binary_and_the_provenance_of_the_document_may_ride_along() -> Te
     Ok(())
 }
 
+/// A synthetic PDF Binary.
+fn pdf(id: &str) -> serde_json::Value {
+    json!({"resourceType": "Binary", "id": id, "contentType": "application/pdf", "data": "JVBERg=="})
+}
+
+/// The complete document with its performer's photo at `url` and the PDF
+/// Binary `binary` at the fullUrl `at`.
+fn with_photo(
+    url: &str,
+    at: &'static str,
+    binary: serde_json::Value,
+) -> Vec<(&'static str, serde_json::Value)> {
+    let mut entries = complete();
+    if let Some((_, performer)) = entries.iter_mut().find(|(entry, _)| *entry == PERFORMER) {
+        performer["photo"] = json!([{"contentType": "application/pdf", "url": url}]);
+    }
+    entries.push((at, binary));
+    entries
+}
+
+// NOTE: R4 documents.html §3.3.1 counts what the Composition references directly or indirectly;
+// an Attachment.url naming an entry is such a reference, our reading where the page is not explicit.
+#[test]
+fn an_entry_named_by_an_attachment_url_is_referenced() -> TestResult {
+    let binary = "urn:uuid:4a1e8f9e-0000-4000-8000-000000000039";
+    let report = document(&with_photo(binary, binary, pdf("synthetic-pdf")))?;
+    assert!(report.is_valid(), "{:#?}", report.issues());
+    Ok(())
+}
+
+#[test]
+fn an_attachment_url_relative_to_the_holders_base_names_an_entry() -> TestResult {
+    let mut entries = with_photo(
+        "Binary/synthetic-pdf",
+        "http://example.org/fhir/Binary/synthetic-pdf",
+        pdf("synthetic-pdf"),
+    );
+    let performer = entries
+        .iter()
+        .position(|(entry, _)| *entry == PERFORMER)
+        .ok_or("the performer")?;
+    let (_, resource) = entries.remove(performer);
+    let mut resource = resource;
+    resource["id"] = json!("synthetic-performer");
+    entries.insert(
+        performer,
+        (
+            "http://example.org/fhir/Practitioner/synthetic-performer",
+            resource,
+        ),
+    );
+    if let Some((_, observation)) = entries.iter_mut().find(|(entry, _)| *entry == OBSERVATION) {
+        observation["performer"] =
+            json!([{"reference": "http://example.org/fhir/Practitioner/synthetic-performer"}]);
+    }
+    let report = document(&entries)?;
+    assert!(report.is_valid(), "{:#?}", report.issues());
+    Ok(())
+}
+
+#[test]
+fn an_attachment_url_to_nothing_in_the_bundle_references_no_entry() -> TestResult {
+    let report = document(&with_photo(
+        "urn:uuid:4a1e8f9e-0000-4000-8000-000000000040",
+        "urn:uuid:4a1e8f9e-0000-4000-8000-000000000039",
+        pdf("synthetic-pdf"),
+    ))?;
+    assert_eq!(
+        locations(&report, MessageId::DocumentEntryUnreferenced),
+        ["Bundle.entry[5]"]
+    );
+    Ok(())
+}
+
 /// The Bundle profile of the European patient summary.
 const EPS_BUNDLE: &str = "http://hl7.eu/fhir/eps/StructureDefinition/bundle-eu-eps";
 
