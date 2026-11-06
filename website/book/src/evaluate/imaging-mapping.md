@@ -40,12 +40,11 @@ which `ImagingStudyEuImaging` requires as a DICOM UID (`urn:dicom:uid`, an
 codes, and the description.
 
 The archetype holds the modality and the study date in the observation's
-event. The study's reference is made outside the event, and a mapping
-there would add a second event to the observation, so neither is mapped.
-The project accounts for `ImagingStudy.modality` and `ImagingStudy.started`
-(`IMAGING.accounted()`): a received study that carries either has a
-`warning` issue in the composition's `OperationOutcome`, and the original
-document still holds the value.
+event, and its protocol holds the rest of the study. The study's reference
+sits below the event, so `ImagingStudy.modality` and `ImagingStudy.started`
+come from the event the report describes, and the identifier, the status
+and the description from the protocol outside it, through the `$archetype`
+paths FHIRconnect resolves against the archetype root.
 
 ## Mapping out of openEHR
 

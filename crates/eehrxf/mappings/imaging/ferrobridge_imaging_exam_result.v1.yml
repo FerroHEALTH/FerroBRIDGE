@@ -6,13 +6,11 @@
 # the overall impression as its conclusion, the overall result status over
 # the archetype's local codes, which are the R4 diagnostic-report-status
 # codes but entered-in-error, and the report identifier. The study the
-# result reports is the ImagingStudy the report references, mapped from the
-# protocol: the study instance identifier, the study status over its local
-# codes, which are R4 imagingstudy-status codes, and the description. The
-# modality and the study date sit in the event, which a reference made
-# outside it cannot reach without a second event, so neither is mapped and
-# the project accounts for both. No specification governs these choices:
-# our own design.
+# result reports is the ImagingStudy the report references, mapped below
+# the event: the modality and the study date from the event, and from the
+# protocol the study instance identifier, the study status over its local
+# codes, which are R4 imagingstudy-status codes, and the description. No
+# specification governs these choices: our own design.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -249,146 +247,157 @@ mappings:
                 operator: "one of"
                 criteria: "at0090"
 
+        # The study is an ImagingStudy the report references, mapped below
+        # the event: its modality and start from the event, and its
+        # identifier, status and description from the observation's protocol,
+        # outside the event (basics/path_operators.adoc).
+        - name: "imagingStudy"
+          with:
+            fhir: "$resource.imagingStudy"
+            openehr: "$reference"
+          reference:
+            resourceType: "ImagingStudy"
+            mappings:
+              - name: "studyProfile"
+                unidirectional: "openEHR->fhir"
+                with:
+                  fhir: "$fhirRoot.meta"
+                manual:
+                  - name: "profileUrl"
+                    fhir:
+                      - path: "profile"
+                        value: "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging"
+
+              - name: "studyInstanceIdentifier"
+                with:
+                  fhir: "$fhirRoot.identifier"
+                  openehr: "$archetype/protocol[at0025]/items[at0092]"
+                # NOTE: HL7 Europe Imaging Report 1.0.0-ballot, StudyInstanceUidIdentifierEuImaging fixes
+                # the identifier's type to the DICOM coding 110180, which the DV_IDENTIFIER does not hold.
+                followedBy:
+                  mappings:
+                    - name: "studyInstanceUidType"
+                      unidirectional: "openEHR->fhir"
+                      with:
+                        fhir: "type.coding"
+                      manual:
+                        - name: "studyInstanceUid"
+                          fhir:
+                            - path: "system"
+                              value: "http://dicom.nema.org/resources/ontology/DCM"
+                            - path: "code"
+                              value: "110180"
+                            - path: "display"
+                              value: "Study Instance UID"
+
+              - name: "description"
+                with:
+                  fhir: "$fhirRoot.description"
+                  openehr: "$archetype/protocol[at0025]/items[at0105]"
+
+              - name: "modality"
+                with:
+                  fhir: "$fhirRoot.modality"
+                  openehr: "data[at0003]/items[at0091]"
+
+              - name: "started"
+                with:
+                  fhir: "$fhirRoot.started"
+                  openehr: "data[at0003]/items[at0070]"
+
+              # NOTE: DV_CODED_TEXT.adoc, a FHIR `code` cannot convert to a DV_CODED_TEXT, so
+              # the study status maps through a `manual` table over the archetype's local codes.
+              - name: "studyStatus"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$archetype/protocol[at0025]/items[at0099]"
+                manual:
+                  - name: "registered"
+                    fhir:
+                      - path: "status"
+                        value: "registered"
+                    fhirCondition:
+                      targetRoot: "$fhirRoot"
+                      targetAttribute: "status"
+                      operator: "one of"
+                      criteria: "registered"
+                    openehr:
+                      - path: "defining_code/terminology_id/value"
+                        value: "local"
+                      - path: "defining_code/code_string"
+                        value: "at0100"
+                      - path: "value"
+                        value: "Registered"
+                    openehrCondition:
+                      targetRoot: "$openehrRoot"
+                      targetAttribute: "defining_code/code_string"
+                      operator: "one of"
+                      criteria: "at0100"
+                  - name: "available"
+                    fhir:
+                      - path: "status"
+                        value: "available"
+                    fhirCondition:
+                      targetRoot: "$fhirRoot"
+                      targetAttribute: "status"
+                      operator: "one of"
+                      criteria: "available"
+                    openehr:
+                      - path: "defining_code/terminology_id/value"
+                        value: "local"
+                      - path: "defining_code/code_string"
+                        value: "at0101"
+                      - path: "value"
+                        value: "Available"
+                    openehrCondition:
+                      targetRoot: "$openehrRoot"
+                      targetAttribute: "defining_code/code_string"
+                      operator: "one of"
+                      criteria: "at0101"
+                  - name: "cancelled"
+                    fhir:
+                      - path: "status"
+                        value: "cancelled"
+                    fhirCondition:
+                      targetRoot: "$fhirRoot"
+                      targetAttribute: "status"
+                      operator: "one of"
+                      criteria: "cancelled"
+                    openehr:
+                      - path: "defining_code/terminology_id/value"
+                        value: "local"
+                      - path: "defining_code/code_string"
+                        value: "at0102"
+                      - path: "value"
+                        value: "Cancelled"
+                    openehrCondition:
+                      targetRoot: "$openehrRoot"
+                      targetAttribute: "defining_code/code_string"
+                      operator: "one of"
+                      criteria: "at0102"
+                  - name: "unknown"
+                    fhir:
+                      - path: "status"
+                        value: "unknown"
+                    fhirCondition:
+                      targetRoot: "$fhirRoot"
+                      targetAttribute: "status"
+                      operator: "one of"
+                      criteria: "unknown"
+                    openehr:
+                      - path: "defining_code/terminology_id/value"
+                        value: "local"
+                      - path: "defining_code/code_string"
+                        value: "at0103"
+                      - path: "value"
+                        value: "Unknown"
+                    openehrCondition:
+                      targetRoot: "$openehrRoot"
+                      targetAttribute: "defining_code/code_string"
+                      operator: "one of"
+                      criteria: "at0103"
+
   - name: "identifier"
     with:
       fhir: "$resource.identifier"
       openehr: "$archetype/protocol[at0025]/items[at0104]"
-
-  # The study is an ImagingStudy the report references, mapped from the
-  # same observation's protocol: its identifier, status and description.
-  - name: "imagingStudy"
-    with:
-      fhir: "$resource.imagingStudy"
-      openehr: "$reference"
-    reference:
-      resourceType: "ImagingStudy"
-      mappings:
-        - name: "studyProfile"
-          unidirectional: "openEHR->fhir"
-          with:
-            fhir: "$fhirRoot.meta"
-          manual:
-            - name: "profileUrl"
-              fhir:
-                - path: "profile"
-                  value: "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging"
-
-        - name: "studyInstanceIdentifier"
-          with:
-            fhir: "$fhirRoot.identifier"
-            openehr: "$archetype/protocol[at0025]/items[at0092]"
-          # NOTE: HL7 Europe Imaging Report 1.0.0-ballot, StudyInstanceUidIdentifierEuImaging fixes
-          # the identifier's type to the DICOM coding 110180, which the DV_IDENTIFIER does not hold.
-          followedBy:
-            mappings:
-              - name: "studyInstanceUidType"
-                unidirectional: "openEHR->fhir"
-                with:
-                  fhir: "type.coding"
-                manual:
-                  - name: "studyInstanceUid"
-                    fhir:
-                      - path: "system"
-                        value: "http://dicom.nema.org/resources/ontology/DCM"
-                      - path: "code"
-                        value: "110180"
-                      - path: "display"
-                        value: "Study Instance UID"
-
-        - name: "description"
-          with:
-            fhir: "$fhirRoot.description"
-            openehr: "$archetype/protocol[at0025]/items[at0105]"
-
-        # NOTE: DV_CODED_TEXT.adoc, a FHIR `code` cannot convert to a DV_CODED_TEXT, so
-        # the study status maps through a `manual` table over the archetype's local codes.
-        - name: "studyStatus"
-          with:
-            fhir: "$fhirRoot"
-            openehr: "$archetype/protocol[at0025]/items[at0099]"
-          manual:
-            - name: "registered"
-              fhir:
-                - path: "status"
-                  value: "registered"
-              fhirCondition:
-                targetRoot: "$fhirRoot"
-                targetAttribute: "status"
-                operator: "one of"
-                criteria: "registered"
-              openehr:
-                - path: "defining_code/terminology_id/value"
-                  value: "local"
-                - path: "defining_code/code_string"
-                  value: "at0100"
-                - path: "value"
-                  value: "Registered"
-              openehrCondition:
-                targetRoot: "$openehrRoot"
-                targetAttribute: "defining_code/code_string"
-                operator: "one of"
-                criteria: "at0100"
-            - name: "available"
-              fhir:
-                - path: "status"
-                  value: "available"
-              fhirCondition:
-                targetRoot: "$fhirRoot"
-                targetAttribute: "status"
-                operator: "one of"
-                criteria: "available"
-              openehr:
-                - path: "defining_code/terminology_id/value"
-                  value: "local"
-                - path: "defining_code/code_string"
-                  value: "at0101"
-                - path: "value"
-                  value: "Available"
-              openehrCondition:
-                targetRoot: "$openehrRoot"
-                targetAttribute: "defining_code/code_string"
-                operator: "one of"
-                criteria: "at0101"
-            - name: "cancelled"
-              fhir:
-                - path: "status"
-                  value: "cancelled"
-              fhirCondition:
-                targetRoot: "$fhirRoot"
-                targetAttribute: "status"
-                operator: "one of"
-                criteria: "cancelled"
-              openehr:
-                - path: "defining_code/terminology_id/value"
-                  value: "local"
-                - path: "defining_code/code_string"
-                  value: "at0102"
-                - path: "value"
-                  value: "Cancelled"
-              openehrCondition:
-                targetRoot: "$openehrRoot"
-                targetAttribute: "defining_code/code_string"
-                operator: "one of"
-                criteria: "at0102"
-            - name: "unknown"
-              fhir:
-                - path: "status"
-                  value: "unknown"
-              fhirCondition:
-                targetRoot: "$fhirRoot"
-                targetAttribute: "status"
-                operator: "one of"
-                criteria: "unknown"
-              openehr:
-                - path: "defining_code/terminology_id/value"
-                  value: "local"
-                - path: "defining_code/code_string"
-                  value: "at0103"
-                - path: "value"
-                  value: "Unknown"
-              openehrCondition:
-                targetRoot: "$openehrRoot"
-                targetAttribute: "defining_code/code_string"
-                operator: "one of"
-                criteria: "at0103"
-
