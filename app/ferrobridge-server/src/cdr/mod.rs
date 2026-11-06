@@ -145,6 +145,9 @@ pub struct CdrClient {
     /// The onward lane a facade request reaches the CDR under its caller
     /// through, when one is configured.
     onward: Option<onward::CdrOnward>,
+    /// The person the client calls the CDR as, when it carries an onward
+    /// token.
+    on_behalf: Option<onward::OnwardSubject>,
 }
 
 impl CdrClient {
@@ -176,6 +179,7 @@ impl CdrClient {
             request_id: None,
             demographic: config.demographic,
             onward: config.onward.clone(),
+            on_behalf: None,
         })
     }
 
@@ -188,6 +192,7 @@ impl CdrClient {
             request_id: Some(request_id),
             demographic: self.demographic,
             onward: self.onward.clone(),
+            on_behalf: self.on_behalf.clone(),
         }
     }
 
@@ -212,17 +217,25 @@ impl CdrClient {
         let Some(onward) = self.onward.as_ref() else {
             return Ok(self.clone());
         };
-        let Some(token) = onward.token(access, headers).await? else {
+        let Some(exchanged) = onward.token(access, headers).await? else {
             return Ok(self.clone());
         };
-        let auth = Some(Auth::Static(Credentials::bearer(token)));
+        let auth = Some(Auth::Static(Credentials::bearer(exchanged.token)));
         Ok(Self {
             client: authenticated(self.client.clone(), auth.as_ref()),
             auth,
             request_id: self.request_id.clone(),
             demographic: self.demographic,
             onward: None,
+            on_behalf: Some(exchanged.subject),
         })
+    }
+
+    /// Returns the person this client calls the CDR as, when it carries a
+    /// token the caller's was exchanged for.
+    #[must_use]
+    pub const fn on_behalf(&self) -> Option<&onward::OnwardSubject> {
+        self.on_behalf.as_ref()
     }
 
     /// Returns the openEHR REST API root every call is resolved under.

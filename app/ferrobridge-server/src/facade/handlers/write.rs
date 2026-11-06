@@ -84,10 +84,11 @@ pub(crate) async fn create(
     let program = &select_program(facade, &inbound, headers)?;
     let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let committer = Committer::of(access, &client, &facade.settings().system_id);
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_committer(Committer::of(access, &facade.settings().system_id));
+        .with_committer(committer);
     let claim = ingest.claim_resource(&inbound)?;
 
     match ingest
@@ -184,10 +185,11 @@ pub(crate) async fn update(
     let program = &select_program(facade, &inbound, headers)?;
     let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let committer = Committer::of(access, &client, &facade.settings().system_id);
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_committer(Committer::of(access, &facade.settings().system_id));
+        .with_committer(committer);
     resend(
         facade,
         &ingest,
