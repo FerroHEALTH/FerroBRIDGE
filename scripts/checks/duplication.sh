@@ -617,7 +617,16 @@ if [[ "${1:-}" == "--self-test" ]]; then
   [[ "$(committed_count "$count_file")" == 0 ]] || fail "--update did not record the lower count"
   [[ "$(run check)" == 0 ]] || fail "the lowered count was refused: $(cat "$work/answer")"
 
-  echo "duplication: self-test OK (the pins, the detector order, a rise, a fall, an unchanged count and a move around a block)."
+  # A lowered count that lands on a tree grown since it was measured (#1633):
+  # the ratchet pull request's merge group carries a pull request merged
+  # after the measurement, so the guard measures that tree and refuses it.
+  other_block ninth >"$tree/app/demo/src/five.rs"
+  other_block tenth >"$tree/crates/demo/src/six.rs"
+  [[ "$(run check)" == 1 ]] || fail "a count lowered below the tree it lands on passed"
+  grep -q 'rose from 0' "$work/answer" ||
+    fail "a count below the tree it lands on was not reported as a rise: $(cat "$work/answer")"
+
+  echo "duplication: self-test OK (the pins, the detector order, a rise, a fall, an unchanged count, a move around a block and a lowered count below the tree it lands on)."
   exit 0
 fi
 

@@ -8,6 +8,7 @@
 #![allow(clippy::panic_in_result_fn, reason = "test assertions")]
 
 mod action_time;
+mod condition_outside;
 mod corpus;
 mod derive;
 mod engine;
@@ -35,6 +36,7 @@ mod readiness;
 mod repeated_start;
 mod resolve;
 mod roundtrip;
+mod split_outside;
 mod support;
 mod term_mapping;
 mod tree;

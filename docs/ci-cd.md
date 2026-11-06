@@ -552,6 +552,18 @@ guard fails there, it closes the pull request and deletes its branch, or
 deletes a branch no pull request was opened from. A push never creates the
 branch; only the schedule and a dispatch do.
 
+A lowered count lands only through the merge queue. The merge group holds
+every pull request merged after the measurement, and the `duplication`,
+`forwarders`, `file-length` and `stray-literals` jobs run on it like any
+other, so a count below what that tree carries is a rise there, and the queue
+refuses it. That is how it went on 2026-11-06 (#1633): the merge groups of
+#1627 failed `duplication` with 1758 duplicated lines against a count of 1748,
+and the pull request reached `main` only because it was merged around the
+queue ten seconds after its second group started. Never merge a tightening
+pull request by hand or with an administrator bypass. The duplication
+guard's self-test holds the case: a lowered count on a tree that grew since
+the measurement fails as a rise.
+
 The lane commits through the Git Data REST API, so GitHub signs the commit,
 and it never pushes to `main` (#1363, the rule FerroEHR adopted in
 FerroHEALTH/FerroEHR#4554). No specification governs this: our own design.

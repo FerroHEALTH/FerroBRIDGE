@@ -134,7 +134,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         source: Box::new(source),
                     })
             }
-            Direction::OpenehrToFhir => self.openehr_holds(mapping.name(), gate, &binding.openehr),
+            Direction::OpenehrToFhir => self.openehr_holds(mapping.name(), gate, binding),
         }
     }
 

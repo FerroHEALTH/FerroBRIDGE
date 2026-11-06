@@ -8,8 +8,10 @@
 //! guard, the program selection, the engine, the identity map and the status
 //! table.
 
+mod attestation;
 pub(crate) mod auth;
 pub(crate) mod batch;
+mod bound;
 mod capability;
 mod conditional;
 mod created;

@@ -12,6 +12,7 @@ use argon2::Argon2;
 use argon2::password_hash::PasswordHasher;
 use ferrohealth_smart::basic::Credential;
 use ferrohealth_smart::basic::PasswordStore;
+use ferrohealth_smart::basic::StoreError;
 use http::StatusCode;
 use http::header;
 use jsonwebtoken::Algorithm;
@@ -129,25 +130,43 @@ async fn a_missing_credential_is_challenged_for_both_schemes() -> Result<(), Box
 }
 
 #[test]
-fn a_basic_caller_is_audited_as_a_person_never_a_system() {
+fn a_basic_caller_is_audited_as_a_person_never_a_system() -> Result<(), Box<dyn Error>> {
     // NOTE: RFC 6749 §4.4, a machine authenticates with the client credentials
     // grant, so a Basic credential is a person's whatever scope it is granted.
-    for scope in ["user/Condition.r", "system/Condition.r"] {
-        let text = logged(async {
-            let app = app_granting(scope).await.expect("the facade starts");
-            let response = raw(
-                app,
-                basic(get(UNKNOWN), USER, "synthetic-password").expect("a legal credential"),
-            )
-            .await
-            .expect("an answer");
-            assert_eq!(StatusCode::NOT_FOUND, response.status(), "{scope}");
-        });
-        let lines = audit_lines(&text);
-        assert_eq!(1, lines.len(), "{scope}: {text}");
-        let line = &lines[0];
-        assert_eq!(Some(USER), line["principal"].as_str(), "{scope}: {line}");
-        assert_eq!(Some("basic"), line["via"].as_str(), "{scope}: {line}");
-        assert_eq!(Some("person"), line["kind"].as_str(), "{scope}: {line}");
+    let text = logged(async {
+        let app = app().await.expect("the facade starts");
+        let response = raw(
+            app,
+            basic(get(UNKNOWN), USER, "synthetic-password").expect("a legal credential"),
+        )
+        .await
+        .expect("an answer");
+        assert_eq!(StatusCode::NOT_FOUND, response.status());
+    });
+    let lines = audit_lines(&text);
+    assert_eq!(1, lines.len(), "{text}");
+    let line = &lines[0];
+    assert_eq!(Some(USER), line["principal"].as_str(), "{line}");
+    assert_eq!(Some("basic"), line["via"].as_str(), "{line}");
+    assert_eq!(Some("person"), line["kind"].as_str(), "{line}");
+    // NOTE: GHSA-jhg2-jwjp-hq74, a Basic user granted a `system/` scope never
+    // reaches the facade: the store refuses it, naming the user and the scope.
+    for (scopes, refused) in [
+        ("system/Condition.r", "system/Condition.r"),
+        ("user/Condition.r system/*.read", "system/*.read"),
+    ] {
+        let error = PasswordStore::new()
+            .with_user(USER, hash("synthetic-password")?, scopes)
+            .err()
+            .ok_or("a Basic user with a system scope is refused")?;
+        assert!(
+            matches!(
+                &error,
+                StoreError::SystemScope { username, scope }
+                    if username == USER && scope == refused
+            ),
+            "{scopes}: {error:?}"
+        );
     }
+    Ok(())
 }

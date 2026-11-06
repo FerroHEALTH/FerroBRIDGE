@@ -32,6 +32,7 @@ use openehr_its::rest::generated::common::UpdateAuditData;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentified;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
 use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
+use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::support::terminology::openehr_terminology_group_identifiers::OpenehrTerminologyGroupIdentifiersData;
@@ -103,13 +104,32 @@ pub enum Committer {
         /// it, or the bridge's system id for a Basic user the bridge checked.
         namespace: String,
     },
+    /// A caller the request reaches the CDR as through an onward token, which
+    /// the CDR derives the committer from.
+    ///
+    /// A header commit then states no committer, and a CONTRIBUTION the one
+    /// placeholder the CDR discards: a `PARTY_IDENTIFIED` whose only member
+    /// is a `DV_IDENTIFIER` of the onward token's `iss` and `sub`.
+    Placeholder {
+        /// The onward token's `iss`.
+        issuer: String,
+        /// The onward token's `sub`.
+        subject: String,
+    },
 }
 
 impl Committer {
-    /// Returns the committer of a request admitted with `access`, the bridge
-    /// for an open surface.
+    /// Returns the committer of a request admitted with `access` that calls
+    /// the CDR through `client`: the placeholder of the onward token it
+    /// carries, the caller, or the bridge for an open surface.
     #[must_use]
-    pub fn of(access: &Access, system_id: &str) -> Self {
+    pub fn of(access: &Access, client: &crate::cdr::CdrClient, system_id: &str) -> Self {
+        if let Some(onward) = client.on_behalf() {
+            return Self::Placeholder {
+                issuer: onward.issuer.clone(),
+                subject: onward.subject.clone(),
+            };
+        }
         let Some(caller) = access.caller() else {
             return Self::Bridge;
         };
@@ -131,6 +151,22 @@ impl Committer {
     /// `[a-zA-Z][a-zA-Z0-9_.:/&?=+-]*`); the name alone carries it otherwise.
     fn party(&self, system_id: &str) -> PartyProxy {
         let (name, external_ref) = match self {
+            Self::Placeholder { issuer, subject } => {
+                return PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(
+                    PartyIdentifiedData {
+                        external_ref: None,
+                        name: None,
+                        identifiers: Some(openehr_base::containers::NonEmptyVec::of(
+                            DvIdentifier {
+                                issuer: Some(issuer.clone()),
+                                assigner: None,
+                                id: subject.clone(),
+                                r#type: None,
+                            },
+                        )),
+                    },
+                ));
+            }
             Self::Bridge => (system_id, None),
             Self::Caller { subject, namespace } => (
                 subject.as_str(),
@@ -203,7 +239,7 @@ pub enum CommitError {
 pub fn status_context(system_id: &str, committer: &Committer) -> CommitContext {
     CommitContext {
         lifecycle_state: Some(lifecycle_state(VersionLifecycleState::Complete)),
-        audit: Some(audit_data(Change::Modification, system_id, committer)),
+        audit: header_audit(Change::Modification, system_id, committer),
         template_id: None,
     }
 }
@@ -232,7 +268,7 @@ pub fn context(
                 lifecycle_state(VersionLifecycleState::Complete)
             }
         }),
-        audit: Some(audit_data(change, system_id, committer)),
+        audit: header_audit(change, system_id, committer),
         template_id: Some(
             template_id(template).map_err(|source| CommitError::Template {
                 template: String::from(template),
@@ -250,6 +286,20 @@ pub fn context(
 #[must_use]
 pub fn audit(change: Change, system_id: &str, committer: &Committer) -> UpdateAudit {
     UpdateAudit::UpdateAudit(audit_data(change, system_id, committer))
+}
+
+/// Returns the `openehr-audit-details` a header commit states, none under an
+/// onward token, whose committer the CDR derives from the token.
+///
+/// ITS-REST 1.1.0 leaves the header optional ("None of these headers are
+/// mandatory"), and `committer` is a required member of it.
+fn header_audit(change: Change, system_id: &str, committer: &Committer) -> Option<UpdateAuditData> {
+    match committer {
+        Committer::Placeholder { .. } => None,
+        Committer::Bridge | Committer::Caller { .. } => {
+            Some(audit_data(change, system_id, committer))
+        }
+    }
 }
 
 /// Returns the `UPDATE_AUDIT` members one write states.
@@ -411,5 +461,50 @@ mod tests {
         };
         assert_eq!(Some("FerroBRIDGE"), party.name.as_deref());
         assert_eq!(None, party.external_ref);
+    }
+
+    fn placeholder() -> Committer {
+        Committer::Placeholder {
+            issuer: String::from("https://as.example.org"),
+            subject: String::from("synthetic-sub"),
+        }
+    }
+
+    #[test]
+    fn a_header_commit_under_an_onward_token_states_no_audit() {
+        let built = context(
+            Change::Creation,
+            "FerroBRIDGE",
+            &placeholder(),
+            "ferrobridge.diagnose.v1",
+        )
+        .expect("the context builds");
+        assert!(built.audit.is_none());
+        assert!(built.lifecycle_state.is_some());
+        assert!(
+            super::status_context("FerroBRIDGE", &placeholder())
+                .audit
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn the_placeholder_committer_is_one_identifier_of_the_token_s_iss_and_sub() {
+        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &placeholder())
+        else {
+            panic!("the facade writes an UPDATE_AUDIT, never an attestation");
+        };
+        let json = openehr_its::json::to_canonical_value(&data.committer);
+        assert_eq!(
+            serde_json::json!({
+                "_type": "PARTY_IDENTIFIED",
+                "identifiers": [{
+                    "_type": "DV_IDENTIFIER",
+                    "issuer": "https://as.example.org",
+                    "id": "synthetic-sub"
+                }]
+            }),
+            json
+        );
     }
 }

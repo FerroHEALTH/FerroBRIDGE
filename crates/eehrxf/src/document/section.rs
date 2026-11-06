@@ -4,6 +4,8 @@
 //! One section of a document: its slot, its narrative, its entries and the
 //! reason it has none.
 
+use fhir_types::r4::codeable_concept::CodeableConcept;
+
 use super::form::Slot;
 
 /// Why a section has no entry (FHIR R4 `list-empty-reason`).
@@ -27,6 +29,15 @@ impl EmptyReason {
     }
 }
 
+/// The reason a section has no entry, as the document holds it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Emptied {
+    /// The `list-empty-reason` code the caller gave.
+    Coded(EmptyReason),
+    /// The `emptyReason` a mapping run wrote, kept whole.
+    Mapped(CodeableConcept),
+}
+
 /// One section of the document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Section {
@@ -34,7 +45,7 @@ pub struct Section {
     pub(super) paragraphs: Vec<String>,
     pub(super) entries: Vec<String>,
     pub(super) authors: Vec<String>,
-    pub(super) empty: Option<EmptyReason>,
+    pub(super) empty: Option<Emptied>,
 }
 
 impl Section {
@@ -78,32 +89,36 @@ impl Section {
     /// [`super::form::SectionRule::Reasoned`] rule of the document's form
     /// requires it of a section with no entry.
     #[must_use]
-    pub const fn empty_because(mut self, reason: EmptyReason) -> Self {
-        self.empty = Some(reason);
+    pub fn empty_because(mut self, reason: EmptyReason) -> Self {
+        self.empty = Some(Emptied::Coded(reason));
         self
     }
 }
 
 /// One section a mapping run wrote, placed in the document's form.
 ///
-/// It holds the slot the section's LOINC code names and the `fullUrl` of
-/// each entry it references, as
-/// [`super::Document::with_mapped_composition`] added them.
+/// It holds the slot the section's LOINC code names, the `fullUrl` of each
+/// entry it references, as [`super::Document::with_mapped_composition`]
+/// added them, and the `emptyReason` the run wrote.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MappedSection {
     /// The slot of the form the section's code names.
     pub slot: &'static Slot,
     /// The `fullUrl` of each entry, in the section's order.
     pub entries: Vec<String>,
+    /// The `emptyReason` the run wrote on the section, when it wrote one.
+    pub empty_reason: Option<CodeableConcept>,
 }
 
 impl MappedSection {
     /// Returns the document section of this mapped section, its generated
-    /// narrative the `paragraphs`, holding every entry.
+    /// narrative the `paragraphs`, holding every entry and the run's
+    /// `emptyReason`.
     #[must_use]
     pub fn into_section(self, paragraphs: Vec<String>) -> Section {
         Section {
             entries: self.entries,
+            empty: self.empty_reason.map(Emptied::Mapped),
             ..Section::new(self.slot, paragraphs)
         }
     }

@@ -21,8 +21,10 @@ use eehrxf::document::imaging::{
 };
 use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::document::{Document, DocumentError, LOINC};
+use fhir_types::r4::bundle::{Bundle, BundleEntry};
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use fhir_types::r4::composition::{Composition, CompositionSection};
 use fhir_types::r4::device::Device;
 use fhir_types::r4::diagnostic_report::DiagnosticReport;
 use fhir_types::r4::human_name::HumanName;
@@ -451,5 +453,60 @@ fn an_imaging_report_lacking_a_required_section_is_refused() -> Result<(), Box<d
         matches!(refused, Err(DocumentError::Lacking { slice: "procedure" })),
         "{refused:?}"
     );
+    Ok(())
+}
+
+/// The LOINC coding `code`.
+fn loinc(code: &str) -> Coding {
+    Coding {
+        system: Some(LOINC.into()),
+        code: Some(code.into()),
+        ..Coding::default()
+    }
+}
+
+#[test]
+fn the_empty_reason_a_mapping_run_writes_reaches_the_document() -> Result<(), Box<dyn Error>> {
+    let mut document = document(Some(MR_BRAIN))?;
+    // NOTE: SectionEmptyReasonEuImaging includes LOINC LA4720-4 beside list-empty-reason.
+    let reason = CodeableConcept {
+        coding: vec![loinc("LA4720-4")],
+        ..CodeableConcept::default()
+    };
+    let findings = IMAGING_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "findings")
+        .ok_or("the findings slot")?;
+    let run = Bundle {
+        r#type: "collection".into(),
+        entry: vec![BundleEntry {
+            resource: Some(Resource::Composition(Box::new(Composition {
+                section: vec![CompositionSection {
+                    code: Some(CodeableConcept {
+                        coding: vec![loinc(findings.code)],
+                        ..CodeableConcept::default()
+                    }),
+                    empty_reason: Some(reason.clone()),
+                    ..CompositionSection::default()
+                }],
+                ..Composition::default()
+            }))),
+            ..BundleEntry::default()
+        }],
+        ..Bundle::default()
+    };
+    for section in document.with_mapped_composition(&run)? {
+        assert_eq!(section.empty_reason.as_ref(), Some(&reason));
+        document.with_section(section.into_section(vec![String::from("No findings.")]))?;
+    }
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    let written = bundle["entry"][0]["resource"]["section"]
+        .as_array()
+        .ok_or("sections")?
+        .iter()
+        .find(|section| section["code"]["coding"][0]["code"] == findings.code)
+        .ok_or("the findings section")?;
+    assert_eq!(written["emptyReason"]["coding"][0]["code"], "LA4720-4");
+    assert_eq!(written["emptyReason"]["coding"][0]["system"], LOINC);
     Ok(())
 }

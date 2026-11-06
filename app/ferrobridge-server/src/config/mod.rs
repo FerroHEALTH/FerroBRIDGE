@@ -378,6 +378,9 @@ pub struct FacadeSettings {
     pub identifier: Option<crate::facade::search::identifier::IdentifierSearch>,
     /// The queries the party types are searched with, when on.
     pub party_search: Option<crate::facade::search::party::PartySearch>,
+    /// The issuers of the binding keys a party the facade never writes
+    /// carries.
+    pub binding_issuers: Vec<String>,
 }
 
 /// The HL7 v2 face, resolved.

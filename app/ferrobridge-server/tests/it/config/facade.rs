@@ -533,3 +533,20 @@ fn the_subject_link_keys_are_set_from_the_environment() -> Result<(), Box<dyn st
     assert_eq!("GROUP", facade.settings.subject.party_type());
     Ok(())
 }
+
+#[test]
+fn the_binding_identifier_issuers_are_empty_until_a_deployment_names_them()
+-> Result<(), Box<dyn std::error::Error>> {
+    let settings =
+        Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve(Process::Server)?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(Vec::<String>::new(), facade.binding_issuers);
+    let text = facade_with("binding_identifier_issuers = [\"https://login.example/persons\"]\n");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!(
+        ["https://login.example/persons"],
+        facade.binding_issuers.as_slice()
+    );
+    Ok(())
+}
