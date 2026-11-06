@@ -84,8 +84,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<bool, EngineError> {
         // NOTE: no specification governs this: our own design, a run over one occurrence of
         // the start archetype evaluates the context's condition at that occurrence.
-        let instance: Vec<RmPosition> = self.pins.iter().map(|&(_, position)| position).collect();
-        self.openehr_holds(self.program.context().as_str(), gate, &instance)
+        self.openehr_holds(self.program.context().as_str(), gate, &Binding::default())
     }
 
     /// Runs a list of mappings under one binding, in program order.
@@ -172,8 +171,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let present = !inputs.is_empty();
                 let mut admitted = Vec::with_capacity(inputs.len());
                 for input in inputs {
-                    let positions = Self::positions_at(mapping, &input)?;
-                    if self.openehr_holds(mapping.name(), gate, &positions)? {
+                    let openehr = Self::positions_at(mapping, &input)?;
+                    let held = Binding {
+                        axes: parent.axes_of(mapping.openehr(), openehr.len()),
+                        openehr,
+                        ..Binding::default()
+                    };
+                    if self.openehr_holds(mapping.name(), gate, &held)? {
                         admitted.push(input);
                     }
                 }
@@ -192,7 +196,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         &self,
         name: &str,
         gate: &crate::resolve::program::condition::Condition,
-        instance: &[RmPosition],
+        instance: &Binding,
     ) -> Result<bool, EngineError> {
         let Some(composition) = self.composition else {
             return Ok(true);
@@ -205,9 +209,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     source: Box::new(ConditionError::WrongSide),
                 });
             };
-            let depth = target.occurrences().len();
-            let mut positions: Vec<RmPosition> = instance.iter().take(depth).copied().collect();
-            positions.resize(depth, RmPosition::first());
+            let positions = self.bound_positions(target, instance);
             let read = self
                 .read_target(composition, target, &positions)
                 .map_err(|source| EngineError::Template {
@@ -646,7 +648,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         })?
                 }
                 Direction::OpenehrToFhir => {
-                    self.openehr_holds(preprocessor.model().as_str(), gate, &binding.openehr)?
+                    self.openehr_holds(preprocessor.model().as_str(), gate, binding)?
                 }
             };
             if !holds {

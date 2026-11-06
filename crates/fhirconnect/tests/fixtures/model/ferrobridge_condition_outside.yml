@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that makes each event its own
+# Observation (HierarchyMappings.adoc, split) and maps an event's amount only
+# while the protocol's batch names a lot: an openehrCondition whose target
+# lies outside the repeating event (basics/Conditions.adoc, targetRoot).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_condition_outside
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.ferrobridge_reading.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+preprocessor:
+  hierarchy:
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+    split:
+      fhir:
+        create: "resource"
+
+mappings:
+  - name: "reading"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "time"
+          with:
+            fhir: "effective.as(DateTime)"
+            openehr: "time"
+
+        - name: "amount"
+          with:
+            fhir: "value.as(Quantity)"
+            openehr: "data[at0003]/items[at0004]"
+          openehrCondition:
+            targetRoot: "$archetype/protocol[at0005]/items[at0009]"
+            targetAttributes:
+              - "items[at0010]"
+            operator: "not empty"
+
+  - name: "status"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  - name: "code"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "text"
+        fhir:
+          - path: "code.text"
+            value: "Synthetic reading"
