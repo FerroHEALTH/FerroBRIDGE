@@ -101,12 +101,25 @@ test = "crates/fhirconnect/tests/it/eu_mpd.rs::the_profile_elements_of_the_dispe
 [[category]]
 article = "14(1)(d)"
 name = "Medical imaging studies and related reports"
-note = "HL7 Europe Imaging Report is at 1.0.0-ballot and deferred (docs/architecture.md section 4.8)."
+note = "The openEHR international CKM publishes no imaging report template; the template is FerroBRIDGE's, over published CKM archetypes only (owner ruling on #116, 2026-11-06). The CompositionEuImaging is assembled by eehrxf::document around the mapped report."
 
 [[category.row]]
-target = "Imaging report Composition"
+target = "DiagnosticReportEuImaging"
+profile = "http://hl7.eu/fhir/imaging/StructureDefinition/DiagnosticReportEuImaging"
 package = "hl7.fhir.eu.imaging 1.0.0-ballot"
-gap = "no imaging report template in the openEHR international CKM"
+template = "FerroBRIDGE imaging report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_imaging_report.adlt"
+context = "crates/eehrxf/mappings/imaging/ferrobridge_eu_imaging.context.yml"
+test = "crates/eehrxf/tests/it/imaging_mapped.rs::the_report_mapped_back_out_is_a_document_the_profiles_constrain"
+
+[[category.row]]
+target = "ImagingStudyEuImaging"
+profile = "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging"
+package = "hl7.fhir.eu.imaging 1.0.0-ballot"
+template = "FerroBRIDGE imaging report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_imaging_report.adlt"
+context = "crates/eehrxf/mappings/imaging/ferrobridge_eu_imaging.context.yml"
+test = "crates/eehrxf/tests/it/imaging_mapped.rs::the_report_mapped_back_out_is_a_document_the_profiles_constrain"
 
 [[category]]
 article = "14(1)(e)"

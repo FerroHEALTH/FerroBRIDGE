@@ -62,11 +62,12 @@ The openEHR international CKM publishes no dispensation template; the template i
 
 ### Article 14(1)(d): Medical imaging studies and related reports
 
-HL7 Europe Imaging Report is at 1.0.0-ballot and deferred (docs/architecture.md section 4.8).
+The openEHR international CKM publishes no imaging report template; the template is FerroBRIDGE's, over published CKM archetypes only (owner ruling on #116, 2026-11-06). The CompositionEuImaging is assembled by eehrxf::document around the mapped report.
 
 | Target profile | Package | Committed template | Transform proven |
 |---|---|---|---|
-| `Imaging report Composition` | hl7.fhir.eu.imaging 1.0.0-ballot | none: no imaging report template in the openEHR international CKM | no |
+| `DiagnosticReportEuImaging` | hl7.fhir.eu.imaging 1.0.0-ballot | FerroBRIDGE imaging report template over CKM archetypes | `the_report_mapped_back_out_is_a_document_the_profiles_constrain` |
+| `ImagingStudyEuImaging` | hl7.fhir.eu.imaging 1.0.0-ballot | FerroBRIDGE imaging report template over CKM archetypes | `the_report_mapped_back_out_is_a_document_the_profiles_constrain` |
 
 ### Article 14(1)(e): Medical test results, laboratory results and related reports
 

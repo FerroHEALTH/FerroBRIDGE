@@ -211,9 +211,9 @@ classify() {
     # Write only the KDS templates under the testkit's fixtures: the testkit
     # embeds them for every package testing with it, fhirconnect's tests too.
     scripts/vendor/kds-*-opt.sh | scripts/vendor/lib/kds-opt.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
-    # Writes only the CKM archetypes under the testkit's fixtures, which the
-    # medication template the testkit builds reads.
-    scripts/vendor/ckm-medication.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
+    # Write only the CKM archetypes under the testkit's fixtures, which the
+    # medication and imaging templates the testkit builds read.
+    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
     # The corpora only the eehrxf tests read, and the script that writes them.
     docs/specs/eu-xtehr-models/* | docs/specs/eu-hl7-*/* | docs/specs/fhir-r4/*) echo "only eehrxf" ;;
     docs/specs/ehdsi-mvc/* | docs/specs/fr-ans/*) echo "only eehrxf" ;;
