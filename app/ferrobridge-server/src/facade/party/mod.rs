@@ -345,3 +345,55 @@ pub(crate) fn location(facade: &Facade, resource_type: &str, version: &ObjectVer
         version.version_tree_id().value()
     )
 }
+
+/// Refuses a write of `party`, the canonical JSON of a party the request
+/// would commit or replace, when it carries a binding key: a `DV_IDENTIFIER`
+/// whose `issuer` is one the facade is configured with.
+///
+/// A party bound to a login is provisioned through the CDR's SCIM service and
+/// written only by an administrator or that SCIM client, so the facade
+/// answers `403` before it commits anything (no specification governs the
+/// binding: our own design).
+pub(crate) fn unbound(
+    facade: &Facade,
+    resource_type: &str,
+    party: &serde_json::Value,
+) -> Result<(), Refusal> {
+    let issuers = facade.binding_issuers();
+    if issuers.is_empty() {
+        return Ok(());
+    }
+    match binding_issuer(party, issuers) {
+        None => Ok(()),
+        Some(issuer) => Err(reply::refusal(
+            StatusCode::FORBIDDEN,
+            Issue::error(IssueType::Forbidden).diagnosing(format!(
+                "this {resource_type} carries a binding identifier of {issuer}: a party bound \
+                 to a login is provisioned through SCIM and never written through the facade"
+            )),
+        )),
+    }
+}
+
+/// Returns the first of `issuers` a `DV_IDENTIFIER` anywhere in `value`
+/// names as its `issuer`.
+fn binding_issuer<'a>(value: &serde_json::Value, issuers: &'a [String]) -> Option<&'a str> {
+    match value {
+        serde_json::Value::Object(members) => {
+            let named = (members.get("_type").and_then(serde_json::Value::as_str)
+                == Some("DV_IDENTIFIER"))
+            .then(|| members.get("issuer").and_then(serde_json::Value::as_str))
+            .flatten()
+            .and_then(|issuer| issuers.iter().find(|listed| *listed == issuer));
+            named.map(String::as_str).or_else(|| {
+                members
+                    .values()
+                    .find_map(|item| binding_issuer(item, issuers))
+            })
+        }
+        serde_json::Value::Array(items) => {
+            items.iter().find_map(|item| binding_issuer(item, issuers))
+        }
+        _ => None,
+    }
+}

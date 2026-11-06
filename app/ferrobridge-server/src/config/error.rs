@@ -137,17 +137,6 @@ pub enum Error {
         #[source]
         source: Box<ferrohealth_smart::config::ConfigError>,
     },
-    /// A Basic user holds a `system/` scope: a Basic credential is a
-    /// person's, and a machine authenticates with a client credentials token.
-    #[error(
-        "auth.basic.users: the user {user} holds the system scope {scope}; a Basic credential is a person's, so a machine authenticates with a client credentials token of an [[auth.issuer]] (RFC 6749 §4.4)"
-    )]
-    BasicSystemScope {
-        /// The user-id of the table.
-        user: String,
-        /// The first `system/` scope it lists.
-        scope: String,
-    },
     /// A `[<lane>.credentials]` table breaks a rule of `ferrohealth-smart`.
     #[error("[{section}] is refused")]
     Credentials {

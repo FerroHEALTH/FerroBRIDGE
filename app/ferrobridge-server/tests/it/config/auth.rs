@@ -14,6 +14,7 @@ use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::smart::OPERATOR_SCOPE;
 use ferrobridge_server::smart::SmartSettings;
+use ferrohealth_smart::basic::StoreError;
 use ferrohealth_smart::config::ConfigError;
 use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_smart::metadata::DiscoveryError;
@@ -460,27 +461,41 @@ fn a_basic_user_holding_a_system_scope_is_refused_naming_the_user()
 -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 6749 §4.4, a machine authenticates with the client credentials
     // grant, and every Basic credential is a person's, never a system's.
-    for scopes in [
-        "[\"system/Condition.rs\"]",
-        "[\"user/Condition.r\", \"system/*.read\"]",
+    for (scopes, refused) in [
+        ("[\"system/Condition.rs\"]", "system/Condition.rs"),
+        ("[\"user/Condition.r\", \"system/*.read\"]", "system/*.read"),
     ] {
         let error = refusal(&format!(
             "{MINIMAL}[[auth.basic.users]]\nuser = \"etl\"\npassword_hash = \"{PHC}\"\nscopes = {scopes}\n"
         ))?;
         assert!(
             matches!(
-                &error,
-                Error::BasicSystemScope { user, scope }
-                    if user == "etl" && scope.starts_with("system/")
+                rule(&error),
+                Some(ConfigError::Basic {
+                    source: StoreError::SystemScope { username, scope },
+                }) if username == "etl" && scope == refused
             ),
             "{scopes}: {error:?}"
         );
+        let chain = chain(&error);
         assert!(
-            error.to_string().contains("etl"),
-            "the refusal names the user: {error}"
+            chain.contains("\"etl\"") && chain.contains(&format!("\"{refused}\"")),
+            "the refusal names the user and the scope: {chain}"
         );
     }
     Ok(())
+}
+
+/// Returns the display of `error` and of every cause under it, joined.
+fn chain(error: &Error) -> String {
+    let mut text = error.to_string();
+    let mut cause = std::error::Error::source(error);
+    while let Some(next) = cause {
+        text.push_str(": ");
+        text.push_str(&next.to_string());
+        cause = next.source();
+    }
+    text
 }
 
 #[test]

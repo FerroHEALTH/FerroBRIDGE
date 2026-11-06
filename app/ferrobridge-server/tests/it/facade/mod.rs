@@ -10,6 +10,7 @@
 
 pub(crate) mod auth;
 pub(crate) mod batch;
+mod bound;
 mod capability;
 mod conditional;
 mod created;
