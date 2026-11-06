@@ -363,6 +363,11 @@ jobs:
       - run: bash scripts/checks/changelog-security.sh --self-test
       - run: bash scripts/release/changelog.sh --self-test
       - run: bash scripts/release/changelog.sh --check
+      # The release window: while the newest changelog section is assembled
+      # and untagged, no fragment may sit under changelog.d/, so the commit to
+      # be tagged stays taggable (docs/release.md, #1652).
+      - run: bash scripts/checks/release-window.sh --self-test
+      - run: bash scripts/checks/release-window.sh
       - run: bash scripts/release/changelog.sh --check-preview
       - run: bash scripts/release/plan.sh --self-test
       # The EHDS system documents' pin, standards readers, page check, the
