@@ -187,7 +187,11 @@ impl Document {
                 .iter()
                 .map(|entry| added(entry).ok_or(DocumentError::Dangling { slice: slot.slice }))
                 .collect::<Result<Vec<_>, _>>()?;
-            sections.push(MappedSection { slot, entries });
+            sections.push(MappedSection {
+                slot,
+                entries,
+                empty_reason: section.empty_reason.clone(),
+            });
         }
         Ok(sections)
     }

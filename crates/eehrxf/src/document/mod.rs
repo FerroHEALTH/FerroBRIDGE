@@ -54,7 +54,7 @@ pub mod section;
 #[cfg(feature = "patient-summary")]
 use form::PATIENT_SUMMARY_FORM;
 use form::{Code, Form};
-use section::Section;
+use section::{Emptied, Section};
 
 /// The `id` a report that carries none is written under.
 const REPORT_ID: &str = "report";
@@ -596,13 +596,17 @@ fn composition_section(section: &Section) -> CompositionSection {
         // NOTE: FHIR R4 Composition cmp-2: an empty reason stands only beside no entry.
         empty_reason: section
             .empty
+            .as_ref()
             .filter(|_| section.entries.is_empty())
-            .map(|reason| CodeableConcept {
-                coding: vec![coding(Code {
-                    system: EMPTY_REASON,
-                    code: reason.code(),
-                })],
-                ..CodeableConcept::default()
+            .map(|empty| match empty {
+                Emptied::Coded(reason) => CodeableConcept {
+                    coding: vec![coding(Code {
+                        system: EMPTY_REASON,
+                        code: reason.code(),
+                    })],
+                    ..CodeableConcept::default()
+                },
+                Emptied::Mapped(reason) => reason.clone(),
             }),
         ..CompositionSection::default()
     }
