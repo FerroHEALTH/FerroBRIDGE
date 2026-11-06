@@ -313,7 +313,10 @@ With this table, each FHIR facade request reaches the CDR under the person
 who made it. The bridge exchanges the caller's access token for a token of
 the CDR's issuer that names the same person, and sends that token on every
 CDR call of the request. The bridge authenticates the exchange with its own
-client of `[cdr.credentials.oauth]`, which the table requires. Only the CDR
+client of `[cdr.credentials.oauth]`, which the table requires and which must ask
+for the CDR alone, by `resource` (RFC 8707 §2) or by `scope` (such as
+`api://<cdr>/.default` under Entra ID), because a machine's request reaches the
+CDR under that token; one naming neither refuses the start. Only the CDR
 lane takes the table: an `onward` table under `[terminology.credentials]` or
 another lane refuses the start, and so does one on a server whose `[auth]` is
 off, because no caller then holds a token to exchange.
@@ -359,7 +362,7 @@ Who reaches the CDR how:
 
 | Caller | Reaches the CDR |
 |---|---|
-| A machine (a client credentials token) | Under the bridge's own token of `[cdr.credentials.oauth]`, never exchanged |
+| A machine (a client credentials token) | Under the bridge's own token of `[cdr.credentials.oauth]`, never exchanged; its composition names the machine's client in `originating_system_audit.system_id` |
 | A person, a delegated or representing person, under `kind = "persons"` | Under the exchanged token |
 | A professional of another party, under `kind = "federation"` | Under the exchanged token |
 | A patient, another party's organisation, a guest, a Basic user | Refused with `403` |

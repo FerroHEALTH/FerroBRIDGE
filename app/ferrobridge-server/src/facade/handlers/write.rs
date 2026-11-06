@@ -87,7 +87,8 @@ pub(crate) async fn create(
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_committer(Committer::of(access, &facade.settings().system_id));
+        .with_committer(Committer::of(access, &facade.settings().system_id))
+        .with_originating_system(crate::facade::commit::originating_system(access));
     let claim = ingest.claim_resource(&inbound)?;
 
     match ingest
@@ -187,7 +188,8 @@ pub(crate) async fn update(
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_committer(Committer::of(access, &facade.settings().system_id));
+        .with_committer(Committer::of(access, &facade.settings().system_id))
+        .with_originating_system(crate::facade::commit::originating_system(access));
     resend(
         facade,
         &ingest,

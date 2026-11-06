@@ -97,6 +97,7 @@ pub(crate) async fn transaction(
         .ingest(client)
         .with_references(&bundled)
         .with_committer(Committer::of(access, &facade.settings().system_id))
+        .with_originating_system(crate::facade::commit::originating_system(access))
         .ingest_bundle(
             bundle.document(),
             UnmappedEntries::Refuse,

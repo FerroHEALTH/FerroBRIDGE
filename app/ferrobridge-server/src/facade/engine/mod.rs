@@ -73,7 +73,7 @@ pub fn inbound(
         document,
         now,
         settings,
-        SourceItem::of(document),
+        origin_of(settings, SourceItem::of(document), None),
         &Seams::default()
             .with_functions(&Library)
             .with_terminology(terminology)
@@ -81,12 +81,32 @@ pub fn inbound(
     )
 }
 
-/// Maps one FHIR document into a composition that names `source` as its
+/// Returns the origin of a run under `settings`: the bridge as the system the
+/// content passed through, `source` as the item it came from, and
+/// `originating`, when given, as the system it originated in.
+#[must_use]
+pub fn origin_of(
+    settings: &crate::facade::Settings,
+    source: Option<SourceItem>,
+    originating: Option<&str>,
+) -> Origin {
+    let mut origin = Origin::new(&settings.system_id);
+    if let Some(originating) = originating {
+        origin = origin.with_originating_system(originating);
+    }
+    if let Some(source) = source {
+        origin = origin.with_source(source);
+    }
+    origin
+}
+
+/// Maps one FHIR document into a composition that names `origin` as its
 /// origin.
 ///
-/// This is [`inbound`] with the originating item given by the caller, so a
-/// face that received something other than the resource itself, such as a
-/// message, names what it received. `None` records no source item. Every
+/// This is [`inbound`] with the origin given by the caller ([`origin_of`]),
+/// so a face that received something other than the resource itself, such
+/// as a message, names what it received, and a system caller is named as the
+/// originating system. Every
 /// `conceptmap` code translates through the terminology `seams` carries, and
 /// a `reference` mapping reads the resource it points at from its reference
 /// source, where one it holds no resource for is a declared skip.
@@ -102,13 +122,9 @@ pub fn inbound_from(
     document: &Value,
     now: &str,
     settings: &crate::facade::Settings,
-    source: Option<SourceItem>,
+    origin: Origin,
     seams: &Seams<'_>,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
-    let mut origin = Origin::new(&settings.system_id);
-    if let Some(source) = source {
-        origin = origin.with_source(source);
-    }
     let defaults = Defaults::at(now)
         .with_composer(COMPOSER)
         .with_language(&settings.language)

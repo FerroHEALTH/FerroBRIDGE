@@ -343,7 +343,11 @@ Every composition the facade commits carries a `FEEDER_AUDIT`, which is the
 reference model's own element for data transformed into openEHR form: the
 source resource's `id` and type as an `originating_system_item_ids` entry, its
 `meta.versionId` as `originating_system_audit.version_id`, and the configured
-`system_id` naming the bridge. A source resource that carries no `id` is
+`system_id` naming the bridge. When a machine (a client credentials token)
+made the request, its client is the originating system
+(`originating_system_audit.system_id`) and the bridge the feeder system
+(`feeder_system_audit.system_id`), which RM `FEEDER_AUDIT` records for a
+feeder "different from the originating system". A source resource that carries no `id` is
 recorded as unknown, never given one. So a reader of the CDR can tell which
 FHIR resource a composition came from without asking the bridge.
 

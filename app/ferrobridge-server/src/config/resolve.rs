@@ -414,6 +414,22 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             section: String::from("cdr.credentials"),
             source: Box::new(source),
         })?;
+    // NOTE: RFC 8707 §2 and Microsoft's `scope=api://<cdr>/.default`: a machine's commit
+    // goes under the bridge's own token, which must name the CDR alone.
+    if cdr.credentials.onward.is_some()
+        && cdr
+            .credentials
+            .oauth
+            .as_ref()
+            .is_some_and(|oauth| oauth.resource.is_empty() && oauth.scope.is_empty())
+    {
+        return Err(Error::Needs {
+            key: String::from("cdr.credentials.onward"),
+            needs: String::from(
+                "cdr.credentials.oauth.resource or cdr.credentials.oauth.scope naming the CDR",
+            ),
+        });
+    }
     let kind = cdr
         .credentials
         .onward
