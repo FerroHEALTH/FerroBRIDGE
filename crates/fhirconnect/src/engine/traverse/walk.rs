@@ -6,6 +6,7 @@
 
 use openehr_mapping_core::composition::CanonicalDocument;
 use openehr_mapping_core::composition::RmPosition;
+use openehr_mapping_core::index::paths::FlatId;
 use openehr_mapping_core::template::PathError;
 
 use crate::engine::condition;
@@ -336,26 +337,69 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }
             return Ok(vec![prefix]);
         }
-        let mut found = Vec::new();
-        let mut instance = 1u32;
-        while instance <= INSTANCE_CEILING {
-            let mut positions = prefix.clone();
-            positions.push(
-                RmPosition::new(instance).map_err(|source| EngineError::Position {
-                    mapping: String::from(name),
-                    source,
-                })?,
-            );
-            for axis in axes.iter().skip(positions.len()) {
-                positions.push(self.pin(axis.as_str()).unwrap_or_else(RmPosition::first));
+        let start = prefix.len();
+        let mut found = vec![prefix];
+        for (offset, axis) in axes.iter().enumerate().skip(start) {
+            let last = offset.saturating_add(1) == depth;
+            let mut deeper = Vec::new();
+            for partial in found {
+                let mut instance = 1u32;
+                while instance <= INSTANCE_CEILING {
+                    let mut positions = partial.clone();
+                    let pinned = self.pin(axis.as_str());
+                    positions.push(match pinned {
+                        Some(pinned) => pinned,
+                        None => {
+                            RmPosition::new(instance).map_err(|source| EngineError::Position {
+                                mapping: String::from(name),
+                                source,
+                            })?
+                        }
+                    });
+                    let held = if last {
+                        self.node_held(name, input, &positions)?
+                    } else {
+                        self.axis_held(name, axis, &positions)?
+                    };
+                    if !held {
+                        break;
+                    }
+                    deeper.push(positions);
+                    if pinned.is_some() {
+                        break;
+                    }
+                    instance = instance.saturating_add(1);
+                }
             }
-            if !self.node_held(name, input, &positions)? {
-                break;
-            }
-            found.push(positions);
-            instance = instance.saturating_add(1);
+            found = deeper;
         }
         Ok(found)
+    }
+
+    /// Returns whether the composition holds one instance of the repeating
+    /// node `axis`, a free axis above an input node.
+    ///
+    /// Each free axis is probed on its own node, outermost first, so an input
+    /// below two repeating nodes the parent did not bind reads every instance
+    /// of both, as the start archetype's instances are found.
+    fn axis_held(
+        &self,
+        name: &str,
+        axis: &FlatId,
+        positions: &[RmPosition],
+    ) -> Result<bool, EngineError> {
+        let Some(composition) = self.composition else {
+            return Ok(false);
+        };
+        let refuse = |source| EngineError::Template {
+            mapping: String::from(name),
+            node: String::from(axis.as_str()),
+            source: Box::new(source),
+        };
+        let node = self.index.node_by_flat_id(axis).map_err(refuse)?;
+        self.index
+            .holds(composition, node, positions)
+            .map_err(refuse)
     }
 
     /// Reads one instance of a target's node, or of the `ELEMENT` the node is

@@ -37,7 +37,7 @@ use crate::support::compiled_against;
 const OBSERVATION: &str = "/content[openEHR-EHR-OBSERVATION.ferrobridge_reading.v1]";
 
 /// Builds the index over the synthetic protocol template.
-fn protocol_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
+pub(crate) fn protocol_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let xml = std::fs::read_to_string(format!("{FIXTURES}/opt/observation_protocol.opt"))?;
     let opt = openehr_its::opt14::from_xml(&xml)?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(

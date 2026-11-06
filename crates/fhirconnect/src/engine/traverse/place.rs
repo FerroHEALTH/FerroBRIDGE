@@ -261,6 +261,31 @@ impl<T: Table + ?Sized> Run<'_, T> {
         })
     }
 
+    /// Returns the instance of each repeating node of `target` that `bound`
+    /// fixes: the binding's own for a node the two share, a split pin, or
+    /// else the first.
+    pub(super) fn bound_positions(
+        &self,
+        target: &OpenehrTarget,
+        bound: &Binding,
+    ) -> Vec<RmPosition> {
+        let shared = bound.shared(target.occurrences());
+        target
+            .occurrences()
+            .iter()
+            .enumerate()
+            .map(|(depth, axis)| {
+                bound
+                    .openehr
+                    .get(..shared)
+                    .and_then(|held| held.get(depth))
+                    .copied()
+                    .or_else(|| self.pin(axis.as_str()))
+                    .unwrap_or_else(RmPosition::first)
+            })
+            .collect()
+    }
+
     /// Returns the next free instance of one axis under one prefix, in the
     /// document of `level` coming out of openEHR.
     pub(super) fn next_index(&mut self, level: usize, axis: &str, prefix: &[usize]) -> usize {

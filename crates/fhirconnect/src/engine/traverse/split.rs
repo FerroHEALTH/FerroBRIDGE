@@ -235,7 +235,22 @@ impl<T: Table + ?Sized> Run<'_, T> {
         }
         let with_axes = fhir_axes(with);
         let start = self.warnings.len();
-        for (index, (_tuple, members)) in groups.into_iter().enumerate() {
+        for (_tuple, members) in groups {
+            // NOTE: HierarchyMappings.adoc §split, each group creates an element, so the split node
+            // takes the next free instance under the instances its ancestors are bound to.
+            let mut positions = self.bound_positions(node, parent);
+            positions.pop();
+            let mut prefix = Vec::with_capacity(positions.len());
+            for position in &positions {
+                prefix.push(usize::try_from(FlatIndex::from(*position).get()).map_err(
+                    |_refused| EngineError::Position {
+                        mapping: String::from(model),
+                        source: PositionError::Overflow,
+                    },
+                )?);
+            }
+            let split_axis = node.node().flat_id();
+            let index = self.next_index(with.level(), split_axis.as_str(), &prefix);
             let instance = u32::try_from(index)
                 .ok()
                 .and_then(|index| RmPosition::try_from(FlatIndex::new(index)).ok())
@@ -243,19 +258,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     mapping: String::from(model),
                     source: PositionError::Overflow,
                 })?;
-            let mut pins: Vec<(FlatId, RmPosition)> = Vec::with_capacity(axes.len());
-            for (depth, axis) in axes.iter().enumerate() {
-                let position = if depth.saturating_add(1) == axes.len() {
-                    instance
-                } else {
-                    parent
-                        .openehr
-                        .get(depth)
-                        .copied()
-                        .unwrap_or_else(RmPosition::first)
-                };
-                pins.push((axis.clone(), position));
-            }
+            positions.push(instance);
+            let pins: Vec<(FlatId, RmPosition)> = axes.iter().cloned().zip(positions).collect();
             for occurrence in members {
                 let held = core::mem::replace(&mut self.pins, pins.clone());
                 let held_fhir = self
