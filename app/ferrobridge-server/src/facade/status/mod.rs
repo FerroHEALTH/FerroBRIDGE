@@ -32,6 +32,7 @@
 
 mod client;
 pub mod demographic;
+pub mod onward;
 
 use http::StatusCode;
 use openehr_its::rest::client::ErrorBody;

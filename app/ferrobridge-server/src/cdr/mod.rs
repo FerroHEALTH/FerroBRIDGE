@@ -23,6 +23,7 @@ pub mod demographic;
 mod ehr;
 pub mod error;
 pub mod ids;
+pub mod onward;
 pub mod query;
 pub mod reach;
 pub mod template;
@@ -141,6 +142,9 @@ pub struct CdrClient {
     request_id: Option<RequestId>,
     /// Whether `[cdr] demographic` lets the client reach the Demographic API.
     demographic: bool,
+    /// The onward lane a facade request reaches the CDR under its caller
+    /// through, when one is configured.
+    onward: Option<onward::CdrOnward>,
 }
 
 impl CdrClient {
@@ -171,6 +175,7 @@ impl CdrClient {
             auth,
             request_id: None,
             demographic: config.demographic,
+            onward: config.onward.clone(),
         })
     }
 
@@ -182,7 +187,42 @@ impl CdrClient {
             auth: self.auth.clone(),
             request_id: Some(request_id),
             demographic: self.demographic,
+            onward: self.onward.clone(),
         }
+    }
+
+    /// Returns this client calling the CDR under the caller behind `access`,
+    /// whose bearer token `headers` carry.
+    ///
+    /// Without an onward lane, and for a machine under one, the client keeps
+    /// the bridge's own credential. Every other caller reaches the CDR under
+    /// the token the onward issuer exchanged its own for, and a refused
+    /// exchange refuses the call: the bridge's credential is never sent in
+    /// its place. A `401` on the exchanged token is never renewed with the
+    /// bridge's.
+    ///
+    /// # Errors
+    /// Returns [`OnwardRefusal`](crate::cdr::onward::OnwardRefusal) as
+    /// [`CdrOnward::token`](crate::cdr::onward::CdrOnward::token) does.
+    pub async fn for_caller(
+        &self,
+        access: &ferrohealth_smart::resource::Access,
+        headers: &HeaderMap,
+    ) -> Result<Self, onward::OnwardRefusal> {
+        let Some(onward) = self.onward.as_ref() else {
+            return Ok(self.clone());
+        };
+        let Some(token) = onward.token(access, headers).await? else {
+            return Ok(self.clone());
+        };
+        let auth = Some(Auth::Static(Credentials::bearer(token)));
+        Ok(Self {
+            client: authenticated(self.client.clone(), auth.as_ref()),
+            auth,
+            request_id: self.request_id.clone(),
+            demographic: self.demographic,
+            onward: None,
+        })
     }
 
     /// Returns the openEHR REST API root every call is resolved under.

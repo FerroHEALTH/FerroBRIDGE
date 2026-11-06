@@ -50,6 +50,9 @@ pub struct CdrConfig {
     /// Whether the client reaches the ITS-REST 1.1.0 Demographic API, which
     /// the release marks `x-status: DEVELOPMENT`.
     pub demographic: bool,
+    /// The onward lane a facade request reaches the CDR under its caller
+    /// through, when `[cdr.credentials.onward]` declares one.
+    pub onward: Option<crate::cdr::onward::CdrOnward>,
 }
 
 impl CdrConfig {
@@ -65,6 +68,7 @@ impl CdrConfig {
             retry: RetryPolicy::default(),
             credentials: None,
             demographic: false,
+            onward: None,
         }
     }
 
@@ -102,6 +106,14 @@ impl CdrConfig {
             user: user.into(),
             password: password.into(),
         });
+        self
+    }
+
+    /// Returns this configuration reaching the CDR under each facade caller
+    /// through `onward`.
+    #[must_use]
+    pub fn with_onward(mut self, onward: crate::cdr::onward::CdrOnward) -> Self {
+        self.onward = Some(onward);
         self
     }
 

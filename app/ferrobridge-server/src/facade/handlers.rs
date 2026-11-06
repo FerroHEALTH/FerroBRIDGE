@@ -254,7 +254,7 @@ async fn document(
     read::document(
         facade,
         access,
-        &facade.client_for(headers),
+        &facade.client_for(headers, access).await?,
         (headers, uri),
         &id,
     )
@@ -430,7 +430,7 @@ pub(crate) async fn read(
     admit_existing(facade, access, Permission::Read, resource_type, id)?;
     read::read(
         facade,
-        &facade.client_for(headers),
+        &facade.client_for(headers, access).await?,
         resource_type,
         id,
         headers,
@@ -461,7 +461,7 @@ pub(crate) async fn vread(
     admit_existing(facade, access, Permission::Read, resource_type, id)?;
     read::vread(
         facade,
-        &facade.client_for(headers),
+        &facade.client_for(headers, access).await?,
         (resource_type, id, vid),
         headers,
         uri,

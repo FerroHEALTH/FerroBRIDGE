@@ -190,11 +190,18 @@ status and its position in the Bundle as `entry`, then the request's own
 line with the interaction `batch`. The line
 never carries the token, another claim, a query value or a body.
 
-The bridge reaches the CDR with its own credential
+The bridge never forwards the caller's token to the CDR, because an access
+token is bound to the audience it was issued for. By default it reaches the
+CDR with its own credential
 ([`[cdr.credentials.oauth]`](../operate/configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)),
-never with the caller's token, because an access token is bound to the
-audience it was issued for. The CDR therefore records the bridge as the actor,
-and the caller's identity lives in the bridge's audit line.
+so the CDR records the bridge as the actor and the caller's identity lives in
+the bridge's audit line. With
+[`[cdr.credentials.onward]`](../operate/configuration.md#cdrcredentialsonward)
+it exchanges the caller's token per request for a token of the CDR's issuer
+that names the same person (RFC 8693 token exchange, or the Entra ID
+on-behalf-of grant), so the CDR records the clinician too; a machine keeps the
+bridge's own token, and a caller the exchange cannot carry is refused. The
+audit line still names the caller.
 
 ## Media types and bodies
 
