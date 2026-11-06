@@ -259,18 +259,28 @@ The R4 profile validator runs offline against the packages below, fetched
 verbatim from the FHIR package registry at build time by
 `scripts/vendor/profile-packages.sh` into the ignored
 `docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
-from this table (#435). At about 650 MB unpacked they are never committed;
+from this table (#435). At about 970 MB unpacked they are never committed;
 only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
-`scripts/vendor/profile-packages.sh --cache-key`. The five roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
+`scripts/vendor/profile-packages.sh --cache-key`. The six roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
 one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.1,
-and the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
+the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
 2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
-held;
+held, and `hl7.fhir.eu.imaging` 1.0.0-ballot, the guide a received imaging
+report is validated against (#1601);
 every other row is in the set because a vendored package's `package.json`
 `dependencies` names it at that version. A package two dependents name at
 different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
-2.0.0 and IPS 2.0.0, so both 2.0.0 and 2.0.1 of each are here, and the six
-`hl7.terminology.r4` rows are the six versions the set names. Every package depends on
+2.0.0 and IPS 2.0.0, so both 2.0.0 and 2.0.1 of each are here, and the eight
+`hl7.terminology.r4` rows are the eight versions the set names. A dependency
+named by a patch range (`4.2.x`), which FHIR R5 2.1.10.2
+(<https://hl7.org/fhir/R5/packages.html>) allows in the patch place
+alone, is resolved when `--stamp` runs to the highest version the registry
+publishes in the range, leaving out a pre-release unless the range names
+its label (our own design: the page is silent on pre-releases), and the
+resolved version has a row like any other. `--stamp` records the
+resolution in the dependent's `PROVENANCE.md` (`Resolved ranges`), which
+`--check` reads, so nothing resolves at build time; any other wildcard is
+refused. Every package depends on
 `hl7.fhir.r4.core` 4.0.1, which has no row here: the set reads the tree the
 FHIR packages table above already vendors at
 `tools/fhir-codegen/vendor/hl7.fhir.r4.core/`. Each pin is the version, then
@@ -318,6 +328,20 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.terminology.r4` | 6.5.0 files `4407` digest `acae644b9b4dba9d388b96b35f452c2a35f8bf199c1d2b570e85634c6972ee09` | `docs/specs/fhir-packages/hl7.terminology.r4#6.5.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 6.3.0 files `4389` digest `67c5e37eee889968f623290df576cf8a24a6de8936c0ad4b14e742b6faf9833f` | `docs/specs/fhir-packages/hl7.terminology.r4#6.3.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 6.2.0 files `4342` digest `6d074864dff5ce089248b6113b6049b0420b8db1ffbb2837bf4e39847d3e28fe` | `docs/specs/fhir-packages/hl7.terminology.r4#6.2.0/PROVENANCE.md` |
+| `hl7.fhir.eu.imaging` | 1.0.0-ballot files `186` digest `3f2563a2cc493f3f2e13a70e3bc7ff7119c23b4580261f173095c35824c4cc53` | `docs/specs/fhir-packages/hl7.fhir.eu.imaging#1.0.0-ballot/PROVENANCE.md` (a root) |
+| `hl7.fhir.eu.health-data-api` | 1.0.0-ballot files `44` digest `3256c01a6532d870b697caa1a1e6d5b82f042e5780148ff8cb5816accf7bb0ee` | `docs/specs/fhir-packages/hl7.fhir.eu.health-data-api#1.0.0-ballot/PROVENANCE.md` |
+| `hl7.fhir.eu.base` | 2.0.0-ballot files `79` digest `dc96fe512acc144583cbce9779d32881ffc87d0150d730c00aa5fecad42a38c0` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.0-ballot/PROVENANCE.md` |
+| `hl7.fhir.eu.extensions.r4` | 1.2.0 files `27` digest `e52e95f08e65f87b87e0f37a4117636dc8a23e3c162ac64cd8daeb0420046194` | `docs/specs/fhir-packages/hl7.fhir.eu.extensions.r4#1.2.0/PROVENANCE.md` |
+| `hl7.fhir.uv.xver-r5.r4` | 0.0.1-snapshot-2 files `5763` digest `d1069e465564ec2e0f2f75f9760980014d282cae32e3b7cb9f170b344ba85614` | `docs/specs/fhir-packages/hl7.fhir.uv.xver-r5.r4#0.0.1-snapshot-2/PROVENANCE.md` |
+| `hl7.terminology.r4` | 7.4.0 files `4226` digest `1c1031303b355e2ea90579354cbd4d7665afa1a2ec39c831cc7ce773d4f51826` | `docs/specs/fhir-packages/hl7.terminology.r4#7.4.0/PROVENANCE.md` |
+| `hl7.terminology.r4` | 7.0.1 files `4111` digest `d603014a453916eadf2323990ab6c7c20b0f6d05deae055b2c1abb149b153441` | `docs/specs/fhir-packages/hl7.terminology.r4#7.0.1/PROVENANCE.md` |
+| `ihe.iti.mhd` | 4.2.5 files `205` digest `a512c6829d09b579d030ab5a77ad601bc2ebff5ed9041ce4a572b163fce9b2c5` | `docs/specs/fhir-packages/ihe.iti.mhd#4.2.5/PROVENANCE.md` (CC-BY-4.0) |
+| `ihe.iti.mhd` | 4.2.3 files `184` digest `e04d62f748649a821d60e439f08817a4bb05505532042c0eb72fdf2da8d5004a` | `docs/specs/fhir-packages/ihe.iti.mhd#4.2.3/PROVENANCE.md` (CC-BY-4.0) |
+| `ihe.iti.pdqm` | 3.2.0 files `53` digest `cc2ca55cef4d1181108ab9867470252293f2e2f49538ce2123d5bef62d0f83b9` | `docs/specs/fhir-packages/ihe.iti.pdqm#3.2.0/PROVENANCE.md` (CC-BY-4.0) |
+| `ihe.iti.balp` | 1.1.4 files `126` digest `3a150751bc5fad01361b05518a8e757639fe7cc44b1b9faf7d0844dcce352ea2` | `docs/specs/fhir-packages/ihe.iti.balp#1.1.4/PROVENANCE.md` (CC-BY-4.0) |
+| `ihe.formatcode.fhir` | 1.6.0 files `11` digest `75224d1142b43eeede33ab06aa3ffa69fec1a3c46a97335b1e9c476d6221a06b` | `docs/specs/fhir-packages/ihe.formatcode.fhir#1.6.0/PROVENANCE.md` (CC-BY-4.0) |
+| `ihe.formatcode.fhir` | 1.4.0 files `11` digest `57640df5a7d0136621359309c1c4c4f37b06e67f77769230ed34366509e962ff` | `docs/specs/fhir-packages/ihe.formatcode.fhir#1.4.0/PROVENANCE.md` (CC-BY-4.0) |
+| `fhir.dicom` | 2025.3.20250714 files `1415` digest `47f417064ebb643814b66ee9e557a8a2f92e8ae1a7c0eb6d6817608871493ba1` | `docs/specs/fhir-packages/fhir.dicom#2025.3.20250714/PROVENANCE.md` (license `free` in its manifest) |
 
 ## HL7 FHIR Validator (the agreement corpus's reference and the exchange-format lane, never committed)
 
