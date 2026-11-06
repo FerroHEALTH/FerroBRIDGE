@@ -393,6 +393,8 @@ fn a_received_imaging_report_maps_into_one_composition_that_keeps_it() -> Result
         "24802-1",
         "urn:oid:2.25.110239581749205781493301578934620193847",
         "Synthetic MR study",
+        "Magnetic Resonance",
+        "2026-03-02T08:00:00+01:00",
         "at0076",
         "at0101",
     ] {
@@ -449,6 +451,10 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         "/identifier/0/system",
         "/identifier/0/value",
         "/status",
+        "/modality/0/system",
+        "/modality/0/code",
+        "/modality/0/display",
+        "/started",
         "/description",
     ] {
         assert_eq!(
@@ -558,16 +564,16 @@ fn declared_losses() -> Result<Vec<String>, Box<dyn Error>> {
         .collect())
 }
 
-// NOTE: no specification governs this: our own design; OBSERVATION.imaging_exam_result.v1 holds
-// the modality and the study date in its event, which the study's reference does not reach.
+// NOTE: basics/path_operators.adoc, the study's reference sits below the event that holds its
+// modality and date, and reaches the protocol outside it, so neither is declared lost.
 #[test]
-fn the_study_modality_and_date_the_template_holds_in_the_event_are_declared_lost()
+fn the_study_modality_and_date_the_template_holds_in_the_event_are_mapped()
 -> Result<(), Box<dyn Error>> {
     let declared = declared_losses()?;
     for expression in ["ImagingStudy.modality", "ImagingStudy.started"] {
         assert!(
-            declared.iter().any(|held| held.starts_with(expression)),
-            "{expression} is declared: {declared:?}"
+            !declared.iter().any(|held| held.starts_with(expression)),
+            "{expression} is mapped, not declared: {declared:?}"
         );
     }
     Ok(())
