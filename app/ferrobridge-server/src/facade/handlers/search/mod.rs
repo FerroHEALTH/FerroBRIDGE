@@ -143,7 +143,7 @@ async fn search(
     })?;
     let fingerprint = cursor::fingerprint(resource_type, &criteria.used);
     let start = start_of(&criteria, &fingerprint, declarations.len())?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let mut resolved = resolve(facade, &client, resource_type, &criteria).await?;
     if let Compartment::Patient(patient) = compartment {
         resolved.ehrs.push(compartment_ehrs(facade, &patient)?);

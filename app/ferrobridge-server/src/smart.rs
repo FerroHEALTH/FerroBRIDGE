@@ -17,8 +17,10 @@
 //! `crate::operator::routes`'s.
 //!
 //! The bridge never forwards a caller's token to the CDR: an access token
-//! names the resource server it is for (RFC 9068 §4), and the CDR is reached
-//! with the bridge's own credential (`crate::credentials`).
+//! names the resource server it is for (RFC 9068 §4). The CDR is reached with
+//! the bridge's own credential (`crate::credentials`), or, under
+//! `[cdr.credentials.onward]`, with a token the caller's was exchanged for
+//! (`crate::cdr::onward`).
 
 use crate::mount::BASE_PATH;
 use std::collections::BTreeSet;

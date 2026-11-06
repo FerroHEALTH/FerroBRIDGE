@@ -82,7 +82,7 @@ pub(crate) async fn create(
     let inbound = read::parse(body, resource_type)?;
     compartment::admit_inbound(facade, access, Permission::Create, &inbound)?;
     let program = &select_program(facade, &inbound, headers)?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
     let ingest = facade
         .ingest(client)
@@ -182,7 +182,7 @@ pub(crate) async fn update(
     same_id(&inbound, id)?;
     compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
     let program = &select_program(facade, &inbound, headers)?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
     let ingest = facade
         .ingest(client)

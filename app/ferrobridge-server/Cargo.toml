@@ -131,6 +131,9 @@ jsonschema.workspace = true
 openehr-sdt.workspace = true
 # The shutdown cases drive a real socket, so they need a real HTTP client.
 reqwest.workspace = true
+# The onward cases sign the bridge's client assertions with a key generated at
+# test time.
+rcgen.workspace = true
 tempfile.workspace = true
 # The ETL cases dump the CDM through the container engine's exec API.
 testcontainers.workspace = true

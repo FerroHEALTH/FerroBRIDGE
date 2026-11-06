@@ -37,10 +37,18 @@ pub(super) enum Upstream {
 /// `token_endpoint`, the issuer URL rule of RFC 8414 §2, a client id, the
 /// key of a `private_key_jwt` client, every scope token, and a resource
 /// indicator without a fragment (RFC 8707 §2).
+///
+/// An `onward` table is refused: only the CDR lane reaches its upstream on a
+/// caller's behalf, and it resolves that table itself.
 pub(super) fn resolve_credentials(
     section: &str,
     credentials: &CredentialsSection,
 ) -> Result<Option<Upstream>, Error> {
+    if credentials.onward.is_some() {
+        return Err(Error::OnwardLane {
+            section: section.to_owned(),
+        });
+    }
     let outbound = credentials.resolve().map_err(|source| Error::Credentials {
         section: section.to_owned(),
         source: Box::new(source),

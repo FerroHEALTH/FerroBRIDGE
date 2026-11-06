@@ -394,7 +394,11 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
         });
-    match resolve_credentials("cdr.credentials", &cdr.credentials)? {
+    let own = ferrohealth_smart::config::CredentialsSection {
+        onward: None,
+        ..cdr.credentials.clone()
+    };
+    match resolve_credentials("cdr.credentials", &own)? {
         Some(Upstream::Basic { user, password }) => {
             config = config.with_basic(user, password);
         }
@@ -402,6 +406,21 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             config = config.with_oauth(*grant);
         }
         None => {}
+    }
+    let lane = cdr
+        .credentials
+        .onward()
+        .map_err(|source| Error::Credentials {
+            section: String::from("cdr.credentials"),
+            source: Box::new(source),
+        })?;
+    let kind = cdr
+        .credentials
+        .onward
+        .as_ref()
+        .and_then(|onward| onward.kind);
+    if let (Some(lane), Some(kind)) = (lane, kind) {
+        config = config.with_onward(crate::cdr::onward::CdrOnward::new(lane, kind));
     }
     Ok(config)
 }

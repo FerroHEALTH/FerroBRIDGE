@@ -17,6 +17,7 @@ mod discovery;
 mod forwarding;
 mod grants;
 mod introspection;
+mod onward;
 mod routes;
 mod scope;
 mod search;
@@ -120,6 +121,11 @@ impl Issuer {
         Self {
             server: MockServer::start().await,
         }
+    }
+
+    /// Returns the stub server, for a case that mounts its own answers.
+    pub(crate) const fn server(&self) -> &MockServer {
+        &self.server
     }
 
     /// Returns the issuer identifier.
