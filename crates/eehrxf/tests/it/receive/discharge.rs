@@ -19,9 +19,11 @@ use eehrxf::document::discharge::{DISCHARGE_SUMMARY, HDR_BUNDLE};
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::category::{DocumentType, LOINC, Uncategorised};
 use eehrxf::receive::conform::{CheckError, FindingKind};
+use eehrxf::receive::validation::{Validated, ValidationError};
+use ferrobridge_term::client::Client;
 use flate2::read::GzDecoder;
 
-use crate::support::{hdr, hdr_package};
+use crate::support::{hdr, hdr_package, profile_set};
 
 /// Every document `Bundle` example of the HDR package, by its member path.
 const EXAMPLES: [&str; 5] = [
@@ -140,4 +142,68 @@ fn a_discharge_code_in_another_system_names_no_category() -> Result<(), Box<dyn 
     let document = ReceivedDocument::read(&serde_json::to_string(&tree)?)?;
     assert_eq!(document.category(), Err(Uncategorised::Unknown));
     Ok(())
+}
+
+/// Validates the HDR example at `path`, with `edit` applied to its tree,
+/// against `bundle-eu-hdr` over every fetched profile package, with no
+/// terminology server (a binding the set cannot decide stays listed); `None` when the packages are absent outside CI.
+fn validated(
+    path: &str,
+    edit: impl FnOnce(&mut serde_json::Value) -> Result<(), Box<dyn Error>>,
+) -> Result<Option<Result<Validated, ValidationError>>, Box<dyn Error>> {
+    let Some(set) = profile_set()? else {
+        return Ok(None);
+    };
+    let mut tree: serde_json::Value = serde_json::from_str(&example(path)?)?;
+    edit(&mut tree)?;
+    let document = ReceivedDocument::read(&serde_json::to_string(&tree)?)?;
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    Ok(Some(runtime.block_on(document.validate(
+        &set,
+        HDR_BUNDLE,
+        None::<&Client>,
+    ))))
+}
+
+// NOTE: HDR 1.0.0 declares the R5 `xtehr.eu.ehds.models` as a dependency, which the set holds
+// unread (packages.html 6.0.0-ballot4 §2.1.10.3 is silent on it; our own design, #1604).
+#[test]
+fn a_discharge_report_validates_against_bundle_eu_hdr() -> Result<(), Box<dyn Error>> {
+    let path = "package/examples/Bundle-HDR-Paolo-Marcheschi-Example.json";
+    let Some(outcome) = validated(path, |_| Ok(()))? else {
+        return Ok(());
+    };
+    outcome.map_err(|error| format!("{path}: {error:?}"))?;
+    Ok(())
+}
+
+#[test]
+fn a_discharge_report_without_its_encounter_is_refused_by_the_validator()
+-> Result<(), Box<dyn Error>> {
+    let path = "package/examples/Bundle-HDR-Paolo-Marcheschi-Example.json";
+    let Some(outcome) = validated(path, |tree| {
+        let composition = tree
+            .pointer_mut("/entry/0/resource")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or("the Composition entry")?;
+        composition
+            .remove("encounter")
+            .ok_or("the example names its encounter")?;
+        Ok(())
+    })?
+    else {
+        return Ok(());
+    };
+    match outcome {
+        Err(ValidationError::NonConformant { findings }) => {
+            assert!(
+                findings.iter().any(|finding| finding.location == "Bundle.entry[0].resource"
+                    && matches!(&finding.kind, FindingKind::Issue { code: "required", message, .. }
+                        if message.starts_with("Composition.encounter occurs 0 times"))),
+                "{findings:?}"
+            );
+            Ok(())
+        }
+        other => Err(format!("the document without its encounter passed: {other:?}").into()),
+    }
 }
