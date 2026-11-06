@@ -23,8 +23,14 @@
 //!   (<https://hl7.org/fhir/R4/references.html#logical>) is admitted with no
 //!   declared `type` too at `Provenance.entity.what`, and at an element whose
 //!   R4 target types are listed and include no `Patient`, `Group` or
-//!   `Resource`, so that it cannot name a patient. Every other outcome of the
-//!   resolver is refused, a `reference` the document cannot resolve included.
+//!   `Resource`, so that it cannot name a patient. Inside a choice element
+//!   (`medicationReference` of `medication[x]`) no such reference is
+//!   admitted: R4 gives each type of a choice its own `targetProfile`
+//!   (<https://hl7.org/fhir/R4/elementdefinition-definitions.html#ElementDefinition.type.targetProfile>),
+//!   and the element table lists the targets of the whole choice, so the walk
+//!   cannot show the reference alternative alone never names a patient.
+//!   Every other outcome of the resolver is refused, a `reference` the
+//!   document cannot resolve included.
 
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
@@ -205,7 +211,9 @@ const PATIENT_TARGETS: [&str; 3] = [
 
 /// Returns whether the reference element `key` of `schema` lists its R4
 /// target types and none of them can be a patient, so a logical reference
-/// there names no person the document is about.
+/// there names no person the document is about. A choice element is never
+/// one: `key` is then the alternative's name (`medicationReference`), which
+/// no field carries.
 // NOTE: FHIR R4 References, logical references (<https://hl7.org/fhir/R4/references.html#logical>);
 // HL7 Europe Imaging Report 1.0.0-ballot writes ImagingStudy.basedOn as an untyped accession number.
 fn never_a_patient(schema: &TypeSchema, key: &str) -> bool {
