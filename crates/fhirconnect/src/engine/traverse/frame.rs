@@ -110,12 +110,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         };
         self.frames.get(target.level()).map_or_else(
             || parent.clone(),
-            |frame| Binding {
-                fhir: frame.occurrence.clone(),
-                openehr: parent.openehr.clone(),
-                axes: parent.axes.clone(),
-                level: target.level(),
-            },
+            |frame| parent.keeping_openehr(frame.occurrence.clone(), target.level()),
         )
     }
 
