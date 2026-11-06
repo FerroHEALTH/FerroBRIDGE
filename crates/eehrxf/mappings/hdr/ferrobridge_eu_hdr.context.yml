@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the HL7 Europe Hospital Discharge Report 1.0.0
+# composition-eu-hdr profile over FerroBRIDGE's discharge report template,
+# whose archetypes are CKM's: the transfer of care summary becomes the
+# document's Composition, its context the encounter-eu-hdr the Composition
+# names, and each problem or diagnosis of its diagnostic summary section one
+# condition-eu-core entry of the section of that name.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_hdr.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/hdr/StructureDefinition/composition-eu-hdr"
+    version: "1.0.0"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.0.0"
+  archetypes:
+    - "COMPOSITION.transfer_summary.v1.Composition"
+    - "EVALUATION.problem_diagnosis.v1"
+  start: "COMPOSITION.transfer_summary.v1.Composition"

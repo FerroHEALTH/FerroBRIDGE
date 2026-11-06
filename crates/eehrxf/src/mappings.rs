@@ -128,7 +128,8 @@ impl Project {
     feature = "prescription",
     feature = "dispensation",
     feature = "laboratory",
-    feature = "patient-summary"
+    feature = "patient-summary",
+    feature = "discharge"
 ))]
 macro_rules! shipped {
     ($directory:literal, $name:literal) => {
@@ -241,6 +242,27 @@ pub const EPS: Project = Project {
         ),
         shipped!("eps", "ferrobridge_eu_eps_immunization.context.yml"),
         shipped!("eps", "ferrobridge_medication.v1.Immunization.yml"),
+    ],
+    accounted: &[],
+};
+
+/// The HL7 Europe Hospital Discharge Report 1.0.0 project.
+///
+/// It maps over FerroBRIDGE's discharge report template, a transfer of care
+/// summary over published CKM archetypes. Its one context,
+/// `ferrobridge_eu_hdr.context`, maps the composition to a
+/// `composition-eu-hdr` naming an `encounter-eu-hdr` built from the
+/// composition's context, the hospital stay, and each problem or diagnosis
+/// of the template's diagnostic summary section to a `condition-eu-core`
+/// entry of the section of that name.
+#[cfg(feature = "discharge")]
+pub const HDR: Project = Project {
+    directory: "hdr",
+    contexts: &["ferrobridge_eu_hdr.context"],
+    files: &[
+        shipped!("hdr", "ferrobridge_eu_hdr.context.yml"),
+        shipped!("hdr", "ferrobridge_transfer_summary.v1.Composition.yml"),
+        shipped!("hdr", "ferrobridge_problem_diagnosis.v1.yml"),
     ],
     accounted: &[],
 };

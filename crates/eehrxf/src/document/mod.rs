@@ -139,6 +139,20 @@ pub enum DocumentError {
         /// How many the run holds.
         found: usize,
     },
+    /// A mapping run whose composition the document takes holds no
+    /// `Composition` or more than one.
+    #[error("the mapping run holds {found} Composition resources, not one")]
+    Uncomposed {
+        /// How many the run holds.
+        found: usize,
+    },
+    /// A section a mapping run wrote carries no LOINC code of a section of
+    /// the document's form.
+    #[error("a mapped section's LOINC codes {codes:?} name no section of the document's form")]
+    Unslotted {
+        /// The LOINC codes the section carries.
+        codes: Vec<String>,
+    },
     /// The report's `fullUrl` is an entry's already, which FHIR R4 `bdl-7`
     /// forbids.
     #[error("the report's fullUrl is an entry's already")]
@@ -425,9 +439,10 @@ impl Document {
     /// Writes the document `Bundle`: the composition first, then every
     /// resource in the order it was added.
     ///
-    /// The composition is `final`, of the form's type, about the patient,
-    /// by every author, with each section in the order it was added. A
-    /// section with no entry carries its empty reason. The report of a form
+    /// The composition is `final`, claims the form's `Composition` profile,
+    /// is of the form's type, about the patient, by every author, with each
+    /// section in the order it was added. A section with no entry carries its
+    /// empty reason. The report of a form
     /// that holds one follows the composition ([`Document::with_report`]).
     ///
     /// # Errors
@@ -472,6 +487,7 @@ impl Document {
         let report = self.report_written(&subject, &composition_url)?;
         let mut composition = Composition {
             id: Some(id),
+            meta: Some(claiming(self.form.composition)),
             identifier: Some(Identifier {
                 system: Some(URN_SYSTEM.into()),
                 value: Some(self.identifier.as_str().into()),
@@ -519,10 +535,7 @@ impl Document {
                 }),
         );
         Ok(Bundle {
-            meta: Some(Meta {
-                profile: vec![self.form.bundle.into()],
-                ..Meta::default()
-            }),
+            meta: Some(claiming(self.form.bundle)),
             identifier: Some(Identifier {
                 system: Some(URN_SYSTEM.into()),
                 value: Some(self.identifier.into()),
@@ -620,6 +633,14 @@ fn reference(url: &str) -> Reference {
     Reference {
         reference: Some(url.into()),
         ..Reference::default()
+    }
+}
+
+/// The `meta` of a resource that claims `profile`.
+fn claiming(profile: &str) -> Meta {
+    Meta {
+        profile: vec![profile.into()],
+        ..Meta::default()
     }
 }
 
