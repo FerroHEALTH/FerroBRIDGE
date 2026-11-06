@@ -356,12 +356,13 @@ the committed files alone.
 
 ## Why build time
 
-The package set unpacks to about 970 MB, eight versions of
-\`hl7.terminology.r4\` and \`hl7.fhir.uv.xver-r5.r4\` among it, for input only
-the validator and its tests read. The licences would permit vendoring; the
-size decides. CI restores the trees from a cache keyed on
-\`scripts/vendor/profile-packages.sh --cache-key\`, and the script verifies the
-count and digest of a restored tree as it does of a download.
+The package set holds several versions of large packages,
+\`hl7.terminology.r4\` and \`hl7.fhir.uv.xver-r5.r4\` among them, for input only
+the validator and its tests read; docs/VERSIONS.md lists every pin. The
+licences would permit vendoring; the size decides. CI restores the trees from
+a cache keyed on \`scripts/vendor/profile-packages.sh --cache-key\`, and the
+script verifies the count and digest of a restored tree as it does of a
+download.
 PROV
 }
 
@@ -751,6 +752,14 @@ PINS
   local status=0
   with_retries 2 failing_with 7 2> "$work/out" || status=$?
   [[ "$status" -eq 7 ]] || die "self-test: a persistent failure ends with status $status, not the fetch's 7"
+  # The rendered provenance names no figure of the whole set, which every
+  # pin that moves would leave stale in the files whose own pin did not.
+  local pkg=example.dep ver=2.0.0 meta_url=m tarball_url=t shasum=s sha256=h license=CC0-1.0
+  local author=a deps=d resolved="" files=3 digest=abc
+  render_provenance > "$work/rendered.md"
+  if grep -nE '[0-9]+ ?[MG]B|(two|three|four|five|six|seven|eight|nine|ten|[0-9]+) versions' "$work/rendered.md" > "$work/out"; then
+    die "self-test: the rendered provenance names a figure of the set: $(cat "$work/out")"
+  fi
   say "self-test: OK"
 }
 

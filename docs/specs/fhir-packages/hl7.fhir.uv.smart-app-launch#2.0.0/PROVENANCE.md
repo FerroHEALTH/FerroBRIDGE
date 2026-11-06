@@ -34,9 +34,10 @@ the committed files alone.
 
 ## Why build time
 
-The package set unpacks to about 970 MB, eight versions of
-`hl7.terminology.r4` and `hl7.fhir.uv.xver-r5.r4` among it, for input only
-the validator and its tests read. The licences would permit vendoring; the
-size decides. CI restores the trees from a cache keyed on
-`scripts/vendor/profile-packages.sh --cache-key`, and the script verifies the
-count and digest of a restored tree as it does of a download.
+The package set holds several versions of large packages,
+`hl7.terminology.r4` and `hl7.fhir.uv.xver-r5.r4` among them, for input only
+the validator and its tests read; docs/VERSIONS.md lists every pin. The
+licences would permit vendoring; the size decides. CI restores the trees from
+a cache keyed on `scripts/vendor/profile-packages.sh --cache-key`, and the
+script verifies the count and digest of a restored tree as it does of a
+download.
