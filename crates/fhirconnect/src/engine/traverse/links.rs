@@ -65,12 +65,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             Direction::FhirToOpenehr => {
                 let mut bindings = Vec::with_capacity(inputs.len());
                 for input in inputs {
-                    let binding = Binding {
-                        fhir: input.clone(),
-                        openehr: parent.openehr.clone(),
-                        axes: parent.axes.clone(),
-                        level: mapping.fhir().map_or(parent.level, FhirTarget::level),
-                    };
+                    let binding = parent.keeping_openehr(
+                        input.clone(),
+                        mapping.fhir().map_or(parent.level, FhirTarget::level),
+                    );
                     let Some(literal) = self.reference_at(mapping, input)? else {
                         let location = self.locate(mapping, input);
                         self.warnings.push(Warning::new(
@@ -129,20 +127,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Ok(bindings)
             }
             Direction::OpenehrToFhir => {
-                let positions = self.family_positions(openehr, parent);
-                let Some(node) = self.node_value(mapping.name(), openehr, &positions)? else {
-                    return Ok(Vec::new());
-                };
-                let targets =
-                    family::link_targets(&node, meaning, link_type).map_err(|source| {
-                        EngineError::Family {
-                            mapping: String::from(mapping.name()),
-                            source: Box::new(source),
-                        }
+                let (bindings, targets) =
+                    self.family_bindings(mapping, openehr, parent, |node| {
+                        family::link_targets(node, meaning, link_type)
                     })?;
-                let occurrences =
-                    vec![openehr_occurrence(mapping.name(), &positions)?; targets.len()];
-                let bindings = self.bindings(mapping, parent, &occurrences)?;
                 for (binding, literal) in bindings.iter().zip(targets.iter()) {
                     self.write_reference(mapping, binding, literal, None)?;
                 }
@@ -227,12 +215,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             Direction::FhirToOpenehr => {
                 let mut bindings = Vec::with_capacity(inputs.len());
                 for input in inputs {
-                    let binding = Binding {
-                        fhir: input.clone(),
-                        openehr: parent.openehr.clone(),
-                        axes: parent.axes.clone(),
-                        level: mapping.fhir().map_or(parent.level, FhirTarget::level),
-                    };
+                    let binding = parent.keeping_openehr(
+                        input.clone(),
+                        mapping.fhir().map_or(parent.level, FhirTarget::level),
+                    );
                     let value = self.fhir_value_at(mapping, input)?;
                     let literal = value
                         .as_ref()
@@ -275,19 +261,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Ok(bindings)
             }
             Direction::OpenehrToFhir => {
-                let positions = self.family_positions(openehr, parent);
-                let Some(node) = self.node_value(mapping.name(), openehr, &positions)? else {
-                    return Ok(Vec::new());
-                };
-                let found = family::participations(&node, list, function).map_err(|source| {
-                    EngineError::Family {
-                        mapping: String::from(mapping.name()),
-                        source: Box::new(source),
-                    }
+                let (bindings, found) = self.family_bindings(mapping, openehr, parent, |node| {
+                    family::participations(node, list, function)
                 })?;
-                let occurrences =
-                    vec![openehr_occurrence(mapping.name(), &positions)?; found.len()];
-                let bindings = self.bindings(mapping, parent, &occurrences)?;
                 for (binding, participant) in bindings.iter().zip(found.iter()) {
                     let Some(literal) = self.participant_reference(participant) else {
                         continue;
@@ -356,6 +332,33 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     .unwrap_or_else(RmPosition::first)
             })
             .collect()
+    }
+
+    /// Reads the entries of one family off the node instance `parent` binds,
+    /// and returns them with one output binding each.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Family`] when `read` refuses the node's family,
+    /// and the errors of reading the node and binding its occurrences.
+    fn family_bindings<E>(
+        &mut self,
+        mapping: &Mapping,
+        openehr: &OpenehrTarget,
+        parent: &Binding,
+        read: impl FnOnce(&serde_json::Value) -> Result<Vec<E>, family::FamilyError>,
+    ) -> Result<(Vec<Binding>, Vec<E>), EngineError> {
+        let positions = self.family_positions(openehr, parent);
+        let Some(node) = self.node_value(mapping.name(), openehr, &positions)? else {
+            return Ok((Vec::new(), Vec::new()));
+        };
+        let entries = read(&node).map_err(|source| EngineError::Family {
+            mapping: String::from(mapping.name()),
+            source: Box::new(source),
+        })?;
+        let occurrences = vec![openehr_occurrence(mapping.name(), &positions)?; entries.len()];
+        let bindings = self.bindings(mapping, parent, &occurrences)?;
+        Ok((bindings, entries))
     }
 
     /// Returns the next free index of one family on one node instance.
