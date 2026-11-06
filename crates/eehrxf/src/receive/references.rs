@@ -19,9 +19,11 @@
 //!   it names, by its canonical path, a resource outside the document whose
 //!   type is not `Patient` and agrees with its `type`; or it names its target
 //!   by `display` alone, or by `identifier` alone under a declared `type`
-//!   other than `Patient`. At `Provenance.entity.what` alone, a logical
-//!   reference by `identifier` (<https://hl7.org/fhir/R4/references.html#logical>)
-//!   is admitted with no declared `type` too. Every other outcome of the
+//!   other than `Patient`. A logical reference by `identifier`
+//!   (<https://hl7.org/fhir/R4/references.html#logical>) is admitted with no
+//!   declared `type` too at `Provenance.entity.what`, and at an element whose
+//!   R4 target types are listed and include no `Patient`, `Group` or
+//!   `Resource`, so that it cannot name a patient. Every other outcome of the
 //!   resolver is refused, a `reference` the document cannot resolve included.
 
 use fhir_types::codec::Object;
@@ -131,7 +133,8 @@ impl Walk<'_, '_> {
                     Kind::Complex(name) => {
                         let object = item.as_object().ok_or_else(|| unread(&place))?;
                         if name == "Reference" {
-                            let logical = schema.path == LOGICAL.0 && key == LOGICAL.1;
+                            let logical = (schema.path == LOGICAL.0 && key == LOGICAL.1)
+                                || never_a_patient(schema, key);
                             self.reference(key, logical, object, &place)?;
                         }
                         let inner = SCHEMAS.type_named(name).ok_or_else(|| unread(&place))?;
@@ -190,6 +193,33 @@ impl Walk<'_, '_> {
             },
         })
     }
+}
+
+/// The R4 target types through which a reference could name the patient of
+/// care: the patient itself, a group of patients, or any resource.
+const PATIENT_TARGETS: [&str; 3] = [
+    "http://hl7.org/fhir/StructureDefinition/Patient",
+    "http://hl7.org/fhir/StructureDefinition/Group",
+    "http://hl7.org/fhir/StructureDefinition/Resource",
+];
+
+/// Returns whether the reference element `key` of `schema` lists its R4
+/// target types and none of them can be a patient, so a logical reference
+/// there names no person the document is about.
+// NOTE: FHIR R4 References, logical references (<https://hl7.org/fhir/R4/references.html#logical>);
+// HL7 Europe Imaging Report 1.0.0-ballot writes ImagingStudy.basedOn as an untyped accession number.
+fn never_a_patient(schema: &TypeSchema, key: &str) -> bool {
+    schema
+        .fields
+        .iter()
+        .find(|field| field.name == key)
+        .is_some_and(|field| {
+            !field.target_profiles.is_empty()
+                && !field
+                    .target_profiles
+                    .iter()
+                    .any(|target| PATIENT_TARGETS.contains(target))
+        })
 }
 
 /// Returns the kind the element `key` of `schema` reads, a choice element
