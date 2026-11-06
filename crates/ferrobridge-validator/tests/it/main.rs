@@ -25,6 +25,7 @@ mod invariants;
 mod outcome;
 mod packages;
 mod partial;
+mod releases;
 mod resolve;
 mod scope;
 mod slicing;

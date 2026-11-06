@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM EVALUATION.problem_diagnosis.v1 to
+# the HL7 Europe Base and Core 2.0.1 condition-eu-core profile, the entry
+# the Hospital Discharge Report's diagnostic summary section takes: the
+# name, onset, clinical recognition, body site and comment of the problem
+# or diagnosis (no specification governs which elements: our own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: EVALUATION.problem_diagnosis.v1
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "metaURL"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core"
+
+  - name: "problemDiagnosis"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+
+  - name: "onset"
+    with:
+      fhir: "$resource.onset.as(DateTime)"
+      openehr: "$archetype/data[at0001]/items[at0077]"
+
+  # condition-eu-core 2.0.1 slices Condition.extension:assertedDate onto the R4
+  # condition-assertedDate extension; the date the problem was clinically recognised fills it.
+  - name: "assertedDate"
+    with:
+      fhir: "$resource.extension"
+      openehr: "$archetype/data[at0001]/items[at0003]"
+    fhirCondition:
+      targetRoot: "$resource.extension"
+      targetAttribute: "url"
+      operator: "one of"
+      criteria: "http://hl7.org/fhir/StructureDefinition/condition-assertedDate"
+    followedBy:
+      mappings:
+        - name: "assertedDateValue"
+          with:
+            fhir: "value.as(DateTime)"
+            openehr: "$archetype/data[at0001]/items[at0003]"
+
+        - name: "assertedDateUrl"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "url"
+              fhir:
+                - path: "url"
+                  value: "http://hl7.org/fhir/StructureDefinition/condition-assertedDate"
+
+  - name: "bodySite"
+    with:
+      fhir: "$resource.bodySite"
+      openehr: "$archetype/data[at0001]/items[at0012]"
+
+  - name: "comment"
+    with:
+      fhir: "$resource.note.text"
+      openehr: "$archetype/data[at0001]/items[at0069]"
