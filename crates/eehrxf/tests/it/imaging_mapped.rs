@@ -22,7 +22,7 @@ use std::error::Error;
 use eehrxf::category::Category;
 use eehrxf::document::Document;
 use eehrxf::document::imaging::{IMAGING_BUNDLE, IMAGING_REPORT_FORM, IMAGING_SLOTS};
-use eehrxf::document::section::Section;
+use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::IMAGING;
 use eehrxf::receive::ReceivedDocument;
@@ -205,13 +205,16 @@ fn imaging_document(identifier: &str) -> Result<(Document, String, String), Box<
 }
 
 /// Adds the four sections `CompositionEuImaging` requires, the imaging study
-/// section listing `study`.
+/// section listing `study`, and each other one empty for
+/// nothing known, which `eu-imaging-composition-1` asks of an empty section.
 fn with_sections(document: &mut Document, study: &str) -> Result<(), Box<dyn Error>> {
     for slot in IMAGING_SLOTS.iter().take(4) {
         let mut section = Section::new(slot, vec![format!("{}.", slot.title)]);
-        if slot.slice == "imagingstudy" {
-            section = section.with_entry(study.to_owned());
-        }
+        section = if slot.slice == "imagingstudy" {
+            section.with_entry(study.to_owned())
+        } else {
+            section.empty_because(EmptyReason::NilKnown)
+        };
         document.with_section(section)?;
     }
     Ok(())
@@ -493,6 +496,13 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         Some(study_url),
         "the imaging study section lists it"
     );
+    // NOTE: HL7 Europe Imaging Report 1.0.0-ballot, CompositionEuImaging eu-imaging-composition-1:
+    // a section with no entry carries an emptyReason.
+    for section in composition["section"].as_array().ok_or("sections")? {
+        if section["entry"].as_array().is_none_or(Vec::is_empty) {
+            assert!(section["emptyReason"].is_object(), "{section}");
+        }
+    }
     assert_eq!(
         of_type(&output, "OperationOutcome").len(),
         0,
