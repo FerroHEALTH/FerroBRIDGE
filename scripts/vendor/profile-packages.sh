@@ -12,7 +12,7 @@
 # registry, verifies the tarball against the registry's recorded shasum,
 # extracts it verbatim into the ignored
 # docs/specs/fhir-packages/<package>#<version>/package/, and checks the count
-# and digest against the pin. At about 650 MB unpacked the trees are fetched at
+# and digest against the pin. At about 970 MB unpacked the trees are fetched at
 # build time and never committed; only each PROVENANCE.md beside them is. A
 # tree already on disk at its pinned count and digest is kept without a
 # download, so a re-run or a cache-restored tree changes nothing. Its count and
@@ -22,6 +22,11 @@
 # and digest from the stamp instead of hashing the tree again; any changed
 # file changes the fingerprint and the tree is hashed, and the pin is always
 # compared afresh.
+#
+# A dependency named by a patch range (`1.4.x`) is resolved when --stamp runs,
+# to the highest version the registry publishes in the range, and the
+# resolution is written into the dependent's PROVENANCE.md; the resolved
+# version is pinned like any other, so nothing resolves at build time.
 #
 # hl7.fhir.r4.core 4.0.1, a dependency of every package here, is the tree the
 # generator already vendors at tools/fhir-codegen/vendor/hl7.fhir.r4.core and
@@ -139,6 +144,65 @@ check_ref() {
   esac
 }
 
+# The dependency versions a package may name. FHIR R5 2.1.10.2 package.json,
+# `dependencies` (<https://hl7.org/fhir/R5/packages.html>), asks for
+# the whole version and allows a wildcard in the patch place alone, which a
+# resolver answers with the highest patch it finds. That page says nothing of
+# pre-releases; leaving one out unless the range names its label is our own
+# design. Any other form (`1.x`, `*`, `current`) is refused.
+
+# Succeeds when the version $1 is exact: major.minor.patch with an optional
+# pre-release label.
+is_exact() {
+  [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]
+}
+
+# Succeeds when the version $1 is a patch range: major.minor.x with an
+# optional pre-release label.
+is_range() {
+  [[ "$1" =~ ^[0-9]+\.[0-9]+\.x(-[A-Za-z0-9.-]+)?$ ]]
+}
+
+# Succeeds when the exact version $2 matches the patch range $1: the same
+# major and minor, a numeric patch, and the range's pre-release label, or no
+# label when the range names none.
+range_matches() {
+  local range="$1" ver="$2" stem label="" rest patch got=""
+  stem="${range%%.x*}"
+  [[ "$range" != *.x-* ]] || label="${range#*.x-}"
+  [[ "$ver" = "$stem".* ]] || return 1
+  rest="${ver#"$stem".}"
+  patch="${rest%%-*}"
+  [[ "$rest" != *-* ]] || got="${rest#*-}"
+  [[ "$patch" =~ ^[0-9]+$ && "$got" = "$label" ]]
+}
+
+# The highest of the versions on stdin, one per line, that the patch range $1
+# matches, or nothing when none does.
+highest_match() {
+  local range="$1" ver patch best="" best_patch=-1
+  while IFS= read -r ver; do
+    range_matches "$range" "$ver" || continue
+    patch="${ver#"${range%%.x*}".}"
+    patch="${patch%%-*}"
+    if ((10#$patch > best_patch)); then
+      best="$ver"
+      best_patch=$((10#$patch))
+    fi
+  done
+  printf '%s' "$best"
+}
+
+# The version the PROVENANCE.md of the tree directory $1 records for the
+# dependency $2 at the patch range $3, or nothing when it records none.
+resolution_of() {
+  [[ -f "$1/PROVENANCE.md" ]] || return 0
+  # shellcheck disable=SC2016 # the backticks are literal Markdown, never a substitution
+  sed -n 's/^- Resolved ranges ([^)]*): //p' "$1/PROVENANCE.md" |
+    grep -oE '`[^`]+` [A-Za-z0-9.-]+ as [A-Za-z0-9.-]+' |
+    awk -v p="\`$2\`" -v r="$3" '$1 == p && $2 == r { print $4; exit }' || true
+}
+
 # Prints why the PROVENANCE.md $1 does not record the version $2, the file
 # count $3 and the digest $4, or nothing when it does.
 provenance_gap() {
@@ -212,12 +276,35 @@ fetch_one() {
 # byte for byte.
 write_provenance() {
   local pkg="$1" ver="$2" meta_url="$3" tarball_url="$4" shasum="$5" sha256="$6" license="$7" files="$8" digest="$9"
-  local dir="$vendor_dir/$pkg#$ver" author deps fhir
+  local dir="$vendor_dir/$pkg#$ver" author deps fhir resolved
   author="$(jq -r '.author // "unstated"' "$dir/package/package.json")"
   fhir="$(jq -r '(.fhirVersions // .["fhir-version-list"] // []) | join(", ")' "$dir/package/package.json")"
   deps="$(jq -r '.dependencies // {} | to_entries | map("`\(.key)` \(.value)") | join(", ")' "$dir/package/package.json")"
+  resolved="$(resolve_ranges "$dir/package/package.json")"
   render_provenance > "$dir/PROVENANCE.md.new"
   keep_or_replace "$dir/PROVENANCE.md"
+}
+
+# The line PROVENANCE.md adds under its declared dependencies when the
+# package.json $1 names a patch range: each range resolved against the
+# registry to the highest published version it matches, opened with a newline,
+# or nothing when it names no range. A range no published version matches
+# fails the pin.
+resolve_ranges() {
+  local dep range meta best pairs=""
+  while IFS= read -r dep; do
+    [[ -n "$dep" ]] || continue
+    range="${dep#*#}"
+    is_range "$range" || continue
+    meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$registry/${dep%%#*}")" \
+      || die "cannot read registry metadata for ${dep%%#*}"
+    best="$(jq -r '.versions // {} | keys[]' <<< "$meta" | highest_match "$range")"
+    [[ -n "$best" ]] || die "the registry lists no version of ${dep%%#*} in the range $range"
+    pairs="${pairs:+$pairs, }\`${dep%%#*}\` $range as $best"
+  done < <(jq -r '.dependencies // {} | to_entries[] | "\(.key)#\(.value)"' "$1")
+  if [[ -n "$pairs" ]]; then
+    printf '\n- Resolved ranges (the highest published version each matches): %s' "$pairs"
+  fi
 }
 
 # Moves $1.new over $1, unless $1 exists and differs from it in its
@@ -256,7 +343,7 @@ script with \`--stamp\`, and record the count and digest it prints.
 - Files: $files
 - Tree digest (sha256 over the sorted per-file \`sha256  path\` listing,
   \`PROVENANCE.md\` excluded): \`$digest\`
-- Declared dependencies (\`package/package.json\`): $deps
+- Declared dependencies (\`package/package.json\`): $deps$resolved
 - FHIR versions (\`fhirVersions\` of \`package/package.json\`): ${fhir:-none declared}
 - Stamped: $(corpus_fetched)
 
@@ -269,7 +356,7 @@ the committed files alone.
 
 ## Why build time
 
-The package set unpacks to about 650 MB, seven versions of
+The package set unpacks to about 970 MB, eight versions of
 \`hl7.terminology.r4\` and \`hl7.fhir.uv.xver-r5.r4\` among it, for input only
 the validator and its tests read. The licences would permit vendoring; the
 size decides. CI restores the trees from a cache keyed on
@@ -352,13 +439,14 @@ tree_of() {
 }
 
 # The closure check: every dependency of every tree under the vendor directory
-# $1 names a package at a version that is itself there, fetched or recorded by
+# $1, a patch range read as the version its PROVENANCE.md resolves it to,
+# names a package at a version that is itself there, fetched or recorded by
 # its PROVENANCE.md, or is one the reuse list $2 points at, and every tree
 # holds the package and version its directory names. The dependencies of a
 # tree of another FHIR release (other_release) are not checked. Prints each
 # gap and returns 1 when there is one.
 closure_gaps() {
-  local dir="$1" list="$2" ref id dep held gaps=0
+  local dir="$1" list="$2" ref id dep ver resolved held gaps=0
   while IFS= read -r ref; do
     [[ -n "$ref" ]] || continue
     id="$(identity_of "$dir/$ref")"
@@ -376,6 +464,25 @@ closure_gaps() {
     fi
     while IFS= read -r dep; do
       [[ -n "$dep" ]] || continue
+      ver="${dep#*#}"
+      if is_range "$ver"; then
+        resolved="$(resolution_of "$dir/$ref" "${dep%%#*}" "$ver")"
+        if [[ -z "$resolved" ]]; then
+          echo "   $ref depends on the range $dep, which its PROVENANCE.md resolves to no version (run --stamp)"
+          gaps=1
+          continue
+        fi
+        if ! range_matches "$ver" "$resolved"; then
+          echo "   $ref depends on the range $dep, which its PROVENANCE.md resolves to $resolved, outside the range"
+          gaps=1
+          continue
+        fi
+        dep="${dep%%#*}#$resolved"
+      elif ! is_exact "$ver"; then
+        echo "   $ref depends on $dep, which is neither an exact version nor a patch range"
+        gaps=1
+        continue
+      fi
       held="$(tree_of "$dep" "$dir" "$list")"
       if [[ -z "$held" ]]; then
         echo "   $ref depends on $dep, which is not vendored"
@@ -448,6 +555,12 @@ fixture_provenance() {
     # shellcheck disable=SC2016 # the backticks are literal Markdown, never a substitution
     printf -- '- FHIR versions (`fhirVersions` of `package/package.json`): %s\n' "$5" >> "$1/$2#$3/PROVENANCE.md"
   fi
+}
+
+# Writes the resolved-ranges line $3 alone into the PROVENANCE.md of the tree
+# $2 under the vendor directory $1.
+resolved_fixture() {
+  printf -- '- Resolved ranges (x): %s\n' "$3" > "$1/$2/PROVENANCE.md"
 }
 
 # Counts one attempt in the file $1 and fails while the count is at most $2,
@@ -534,6 +647,45 @@ self_test() {
   fixture_provenance "$work/release-unfetched-r4" example.models 1.0.0 "${tick}example.r4.terminology${tick} 7.4.0" "4.0.1"
   if closure_gaps "$work/release-unfetched-r4" "$list" > "$work/out"; then
     die "self-test: an unfetched R4 package with a missing dependency passes"
+  fi
+
+  # A patch range resolves to the highest patch, leaves pre-releases out
+  # unless it names their label, and refuses any other wildcard.
+  local versions=$'4.2.0\n4.2.0-ballot\n4.2.9\n4.2.10\n4.2.11-comment\n4.3.0\n4.20.1'
+  [[ "$(highest_match 4.2.x <<< "$versions")" = "4.2.10" ]] \
+    || die "self-test: 4.2.x resolves to '$(highest_match 4.2.x <<< "$versions")', not 4.2.10"
+  [[ "$(highest_match 4.2.x-ballot <<< "$versions")" = "4.2.0-ballot" ]] \
+    || die "self-test: 4.2.x-ballot resolves to '$(highest_match 4.2.x-ballot <<< "$versions")'"
+  [[ -z "$(highest_match 5.0.x <<< "$versions")" ]] || die "self-test: a range no version matches resolves"
+  is_range 1.4.x || die "self-test: 1.4.x is not read as a range"
+  if is_range 1.x || is_range '*' || is_exact 1.4.x || is_exact current; then
+    die "self-test: a wildcard outside the patch place is accepted"
+  fi
+
+  # A range a dependent names closes on the version its PROVENANCE.md
+  # resolves it to; an unresolved range, or one resolved outside itself, is
+  # a gap, and so is any other wildcard.
+  fixture_package "$work/range" example.root 1.0.0 '{"example.dep": "2.0.x"}'
+  resolved_fixture "$work/range" example.root#1.0.0 "${tick}example.dep${tick} 2.0.x as 2.0.3"
+  fixture_package "$work/range" example.dep 2.0.3 '{}'
+  closure_gaps "$work/range" "$list" > "$work/out" || die "self-test: a resolved range reports a gap: $(cat "$work/out")"
+  rm "$work/range/example.root#1.0.0/PROVENANCE.md"
+  if closure_gaps "$work/range" "$list" > "$work/out"; then
+    die "self-test: an unresolved range passes"
+  fi
+  grep -qF "example.root#1.0.0 depends on the range example.dep#2.0.x, which its PROVENANCE.md resolves to no version" "$work/out" \
+    || die "self-test: an unresolved range is not named: $(cat "$work/out")"
+  resolved_fixture "$work/range" example.root#1.0.0 "${tick}example.dep${tick} 2.0.x as 2.1.0"
+  if closure_gaps "$work/range" "$list" > "$work/out"; then
+    die "self-test: a range resolved outside itself passes"
+  fi
+  resolved_fixture "$work/range" example.root#1.0.0 "${tick}example.dep${tick} 2.0.x as 2.0.4"
+  if closure_gaps "$work/range" "$list" > "$work/out"; then
+    die "self-test: a range resolved to a version not vendored passes"
+  fi
+  fixture_package "$work/wildcard" example.root 1.0.0 '{"example.dep": "2.x"}'
+  if closure_gaps "$work/wildcard" "$list" > "$work/out"; then
+    die "self-test: a wildcard outside the patch place passes"
   fi
 
   cat > "$work/pins.md" << 'PINS'

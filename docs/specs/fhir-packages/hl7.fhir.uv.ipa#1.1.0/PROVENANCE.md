@@ -34,7 +34,7 @@ the committed files alone.
 
 ## Why build time
 
-The package set unpacks to about 650 MB, seven versions of
+The package set unpacks to about 970 MB, eight versions of
 `hl7.terminology.r4` and `hl7.fhir.uv.xver-r5.r4` among it, for input only
 the validator and its tests read. The licences would permit vendoring; the
 size decides. CI restores the trees from a cache keyed on

@@ -1,0 +1,42 @@
+<!-- This file describes third-party material fetched at build time; the bytes
+     it describes keep their upstream terms and are never committed. -->
+
+# Provenance: hl7.fhir.eu.imaging 1.0.0-ballot
+
+Fetched verbatim at build time by `scripts/vendor/profile-packages.sh` into
+`package/` beside this file, which `.gitignore` refuses, as a run-time input
+of the R4 profile validator (.claude/rules/vendored-inputs.md). Never commit a
+file from there and never edit one: change the pin in docs/VERSIONS.md, run the
+script with `--stamp`, and record the count and digest it prints.
+
+- Package: hl7.fhir.eu.imaging
+- Version: 1.0.0-ballot
+- Source: the FHIR package registry, https://packages.fhir.org/hl7.fhir.eu.imaging
+- Tarball: https://packages.simplifier.net/hl7.fhir.eu.imaging/1.0.0-ballot
+- SHA-1 (registry shasum): 7f42e700f258d4e2d705f951ba0879a213d65f1a
+- SHA-256 (tarball): bb6012bd7a019ac82f5e939dd6e892e6db6b15fd2931dcf7cc445c1ad92c3d70
+- Upstream license: CC0-1.0 (the `license` field of `package/package.json`)
+- Author: HL7 Europe (the `author` field of `package/package.json`)
+- Layout: the tarball's `package/` directory, extracted unchanged
+- Files: 186
+- Tree digest (sha256 over the sorted per-file `sha256  path` listing,
+  `PROVENANCE.md` excluded): `3f2563a2cc493f3f2e13a70e3bc7ff7119c23b4580261f173095c35824c4cc53`
+- Declared dependencies (`package/package.json`): `hl7.fhir.r4.core` 4.0.1, `hl7.fhir.eu.health-data-api` 1.0.0-ballot, `hl7.fhir.eu.base` 2.0.0-ballot, `hl7.fhir.uv.extensions.r4` 5.2.0, `hl7.fhir.eu.extensions.r4` 1.2.0, `hl7.terminology.r4` 7.1.0, `hl7.fhir.uv.xver-r5.r4` 0.0.1-snapshot-2, `ihe.iti.mhd` 4.2.3, `fhir.dicom` 2025.3.20250714
+- FHIR versions (`fhirVersions` of `package/package.json`): 4.0.1
+- Stamped: 2026-11-06
+
+Each declared dependency is fetched beside this tree at the version named,
+except `hl7.fhir.r4.core` 4.0.1, which is read from the committed
+`tools/fhir-codegen/vendor/hl7.fhir.r4.core/`, and except the
+dependencies of a package of another FHIR release, which the R4 set holds
+and never reads. The two lines above let `--check` assert the closure from
+the committed files alone.
+
+## Why build time
+
+The package set unpacks to about 970 MB, eight versions of
+`hl7.terminology.r4` and `hl7.fhir.uv.xver-r5.r4` among it, for input only
+the validator and its tests read. The licences would permit vendoring; the
+size decides. CI restores the trees from a cache keyed on
+`scripts/vendor/profile-packages.sh --cache-key`, and the script verifies the
+count and digest of a restored tree as it does of a download.
