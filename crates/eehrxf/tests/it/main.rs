@@ -49,6 +49,9 @@ mod imaging;
 #[cfg(all(feature = "imaging", feature = "fhir-r4"))]
 mod imaging_document;
 #[cfg(test)]
+#[cfg(all(feature = "imaging", feature = "fhir-r4"))]
+mod imaging_received;
+#[cfg(test)]
 #[cfg(all(feature = "laboratory", feature = "fhir-r4"))]
 mod lab_document;
 #[cfg(test)]

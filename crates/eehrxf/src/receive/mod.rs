@@ -11,8 +11,8 @@
 //! the R4 document rules, with its subject resolved to the `Patient` entry
 //! and its original text kept byte for byte.
 //!
-//! - [`category`]: the priority category the document's `Composition.type`
-//!   names, and the profiles a document of it is checked against;
+//! - [`category`]: the priority category the document's `Composition` names,
+//!   and the profiles a document of it is checked against;
 //! - [`conform`]: the document checked against the profiles of its category,
 //!   read from the vendored package;
 //! - [`validation`]: the document held to every constraint of its profiles

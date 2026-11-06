@@ -396,6 +396,34 @@ fn a_typed_reference_by_identifier_alone_elsewhere_is_admitted() -> Result<(), B
     Ok(())
 }
 
+// NOTE: FHIR R4 References, logical references (<https://hl7.org/fhir/R4/references.html#logical>);
+// AllergyIntolerance.encounter targets Encounter alone, so no patient can be named there.
+#[test]
+fn an_untyped_reference_by_identifier_alone_is_admitted_where_no_target_is_a_patient()
+-> Result<(), Box<dyn Error>> {
+    let text = document_with(
+        r#""code": { "text": "Synthetic substance one" },"#,
+        r#""code": { "text": "Synthetic substance one" }, "encounter": { "identifier": { "system": "urn:oid:2.999.1.669", "value": "synthetic-visit" } },"#,
+    )?;
+    ReceivedDocument::read(&text)?;
+    Ok(())
+}
+
+#[test]
+fn an_untyped_reference_by_identifier_alone_is_refused_where_any_resource_is_a_target()
+-> Result<(), Box<dyn Error>> {
+    let text = document_with(
+        r#""entry": [{ "reference": "AllergyIntolerance/synthetic-allergy" }]"#,
+        r#""entry": [{ "identifier": { "system": "urn:oid:2.999.1.669", "value": "synthetic-entry" } }]"#,
+    )?;
+    let error = refused(&text)?;
+    assert!(
+        matches!(error, ReceiveError::Reference { ref location, source: ReferenceError::Unreferenced { identifier: true } } if location == "Bundle.entry[0].resource.section[1].entry[0]"),
+        "{error:?}"
+    );
+    Ok(())
+}
+
 #[test]
 fn a_reference_whose_target_is_unknown_is_refused() -> Result<(), Box<dyn Error>> {
     let text = document_with(
