@@ -1195,11 +1195,16 @@ from each guide's `package-list.json` and `ImplementationGuide` resource):
 **The R4 profile validator's package set** is pinned ahead of any mapping
 (#435): EPS 1.0.0-ballot, EU Base 2.0.1 and IPS 2.0.1, with every package
 their `package.json` files name, transitively, at the version each dependent
-names (`docs/VERSIONS.md` "Profile packages"). The 35 package versions, about
-970 MB unpacked, are fetched at build time into the ignored
-`docs/specs/fhir-packages/` and never committed; only each `PROVENANCE.md`
-is. `hl7.fhir.r4.core` 4.0.1, which every one of them names, is read from the
-generator's committed tree. Pinning a package there is no conformance claim:
+names (`docs/VERSIONS.md` "Profile packages"), and HDR 1.0.0 with its closure
+(#1600). The 37 package versions, about 970 MB unpacked, are fetched at
+build time into the ignored `docs/specs/fhir-packages/` and never committed;
+only each `PROVENANCE.md` is. `hl7.fhir.r4.core` 4.0.1, which every R4 one of
+them names, is read from the generator's committed tree. The set is read in
+the FHIR version its core dependency fixes for the whole tree (FHIR
+6.0.0-ballot4 packages.html 2.1.10.3); a dependency of another release,
+HDR's R5 `xtehr.eu.ehds.models`, is held and never read, and a canonical only
+it defines is refused, which is our own design where that text is silent.
+Pinning a package there is no conformance claim:
 the reasoning above still holds until the implementing act is adopted.
 
 **What the mapping library targets today** is the German core data set: 12
