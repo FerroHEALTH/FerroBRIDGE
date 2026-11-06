@@ -188,6 +188,7 @@ classify() {
     scripts/checks/changelog-released.sh | scripts/checks/changelog-structure.sh) echo inert ;;
     scripts/checks/changelog-security.sh | scripts/lib/guard-args.sh) echo inert ;;
     scripts/checks/changelog-guard.sh | changelog.d/*) echo inert ;;
+    scripts/checks/release-window.sh) echo inert ;;
     scripts/checks/vex-advisories.sh | scripts/checks/vex-reachability.sh) echo inert ;;
     scripts/checks/vex-coverage.sh | scripts/checks/advisory-exceptions.sh) echo inert ;;
     scripts/security/* | security/* | trivy.yaml | .trivyignore.yaml) echo inert ;;
