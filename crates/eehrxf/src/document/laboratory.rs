@@ -55,4 +55,6 @@ pub const LABORATORY_REPORT_FORM: Form = Form {
     }),
     encounter: None,
     language: false,
+    // NOTE: Composition-eu-lab 2.0.0 adds no section invariant; FHIR R4 cmp-1 holds by the narrative.
+    rules: &[],
 };

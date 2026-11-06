@@ -153,6 +153,33 @@ pub enum DocumentError {
         /// The LOINC codes the section carries.
         codes: Vec<String>,
     },
+    /// A section with no entry carries no empty reason, which the form's
+    /// `Composition` profile requires of it ([`form::SectionRule::Reasoned`]).
+    #[error("the section {slice} holds no entry and no empty reason, which {invariant} requires")]
+    Unreasoned {
+        /// The section slice.
+        slice: &'static str,
+        /// The key of the profile invariant.
+        invariant: &'static str,
+    },
+    /// The document holds no section of a slice the form's `Composition`
+    /// profile requires ([`form::SectionRule::Required`]).
+    #[error("the document holds no section {slice}, which its composition profile requires")]
+    Lacking {
+        /// The section slice.
+        slice: &'static str,
+    },
+    /// The document holds a section of none of the slices of which the form's
+    /// `Composition` profile requires one ([`form::SectionRule::OneOf`]).
+    #[error(
+        "the document holds none of the sections {slices:?}, one of which {invariant} requires"
+    )]
+    Absent {
+        /// The section slices of which one is required.
+        slices: &'static [&'static str],
+        /// The key of the profile invariant.
+        invariant: &'static str,
+    },
     /// The report's `fullUrl` is an entry's already, which FHIR R4 `bdl-7`
     /// forbids.
     #[error("the report's fullUrl is an entry's already")]
@@ -448,9 +475,13 @@ impl Document {
     /// # Errors
     ///
     /// [`DocumentError::Dangling`] when a section names a `fullUrl` the
-    /// document does not hold, or no patient was added, and
-    /// [`DocumentError::Report`] when the form holds a report and none was
-    /// given.
+    /// document does not hold, or no patient was added,
+    /// [`DocumentError::Unreasoned`], [`DocumentError::Lacking`] and
+    /// [`DocumentError::Absent`] when the
+    /// sections break a rule of the form ([`form::SectionRule`]),
+    /// [`DocumentError::Missing`] when the form requires an encounter or a
+    /// language that was not given, and [`DocumentError::Report`] when the
+    /// form holds a report and none was given.
     pub fn into_bundle(mut self) -> Result<Bundle, DocumentError> {
         let held: BTreeSet<&str> = self.entries.iter().map(|(url, _)| url.as_str()).collect();
         let mut sections = Vec::with_capacity(self.sections.len());
@@ -471,6 +502,7 @@ impl Document {
             .patient
             .clone()
             .ok_or(DocumentError::Dangling { slice: "subject" })?;
+        self.hold_section_rules()?;
         let id = self
             .identifier
             .rsplit(':')
