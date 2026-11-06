@@ -313,6 +313,8 @@ the testkit tool crate. Beside it:
   types and the CRA Security rules (a reason line, a `GHSA-` id or VEX path
   per entry) over `[Unreleased]` with the fragments folded in and, through
   `scripts/release/plan.sh`, over the section a release cuts;
+  `release-window.sh`, no fragment under `changelog.d/` while the newest
+  changelog section is assembled and untagged (`docs/release.md`);
   `changelog-guard.sh`, a fragment under `changelog.d/` for a user-visible
   change and no edit of `[Unreleased]`, beside `scripts/release/changelog.sh`,
   which checks the fragments and assembles them at the cut;

@@ -48,6 +48,11 @@ lines of `CHANGELOG.md`.
   that still holds a fragment (`plan.sh`, `check_changelog_fragments`).
   `scripts/release/changelog.sh --preview` prints the section the next cut
   would write.
+- **The release window holds fragments back.** From the release commit
+  until its tag is pushed, `scripts/checks/release-window.sh` (CI `versions`
+  job) refuses a tree that carries a fragment, so a fragment-bearing pull
+  request waits for the tag and the release pull request assembles last
+  (`docs/release.md`, the release window).
 
 ## Structure
 

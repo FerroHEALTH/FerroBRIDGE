@@ -347,6 +347,32 @@ before a real cut.
 10. **The preflight passes** at the commit you are about to tag
    (below).
 
+## The release window
+
+The release window opens when the release pull request assembles the
+fragments into `## [X.Y.Z]` and closes when `vX.Y.Z` is pushed. Inside it
+`changelog.d/` holds no fragment, so the commit you tag has none left
+unassembled, which the plan refuses (`check_changelog_fragments`).
+`scripts/checks/release-window.sh` enforces this in CI's `versions` job, on
+every pull request, merge-group run and push to `main`. The guard fails when
+the newest version section of `CHANGELOG.md` has no pushed tag and
+`changelog.d/` holds any fragment:
+
+- **A fragment-bearing pull request waits for the tag.** While the cut is on
+  `main` and untagged, its merge group fails the guard. Re-run it after the
+  tag is pushed. A pull request without a fragment merges as usual.
+- **The release pull request assembles last.** When a fragment lands on
+  `main` after the release branch assembled, the release pull request's merge
+  group fails the guard. Merge `main` into the release branch, run
+  `scripts/release/changelog.sh --assemble X.Y.Z YYYY-MM-DD` again, and queue
+  it again.
+- **Tag right after the release commit merges** (below), so the window stays
+  short.
+
+`bash scripts/checks/release-window.sh --self-test` covers a fragment
+landing between the cut and the tag. No specification governs the window:
+our own design.
+
 ## Preflight: the plan job, before the tag
 
 The `plan` job verifies every release fact at the tagged commit before
