@@ -90,6 +90,24 @@ impl<'i, R: Release> Walk<'_, '_, 'i, R> {
         }
     }
 
+    /// Records the entry of the Bundle the `url` of the Attachment `value`
+    /// names, for the document rules; a url naming no entry records nothing
+    /// and is no issue, since an Attachment.url need not resolve.
+    // NOTE: R4 documents.html §3.3.1 names what the Composition references and calls a stylesheet
+    // url "a relative reference to a Binary resource"; an Attachment.url is one too: our reading.
+    pub(crate) fn attachment(&mut self, value: &'i Value) {
+        let Some(url) = value.get("url").and_then(Value::as_str) else {
+            return;
+        };
+        if let Resolution::Found {
+            target,
+            via: Via::Entry { from },
+        } = self.resolve_reference(url)
+        {
+            self.link(from, target);
+        }
+    }
+
     /// Checks the aggregation and the target profiles the types of
     /// `element` coded `code` declare on the reference `occurrence` holds.
     ///
