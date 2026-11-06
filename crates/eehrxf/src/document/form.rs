@@ -4,9 +4,8 @@
 //! The forms a document takes: its section slots, the codes it carries, and
 //! the companions and authorship each form names.
 
-use super::LOINC;
 #[cfg(feature = "patient-summary")]
-use super::{EPS_BUNDLE, EPS_PATIENT, PATIENT_SUMMARY};
+use super::{EPS_BUNDLE, EPS_PATIENT, LOINC, PATIENT_SUMMARY};
 
 /// One section slice of the `composition-eu-eps` profile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
