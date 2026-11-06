@@ -518,3 +518,49 @@ fn a_document_with_no_patient_entry_is_refused() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+/// Returns the synthetic document with a `MedicationStatement` entry whose
+/// members past `status` are `members`.
+fn with_medication_statement(members: &str) -> Result<String, String> {
+    document_with_entry(&format!(
+        r#"{{ "fullUrl": "http://example.org/fhir/MedicationStatement/synthetic-medication", "resource": {{ "resourceType": "MedicationStatement", "id": "synthetic-medication", "status": "active", "subject": {{ "reference": "Patient/synthetic-patient" }}, {members} }} }}"#
+    ))
+}
+
+// NOTE: FHIR R4 ElementDefinition.type.targetProfile sits on each type of a choice, which the
+// element table does not keep apart, so the refusal is our own design (the module docs say why).
+#[test]
+fn an_untyped_reference_by_identifier_alone_is_refused_inside_a_choice_element()
+-> Result<(), Box<dyn Error>> {
+    let text = with_medication_statement(
+        r#""medicationReference": { "identifier": { "system": "urn:oid:2.999.1.670", "value": "synthetic-product" } }"#,
+    )?;
+    let error = refused(&text)?;
+    assert!(
+        matches!(error, ReceiveError::Reference { ref location, source: ReferenceError::Unreferenced { identifier: true } } if location == "Bundle.entry[3].resource.medicationReference"),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_typed_reference_by_identifier_alone_is_admitted_inside_a_choice_element()
+-> Result<(), Box<dyn Error>> {
+    let text = with_medication_statement(
+        r#""medicationReference": { "type": "Medication", "identifier": { "system": "urn:oid:2.999.1.670", "value": "synthetic-product" } }"#,
+    )?;
+    ReceivedDocument::read(&text)?;
+    Ok(())
+}
+
+// NOTE: FHIR R4 MedicationStatement.partOf targets MedicationAdministration, MedicationDispense,
+// MedicationStatement, Procedure and Observation, none a patient, beside the refused choice above.
+#[test]
+fn the_same_resource_admits_an_untyped_logical_reference_outside_its_choice_element()
+-> Result<(), Box<dyn Error>> {
+    let text = with_medication_statement(
+        r#""medicationCodeableConcept": { "text": "Synthetic product" }, "partOf": [{ "identifier": { "system": "urn:oid:2.999.1.671", "value": "synthetic-dispense" } }]"#,
+    )?;
+    ReceivedDocument::read(&text)?;
+    Ok(())
+}
