@@ -629,9 +629,11 @@ jobs:
       - if: contains(matrix.packages, 'ferrobridge-hl7v2')
         run: cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
       # eehrxf has no default feature: one feature per Art 14(1) category and
-      # one per serialisation, each linted on its own as well as together.
+      # one per serialisation, linted with none, alone and in every pair (the
+      # step above lints them all together), so an import only some
+      # combinations use never warns unseen.
       - if: contains(matrix.packages, 'eehrxf')
-        run: cargo hack clippy -p eehrxf --each-feature --all-targets --locked -- -D warnings
+        run: cargo hack clippy -p eehrxf --feature-powerset --depth 2 --all-targets --locked -- -D warnings
 
   clippy-fhir-types:
     name: clippy-fhir-types (${{ matrix.version }}, resources)
