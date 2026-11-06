@@ -90,12 +90,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             Direction::FhirToOpenehr => {
                 let mut bindings = Vec::with_capacity(inputs.len());
                 for input in inputs {
-                    let binding = Binding {
-                        fhir: input.clone(),
-                        openehr: parent.openehr.clone(),
-                        axes: parent.axes.clone(),
-                        level: mapping.fhir().map_or(parent.level, FhirTarget::level),
-                    };
+                    let binding = parent.keeping_openehr(
+                        input.clone(),
+                        mapping.fhir().map_or(parent.level, FhirTarget::level),
+                    );
                     self.enter_reference(mapping, input, resource, mappings, &binding)?;
                     bindings.push(binding);
                 }
@@ -160,12 +158,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         }
         let level = self.enter_frame(fetched, binding.fhir.clone());
         self.references.push(literal);
-        let inner = Binding {
-            fhir: Occurrence::default(),
-            openehr: binding.openehr.clone(),
-            axes: binding.axes.clone(),
-            level,
-        };
+        let inner = binding.keeping_openehr(Occurrence::default(), level);
         let ran = self.mappings(mappings, &inner);
         self.references.pop();
         self.leave_frame();
@@ -279,12 +272,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         binding: &Binding,
     ) -> Result<(), EngineError> {
         let level = self.enter_frame(empty_resource(resource.as_str()), binding.fhir.clone());
-        let inner = Binding {
-            fhir: Occurrence::default(),
-            openehr: binding.openehr.clone(),
-            axes: binding.axes.clone(),
-            level,
-        };
+        let inner = binding.keeping_openehr(Occurrence::default(), level);
         let ran = self.mappings(mappings, &inner);
         let mut created = self.leave_frame();
         ran?;
