@@ -646,16 +646,35 @@ fn is_core_package(name: &str) -> bool {
 }
 
 /// Answers whether `version` satisfies the dependency version `wanted`: the
-/// same version, or the same major and minor when the patch of `wanted` is
-/// `x` (packages.html §2.1.10.2).
+/// same version, or, when the patch of `wanted` is `x`, the same major and
+/// minor with a numeric patch (packages.html §2.1.10.2) and the pre-release
+/// label `wanted` names after the `x`, or none when it names none.
+// NOTE: packages.html §2.1.10.2 is silent on pre-releases; no specification governs this: our
+// own design, the rule scripts/vendor/profile-packages.sh pins a range's resolution by.
 fn version_satisfies(version: &str, wanted: &str) -> bool {
-    match wanted.strip_suffix(".x") {
-        Some(prefix) => version
-            .strip_prefix(prefix)
-            .and_then(|rest| rest.strip_prefix('.'))
-            .is_some_and(|patch| !patch.is_empty() && !patch.contains('.')),
-        None => version == wanted,
+    let Some((prefix, range_label)) = patch_range(wanted) else {
+        return version == wanted;
+    };
+    let Some(rest) = version
+        .strip_prefix(prefix)
+        .and_then(|rest| rest.strip_prefix('.'))
+    else {
+        return false;
+    };
+    let (patch, label) = rest
+        .split_once('-')
+        .map_or((rest, None), |(patch, label)| (patch, Some(label)));
+    !patch.is_empty() && patch.bytes().all(|byte| byte.is_ascii_digit()) && label == range_label
+}
+
+/// Splits a patch range, `major.minor.x` with an optional `-label`, into its
+/// `major.minor` and its label; `None` for any other version.
+fn patch_range(wanted: &str) -> Option<(&str, Option<&str>)> {
+    if let Some(prefix) = wanted.strip_suffix(".x") {
+        return Some((prefix, None));
     }
+    let (head, label) = wanted.split_once(".x-")?;
+    Some((head, Some(label)))
 }
 
 #[cfg(test)]
@@ -693,6 +712,18 @@ mod tests {
         assert!(version_satisfies("4.0.1", "4.0.x"));
         assert!(!version_satisfies("4.1.0", "4.0.x"));
         assert!(!version_satisfies("4.0.1", "4.0.2"));
+    }
+
+    #[test]
+    fn a_patch_wildcard_takes_a_pre_release_only_when_it_names_the_label() {
+        assert!(!version_satisfies("4.2.5-comment", "4.2.x"));
+        assert!(!version_satisfies("4.2.0-ballot", "4.2.x"));
+        assert!(version_satisfies("4.2.5", "4.2.x"));
+        assert!(version_satisfies("4.2.0-ballot", "4.2.x-ballot"));
+        assert!(!version_satisfies("4.2.0", "4.2.x-ballot"));
+        assert!(!version_satisfies("4.2.0-comment", "4.2.x-ballot"));
+        assert!(!version_satisfies("4.2.a", "4.2.x"));
+        assert!(!version_satisfies("4.2.", "4.2.x"));
     }
 
     // scripts/vendor/profile-packages.sh fetches the EU trees at build time; the test
