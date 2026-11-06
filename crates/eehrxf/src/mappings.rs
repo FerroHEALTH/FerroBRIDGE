@@ -252,9 +252,11 @@ pub const EPS: Project = Project {
 /// summary over published CKM archetypes. Its one context,
 /// `ferrobridge_eu_hdr.context`, maps the composition to a
 /// `composition-eu-hdr` naming an `encounter-eu-hdr` built from the
-/// composition's context, the hospital stay, and each problem or diagnosis
-/// of the template's diagnostic summary section to a `condition-eu-core`
-/// entry of the section of that name.
+/// composition's context, the hospital stay, each problem or diagnosis of
+/// the template's diagnostic summary section to a `condition-eu-core`, each
+/// procedure of its significant procedures section to a `procedure-eu-core`
+/// and each medication order of its discharge medications section to a
+/// `medicationRequest-eu-core`, each an entry of the section of that name.
 #[cfg(feature = "discharge")]
 pub const HDR: Project = Project {
     directory: "hdr",
@@ -263,6 +265,8 @@ pub const HDR: Project = Project {
         shipped!("hdr", "ferrobridge_eu_hdr.context.yml"),
         shipped!("hdr", "ferrobridge_transfer_summary.v1.Composition.yml"),
         shipped!("hdr", "ferrobridge_problem_diagnosis.v1.yml"),
+        shipped!("hdr", "ferrobridge_procedure.v1.yml"),
+        shipped!("hdr", "ferrobridge_medication_order.v3.yml"),
     ],
     accounted: &[],
 };

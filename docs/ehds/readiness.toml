@@ -191,3 +191,21 @@ template = "FerroBRIDGE discharge report template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
 context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
 test = "crates/eehrxf/tests/it/discharge_mapped/mod.rs::the_profile_elements_of_the_discharge_report_survive_the_round_trip"
+
+[[category.row]]
+target = "procedure-eu-core (significant procedures)"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/procedure-eu-core"
+package = "hl7.fhir.eu.base 2.0.1"
+template = "FerroBRIDGE discharge report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
+context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
+test = "crates/eehrxf/tests/it/discharge_mapped/mod.rs::every_section_of_the_report_survives_the_round_trip"
+
+[[category.row]]
+target = "medicationRequest-eu-core (discharge medications)"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/medicationRequest-eu-core"
+package = "hl7.fhir.eu.base 2.0.1"
+template = "FerroBRIDGE discharge report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
+context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
+test = "crates/eehrxf/tests/it/discharge_mapped/mod.rs::every_section_of_the_report_survives_the_round_trip"

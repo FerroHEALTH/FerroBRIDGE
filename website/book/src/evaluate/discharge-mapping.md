@@ -40,20 +40,27 @@ time.
 | the composition | `composition-eu-hdr`, of type LOINC `34105-7` |
 | the composition's `context/start_time` and `context/end_time` | `encounter-eu-hdr`, its `period` |
 | each `EVALUATION.problem_diagnosis.v1` of the diagnostic summary | one `condition-eu-core` entry of `sectionDiagnosticSummary`: its `code`, `onset[x]`, `assertedDate` extension, `bodySite` and `note` |
+| each `ACTION.procedure.v1` of the significant procedures | one `procedure-eu-core` entry of `sectionSignificantProcedures`: its `status` from the careflow step, `code`, `performed[x]` from the action's time, `bodySite` and `note` |
+| each `INSTRUCTION.medication_order.v3` of the discharge medications | one `medicationRequest-eu-core` entry of `sectionDischargeMedications`: its `medicationCodeableConcept`, the overall directions as `dosageInstruction.text`, and `note` |
 
 The template records neither the status nor the class of the stay, and
 `encounter-eu-hdr` requires both. The mapping writes the status `finished`
 and the class `IMP` from the v3 `ActCode` system, a member of the
 `encounter-class-eu-hdr` value set, because a discharge report reports a
-finished hospital stay. The significant procedures and the discharge
-medications are template sections with no mapping yet.
+finished hospital stay. A procedure commenced is `in-progress`, one
+completed `completed` and one aborted `stopped`, the three careflow steps of
+the CKM procedure action at which it was performed. An `INSTRUCTION` records
+no request status, so a discharge medication is `unknown` and an `order`, as
+in the MPD project. A section is written only when the composition holds an
+entry for it.
 
 ## Mapping out of openEHR
 
 `Mapping::to_fhir_with` maps a committed composition to a FHIR R4
-`collection` Bundle: the composition, the encounter, every condition and one
-`Provenance` covering them. `Document::with_mapped_composition` takes that
-Bundle into a discharge report document. The run's `Composition` stays out,
+`collection` Bundle: the composition, the encounter, every condition,
+procedure and medication request, and one `Provenance` covering them.
+`Document::with_mapped_composition` takes that Bundle into a discharge
+report document. The run's `Composition` stays out,
 because the document writes its own from the form. The encounter it names
 becomes the document's encounter, every other resource becomes an entry, and
 the method answers each section of the run placed in the form's slot by its
@@ -67,7 +74,7 @@ carries LOINC `34105-7` a discharge report, and `Category::profiles` names
 `bundle-eu-hdr` and `composition-eu-hdr`, which `ReceivedDocument::check`
 holds the document to. `Mapping::to_openehr` maps the document from its
 `composition-eu-hdr` into one composition of the template, following the
-composition's encounter and the entries of its diagnostic summary. The
+composition's encounter and the entries of its three sections. The
 document as received is kept in the composition's
 `FEEDER_AUDIT.original_content`.
 

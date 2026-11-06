@@ -6,7 +6,8 @@
 # (a context whose start is a composition model slots no composition:
 # composition-element.adoc). The composition's context is the hospital stay,
 # the encounter-eu-hdr the Composition names, and each section of the
-# template is the section slice of the same name. The type (LOINC 34105-7)
+# template is the section slice of the same name: the diagnostic summary,
+# the significant procedures and the discharge medications. The type (LOINC 34105-7)
 # and the title are fixed (no specification governs these choices: our own
 # design).
 grammar: FHIRConnect/v1.0.0
@@ -153,6 +154,10 @@ mappings:
       targetAttribute: "code.coding.code"
       operator: "one of"
       criteria: "11535-2"
+    openehrCondition:
+      targetRoot: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Diagnostic summary']"
+      targetAttribute: "items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"
+      operator: "not empty"
     followedBy:
       mappings:
         - name: "title"
@@ -197,3 +202,115 @@ mappings:
                         fhir: "$fhirRoot"
                         openehr: "$openehrRoot"
                       slotArchetype: "EVALUATION.problem_diagnosis.v1"
+
+  - name: "significantProcedures"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Significant procedures']"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "10185-7"
+    openehrCondition:
+      targetRoot: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Significant procedures']"
+      targetAttribute: "items[openEHR-EHR-ACTION.procedure.v1]"
+      operator: "not empty"
+    followedBy:
+      mappings:
+        - name: "title"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "title"
+              fhir:
+                - path: "title"
+                  value: "Significant procedures"
+
+        - name: "code"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "code.coding"
+          manual:
+            - name: "loinc"
+              fhir:
+                - path: "system"
+                  value: "http://loinc.org"
+                - path: "code"
+                  value: "10185-7"
+
+        - name: "entries"
+          with:
+            fhir: "entry"
+            openehr: "items[openEHR-EHR-ACTION.procedure.v1]"
+          followedBy:
+            mappings:
+              - name: "entry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$reference"
+                reference:
+                  resourceType: "Procedure"
+                  mappings:
+                    - name: "procedure"
+                      with:
+                        fhir: "$fhirRoot"
+                        openehr: "$openehrRoot"
+                      slotArchetype: "ACTION.procedure.v1"
+
+  - name: "dischargeMedications"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Discharge medications']"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "75311-1"
+    openehrCondition:
+      targetRoot: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Discharge medications']"
+      targetAttribute: "items[openEHR-EHR-INSTRUCTION.medication_order.v3]"
+      operator: "not empty"
+    followedBy:
+      mappings:
+        - name: "title"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "title"
+              fhir:
+                - path: "title"
+                  value: "Discharge medications"
+
+        - name: "code"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "code.coding"
+          manual:
+            - name: "loinc"
+              fhir:
+                - path: "system"
+                  value: "http://loinc.org"
+                - path: "code"
+                  value: "75311-1"
+
+        - name: "entries"
+          with:
+            fhir: "entry"
+            openehr: "items[openEHR-EHR-INSTRUCTION.medication_order.v3]"
+          followedBy:
+            mappings:
+              - name: "entry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$reference"
+                reference:
+                  resourceType: "MedicationRequest"
+                  mappings:
+                    - name: "medicationOrder"
+                      with:
+                        fhir: "$fhirRoot"
+                        openehr: "$openehrRoot"
+                      slotArchetype: "INSTRUCTION.medication_order.v3"

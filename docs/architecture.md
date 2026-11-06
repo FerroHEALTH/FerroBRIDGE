@@ -1289,9 +1289,11 @@ models, and the readiness matrix names the template as FerroBRIDGE's. The
 owner ruling on #116 of 2026-11-06 extends the exception to discharge and
 imaging reports: FerroBRIDGE's discharge report template specialises the CKM
 transfer of care summary, and the `eehrxf` HDR project maps it to
-`composition-eu-hdr`, its context to `encounter-eu-hdr` and the problems of
-its diagnostic summary to `condition-eu-core` (the "Discharge report
-template" row of the decision table). No openEHR
+`composition-eu-hdr`, its context to `encounter-eu-hdr`, the problems of
+its diagnostic summary to `condition-eu-core`, its significant procedures to
+`procedure-eu-core` and its discharge medications to
+`medicationRequest-eu-core` (the "Discharge report template" row of the
+decision table). No openEHR
 Foundation position on the exchange format was found, and no HL7 Europe guide
 or Xt-EHR deliverable references openEHR; the library's laboratory OPT is the
 one concrete openEHR-to-EEHRxF artefact.

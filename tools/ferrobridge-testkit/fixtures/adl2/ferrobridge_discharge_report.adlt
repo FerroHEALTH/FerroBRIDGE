@@ -85,6 +85,11 @@ description
 
 definition
     SECTION[at0000.1] matches {
+        name matches {
+            DV_TEXT matches {
+                value matches {"Diagnostic summary"}
+            }
+        }
         items matches {
             use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.problem_diagnosis.v1] occurrences matches {0..*}
         }
@@ -128,6 +133,11 @@ description
 
 definition
     SECTION[at0000.1] matches {
+        name matches {
+            DV_TEXT matches {
+                value matches {"Significant procedures"}
+            }
+        }
         items matches {
             use_archetype ACTION[at0000.2, openEHR-EHR-ACTION.procedure.v1] occurrences matches {0..*}
         }
@@ -171,6 +181,11 @@ description
 
 definition
     SECTION[at0000.1] matches {
+        name matches {
+            DV_TEXT matches {
+                value matches {"Discharge medications"}
+            }
+        }
         items matches {
             use_archetype INSTRUCTION[at0000.2, openEHR-EHR-INSTRUCTION.medication_order.v3] occurrences matches {0..*}
         }

@@ -4,8 +4,11 @@
 # composition-eu-hdr profile over FerroBRIDGE's discharge report template,
 # whose archetypes are CKM's: the transfer of care summary becomes the
 # document's Composition, its context the encounter-eu-hdr the Composition
-# names, and each problem or diagnosis of its diagnostic summary section one
-# condition-eu-core entry of the section of that name.
+# names, each problem or diagnosis of its diagnostic summary one
+# condition-eu-core entry, each procedure of its significant procedures one
+# procedure-eu-core entry, and each medication order of its discharge
+# medications one medicationRequest-eu-core entry, of the section of that
+# name.
 grammar: FHIRConnect/v1.0.0
 type: context
 metadata:
@@ -23,4 +26,6 @@ context:
   archetypes:
     - "COMPOSITION.transfer_summary.v1.Composition"
     - "EVALUATION.problem_diagnosis.v1"
+    - "ACTION.procedure.v1"
+    - "INSTRUCTION.medication_order.v3"
   start: "COMPOSITION.transfer_summary.v1.Composition"

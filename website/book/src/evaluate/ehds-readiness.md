@@ -87,5 +87,7 @@ HL7 Europe Hospital Discharge Report 1.0.0 (R4, 2026-10-16) is pinned, and the i
 | `composition-eu-hdr`; the document assembly of the interoperability component writes the `bundle-eu-hdr` and its `Composition` from the sections the context maps | hl7.fhir.eu.hdr 1.0.0 | FerroBRIDGE discharge report template over CKM archetypes | `the_profile_elements_of_the_discharge_report_survive_the_round_trip` |
 | `encounter-eu-hdr` | hl7.fhir.eu.hdr 1.0.0 | FerroBRIDGE discharge report template over CKM archetypes | `the_profile_elements_of_the_discharge_report_survive_the_round_trip` |
 | `condition-eu-core (diagnostic summary)` | hl7.fhir.eu.base 2.0.1 | FerroBRIDGE discharge report template over CKM archetypes | `the_profile_elements_of_the_discharge_report_survive_the_round_trip` |
+| `procedure-eu-core (significant procedures)` | hl7.fhir.eu.base 2.0.1 | FerroBRIDGE discharge report template over CKM archetypes | `every_section_of_the_report_survives_the_round_trip` |
+| `medicationRequest-eu-core (discharge medications)` | hl7.fhir.eu.base 2.0.1 | FerroBRIDGE discharge report template over CKM archetypes | `every_section_of_the_report_survives_the_round_trip` |
 
 <!-- readiness:end -->

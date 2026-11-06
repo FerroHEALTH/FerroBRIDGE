@@ -66,6 +66,15 @@ const NOW: &str = "2026-10-20T12:00:00Z";
 /// The synthetic diagnosis's code, in a code system under `example.org`.
 const DIAGNOSIS: &str = "SYN-DIAGNOSIS-0001";
 
+/// The synthetic procedure's code, in a code system under `example.org`.
+const PROCEDURE: &str = "SYN-PROCEDURE-0001";
+
+/// The synthetic medicine's code, in a code system under `example.org`.
+const MEDICINE: &str = "SYN-MEDICINE-0001";
+
+/// The time the synthetic procedure was completed.
+const PERFORMED: &str = "2026-10-14T13:00:00Z";
+
 /// The synthetic stay's admission.
 const ADMITTED: &str = "2026-10-12T09:30:00Z";
 
@@ -178,9 +187,123 @@ fn diagnosis() -> String {
     )
 }
 
+/// A coded text of the synthetic code system `system` under `example.org`.
+fn synthetic(system: &str, value: &str, code: &str) -> String {
+    format!(
+        r#"{{ "_type": "DV_CODED_TEXT", "value": "{value}", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "http://example.org/fhir/CodeSystem/{system}" }}, "code_string": "{code}" }} }}"#
+    )
+}
+
+/// A synthetic procedure completed during the stay.
+fn procedure() -> String {
+    let items = [
+        element(
+            "at0002",
+            "Procedure name",
+            &synthetic("ferrobridge-procedures", "Synthetic procedure", PROCEDURE),
+        ),
+        element(
+            "at0063",
+            "Body site",
+            r#"{ "_type": "DV_TEXT", "value": "Synthetic body site" }"#,
+        ),
+        element(
+            "at0005",
+            "Comment",
+            r#"{ "_type": "DV_TEXT", "value": "A synthetic procedure comment." }"#,
+        ),
+    ];
+    format!(
+        r#"{{
+  "_type": "ACTION",
+  "name": {{ "_type": "DV_TEXT", "value": "Procedure" }},
+  {details},
+  {ENTRY},
+  "time": {time},
+  "ism_transition": {{
+    "_type": "ISM_TRANSITION",
+    "current_state": {{ "_type": "DV_CODED_TEXT", "value": "completed", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "openehr" }}, "code_string": "532" }} }},
+    "careflow_step": {{ "_type": "DV_CODED_TEXT", "value": "Procedure completed", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "local" }}, "code_string": "at0043" }} }}
+  }},
+  "description": {{ "_type": "ITEM_TREE", "name": {{ "_type": "DV_TEXT", "value": "Tree" }}, "archetype_node_id": "at0001", "items": [{items}] }}
+}}"#,
+        details = details("openEHR-EHR-ACTION.procedure.v1"),
+        time = instant(PERFORMED),
+        items = items.join(","),
+    )
+}
+
+/// A synthetic medication order for after discharge.
+fn order() -> String {
+    format!(
+        r#"{{
+  "_type": "INSTRUCTION",
+  "name": {{ "_type": "DV_TEXT", "value": "Medication order" }},
+  {details},
+  {ENTRY},
+  "narrative": {{ "_type": "DV_TEXT", "value": "Synthetic medication order" }},
+  "activities": [{{
+    "_type": "ACTIVITY",
+    "name": {{ "_type": "DV_TEXT", "value": "Order" }},
+    "archetype_node_id": "at0001",
+    "description": {{
+      "_type": "ITEM_TREE",
+      "name": {{ "_type": "DV_TEXT", "value": "Tree" }},
+      "archetype_node_id": "at0002",
+      "items": [{medicine}, {directions}, {comment}]
+    }},
+    "timing": {{ "_type": "DV_PARSABLE", "value": "R/2026-10-20T08:00:00Z/P1D", "formalism": "ISO8601" }},
+    "action_archetype_id": "openEHR-EHR-ACTION\\.medication\\.v1"
+  }}],
+  "protocol": {{ "_type": "ITEM_TREE", "name": {{ "_type": "DV_TEXT", "value": "Tree" }}, "archetype_node_id": "at0005", "items": [] }}
+}}"#,
+        details = details("openEHR-EHR-INSTRUCTION.medication_order.v3"),
+        medicine = element(
+            "at0070",
+            "Medication item",
+            &synthetic("ferrobridge-products", "Synthetic tablet 500 mg", MEDICINE),
+        ),
+        directions = element(
+            "at0009",
+            "Overall directions description",
+            r#"{ "_type": "DV_TEXT", "value": "One synthetic tablet each morning" }"#,
+        ),
+        comment = element(
+            "at0167",
+            "Comment",
+            r#"{ "_type": "DV_TEXT", "value": "A synthetic order comment." }"#,
+        ),
+    )
+}
+
+/// A synthetic discharge report whose three sections each hold one entry.
+fn full_report() -> String {
+    composition_of(&[
+        ("Diagnostic summary", &[diagnosis()]),
+        ("Significant procedures", &[procedure()]),
+        ("Discharge medications", &[order()]),
+    ])
+}
+
 /// A synthetic discharge report of a stay from [`ADMITTED`] to
 /// [`DISCHARGED`], whose diagnostic summary holds `diagnoses`.
 fn composition(diagnoses: &[String]) -> String {
+    composition_of(&[("Diagnostic summary", diagnoses)])
+}
+
+/// A synthetic discharge report of a stay from [`ADMITTED`] to
+/// [`DISCHARGED`] holding each `(name, items)` section of the template.
+fn composition_of(sections: &[(&str, &[String])]) -> String {
+    let content: Vec<String> = sections
+        .iter()
+        .map(|(name, items)| {
+            format!(
+                r#"{{ "_type": "SECTION", "name": {{ "_type": "DV_TEXT", "value": "{name}" }}, {section}, "items": [{items}] }}"#,
+                section = details("openEHR-EHR-SECTION.adhoc.v1"),
+                items = items.join(","),
+            )
+        })
+        .collect();
     format!(
         r#"{{
   "_type": "COMPOSITION",
@@ -207,12 +330,11 @@ fn composition(diagnoses: &[String]) -> String {
     "end_time": {end},
     "setting": {{ "_type": "DV_CODED_TEXT", "value": "other care", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "openehr" }}, "code_string": "238" }} }}
   }},
-  "content": [{{ "_type": "SECTION", "name": {{ "_type": "DV_TEXT", "value": "Diagnostic summary" }}, {section}, "items": [{items}] }}]
+  "content": [{content}]
 }}"#,
         start = instant(ADMITTED),
         end = instant(DISCHARGED),
-        section = details("openEHR-EHR-SECTION.adhoc.v1"),
-        items = diagnoses.join(","),
+        content = content.join(","),
     )
 }
 
@@ -671,5 +793,173 @@ fn an_entry_the_run_does_not_hold_is_refused() -> Result<(), Box<dyn Error>> {
             slice: "sectionDiagnosticSummary"
         })
     ));
+    Ok(())
+}
+
+/// The EU core profile of a significant procedures entry.
+const PROCEDURE_EU_CORE: &str = "http://hl7.eu/fhir/base/StructureDefinition/procedure-eu-core";
+
+/// The EU core profile of a discharge medications entry.
+const MEDICATION_REQUEST_EU_CORE: &str =
+    "http://hl7.eu/fhir/base/StructureDefinition/medicationRequest-eu-core";
+
+/// The `entry` references of the section of `composition` coded `code`.
+fn section_entries(composition: &Value, code: &str) -> Vec<String> {
+    composition["section"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|section| section["code"]["coding"][0]["code"] == code)
+        .flat_map(|section| section["entry"].as_array().cloned().unwrap_or_default())
+        .filter_map(|entry| entry["reference"].as_str().map(ToOwned::to_owned))
+        .collect()
+}
+
+#[test]
+fn the_report_maps_its_procedure_and_discharge_medication() -> Result<(), Box<dyn Error>> {
+    let run = mapping()?.to_fhir_with(
+        &full_report(),
+        &settings(),
+        CallContext::new()
+            .with_patient(reference("Patient/synthetic-patient"))
+            .with_who(reference("Device/gateway")),
+    )?;
+    let bundle = run.bundle();
+    assert!(
+        of_type(bundle, "OperationOutcome")?.is_empty(),
+        "the run declares no loss"
+    );
+    assert_eq!(
+        of_type(bundle, "Provenance")?.len(),
+        1,
+        "one Provenance per run"
+    );
+    let procedure = only(bundle, "Procedure")?;
+    assert_eq!(procedure["meta"]["profile"][0], PROCEDURE_EU_CORE);
+    assert_eq!(procedure["status"], "completed");
+    assert_eq!(procedure["code"]["coding"][0]["code"], PROCEDURE);
+    assert_eq!(procedure["performedDateTime"], PERFORMED);
+    assert_eq!(procedure["bodySite"][0]["text"], "Synthetic body site");
+    assert_eq!(
+        procedure["note"][0]["text"],
+        "A synthetic procedure comment."
+    );
+    check_resource(
+        &vendored_base(PROCEDURE_EU_CORE)?,
+        "Procedure",
+        &object(bundle, "Procedure")?,
+    )?;
+    let request = only(bundle, "MedicationRequest")?;
+    assert_eq!(request["meta"]["profile"][0], MEDICATION_REQUEST_EU_CORE);
+    assert_eq!(request["status"], "unknown");
+    assert_eq!(request["intent"], "order");
+    assert_eq!(
+        request["medicationCodeableConcept"]["coding"][0]["code"],
+        MEDICINE
+    );
+    assert_eq!(
+        request["dosageInstruction"][0]["text"],
+        "One synthetic tablet each morning"
+    );
+    assert_eq!(request["note"][0]["text"], "A synthetic order comment.");
+    check_resource(
+        &vendored_base(MEDICATION_REQUEST_EU_CORE)?,
+        "MedicationRequest",
+        &object(bundle, "MedicationRequest")?,
+    )?;
+    let composition = only(bundle, "Composition")?;
+    let id = |resource: &Value| resource["id"].as_str().map(ToOwned::to_owned);
+    assert_eq!(
+        section_entries(&composition, "10185-7"),
+        [format!(
+            "Procedure/{}",
+            id(&procedure).ok_or("the procedure's id")?
+        )]
+    );
+    assert_eq!(
+        section_entries(&composition, "75311-1"),
+        [format!(
+            "MedicationRequest/{}",
+            id(&request).ok_or("the request's id")?
+        )]
+    );
+    Ok(())
+}
+
+#[test]
+fn every_section_of_the_report_survives_the_round_trip() -> Result<(), Box<dyn Error>> {
+    let mapping = mapping()?;
+    let first = sent(
+        &mapping,
+        &full_report(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d111",
+    )?;
+    let received = ReceivedDocument::read(&first)?;
+    received.check(&hdr(HDR_BUNDLE)?, &hdr(HDR_COMPOSITION)?)?;
+    let stored = mapping.to_openehr(&received, &settings())?;
+    let mut canonical: Value = serde_json::from_str(stored.composition())?;
+    canonical
+        .as_object_mut()
+        .ok_or("the composition is an object")?
+        .insert(
+            String::from("uid"),
+            serde_json::json!({
+                "_type": "OBJECT_VERSION_ID",
+                "value": "5b0c3f7e-0000-4000-8000-00000000d112::ferrobridge.example::1"
+            }),
+        );
+    let second = sent(
+        &mapping,
+        &canonical.to_string(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d113",
+    )?;
+    let document = ReceivedDocument::read(&second)?;
+    document.check(&hdr(HDR_BUNDLE)?, &hdr(HDR_COMPOSITION)?)?;
+    for (kind, pointers) in [
+        (
+            "Procedure",
+            &[
+                "/meta/profile",
+                "/status",
+                "/code",
+                "/performedDateTime",
+                "/bodySite",
+                "/note",
+            ][..],
+        ),
+        (
+            "MedicationRequest",
+            &[
+                "/meta/profile",
+                "/status",
+                "/intent",
+                "/medicationCodeableConcept",
+                "/dosageInstruction",
+                "/note",
+            ][..],
+        ),
+        (
+            "Condition",
+            &["/meta/profile", "/code", "/onsetDateTime"][..],
+        ),
+    ] {
+        let (before, after) = (
+            only(received.bundle(), kind)?,
+            only(document.bundle(), kind)?,
+        );
+        for pointer in pointers {
+            assert_eq!(
+                before.pointer(pointer),
+                after.pointer(pointer),
+                "{kind}{pointer}"
+            );
+        }
+    }
+    let root: Value = serde_json::from_str(&second)?;
+    let composition = &root["entry"][0]["resource"];
+    for code in ["11535-2", "10185-7", "75311-1"] {
+        assert_eq!(section_entries(composition, code).len(), 1, "{code}");
+    }
+    emit("eehrxf-discharge-full", &second)?;
     Ok(())
 }

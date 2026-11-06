@@ -53,8 +53,8 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   `laboratory`), the HL7 Europe Laboratory Report 2.0.0 report with its
   results and specimens over the published `KDS_Laborbericht` template, and
   `HDR` (feature `discharge`), the HL7 Europe Hospital Discharge Report
-  1.0.0 composition, encounter and diagnostic summary over FerroBRIDGE's
-  discharge report template. `Mapping::compile_project`
+  1.0.0 composition, encounter, diagnostic summary, significant procedures
+  and discharge medications over FerroBRIDGE's discharge report template. `Mapping::compile_project`
   compiles a project from its embedded text with no file written, and
   `Project::write_to` writes its files where a system keeps its mappings,
   the paths `Mapping::compile` takes. Three model mappings of the laboratory project are
