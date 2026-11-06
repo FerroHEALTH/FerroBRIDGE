@@ -86,7 +86,7 @@ pub(crate) async fn transaction(
         ));
     }
     admit_entries(facade, access, bundle.document())?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let resolved =
         crate::facade::references::resolve_bundle(facade, &client, bundle.document()).await;
     let bundled = fhirconnect::engine::seam::BundleReferences::new(

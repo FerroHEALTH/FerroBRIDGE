@@ -44,7 +44,7 @@ pub(crate) async fn read(
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     party::admit(access, Permission::Read, resource_type, Some(id))?;
     let uid = party::party_id(resource_type, id)?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let held = party::get(demographic, class, resource_type, uid.value()).await?;
@@ -66,7 +66,7 @@ pub(crate) async fn vread(
     party::admit(access, Permission::Read, resource_type, Some(id))?;
     let uid = party::party_id(resource_type, id)?;
     let tree = crate::facade::handlers::read::version_tree(resource_type, id, vid)?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
@@ -92,7 +92,7 @@ pub(crate) async fn history(
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     party::admit(access, Permission::Read, resource_type, Some(id))?;
     let uid = party::party_id(resource_type, id)?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let Answered { outcome, upstream } = demographic

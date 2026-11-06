@@ -1712,7 +1712,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-console"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1803,7 +1803,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-server"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1845,6 +1845,7 @@ dependencies = [
  "openehr-rm",
  "openehr-sdt",
  "openehr-term",
+ "rcgen",
  "redb",
  "reqwest",
  "secrecy",
@@ -1894,7 +1895,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-testkit"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -2131,7 +2132,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-codegen"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "clap",
@@ -2332,7 +2333,7 @@ dependencies = [
 
 [[package]]
 name = "forwarders"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -2481,7 +2482,7 @@ dependencies = [
 
 [[package]]
 name = "generated-tree"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "tempfile",
  "thiserror",
@@ -3850,7 +3851,7 @@ dependencies = [
 
 [[package]]
 name = "omop-cdm-codegen"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "clap",

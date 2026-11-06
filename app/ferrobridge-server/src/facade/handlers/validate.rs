@@ -102,7 +102,7 @@ pub(crate) async fn validate(
     // every defaulted time of one run, and this one is discarded with the
     // composition it builds.
     let now = jiff::Timestamp::now().to_string();
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let resolved = crate::facade::references::resolve(facade, &client, inbound.document()).await;
     // NOTE: R4 operation-resource-validate.html: validation changes nothing, so a linked
     // composition is answered with the probe URI and never committed (our own design).

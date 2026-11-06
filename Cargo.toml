@@ -9,7 +9,7 @@ members = ["crates/*", "app/*", "tools/*"]
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.0.21"
+version = "0.0.22"
 edition = "2024"
 rust-version = "1.98"
 license = "BUSL-1.1"
@@ -133,9 +133,11 @@ backon = "1.6.0"
 # lanes, and the RFC 7662 introspection check of an `[[auth.issuer]]` with `mode =
 # "introspection"`. A caret requirement, as a shared crate takes another (owner
 # decision, 2026-10-26), with 0.9.0 as the floor: it classifies every caller by
-# its issuer's `kind` and holds a Basic credential to a person. `fetch` reads each
-# issuer's metadata and key set and runs the client credentials token client
-# and the introspector. The server adds `axum` for its guard;
+# its issuer's `kind`, holds a Basic credential to a person, and carries the
+# onward grants (RFC 8693, RFC 7523) the facade reaches the CDR under its
+# caller with. `fetch` reads each issuer's metadata and key set and runs the
+# client credentials token client, the onward client and the introspector.
+# The server adds `axum` for its guard;
 # ferrobridge-term's `smart` feature takes the token client alone.
 ferrohealth-smart = { version = "0.9.1", default-features = false, features = ["fetch"] }
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the

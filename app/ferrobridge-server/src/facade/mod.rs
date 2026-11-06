@@ -370,13 +370,27 @@ impl Facade {
     ///
     /// The inbound `X-Request-Id` travels onto every outbound call, so one
     /// correlation identifier covers the request and the CDR calls it makes.
-    #[must_use]
-    pub fn client_for(&self, headers: &http::HeaderMap) -> CdrClient {
-        headers
+    /// Under `[cdr.credentials.onward]` the calls carry the token the caller
+    /// behind `access` was exchanged for ([`CdrClient::for_caller`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal of a caller the onward lane does not carry or
+    /// whose exchange failed (`crate::facade::status::onward`); the request
+    /// then reaches the CDR under no credential at all.
+    pub async fn client_for(
+        &self,
+        headers: &http::HeaderMap,
+        access: &ferrohealth_smart::resource::Access,
+    ) -> Result<CdrClient, reply::Refusal> {
+        let client = headers
             .get(ferrohealth_server::request_id::HEADER)
             .and_then(|value| value.to_str().ok())
             .and_then(|text| crate::cdr::ids::RequestId::new(text).ok())
-            .map_or_else(|| self.client.clone(), |id| self.client.with_request_id(id))
+            .map_or_else(|| self.client.clone(), |id| self.client.with_request_id(id));
+        client.for_caller(access, headers).await.map_err(|refusal| {
+            handlers::write::refuse(&status::onward::of_onward_refusal(&refusal))
+        })
     }
 
     /// Returns what the deployment configured.

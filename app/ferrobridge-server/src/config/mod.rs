@@ -223,6 +223,26 @@ impl Config {
             || (self.operations.enabled && self.mappings.directory.is_some())
     }
 
+    /// Refuses an onward lane on a server whose callers hold no token to
+    /// exchange, because `[auth]` is off.
+    fn onward_guarded(&self, serves: bool) -> Result<(), Error> {
+        // NOTE: no specification governs this: our own design; without `[auth]` no caller
+        // holds a token to exchange, so every facade request would be refused.
+        if serves
+            && !self.auth.enabled
+            && self
+                .cdr
+                .as_ref()
+                .is_some_and(|cdr| cdr.credentials.onward.is_some())
+        {
+            return Err(Error::Needs {
+                key: String::from("cdr.credentials.onward"),
+                needs: String::from("auth.enabled"),
+            });
+        }
+        Ok(())
+    }
+
     /// Resolves this tree into the settings `process` holds.
     ///
     /// Every `_file` sibling is read here, so a secret reaches the process
@@ -257,6 +277,7 @@ impl Config {
         if self.server.caller_rate.is_some() {
             return Err(Error::CallerRate);
         }
+        self.onward_guarded(serves)?;
         Ok(Settings {
             server: self.server.clone(),
             telemetry: self.telemetry.clone(),

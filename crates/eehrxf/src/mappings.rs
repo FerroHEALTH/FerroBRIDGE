@@ -189,9 +189,7 @@ pub const IMAGING: Project = Project {
         shipped!("imaging", "ferrobridge_imaging_exam_result.v1.yml"),
         shipped!("imaging", "ferrobridge_eu_imaging_report.yml"),
     ],
-    // NOTE: no specification governs this: our own design; the template's modality and study
-    // date sit in the report's event, which the study's reference cannot reach, so each is declared.
-    accounted: &["ImagingStudy.modality", "ImagingStudy.started"],
+    accounted: &[],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.

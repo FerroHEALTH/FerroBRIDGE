@@ -146,6 +146,14 @@ pub enum Error {
         #[source]
         source: Box<ferrohealth_smart::config::ConfigError>,
     },
+    /// A `[<lane>.credentials.onward]` table names a lane other than the CDR's.
+    #[error(
+        "[{section}.onward] is set; only the CDR lane reaches its upstream on a caller's behalf, under [cdr.credentials.onward]"
+    )]
+    OnwardLane {
+        /// The credentials table, such as `terminology.credentials`.
+        section: String,
+    },
     /// A base URL is no http or https base without a query or a fragment.
     #[error("{key} holds `{value}`, which is no http or https base without a query or a fragment")]
     FetchBase {

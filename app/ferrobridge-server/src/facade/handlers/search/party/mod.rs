@@ -90,7 +90,7 @@ pub(super) async fn search(
             )
         })?;
     let request = request::read(facade, resource_type, queries, pairs, Handling::of(headers))?;
-    let client = facade.client_for(headers);
+    let client = facade.client_for(headers, access).await?;
     let keep = |uid: &str| match compartment {
         Compartment::Any => true,
         // NOTE: SMART App Launch 2.x scopes-and-launch-context.html, a `patient/` token

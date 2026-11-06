@@ -307,6 +307,97 @@ As environment variables, the same section reads
 `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE`. The terminology
 section reads the same names under `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__`.
 
+### `[cdr.credentials.onward]`
+
+With this table, each FHIR facade request reaches the CDR under the person
+who made it. The bridge exchanges the caller's access token for a token of
+the CDR's issuer that names the same person, and sends that token on every
+CDR call of the request. The bridge authenticates the exchange with its own
+client of `[cdr.credentials.oauth]`, which the table requires. Only the CDR
+lane takes the table: an `onward` table under `[terminology.credentials]` or
+another lane refuses the start, and so does one on a server whose `[auth]` is
+off, because no caller then holds a token to exchange.
+
+The issuer's `profile` picks the grant:
+
+- `rfc9068` (and `keycloak`): OAuth 2.0 Token Exchange (RFC 8693 §2.1). The
+  caller's token is the `subject_token`, an access token, and the CDR is named
+  by `resource`, or by `audience` under `keycloak`. Keycloak requires the
+  bridge's client in the `aud` of the caller's token, so the client scope of
+  the facade's clients carries an audience mapper that puts it there.
+- `entra`: the JWT bearer grant (RFC 7523 §2.1) with the Microsoft identity
+  platform's on-behalf-of parameters. The caller's token, whose `aud` is the
+  bridge's application id, is the `assertion`, `requested_token_use` is
+  `on_behalf_of`, and `scope` names the CDR, such as `api://<cdr>/.default`.
+  Register the bridge and the CDR to issue v2.0 tokens.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `issuer` | none, required | The issuer of the onward tokens; its metadata names the token endpoint unless `token_endpoint` is set |
+| `kind` | none, required | `persons` for a same-organisation person, `federation` for a professional of another party |
+| `profile` | `rfc9068` | The preset the issuer's profile starts from: `rfc9068`, `entra`, `keycloak` and the others `[[auth.issuer]]` takes |
+| `token_endpoint` | none | The token endpoint itself |
+| `client_id` | the `oauth` table's | The bridge's client id at this issuer |
+| `audiences` | none, required | The audiences an onward token may name; a token naming any other is refused |
+| `indicators` | none | The `resource` or `audience` values the exchange names the CDR by |
+| `scope` | none | The `scope` the request names; the on-behalf-of grant requires it |
+| `correlation_claim` | none | The claim a chained `federation` route carries from the caller's token to the onward one |
+| `keys` | none | The profile keys over the preset; `max_onward_lifetime`, in seconds, is required |
+
+Each issued token is decoded and refused unless its issuer is the one asked,
+its `aud` lies inside `audiences`, it lives no longer than
+`max_onward_lifetime`, it names the bridge's client as its actor (`act`, or
+the profile's client claim such as `azp`), and it names the caller's person
+by the profile's `person_equality` claims (`iss` and `sub` by default, `oid`
+and `tid` under `entra`, so a different pairwise `sub` is accepted). The
+bridge caches the token under the caller's token and the target until
+`refresh_margin_ms` before the earlier of its own and the caller's token's
+expiry, and checks it again on every use. The caller's token appears in no
+log, span or metric.
+
+Who reaches the CDR how:
+
+| Caller | Reaches the CDR |
+|---|---|
+| A machine (a client credentials token) | Under the bridge's own token of `[cdr.credentials.oauth]`, never exchanged |
+| A person, a delegated or representing person, under `kind = "persons"` | Under the exchanged token |
+| A professional of another party, under `kind = "federation"` | Under the exchanged token |
+| A patient, another party's organisation, a guest, a Basic user | Refused with `403` |
+
+A failed exchange fails the request, and the bridge's own token is never sent
+in its place. The token endpoint's `400` or `403` (RFC 8693 §2.2.2,
+`invalid_request` or `invalid_target`) is the facade's answer too, with the
+OAuth error in the `OperationOutcome`. An on-behalf-of `interaction_required`
+answer is a `401` whose `WWW-Authenticate` carries the error and the claims
+challenge, so the client signs in again. A token endpoint that fails, refuses
+the bridge's own client (`401`), or issues a token the checks above refuse,
+is a `502`.
+
+```toml
+[cdr.credentials.oauth]
+token_endpoint = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"
+client_id = "<bridge application id>"
+client_auth = "private_key_jwt"
+private_key_file = "/run/secrets/bridge_key.pem"
+
+[cdr.credentials.onward]
+issuer = "https://login.microsoftonline.com/<tenant>/v2.0"
+kind = "persons"
+profile = "entra"
+token_endpoint = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"
+audiences = ["<cdr application id>"]
+scope = "api://<cdr application id>/.default"
+
+[cdr.credentials.onward.keys]
+max_onward_lifetime = 3600
+```
+
+As environment variables, the table reads
+`FERROBRIDGE__CDR__CREDENTIALS__ONWARD__ISSUER`,
+`FERROBRIDGE__CDR__CREDENTIALS__ONWARD__KIND`,
+`FERROBRIDGE__CDR__CREDENTIALS__ONWARD__PROFILE` and the other keys the same
+way.
+
 ### `[terminology]`
 
 The FHIR terminology lane. The facade, the `$tofhir` and `$toopenehr`
