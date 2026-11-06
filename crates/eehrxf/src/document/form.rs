@@ -121,6 +121,12 @@ pub enum SectionRule {
         /// The section slices the invariant constrains.
         slices: &'static [&'static str],
     },
+    /// The profile's cardinality: the document holds a section of each of
+    /// `slices`, the section slices whose `min` is 1.
+    Required {
+        /// The section slices the profile requires.
+        slices: &'static [&'static str],
+    },
     /// The profile invariant `invariant`: the document holds a section of at
     /// least one of `slices`.
     OneOf {
@@ -181,8 +187,19 @@ pub const PATIENT_SUMMARY_FORM: Form = Form {
     encounter: None,
     language: false,
     // NOTE: composition-eu-eps `ips-comp-1` (error) on these three slices: an entry or an emptyReason.
-    rules: &[SectionRule::Reasoned {
-        invariant: "ips-comp-1",
-        slices: &["sectionProblems", "sectionAllergies", "sectionMedications"],
-    }],
+    rules: &[
+        SectionRule::Reasoned {
+            invariant: "ips-comp-1",
+            slices: &["sectionProblems", "sectionAllergies", "sectionMedications"],
+        },
+        SectionRule::Required {
+            slices: &[
+                "sectionProblems",
+                "sectionAllergies",
+                "sectionMedications",
+                "sectionProceduresHx",
+                "sectionMedicalDevices",
+            ],
+        },
+    ],
 };

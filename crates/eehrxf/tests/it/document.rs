@@ -485,3 +485,59 @@ fn an_empty_section_ips_comp_1_constrains_is_refused_without_a_reason() -> Resul
     }
     Ok(())
 }
+
+#[test]
+fn the_form_requires_every_section_slice_the_profile_requires() -> Result<(), Box<dyn Error>> {
+    let required: BTreeSet<String> = profile_slices()?
+        .into_iter()
+        .filter_map(|(slice, min)| (min >= 1).then_some(slice))
+        .collect();
+    assert_eq!(required.len(), 5, "{required:?}");
+    let ruled: BTreeSet<String> = PATIENT_SUMMARY_FORM
+        .rules
+        .iter()
+        .filter_map(|rule| match rule {
+            SectionRule::Required { slices } => {
+                Some(slices.iter().map(|slice| (*slice).to_owned()))
+            }
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(ruled, required);
+    Ok(())
+}
+
+#[test]
+fn a_patient_summary_lacking_a_required_section_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut document = Document::new(
+        BASE,
+        String::from("urn:uuid:4f5c1d1e-0000-4000-8000-0000000000af"),
+        String::from("2026-10-06T10:00:00Z"),
+        String::from("Patient Summary"),
+    );
+    document.with_patient(patient())?;
+    for slice in [
+        "sectionProblems",
+        "sectionAllergies",
+        "sectionMedications",
+        "sectionProceduresHx",
+    ] {
+        let held = slot(slice).ok_or("a slot")?;
+        document.with_section(
+            Section::new(held, vec![String::from("Nothing recorded.")])
+                .empty_because(EmptyReason::NilKnown),
+        )?;
+    }
+    let refused = document.into_bundle();
+    assert!(
+        matches!(
+            refused,
+            Err(DocumentError::Lacking {
+                slice: "sectionMedicalDevices"
+            })
+        ),
+        "{refused:?}"
+    );
+    Ok(())
+}

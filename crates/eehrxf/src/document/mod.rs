@@ -162,6 +162,13 @@ pub enum DocumentError {
         /// The key of the profile invariant.
         invariant: &'static str,
     },
+    /// The document holds no section of a slice the form's `Composition`
+    /// profile requires ([`form::SectionRule::Required`]).
+    #[error("the document holds no section {slice}, which its composition profile requires")]
+    Lacking {
+        /// The section slice.
+        slice: &'static str,
+    },
     /// The document holds a section of none of the slices of which the form's
     /// `Composition` profile requires one ([`form::SectionRule::OneOf`]).
     #[error(
@@ -469,7 +476,8 @@ impl Document {
     ///
     /// [`DocumentError::Dangling`] when a section names a `fullUrl` the
     /// document does not hold, or no patient was added,
-    /// [`DocumentError::Unreasoned`] and [`DocumentError::Absent`] when the
+    /// [`DocumentError::Unreasoned`], [`DocumentError::Lacking`] and
+    /// [`DocumentError::Absent`] when the
     /// sections break a rule of the form ([`form::SectionRule`]),
     /// [`DocumentError::Missing`] when the form requires an encounter or a
     /// language that was not given, and [`DocumentError::Report`] when the
@@ -490,11 +498,11 @@ impl Document {
             }
             sections.push(composition_section(section));
         }
-        self.hold_section_rules()?;
         let subject = self
             .patient
             .clone()
             .ok_or(DocumentError::Dangling { slice: "subject" })?;
+        self.hold_section_rules()?;
         let id = self
             .identifier
             .rsplit(':')

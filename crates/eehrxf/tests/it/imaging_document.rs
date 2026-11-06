@@ -392,3 +392,64 @@ fn an_empty_required_imaging_section_without_a_reason_is_refused() -> Result<(),
     );
     Ok(())
 }
+
+#[test]
+fn the_form_requires_every_section_slice_the_profile_requires() -> Result<(), Box<dyn Error>> {
+    let composition = package_member("package/StructureDefinition-CompositionEuImaging.json")?;
+    let required: Vec<&str> = composition["snapshot"]["element"]
+        .as_array()
+        .ok_or("a snapshot")?
+        .iter()
+        .filter(|element| element["min"].as_u64() >= Some(1))
+        .filter_map(|element| {
+            let slice = element["id"]
+                .as_str()?
+                .strip_prefix("Composition.section:")?;
+            (!slice.contains('.')).then_some(slice)
+        })
+        .collect();
+    let ruled: Vec<&str> = IMAGING_REPORT_FORM
+        .rules
+        .iter()
+        .filter_map(|rule| match rule {
+            SectionRule::Required { slices } => Some(slices.iter().copied()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(ruled, required);
+    assert_eq!(required.len(), 4, "{required:?}");
+    Ok(())
+}
+
+#[test]
+fn an_imaging_report_lacking_a_required_section_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut document = Document::of(
+        &IMAGING_REPORT_FORM,
+        BASE,
+        IDENTIFIER.to_owned(),
+        String::from("2026-10-25T12:00:00Z"),
+        String::from("Imaging report"),
+    );
+    document.with_patient(Patient {
+        id: Some(String::from("patient-1")),
+        ..Patient::default()
+    })?;
+    for slot in IMAGING_SLOTS.iter().take(3) {
+        document.with_section(
+            Section::new(slot, vec![format!("{}.", slot.title)])
+                .empty_because(EmptyReason::Unavailable),
+        )?;
+    }
+    document.with_report(DiagnosticReport {
+        id: Some(String::from("imaging-report")),
+        status: "final".into(),
+        ..DiagnosticReport::default()
+    })?;
+    let refused = document.into_bundle();
+    assert!(
+        matches!(refused, Err(DocumentError::Lacking { slice: "procedure" })),
+        "{refused:?}"
+    );
+    Ok(())
+}

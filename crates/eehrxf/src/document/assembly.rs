@@ -62,8 +62,9 @@ impl Document {
 
     /// Holds the document's sections to the rules of its form: a section a
     /// [`SectionRule::Reasoned`] rule names that holds no entry carries an
-    /// empty reason, and a [`SectionRule::OneOf`] rule's slices name one of
-    /// the sections.
+    /// empty reason, every slice of a [`SectionRule::Required`] rule names a
+    /// section, and a [`SectionRule::OneOf`] rule's slices name one of the
+    /// sections.
     pub(super) fn hold_section_rules(&self) -> Result<(), DocumentError> {
         for rule in self.form.rules {
             match *rule {
@@ -77,6 +78,16 @@ impl Document {
                             slice: section.slot.slice,
                             invariant,
                         });
+                    }
+                }
+                SectionRule::Required { slices } => {
+                    if let Some(slice) = slices.iter().find(|slice| {
+                        !self
+                            .sections
+                            .iter()
+                            .any(|section| section.slot.slice == **slice)
+                    }) {
+                        return Err(DocumentError::Lacking { slice });
                     }
                 }
                 SectionRule::OneOf { invariant, slices } => {

@@ -291,3 +291,29 @@ fn a_discharge_report_with_neither_its_summary_nor_its_course_is_refused()
     summarized.into_bundle()?;
     Ok(())
 }
+
+#[test]
+fn the_profile_requires_no_section_slice_so_the_form_requires_none() -> Result<(), Box<dyn Error>> {
+    let composition = package_member("package/StructureDefinition-composition-eu-hdr.json")?;
+    let required: Vec<&str> = composition["snapshot"]["element"]
+        .as_array()
+        .ok_or("a snapshot")?
+        .iter()
+        .filter(|element| element["min"].as_u64() >= Some(1))
+        .filter_map(|element| {
+            let slice = element["id"]
+                .as_str()?
+                .strip_prefix("Composition.section:")?;
+            (!slice.contains('.')).then_some(slice)
+        })
+        .collect();
+    assert_eq!(required, Vec::<&str>::new());
+    assert!(
+        !DISCHARGE_REPORT_FORM
+            .rules
+            .iter()
+            .any(|rule| matches!(rule, SectionRule::Required { .. })),
+        "no required slice"
+    );
+    Ok(())
+}

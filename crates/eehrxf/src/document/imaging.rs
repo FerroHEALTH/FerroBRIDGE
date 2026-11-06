@@ -76,19 +76,24 @@ pub const IMAGING_REPORT_FORM: Form = Form {
     language: false,
     // NOTE: CompositionEuImaging `eu-imaging-composition-1` (error) on every section: an entry or an
     // emptyReason, the document writing neither sub-sections nor the `note` extension it also admits.
-    rules: &[SectionRule::Reasoned {
-        invariant: "eu-imaging-composition-1",
-        slices: &[
-            "imagingstudy",
-            "order",
-            "history",
-            "procedure",
-            "comparison",
-            "findings",
-            "impression",
-            "recommendation",
-            "communication",
-            "report",
-        ],
-    }],
+    rules: &[
+        SectionRule::Reasoned {
+            invariant: "eu-imaging-composition-1",
+            slices: &[
+                "imagingstudy",
+                "order",
+                "history",
+                "procedure",
+                "comparison",
+                "findings",
+                "impression",
+                "recommendation",
+                "communication",
+                "report",
+            ],
+        },
+        SectionRule::Required {
+            slices: &["imagingstudy", "order", "history", "procedure"],
+        },
+    ],
 };
