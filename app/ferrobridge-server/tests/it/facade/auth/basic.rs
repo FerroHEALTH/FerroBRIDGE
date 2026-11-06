@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! An HTTP Basic caller (RFC 7617) of `[[auth.basic.users]]` beside the
-//! bearer tokens: the user's configured scopes decide what it reaches, and a
-//! refused credential is the generic `401`.
+//! bearer tokens: always a person, the user's configured scopes decide what
+//! it reaches, and a refused credential is the generic `401`.
 
 use std::error::Error;
 use std::sync::Arc;
@@ -18,6 +18,8 @@ use jsonwebtoken::Algorithm;
 use secrecy::SecretString;
 
 use super::Issuer;
+use super::audit::audit_lines;
+use super::audit::logged;
 use super::authority;
 use super::challenge;
 use super::ec_key;
@@ -42,16 +44,25 @@ fn hash(password: &str) -> Result<SecretString, Box<dyn Error>> {
     ))
 }
 
-/// Returns the router of a facade that admits the Basic user `etl` with
-/// `system/Condition.r` beside the issuer's tokens.
+/// The Basic user every case authenticates as, a person.
+const USER: &str = "clinician";
+
+/// Returns the router of a facade that admits the Basic user [`USER`] with
+/// `user/Condition.r` beside the issuer's tokens.
 async fn app() -> Result<axum::Router, Box<dyn Error>> {
+    app_granting("user/Condition.r").await
+}
+
+/// Returns the router of a facade that admits the Basic user [`USER`] with
+/// `scope` beside the issuer's tokens, built past the configuration check.
+async fn app_granting(scope: &str) -> Result<axum::Router, Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let mut settings = issuer.settings();
     settings.basic = Some(Arc::new(PasswordStore::new().with_user(
-        "etl",
+        USER,
         hash("synthetic-password")?,
-        "system/Condition.r",
+        scope,
     )?));
     let harness = harness().await;
     Ok(secured(&harness, &authority(settings).await))
@@ -75,13 +86,13 @@ async fn a_basic_user_reaches_what_its_scopes_grant() -> Result<(), Box<dyn Erro
     let app = app().await?;
     let read = raw(
         app.clone(),
-        basic(get(UNKNOWN), "etl", "synthetic-password")?,
+        basic(get(UNKNOWN), USER, "synthetic-password")?,
     )
     .await?;
     assert_eq!(StatusCode::NOT_FOUND, read.status());
     let create = raw(
         app,
-        basic(post_condition(&condition()), "etl", "synthetic-password")?,
+        basic(post_condition(&condition()), USER, "synthetic-password")?,
     )
     .await?;
     assert_eq!(StatusCode::FORBIDDEN, create.status(), "no c on Condition");
@@ -91,10 +102,7 @@ async fn a_basic_user_reaches_what_its_scopes_grant() -> Result<(), Box<dyn Erro
 #[tokio::test]
 async fn a_wrong_password_or_an_unknown_user_is_the_same_401() -> Result<(), Box<dyn Error>> {
     let app = app().await?;
-    for (user, password) in [
-        ("etl", "another-password"),
-        ("nobody", "synthetic-password"),
-    ] {
+    for (user, password) in [(USER, "another-password"), ("nobody", "synthetic-password")] {
         let response = raw(app.clone(), basic(get(UNKNOWN), user, password)?).await?;
         assert_eq!(StatusCode::UNAUTHORIZED, response.status(), "{user}");
         // NOTE: RFC 7617 §2 and §2.1, the Basic challenge names a realm and
@@ -118,4 +126,28 @@ async fn a_missing_credential_is_challenged_for_both_schemes() -> Result<(), Box
         challenge(&response).as_deref()
     );
     Ok(())
+}
+
+#[test]
+fn a_basic_caller_is_audited_as_a_person_never_a_system() {
+    // NOTE: RFC 6749 §4.4, a machine authenticates with the client credentials
+    // grant, so a Basic credential is a person's whatever scope it is granted.
+    for scope in ["user/Condition.r", "system/Condition.r"] {
+        let text = logged(async {
+            let app = app_granting(scope).await.expect("the facade starts");
+            let response = raw(
+                app,
+                basic(get(UNKNOWN), USER, "synthetic-password").expect("a legal credential"),
+            )
+            .await
+            .expect("an answer");
+            assert_eq!(StatusCode::NOT_FOUND, response.status(), "{scope}");
+        });
+        let lines = audit_lines(&text);
+        assert_eq!(1, lines.len(), "{scope}: {text}");
+        let line = &lines[0];
+        assert_eq!(Some(USER), line["principal"].as_str(), "{scope}: {line}");
+        assert_eq!(Some("basic"), line["via"].as_str(), "{scope}: {line}");
+        assert_eq!(Some("person"), line["kind"].as_str(), "{scope}: {line}");
+    }
 }

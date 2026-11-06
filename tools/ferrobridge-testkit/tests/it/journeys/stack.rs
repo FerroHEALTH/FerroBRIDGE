@@ -488,7 +488,8 @@ async fn bridge(
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
-         [auth]\nissuer = \"{issuer}\"\naudience = [\"{bridge}/fhir\"]\n\n\
+         [[auth.issuer]]\nissuer = \"{issuer}\"\nkind = \"persons\"\naudience = [\"{bridge}/fhir\"]\n\
+         first_party_clients = [\"ferrobridge-console\"]\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
          [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\nconcept_maps = {v2mappings}\n\n\
          [usage_report]\nenabled = false\n{events}{etl}",

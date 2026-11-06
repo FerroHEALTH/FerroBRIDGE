@@ -11,15 +11,17 @@ default. No specification governs it: it is FerroBRIDGE's own design.
 
 Set `[operator] enabled = true` (or `FERROBRIDGE__OPERATOR__ENABLED=true`).
 The API needs inbound authentication, so the server refuses to start when
-`[operator] enabled` is true and `[auth] enabled` is false or `[auth]` names
-no issuer. The routes are
+`[operator] enabled` is true and `[auth] enabled` is false or `[auth]` holds
+no `[[auth.issuer]]` table. The routes are
 mounted under `/operator` on the server's one listener; the bridge has no
 second admin listener.
 
 ```toml
-[auth]
+[[auth.issuer]]
 issuer = "https://auth.example.org/realms/clinic"
+kind = "persons"
 audience = ["https://bridge.example.org/fhir"]
+first_party_clients = ["ferrobridge-console"]
 
 [operator]
 enabled = true
@@ -30,7 +32,7 @@ mapping_dir = "/var/lib/ferrobridge/mappings"
 
 Every route needs a bearer access token from the configured issuer, checked
 as the FHIR facade checks one, or the Basic credential of an
-`[[auth.basic.users]]` user. The token's `scope` claim, or the user's
+`[[auth.basic.users]]` user, a person. The token's `scope` claim, or the user's
 `scopes`, must carry the operator scope, `[auth] product_scope`, which is
 `__ferrobridge.operator` unless you set another. SMART scopes cover FHIR
 resources only, so the operator scope is FerroBRIDGE's own, in a form SMART
@@ -379,7 +381,7 @@ until an apply.
 Every operator request leaves one audit line on the
 `ferrohealth_smart::audit` target, the record every FerroHEALTH product
 writes: the token's `sub` as `principal`, its `client_id` and issuer, the
-scheme (`via`), the method, the matched route (such as
+caller's `kind`, the scheme (`via`), the method, the matched route (such as
 `/operator/mappings/{*path}`), the interaction `operator`, the status, the
 duration and the request id, beside the ordinary request line. A save adds
 one more line on the `ferrobridge::audit` target with the caller's `subject`,

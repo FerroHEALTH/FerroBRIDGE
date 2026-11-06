@@ -5,9 +5,10 @@
 //! `ferrohealth-smart`.
 //!
 //! The crate reads each configured issuer's metadata and key set, validates
-//! every access token, or under `[auth] mode = "introspection"` asks the
-//! issuer's introspection endpoint (RFC 7662), checks the Basic users of
-//! `[[auth.basic.users]]`, and builds the SMART discovery document; this
+//! every access token, or for an issuer with `mode = "introspection"` asks
+//! its introspection endpoint (RFC 7662), classifies every caller by its
+//! issuer's `kind`, checks the Basic users of `[[auth.basic.users]]`, each a
+//! person, and builds the SMART discovery document; this
 //! module holds what is the
 //! bridge's own: the R4 resource types a clinical scope may name, the
 //! operator scope, and the token endpoint the `CapabilityStatement` names.
@@ -58,12 +59,14 @@ const SSO_OPENID_CONNECT: &str = "sso-openid-connect";
 /// What the deployment configured its resource server with, resolved.
 #[derive(Debug, Clone)]
 pub struct SmartSettings {
-    /// The resource-server settings of each trusted issuer, the first of
-    /// which the discovery document and the `CapabilityStatement` name.
+    /// The resource-server settings of each trusted issuer whose JWT access
+    /// tokens are checked against its key set, the first of which the
+    /// discovery document and the `CapabilityStatement` name.
     pub issuers: Vec<Settings>,
-    /// The introspection check of `[auth] mode = "introspection"`, in place
-    /// of the issuers.
-    pub introspection: Option<IntrospectionSettings>,
+    /// The introspection check of each issuer with `mode =
+    /// "introspection"`, the first of which the two documents name when no
+    /// issuer is checked by its key set.
+    pub introspection: Vec<IntrospectionSettings>,
     /// The Basic users, when the surface admits Basic.
     pub basic: Option<Arc<PasswordStore>>,
     /// The realm every challenge names, when one is set.
@@ -84,7 +87,7 @@ impl SmartSettings {
     pub fn new(issuer: Settings) -> Self {
         Self {
             issuers: vec![issuer],
-            introspection: None,
+            introspection: Vec::new(),
             basic: None,
             realm: None,
             options: SmartOptions::default(),
@@ -185,28 +188,12 @@ impl Smart {
     /// Returns [`SmartError::NoIssuer`] for settings without an issuer,
     /// [`SmartError::Issuer`] for an issuer whose metadata or key set could
     /// not be read or that breaks a rule, [`SmartError::Introspection`] when
-    /// the introspection check cannot start, and
-    /// [`SmartError::NoTokenEndpoint`] when the first issuer names no token
-    /// endpoint.
+    /// an introspection check cannot start, and
+    /// [`SmartError::NoTokenEndpoint`] when the issuer the documents name
+    /// names no token endpoint.
     pub async fn discover(settings: SmartSettings) -> Result<Self, SmartError> {
-        let (bearer, primary): (Arc<dyn Verifier>, Primary) =
-            if let Some(introspection) = settings.introspection {
-                let issuer = introspection.issuer.clone();
-                let introspector = Introspector::discover(introspection)
-                    .await
-                    .map_err(|source| SmartError::Introspection {
-                        issuer,
-                        source: Box::new(source),
-                    })?
-                    .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
-                let introspector = Arc::new(introspector);
-                let held = Arc::clone(&introspector);
-                let bearer: Arc<dyn Verifier> = held;
-                (bearer, Primary::Introspection(introspector))
-            } else {
-                let (issuers, primary) = Self::issuers(settings.issuers).await?;
-                (Arc::new(issuers), Primary::Jwt(primary))
-            };
+        let (issuers, primary) = Self::issuers(settings.issuers, settings.introspection).await?;
+        let bearer: Arc<dyn Verifier> = Arc::new(issuers);
         let token_endpoint = primary.metadata().token_endpoint.clone().ok_or_else(|| {
             SmartError::NoTokenEndpoint {
                 issuer: primary.metadata().issuer.clone(),
@@ -228,14 +215,17 @@ impl Smart {
         })
     }
 
-    /// Reads the metadata and the key set of every issuer of `settings`, and
-    /// returns the set of them and the first.
+    /// Reads the metadata and the key set of every issuer of `jwt`, and the
+    /// metadata of every issuer of `introspected`, and returns the set of
+    /// them and the issuer the documents name: the first of `jwt`, or the
+    /// first of `introspected` when `jwt` is empty.
     async fn issuers(
-        settings: Vec<Settings>,
-    ) -> Result<(IssuerSet, Arc<ResourceServer>), SmartError> {
+        jwt: Vec<Settings>,
+        introspected: Vec<IntrospectionSettings>,
+    ) -> Result<(IssuerSet, Primary), SmartError> {
         let mut issuers = IssuerSet::new();
         let mut primary = None;
-        for issuer in settings {
+        for issuer in jwt {
             let name = issuer.issuer.clone();
             let server = ResourceServer::discover(issuer)
                 .await
@@ -245,8 +235,21 @@ impl Smart {
                 })?
                 .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
             let server = Arc::new(server);
-            primary.get_or_insert_with(|| Arc::clone(&server));
+            primary.get_or_insert_with(|| Primary::Jwt(Arc::clone(&server)));
             issuers = issuers.with(server);
+        }
+        for introspection in introspected {
+            let name = introspection.issuer.clone();
+            let introspector = Introspector::discover(introspection)
+                .await
+                .map_err(|source| SmartError::Introspection {
+                    issuer: name,
+                    source: Box::new(source),
+                })?
+                .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
+            let introspector = Arc::new(introspector);
+            primary.get_or_insert_with(|| Primary::Introspection(Arc::clone(&introspector)));
+            issuers = issuers.with_introspector(introspector);
         }
         let primary = primary.ok_or(SmartError::NoIssuer)?;
         Ok((issuers, primary))
