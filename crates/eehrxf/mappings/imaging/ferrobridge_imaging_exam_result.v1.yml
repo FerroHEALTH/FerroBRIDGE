@@ -277,6 +277,23 @@ mappings:
           with:
             fhir: "$fhirRoot.identifier"
             openehr: "$archetype/protocol[at0025]/items[at0092]"
+          # NOTE: HL7 Europe Imaging Report 1.0.0-ballot, StudyInstanceUidIdentifierEuImaging fixes
+          # the identifier's type to the DICOM coding 110180, which the DV_IDENTIFIER does not hold.
+          followedBy:
+            mappings:
+              - name: "studyInstanceUidType"
+                unidirectional: "openEHR->fhir"
+                with:
+                  fhir: "type.coding"
+                manual:
+                  - name: "studyInstanceUid"
+                    fhir:
+                      - path: "system"
+                        value: "http://dicom.nema.org/resources/ontology/DCM"
+                      - path: "code"
+                        value: "110180"
+                      - path: "display"
+                        value: "Study Instance UID"
 
         - name: "description"
           with:

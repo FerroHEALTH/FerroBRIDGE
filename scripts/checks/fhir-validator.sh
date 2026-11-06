@@ -2,9 +2,10 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The exchange-format validator lane (#1318; no specification governs the
-# lane: our own design). The eehrxf suites that write a patient summary or a
-# laboratory report document and hold it to the vendored HL7 Europe profiles
-# (`claimed`, `own`, `lab_mapped`), and the one that maps a prescription and
+# lane: our own design). The eehrxf suites that write a patient summary, a
+# laboratory report or an imaging report document and hold it to the
+# vendored HL7 Europe profiles (`claimed`, `own`, `lab_mapped`,
+# `imaging_mapped`), and the one that maps a prescription and
 # a dispensation to the MPD resources (`medication::mapped`), also write it
 # to the directory EEHRXF_EMIT_DIR names; this script runs HL7's
 # FHIR Validator over every one of them and fails on an error. Its results
@@ -22,7 +23,9 @@
 # dependency closure). This script adds the vendored MyHealth@EU Master
 # Value Sets Catalogue, whose value sets the patient summary profiles bind,
 # and the remaining-dispensations extension eehrxf publishes, and loads the
-# six with -ig.
+# six with -ig. An imaging report (`imaging_mapped`) is validated in a run of
+# its own with hl7.fhir.eu.imaging 1.0.0-ballot loaded, and the two runs'
+# outcomes are judged together.
 #
 # A run fails on an issue of severity error or fatal, on a document the
 # output names no outcome for, and on a claimed profile the validator could
@@ -106,6 +109,13 @@ outcome_files() {
 readonly KNOWN_DEFECT_ID="Reference_REF_CantResolveProfile"
 readonly KNOWN_DEFECT_PROFILE="http://hl7.eu/fhir/base/StructureDefinition/patient-animal-eu-core"
 readonly LAB_BUNDLE="http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab"
+
+# The imaging report document a run validates over the Imaging Report guide.
+readonly IMAGING_BUNDLE="http://hl7.eu/fhir/imaging/StructureDefinition/BundleReportEuImaging"
+readonly IMAGING_IG="hl7.fhir.eu.imaging#1.0.0-ballot"
+
+# The extension a validator outcome names its file in.
+readonly OUTCOME_FILE="http://hl7.org/fhir/StructureDefinition/operationoutcome-file"
 
 # judge OUTPUT DOCUMENTS OUT: holds the validator output OUTPUT for the
 # documents in DOCUMENTS to the rules in the header, writes summary.tsv and
@@ -196,8 +206,55 @@ judge() {
   return "$status"
 }
 
+# validate OUT GROUP DOCUMENT... -- IG...: runs the validator offline over the
+# DOCUMENTs with the IGs loaded, writing OUT/GROUP.json, OUT/GROUP.html and
+# OUT/GROUP.log, and answers its output as a Bundle of OperationOutcomes, each
+# naming its file. A single document's outcome may name none, so it takes the
+# document's name.
+validate() {
+  local out="$1" group="$2" java="${JAVA:-java}"
+  shift 2
+  local docs=() igs=()
+  while [[ $# -gt 0 && "$1" != "--" ]]; do
+    docs+=("$1")
+    shift
+  done
+  shift
+  while [[ $# -gt 0 ]]; do
+    igs+=(-ig "$1")
+    shift
+  done
+  local code=0
+  "$java" -Xmx6g -Duser.home="$PWD/$WORK/home" -jar "$WORK/validator_cli.jar" \
+    "${docs[@]}" \
+    -version 4.0.1 \
+    -tx n/a \
+    -no-http-access \
+    -show-message-ids \
+    -allow-example-urls true \
+    "${igs[@]}" \
+    -output "$out/$group.json" \
+    -html-output "$out/$group.html" \
+    > "$out/$group.log" 2>&1 || code=$?
+  tail -n 40 "$out/$group.log" >&2
+  if [[ ! -f "$out/$group.json" ]]; then
+    echo "::error::the validator wrote no output for the $group documents (exit $code); see $group.log" >&2
+    return 1
+  fi
+  jq --arg file "${docs[0]}" --arg url "$OUTCOME_FILE" '
+    if .resourceType == "Bundle" then .
+    else {resourceType: "Bundle", type: "collection", entry: [{resource:
+      (if ((.extension // []) | map(select(.url == $url)) | length) > 0 then .
+       else .extension = ((.extension // []) + [{url: $url, valueString: $file}]) end)}]}
+    end' "$out/$group.json"
+}
+
 # run DOCUMENTS OUT: prepares the jar and the package cache, runs the
 # validator offline over every document in DOCUMENTS and judges its output.
+# An imaging report is validated in a run of its own, over the HL7 Europe
+# Imaging Report closure: one validator context holding both closures reads
+# the laboratory report against the imaging guide's dependencies too (no
+# specification governs this: our own design).
 run() {
   local documents="$1" out="$2" java="${JAVA:-java}"
   command -v "$java" > /dev/null 2>&1 || {
@@ -211,37 +268,34 @@ run() {
     mkdir -p "$CACHE/$name"
     tar -xzf "$MVC" -C "$CACHE/$name"
   fi
-  local docs=() doc
+  local docs=() general=() imaging=() doc
   for doc in "$documents"/*.json; do
-    [[ -f "$doc" ]] && docs+=("$doc")
+    [[ -f "$doc" ]] || continue
+    docs+=("$doc")
+    if jq -e --arg bundle "$IMAGING_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
+      imaging+=("$doc")
+    else
+      general+=("$doc")
+    fi
   done
   if [[ "${#docs[@]}" -eq 0 ]]; then
     echo "::error::$documents holds no document: did the tests run with EEHRXF_EMIT_DIR set?" >&2
     return 1
   fi
   mkdir -p "$out"
-  local code=0
-  "$java" -Xmx6g -Duser.home="$PWD/$WORK/home" -jar "$WORK/validator_cli.jar" \
-    "${docs[@]}" \
-    -version 4.0.1 \
-    -tx n/a \
-    -no-http-access \
-    -show-message-ids \
-    -allow-example-urls true \
-    -ig 'hl7.fhir.eu.eps#1.0.0-ballot' \
-    -ig 'hl7.fhir.eu.base#2.0.1' \
-    -ig 'hl7.fhir.eu.laboratory#2.0.0' \
-    -ig 'hl7.fhir.eu.mpd#1.0.0' \
-    -ig "$REMAINING" \
-    -ig "$name" \
-    -output "$out/validation.json" \
-    -html-output "$out/validation.html" \
-    > "$out/validator.log" 2>&1 || code=$?
-  tail -n 40 "$out/validator.log"
-  if [[ ! -f "$out/validation.json" ]]; then
-    echo "::error::the validator wrote no output (exit $code); see validator.log" >&2
-    return 1
+  local parts=()
+  if [[ "${#general[@]}" -gt 0 ]]; then
+    validate "$out" general "${general[@]}" -- \
+      'hl7.fhir.eu.eps#1.0.0-ballot' 'hl7.fhir.eu.base#2.0.1' 'hl7.fhir.eu.laboratory#2.0.0' \
+      'hl7.fhir.eu.mpd#1.0.0' "$REMAINING" "$name" > "$out/general.bundle.json" || return 1
+    parts+=("$out/general.bundle.json")
   fi
+  if [[ "${#imaging[@]}" -gt 0 ]]; then
+    validate "$out" imaging "${imaging[@]}" -- "$IMAGING_IG" > "$out/imaging.bundle.json" || return 1
+    parts+=("$out/imaging.bundle.json")
+  fi
+  jq -s '{resourceType: "Bundle", type: "collection", entry: [.[].entry[]]}' "${parts[@]}" \
+    > "$out/validation.json"
   cp "${docs[@]}" "$out/"
   judge "$out/validation.json" "$documents" "$out"
 }

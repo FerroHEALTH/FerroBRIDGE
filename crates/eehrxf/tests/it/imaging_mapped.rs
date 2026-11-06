@@ -123,6 +123,11 @@ fn study() -> Value {
         "id": "synthetic-study",
         "meta": {"profile": [IMAGING_STUDY_EU_IMAGING]},
         "identifier": [{
+            "type": {"coding": [{
+                "system": "http://dicom.nema.org/resources/ontology/DCM",
+                "code": "110180",
+                "display": "Study Instance UID"
+            }]},
             "system": "urn:dicom:uid",
             "value": "urn:oid:2.25.110239581749205781493301578934620193847"
         }],
@@ -455,6 +460,17 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         study_after["identifier"][0]["value"]
             .as_str()
             .is_some_and(|value| value.starts_with("urn:oid:")),
+        "{study_after}"
+    );
+    // NOTE: HL7 Europe Imaging Report 1.0.0-ballot, StudyInstanceUidIdentifierEuImaging requires
+    // Identifier.type with the DICOM coding 110180 "Study Instance UID".
+    assert_eq!(
+        study_after.pointer("/identifier/0/type/coding/0"),
+        Some(&serde_json::json!({
+            "system": "http://dicom.nema.org/resources/ontology/DCM",
+            "code": "110180",
+            "display": "Study Instance UID"
+        })),
         "{study_after}"
     );
     let study_url = full_url(&output, "ImagingStudy")?;

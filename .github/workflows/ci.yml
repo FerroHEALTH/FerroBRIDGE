@@ -807,7 +807,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # HL7's FHIR Validator over the patient summary and laboratory report
+  # HL7's FHIR Validator over the patient summary, laboratory and imaging report
   # documents the eehrxf suites write (#1318; no specification governs the
   # lane: our own design), the evidence the component's page cites for the
   # exchange format. It runs offline, the jar and the packages pinned in the
