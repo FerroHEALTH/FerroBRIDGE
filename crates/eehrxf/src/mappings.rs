@@ -127,6 +127,7 @@ impl Project {
 #[cfg(any(
     feature = "prescription",
     feature = "dispensation",
+    feature = "imaging",
     feature = "laboratory",
     feature = "patient-summary",
     feature = "discharge"
@@ -171,6 +172,26 @@ pub const MPD: Project = Project {
         shipped!("mpd", "ferrobridge_eu_mpd_dispense.yml"),
     ],
     accounted: &[],
+};
+
+/// The HL7 Europe Imaging Report 1.0.0-ballot project.
+///
+/// It maps over FerroBRIDGE's imaging report template: the imaging
+/// examination result to the `DiagnosticReportEuImaging` the document holds
+/// beside its composition, and the study it reports to the
+/// `ImagingStudyEuImaging` the report references.
+#[cfg(feature = "imaging")]
+pub const IMAGING: Project = Project {
+    directory: "imaging",
+    contexts: &["ferrobridge_eu_imaging.context"],
+    files: &[
+        shipped!("imaging", "ferrobridge_eu_imaging.context.yml"),
+        shipped!("imaging", "ferrobridge_imaging_exam_result.v1.yml"),
+        shipped!("imaging", "ferrobridge_eu_imaging_report.yml"),
+    ],
+    // NOTE: no specification governs this: our own design; the template's modality and study
+    // date sit in the report's event, which the study's reference cannot reach, so each is declared.
+    accounted: &["ImagingStudy.modality", "ImagingStudy.started"],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.

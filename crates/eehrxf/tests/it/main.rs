@@ -49,6 +49,9 @@ mod imaging;
 #[cfg(all(feature = "imaging", feature = "fhir-r4"))]
 mod imaging_document;
 #[cfg(test)]
+#[cfg(all(feature = "openehr", feature = "imaging"))]
+mod imaging_mapped;
+#[cfg(test)]
 #[cfg(all(feature = "imaging", feature = "fhir-r4"))]
 mod imaging_received;
 #[cfg(test)]

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of OBSERVATION.imaging_exam_result.v1 for the HL7
+# Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging profile: its
+# canonical.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_imaging_report
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: OBSERVATION.imaging_exam_result.v1
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/imaging/StructureDefinition/DiagnosticReportEuImaging"

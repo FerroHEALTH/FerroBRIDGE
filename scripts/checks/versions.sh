@@ -769,6 +769,7 @@ tools/ferrobridge-testkit/fixtures/opt/kds-studienteilnahme|KDS Studienteilnahme
 tools/ferrobridge-testkit/fixtures/opt/kds-todesursache|KDS Todesursache operational template (fixture)
 tools/ferrobridge-testkit/fixtures/opt/kds-vitalstatus|KDS Vitalstatus operational template (fixture)
 tools/ferrobridge-testkit/fixtures/ckm/medication|CKM medication archetypes (fixture)
+tools/ferrobridge-testkit/fixtures/ckm/imaging|CKM imaging archetypes (fixture)
 tools/ferrobridge-testkit/fixtures/ckm/discharge|CKM discharge archetypes (fixture)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2 definitions (v2ig source of truth, never committed)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2+ licence page
