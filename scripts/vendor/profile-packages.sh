@@ -12,7 +12,7 @@
 # registry, verifies the tarball against the registry's recorded shasum,
 # extracts it verbatim into the ignored
 # docs/specs/fhir-packages/<package>#<version>/package/, and checks the count
-# and digest against the pin. At about 650 MB unpacked the trees are fetched at
+# and digest against the pin. At about 970 MB unpacked the trees are fetched at
 # build time and never committed; only each PROVENANCE.md beside them is. A
 # tree already on disk at its pinned count and digest is kept without a
 # download, so a re-run or a cache-restored tree changes nothing. Its count and
@@ -276,8 +276,9 @@ fetch_one() {
 # byte for byte.
 write_provenance() {
   local pkg="$1" ver="$2" meta_url="$3" tarball_url="$4" shasum="$5" sha256="$6" license="$7" files="$8" digest="$9"
-  local dir="$vendor_dir/$pkg#$ver" author deps resolved
+  local dir="$vendor_dir/$pkg#$ver" author deps fhir resolved
   author="$(jq -r '.author // "unstated"' "$dir/package/package.json")"
+  fhir="$(jq -r '(.fhirVersions // .["fhir-version-list"] // []) | join(", ")' "$dir/package/package.json")"
   deps="$(jq -r '.dependencies // {} | to_entries | map("`\(.key)` \(.value)") | join(", ")' "$dir/package/package.json")"
   resolved="$(resolve_ranges "$dir/package/package.json")"
   render_provenance > "$dir/PROVENANCE.md.new"
@@ -343,16 +344,19 @@ script with \`--stamp\`, and record the count and digest it prints.
 - Tree digest (sha256 over the sorted per-file \`sha256  path\` listing,
   \`PROVENANCE.md\` excluded): \`$digest\`
 - Declared dependencies (\`package/package.json\`): $deps$resolved
+- FHIR versions (\`fhirVersions\` of \`package/package.json\`): ${fhir:-none declared}
 - Stamped: $(corpus_fetched)
 
 Each declared dependency is fetched beside this tree at the version named,
 except \`hl7.fhir.r4.core\` 4.0.1, which is read from the committed
-\`tools/fhir-codegen/vendor/hl7.fhir.r4.core/\`. The line above lets
-\`--check\` assert the closure from the committed files alone.
+\`tools/fhir-codegen/vendor/hl7.fhir.r4.core/\`, and except the
+dependencies of a package of another FHIR release, which the R4 set holds
+and never reads. The two lines above let \`--check\` assert the closure from
+the committed files alone.
 
 ## Why build time
 
-The package set unpacks to about 650 MB, six versions of
+The package set unpacks to about 970 MB, eight versions of
 \`hl7.terminology.r4\` and \`hl7.fhir.uv.xver-r5.r4\` among it, for input only
 the validator and its tests read. The licences would permit vendoring; the
 size decides. CI restores the trees from a cache keyed on
@@ -392,6 +396,32 @@ dependencies_of() {
   fi
 }
 
+# Answers whether the tree directory $1 holds a package of a FHIR release
+# other than R4, the release the set is read in: its `fhirVersions` (or the
+# older `fhir-version-list`) name no 4.0 version, or, when it declares none,
+# it depends on a core package and on no `hl7.fhir.r4.core`. A package of
+# another release is held and never read, so its own dependencies are not
+# part of the R4 closure (FHIR 6.0.0-ballot4 packages.html 2.1.10.3; where
+# that text is silent, our own design, #1604).
+other_release() {
+  local versions cores
+  if [[ -f "$1/package/package.json" ]]; then
+    versions="$(jq -r '(.fhirVersions // .["fhir-version-list"] // [])[]' "$1/package/package.json")"
+  elif [[ -f "$1/PROVENANCE.md" ]]; then
+    # shellcheck disable=SC2016 # the backticks are literal Markdown, never a substitution
+    versions="$(sed -n 's/^- FHIR versions (`fhirVersions` of `package\/package.json`): //p' "$1/PROVENANCE.md" |
+      grep -v '^none declared$' | tr ',' '\n' | tr -d ' ' || true)"
+  fi
+  if [[ -n "$versions" ]]; then
+    if grep -qE '^4\.0(\.|$)' <<< "$versions"; then
+      return 1
+    fi
+    return 0
+  fi
+  cores="$(dependencies_of "$1" | sed 's/#.*//' | grep -E '^hl7\.fhir\.r[0-9a-z]+\.core$' || true)"
+  [[ -n "$cores" ]] && ! grep -qx 'hl7.fhir.r4.core' <<< "$cores"
+}
+
 # The directory holding the reference $1 against the vendor directory $2 and
 # the reuse list $3, or nothing when neither has it.
 tree_of() {
@@ -412,8 +442,9 @@ tree_of() {
 # $1, a patch range read as the version its PROVENANCE.md resolves it to,
 # names a package at a version that is itself there, fetched or recorded by
 # its PROVENANCE.md, or is one the reuse list $2 points at, and every tree
-# holds the package and version its directory names. Prints each gap and
-# returns 1 when there is one.
+# holds the package and version its directory names. The dependencies of a
+# tree of another FHIR release (other_release) are not checked. Prints each
+# gap and returns 1 when there is one.
 closure_gaps() {
   local dir="$1" list="$2" ref id dep ver resolved held gaps=0
   while IFS= read -r ref; do
@@ -427,6 +458,9 @@ closure_gaps() {
     if [[ "$id" != "$ref" ]]; then
       echo "   $ref: the tree holds $id"
       gaps=1
+    fi
+    if other_release "$dir/$ref"; then
+      continue
     fi
     while IFS= read -r dep; do
       [[ -n "$dep" ]] || continue
@@ -500,20 +534,27 @@ check_all() {
 }
 
 # Writes a synthetic package.json for $2#$3 under the vendor directory $1, with
-# the dependencies $4 given as a jq object literal.
+# the dependencies $4 given as a jq object literal and the fhirVersions $5, a
+# jq array literal, when given.
 fixture_package() {
   mkdir -p "$1/$2#$3/package"
-  jq -n --arg n "$2" --arg v "$3" --argjson d "$4" '{name: $n, version: $v, dependencies: $d}' \
+  jq -n --arg n "$2" --arg v "$3" --argjson d "$4" --argjson f "${5:-null}" \
+    '{name: $n, version: $v, dependencies: $d} + (if $f == null then {} else {fhirVersions: $f} end)' \
     > "$1/$2#$3/package/package.json"
 }
 
 # Writes a synthetic PROVENANCE.md alone for $2#$3 under the vendor directory
-# $1, declaring the dependencies $4 as the --stamp line spells them.
+# $1, declaring the dependencies $4 and, when given, the FHIR versions $5 as
+# the --stamp lines spell them.
 fixture_provenance() {
   mkdir -p "$1/$2#$3"
   # shellcheck disable=SC2016 # the backticks are literal Markdown, never a substitution
   printf -- '- Package: %s\n- Version: %s\n- Declared dependencies (`package/package.json`): %s\n' \
     "$2" "$3" "$4" > "$1/$2#$3/PROVENANCE.md"
+  if [[ -n "${5:-}" ]]; then
+    # shellcheck disable=SC2016 # the backticks are literal Markdown, never a substitution
+    printf -- '- FHIR versions (`fhirVersions` of `package/package.json`): %s\n' "$5" >> "$1/$2#$3/PROVENANCE.md"
+  fi
 }
 
 # Writes the resolved-ranges line $3 alone into the PROVENANCE.md of the tree
@@ -586,6 +627,27 @@ self_test() {
   fi
   grep -qF "example.root#1.0.0 depends on example.dep#2.0.0, which is not vendored" "$work/out" \
     || die "self-test: a missing dependency of an unfetched tree is not named: $(cat "$work/out")"
+
+  # A package of another FHIR release is held, and its own dependencies are
+  # not part of the R4 closure; an R4 package's still are.
+  fixture_package "$work/release" example.root 1.0.0 '{"example.core": "1.0.0", "example.models": "1.0.0"}' '["4.0.1"]'
+  fixture_package "$work/release" example.models 1.0.0 '{"example.r5.terminology": "7.1.0"}' '["5.0.0"]'
+  closure_gaps "$work/release" "$list" > "$work/out" \
+    || die "self-test: the dependencies of a package of another release are required: $(cat "$work/out")"
+  fixture_package "$work/release-r4" example.models 1.0.0 '{"example.r4.terminology": "7.4.0"}' '["4.0.1", "5.0.0"]'
+  if closure_gaps "$work/release-r4" "$list" > "$work/out"; then
+    die "self-test: a package that also uses 4.0.1 is read as another release"
+  fi
+  fixture_package "$work/release-core" example.models 1.0.0 '{"hl7.fhir.r5.core": "5.0.0"}'
+  closure_gaps "$work/release-core" "$list" > "$work/out" \
+    || die "self-test: a package whose core dependency is R5 is read as R4: $(cat "$work/out")"
+  fixture_provenance "$work/release-unfetched" example.models 1.0.0 "${tick}example.r5.terminology${tick} 7.1.0" "5.0.0"
+  closure_gaps "$work/release-unfetched" "$list" > "$work/out" \
+    || die "self-test: an unfetched package of another release has its dependencies required: $(cat "$work/out")"
+  fixture_provenance "$work/release-unfetched-r4" example.models 1.0.0 "${tick}example.r4.terminology${tick} 7.4.0" "4.0.1"
+  if closure_gaps "$work/release-unfetched-r4" "$list" > "$work/out"; then
+    die "self-test: an unfetched R4 package with a missing dependency passes"
+  fi
 
   # A patch range resolves to the highest patch, leaves pre-releases out
   # unless it names their label, and refuses any other wildcard.

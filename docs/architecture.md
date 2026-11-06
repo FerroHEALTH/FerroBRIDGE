@@ -1195,11 +1195,16 @@ from each guide's `package-list.json` and `ImplementationGuide` resource):
 **The R4 profile validator's package set** is pinned ahead of any mapping
 (#435): EPS 1.0.0-ballot, EU Base 2.0.1 and IPS 2.0.1, with every package
 their `package.json` files name, transitively, at the version each dependent
-names (`docs/VERSIONS.md` "Profile packages"). The 35 package versions, about
-970 MB unpacked, are fetched at build time into the ignored
-`docs/specs/fhir-packages/` and never committed; only each `PROVENANCE.md`
-is. `hl7.fhir.r4.core` 4.0.1, which every one of them names, is read from the
-generator's committed tree. Pinning a package there is no conformance claim:
+names (`docs/VERSIONS.md` "Profile packages"), and HDR 1.0.0 with its closure
+(#1600). The 37 package versions, about 970 MB unpacked, are fetched at
+build time into the ignored `docs/specs/fhir-packages/` and never committed;
+only each `PROVENANCE.md` is. `hl7.fhir.r4.core` 4.0.1, which every R4 one of
+them names, is read from the generator's committed tree. The set is read in
+the FHIR version its core dependency fixes for the whole tree (FHIR
+6.0.0-ballot4 packages.html 2.1.10.3); a dependency of another release,
+HDR's R5 `xtehr.eu.ehds.models`, is held and never read, and a canonical only
+it defines is refused, which is our own design where that text is silent.
+Pinning a package there is no conformance claim:
 the reasoning above still holds until the implementing act is adopted.
 
 **What the mapping library targets today** is the German core data set: 12
@@ -1285,7 +1290,15 @@ international CKM, which publishes no EHDS template today; that is a corpus
 gap recorded as such. The one exception is the medication template above
 (owner ruling on #116): FerroBRIDGE authors a template over published CKM
 archetypes only, never a new archetype, so the archetypes stay the community
-models, and the readiness matrix names the template as FerroBRIDGE's. No openEHR
+models, and the readiness matrix names the template as FerroBRIDGE's. The
+owner ruling on #116 of 2026-11-06 extends the exception to discharge and
+imaging reports: FerroBRIDGE's discharge report template specialises the CKM
+transfer of care summary, and the `eehrxf` HDR project maps it to
+`composition-eu-hdr`, its context to `encounter-eu-hdr`, the problems of
+its diagnostic summary to `condition-eu-core`, its significant procedures to
+`procedure-eu-core` and its discharge medications to
+`medicationRequest-eu-core` (the "Discharge report template" row of the
+decision table). No openEHR
 Foundation position on the exchange format was found, and no HL7 Europe guide
 or Xt-EHR deliverable references openEHR; the library's laboratory OPT is the
 one concrete openEHR-to-EEHRxF artefact.
@@ -3046,7 +3059,8 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Incremental mode | a change-feed adapter over a configured stream, after the batch round trip, running the same per-composition commit | ITS-REST defines no feed; the reference CDR's outbox is the reference source | polling AQL by time; a bespoke feed |
 | Local codes | rubrics and bindings from the Web Template and OPT; only external systems go to the terminology server | the bridge holds the OPT; no specification defines a canonical for archetype-local terminology | `$lookup` for every code |
 | MPD template | FerroBRIDGE's ADL 2 template over seven published CKM archetypes, at-coded, its overlays filling the nested slots, built into an OPT2 at test time; the dispense is `ACTION.medication.v1` at the careflow step "Prescription dispensed" in the same template | the CKM publishes no prescription or dispense template; an overlay is a template-local specialisation (ADL2 and AOM2 §Templates), so the data keeps the published archetype ids; no specification governs authoring a template for a profile target: our own design (owner ruling on #116) | a hand-authored archetype; the KDS medication templates, which target the German profiles |
-| Profile targets | HL7 Europe Base and Core, Laboratory, MPD in that order; EPS planned, imaging and discharge deferred; authored here, never a conformance claim | R4 lines exist for every category; Laboratory has a published model map and an openEHR artefact; the legal pin does not exist (section 4.8) | waiting for the implementing act; pinning ballots |
+| Discharge report template | FerroBRIDGE's ADL 2 template over published CKM archetypes, built into an OPT2 at test time as the MPD template is: `COMPOSITION.transfer_summary.v1`, whose context is the hospital stay, with three `SECTION.adhoc.v1` overlays holding `EVALUATION.problem_diagnosis.v1`, `ACTION.procedure.v1` and `INSTRUCTION.medication_order.v3`, named for the HDR sections they feed | the CKM publishes no discharge or transfer-of-care template, and the transfer of care summary is the published composition for "management at discharge"; the exception of the MPD row extended to discharge and imaging (owner ruling on #116, 2026-11-06); no specification governs authoring a template for a profile target: our own design | a hand-authored archetype; leaving the category a corpus gap until the CKM publishes a template |
+| Profile targets | HL7 Europe Base and Core, Laboratory, MPD in that order; EPS planned, discharge over FerroBRIDGE's discharge report template, imaging deferred; authored here, never a conformance claim | R4 lines exist for every category; Laboratory has a published model map and an openEHR artefact; the legal pin does not exist (section 4.8) | waiting for the implementing act; pinning ballots |
 | FHIRPath release | the evaluator is FHIRPath N1 2.0.0 by default, so a function only a later release defines is an undefined-function error; the 13 functions FHIRPath 3.0.0 adds as STU that HL7's R4 suite exercises (`lowBoundary`, `highBoundary`, `precision`, `sort`, `matchesFull`, `comparable`, `trim`, `split`, `join`, `encode`, `decode`, `escape`, `unescape`) sit behind the opt-in `Environment::with_fhirpath_stu3_functions`; the suite's tests that call one of them are the `fhirpath-r4-stu3` corpus, with its own pass list and badge, and every other test is the `fhirpath-r4` corpus (#633) | FHIR R4 fhirpath.html §2.9 cites "FHIRPath (release 2)", N1 (<http://hl7.org/fhirpath/N1/>); each of the 13 is a section FHIRPath 3.0.0 marks Standard for Trial Use (<http://hl7.org/fhirpath/STU3/>); the opt-in widens only its own path, so the default pin is unchanged | widening the default to 3.0.0; leaving the 104 tests failing as undefined; reporting them out of scope |
 | Profile validation | `ferrobridge-validator` in this repository; profiles read at run time from FHIR packages into the generated R4 model; FHIRPath through `ferrobridge-fhirpath`; every unevaluated constraint named (section 4.9) | owner direction 2026-10-15; the model, element table, terminology client and FHIRPath evaluator live here; a profile set is per-deployment data | a validator per consumer; profiles generated into Rust; the HL7 FHIR Validator as a runtime dependency |
 | Tenancy | one bridge per tenant; one mapping tree and one identity store per configured CDR | a file tree has no row-level security; the retired connector's scoping was a database property | a tenant column in the identity store |

@@ -58,6 +58,42 @@ pub(crate) fn hdr(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
     )?)
 }
 
+/// The package set of every profile package `scripts/vendor/profile-packages.sh`
+/// fetched, with the vendored R4 core package, `None` when the packages are
+/// absent outside CI.
+///
+/// Under CI (`CI=true`) an absent tree is an error, so a lane cannot pass by
+/// skipping the package-gated tests.
+#[cfg(all(feature = "discharge", feature = "fhir-r4"))]
+pub(crate) fn profile_set() -> Result<Option<ferrobridge_validator::set::PackageSet>, Box<dyn Error>>
+{
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");
+    if !root
+        .join("hl7.fhir.eu.hdr#1.0.0/package/package.json")
+        .is_file()
+    {
+        if std::env::var("CI").is_ok_and(|value| value == "true") {
+            return Err(format!(
+                "the profile packages are absent from {} under CI; run scripts/vendor/profile-packages.sh before the tests",
+                root.display()
+            )
+            .into());
+        }
+        return Ok(None);
+    }
+    let mut paths = vec![
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tools/fhir-codegen/vendor/hl7.fhir.r4.core"),
+    ];
+    for entry in std::fs::read_dir(&root)? {
+        let path = entry?.path();
+        if path.join("package/package.json").is_file() {
+            paths.push(path);
+        }
+    }
+    Ok(Some(ferrobridge_validator::set::PackageSet::load(paths)?))
+}
+
 /// The vendored `hl7.fhir.eu.imaging` 1.0.0-ballot package, as the registry
 /// serves it.
 #[cfg(feature = "imaging")]
@@ -110,7 +146,10 @@ pub(crate) fn mpd(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
 
 /// The vendored `hl7.fhir.eu.base` 2.0.1 package, which holds the EU core
 /// profiles the EPS profiles build on and the entries of a section claim.
-#[cfg(all(feature = "openehr", feature = "patient-summary"))]
+#[cfg(all(
+    feature = "openehr",
+    any(feature = "patient-summary", feature = "discharge")
+))]
 pub(crate) fn eu_base_package() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/specs/eu-hl7-base/hl7.fhir.eu.base-2.0.1.tgz")
@@ -129,6 +168,15 @@ pub(crate) fn vendored(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
     Err(format!("no vendored package holds the profile {url}").into())
 }
 
+/// Reads the profile at `url` from the vendored EU base package.
+#[cfg(all(feature = "openehr", feature = "discharge"))]
+pub(crate) fn vendored_base(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
+    Ok(ResourceProfile::read(
+        std::fs::File::open(eu_base_package())?,
+        url,
+    )?)
+}
+
 /// The environment variable naming the directory a suite writes the
 /// documents it has held to the vendored profiles to, for a run of HL7's
 /// FHIR Validator over them.
@@ -138,7 +186,8 @@ pub(crate) fn vendored(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
         feature = "patient-summary",
         feature = "laboratory",
         feature = "prescription",
-        feature = "dispensation"
+        feature = "dispensation",
+        feature = "discharge"
     )
 ))]
 const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
@@ -151,7 +200,8 @@ const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
         feature = "patient-summary",
         feature = "laboratory",
         feature = "prescription",
-        feature = "dispensation"
+        feature = "dispensation",
+        feature = "discharge"
     )
 ))]
 pub(crate) fn emit(name: &str, text: &str) -> Result<(), Box<dyn Error>> {

@@ -95,3 +95,10 @@ fn the_eps_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
     embeds_its_directory(&eehrxf::mappings::EPS)?;
     writes_its_files(&eehrxf::mappings::EPS)
 }
+
+#[cfg(feature = "discharge")]
+#[test]
+fn the_hdr_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
+    embeds_its_directory(&eehrxf::mappings::HDR)?;
+    writes_its_files(&eehrxf::mappings::HDR)
+}
