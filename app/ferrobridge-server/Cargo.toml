@@ -134,7 +134,8 @@ reqwest.workspace = true
 tempfile.workspace = true
 # The ETL cases dump the CDM through the container engine's exec API.
 testcontainers.workspace = true
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "net"] }
+# The follower cases run on a paused clock.
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "net", "test-util"] }
 # The ETL cases read back what the writer wrote.
 tokio-postgres.workspace = true
 tower.workspace = true
