@@ -1,0 +1,316 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's composition model mapping of the CKM
+# COMPOSITION.transfer_summary.v1 to the HL7 Europe Hospital Discharge
+# Report 1.0.0 composition-eu-hdr, the start of the discharge report context
+# (a context whose start is a composition model slots no composition:
+# composition-element.adoc). The composition's context is the hospital stay,
+# the encounter-eu-hdr the Composition names, and each section of the
+# template is the section slice of the same name: the diagnostic summary,
+# the significant procedures and the discharge medications. The type (LOINC 34105-7)
+# and the title are fixed (no specification governs these choices: our own
+# design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.transfer_summary.v1.Composition
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.transfer_summary.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Composition
+
+mappings:
+  - name: "metaURL"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/hdr/StructureDefinition/composition-eu-hdr"
+
+  # No node of the template records the report's status or date: a committed
+  # composition is reported final, dated by the end of the stay it reports.
+  - name: "status"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  - name: "date"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.date"
+      openehr: "$composition/context/end_time"
+
+  # The document names its own authors, so a received author is not
+  # resolved into the composer, which the engine defaults going in.
+  - name: "author"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.author"
+      openehr: "$composition/composer"
+
+  - name: "type"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.type.coding"
+    manual:
+      - name: "dischargeSummary"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "34105-7"
+          - path: "display"
+            value: "Hospital Discharge summary"
+
+  - name: "title"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "dischargeReport"
+        fhir:
+          - path: "title"
+            value: "Discharge report"
+
+  # The encounter the report is about is the composition's context: the
+  # hospital stay began at its start time and ended at its end time.
+  - name: "encounter"
+    with:
+      fhir: "$resource.encounter"
+      openehr: "$reference"
+    reference:
+      resourceType: "Encounter"
+      mappings:
+        - name: "encounterProfile"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot.meta"
+          manual:
+            - name: "profileUrl"
+              fhir:
+                - path: "profile"
+                  value: "http://hl7.eu/fhir/hdr/StructureDefinition/encounter-eu-hdr"
+
+        - name: "stay"
+          with:
+            fhir: "$fhirRoot.period"
+            openehr: "$composition/context"
+            type: "NONE"
+          followedBy:
+            mappings:
+              - name: "admitted"
+                with:
+                  fhir: "start"
+                  openehr: "start_time"
+              - name: "discharged"
+                with:
+                  fhir: "end"
+                  openehr: "end_time"
+
+        # NOTE: encounter-eu-hdr binds Encounter.status (required) and Encounter.class
+        # (extensible) and the template records neither, so a reported stay is finished and inpatient.
+        - name: "finished"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "status"
+              fhir:
+                - path: "status"
+                  value: "finished"
+
+        - name: "inpatient"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot.class"
+          manual:
+            - name: "class"
+              fhir:
+                - path: "system"
+                  value: "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+                - path: "code"
+                  value: "IMP"
+                - path: "display"
+                  value: "inpatient encounter"
+
+  - name: "diagnosticSummary"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Diagnostic summary']"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "11535-2"
+    openehrCondition:
+      targetRoot: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Diagnostic summary']"
+      targetAttribute: "items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"
+      operator: "not empty"
+    followedBy:
+      mappings:
+        - name: "title"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "title"
+              fhir:
+                - path: "title"
+                  value: "Diagnostic summary"
+
+        - name: "code"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "code.coding"
+          manual:
+            - name: "loinc"
+              fhir:
+                - path: "system"
+                  value: "http://loinc.org"
+                - path: "code"
+                  value: "11535-2"
+
+        # One entry per problem or diagnosis the section holds, each the
+        # reference to the Condition it maps to.
+        - name: "entries"
+          with:
+            fhir: "entry"
+            openehr: "items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"
+          followedBy:
+            mappings:
+              - name: "entry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$reference"
+                reference:
+                  resourceType: "Condition"
+                  mappings:
+                    - name: "problemDiagnosis"
+                      with:
+                        fhir: "$fhirRoot"
+                        openehr: "$openehrRoot"
+                      slotArchetype: "EVALUATION.problem_diagnosis.v1"
+
+  - name: "significantProcedures"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Significant procedures']"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "10185-7"
+    openehrCondition:
+      targetRoot: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Significant procedures']"
+      targetAttribute: "items[openEHR-EHR-ACTION.procedure.v1]"
+      operator: "not empty"
+    followedBy:
+      mappings:
+        - name: "title"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "title"
+              fhir:
+                - path: "title"
+                  value: "Significant procedures"
+
+        - name: "code"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "code.coding"
+          manual:
+            - name: "loinc"
+              fhir:
+                - path: "system"
+                  value: "http://loinc.org"
+                - path: "code"
+                  value: "10185-7"
+
+        - name: "entries"
+          with:
+            fhir: "entry"
+            openehr: "items[openEHR-EHR-ACTION.procedure.v1]"
+          followedBy:
+            mappings:
+              - name: "entry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$reference"
+                reference:
+                  resourceType: "Procedure"
+                  mappings:
+                    - name: "procedure"
+                      with:
+                        fhir: "$fhirRoot"
+                        openehr: "$openehrRoot"
+                      slotArchetype: "ACTION.procedure.v1"
+
+  - name: "dischargeMedications"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Discharge medications']"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "75311-1"
+    openehrCondition:
+      targetRoot: "$composition/content[openEHR-EHR-SECTION.adhoc.v1 and name/value='Discharge medications']"
+      targetAttribute: "items[openEHR-EHR-INSTRUCTION.medication_order.v3]"
+      operator: "not empty"
+    followedBy:
+      mappings:
+        - name: "title"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "title"
+              fhir:
+                - path: "title"
+                  value: "Discharge medications"
+
+        - name: "code"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "code.coding"
+          manual:
+            - name: "loinc"
+              fhir:
+                - path: "system"
+                  value: "http://loinc.org"
+                - path: "code"
+                  value: "75311-1"
+
+        - name: "entries"
+          with:
+            fhir: "entry"
+            openehr: "items[openEHR-EHR-INSTRUCTION.medication_order.v3]"
+          followedBy:
+            mappings:
+              - name: "entry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$reference"
+                reference:
+                  resourceType: "MedicationRequest"
+                  mappings:
+                    - name: "medicationOrder"
+                      with:
+                        fhir: "$fhirRoot"
+                        openehr: "$openehrRoot"
+                      slotArchetype: "INSTRUCTION.medication_order.v3"

@@ -11,10 +11,10 @@
 //! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`],
 //! [`KDS_PERSON_OPT`], [`KDS_LABORAUFTRAG_OPT`] and [`KDS_LABORBERICHT_OPT`]
 //! are published operational templates and [`CKM_MEDICATION_ARCHETYPES`],
-//! [`CKM_LIBRARY_ARCHETYPES`], [`CKM_HIGHMED_ARCHETYPES`] and [`CKM_IMAGING_ARCHETYPES`] published
-//! archetypes, vendored verbatim with their provenance beside
-//! them: a template or an archetype carries constraints, never patient
-//! content.
+//! [`CKM_DISCHARGE_ARCHETYPES`], [`CKM_IMAGING_ARCHETYPES`], [`CKM_LIBRARY_ARCHETYPES`]
+//! and [`CKM_HIGHMED_ARCHETYPES`] published archetypes, vendored verbatim
+//! with their provenance beside them: a template or an archetype carries
+//! constraints, never patient content.
 //! [`KDS_DIAGNOSE_CONDITION`] is synthetic, and names the profile and the
 //! systems and extension URLs the published KDS mappings match on, because a
 //! mapping condition only admits the value it names.
@@ -263,6 +263,50 @@ pub const CKM_MEDICATION_ARCHETYPES: [(&str, &str); 13] = [
     ckm_medication!("openEHR-EHR-COMPOSITION.health_summary.v1.adl"),
     ckm_medication!("openEHR-EHR-SECTION.adhoc.v1.adl"),
     ckm_medication!("openEHR-EHR-SECTION.immunisation_list.v0.adl"),
+];
+
+/// FerroBRIDGE's ADL 2 discharge report template, with its template
+/// overlays.
+///
+/// A transfer of care summary `COMPOSITION`, whose context is the hospital
+/// stay, holding three ad hoc `SECTION`s: a diagnostic summary with
+/// `EVALUATION.problem_diagnosis.v1`, significant procedures with
+/// `ACTION.procedure.v1` and discharge medications with
+/// `INSTRUCTION.medication_order.v3`. A suite builds the ADL 2 operational
+/// template from it, [`CKM_DISCHARGE_ARCHETYPES`] and
+/// [`CKM_MEDICATION_ARCHETYPES`] at test time. The template identifier is
+/// [`FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE_ID`].
+pub const FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE: &str =
+    include_str!("../fixtures/adl2/ferrobridge_discharge_report.adlt");
+
+/// The template identifier [`FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE`] declares.
+pub const FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE_ID: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.0.0";
+
+/// One vendored CKM discharge archetype as `(file name, source)`.
+macro_rules! ckm_discharge {
+    ($file:literal) => {
+        (
+            $file,
+            include_str!(concat!("../fixtures/ckm/discharge/", $file)),
+        )
+    };
+}
+
+/// The three published CKM archetypes [`FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE`]
+/// adds to [`CKM_MEDICATION_ARCHETYPES`].
+///
+/// Each is `(file name, ADL 1.4 source)`: the transfer of care summary
+/// composition the template specialises, and the problem or diagnosis
+/// evaluation and the procedure action its sections hold.
+///
+/// `scripts/vendor/ckm-discharge.sh` fetches them at the CKM mirror commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
+/// source and licence.
+pub const CKM_DISCHARGE_ARCHETYPES: [(&str, &str); 3] = [
+    ckm_discharge!("openEHR-EHR-COMPOSITION.transfer_summary.v1.adl"),
+    ckm_discharge!("openEHR-EHR-EVALUATION.problem_diagnosis.v1.adl"),
+    ckm_discharge!("openEHR-EHR-ACTION.procedure.v1.adl"),
 ];
 
 /// One FerroBRIDGE library template as `(template identifier, source)`.

@@ -131,9 +131,10 @@ through FerroBRIDGE's MPD contexts. The laboratory report is
 laboratory project and received as a `Bundle-eu-lab`. The imaging report is
 [mapped from and into openEHR](imaging-mapping.md) through the shipped
 imaging project, over FerroBRIDGE's template of published CKM archetypes,
-and received as a `BundleReportEuImaging`. The discharge report is received
-as a `bundle-eu-hdr`; it has its crosswalk and its document assembly, and
-its mapping from openEHR is built next. The open
+and received as a `BundleReportEuImaging`. The discharge report is
+[mapped from and into openEHR](discharge-mapping.md) through the shipped
+HDR project over FerroBRIDGE's discharge report template and received as a
+`bundle-eu-hdr`. The open
 work is on the [tracker](https://github.com/FerroHEALTH/FerroBRIDGE/issues).
 The profiles this repository's own FHIR facade maps to, category by category,
 are on [EHDS readiness](ehds-readiness.md).

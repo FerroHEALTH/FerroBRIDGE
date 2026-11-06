@@ -25,6 +25,9 @@ mod discharge;
 #[cfg(all(feature = "discharge", feature = "fhir-r4"))]
 mod discharge_document;
 #[cfg(test)]
+#[cfg(all(feature = "openehr", feature = "discharge"))]
+mod discharge_mapped;
+#[cfg(test)]
 #[cfg(all(
     feature = "fhir-r4",
     feature = "patient-summary",
@@ -70,7 +73,8 @@ mod mapping;
         feature = "prescription",
         feature = "dispensation",
         feature = "laboratory",
-        feature = "patient-summary"
+        feature = "patient-summary",
+        feature = "discharge"
     )
 ))]
 mod mappings;

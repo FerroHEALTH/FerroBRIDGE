@@ -175,9 +175,50 @@ remark = "assembled by the facade's Composition/$document, proven on a synthetic
 [[category]]
 article = "14(1)(f)"
 name = "Discharge reports"
-note = "HL7 Europe Hospital Discharge Report 1.0.0 (R4, 2026-10-16) is pinned, and the interoperability component (`eehrxf`) holds its crosswalk; no context maps its Composition, because no template carries a discharge report."
+note = "HL7 Europe Hospital Discharge Report 1.0.0 (R4, 2026-10-16) is pinned, and the interoperability component (`eehrxf`) maps it over FerroBRIDGE's discharge report template, a transfer of care summary over published CKM archetypes (owner ruling on #116, 2026-11-06), because the openEHR international CKM publishes no discharge report template."
 
 [[category.row]]
-target = "Discharge report Composition"
+target = "composition-eu-hdr"
+profile = "http://hl7.eu/fhir/hdr/StructureDefinition/composition-eu-hdr"
 package = "hl7.fhir.eu.hdr 1.0.0"
-gap = "no discharge report template in the openEHR international CKM"
+template = "FerroBRIDGE discharge report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
+context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
+test = "crates/eehrxf/tests/it/discharge_mapped/received.rs::the_profile_elements_of_the_discharge_report_survive_the_round_trip"
+remark = "the document assembly of the interoperability component writes the `bundle-eu-hdr` and its `Composition` from the sections the context maps"
+
+[[category.row]]
+target = "encounter-eu-hdr"
+profile = "http://hl7.eu/fhir/hdr/StructureDefinition/encounter-eu-hdr"
+package = "hl7.fhir.eu.hdr 1.0.0"
+template = "FerroBRIDGE discharge report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
+context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
+test = "crates/eehrxf/tests/it/discharge_mapped/received.rs::the_profile_elements_of_the_discharge_report_survive_the_round_trip"
+
+[[category.row]]
+target = "condition-eu-core (diagnostic summary)"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/condition-eu-core"
+package = "hl7.fhir.eu.base 2.0.1"
+template = "FerroBRIDGE discharge report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
+context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
+test = "crates/eehrxf/tests/it/discharge_mapped/received.rs::the_profile_elements_of_the_discharge_report_survive_the_round_trip"
+
+[[category.row]]
+target = "procedure-eu-core (significant procedures)"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/procedure-eu-core"
+package = "hl7.fhir.eu.base 2.0.1"
+template = "FerroBRIDGE discharge report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
+context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
+test = "crates/eehrxf/tests/it/discharge_mapped/received.rs::every_section_of_the_report_survives_the_round_trip"
+
+[[category.row]]
+target = "medicationRequest-eu-core (discharge medications)"
+profile = "http://hl7.eu/fhir/base/StructureDefinition/medicationRequest-eu-core"
+package = "hl7.fhir.eu.base 2.0.1"
+template = "FerroBRIDGE discharge report template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_discharge_report.adlt"
+context = "crates/eehrxf/mappings/hdr/ferrobridge_eu_hdr.context.yml"
+test = "crates/eehrxf/tests/it/discharge_mapped/received.rs::every_section_of_the_report_survives_the_round_trip"

@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: BUSL-1.1
 # The exchange-format validator lane (#1318; no specification governs the
 # lane: our own design). The eehrxf suites that write a patient summary, a
-# laboratory report or an imaging report document and hold it to the
-# vendored HL7 Europe profiles (`claimed`, `own`, `lab_mapped`,
-# `imaging_mapped`), and the one that maps a prescription and
+# laboratory report, an imaging report or a discharge report document and hold
+# it to the vendored HL7 Europe profiles (`claimed`, `own`, `lab_mapped`,
+# `imaging_mapped`, `discharge_mapped`), and the one that maps a prescription and
 # a dispensation to the MPD resources (`medication::mapped`), also write it
 # to the directory EEHRXF_EMIT_DIR names; this script runs HL7's
 # FHIR Validator over every one of them and fails on an error. Its results
@@ -19,12 +19,15 @@
 # "HL7 FHIR Validator" table of docs/VERSIONS.md, each checked against its
 # sha256, over the profile packages scripts/vendor/profile-packages.sh
 # fetched (hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
-# hl7.fhir.eu.laboratory 2.0.0 and hl7.fhir.eu.mpd 1.0.0 with their
-# dependency closure). This script adds the vendored MyHealth@EU Master
-# Value Sets Catalogue, whose value sets the patient summary profiles bind,
-# and the remaining-dispensations extension eehrxf publishes, and loads the
-# six with -ig. An imaging report (`imaging_mapped`) is validated in a run of
-# its own with hl7.fhir.eu.imaging 1.0.0-ballot loaded, and the two runs'
+# hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0, hl7.fhir.eu.hdr 1.0.0
+# and hl7.fhir.eu.imaging 1.0.0-ballot with their dependency closure). This
+# script adds the vendored MyHealth@EU Master Value Sets Catalogue, whose
+# value sets the patient summary profiles bind, and the remaining-dispensations
+# extension eehrxf publishes. Each guide's documents run on their own, so no
+# closure reads another guide's documents: a discharge report with
+# hl7.fhir.eu.hdr 1.0.0 and the catalogue loaded, an imaging report with
+# hl7.fhir.eu.imaging 1.0.0-ballot loaded, and every other document with the
+# other four guides, the catalogue and the extension loaded. The runs'
 # outcomes are judged together.
 #
 # A run fails on an issue of severity error or fatal, on a document the
@@ -113,6 +116,11 @@ readonly LAB_BUNDLE="http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu
 # The imaging report document a run validates over the Imaging Report guide.
 readonly IMAGING_BUNDLE="http://hl7.eu/fhir/imaging/StructureDefinition/BundleReportEuImaging"
 readonly IMAGING_IG="hl7.fhir.eu.imaging#1.0.0-ballot"
+
+# The discharge report document a run validates over the Hospital Discharge
+# Report guide.
+readonly HDR_BUNDLE="http://hl7.eu/fhir/hdr/StructureDefinition/bundle-eu-hdr"
+readonly HDR_IG="hl7.fhir.eu.hdr#1.0.0"
 
 # The extension a validator outcome names its file in.
 readonly OUTCOME_FILE="http://hl7.org/fhir/StructureDefinition/operationoutcome-file"
@@ -251,10 +259,10 @@ validate() {
 
 # run DOCUMENTS OUT: prepares the jar and the package cache, runs the
 # validator offline over every document in DOCUMENTS and judges its output.
-# An imaging report is validated in a run of its own, over the HL7 Europe
-# Imaging Report closure: one validator context holding both closures reads
-# the laboratory report against the imaging guide's dependencies too (no
-# specification governs this: our own design).
+# An imaging report and a discharge report are each validated in a run of
+# their own, over their guide's closure: one validator context holding
+# several closures read the laboratory report against the imaging guide's
+# dependencies too (no specification governs this: our own design).
 run() {
   local documents="$1" out="$2" java="${JAVA:-java}"
   command -v "$java" > /dev/null 2>&1 || {
@@ -268,12 +276,14 @@ run() {
     mkdir -p "$CACHE/$name"
     tar -xzf "$MVC" -C "$CACHE/$name"
   fi
-  local docs=() general=() imaging=() doc
+  local docs=() general=() imaging=() discharge=() doc
   for doc in "$documents"/*.json; do
     [[ -f "$doc" ]] || continue
     docs+=("$doc")
     if jq -e --arg bundle "$IMAGING_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       imaging+=("$doc")
+    elif jq -e --arg bundle "$HDR_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
+      discharge+=("$doc")
     else
       general+=("$doc")
     fi
@@ -293,6 +303,10 @@ run() {
   if [[ "${#imaging[@]}" -gt 0 ]]; then
     validate "$out" imaging "${imaging[@]}" -- "$IMAGING_IG" > "$out/imaging.bundle.json" || return 1
     parts+=("$out/imaging.bundle.json")
+  fi
+  if [[ "${#discharge[@]}" -gt 0 ]]; then
+    validate "$out" discharge "${discharge[@]}" -- "$HDR_IG" "$name" > "$out/discharge.bundle.json" || return 1
+    parts+=("$out/discharge.bundle.json")
   fi
   jq -s '{resourceType: "Bundle", type: "collection", entry: [.[].entry[]]}' "${parts[@]}" \
     > "$out/validation.json"

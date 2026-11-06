@@ -81,3 +81,28 @@ impl Section {
         self
     }
 }
+
+/// One section a mapping run wrote, placed in the document's form.
+///
+/// It holds the slot the section's LOINC code names and the `fullUrl` of
+/// each entry it references, as
+/// [`super::Document::with_mapped_composition`] added them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MappedSection {
+    /// The slot of the form the section's code names.
+    pub slot: &'static Slot,
+    /// The `fullUrl` of each entry, in the section's order.
+    pub entries: Vec<String>,
+}
+
+impl MappedSection {
+    /// Returns the document section of this mapped section, its generated
+    /// narrative the `paragraphs`, holding every entry.
+    #[must_use]
+    pub fn into_section(self, paragraphs: Vec<String>) -> Section {
+        Section {
+            entries: self.entries,
+            ..Section::new(self.slot, paragraphs)
+        }
+    }
+}

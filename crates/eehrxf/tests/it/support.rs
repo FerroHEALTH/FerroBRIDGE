@@ -146,7 +146,10 @@ pub(crate) fn mpd(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
 
 /// The vendored `hl7.fhir.eu.base` 2.0.1 package, which holds the EU core
 /// profiles the EPS profiles build on and the entries of a section claim.
-#[cfg(all(feature = "openehr", feature = "patient-summary"))]
+#[cfg(all(
+    feature = "openehr",
+    any(feature = "patient-summary", feature = "discharge")
+))]
 pub(crate) fn eu_base_package() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/specs/eu-hl7-base/hl7.fhir.eu.base-2.0.1.tgz")
@@ -165,6 +168,15 @@ pub(crate) fn vendored(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
     Err(format!("no vendored package holds the profile {url}").into())
 }
 
+/// Reads the profile at `url` from the vendored EU base package.
+#[cfg(all(feature = "openehr", feature = "discharge"))]
+pub(crate) fn vendored_base(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
+    Ok(ResourceProfile::read(
+        std::fs::File::open(eu_base_package())?,
+        url,
+    )?)
+}
+
 /// The environment variable naming the directory a suite writes the
 /// documents it has held to the vendored profiles to, for a run of HL7's
 /// FHIR Validator over them.
@@ -175,7 +187,8 @@ pub(crate) fn vendored(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
         feature = "laboratory",
         feature = "prescription",
         feature = "dispensation",
-        feature = "imaging"
+        feature = "imaging",
+        feature = "discharge"
     )
 ))]
 const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
@@ -189,7 +202,8 @@ const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
         feature = "laboratory",
         feature = "prescription",
         feature = "dispensation",
-        feature = "imaging"
+        feature = "imaging",
+        feature = "discharge"
     )
 ))]
 pub(crate) fn emit(name: &str, text: &str) -> Result<(), Box<dyn Error>> {
