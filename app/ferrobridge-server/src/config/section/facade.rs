@@ -56,6 +56,10 @@ pub struct Facade {
     pub identifier_search: FacadeIdentifierSearch,
     /// How the party types are searched by `identifier`.
     pub party_search: FacadePartySearch,
+    /// The `DV_IDENTIFIER.issuer` of each binding key the CDR binds a login
+    /// to; a party carrying one is provisioned through SCIM and the facade
+    /// refuses to write it. Empty refuses none.
+    pub binding_identifier_issuers: Vec<String>,
 }
 
 impl Default for Facade {
@@ -77,6 +81,7 @@ impl Default for Facade {
             references: FacadeReferences::default(),
             identifier_search: FacadeIdentifierSearch::default(),
             party_search: FacadePartySearch::default(),
+            binding_identifier_issuers: Vec::new(),
         }
     }
 }

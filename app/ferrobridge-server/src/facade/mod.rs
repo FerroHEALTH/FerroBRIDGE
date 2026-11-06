@@ -138,6 +138,9 @@ pub struct Facade {
     /// The identifier queries the party types are searched with, when the
     /// deployment configures them.
     party_search: Option<search::party::PartySearch>,
+    /// The issuers of the binding keys a party the facade never writes
+    /// carries.
+    binding_issuers: Vec<String>,
     /// The terminology server every `conceptmap` code translates through.
     translator: Translator,
     /// What may be fetched to resolve a reference the request does not carry.
@@ -184,6 +187,7 @@ impl Facade {
             limits: search::Limits::default(),
             identifier: None,
             party_search: None,
+            binding_issuers: Vec::new(),
             translator: Translator::default(),
             references: references::Policy::default(),
             usage: Arc::new(crate::usage_report::window()),
@@ -333,6 +337,22 @@ impl Facade {
     pub fn with_party_search(mut self, party_search: Option<search::party::PartySearch>) -> Self {
         self.party_search = party_search;
         self
+    }
+
+    /// Returns this facade refusing to write a party that carries an
+    /// identifier of one of `issuers`, the issuers of the binding keys the CDR
+    /// binds a login to.
+    #[must_use]
+    pub fn with_binding_issuers(mut self, issuers: Vec<String>) -> Self {
+        self.binding_issuers = issuers;
+        self
+    }
+
+    /// Returns the issuers of the binding keys a party the facade never writes
+    /// carries.
+    #[must_use]
+    pub fn binding_issuers(&self) -> &[String] {
+        &self.binding_issuers
     }
 
     /// Returns the queries the party types are searched with, when they are
