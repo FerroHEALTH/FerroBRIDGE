@@ -24,7 +24,7 @@ use crate::facade::raw;
 use crate::support;
 
 /// Runs `case` under a capturing JSON subscriber and returns what it logged.
-fn logged<F: Future<Output = ()>>(case: F) -> String {
+pub(super) fn logged<F: Future<Output = ()>>(case: F) -> String {
     let logs = support::Logs::default();
     let capture = subscriber(Rendering::Json, "info", false, logs.clone());
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -36,7 +36,7 @@ fn logged<F: Future<Output = ()>>(case: F) -> String {
 }
 
 /// Returns the audit lines of `text`, parsed.
-fn audit_lines(text: &str) -> Vec<serde_json::Value> {
+pub(super) fn audit_lines(text: &str) -> Vec<serde_json::Value> {
     text.lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
         .filter(|line| line["target"].as_str() == Some(ferrohealth_smart::audit::AUDIT_TARGET))
@@ -178,16 +178,40 @@ fn a_batch_audits_each_entry_and_the_batch_without_any_content() {
     assert!(!text.contains("SYNTHETIC-BATCH-NOTE"), "{text}");
 }
 
+#[test]
+fn a_client_credentials_token_is_audited_as_a_system_caller() {
+    // NOTE: RFC 9068 §2.2, a client credentials token's `sub` names the client,
+    // which the `rfc9068` profile reads as an app-only token.
+    let text = logged(async {
+        let key = ec_key("k1", Algorithm::ES256);
+        let issuer = Issuer::start(&[&key]).await;
+        let harness = harness().await;
+        let app = secured(&harness, &authority(issuer.settings()).await);
+        let token = mint(&key, &issuer.machine_claims("system/Condition.r"));
+        let response = raw(app, bearing(get("/fhir/Condition/c-audit-7"), &token))
+            .await
+            .expect("an answer");
+        assert_eq!(StatusCode::NOT_FOUND, response.status());
+    });
+    let lines = audit_lines(&text);
+    assert_eq!(1, lines.len(), "{text}");
+    assert_eq!(Some("system"), lines[0]["kind"].as_str(), "{text}");
+    assert_eq!(Some("bearer"), lines[0]["via"].as_str(), "{text}");
+}
+
 /// The fields every audit line carries beside the log envelope (`timestamp`,
 /// `level`, `target` and `message`), in sorted order.
-const REQUEST_FIELDS: [&str; 12] = [
+const REQUEST_FIELDS: [&str; 15] = [
     "addressed",
     "at",
+    "binding",
     "client",
     "duration_ms",
     "interaction",
     "issuer",
+    "kind",
     "method",
+    "party",
     "principal",
     "request_id",
     "route",

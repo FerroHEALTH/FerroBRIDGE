@@ -170,8 +170,11 @@ pub(crate) fn running_configuration() -> serde_json::Value {
         "file": "/etc/ferrobridge/ferrobridge.toml",
         "read_at": "2026-10-24T06:00:00Z",
         "entries": [
-            entry("auth.audience", &json!({"kind": "list", "value": [text("https://bridge.example.org/fhir")]}), "file"),
-            entry("auth.issuer", &text("https://idp.example.org/realms/bridge"), "file"),
+            entry("auth.issuer", &json!({"kind": "list", "value": [{"kind": "table", "value": {
+                "audience": {"kind": "list", "value": [text("https://bridge.example.org/fhir")]},
+                "issuer": text("https://idp.example.org/realms/bridge"),
+                "kind": text("persons"),
+            }}]}), "file"),
             entry("auth.product_scope", &text("__ferrobridge.operator"), "default"),
             entry("cdm.bridge_schema", &text("ferrobridge"), "default"),
             entry("cdm.person_policy", &text("create_on_first_sight"), "default"),

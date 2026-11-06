@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The facade under `[auth] mode = "introspection"`: an opaque token the
+//! The facade over an issuer with `mode = "introspection"`: an opaque token the
 //! issuer's introspection endpoint reports active reaches the handler, the
 //! answer is held, and an inactive token or an endpoint that fails is
 //! refused (RFC 7662 §2.2, §2.3, §4).
@@ -11,6 +11,7 @@ use std::error::Error;
 use ferrobridge_server::smart::SmartSettings;
 use ferrohealth_smart::client::ClientCredentials;
 use ferrohealth_smart::client::Endpoint;
+use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_smart::resource::introspection::IntrospectionAuth;
 use ferrohealth_smart::resource::introspection::IntrospectionSettings;
 use http::StatusCode;
@@ -20,6 +21,7 @@ use wiremock::ResponseTemplate;
 use wiremock::matchers;
 
 use super::AUDIENCE;
+use super::CLIENT;
 use super::Issuer;
 use super::authority;
 use super::bearing;
@@ -63,7 +65,7 @@ async fn answer(issuer: &Issuer, response: ResponseTemplate, times: u64) {
 fn settings(issuer: &Issuer) -> SmartSettings {
     let mut settings = issuer.settings();
     settings.issuers = Vec::new();
-    settings.introspection = Some(IntrospectionSettings::new(
+    let mut introspection = IntrospectionSettings::new(
         issuer.uri(),
         AUDIENCE,
         IntrospectionAuth::Client(Box::new(ClientCredentials::new(
@@ -71,7 +73,10 @@ fn settings(issuer: &Issuer) -> SmartSettings {
             String::from("ferrobridge-rs"),
             SecretString::from("synthetic-secret"),
         ))),
-    ));
+        IssuerKind::Persons,
+    );
+    introspection.profile.first_party_clients = vec![String::from(CLIENT)];
+    settings.introspection = vec![introspection];
     settings
 }
 
@@ -80,7 +85,7 @@ fn active(issuer: &Issuer, scope: &str) -> ResponseTemplate {
     ResponseTemplate::new(200).set_body_json(serde_json::json!({
         "active": true,
         "scope": scope,
-        "client_id": "synthetic-client",
+        "client_id": CLIENT,
         "sub": "synthetic-client-sub",
         "iss": issuer.uri(),
         "aud": AUDIENCE,

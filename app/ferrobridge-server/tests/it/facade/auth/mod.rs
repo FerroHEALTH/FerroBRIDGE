@@ -35,6 +35,7 @@ use ferrobridge_server::smart::Smart;
 use ferrobridge_server::smart::SmartSettings;
 use ferrobridge_server::state::AppState;
 use ferrohealth_health::registry::Registry;
+use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_smart::resource::Settings;
 use http::Request;
 use http::header;
@@ -52,6 +53,10 @@ use super::server_settings;
 
 /// The audience every token of these cases is addressed to.
 pub(super) const AUDIENCE: &str = "http://ferrobridge.invalid/fhir";
+
+/// The client every token of these cases names, the issuer's first-party
+/// client.
+pub(crate) const CLIENT: &str = "synthetic-client";
 
 /// The path the stub serves the key set at.
 const JWKS_PATH: &str = "/jwks";
@@ -192,12 +197,23 @@ impl Issuer {
         SmartSettings::new(self.issuer_settings())
     }
 
-    /// Returns the resource-server settings of this issuer alone, reading the
-    /// key set again on every unknown `kid`.
+    /// Returns the resource-server settings of this issuer alone, a
+    /// `persons` issuer whose first-party client is the one the cases'
+    /// tokens name, reading the key set again on every unknown `kid`.
     pub(crate) fn issuer_settings(&self) -> Settings {
-        let mut settings = Settings::new(self.uri(), AUDIENCE);
+        let mut settings = Settings::new(self.uri(), AUDIENCE, IssuerKind::Persons);
+        settings.profile.first_party_clients = vec![String::from(CLIENT)];
         settings.jwks_refresh_interval = Duration::ZERO;
         settings
+    }
+
+    /// Returns the claims of a machine's client credentials token granting
+    /// `scope`, whose `sub` is its client (RFC 9068 §2.2), so the issuer's
+    /// profile classifies it as a system caller.
+    pub(crate) fn machine_claims(&self, scope: &str) -> serde_json::Value {
+        let mut claims = self.claims(scope);
+        claims["sub"] = serde_json::json!(CLIENT);
+        claims
     }
 
     /// Returns the claims of a valid token granting `scope`.
@@ -207,7 +223,7 @@ impl Issuer {
             "iss": self.uri(),
             "aud": AUDIENCE,
             "sub": "synthetic-client-sub",
-            "client_id": "synthetic-client",
+            "client_id": CLIENT,
             "iat": now,
             "exp": now + 300,
             "jti": "synthetic-jti-1",

@@ -124,9 +124,9 @@ essential functionalities and information about the security properties;"
   [what FerroBRIDGE stores](../operate/deployment-shape.md#what-ferrobridge-stores)).
 - **Security properties:** the ones that ship with every release.
   - `[auth]` is on by default: the facade, the FHIRconnect operations and the
-    operator API refuse to start until it names an issuer and an audience,
-    and every request then needs a valid SMART App Launch 2.x access token or
-    a configured Basic credential. A route under `/fhir` the guard does not
+    operator API refuse to start until it names an issuer with its `kind`
+    and audience, and every request then needs a valid SMART App Launch 2.x
+    access token or the configured Basic credential of a person. A route under `/fhir` the guard does not
     classify is refused with `403`
     ([the FHIR facade, security](../integrate/fhir-facade.md#security)).
   - The request log carries the matched route and never a body, and a query
