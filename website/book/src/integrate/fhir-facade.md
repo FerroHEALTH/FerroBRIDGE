@@ -573,6 +573,14 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
   `issue.diagnostics`.
 - **Authorization.** A `patient/` token reaches the one `Patient` its launch
   context names and no other party resource.
+- **Bound professionals.** A `PERSON` that carries a binding key, an
+  identifier of an issuer
+  [`binding_identifier_issuers`](../operate/configuration.md#facade) names,
+  is bound to a login at the CDR and provisioned through the CDR's SCIM
+  service. The facade refuses a create, update or delete of such a party
+  (a `Practitioner`, typically) with `403 forbidden` before it writes to the
+  CDR, and the CDR refuses the same write from any client but an
+  administrator or that SCIM client.
 
 A `PractitionerRole` maps `practitioner` onto the `ROLE`'s mandatory
 `performer`. The reference must name a `Practitioner` this facade serves,

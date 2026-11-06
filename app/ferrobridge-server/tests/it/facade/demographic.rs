@@ -83,7 +83,7 @@ fn party(class: &str, concept: &str, template: &str, name: &str, tree: u32) -> s
 }
 
 /// Returns the synthetic `PERSON` at version `tree`.
-fn person(tree: u32) -> serde_json::Value {
+pub(super) fn person(tree: u32) -> serde_json::Value {
     party(
         "PERSON",
         "ferrobridge_person",
@@ -112,6 +112,15 @@ async fn harness() -> Result<(MockServer, Arc<Facade>), Box<dyn Error>> {
 pub(super) async fn harness_with(
     facade_settings: ferrobridge_server::facade::Settings,
 ) -> Result<(MockServer, Arc<Facade>), Box<dyn Error>> {
+    let (cdr, facade) = facade_over(facade_settings).await?;
+    Ok((cdr, Arc::new(facade)))
+}
+
+/// Returns the stub CDR and the facade over the demographic fixture set that
+/// runs with `facade_settings`, unshared so a case can configure it further.
+pub(super) async fn facade_over(
+    facade_settings: ferrobridge_server::facade::Settings,
+) -> Result<(MockServer, Facade), Box<dyn Error>> {
     let cdr = MockServer::start().await;
     for (id, opt) in [
         (
@@ -143,8 +152,10 @@ pub(super) async fn harness_with(
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
     let store = Arc::new(MemoryStore::default());
-    let facade = Facade::new(compiled, handle(&store), client, facade_settings);
-    Ok((cdr, Arc::new(facade)))
+    Ok((
+        cdr,
+        Facade::new(compiled, handle(&store), client, facade_settings),
+    ))
 }
 
 /// Returns a client for `cdr` with `[cdr] demographic` set as `on`.
@@ -154,7 +165,7 @@ fn demographic_client(cdr: &MockServer, on: bool) -> Result<CdrClient, Box<dyn E
 }
 
 /// Mounts `GET /demographic/person/{uid}` answering `200` with `body`.
-async fn mount_person(cdr: &MockServer, uid: &str, body: &serde_json::Value, tree: u32) {
+pub(super) async fn mount_person(cdr: &MockServer, uid: &str, body: &serde_json::Value, tree: u32) {
     Mock::given(matchers::method("GET"))
         .and(matchers::path(format!("/demographic/person/{uid}")))
         .respond_with(
