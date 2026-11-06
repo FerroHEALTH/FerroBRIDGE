@@ -1,0 +1,1 @@
+Shipped with functional changes because: FerroBRIDGE has refused a Basic user holding a `system/` scope at start-up since the change that moved it to `ferrohealth-smart` 0.9.0, so no FerroBRIDGE build is exposed to GHSA-jhg2-jwjp-hq74 and there is no security update to separate from the other changes this release carries.
