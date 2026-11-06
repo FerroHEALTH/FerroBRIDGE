@@ -19,6 +19,7 @@ mod openehr;
 mod read;
 mod reference;
 mod subjects;
+mod validated;
 
 use std::error::Error;
 use std::io::Read;
