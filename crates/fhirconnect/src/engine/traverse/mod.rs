@@ -232,6 +232,18 @@ impl Binding {
             .count()
     }
 
+    /// Returns the binding of a FHIR occurrence at `level` that keeps this
+    /// binding's openEHR instance, for a mapping with no openEHR node of
+    /// its own.
+    fn keeping_openehr(&self, fhir: Occurrence, level: usize) -> Self {
+        Self {
+            fhir,
+            openehr: self.openehr.clone(),
+            axes: self.axes.clone(),
+            level,
+        }
+    }
+
     /// Returns the repeating nodes of `target` the positions `held` name,
     /// or the parent's when the mapping has no openEHR side.
     fn axes_of(&self, target: Option<&OpenehrTarget>, held: usize) -> Vec<FlatId> {
