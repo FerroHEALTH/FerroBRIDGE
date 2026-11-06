@@ -54,8 +54,12 @@ use crate::facade::handle;
 use crate::facade::post_condition;
 use crate::facade::raw;
 use crate::facade::settings;
+use crate::facade::stub::ECHOED;
+use crate::facade::stub::Echo;
+use crate::facade::stub::mount_echo;
 use crate::facade::stub::mount_ehr;
 use crate::facade::stub::mount_read;
+use crate::facade::transaction_of;
 
 /// The bridge's client id at the authorization server.
 const BRIDGE_CLIENT: &str = "ferrobridge";
@@ -715,5 +719,107 @@ async fn a_machine_is_never_exchanged_and_reaches_the_cdr_under_the_bridge_token
         "a machine was exchanged"
     );
     assert_every_call_under(&world.cdr_calls().await, OWN_TOKEN);
+    Ok(())
+}
+
+/// Returns the committer the CDR reads from an onward token issued for the
+/// person of `World::person_claims`: the placeholder the CDR discards, a
+/// `PARTY_IDENTIFIED` whose only member is one `DV_IDENTIFIER` of the token's
+/// `iss` and `sub`.
+fn placeholder(world: &World) -> serde_json::Value {
+    serde_json::json!({
+        "_type": "PARTY_IDENTIFIED",
+        "identifiers": [{
+            "_type": "DV_IDENTIFIER",
+            "issuer": world.issuer.uri(),
+            "id": "synthetic-client-sub"
+        }]
+    })
+}
+
+#[tokio::test]
+async fn a_header_commit_under_an_onward_token_states_no_committer() -> Result<(), Box<dyn Error>> {
+    let world = World::start(Grant::Standard).await?;
+    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    world
+        .mount_token_endpoint(Grant::Standard, &issued, 300)
+        .await;
+    world.mount_cdr(&condition_of("p-1")).await;
+    let token = mint(&world.key, &world.person_claims());
+
+    create_and_read(&world, &token).await?;
+
+    let commits: Vec<Request> = world
+        .harness
+        .cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|request| {
+            request.method.as_str() == "POST" && request.url.path().ends_with("/composition")
+        })
+        .collect();
+    assert_eq!(1, commits.len(), "one composition commit");
+    for commit in &commits {
+        // ITS-REST 1.1.0: "None of these headers are mandatory", and `committer` is a
+        // required member of `openehr-audit-details`, so the CDR derives it from the token.
+        assert!(
+            commit.headers.get("openehr-audit-details").is_none(),
+            "a header commit under an onward token states no audit"
+        );
+        assert!(
+            commit.headers.get("openehr-version").is_some(),
+            "the lifecycle still travels"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_contribution_under_an_onward_token_carries_the_placeholder_committer()
+-> Result<(), Box<dyn Error>> {
+    let world = World::start(Grant::Standard).await?;
+    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    world
+        .mount_token_endpoint(Grant::Standard, &issued, 300)
+        .await;
+    mount_ehr(&world.harness.cdr).await;
+    mount_echo(&world.harness.cdr, ECHOED, Echo::Sent).await;
+    let token = mint(&world.key, &world.person_claims());
+    let authority = authority(world.issuer.settings()).await;
+    let bundle = transaction_of(&[("urn:uuid:0000-onward", condition_of("p-1"))]);
+    let request = http::Request::post("/fhir")
+        .header(header::CONTENT_TYPE, "application/fhir+json")
+        .body(axum::body::Body::from(bundle.to_string()))?;
+
+    let response = raw(
+        secured(&world.harness, &authority),
+        bearing(request, &token),
+    )
+    .await?;
+
+    assert_eq!(StatusCode::OK, response.status());
+    let sent = world
+        .harness
+        .cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .find(|request| request.url.path().ends_with("/contribution"))
+        .ok_or("the contribution reached the CDR")?;
+    let body: serde_json::Value = serde_json::from_slice(&sent.body)?;
+    let expected = placeholder(&world);
+    // ITS-REST `schemas/common/UpdateAudit.yaml` requires `committer` in the
+    // CONTRIBUTION's `audit` and `schemas/ehr/UpdateVersion.yaml` a
+    // `commit_audit` per member: each carries the placeholder in its exact form.
+    assert_eq!(expected, body["audit"]["committer"], "{body}");
+    let versions = body["versions"].as_array().ok_or("the versions")?;
+    assert!(!versions.is_empty(), "{body}");
+    for version in versions {
+        assert_eq!(expected, version["commit_audit"]["committer"], "{body}");
+    }
+    assert_every_call_under(&world.cdr_calls().await, &issued);
     Ok(())
 }

@@ -355,6 +355,16 @@ caller made, such as an HL7 v2 message or a request while `[auth]` is off,
 commits under the bridge's name. Reads reach the CDR under the bridge's own
 credential, so the CDR's access log names the bridge for them.
 
+Under [`[cdr.credentials.onward]`](../operate/configuration.md#cdrcredentialsonward)
+the request reaches the CDR under the token the caller's was exchanged for,
+and the CDR derives the committer from that token. A single write then sends
+no `openehr-audit-details` header, which ITS-REST 1.1.0 leaves optional. A
+transaction's CONTRIBUTION must carry a committer in its `audit` and in every
+version's `commit_audit`, so there the facade sends the placeholder the CDR
+discards: `{"_type": "PARTY_IDENTIFIED", "identifiers": [{"_type":
+"DV_IDENTIFIER", "issuer": "<token iss>", "id": "<token sub>"}]}`, read from
+the exchanged token. The facade sends no attestation.
+
 ## Writes
 
 A create resolves the subject to an EHR: the identity map first, then the CDR

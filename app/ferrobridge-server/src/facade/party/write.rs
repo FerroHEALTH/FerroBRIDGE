@@ -63,7 +63,7 @@ pub(crate) async fn create(
     party::unbound(facade, resource_type, built.value())?;
     let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
-    let commit = commit(facade, access, loaded, Change::Creation)?;
+    let commit = commit(facade, (access, &client), loaded, Change::Creation)?;
     let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
     party::provision::provision(facade, &client, resource_type, &version).await?;
     respond(
@@ -104,7 +104,7 @@ pub(crate) async fn update(
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
     let preceding = preceding(headers, &latest.version)?;
-    let commit = commit(facade, access, loaded, Change::Modification)?;
+    let commit = commit(facade, (access, &client), loaded, Change::Modification)?;
     let version = commit_party(
         demographic,
         class,
@@ -143,7 +143,7 @@ pub(crate) async fn delete(
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
-    let commit = commit(facade, access, loaded, Change::Deleted)?;
+    let commit = commit(facade, (access, &client), loaded, Change::Deleted)?;
     macro_rules! delete_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
@@ -191,7 +191,7 @@ async fn build(
 /// Returns the commit headers one party write carries.
 fn commit(
     facade: &Facade,
-    access: &Access,
+    (access, client): (&Access, &crate::cdr::CdrClient),
     loaded: &Loaded,
     change: Change,
 ) -> Result<CommitContext, Refusal> {
@@ -199,7 +199,7 @@ fn commit(
     crate::facade::commit::context(
         change,
         system_id,
-        &Committer::of(access, system_id),
+        &Committer::of(access, client, system_id),
         loaded.program().template().id().as_str(),
     )
     .map_err(|error| {

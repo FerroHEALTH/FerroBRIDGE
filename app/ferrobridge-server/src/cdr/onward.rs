@@ -60,6 +60,28 @@ pub enum Route {
     Refused,
 }
 
+/// The person an onward token names: its `iss` and `sub` (RFC 7519 §4.1.1,
+/// §4.1.2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OnwardSubject {
+    /// The issuer that signed the onward token.
+    pub issuer: String,
+    /// The subject it names.
+    pub subject: String,
+}
+
+/// A token the onward issuer exchanged a caller's for, with the person it
+/// names.
+///
+/// The `Debug` rendering never carries the token.
+#[derive(Debug, Clone)]
+pub struct Exchanged {
+    /// The token, sent as the bearer credential of every CDR call.
+    pub token: SecretString,
+    /// The person it names.
+    pub subject: OnwardSubject,
+}
+
 /// Why a caller does not reach the CDR under an onward token.
 ///
 /// No variant carries a token, a secret or a claim value.
@@ -127,7 +149,7 @@ impl CdrOnward {
         &self,
         access: &Access,
         headers: &HeaderMap,
-    ) -> Result<Option<SecretString>, OnwardRefusal> {
+    ) -> Result<Option<Exchanged>, OnwardRefusal> {
         let Access::Caller(caller) = access else {
             return Err(OnwardRefusal::NotCarried {
                 caller: "anonymous",
@@ -149,7 +171,7 @@ impl CdrOnward {
         &self,
         caller: &Caller,
         headers: &HeaderMap,
-    ) -> Result<SecretString, OnwardRefusal> {
+    ) -> Result<Exchanged, OnwardRefusal> {
         let presented = bearer(headers).ok_or(OnwardRefusal::NoBearer)?;
         let subject =
             SubjectToken::from_caller(caller, presented).map_err(|error| match error {
@@ -161,15 +183,25 @@ impl CdrOnward {
             .token(&subject, None, &self.target)
             .await
             .map_err(OnwardRefusal::Exchange)?;
-        issued
+        let unusable = || {
+            OnwardRefusal::Exchange(OnwardError::Token(
+                ferrohealth_smart::client::TokenError::Unusable,
+            ))
+        };
+        let token = issued
             .header()
             .to_str()
             .ok()
             .and_then(|value| credential(value, BEARER))
-            .map(|token| SecretString::from(token.to_owned()))
-            .ok_or(OnwardRefusal::Exchange(OnwardError::Token(
-                ferrohealth_smart::client::TokenError::Unusable,
-            )))
+            .ok_or_else(unusable)?;
+        let (named_issuer, named_subject) = issued_party(token).ok_or_else(unusable)?;
+        Ok(Exchanged {
+            token: SecretString::from(token.to_owned()),
+            subject: OnwardSubject {
+                issuer: named_issuer,
+                subject: named_subject,
+            },
+        })
     }
 }
 
@@ -193,6 +225,27 @@ pub const fn route(caller: &CallerKind, issuer: IssuerKind) -> Route {
         | (CallerKind::ExternalPerson(_), IssuerKind::Federation) => Route::Exchanged,
         _ => Route::Refused,
     }
+}
+
+/// Returns the `iss` and `sub` of `token`, a JWS whose payload is a JSON
+/// object (RFC 7515 §7.1), or `None` when it is not one or names neither.
+///
+/// The token is decoded, never verified: the onward client already checked
+/// it as it arrived from the token endpoint.
+fn issued_party(token: &str) -> Option<(String, String)> {
+    use base64::Engine as _;
+    let payload = token.split('.').nth(1)?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
+    let claims: serde_json::Map<String, serde_json::Value> = serde_json::from_slice(&bytes).ok()?;
+    let claim = |name: &str| {
+        claims
+            .get(name)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    };
+    Some((claim("iss")?, claim("sub")?))
 }
 
 /// Returns the bearer token the `Authorization` field of `headers` carries.

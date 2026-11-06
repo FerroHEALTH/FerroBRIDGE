@@ -2567,11 +2567,14 @@ draft upstream change.
     `403`, and a failed exchange fails the request, never falling back to the
     bridge's credential. Which caller is exchanged, and the status of each
     refusal, is our own design (`cdr::onward`, `facade::status::onward`).
-    The committer placeholder and the attestation refusal (#1635), the
+    Under an onward token a header commit states no committer, and a
+    CONTRIBUTION states the placeholder FerroEHR discards (a
+    `PARTY_IDENTIFIED` with one `DV_IDENTIFIER` of the token's `iss` and
+    `sub`), since the CDR derives the committer from the token; the facade
+    sends no attestation. The
     `patients` and `federation` lanes beside `persons` (#1636), the system
-    lane's `originating_system_audit` (#1637), the HL7 v2 face's TLS and
-    commit rules (#1638, #1639) and the bound `Practitioner` (#1640) follow
-    on their own issues.
+    lane's `originating_system_audit` (#1637), and the HL7 v2 face's TLS
+    and commit rules (#1638, #1639) follow on their own issues.
 - **Tenancy.** The reference CDR scopes its mapping rows per tenant with
   row-level security and keeps its outbound watermark deliberately unscoped
   (one integer, no tenant data). FerroBRIDGE's mapping set is a file tree per
