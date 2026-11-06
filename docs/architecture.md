@@ -1195,8 +1195,8 @@ from each guide's `package-list.json` and `ImplementationGuide` resource):
 **The R4 profile validator's package set** is pinned ahead of any mapping
 (#435): EPS 1.0.0-ballot, EU Base 2.0.1 and IPS 2.0.1, with every package
 their `package.json` files name, transitively, at the version each dependent
-names (`docs/VERSIONS.md` "Profile packages"). The 21 package versions, about
-650 MB unpacked, are fetched at build time into the ignored
+names (`docs/VERSIONS.md` "Profile packages"). The 35 package versions, about
+970 MB unpacked, are fetched at build time into the ignored
 `docs/specs/fhir-packages/` and never committed; only each `PROVENANCE.md`
 is. `hl7.fhir.r4.core` 4.0.1, which every one of them names, is read from the
 generator's committed tree. Pinning a package there is no conformance claim:
