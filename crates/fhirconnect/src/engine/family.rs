@@ -82,8 +82,10 @@ fn indexed(name: &str, index: usize) -> Segment {
 
 /// Returns the `_feeder_audit` family of the composition root.
 ///
-/// `originating_system_audit.system_id` and `feeder_system_audit.system_id`
-/// name the bridge, the source resource travels as the one
+/// `originating_system_audit.system_id` names the originating system when the
+/// origin names one apart and the bridge otherwise, `feeder_system_audit`
+/// names the bridge and is present when the two differ or a field was
+/// defaulted, the source resource travels as the one
 /// `originating_system_item_ids` entry with its `meta.versionId` as
 /// `originating_system_audit.version_id`, and each defaulted field travels as
 /// one `feeder_system_item_ids` entry whose `id` is the field's openEHR path,
@@ -92,8 +94,8 @@ fn indexed(name: &str, index: usize) -> Segment {
 /// The allocation of facts to attributes is our own design.
 #[must_use]
 pub fn feeder_audit(root: &ResolvedNode, origin: &Origin, defaulted: &[String]) -> Vec<NodeValue> {
-    let details = |version_id: Option<&str>| FeederAuditDetails {
-        system_id: String::from(origin.system_id()),
+    let details = |system_id: &str, version_id: Option<&str>| FeederAuditDetails {
+        system_id: String::from(system_id),
         location: None,
         subject: None,
         provider: None,
@@ -123,8 +125,12 @@ pub fn feeder_audit(root: &ResolvedNode, origin: &Origin, defaulted: &[String]) 
                 .collect()
         }),
         original_content: None,
-        originating_system_audit: Box::new(details(source.and_then(|source| source.version_id()))),
-        feeder_system_audit: (!defaulted.is_empty()).then(|| Box::new(details(None))),
+        originating_system_audit: Box::new(details(
+            origin.originating_system().unwrap_or(origin.system_id()),
+            source.and_then(|source| source.version_id()),
+        )),
+        feeder_system_audit: (!defaulted.is_empty() || origin.originating_system().is_some())
+            .then(|| Box::new(details(origin.system_id(), None))),
     };
     vec![
         NodeValue::new(root, to_canonical_value(&audit))

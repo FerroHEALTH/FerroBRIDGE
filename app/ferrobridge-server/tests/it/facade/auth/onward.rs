@@ -171,12 +171,14 @@ impl World {
                 "token_endpoint = \"{issuer}/token\"\n",
                 "client_id = \"{client}\"\n",
                 "client_auth = \"private_key_jwt\"\n",
-                "private_key_file = \"{key}\"\n\n",
+                "private_key_file = \"{key}\"\n",
+                "resource = \"{audience}\"\n\n",
                 "{onward}"
             ),
             cdr = cdr.uri(),
             issuer = issuer.uri(),
             client = BRIDGE_CLIENT,
+            audience = CDR_AUDIENCE,
             key = assertion_key.path().display(),
             onward = grant.table(&issuer.uri()),
         );
@@ -821,5 +823,77 @@ async fn a_contribution_under_an_onward_token_carries_the_placeholder_committer(
         assert_eq!(expected, version["commit_audit"]["committer"], "{body}");
     }
     assert_every_call_under(&world.cdr_calls().await, &issued);
+    Ok(())
+}
+
+/// Creates a Condition as a machine under `grant` and returns the composition
+/// the CDR received and the client credentials request the bridge sent.
+async fn machine_create(grant: Grant) -> Result<(serde_json::Value, String), Box<dyn Error>> {
+    let world = World::start(grant).await?;
+    world.mount_own_token().await;
+    world.mount_cdr(&condition_of("p-1")).await;
+    let token = mint(
+        &world.key,
+        &world.issuer.machine_claims("system/Condition.cru"),
+    );
+    let authority = authority(world.issuer.settings()).await;
+    let created = raw(
+        secured(&world.harness, &authority),
+        bearing(post_condition(&condition_of("p-1")), &token),
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, created.status(), "the create");
+    assert!(
+        world.onward_requests().await.is_empty(),
+        "a machine was exchanged"
+    );
+    assert_every_call_under(&world.cdr_calls().await, OWN_TOKEN);
+    let commit = world
+        .harness
+        .cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .find(|request| {
+            request.method.as_str() == "POST" && request.url.path().ends_with("/composition")
+        })
+        .ok_or("the composition reached the CDR")?;
+    let own = world
+        .token_requests()
+        .await
+        .into_iter()
+        .find(|body| body.contains("grant_type=client_credentials"))
+        .ok_or("the bridge fetched its own token")?;
+    Ok((serde_json::from_slice(&commit.body)?, own))
+}
+
+#[tokio::test]
+async fn a_machine_s_composition_names_its_client_as_the_originating_system()
+-> Result<(), Box<dyn Error>> {
+    for grant in [Grant::Standard, Grant::Entra] {
+        let (composition, own) = machine_create(grant).await?;
+        // RM FEEDER_AUDIT: `originating_system_audit` is the audit "from the originating
+        // system", `feeder_system_audit` that of the feeder "if different".
+        assert_eq!(
+            Some(super::CLIENT),
+            composition
+                .pointer("/feeder_audit/originating_system_audit/system_id")
+                .and_then(serde_json::Value::as_str),
+            "{composition}"
+        );
+        assert_eq!(
+            Some("ferrobridge.test"),
+            composition
+                .pointer("/feeder_audit/feeder_system_audit/system_id")
+                .and_then(serde_json::Value::as_str),
+            "{composition}"
+        );
+        // RFC 8707 §2: the bridge's own token is asked for the CDR alone.
+        assert!(
+            own.contains(&format!("resource={}", encoded(CDR_AUDIENCE))),
+            "{own}"
+        );
+    }
     Ok(())
 }

@@ -232,7 +232,11 @@ impl Ingest<'_> {
                     inbound.document(),
                     &now,
                     self.settings,
-                    provenance.source_for(inbound.document()),
+                    engine::origin_of(
+                        self.settings,
+                        provenance.source_for(inbound.document()),
+                        self.originating.as_deref(),
+                    ),
                     &linking(
                         Seams::default()
                             .with_functions(&Library)

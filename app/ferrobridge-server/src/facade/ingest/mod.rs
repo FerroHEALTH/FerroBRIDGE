@@ -434,6 +434,9 @@ pub struct Ingest<'a> {
     demographics: &'a dyn Demographics,
     /// Who every commit of this ingest is attributed to.
     committer: Committer,
+    /// The system the content originated in, when it is named apart from
+    /// the bridge.
+    originating: Option<String>,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -464,7 +467,19 @@ impl<'a> Ingest<'a> {
             usage: None,
             demographics: &NoDemographics,
             committer: Committer::Bridge,
+            originating: None,
         }
+    }
+
+    /// Returns this ingest naming `originating` as the system every
+    /// composition originated in (`originating_system_audit.system_id`), with
+    /// the bridge as the feeder system.
+    ///
+    /// The default names none, so the bridge is the originating system.
+    #[must_use]
+    pub fn with_originating_system(mut self, originating: Option<String>) -> Self {
+        self.originating = originating;
+        self
     }
 
     /// Returns this ingest attributing every commit to `committer`, the

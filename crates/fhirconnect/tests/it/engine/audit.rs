@@ -200,3 +200,44 @@ fn a_run_without_an_origin_writes_no_feeder_audit() -> Result<(), Box<dyn Error>
     assert_eq!(inbound.value().value().get("feeder_audit"), None);
     Ok(())
 }
+
+#[test]
+fn an_originating_system_is_named_apart_from_the_feeder() -> Result<(), Box<dyn Error>> {
+    // RM 1.1.0 common.html §FEEDER_AUDIT: `originating_system_audit` is "Any
+    // audit information for the information item from the originating system",
+    // and `feeder_system_audit` that of the feeder system, "if different from
+    // the originating system".
+    let program = compiled("ferrobridge_diagnose_minimal")?;
+    let index = template()?;
+    let origin = Origin::new("ferrobridge.test")
+        .with_originating_system("synthetic-machine-client")
+        .with_source(SourceItem::new("Condition").with_id("sender-1"));
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_document()?,
+        &Seams::default(),
+        &defaults().with_origin(origin),
+        &CallContext::new(),
+    )?;
+    let audit = inbound
+        .value()
+        .value()
+        .get("feeder_audit")
+        .ok_or("the composition carries a FEEDER_AUDIT")?;
+    assert_eq!(
+        audit
+            .pointer("/originating_system_audit/system_id")
+            .and_then(serde_json::Value::as_str),
+        Some("synthetic-machine-client")
+    );
+    assert_eq!(
+        audit
+            .pointer("/feeder_system_audit/system_id")
+            .and_then(serde_json::Value::as_str),
+        Some("ferrobridge.test"),
+        "the bridge is the feeder"
+    );
+    Ok(())
+}

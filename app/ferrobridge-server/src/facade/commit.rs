@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 use crate::cdr::commit::CommitContext;
 use crate::cdr::ids::IdError;
 use crate::cdr::ids::template_id;
+use ferrohealth_smart::kind::CallerKind;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::resource::Via;
 use openehr_base::v1_3::base_types::identification::generic_id::GenericId;
@@ -185,6 +186,22 @@ impl Committer {
             identifiers: None,
         }))
     }
+}
+
+/// Returns the system a request admitted with `access` originated in, apart
+/// from the bridge: the client of a system caller, by its client claim or its
+/// `sub`.
+///
+/// A machine's write is an act of that machine fed through the bridge, so it
+/// becomes `originating_system_audit.system_id` and the bridge the feeder
+/// system (RM `FEEDER_AUDIT.feeder_system_audit`, "if different from the
+/// originating system"). A person's write has none; no specification governs
+/// the choice: our own design.
+#[must_use]
+pub fn originating_system(access: &Access) -> Option<String> {
+    let caller = access.caller()?;
+    matches!(caller.kind(), CallerKind::System)
+        .then(|| caller.client_id().unwrap_or(caller.subject()).to_owned())
 }
 
 /// Returns whether `namespace` matches the `OBJECT_REF.namespace` regex

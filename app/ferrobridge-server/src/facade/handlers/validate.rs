@@ -24,6 +24,7 @@ use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhirconnect::engine::library::Library;
+use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::operations::issues::of_warning;
 use http::HeaderMap;
 use http::StatusCode;
@@ -116,7 +117,7 @@ pub(crate) async fn validate(
                 inbound.document(),
                 &now,
                 facade.settings(),
-                fhirconnect::engine::origin::SourceItem::of(inbound.document()),
+                engine::origin_of(facade.settings(), SourceItem::of(inbound.document()), None),
                 &fhirconnect::engine::seam::Seams::default()
                     .with_functions(&Library)
                     .with_terminology(terminology)

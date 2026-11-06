@@ -24,6 +24,7 @@ pub const UNKNOWN_SOURCE: &str = "unknown";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Origin {
     system_id: String,
+    originating: Option<String>,
     source: Option<SourceItem>,
 }
 
@@ -37,6 +38,7 @@ impl Origin {
     pub fn new(system_id: impl Into<String>) -> Self {
         Self {
             system_id: system_id.into(),
+            originating: None,
             source: None,
         }
     }
@@ -47,6 +49,25 @@ impl Origin {
     pub fn with_source(mut self, source: SourceItem) -> Self {
         self.source = Some(source);
         self
+    }
+
+    /// Returns this origin naming `system_id` as the system the content
+    /// originated in, apart from the system it passed through.
+    ///
+    /// `system_id` becomes `originating_system_audit.system_id`, and the system
+    /// of [`Origin::new`] the `feeder_system_audit.system_id`
+    /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html#_feeder_audit_class>).
+    #[must_use]
+    pub fn with_originating_system(mut self, system_id: impl Into<String>) -> Self {
+        self.originating = Some(system_id.into());
+        self
+    }
+
+    /// Returns the system the content originated in, when it is named apart
+    /// from the system it passed through.
+    #[must_use]
+    pub fn originating_system(&self) -> Option<&str> {
+        self.originating.as_deref()
     }
 
     /// Returns the system the content passed through.

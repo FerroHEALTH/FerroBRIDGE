@@ -17,7 +17,8 @@ const OAUTH: &str = concat!(
     "[cdr.credentials.oauth]\n",
     "token_endpoint = \"https://as.example.org/token\"\n",
     "client_id = \"ferrobridge\"\n",
-    "client_secret = \"synthetic-secret\"\n\n",
+    "client_secret = \"synthetic-secret\"\n",
+    "resource = \"https://cdr.example/openehr\"\n\n",
 );
 
 /// A complete onward table: a `persons` issuer exchanging under RFC 8693.
@@ -137,5 +138,31 @@ fn an_onward_table_on_the_terminology_lane_is_refused() -> Result<(), Box<dyn st
         ),
         "{error:?}"
     );
+    Ok(())
+}
+
+#[test]
+fn an_onward_lane_whose_own_grant_names_no_cdr_is_refused() -> Result<(), Box<dyn std::error::Error>>
+{
+    // RFC 8707 §2: a machine's commit goes under the bridge's own token, which
+    // names the CDR by `resource`, or by `scope` under the Entra profile.
+    let own = OAUTH.replace("resource = \"https://cdr.example/openehr\"\n", "");
+    let error = refusal(&cdr(&format!("{own}{ONWARD}")), Process::Job)?;
+    assert!(
+        matches!(
+            &error,
+            Error::Needs { key, needs }
+                if key == "cdr.credentials.onward" && needs.contains("resource")
+        ),
+        "{error:?}"
+    );
+    let scoped = own.replace(
+        "client_secret = \"synthetic-secret\"\n",
+        "client_secret = \"synthetic-secret\"\nscope = \"api://cdr/.default\"\n",
+    );
+    let settings =
+        Config::from_sources(Some(&cdr(&format!("{scoped}{ONWARD}"))), &BTreeMap::new())?
+            .resolve(Process::Job)?;
+    assert!(settings.cdr.ok_or("the CDR lane is on")?.onward.is_some());
     Ok(())
 }

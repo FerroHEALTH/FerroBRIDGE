@@ -366,3 +366,28 @@ async fn a_request_the_guard_refuses_leaves_no_record() -> Result<(), Box<dyn Er
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_machine_s_access_is_recorded_naming_its_client() -> Result<(), Box<dyn Error>> {
+    let case = recorded(harness().await, 64 << 20).await?;
+    mount_ehr(&case.harness.cdr).await;
+    mount_create(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
+    let token = mint(&case.key, &case.issuer.machine_claims("system/Condition.c"));
+
+    let response = raw(case.app(), bearing(post_condition(&condition()), &token)).await?;
+
+    assert_eq!(
+        StatusCode::CREATED,
+        response.status(),
+        "the machine creates"
+    );
+    let records = case.records(1).await?;
+    let record = records.first().ok_or("one record")?;
+    // Regulation (EU) 2025/327 Annex II 3.2(a): the record names who accessed,
+    // here the inbound client the bridge names as the originating system.
+    assert!(
+        record.to_string().contains(super::CLIENT),
+        "the record names the machine's client: {record}"
+    );
+    Ok(())
+}
