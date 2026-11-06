@@ -810,8 +810,8 @@ table names one person, takes `user`, the Argon2id PHC string of the password
 as `password_hash` or in the file `password_hash_file`, and `scopes`, the
 SMART `user/` scopes and the operator scope the person is granted, which the
 facade checks as it checks a token's. A user listing a `system/` scope
-refuses the start, naming the user. A user's `roles` list is accepted and,
-as with `role_claims`, grants nothing on the bridge. `[auth.basic]
+refuses the start, naming the user and the scope. A user's `roles` list is
+accepted and, as with `role_claims`, grants nothing on the bridge. `[auth.basic]
 cache_ttl_seconds` (default `300`) is how long a password that verified is
 remembered, so a repeat request skips the Argon2id derivation; `0`
 remembers none.
