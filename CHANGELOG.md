@@ -38,6 +38,7 @@ requires `ferrohealth-smart` 0.9.0, so a consumer moves both in one change;
 0.1.149 follow it. `eehrxf` maps discharge and imaging reports between
 openEHR and HL7 Europe and receives both, and `ferrobridge-validator` holds
 a dependency of another FHIR release, which adds a `ResolveError` variant.
+A FHIRconnect mapping below a repeating anchor may name a node outside it.
 
 ### Added
 
@@ -129,6 +130,11 @@ a dependency of another FHIR release, which adds a `ResolveError` variant.
 
 ### Fixed
 
+- A FHIRconnect mapping below a `followedBy` anchored at a repeating node can
+  name a node outside that anchor, by `../` or by an absolute `$archetype`
+  path, and inside a `reference` placed there: the FLAT build no longer
+  refuses it with an occurrence count mismatch, and the node keeps the
+  instance of only the repeating nodes it lies below (#1612).
 - `ferrobridge-validator`: an `Attachment.url` that resolves to an entry of a
   document Bundle, by its `fullUrl` or relative to the holding entry's base,
   now counts as a reference to that entry for the R4 documents.html §3.3.1
