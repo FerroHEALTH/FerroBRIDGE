@@ -96,6 +96,7 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         references: reference_policy(facade)?,
         identifier: identifier_search(facade)?,
         party_search: party_search(facade)?,
+        binding_issuers: facade.binding_identifier_issuers.clone(),
     })
 }
 

@@ -630,6 +630,7 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `composition_territory` | none, required | The `COMPOSITION.territory` every commit carries, an ISO 3166-1 code |
 | `search_count` | `20` | The page size of a search that names no `_count` |
 | `search_count_max` | `100` | The largest page one search answers; a larger `_count` is answered with this many |
+| `binding_identifier_issuers` | none | The `DV_IDENTIFIER.issuer` of each binding key the CDR binds a login to (the `identifier_issuer` of its `[[auth.party]]` tables); the facade refuses with `403` to create, update or delete a party resource whose party carries an identifier of one of them |
 
 The three `subject_` keys make the facade's link between a Patient and its
 EHR match the one the CDR's owner writes, because the facade finds an EHR
