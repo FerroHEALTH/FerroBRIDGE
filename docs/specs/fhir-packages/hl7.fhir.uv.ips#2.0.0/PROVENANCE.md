@@ -22,16 +22,19 @@ script with `--stamp`, and record the count and digest it prints.
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
   `PROVENANCE.md` excluded): `86dbd916617c60642e0296c33bea0d1aa6497c4ca46a2db285a0e5c975f28316`
 - Declared dependencies (`package/package.json`): `hl7.fhir.r4.core` 4.0.1, `hl7.terminology.r4` 6.5.0, `hl7.fhir.uv.extensions.r4` 5.2.0, `hl7.fhir.uv.ipa` 1.1.0
-- Stamped: 2026-11-03
+- FHIR versions (`fhirVersions` of `package/package.json`): 4.0.1
+- Stamped: 2026-11-06
 
 Each declared dependency is fetched beside this tree at the version named,
 except `hl7.fhir.r4.core` 4.0.1, which is read from the committed
-`tools/fhir-codegen/vendor/hl7.fhir.r4.core/`. The line above lets
-`--check` assert the closure from the committed files alone.
+`tools/fhir-codegen/vendor/hl7.fhir.r4.core/`, and except the
+dependencies of a package of another FHIR release, which the R4 set holds
+and never reads. The two lines above let `--check` assert the closure from
+the committed files alone.
 
 ## Why build time
 
-The package set unpacks to about 650 MB, six versions of
+The package set unpacks to about 650 MB, seven versions of
 `hl7.terminology.r4` and `hl7.fhir.uv.xver-r5.r4` among it, for input only
 the validator and its tests read. The licences would permit vendoring; the
 size decides. CI restores the trees from a cache keyed on
