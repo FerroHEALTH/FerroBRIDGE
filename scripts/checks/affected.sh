@@ -213,7 +213,7 @@ classify() {
     scripts/vendor/kds-*-opt.sh | scripts/vendor/lib/kds-opt.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
     # Write only the CKM archetypes under the testkit's fixtures, which the
     # templates the testkit carries read.
-    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh)
+    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh | scripts/vendor/ckm-highmed.sh)
       echo "packages ferrobridge-testkit fhirconnect"
       ;;
     # The corpora only the eehrxf tests read, and the script that writes them.
@@ -622,6 +622,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
   check "the CKM library vendor script reaches the testkit and fhirconnect" \
     "scripts/vendor/ckm-library.sh" false \
+    "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
+  check "the CKM HiGHmed vendor script reaches the testkit and fhirconnect" \
+    "scripts/vendor/ckm-highmed.sh" false \
     "+ferrobridge-testkit +fhirconnect +ferrobridge-server -fhir-codegen -fhir-types -hl7v2-types"
   check "the CKM discharge vendor script reaches the testkit and fhirconnect" \
     "scripts/vendor/ckm-discharge.sh" false \
