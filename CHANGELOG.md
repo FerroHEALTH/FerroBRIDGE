@@ -40,6 +40,7 @@ openEHR and HL7 Europe and receives both, and `ferrobridge-validator` holds
 a dependency of another FHIR release, which adds a `ResolveError` variant.
 A FHIRconnect mapping below a repeating anchor may name a node outside it.
 
+
 ### Added
 
 - `eehrxf` maps discharge reports between openEHR and HL7 Europe Hospital
@@ -62,7 +63,7 @@ A FHIRconnect mapping below a repeating anchor may name a node outside it.
   `composition-eu-hdr` of HL7 Europe Hospital Discharge Report 1.0.0 fixes,
   and `Category::profiles` names `bundle-eu-hdr` and `composition-eu-hdr`
   for `ReceivedDocument::check` (#1325).
-- `eehrxf` maps an imaging report between openEHR and the HL7 Europe Imaging Report 1.0.0-ballot document. The new `IMAGING` project (feature `imaging` with `openehr`) maps `OBSERVATION.imaging_exam_result.v1` to `DiagnosticReportEuImaging` and the `ImagingStudyEuImaging` it references, over FerroBRIDGE's ADL 2 imaging report template of published CKM archetypes. The modality and the study date, which the archetype holds in its event, are accounted losses. The testkit vendors the archetype through `scripts/vendor/ckm-imaging.sh`, and the EHDS readiness matrix lists both profiles (#1326).
+- `eehrxf` maps an imaging report between openEHR and the HL7 Europe Imaging Report 1.0.0-ballot document. The new `IMAGING` project (feature `imaging` with `openehr`) maps `OBSERVATION.imaging_exam_result.v1` to `DiagnosticReportEuImaging` and the `ImagingStudyEuImaging` it references, over FerroBRIDGE's ADL 2 imaging report template of published CKM archetypes. The testkit vendors the archetype through `scripts/vendor/ckm-imaging.sh`, and the EHDS readiness matrix lists both profiles (#1326).
 - `eehrxf` receives an imaging report: `ReceivedDocument::category` names the imaging category from the `Medical-Imaging` coding of `Composition.category`, which `CompositionEuImaging` requires while it leaves `Composition.type` open, and `Category::profiles` holds the document to `BundleReportEuImaging` and `CompositionEuImaging` of HL7 Europe Imaging Report 1.0.0-ballot. The new `Category::document_category` names the coding. A reference that names its target by `identifier` alone, with no `type`, is now admitted at an element whose R4 target types are listed and include no `Patient`, `Group` or `Resource`, such as the accession number the guide writes in `ImagingStudy.basedOn` (#1326).
 - `ferrobridge-validator` holds a dependency of another FHIR release, such as the FHIR 5.0.0 `xtehr.eu.ehds.models` that HL7 Europe Hospital Discharge Report 1.0.0 depends on, instead of refusing the package set: the package satisfies the dependency, its resources are never read, its own dependencies are not required, and a canonical only it defines is refused with the new `ResolveError::OtherRelease`. `Package::fhir_versions`, `PackageSet::other_releases` and the `Release::FHIR_VERSION` and `Release::CORE_PACKAGE` constants are new. `ResolveError` gains a variant, so a consumer that matches it exhaustively adds an arm. HDR 1.0.0, `hl7.terminology.r4` 7.4.0 and `xtehr.eu.ehds.models` 1.0.0 join the profile package pins, and a received discharge report validates through `ReceivedDocument::validate` (#1600).
 
@@ -116,6 +117,11 @@ A FHIRconnect mapping below a repeating anchor may name a node outside it.
   its `smart` feature, and `smart::SmartToken` takes the 0.9.0 token
   source: a consumer moves `ferrohealth-smart` to 0.9.0 and pins
   `ferrobridge-term = "=0.1.143"` in one change (#1585).
+- The `eehrxf` `IMAGING` project maps `ImagingStudy.modality` and
+  `ImagingStudy.started` from the imaging examination result's event, where
+  the archetype holds them, and no longer accounts for them as losses: the
+  study's reference sits below the event and reaches the protocol outside it
+  for the identifier, the status and the description (#1612).
 
 ### Removed
 
