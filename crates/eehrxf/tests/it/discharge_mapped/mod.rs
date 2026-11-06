@@ -963,3 +963,68 @@ fn every_section_of_the_report_survives_the_round_trip() -> Result<(), Box<dyn E
     emit("eehrxf-discharge-full", &second)?;
     Ok(())
 }
+
+#[test]
+fn every_entry_of_the_mapped_report_meets_the_profile_it_claims() -> Result<(), Box<dyn Error>> {
+    let text = sent(
+        &mapping()?,
+        &full_report(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d114",
+    )?;
+    let document = ReceivedDocument::read(&text)?;
+    let mut checked = Vec::new();
+    for resource in document
+        .bundle()
+        .entry
+        .iter()
+        .filter_map(|entry| entry.resource.as_ref())
+    {
+        let object = Json::to_json(resource)?;
+        let (
+            Some(fhir_types::codec::Value::String(kind)),
+            Some(fhir_types::codec::Value::Object(meta)),
+        ) = (object.get("resourceType"), object.get("meta"))
+        else {
+            continue;
+        };
+        let Some(fhir_types::codec::Value::Array(profiles)) = meta.get("profile") else {
+            continue;
+        };
+        for profile in profiles {
+            let fhir_types::codec::Value::String(url) = profile else {
+                continue;
+            };
+            let read = if url.starts_with("http://hl7.eu/fhir/hdr/") {
+                hdr(url)?
+            } else {
+                vendored_base(url)?
+            };
+            let expected: &'static str = match kind.as_str() {
+                "Composition" => "Composition",
+                "Encounter" => "Encounter",
+                "Condition" => "Condition",
+                "Procedure" => "Procedure",
+                "MedicationRequest" => "MedicationRequest",
+                "Patient" => "Patient",
+                other => return Err(format!("an unexpected {other} claims {url}").into()),
+            };
+            check_resource(&read, expected, &object)
+                .map_err(|error| format!("{kind} against {url}: {error:?}"))?;
+            checked.push(kind.clone());
+        }
+    }
+    checked.sort();
+    assert_eq!(
+        checked,
+        [
+            "Composition",
+            "Condition",
+            "Encounter",
+            "MedicationRequest",
+            "Patient",
+            "Procedure"
+        ],
+        "every claimed profile of every entry is checked"
+    );
+    Ok(())
+}
