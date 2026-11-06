@@ -128,9 +128,11 @@ receipt are built. The prescription and dispensation records are read and
 written in the MPD form, and [mapped from and into openEHR](prescription-mapping.md)
 through FerroBRIDGE's MPD contexts. The laboratory report is
 [mapped from and into openEHR](laboratory-mapping.md) through the shipped
-laboratory project and received as a `Bundle-eu-lab`. The discharge report is received as a `bundle-eu-hdr`. The imaging and
-discharge reports have their crosswalks and their document assembly;
-building each from openEHR content waits on a published template. The open
+laboratory project and received as a `Bundle-eu-lab`. The discharge report is
+[mapped from and into openEHR](discharge-mapping.md) through the shipped
+HDR project over FerroBRIDGE's discharge report template and received as a
+`bundle-eu-hdr`. The imaging report has its crosswalk and its document
+assembly; building it from openEHR content waits on a template. The open
 work is on the [tracker](https://github.com/FerroHEALTH/FerroBRIDGE/issues).
 The profiles this repository's own FHIR facade maps to, category by category,
 are on [EHDS readiness](ehds-readiness.md).

@@ -2,9 +2,10 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The exchange-format validator lane (#1318; no specification governs the
-# lane: our own design). The eehrxf suites that write a patient summary or a
-# laboratory report document and hold it to the vendored HL7 Europe profiles
-# (`claimed`, `own`, `lab_mapped`), and the one that maps a prescription and
+# lane: our own design). The eehrxf suites that write a patient summary, a
+# laboratory report or a discharge report document and hold it to the
+# vendored HL7 Europe profiles (`claimed`, `own`, `lab_mapped`,
+# `discharge_mapped`), and the one that maps a prescription and
 # a dispensation to the MPD resources (`medication::mapped`), also write it
 # to the directory EEHRXF_EMIT_DIR names; this script runs HL7's
 # FHIR Validator over every one of them and fails on an error. Its results
@@ -18,11 +19,11 @@
 # "HL7 FHIR Validator" table of docs/VERSIONS.md, each checked against its
 # sha256, over the profile packages scripts/vendor/profile-packages.sh
 # fetched (hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
-# hl7.fhir.eu.laboratory 2.0.0 and hl7.fhir.eu.mpd 1.0.0 with their
-# dependency closure). This script adds the vendored MyHealth@EU Master
-# Value Sets Catalogue, whose value sets the patient summary profiles bind,
-# and the remaining-dispensations extension eehrxf publishes, and loads the
-# six with -ig.
+# hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0 and hl7.fhir.eu.hdr
+# 1.0.0 with their dependency closure). This script adds the vendored
+# MyHealth@EU Master Value Sets Catalogue, whose value sets the patient
+# summary profiles bind, and the remaining-dispensations extension eehrxf
+# publishes, and loads the seven with -ig.
 #
 # A run fails on an issue of severity error or fatal, on a document the
 # output names no outcome for, and on a claimed profile the validator could
@@ -232,6 +233,7 @@ run() {
     -ig 'hl7.fhir.eu.base#2.0.1' \
     -ig 'hl7.fhir.eu.laboratory#2.0.0' \
     -ig 'hl7.fhir.eu.mpd#1.0.0' \
+    -ig 'hl7.fhir.eu.hdr#1.0.0' \
     -ig "$REMAINING" \
     -ig "$name" \
     -output "$out/validation.json" \

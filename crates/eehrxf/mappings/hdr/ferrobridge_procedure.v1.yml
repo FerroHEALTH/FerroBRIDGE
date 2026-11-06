@@ -1,0 +1,140 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM ACTION.procedure.v1 to the HL7
+# Europe Base and Core 2.0.1 procedure-eu-core profile, the entry the
+# Hospital Discharge Report's significant procedures section takes: the
+# procedure's name, the time it reached its careflow step, its body site and
+# its comment. A procedure commenced is in progress, one completed is
+# completed and one aborted is stopped, the three careflow steps of the
+# archetype at which a procedure was performed (no specification governs
+# the pairing: our own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ACTION.procedure.v1
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ACTION.procedure.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Procedure
+
+mappings:
+  - name: "metaURL"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/base/StructureDefinition/procedure-eu-core"
+
+  - name: "status"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/ism_transition"
+    manual:
+      - name: "commenced"
+        fhir:
+          - path: "status"
+            value: "in-progress"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "in-progress"
+        openehr:
+          - path: "current_state/defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "current_state/defining_code/code_string"
+            value: "245"
+          - path: "current_state/value"
+            value: "active"
+          - path: "careflow_step/defining_code/terminology_id/value"
+            value: "local"
+          - path: "careflow_step/defining_code/code_string"
+            value: "at0068"
+          - path: "careflow_step/value"
+            value: "Procedure commenced"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "careflow_step/defining_code/code_string"
+          operator: "one of"
+          criteria: "at0068"
+      - name: "completed"
+        fhir:
+          - path: "status"
+            value: "completed"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "completed"
+        openehr:
+          - path: "current_state/defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "current_state/defining_code/code_string"
+            value: "532"
+          - path: "current_state/value"
+            value: "completed"
+          - path: "careflow_step/defining_code/terminology_id/value"
+            value: "local"
+          - path: "careflow_step/defining_code/code_string"
+            value: "at0043"
+          - path: "careflow_step/value"
+            value: "Procedure completed"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "careflow_step/defining_code/code_string"
+          operator: "one of"
+          criteria: "at0043"
+      - name: "aborted"
+        fhir:
+          - path: "status"
+            value: "stopped"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "stopped"
+        openehr:
+          - path: "current_state/defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "current_state/defining_code/code_string"
+            value: "531"
+          - path: "current_state/value"
+            value: "aborted"
+          - path: "careflow_step/defining_code/terminology_id/value"
+            value: "local"
+          - path: "careflow_step/defining_code/code_string"
+            value: "at0041"
+          - path: "careflow_step/value"
+            value: "Procedure aborted"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "careflow_step/defining_code/code_string"
+          operator: "one of"
+          criteria: "at0041"
+
+  - name: "performed"
+    with:
+      fhir: "$resource.performed.as(DateTime)"
+      openehr: "$archetype/time"
+
+  - name: "procedureName"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/description[at0001]/items[at0002]"
+
+  - name: "bodySite"
+    with:
+      fhir: "$resource.bodySite"
+      openehr: "$archetype/description[at0001]/items[at0063]"
+
+  - name: "comment"
+    with:
+      fhir: "$resource.note.text"
+      openehr: "$archetype/description[at0001]/items[at0005]"
