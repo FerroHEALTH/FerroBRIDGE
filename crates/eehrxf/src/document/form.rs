@@ -108,6 +108,29 @@ pub enum Authorship {
     ReportPerformers,
 }
 
+/// A rule of a form's `Composition` profile over the sections a document
+/// holds, which [`super::Document::into_bundle`] holds the document to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SectionRule {
+    /// The profile invariant `invariant`: a section of one of `slices` holds
+    /// an entry or an empty reason.
+    Reasoned {
+        /// The key of the profile invariant.
+        invariant: &'static str,
+        /// The section slices the invariant constrains.
+        slices: &'static [&'static str],
+    },
+    /// The profile invariant `invariant`: the document holds a section of at
+    /// least one of `slices`.
+    OneOf {
+        /// The key of the profile invariant.
+        invariant: &'static str,
+        /// The section slices of which one is required.
+        slices: &'static [&'static str],
+    },
+}
+
 /// The form of one category's document: its HL7 Europe profiles, its
 /// document type and its sections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,6 +160,8 @@ pub struct Form {
     pub encounter: Option<&'static str>,
     /// Whether the form requires `Bundle.language`.
     pub language: bool,
+    /// The rules of the `Composition` profile over the sections.
+    pub rules: &'static [SectionRule],
 }
 
 /// The patient summary in the HL7 Europe Patient Summary 1.0.0-ballot form.
@@ -155,4 +180,9 @@ pub const PATIENT_SUMMARY_FORM: Form = Form {
     report: None,
     encounter: None,
     language: false,
+    // NOTE: composition-eu-eps `ips-comp-1` (error) on these three slices: an entry or an emptyReason.
+    rules: &[SectionRule::Reasoned {
+        invariant: "ips-comp-1",
+        slices: &["sectionProblems", "sectionAllergies", "sectionMedications"],
+    }],
 };

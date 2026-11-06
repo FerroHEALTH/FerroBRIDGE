@@ -74,7 +74,9 @@ impl Section {
     }
 
     /// Returns this section with `reason` as the reason it has no entry,
-    /// which the document writes only while it has none (`cmp-2`).
+    /// which the document writes only while it has none (`cmp-2`). A
+    /// [`super::form::SectionRule::Reasoned`] rule of the document's form
+    /// requires it of a section with no entry.
     #[must_use]
     pub const fn empty_because(mut self, reason: EmptyReason) -> Self {
         self.empty = Some(reason);

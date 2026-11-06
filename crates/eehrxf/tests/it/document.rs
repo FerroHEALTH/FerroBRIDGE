@@ -16,7 +16,7 @@ use std::error::Error;
 use std::io::Read;
 use std::path::PathBuf;
 
-use eehrxf::document::form::{SLOTS, slot};
+use eehrxf::document::form::{PATIENT_SUMMARY_FORM, SLOTS, SectionRule, slot};
 use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::document::{Document, DocumentError, LOINC, PATIENT_SUMMARY};
 use eehrxf::mapping::Mapping;
@@ -416,4 +416,72 @@ fn a_document_with_no_patient_is_refused() {
         document.into_bundle(),
         Err(DocumentError::Dangling { slice: "subject" })
     ));
+}
+
+/// The slices of the composition profile whose element carries the
+/// invariant `key`.
+fn slices_constrained_by(key: &str) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    Ok(composition_elements()?
+        .iter()
+        .filter(|element| {
+            element["constraint"]
+                .as_array()
+                .is_some_and(|constraints| constraints.iter().any(|held| held["key"] == key))
+        })
+        .filter_map(|element| {
+            let slice = element["id"]
+                .as_str()?
+                .strip_prefix("Composition.section:")?;
+            (!slice.contains('.')).then(|| slice.to_owned())
+        })
+        .collect())
+}
+
+#[test]
+fn the_form_holds_every_section_whose_profile_slice_carries_ips_comp_1()
+-> Result<(), Box<dyn Error>> {
+    let constrained = slices_constrained_by("ips-comp-1")?;
+    assert_eq!(constrained.len(), 3, "{constrained:?}");
+    let ruled: BTreeSet<String> = PATIENT_SUMMARY_FORM
+        .rules
+        .iter()
+        .filter_map(|rule| match rule {
+            SectionRule::Reasoned {
+                invariant: "ips-comp-1",
+                slices,
+            } => Some(slices.iter().map(|slice| (*slice).to_owned())),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(ruled, constrained);
+    Ok(())
+}
+
+#[test]
+fn an_empty_section_ips_comp_1_constrains_is_refused_without_a_reason() -> Result<(), Box<dyn Error>>
+{
+    for slice in ["sectionProblems", "sectionAllergies", "sectionMedications"] {
+        let mut document = Document::new(
+            BASE,
+            String::from("urn:uuid:4f5c1d1e-0000-4000-8000-0000000000ae"),
+            String::from("2026-10-06T10:00:00Z"),
+            String::from("Patient Summary"),
+        );
+        document.with_patient(patient())?;
+        let held = slot(slice).ok_or("a slot")?;
+        document.with_section(Section::new(held, vec![String::from("Nothing recorded.")]))?;
+        let refused = document.into_bundle();
+        assert!(
+            matches!(
+                refused,
+                Err(DocumentError::Unreasoned {
+                    slice: refused_slice,
+                    invariant: "ips-comp-1",
+                }) if refused_slice == slice
+            ),
+            "{slice}: {refused:?}"
+        );
+    }
+    Ok(())
 }

@@ -17,6 +17,7 @@ use std::io::Read;
 use eehrxf::document::discharge::{
     DISCHARGE_REPORT_FORM, DISCHARGE_SUMMARY, HDR_BUNDLE, HDR_ENCOUNTER, HDR_SLOTS,
 };
+use eehrxf::document::form::SectionRule;
 use eehrxf::document::section::Section;
 use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::coding::Coding;
@@ -104,8 +105,23 @@ fn every_slot_is_a_section_slice_with_the_code_the_profile_fixes() -> Result<(),
 }
 
 /// A discharge report document over a synthetic patient, given its
-/// encounter when `encounter` and its language when `language`.
+/// encounter when `encounter` and its language when `language`, with its
+/// hospital course.
 fn document(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
+    let mut document = bare(encounter, language)?;
+    let course = HDR_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "sectionHospitalCourse")
+        .ok_or("the hospital course slot")?;
+    document.with_section(Section::new(
+        course,
+        vec![String::from("A synthetic stay.")],
+    ))?;
+    Ok(document)
+}
+
+/// The document of [`document`] before any section is given.
+fn bare(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
     let mut document = Document::of(
         &DISCHARGE_REPORT_FORM,
         BASE,
@@ -136,14 +152,6 @@ fn document(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>>
     if language {
         document.with_language(String::from("en"));
     }
-    let course = HDR_SLOTS
-        .iter()
-        .find(|slot| slot.slice == "sectionHospitalCourse")
-        .ok_or("the hospital course slot")?;
-    document.with_section(Section::new(
-        course,
-        vec![String::from("A synthetic stay.")],
-    ))?;
     Ok(document)
 }
 
@@ -208,5 +216,78 @@ fn a_discharge_report_without_its_encounter_or_its_language_is_refused()
         document(true, false)?.into_bundle(),
         Err(DocumentError::Missing { part: "language" })
     ));
+    Ok(())
+}
+
+#[test]
+fn the_form_holds_cmp_hdr_2_over_the_sections_it_names() -> Result<(), Box<dyn Error>> {
+    let composition = package_member("package/StructureDefinition-composition-eu-hdr.json")?;
+    let root = composition["snapshot"]["element"]
+        .as_array()
+        .ok_or("a snapshot")?
+        .iter()
+        .find(|element| element["id"] == "Composition")
+        .ok_or("Composition")?;
+    let invariant = root["constraint"]
+        .as_array()
+        .ok_or("the composition's constraints")?
+        .iter()
+        .find(|constraint| constraint["key"] == "cmp-hdr-2")
+        .ok_or("cmp-hdr-2")?;
+    assert_eq!(invariant["severity"], "error");
+    let expression = invariant["expression"].as_str().ok_or("an expression")?;
+    let ruled: Vec<&str> = DISCHARGE_REPORT_FORM
+        .rules
+        .iter()
+        .filter_map(|rule| match rule {
+            SectionRule::OneOf {
+                invariant: "cmp-hdr-2",
+                slices,
+            } => Some(slices.iter().copied()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(ruled.len(), 2, "{ruled:?}");
+    for slice in ruled {
+        let slot = HDR_SLOTS
+            .iter()
+            .find(|slot| slot.slice == slice)
+            .ok_or("a slot")?;
+        assert!(
+            expression.contains(&format!("code = '{}'", slot.code)),
+            "{slice} in {expression}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_discharge_report_with_neither_its_summary_nor_its_course_is_refused()
+-> Result<(), Box<dyn Error>> {
+    let mut document = bare(true, true)?;
+    let problems = HDR_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "sectionProblems")
+        .ok_or("the problems slot")?;
+    document.with_section(Section::new(problems, vec![String::from("Problems.")]))?;
+    let refused = document.into_bundle();
+    assert!(
+        matches!(
+            refused,
+            Err(DocumentError::Absent {
+                slices: &["sectionDischargeSummary", "sectionHospitalCourse"],
+                invariant: "cmp-hdr-2",
+            })
+        ),
+        "{refused:?}"
+    );
+    let summary = HDR_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "sectionDischargeSummary")
+        .ok_or("the discharge summary slot")?;
+    let mut summarized = bare(true, true)?;
+    summarized.with_section(Section::new(summary, vec![String::from("A summary.")]))?;
+    summarized.into_bundle()?;
     Ok(())
 }

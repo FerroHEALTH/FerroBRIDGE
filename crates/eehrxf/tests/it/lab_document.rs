@@ -396,3 +396,35 @@ fn a_document_report_under_an_entry_s_url_is_refused() -> Result<(), Box<dyn Err
     );
     Ok(())
 }
+
+#[test]
+fn the_laboratory_composition_profile_adds_no_section_invariant() -> Result<(), Box<dyn Error>> {
+    let composition = package_member("package/StructureDefinition-Composition-eu-lab.json")?;
+    let constrained: Vec<&Value> = composition["differential"]["element"]
+        .as_array()
+        .ok_or("a differential")?
+        .iter()
+        .filter(|element| element["constraint"].is_array())
+        .collect();
+    assert!(constrained.is_empty(), "{constrained:?}");
+    assert_eq!(LABORATORY_REPORT_FORM.rules, []);
+    let mut document = document()?;
+    let annotations = LAB_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "annotations")
+        .ok_or("the annotations slot")?;
+    document.with_section(Section::new(annotations, vec![String::from("No comment.")]))?;
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    let sections = bundle["entry"][0]["resource"]["section"]
+        .as_array()
+        .ok_or("sections")?;
+    let written = sections
+        .iter()
+        .find(|section| section["code"]["coding"][0]["code"] == annotations.code)
+        .ok_or("the annotations section")?;
+    assert!(
+        written["text"]["div"].is_string(),
+        "cmp-1 holds by the narrative"
+    );
+    Ok(())
+}

@@ -13,7 +13,7 @@ use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::reference::Reference;
 
-use crate::document::form::{Authorship, Companion, Kind};
+use crate::document::form::{Authorship, Companion, Kind, SectionRule};
 use crate::document::{Document, DocumentError, REPORT_ID, URN_SYSTEM, coding, reference};
 
 impl Document {
@@ -58,6 +58,39 @@ impl Document {
                     .cloned(),
             );
         }
+    }
+
+    /// Holds the document's sections to the rules of its form: a section a
+    /// [`SectionRule::Reasoned`] rule names that holds no entry carries an
+    /// empty reason, and a [`SectionRule::OneOf`] rule's slices name one of
+    /// the sections.
+    pub(super) fn hold_section_rules(&self) -> Result<(), DocumentError> {
+        for rule in self.form.rules {
+            match *rule {
+                SectionRule::Reasoned { invariant, slices } => {
+                    if let Some(section) = self.sections.iter().find(|section| {
+                        slices.contains(&section.slot.slice)
+                            && section.entries.is_empty()
+                            && section.empty.is_none()
+                    }) {
+                        return Err(DocumentError::Unreasoned {
+                            slice: section.slot.slice,
+                            invariant,
+                        });
+                    }
+                }
+                SectionRule::OneOf { invariant, slices } => {
+                    if !self
+                        .sections
+                        .iter()
+                        .any(|section| slices.contains(&section.slot.slice))
+                    {
+                        return Err(DocumentError::Absent { slices, invariant });
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     /// The report entry of a form that holds one, about `subject` and
