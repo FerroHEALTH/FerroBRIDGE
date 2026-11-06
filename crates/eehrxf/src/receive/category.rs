@@ -22,6 +22,10 @@ use fhir_types::r4::coding::Coding;
 use crate::category::Category;
 #[cfg(feature = "imaging")]
 use crate::category::PRIORITY_SYSTEM;
+#[cfg(feature = "discharge")]
+use crate::crosswalk::discharge::HDR_COMPOSITION;
+#[cfg(feature = "discharge")]
+use crate::document::discharge::{DISCHARGE_SUMMARY, HDR_BUNDLE};
 use crate::receive::ReceivedDocument;
 
 /// The LOINC code system (<https://hl7.org/fhir/R4/loinc.html>).
@@ -85,17 +89,23 @@ impl Category {
                 system: LOINC,
                 code: "11502-2",
             }),
+            // NOTE: HL7 Europe Hospital Discharge Report 1.0.0, composition-eu-hdr: the profile
+            // fixes Composition.type to LOINC 34105-7 by patternCodeableConcept.
+            #[cfg(feature = "discharge")]
+            Self::Discharge => Some(DocumentType {
+                system: LOINC,
+                code: DISCHARGE_SUMMARY,
+            }),
             #[cfg_attr(
                 not(any(
                     feature = "prescription",
                     feature = "dispensation",
                     feature = "imaging",
-                    feature = "discharge",
                 )),
                 expect(
                     unreachable_patterns,
-                    reason = "a build with none of these features carries at most the patient summary \
-                              and the laboratory report, which their own arms receive"
+                    reason = "a build with none of these features carries at most the patient summary, \
+                              the laboratory report and the discharge report, which their own arms receive"
                 )
             )]
             _ => None,
@@ -156,16 +166,18 @@ impl Category {
                 bundle: "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab",
                 composition: "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab",
             }),
+            #[cfg(feature = "discharge")]
+            Self::Discharge => Some(Profiles {
+                bundle: HDR_BUNDLE,
+                composition: HDR_COMPOSITION,
+            }),
             #[cfg_attr(
-                not(any(
-                    feature = "prescription",
-                    feature = "dispensation",
-                    feature = "discharge",
-                )),
+                not(any(feature = "prescription", feature = "dispensation")),
                 expect(
                     unreachable_patterns,
                     reason = "a build with none of these features carries at most the patient summary, \
-                              the imaging report and the laboratory report, which their own arms receive"
+                              the imaging report, the laboratory report and the discharge report, which their \
+                              own arms receive"
                 )
             )]
             _ => None,

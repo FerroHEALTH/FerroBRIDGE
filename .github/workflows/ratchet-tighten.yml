@@ -12,15 +12,17 @@
 # lane does the tightening instead: once a day it
 # runs each guard's --update on main and pushes one branch,
 # chore/ratchet-tighten, that holds only the ratchet files, or moves an open
-# pull request on it to the new counts. When nothing fell it does nothing.
+# pull request on it to the new counts. When nothing fell it deletes a
+# branch no pull request was opened from (#1593).
 #
 # MAIN MOVES (#1590). The counts hold only for the commit they were measured
 # on: a merge after the measurement that grows a count within main's recorded
 # one leaves the open pull request unable to pass the merge queue. So every
 # push to main moves an open tightening pull request to the counts measured
 # at the pushed commit, and closes it when nothing falls there any more or a
-# guard fails there. A push never opens a pull request or pushes a new
-# branch; only the schedule and a dispatch do.
+# guard fails there. A branch pushed for the hand-off that has no pull
+# request yet moves or is deleted the same way (#1593). A push never opens a
+# pull request or pushes a new branch; only the schedule and a dispatch do.
 #
 # It never pushes to main. The commit is made through the Git Data REST API,
 # so GitHub signs it and it shows Verified
@@ -47,17 +49,20 @@ on:
 permissions: {}
 
 jobs:
-  # A push with no open tightening pull request ends here, before the
-  # concurrency group, so it can never displace a pending scheduled run.
+  # A push that finds neither an open tightening pull request nor the lane's
+  # branch ends here, before the concurrency group, so it can never displace
+  # a pending scheduled run.
   find:
-    name: find the open tightening pull request
+    name: find the tightening pull request and branch
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      contents: read # read the lane's branch ref
       pull-requests: read # list the open pull request of the lane's branch
     outputs:
       open: ${{ steps.find.outputs.open }}
+      branch: ${{ steps.find.outputs.branch }}
     steps:
       - name: List it
         id: find
@@ -68,13 +73,18 @@ jobs:
           set -euo pipefail
           open=$(gh pr list --repo "$REPO" --head chore/ratchet-tighten --state open --json number --jq '.[0].number // empty')
           echo "open=${open}" >>"$GITHUB_OUTPUT"
+          # matching-refs answers an empty list for a missing branch, so an API
+          # failure fails the step instead of reading as no branch.
+          branch=$(gh api "repos/${REPO}/git/matching-refs/heads/chore/ratchet-tighten" \
+                     --jq '.[] | select(.ref == "refs/heads/chore/ratchet-tighten") | .object.sha')
+          echo "branch=${branch}" >>"$GITHUB_OUTPUT"
 
   tighten:
     name: tighten
     needs: find
     # The counts are main's; a dispatch from another branch would lower them
-    # to that branch's tree. A push only moves an open pull request.
-    if: github.ref == 'refs/heads/main' && (github.event_name != 'push' || needs.find.outputs.open != '')
+    # to that branch's tree. A push only moves or deletes what is there.
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'push' || needs.find.outputs.open != '' || needs.find.outputs.branch != '')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # One run touches the branch at a time; a newer pending push run replaces
@@ -119,6 +129,13 @@ jobs:
           set -euo pipefail
           open=$(gh pr list --repo "$REPO" --head chore/ratchet-tighten --state open --json number --jq '.[0].number // empty')
           if [ -z "$open" ]; then
+            # A branch pushed for the hand-off holds the same stale counts.
+            branch=$(gh api "repos/${REPO}/git/matching-refs/heads/chore/ratchet-tighten" \
+                       --jq '.[] | select(.ref == "refs/heads/chore/ratchet-tighten") | .object.sha')
+            if [ -n "$branch" ]; then
+              gh api -X DELETE "repos/${REPO}/git/refs/heads/chore/ratchet-tighten"
+              echo "::warning::Deleted chore/ratchet-tighten: a ratchet guard fails on main."
+            fi
             exit 0
           fi
           gh pr close "$open" --repo "$REPO" --delete-branch \
@@ -197,25 +214,34 @@ jobs:
             scripts/checks/forwarders.count scripts/checks/forwarders-baseline.txt
           )
           open=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty')
+          # matching-refs answers an empty list for a missing branch, so an API
+          # failure fails the step instead of reading as no branch.
+          existing=$(gh api "repos/${REPO}/git/matching-refs/heads/${branch}" \
+                       --jq ".[] | select(.ref == \"refs/heads/${branch}\") | .object.sha")
 
-          # Nothing falls at this commit, so an open pull request lowers a
-          # count below what main measures and can no longer pass.
+          # Nothing falls at this commit, so an open pull request or a branch
+          # pushed for the hand-off lowers a count below what main measures
+          # and can no longer pass.
           if [ "$CHANGED" != "1" ]; then
             if [ -n "$open" ]; then
               gh pr close "$open" --repo "$REPO" --delete-branch \
                 --comment "Nothing falls on \`main\` at ${BASE_SHA} any more, so these counts no longer hold. Closed by \`.github/workflows/ratchet-tighten.yml\`."
               echo "::notice::Closed #${open}: nothing falls on main at ${BASE_SHA}."
+            elif [ -n "$existing" ]; then
+              gh api -X DELETE "repos/${REPO}/git/refs/heads/${branch}"
+              echo "::notice::Deleted ${branch}: nothing falls on main at ${BASE_SHA}."
             fi
             exit 0
           fi
-          if [ "$EVENT" = "push" ] && [ -z "$open" ]; then
-            echo "::notice::No open tightening pull request to move; a push opens none."
+          if [ "$EVENT" = "push" ] && [ -z "$open" ] && [ -z "$existing" ]; then
+            echo "::notice::No tightening pull request or branch to move; a push opens none."
             exit 0
           fi
 
-          # An open pull request that already carries these counts holds for
-          # this commit too; moving it would only restart its checks.
-          if [ -n "$open" ]; then
+          # A pull request or hand-off branch that already carries these
+          # counts holds for this commit too; moving it would only restart
+          # its checks.
+          if [ -n "$existing" ]; then
             same=1
             for f in "${ratchet_files[@]}"; do
               theirs=$(gh api "repos/${REPO}/contents/${f}?ref=${branch}" --jq .sha)
@@ -226,7 +252,7 @@ jobs:
               fi
             done
             if [ "$same" = "1" ]; then
-              echo "::notice::#${open} already carries the counts measured at ${BASE_SHA}."
+              echo "::notice::${branch} already carries the counts measured at ${BASE_SHA}."
               exit 0
             fi
           fi
