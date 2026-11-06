@@ -109,7 +109,6 @@ async fn validated(
     Ok(document.validate(set, profile, None::<&Client>).await)
 }
 
-#[cfg(any(feature = "patient-summary", feature = "laboratory"))]
 /// Validates every document example of `tarball` as a document of
 /// `category`, but the members `refused`, which their own tests hold, failing
 /// naming every one that does not pass; returns how many passed.
@@ -344,13 +343,27 @@ mod imaging {
     use eehrxf::category::Category;
     use eehrxf::receive::conform::FindingKind;
 
-    use super::{examples, planted, profile_set, refusals, reported, validated};
+    use super::{
+        every_example_passes, examples, planted, profile_set, refusals, reported, validated,
+    };
 
     /// The vendored HL7 Europe Imaging Report 1.0.0-ballot package.
     const IMAGING: &str = "eu-hl7-imaging/hl7.fhir.eu.imaging-1.0.0-ballot.tgz";
 
     /// The structured report, which breaks R4 and is held by its own test.
     const STRUCTURED: &str = "package/example/Bundle-bundle-report-structured.json";
+
+    // NOTE: the semi-structured report names its Binary by DiagnosticReport.presentedForm.url
+    // alone, which counts as a reference under R4 documents.html §3.3.1 by our reading.
+    #[tokio::test]
+    async fn the_semi_structured_imaging_report_example_validates() -> Result<(), Box<dyn Error>> {
+        let Some(set) = profile_set()? else {
+            return Ok(());
+        };
+        let passed = every_example_passes(set, Category::Imaging, IMAGING, &[STRUCTURED]).await?;
+        assert_eq!(passed, 1, "the guide's conformant document examples");
+        Ok(())
+    }
 
     // NOTE: FHIR R4 documents.html §3.3.1, "The document bundle SHALL include only" what the
     // Composition references; nothing in the example references its two key image DocumentReferences.

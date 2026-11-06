@@ -27,12 +27,24 @@
 # INBOUND AUTHENTICATION is on by default. A lane that serves FHIR (the facade,
 # the operator API, or the FHIRconnect operations over a mapping directory)
 # refuses to start until you name the authorization server that issues your
-# callers' tokens, or say the network is trusted:
+# callers' tokens, or say the network is trusted. Each trusted server is an
+# [[auth.issuer]] table with its kind, written in a configuration file in the
+# ./config directory beside this one, which FERROBRIDGE_CONFIG names:
 #
-#   FERROBRIDGE__AUTH__ISSUER=https://auth.example.org/realms/clinic
-#   FERROBRIDGE__AUTH__AUDIENCE=["https://bridge.example.org/fhir"]
+#   mkdir -p config
+#   cat > config/ferrobridge.toml <<'TOML'
+#   [[auth.issuer]]
+#   issuer = "https://auth.example.org/realms/clinic"
+#   kind = "persons"
+#   audience = ["https://bridge.example.org/fhir"]
+#   first_party_clients = ["clinic-portal"]
+#   TOML
+#   FERROBRIDGE_CONFIG=/etc/ferrobridge/ferrobridge.toml
 #   # or, on a network only trusted callers reach:
 #   FERROBRIDGE__AUTH__ENABLED=false
+#
+# A machine that calls the facade holds a client credentials token of such an
+# issuer; [[auth.basic.users]] lists people only.
 #
 # The names are the server's own: every key of the configuration tree is
 # reachable as FERROBRIDGE__<SECTION>__<KEY>, and every secret is read from the
@@ -110,10 +122,10 @@ services:
       FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE:
       FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__AUDIENCE:
       FERROBRIDGE__CDM__URL_FILE:
-      # Inbound authentication (the [auth] section), passed through when set.
+      # The configuration file under ./config that holds the [[auth.issuer]]
+      # tables, and the inbound authentication switch, passed through when set.
+      FERROBRIDGE_CONFIG:
       FERROBRIDGE__AUTH__ENABLED:
-      FERROBRIDGE__AUTH__ISSUER:
-      FERROBRIDGE__AUTH__AUDIENCE:
       # The operator scope, `__ferrobridge.operator` when unset.
       FERROBRIDGE__AUTH__PRODUCT_SCOPE:
       # The operator API (it needs [auth]) saves console mapping files under
@@ -150,6 +162,12 @@ services:
     #   mkdir -p operator-mappings && sudo chown 65532:65532 operator-mappings
     volumes:
       - ferrobridge-state:/home/nonroot
+      - type: bind
+        source: ${FERROBRIDGE_CONFIG_DIR:-./config}
+        target: /etc/ferrobridge
+        read_only: true
+        bind:
+          create_host_path: true
       - type: bind
         source: ${FERROBRIDGE_OPERATOR_MAPPINGS:-./operator-mappings}
         target: /var/lib/ferrobridge/mappings
@@ -271,8 +289,9 @@ services:
   # leave it unset so the session cookie carries Secure.
   #
   # The bridge refuses the console's calls unless it validates the operator's
-  # token: name the issuer in its [auth] section, and turn on [operator] for
-  # the mapping files.
+  # token: name the issuer in an [[auth.issuer]] table of its configuration
+  # file, list the console's client id in that table's first_party_clients,
+  # and turn on [operator] for the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
   console:
     image: ghcr.io/ferrohealth/ferrobridge-console:${FERROBRIDGE_VERSION:-0.0.21}

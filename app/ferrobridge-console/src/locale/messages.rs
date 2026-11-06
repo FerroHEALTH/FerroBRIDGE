@@ -467,8 +467,6 @@ messages! {
     #[doc = "What it governs."] RowAddressDesc = "row-address-desc",
     #[doc = "A setting's label."] RowAliases = "row-aliases",
     #[doc = "What it governs."] RowAliasesDesc = "row-aliases-desc",
-    #[doc = "A setting's label."] RowAudience = "row-audience",
-    #[doc = "What it governs."] RowAudienceDesc = "row-audience-desc",
     #[doc = "A setting's label."] RowBaseUrl = "row-base-url",
     #[doc = "What it governs."] RowCdrBaseUrlDesc = "row-cdr-base-url-desc",
     #[doc = "A setting's label."] RowCharset = "row-charset",

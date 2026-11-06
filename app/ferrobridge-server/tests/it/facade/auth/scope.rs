@@ -21,6 +21,7 @@ use http::StatusCode;
 use http::header;
 use jsonwebtoken::Algorithm;
 
+use super::CLIENT;
 use super::Issuer;
 use super::SigningKey;
 use super::authority;
@@ -81,11 +82,6 @@ impl Case {
         }
     }
 
-    /// Returns a token granting `scope`.
-    fn token(&self, scope: &str) -> String {
-        mint(&self.key, &self.issuer.claims(scope))
-    }
-
     /// Sends `request` under a token granting `scope` and returns the
     /// status, the challenge and the body text.
     async fn send(
@@ -93,9 +89,19 @@ impl Case {
         request: Request<Body>,
         scope: &str,
     ) -> Result<(StatusCode, Option<String>, String), Box<dyn Error>> {
+        self.send_claims(request, &self.issuer.claims(scope)).await
+    }
+
+    /// Sends `request` under a token carrying `claims` and returns the
+    /// status, the challenge and the body text.
+    async fn send_claims(
+        &self,
+        request: Request<Body>,
+        claims: &serde_json::Value,
+    ) -> Result<(StatusCode, Option<String>, String), Box<dyn Error>> {
         let response = raw(
             secured(&self.harness, &self.authority),
-            bearing(request, &self.token(scope)),
+            bearing(request, &mint(&self.key, claims)),
         )
         .await?;
         let status = response.status();
@@ -253,7 +259,10 @@ async fn a_fhirconnect_operation_admits_a_token_with_only_the_operator_scope()
             .body(Body::from(condition().to_string()))?;
         let response = raw(
             app.clone(),
-            bearing(request, &case.token("__ferrobridge.operator")),
+            bearing(
+                request,
+                &mint(&case.key, &case.issuer.claims("__ferrobridge.operator")),
+            ),
         )
         .await?;
         assert_ne!(StatusCode::UNAUTHORIZED, response.status(), "{path}");
@@ -289,15 +298,37 @@ async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say() -> Result<
 async fn a_scopeless_token_gets_system_rights_only_when_its_subject_is_listed()
 -> Result<(), Box<dyn Error>> {
     let unlisted = Case::new().await;
-    assert_forbidden(&unlisted.send(post_condition(&condition()), "").await?);
+    let machine = unlisted.issuer.machine_claims("");
+    assert_forbidden(
+        &unlisted
+            .send_claims(post_condition(&condition()), &machine)
+            .await?,
+    );
     let listed = Case::with(|settings| {
+        settings.issuers[0]
+            .scopeless_subjects
+            .insert(String::from(CLIENT));
+    })
+    .await;
+    let machine = listed.issuer.machine_claims("");
+    let (status, _, body) = listed
+        .send_claims(post_condition(&condition()), &machine)
+        .await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_listed_subject_that_is_a_person_gets_no_system_rights() -> Result<(), Box<dyn Error>> {
+    // NOTE: no specification governs this: our own design, the crate's; system
+    // rights without a scope are a machine's, and a person's token is no machine's.
+    let case = Case::with(|settings| {
         settings.issuers[0]
             .scopeless_subjects
             .insert(String::from("synthetic-client-sub"));
     })
     .await;
-    let (status, _, body) = listed.send(post_condition(&condition()), "").await?;
-    assert_eq!(StatusCode::CREATED, status, "{body}");
+    assert_forbidden(&case.send(post_condition(&condition()), "").await?);
     Ok(())
 }
 

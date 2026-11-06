@@ -185,8 +185,8 @@ pub(crate) fn vendored_base(url: &str) -> Result<ResourceProfile, Box<dyn Error>
     any(
         feature = "patient-summary",
         feature = "laboratory",
-        feature = "prescription",
-        feature = "dispensation",
+        all(feature = "prescription", feature = "dispensation"),
+        feature = "imaging",
         feature = "discharge"
     )
 ))]
@@ -199,8 +199,8 @@ const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
     any(
         feature = "patient-summary",
         feature = "laboratory",
-        feature = "prescription",
-        feature = "dispensation",
+        all(feature = "prescription", feature = "dispensation"),
+        feature = "imaging",
         feature = "discharge"
     )
 ))]

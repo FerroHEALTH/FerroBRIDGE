@@ -66,14 +66,20 @@ The document's text is kept byte for byte. No refusal quotes a value of the
 document, so a patient identifier never reaches an error message or a log
 line through one. `ReceivedDocument::category` names the priority category
 whose document profile fixes a `Composition.type` coding of the document,
-and `Category::profiles` the profiles a document of that category is held
-to. Three categories are received: a patient summary held to
+or a `Composition.category` coding where the profile leaves the type open
+(`Category::document_category`), and `Category::profiles` the profiles a
+document of that category is held to. Four categories are received: a patient summary held to
 `bundle-eu-eps` and `composition-eu-eps`, a laboratory report held to
 `Bundle-eu-lab` and `Composition-eu-lab`, and a discharge report, whose
 `composition-eu-hdr` fixes `Composition.type` to LOINC `34105-7`, held to
 `bundle-eu-hdr` and `composition-eu-hdr` of HL7 Europe Hospital Discharge
 Report 1.0.0. Every document example the HDR package publishes is read and
-passes the structural check below.
+passes the structural check below. An imaging report is named by the
+`Medical-Imaging` coding of `Composition.category`, which
+`CompositionEuImaging` requires while it binds `Composition.type` at
+strength `preferred` only, and is held to `BundleReportEuImaging` and
+`CompositionEuImaging` of HL7 Europe Imaging Report 1.0.0-ballot; both
+document examples of that guide pass the structural check.
 
 ## The structural check
 

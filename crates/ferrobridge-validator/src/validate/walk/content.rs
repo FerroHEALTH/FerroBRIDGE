@@ -122,6 +122,9 @@ impl<'i, R: Release> Walk<'_, '_, 'i, R> {
         if name == "Reference" {
             self.reference(value, location);
         }
+        if name == "Attachment" {
+            self.attachment(value);
+        }
         if field.content_reference.is_none() && name == "Extension" {
             let placement = if field.name == "modifierExtension" {
                 Placement::Modifier

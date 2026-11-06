@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the HL7 Europe Imaging Report 1.0.0-ballot
+# DiagnosticReportEuImaging profile over FerroBRIDGE's imaging report
+# template, whose archetypes are CKM's. The imaging examination result
+# becomes the report, and the study it reports an ImagingStudyEuImaging the
+# report references.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_imaging.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/imaging/StructureDefinition/DiagnosticReportEuImaging"
+    version: "1.0.0-ballot"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_imaging_report.v1.0.0"
+  archetypes:
+    - "OBSERVATION.imaging_exam_result.v1"
+  extensions:
+    - "ferrobridge_eu_imaging_report"
+  start: "OBSERVATION.imaging_exam_result.v1"

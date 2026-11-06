@@ -377,7 +377,7 @@ pub const MAPPINGS: [Row; 3] = [
 ];
 
 /// The Server and access tab of the Configuration page.
-pub const CORE: [Row; 8] = [
+pub const CORE: [Row; 7] = [
     row(
         Msg::RowListener,
         Msg::RowListenerDesc,
@@ -394,12 +394,7 @@ pub const CORE: [Row; 8] = [
     row(
         Msg::RowIssuers,
         Msg::RowIssuersDesc,
-        &[("auth.issuer", Shape::Code)],
-    ),
-    row(
-        Msg::RowAudience,
-        Msg::RowAudienceDesc,
-        &[("auth.audience", Shape::List)],
+        &[("auth.issuer", Shape::Count)],
     ),
     row(
         Msg::RowOperatorScope,

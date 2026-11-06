@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping whose followedBy is anchored at the
+# repeating event and reaches the observation's protocol, outside the event,
+# the method by the parent step of basics/path_operators.adoc.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_leave_anchor_parent
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.ferrobridge_reading.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "reading"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "time"
+          with:
+            fhir: "effective.as(DateTime)"
+            openehr: "time"
+
+        - name: "amount"
+          with:
+            fhir: "value.as(Quantity)"
+            openehr: "data[at0003]/items[at0004]"
+
+        - name: "method"
+          with:
+            fhir: "method.text"
+            openehr: "../../protocol[at0005]/items[at0006]"
+
+  - name: "status"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  - name: "code"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "text"
+        fhir:
+          - path: "code.text"
+            value: "Synthetic reading"

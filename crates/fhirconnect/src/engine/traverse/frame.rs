@@ -113,6 +113,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             |frame| Binding {
                 fhir: frame.occurrence.clone(),
                 openehr: parent.openehr.clone(),
+                axes: parent.axes.clone(),
                 level: target.level(),
             },
         )
