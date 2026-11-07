@@ -103,6 +103,7 @@ pub struct Defaults {
     language: Option<String>,
     territory: Option<String>,
     origin: Option<Origin>,
+    facility: Option<crate::engine::origin::Party>,
 }
 
 impl Defaults {
@@ -124,6 +125,7 @@ impl Defaults {
             language: None,
             territory: None,
             origin: None,
+            facility: None,
         }
     }
 
@@ -185,6 +187,17 @@ impl Defaults {
     #[must_use]
     pub fn with_origin(mut self, origin: Origin) -> Self {
         self.origin = Some(origin);
+        self
+    }
+
+    /// Returns these defaults naming `facility` as the health care facility of a
+    /// composition no mapping gave one (RM EHR IM,
+    /// `EVENT_CONTEXT.health_care_facility`). A composition with no
+    /// `EVENT_CONTEXT` names it as the originating system's location in its
+    /// `FEEDER_AUDIT` instead, when the run records an origin.
+    #[must_use]
+    pub fn with_facility(mut self, facility: crate::engine::origin::Party) -> Self {
+        self.facility = Some(facility);
         self
     }
 
@@ -349,10 +362,15 @@ pub fn to_openehr<T: Table + ?Sized>(
         program.start().as_str(),
         &Binding::default(),
     )?;
-    let defaulted = run.apply_defaults(defaults)?;
+    let mut defaulted = run.apply_defaults(defaults)?;
+    let unplaced = run.place_facility(defaults, &mut defaulted)?;
     if let Some(origin) = defaults.origin() {
-        run.families
-            .extend(family::feeder_audit(index.root(), origin, &defaulted));
+        run.families.extend(family::feeder_audit(
+            index.root(),
+            origin,
+            &defaulted,
+            defaults.facility.as_ref().filter(|_| unplaced),
+        ));
     }
     let (values, routed) = run.node_values()?;
     let built = index
@@ -671,6 +689,8 @@ struct Run<'a, T: Table + ?Sized> {
     composition: Option<&'a dyn CanonicalDocument>,
     written: Vec<Written>,
     families: Vec<NodeValue>,
+    /// Whether a mapping wrote `EVENT_CONTEXT.health_care_facility`.
+    facility_written: bool,
     /// The defaults the run writes as `ctx/` keys.
     context_keys: Vec<NodeValue>,
     /// The values the built composition must carry at the nodes a `ctx/`
@@ -731,6 +751,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             composition,
             written: Vec::new(),
             families: Vec::new(),
+            facility_written: false,
             context_keys: Vec::new(),
             expected: Vec::new(),
             counters: BTreeMap::new(),

@@ -42,6 +42,7 @@ use openehr_sdt::flat::path::Segment;
 use crate::engine::demographics::PartyIdentity;
 use crate::engine::lens::null_flavour::NullFlavour;
 use crate::engine::origin::Origin;
+use crate::engine::origin::Party;
 use crate::engine::origin::UNKNOWN_SOURCE;
 use crate::engine::rm::RAW;
 
@@ -93,7 +94,12 @@ fn indexed(name: &str, index: usize) -> Segment {
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html#_feeder_audit_class>).
 /// The allocation of facts to attributes is our own design.
 #[must_use]
-pub fn feeder_audit(root: &ResolvedNode, origin: &Origin, defaulted: &[String]) -> Vec<NodeValue> {
+pub fn feeder_audit(
+    root: &ResolvedNode,
+    origin: &Origin,
+    defaulted: &[String],
+    unplaced: Option<&Party>,
+) -> Vec<NodeValue> {
     let details = |system_id: &str, version_id: Option<&str>| FeederAuditDetails {
         system_id: String::from(system_id),
         location: None,
@@ -141,10 +147,14 @@ pub fn feeder_audit(root: &ResolvedNode, origin: &Origin, defaulted: &[String]) 
             },
         ),
         original_content: None,
-        originating_system_audit: Box::new(details(
-            origin.originating_system().unwrap_or(origin.system_id()),
-            source.and_then(|source| source.version_id()),
-        )),
+        originating_system_audit: Box::new(FeederAuditDetails {
+            location: origin.location().or(unplaced).map(party_identified),
+            provider: origin.provider().map(party_identified),
+            ..details(
+                origin.originating_system().unwrap_or(origin.system_id()),
+                source.and_then(|source| source.version_id()),
+            )
+        }),
         feeder_system_audit: (!defaulted.is_empty()
             || !origin.feeder_items().is_empty()
             || origin.originating_system().is_some())
@@ -156,6 +166,42 @@ pub fn feeder_audit(root: &ResolvedNode, origin: &Origin, defaulted: &[String]) 
             .with_datum(RAW),
     ]
 }
+
+/// Returns the `PARTY_IDENTIFIED` of `party`: its name and its identifiers.
+#[must_use]
+pub fn party_identified(party: &Party) -> PartyIdentified {
+    let identifiers: Vec<DvIdentifier> = party
+        .identifiers
+        .iter()
+        .map(|item| DvIdentifier {
+            issuer: item.issuer.clone(),
+            assigner: None,
+            id: item.id.clone(),
+            r#type: Some(item.kind.clone()),
+        })
+        .collect();
+    PartyIdentified::PartyIdentified(PartyIdentifiedData {
+        external_ref: None,
+        name: party.name.clone(),
+        // NOTE: RM Common IM, `PARTY_IDENTIFIED.identifiers` is optional; a party with none
+        // legitimately has no list, which is the only failure of the constructor.
+        identifiers: openehr_base::containers::NonEmptyVec::new(identifiers).ok(),
+    })
+}
+
+/// Returns the `_health_care_facility` family of the `context` node naming
+/// `facility` (RM EHR IM, `EVENT_CONTEXT.health_care_facility`).
+#[must_use]
+pub fn health_care_facility(context: &ResolvedNode, facility: &Party) -> Vec<NodeValue> {
+    vec![
+        NodeValue::new(context, to_canonical_value(&party_identified(facility)))
+            .under(vec![plain(HEALTH_CARE_FACILITY)])
+            .with_datum(RAW),
+    ]
+}
+
+/// The FLAT family `EVENT_CONTEXT.health_care_facility` travels as.
+pub const HEALTH_CARE_FACILITY: &str = "_health_care_facility";
 
 /// Returns the `_link:i` family of one `LINK` on `node`.
 ///

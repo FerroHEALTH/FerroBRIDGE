@@ -37,6 +37,8 @@ pub enum Settled {
     Unkeyed,
     /// MSH-4 names a sending facility the face does not accept.
     Sender,
+    /// The message names a health care facility outside the senders' list.
+    Facility(Box<crate::hl7v2::origin::Facility>),
     /// The message's import record could not be stored, so its commit is not
     /// acknowledged.
     Unrecorded,
@@ -60,6 +62,20 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
         Settled::Ingested(_) => (Code::Accept, Vec::new()),
         Settled::Refused(refused) => of_refusal(refused),
         Settled::Unmapped(error) => of_map_error(error),
+        Settled::Facility(facility) => (
+            Code::Error,
+            vec![Error {
+                location: Some(
+                    ferrobridge_hl7v2::parse::Location::segment(facility.field.0, 1)
+                        .with_field(facility.field.1),
+                ),
+                code: ErrorCode::Application,
+                text: format!(
+                    "{} is not a facility of a sender this receiver accepts",
+                    facility.display()
+                ),
+            }],
+        ),
         Settled::Sender => (
             Code::Reject,
             vec![Error {

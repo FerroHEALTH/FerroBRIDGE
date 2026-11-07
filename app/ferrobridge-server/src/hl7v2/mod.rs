@@ -348,6 +348,12 @@ impl Face {
         let control_item =
             origin::control_item(control.as_str(), message_type.as_str(), sending.as_deref());
         let orders = origin::order_numbers(message);
+        let facility = origin::facility(message);
+        if let Some(facility) = facility.as_ref()
+            && !facility.listed(&self.senders)
+        {
+            return (Settled::Facility(Box::new(facility.clone())), tally);
+        }
         let provenance = Provenance::Item(SourceItem::message(control, message_type));
         let client = match crate::cdr::ids::RequestId::new(&stamped.control_id) {
             Ok(id) => self.facade.client().with_request_id(id),
@@ -368,6 +374,10 @@ impl Face {
             .ingest_under(client, &self.settings)
             .with_originating_system(sending)
             .with_item_ids(orders, vec![control_item])
+            .with_parties(
+                facility.map(|facility| facility.party),
+                origin::performing_organisation(message),
+            )
             .ingest_bundle(&bundle, self.unmapped, &provenance)
             .await;
         match outcome {

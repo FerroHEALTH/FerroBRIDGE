@@ -28,6 +28,18 @@ pub struct Origin {
     source: Option<SourceItem>,
     originating_items: Option<Vec<ItemId>>,
     feeder_items: Vec<ItemId>,
+    location: Option<Party>,
+    provider: Option<Party>,
+}
+
+/// A party named in a composition by the engine: a `PARTY_IDENTIFIED` of a
+/// name and identifiers (RM Common IM, `PARTY_IDENTIFIED`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Party {
+    /// The party's name, when known.
+    pub name: Option<String>,
+    /// The party's identifiers.
+    pub identifiers: Vec<ItemId>,
 }
 
 /// One identifier of the item in a system, a `DV_IDENTIFIER` of `FEEDER_AUDIT`.
@@ -58,6 +70,8 @@ impl Origin {
             source: None,
             originating_items: None,
             feeder_items: Vec::new(),
+            location: None,
+            provider: None,
         }
     }
 
@@ -103,6 +117,34 @@ impl Origin {
     pub fn with_feeder_items(mut self, items: Vec<ItemId>) -> Self {
         self.feeder_items = items;
         self
+    }
+
+    /// Returns this origin naming `location`, the site that handled the item in
+    /// the originating system (`originating_system_audit.location`).
+    #[must_use]
+    pub fn with_location(mut self, location: Party) -> Self {
+        self.location = Some(location);
+        self
+    }
+
+    /// Returns this origin naming `provider`, who created or handled the item
+    /// in the originating system (`originating_system_audit.provider`).
+    #[must_use]
+    pub fn with_provider(mut self, provider: Party) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    /// Returns the site that handled the item in the originating system.
+    #[must_use]
+    pub const fn location(&self) -> Option<&Party> {
+        self.location.as_ref()
+    }
+
+    /// Returns who created or handled the item in the originating system.
+    #[must_use]
+    pub const fn provider(&self) -> Option<&Party> {
+        self.provider.as_ref()
     }
 
     /// Returns the identifiers of the item in the originating system the

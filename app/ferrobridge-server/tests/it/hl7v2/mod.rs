@@ -341,7 +341,7 @@ impl Running {
 
     /// Starts the face under `lane` over a CDR whose EHR lookup answers
     /// `lookup`.
-    async fn start_with(
+    pub(crate) async fn start_with(
         lane: Hl7v2Settings,
         lookup: ResponseTemplate,
     ) -> Result<Self, Box<dyn Error>> {
@@ -439,4 +439,5 @@ fn assert_counted(counts: &Counts, (aa, ae, ar): (u64, u64, u64), mapping_failur
 }
 
 mod answers;
+mod facility;
 mod feeder_audit;

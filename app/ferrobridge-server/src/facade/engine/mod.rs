@@ -17,6 +17,7 @@ use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::library::Library;
 use fhirconnect::engine::origin::Origin;
+use fhirconnect::engine::origin::Party;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Outcome;
 use fhirconnect::engine::seam::Seams;
@@ -81,6 +82,17 @@ pub fn inbound(
     )
 }
 
+/// What a run into openEHR records of where its content came from: the
+/// origin its `FEEDER_AUDIT` names, and the health care facility its
+/// `EVENT_CONTEXT` names when no mapping gave one.
+#[derive(Debug, Clone)]
+pub struct Recorded {
+    /// The origin the `FEEDER_AUDIT` names.
+    pub origin: Origin,
+    /// The facility the run defaults, when the face named one.
+    pub facility: Option<Party>,
+}
+
 /// Returns the origin of a run under `settings`: the bridge as the system the
 /// content passed through, `source` as the item it came from, and
 /// `originating`, when given, as the system it originated in.
@@ -89,7 +101,7 @@ pub fn origin_of(
     settings: &crate::facade::Settings,
     source: Option<SourceItem>,
     originating: Option<&str>,
-) -> Origin {
+) -> Recorded {
     let mut origin = Origin::new(&settings.system_id);
     if let Some(originating) = originating {
         origin = origin.with_originating_system(originating);
@@ -97,7 +109,10 @@ pub fn origin_of(
     if let Some(source) = source {
         origin = origin.with_source(source);
     }
-    origin
+    Recorded {
+        origin,
+        facility: None,
+    }
 }
 
 /// Maps one FHIR document into a composition that names `origin` as its
@@ -122,14 +137,17 @@ pub fn inbound_from(
     document: &Value,
     now: &str,
     settings: &crate::facade::Settings,
-    origin: Origin,
+    recorded: Recorded,
     seams: &Seams<'_>,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
-    let defaults = Defaults::at(now)
+    let mut defaults = Defaults::at(now)
         .with_composer(COMPOSER)
         .with_language(&settings.language)
         .with_territory(&settings.territory)
-        .with_origin(origin);
+        .with_origin(recorded.origin);
+    if let Some(facility) = recorded.facility {
+        defaults = defaults.with_facility(facility);
+    }
     to_openehr(
         program,
         &fhir_types::r4::schema::SCHEMAS,
