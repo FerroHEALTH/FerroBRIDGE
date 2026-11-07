@@ -853,6 +853,25 @@ jobs:
           key: profile-packages-${{ steps.profile-packages.outputs.key }}
       - name: Fetch and verify the profile packages
         run: bash scripts/vendor/profile-packages.sh
+      # The validator jar and the packages it loads beyond the profile set, pinned
+      # by sha256 in docs/VERSIONS.md, come from the cache, so a warm run makes no
+      # request to packages.fhir.org (#1668).
+      - name: Read the pinned validator downloads
+        id: validator-downloads
+        run: echo "key=$(bash scripts/vendor/hl7-validator-agreement.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the validator downloads
+        id: validator-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            target/hl7-validator/*.tgz
+            target/hl7-validator/validator_cli.jar
+          key: hl7-validator-${{ steps.validator-downloads.outputs.key }}
+      - name: The fetcher makes no request for a cached download
+        run: bash scripts/vendor/hl7-validator-agreement.sh --self-test
+      - name: A warm cache needs no request
+        if: steps.validator-cache.outputs.cache-hit == 'true'
+        run: bash scripts/vendor/hl7-validator-agreement.sh --check-warm
       - name: The judge holds to its rules
         run: bash scripts/checks/fhir-validator.sh --self-test
       - name: Every document passes the HL7 FHIR Validator

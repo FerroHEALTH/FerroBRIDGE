@@ -29,6 +29,9 @@
 # Usage:
 #   scripts/vendor/hl7-validator-agreement.sh          # fetch what is missing, run, rewrite the outcomes
 #   scripts/vendor/hl7-validator-agreement.sh --fetch  # fetch and verify the jar and the packages only
+#   scripts/vendor/hl7-validator-agreement.sh --check-warm  # fail unless every pinned download is cached
+#   scripts/vendor/hl7-validator-agreement.sh --cache-key   # the key the CI cache of the downloads is stored under
+#   scripts/vendor/hl7-validator-agreement.sh --self-test   # a warm download makes no request, a cold failure names its host
 #
 # Requires: curl, jq, tar, shasum, and a Java 17 or later runtime as $JAVA or
 # java on PATH. Run scripts/vendor/profile-packages.sh first.
@@ -74,26 +77,65 @@ verify() {
   fi
 }
 
-# Downloads $1 to $2 unless $2 is already there at the sha256 $3.
+# Prints the host of the URL $1.
+host_of() {
+  local rest="${1#*://}"
+  printf '%s\n' "${rest%%/*}"
+}
+
+# Downloads $1 to $2 unless $2 is already there at the sha256 $3, so a warm
+# cache makes no request. A download retries transient failures, connection
+# refusals included, and a failure that outlasts them names the host.
 fetch() {
   if [[ -f "$2" ]] && [[ "$(shasum -a 256 "$2" | cut -d' ' -f1)" == "$3" ]]; then
     return
   fi
-  curl -fsSL --retry 3 -A "$ua" -o "$2" "$1"
+  if ! curl -fsSL --retry 5 --retry-all-errors --retry-connrefused --retry-delay 2 \
+    -A "$ua" -o "$2" "$1"; then
+    rm -f "$2"
+    echo "hl7-validator-agreement: cannot fetch $1 from $(host_of "$1") after 5 retries" >&2
+    exit 1
+  fi
   verify "$2" "$3"
+}
+
+# Prints every pinned download as `<url> <file> <sha256>`, one per line.
+downloads() {
+  local item version digest
+  while read -r item version digest; do
+    if [[ "$item" == "validator_cli.jar" ]]; then
+      printf '%s %s %s\n' \
+        "https://github.com/hapifhir/org.hl7.fhir.core/releases/download/$version/validator_cli.jar" \
+        "$work/validator_cli.jar" "$digest"
+    else
+      printf '%s %s %s\n' "$registry/$item/$version" "$work/$item#$version.tgz" "$digest"
+    fi
+  done < <(rows)
+}
+
+# Fails, naming each, when a pinned download is missing from $work or not at
+# its sha256, so a warm cache is shown to need no request.
+check_warm() {
+  local url file digest missing=0
+  while read -r url file digest; do
+    if [[ ! -f "$file" ]] || [[ "$(shasum -a 256 "$file" | cut -d' ' -f1)" != "$digest" ]]; then
+      echo "hl7-validator-agreement: $file is not cached at its pin; a run would fetch $url" >&2
+      missing=1
+    fi
+  done < <(downloads)
+  [[ "$missing" -eq 0 ]] || exit 1
+  echo "hl7-validator-agreement: every pinned download is cached; a run makes no request"
 }
 
 # Fetches the jar and the pinned packages, and fills the private cache.
 prepare() {
   mkdir -p "$work" "$cache"
-  local item version digest
+  local url file item version digest
+  while read -r url file digest; do
+    fetch "$url" "$file" "$digest"
+  done < <(downloads)
   while read -r item version digest; do
-    if [[ "$item" == "validator_cli.jar" ]]; then
-      fetch "https://github.com/hapifhir/org.hl7.fhir.core/releases/download/$version/validator_cli.jar" \
-        "$work/validator_cli.jar" "$digest"
-      continue
-    fi
-    fetch "$registry/$item/$version" "$work/$item#$version.tgz" "$digest"
+    [[ "$item" != "validator_cli.jar" ]] || continue
     if [[ ! -d "$cache/$item#$version/package" ]]; then
       mkdir -p "$cache/$item#$version"
       tar -xzf "$work/$item#$version.tgz" -C "$cache/$item#$version"
@@ -149,8 +191,44 @@ run() {
   done
 }
 
+# Checks that a cached download makes no request and a cold one names its
+# host, with `curl` replaced on PATH by a stub that records each call and
+# fails as an unreachable host does (exit 6, name not resolved).
+self_test() {
+  local scratch stubs file digest status
+  scratch="$(mktemp -d)"
+  trap 'rm -rf "$scratch"' RETURN
+  stubs="$scratch/bin"
+  mkdir -p "$stubs"
+  printf '#!/usr/bin/env bash\necho called >> "%s/calls"\nexit 6\n' "$scratch" >"$stubs/curl"
+  chmod +x "$stubs/curl"
+  file="$scratch/cached.tgz"
+  printf 'pinned bytes\n' >"$file"
+  digest="$(shasum -a 256 "$file" | cut -d' ' -f1)"
+  ( PATH="$stubs:$PATH" fetch "https://packages.fhir.org/example/1.0.0" "$file" "$digest" )
+  if [[ -f "$scratch/calls" ]]; then
+    echo "hl7-validator-agreement: self-test: a cached download made a request" >&2
+    exit 1
+  fi
+  status=0
+  ( PATH="$stubs:$PATH" fetch "https://packages.fhir.org/example/1.0.0" "$scratch/cold.tgz" "$digest" ) \
+    2>"$scratch/err" || status=$?
+  if [[ "$status" -eq 0 ]] || ! grep -q 'from packages.fhir.org after 5 retries' "$scratch/err"; then
+    echo "hl7-validator-agreement: self-test: a cold fetch that fails did not name its host: $(cat "$scratch/err")" >&2
+    exit 1
+  fi
+  if [[ -f "$scratch/cold.tgz" ]]; then
+    echo "hl7-validator-agreement: self-test: a failed fetch left a partial file" >&2
+    exit 1
+  fi
+  echo "hl7-validator-agreement: self-test OK (a warm download makes no request, a cold failure names its host)"
+}
+
 case "${1:-}" in
   --fetch) prepare ;;
+  --check-warm) check_warm ;;
+  --cache-key) rows | shasum -a 256 | cut -c1-16 ;;
+  --self-test) self_test ;;
   "") prepare; run ;;
-  *) echo "usage: $0 [--fetch]" >&2; exit 2 ;;
+  *) echo "usage: $0 [--fetch | --check-warm | --cache-key | --self-test]" >&2; exit 2 ;;
 esac
