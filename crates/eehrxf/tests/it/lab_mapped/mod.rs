@@ -39,7 +39,7 @@ use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::outcome::Loss;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::operations::run::Settings;
 use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;

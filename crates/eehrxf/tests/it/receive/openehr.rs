@@ -18,7 +18,7 @@ use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::openehr::FHIR_JSON;
 use eehrxf::receive::openehr::ReceiveMappingError;
 use eehrxf::receive::openehr::Representative;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::operations::error::OperationError;
 use fhirconnect::operations::run::Settings;
 use openehr_base::containers::NonEmptyVec;

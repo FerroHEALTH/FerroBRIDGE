@@ -39,7 +39,7 @@ use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
-use fhirconnect::engine::traverse::ComposerId;
+use fhirconnect::engine::traverse::defaults::ComposerId;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;

@@ -137,7 +137,7 @@ fn program_set(contexts: &[&str]) -> Result<ProgramSet, Box<dyn Error>> {
 /// performing the mapping", so they are settings rather than constants.
 fn settings() -> Settings {
     Settings::new(DEVICE, NOW).with_defaults(
-        fhirconnect::engine::traverse::Defaults::at(NOW)
+        fhirconnect::engine::traverse::defaults::Defaults::at(NOW)
             .with_language("en")
             .with_territory("NL"),
     )

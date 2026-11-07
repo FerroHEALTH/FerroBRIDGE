@@ -11,7 +11,7 @@ use fhirconnect::engine::origin::Origin;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::seam::Seams;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::engine::traverse::to_openehr;
 
 use crate::support::compiled;
@@ -393,7 +393,7 @@ fn a_default_composer_carries_its_identifier() -> Result<(), Box<dyn Error>> {
         &condition_document()?,
         &Seams::default(),
         &defaults().with_composer("Dana Doctor").with_composer_id(
-            fhirconnect::engine::traverse::ComposerId {
+            fhirconnect::engine::traverse::defaults::ComposerId {
                 id: String::from("DR-1"),
                 namespace: String::from("NORTHLAB"),
                 scheme: String::from("XCN"),

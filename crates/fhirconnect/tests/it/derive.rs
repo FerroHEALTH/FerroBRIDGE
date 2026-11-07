@@ -22,7 +22,7 @@ use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::engine::traverse::to_openehr;

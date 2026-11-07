@@ -19,7 +19,7 @@ use ferrobridge_hl7v2::parse::Field;
 use ferrobridge_hl7v2::parse::Message;
 use fhirconnect::engine::origin::ItemId;
 use fhirconnect::engine::origin::Party;
-use fhirconnect::engine::traverse::ComposerId;
+use fhirconnect::engine::traverse::defaults::ComposerId;
 
 use crate::config::hl7v2::Sender;
 
