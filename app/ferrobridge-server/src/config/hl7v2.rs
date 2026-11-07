@@ -20,3 +20,14 @@ pub enum Sender {
         kind: String,
     },
 }
+
+/// A sender declared `origin = "device"`: an analyser feed with no human,
+/// whose results commit as acts of the device. No specification governs the
+/// declaration: our own design.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Device {
+    /// The sending facility the device sends as.
+    pub sender: Sender,
+    /// The namespace its device identifiers are issued in.
+    pub identifier_issuer: String,
+}

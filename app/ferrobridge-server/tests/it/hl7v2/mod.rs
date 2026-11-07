@@ -65,7 +65,7 @@ const CONTAINERS: &[&str] = &[
 const CONTROL_ID: &str = "MSG-V2-0001";
 
 /// A laboratory result, ORU^R01 from a 2.5.1 sender with an empty MSH-18: one
-/// patient, one order and one numeric result, every value invented for the
+/// patient, one order with its ordering provider and one numeric result, every value invented for the
 /// test.
 pub(crate) fn oru_r01(control_id: &str) -> Vec<u8> {
     let segments = [
@@ -76,7 +76,9 @@ pub(crate) fn oru_r01(control_id: &str) -> Vec<u8> {
             "PID|1||synthetic-subject-0001^^^NORTHLAB^MR||Synthetic^Sam^^^^^L||19800101|M",
         ),
         String::from("ORC|RE|PLC-1|FIL-1"),
-        String::from("OBR|1|PLC-1|FIL-1|2345-7^Glucose^LN|||20260925120000+0200"),
+        String::from(
+            "OBR|1|PLC-1|FIL-1|2345-7^Glucose^LN|||20260925120000+0200|||||||||DR-1^Doctor^Dana^^^^^^NORTHLAB",
+        ),
         String::from(
             "OBX|1|NM|2345-7^Glucose^LN^^^^^^Synthetic glucose||5.4|mmol/L^mmol/L^UCUM|3.9-5.8|N|||F|||20260925130000+0200",
         ),
@@ -97,7 +99,7 @@ fn adt_a01(control_id: &str) -> Vec<u8> {
         format!(
             "MSH|^~\\&|ADT|NORTHLAB|EHR|SOUTHCLINIC|20260925143000+0200||ADT^A01^ADT_A01|{control_id}|P|2.5.1"
         ),
-        String::from("EVN||20260925143000+0200"),
+        String::from("EVN||20260925143000+0200|||OP-1^Operator^Olive^^^^^^NORTHLAB"),
         String::from(
             "PID|1||synthetic-subject-0001^^^NORTHLAB^MR||Synthetic^Sam^^^^^L||19800101|M",
         ),
@@ -231,6 +233,7 @@ pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
         frame_limit: 1024 * 1024,
         log_outcomes: true,
         senders: Vec::new(),
+        devices: Vec::new(),
     }
 }
 
@@ -439,5 +442,6 @@ fn assert_counted(counts: &Counts, (aa, ae, ar): (u64, u64, u64), mapping_failur
 }
 
 mod answers;
+mod clinician;
 mod facility;
 mod feeder_audit;

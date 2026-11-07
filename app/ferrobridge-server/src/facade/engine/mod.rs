@@ -23,6 +23,7 @@ use fhirconnect::engine::outcome::Outcome;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::seam::identity::IdentitySink;
 use fhirconnect::engine::terminology::Terminology;
+use fhirconnect::engine::traverse::ComposerId;
 use fhirconnect::engine::traverse::Defaults;
 use fhirconnect::engine::traverse::error::EngineError;
 use fhirconnect::engine::traverse::party::from_party;
@@ -91,6 +92,9 @@ pub struct Recorded {
     pub origin: Origin,
     /// The facility the run defaults, when the face named one.
     pub facility: Option<Party>,
+    /// The composer the run defaults, its name and its identifier, when the
+    /// face named one.
+    pub composer: Option<(String, Option<ComposerId>)>,
 }
 
 /// Returns the origin of a run under `settings`: the bridge as the system the
@@ -112,6 +116,7 @@ pub fn origin_of(
     Recorded {
         origin,
         facility: None,
+        composer: None,
     }
 }
 
@@ -147,6 +152,12 @@ pub fn inbound_from(
         .with_origin(recorded.origin);
     if let Some(facility) = recorded.facility {
         defaults = defaults.with_facility(facility);
+    }
+    if let Some((name, id)) = recorded.composer {
+        defaults = defaults.with_composer(name);
+        if let Some(id) = id {
+            defaults = defaults.with_composer_id(id);
+        }
     }
     to_openehr(
         program,

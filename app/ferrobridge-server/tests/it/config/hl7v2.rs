@@ -179,6 +179,18 @@ fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn 
         ),
         ("senders = [{ universal_id = \"1.2\" }]\n", "hl7v2.senders"),
         ("senders = [{}]\n", "hl7v2.senders"),
+        (
+            "senders = [{ namespace_id = \"A\", origin = \"robot\" }]\n",
+            "hl7v2.senders",
+        ),
+        (
+            "senders = [{ namespace_id = \"A\", origin = \"device\" }]\n",
+            "hl7v2.senders",
+        ),
+        (
+            "senders = [{ namespace_id = \"A\", device_identifier_issuer = \"urn:example:devices\" }]\n",
+            "hl7v2.senders",
+        ),
     ];
     for (line, expected) in cases {
         let error = refusal(&with_face(&format!("{maps}{line}")))?;
@@ -191,7 +203,8 @@ fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn 
             | Error::ResourceType { key, .. }
             | Error::Url { key, .. }
             | Error::Duplicate { key, .. }
-            | Error::Sender { key } => key.as_str(),
+            | Error::Sender { key }
+            | Error::SenderOrigin { key } => key.as_str(),
             other => return Err(format!("{line}: unexpected refusal {other:?}").into()),
         };
         assert_eq!(expected, key, "{line}");
@@ -207,4 +220,23 @@ fn an_unknown_hl7v2_key_refuses_to_boot() {
     )
     .expect_err("an unknown key is refused");
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+}
+
+#[test]
+fn a_device_sender_resolves_with_its_identifier_issuer() -> Result<(), Box<dyn std::error::Error>> {
+    let text = with_face(concat!(
+        "concept_maps = \"/srv/v2mappings/package\"\n",
+        "senders = [{ namespace_id = \"NORTHLAB\" }, { namespace_id = \"ANALYSER\", origin = \"device\", device_identifier_issuer = \"urn:example:devices\" }]\n",
+    ));
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let face = settings.hl7v2.ok_or("the face is on")?;
+    assert_eq!(2, face.senders.len(), "a device is a sender too");
+    assert_eq!(
+        vec![ferrobridge_server::config::hl7v2::Device {
+            sender: ferrobridge_server::config::hl7v2::Sender::Namespace(String::from("ANALYSER")),
+            identifier_issuer: String::from("urn:example:devices"),
+        }],
+        face.devices
+    );
+    Ok(())
 }

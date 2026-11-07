@@ -409,6 +409,8 @@ pub struct Hl7v2Settings {
     pub log_outcomes: bool,
     /// The sending facilities the face accepts; empty accepts any.
     pub senders: Vec<hl7v2::Sender>,
+    /// The senders that are devices, whose results commit as device acts.
+    pub devices: Vec<hl7v2::Device>,
 }
 
 /// The settings the run path holds, with every secret already read.

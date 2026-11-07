@@ -1011,7 +1011,7 @@ it answers.
 | `frame_timeout_ms` | `30000` | How long one frame may take to arrive whole; `0` waits |
 | `frame_limit_bytes` | `1048576` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes by kind at debug level |
-| `senders` | `[]` | The MSH-4 sending facilities accepted: `{ namespace_id }` or `{ universal_id, universal_id_type }`; empty accepts any |
+| `senders` | `[]` | The MSH-4 sending facilities accepted: `{ namespace_id }` or `{ universal_id, universal_id_type }`, each with an optional `origin = "device"` and its `device_identifier_issuer`; empty accepts any |
 
 A resource type the R4 element table does not name, a profile that is not a
 URL, a resource type listed twice, and a sender that names neither a

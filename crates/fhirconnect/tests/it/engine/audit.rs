@@ -379,3 +379,47 @@ fn an_origin_provider_is_the_originating_system_s_provider() -> Result<(), Box<d
     );
     Ok(())
 }
+
+#[test]
+fn a_default_composer_carries_its_identifier() -> Result<(), Box<dyn Error>> {
+    // Simplified Formats master06 §Composer: `ctx/composer_name` is the
+    // PARTY_IDENTIFIED name and `ctx/composer_id` its `external_ref`.
+    let program = compiled("ferrobridge_diagnose_minimal")?;
+    let index = template()?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_document()?,
+        &Seams::default(),
+        &defaults().with_composer("Dana Doctor").with_composer_id(
+            fhirconnect::engine::traverse::ComposerId {
+                id: String::from("DR-1"),
+                namespace: String::from("NORTHLAB"),
+                scheme: String::from("XCN"),
+            },
+        ),
+        &CallContext::new(),
+    )?;
+    let composer = inbound
+        .value()
+        .value()
+        .get("composer")
+        .ok_or("the composition names a composer")?;
+    assert_eq!(Some("Dana Doctor"), composer["name"].as_str(), "{composer}");
+    assert_eq!(
+        Some("DR-1"),
+        composer
+            .pointer("/external_ref/id/value")
+            .and_then(serde_json::Value::as_str),
+        "{composer}"
+    );
+    assert_eq!(
+        Some("NORTHLAB"),
+        composer
+            .pointer("/external_ref/namespace")
+            .and_then(serde_json::Value::as_str),
+        "{composer}"
+    );
+    Ok(())
+}

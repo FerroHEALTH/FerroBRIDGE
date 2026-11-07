@@ -104,6 +104,20 @@ pub struct Defaults {
     territory: Option<String>,
     origin: Option<Origin>,
     facility: Option<crate::engine::origin::Party>,
+    composer_id: Option<ComposerId>,
+}
+
+/// The identifier of a default composer: the `external_ref` the Simplified
+/// Formats builder writes from `ctx/composer_id`, `ctx/id_namespace` and
+/// `ctx/id_scheme` (master06 §Composer).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComposerId {
+    /// The identifier, `PARTY_REF.id.value`.
+    pub id: String,
+    /// Its namespace, `PARTY_REF.namespace`.
+    pub namespace: String,
+    /// Its scheme, `GENERIC_ID.scheme`.
+    pub scheme: String,
 }
 
 impl Defaults {
@@ -126,6 +140,7 @@ impl Defaults {
             territory: None,
             origin: None,
             facility: None,
+            composer_id: None,
         }
     }
 
@@ -187,6 +202,14 @@ impl Defaults {
     #[must_use]
     pub fn with_origin(mut self, origin: Origin) -> Self {
         self.origin = Some(origin);
+        self
+    }
+
+    /// Returns these defaults naming the default composer by `id` beside its
+    /// name.
+    #[must_use]
+    pub fn with_composer_id(mut self, id: ComposerId) -> Self {
+        self.composer_id = Some(id);
         self
     }
 

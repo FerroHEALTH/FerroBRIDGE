@@ -39,6 +39,7 @@ use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
+use fhirconnect::engine::traverse::ComposerId;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
@@ -449,6 +450,8 @@ pub struct Ingest<'a> {
     facility: Option<Party>,
     /// Who created or handled the item in the originating system.
     provider: Option<Party>,
+    /// The composer every composition names, when the face named one.
+    composer: Option<(String, Option<ComposerId>)>,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -484,6 +487,7 @@ impl<'a> Ingest<'a> {
             feeder_items: Vec::new(),
             facility: None,
             provider: None,
+            composer: None,
         }
     }
 
@@ -517,6 +521,14 @@ impl<'a> Ingest<'a> {
     pub fn with_parties(mut self, facility: Option<Party>, provider: Option<Party>) -> Self {
         self.facility = facility;
         self.provider = provider;
+        self
+    }
+
+    /// Returns this ingest naming `name`, identified by `id`, as the composer
+    /// of every composition no mapping gave one.
+    #[must_use]
+    pub fn with_composer(mut self, name: String, id: Option<ComposerId>) -> Self {
+        self.composer = Some((name, id));
         self
     }
 

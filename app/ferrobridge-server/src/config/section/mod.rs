@@ -119,6 +119,13 @@ pub struct Hl7v2Sender {
     pub universal_id: String,
     /// HD.3 of MSH-4, such as `ISO`.
     pub universal_id_type: String,
+    /// What stands behind the sender: empty for a system that names its
+    /// clinicians, `device` for an analyser feed with no human.
+    pub origin: String,
+    /// The `PARTY_REF.namespace` a device sender's device identifiers are
+    /// issued in, one of the CDR client's `device_identifier_issuers`;
+    /// required with `origin = "device"`.
+    pub device_identifier_issuer: String,
 }
 
 /// The profile one resource type of a mapped message claims.

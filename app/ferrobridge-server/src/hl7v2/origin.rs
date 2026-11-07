@@ -19,6 +19,7 @@ use ferrobridge_hl7v2::parse::Field;
 use ferrobridge_hl7v2::parse::Message;
 use fhirconnect::engine::origin::ItemId;
 use fhirconnect::engine::origin::Party;
+use fhirconnect::engine::traverse::ComposerId;
 
 use crate::config::hl7v2::Sender;
 
@@ -283,3 +284,120 @@ fn hierarchic<'a>(
 /// The `DV_IDENTIFIER.type` of a facility's namespace id; no specification
 /// names one, so the bridge spells it (our own design).
 const NAMESPACE: &str = "namespace";
+
+/// The fields a message names its clinician in, in the order they are read:
+/// the operator of the event (EVN-5), the responsible observer of a result
+/// (OBX-16), and the ordering provider (ORC-12, OBR-16), each an `XCN`.
+const CLINICIANS: [(&str, usize); 4] = [("EVN", 5), ("OBX", 16), ("ORC", 12), ("OBR", 16)];
+
+/// The `GENERIC_ID.scheme` a clinician's identifier is written under, the
+/// `XCN` data type it was read from (our own design).
+const XCN: &str = "XCN";
+
+/// The person a message names as primarily responsible for its content.
+///
+/// It is the composition's composer (RM EHR IM, `COMPOSITION.composer`, "The
+/// person primarily responsible for the content of the Composition").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Clinician {
+    /// The name the composer carries.
+    pub name: String,
+    /// The identifier the composer carries, when the message names one.
+    pub id: Option<ComposerId>,
+}
+
+/// Returns the clinician `message` names, from the first of EVN-5, OBX-16,
+/// ORC-12 and OBR-16 that names one: XCN.3 and XCN.2 the name, XCN.1 the id,
+/// and the assigning authority (XCN.9) its namespace.
+#[must_use]
+pub fn clinician(message: &Message) -> Option<Clinician> {
+    CLINICIANS.iter().find_map(|(id, position)| {
+        message
+            .segments()
+            .iter()
+            .filter(|segment| segment.id() == *id)
+            .filter_map(|segment| segment.field(*position)?.repetitions().first())
+            .find_map(person)
+    })
+}
+
+/// Returns the clinician an `XCN` names.
+fn person(xcn: &ferrobridge_hl7v2::parse::Repetition) -> Option<Clinician> {
+    let part = |component: usize, sub: usize| {
+        xcn.component(component)
+            .and_then(|component| component.subcomponent(sub))
+    };
+    let id = part(1, 1);
+    let name = [part(3, 1), part(2, 1)]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<&str>>()
+        .join(" ");
+    let name = if name.is_empty() {
+        id?.to_owned()
+    } else {
+        name
+    };
+    Some(Clinician {
+        name,
+        id: id.map(|id| ComposerId {
+            id: id.to_owned(),
+            namespace: part(9, 1).unwrap_or(NO_AUTHORITY).to_owned(),
+            scheme: String::from(XCN),
+        }),
+    })
+}
+
+/// The namespace of a clinician's identifier whose `XCN` names no assigning
+/// authority; `PARTY_REF.namespace` is mandatory (our own design).
+const NO_AUTHORITY: &str = "unknown";
+
+/// Returns the device a device sender's result is an act of: the equipment
+/// instance (OBX-18, `EI`) of its first result, or the sending application
+/// (MSH-3) when none names one, identified in `issuer`.
+#[must_use]
+pub fn device(message: &Message, issuer: &str) -> Option<Clinician> {
+    let equipment = message
+        .segments()
+        .iter()
+        .filter(|segment| segment.id() == "OBX")
+        .filter_map(|segment| segment.field(18)?.repetitions().first())
+        .find_map(|ei| {
+            ei.component(1)
+                .and_then(|component| component.subcomponent(1))
+        })
+        .map(str::to_owned);
+    let id = equipment.or_else(|| sending_system(message))?;
+    Some(Clinician {
+        name: id.clone(),
+        id: Some(ComposerId {
+            id,
+            namespace: issuer.to_owned(),
+            scheme: String::from(DEVICE),
+        }),
+    })
+}
+
+/// The `GENERIC_ID.scheme` of a device identifier (our own design).
+const DEVICE: &str = "device";
+
+/// Returns whether `message` carries a result, an `OBX`, which commits a
+/// composition and so needs a composer.
+#[must_use]
+pub fn carries_results(message: &Message) -> bool {
+    message
+        .segments()
+        .iter()
+        .any(|segment| segment.id() == "OBX")
+}
+
+/// Who is responsible for a message's compositions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Responsible {
+    /// The health care facility the message names.
+    pub facility: Option<Facility>,
+    /// The composer: the clinician the message names, or the device.
+    pub composer: Option<Clinician>,
+    /// The device the message is an act of, when its sender is a device.
+    pub device_id: Option<String>,
+}

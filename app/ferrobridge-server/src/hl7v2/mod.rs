@@ -93,6 +93,8 @@ pub struct Face {
     log_outcomes: bool,
     /// The sending facilities the face accepts; empty accepts any.
     senders: Vec<Sender>,
+    /// The senders that are devices.
+    devices: Vec<crate::config::hl7v2::Device>,
     /// The usage report's window each message and acknowledgment is counted
     /// in.
     usage: Arc<Window>,
@@ -170,6 +172,7 @@ impl Face {
             profiles: settings.profiles.clone(),
             log_outcomes: settings.log_outcomes,
             senders: settings.senders.clone(),
+            devices: settings.devices.clone(),
             usage: Arc::new(crate::usage_report::window()),
             access_log: None,
         }
@@ -301,6 +304,44 @@ impl Face {
         }
     }
 
+    /// Returns who is responsible for `message`'s compositions: the facility
+    /// it names, its composer, and the device it is an act of when its sender
+    /// is a device.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Settled::Facility`] for a facility no listed sender names,
+    /// and [`Settled::NoClinician`] for a result naming no clinician from a
+    /// sender that is no device.
+    fn responsible(&self, message: &Message) -> Result<origin::Responsible, Settled> {
+        let facility = origin::facility(message);
+        if let Some(facility) = facility.as_ref()
+            && !facility.listed(&self.senders)
+        {
+            return Err(Settled::Facility(Box::new(facility.clone())));
+        }
+        let device = self
+            .devices
+            .iter()
+            .find(|device| device.sender.names(message));
+        let composer = match device {
+            Some(device) => origin::device(message, &device.identifier_issuer),
+            None => origin::clinician(message),
+        };
+        if composer.is_none() && origin::carries_results(message) {
+            return Err(Settled::NoClinician);
+        }
+        let device_id = device
+            .and(composer.as_ref())
+            .and_then(|composer| composer.id.as_ref())
+            .map(|id| id.id.clone());
+        Ok(origin::Responsible {
+            facility,
+            composer,
+            device_id,
+        })
+    }
+
     /// Runs one parsed message through the guide and the ingest service.
     async fn ingest(
         &self,
@@ -348,12 +389,14 @@ impl Face {
         let control_item =
             origin::control_item(control.as_str(), message_type.as_str(), sending.as_deref());
         let orders = origin::order_numbers(message);
-        let facility = origin::facility(message);
-        if let Some(facility) = facility.as_ref()
-            && !facility.listed(&self.senders)
-        {
-            return (Settled::Facility(Box::new(facility.clone())), tally);
-        }
+        let origin::Responsible {
+            facility,
+            composer,
+            device_id,
+        } = match self.responsible(message) {
+            Ok(found) => found,
+            Err(settled) => return (settled, tally),
+        };
         let provenance = Provenance::Item(SourceItem::message(control, message_type));
         let client = match crate::cdr::ids::RequestId::new(&stamped.control_id) {
             Ok(id) => self.facade.client().with_request_id(id),
@@ -369,15 +412,19 @@ impl Face {
             },
             None => None,
         };
-        let outcome = self
+        let mut ingest = self
             .facade
             .ingest_under(client, &self.settings)
-            .with_originating_system(sending)
+            .with_originating_system(device_id.or(sending))
             .with_item_ids(orders, vec![control_item])
             .with_parties(
                 facility.map(|facility| facility.party),
                 origin::performing_organisation(message),
-            )
+            );
+        if let Some(composer) = composer {
+            ingest = ingest.with_composer(composer.name, composer.id);
+        }
+        let outcome = ingest
             .ingest_bundle(&bundle, self.unmapped, &provenance)
             .await;
         match outcome {
