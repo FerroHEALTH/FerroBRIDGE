@@ -68,73 +68,73 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
         Settled::Ingested(_) => (Code::Accept, Vec::new()),
         Settled::Refused(refused) => of_refusal(refused),
         Settled::Unmapped(error) => of_map_error(error),
-        Settled::Facility(facility) => (
+        Settled::Facility(facility) => one(
             Code::Error,
-            vec![Error {
-                location: Some(
-                    ferrobridge_hl7v2::parse::Location::segment(facility.field.0, 1)
-                        .with_field(facility.field.1),
-                ),
-                code: ErrorCode::Application,
-                text: format!(
-                    "{} is not a facility of a sender this receiver accepts",
-                    facility.display()
-                ),
-            }],
+            Some(facility.field),
+            ErrorCode::Application,
+            format!(
+                "{} is not a facility of a sender this receiver accepts",
+                facility.display()
+            ),
         ),
-        Settled::NoClinician => (
+        Settled::NoClinician => one(
             Code::Error,
-            vec![Error {
-                location: Some(
-                    ferrobridge_hl7v2::parse::Location::segment("OBX", 1).with_field(16),
-                ),
-                code: ErrorCode::RequiredFieldMissing,
-                text: String::from(
-                    "the message names no clinician (EVN-5, OBX-16, ORC-12 or OBR-16) to be the composer of its results",
-                ),
-            }],
+            Some(("OBX", 16)),
+            ErrorCode::RequiredFieldMissing,
+            String::from(
+                "the message names no clinician (EVN-5, OBX-16, ORC-12 or OBR-16) to be the composer of its results",
+            ),
         ),
-        Settled::Certificate => (
+        Settled::Certificate => one(
             Code::Reject,
-            vec![Error {
-                location: Some(ferrobridge_hl7v2::parse::Location::segment("MSH", 1).with_field(4)),
-                code: ErrorCode::Application,
-                text: String::from(
-                    "the connection's client certificate does not name the sender MSH-4 names",
-                ),
-            }],
+            Some(("MSH", 4)),
+            ErrorCode::Application,
+            String::from(
+                "the connection's client certificate does not name the sender MSH-4 names",
+            ),
         ),
-        Settled::Sender => (
+        Settled::Sender => one(
             Code::Reject,
-            vec![Error {
-                location: Some(ferrobridge_hl7v2::parse::Location::segment("MSH", 1).with_field(4)),
-                code: ErrorCode::Application,
-                text: String::from("MSH-4 names a sending facility this receiver does not accept"),
-            }],
+            Some(("MSH", 4)),
+            ErrorCode::Application,
+            String::from("MSH-4 names a sending facility this receiver does not accept"),
         ),
         // NOTE: HL7 v2.5.1 §2.9.2.2: AR is the answer a reason unrelated to the content earns,
         // and a resend is safe, since the identity map recognises a committed MSH-10.
-        Settled::Unrecorded => (
+        Settled::Unrecorded => one(
             Code::Reject,
-            vec![Error {
-                location: None,
-                code: ErrorCode::Application,
-                text: String::from("the message could not be recorded in the audit trail"),
-            }],
+            None,
+            ErrorCode::Application,
+            String::from("the message could not be recorded in the audit trail"),
         ),
-        Settled::Unkeyed => (
+        Settled::Unkeyed => one(
             Code::Error,
-            vec![Error {
-                location: Some(
-                    ferrobridge_hl7v2::parse::Location::segment("MSH", 1).with_field(10),
-                ),
-                code: ErrorCode::RequiredFieldMissing,
-                text: String::from(
-                    "MSH-10 is empty, so the message cannot be recognised when resent",
-                ),
-            }],
+            Some(("MSH", 10)),
+            ErrorCode::RequiredFieldMissing,
+            String::from("MSH-10 is empty, so the message cannot be recognised when resent"),
         ),
     }
+}
+
+/// Returns the acknowledgment `code` with one `ERR` of `error` and `text`, at
+/// the field `(segment, field)` of the segment's first occurrence when one is
+/// named.
+fn one(
+    code: Code,
+    at: Option<(&str, usize)>,
+    error: ErrorCode,
+    text: String,
+) -> (Code, Vec<Error>) {
+    (
+        code,
+        vec![Error {
+            location: at.map(|(segment, field)| {
+                ferrobridge_hl7v2::parse::Location::segment(segment, 1).with_field(field)
+            }),
+            code: error,
+            text,
+        }],
+    )
 }
 
 /// Returns the answer to a refusal of the ingest.
