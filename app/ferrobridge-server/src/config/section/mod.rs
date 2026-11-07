@@ -84,8 +84,27 @@ pub struct Hl7v2 {
     /// Whether an `AE` or an `AR` also logs, at debug level, the counted
     /// outcomes of the run by kind.
     pub log_outcomes: bool,
-    /// The sending facilities (MSH-4) the face accepts; empty accepts any.
+    /// The sending facilities (MSH-4) the face accepts, at least one.
     pub senders: Vec<Hl7v2Sender>,
+    /// The TLS the MLLP listener serves, with the client certificates it
+    /// requires.
+    pub tls: Hl7v2Tls,
+}
+
+/// The `[hl7v2.tls]` table: MLLP over TLS with client certificates.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+#[expect(
+    clippy::struct_field_names,
+    reason = "the keys are [server.tls]'s, certificate_file, key_file and client_ca_file"
+)]
+pub struct Hl7v2Tls {
+    /// The PEM file of the listener's certificate chain.
+    pub certificate_file: Option<PathBuf>,
+    /// The PEM file of the listener's private key.
+    pub key_file: Option<PathBuf>,
+    /// The PEM file of the authorities a client certificate must chain to.
+    pub client_ca_file: Option<PathBuf>,
 }
 
 impl Default for Hl7v2 {
@@ -104,6 +123,7 @@ impl Default for Hl7v2 {
             frame_limit_bytes: 1024 * 1024,
             log_outcomes: false,
             senders: Vec::new(),
+            tls: Hl7v2Tls::default(),
         }
     }
 }
@@ -126,6 +146,9 @@ pub struct Hl7v2Sender {
     /// issued in, one of the CDR client's `device_identifier_issuers`;
     /// required with `origin = "device"`.
     pub device_identifier_issuer: String,
+    /// The DNS name the sender's client certificate carries in its subject
+    /// alternative name; required.
+    pub certificate_subject: String,
 }
 
 /// The profile one resource type of a mapped message claims.

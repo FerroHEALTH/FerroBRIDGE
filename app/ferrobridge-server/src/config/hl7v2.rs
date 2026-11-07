@@ -31,3 +31,27 @@ pub struct Device {
     /// The namespace its device identifiers are issued in.
     pub identifier_issuer: String,
 }
+
+/// The DNS name a sender's client certificate carries in its subject
+/// alternative name, which ties the sender to the connection it sends on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Subject {
+    /// The sending facility.
+    pub sender: Sender,
+    /// The DNS name its client certificate carries.
+    pub name: String,
+}
+
+/// The TLS the MLLP listener serves: its certificate and key, and the
+/// authorities a client certificate must chain to.
+#[derive(Clone)]
+pub struct Tls {
+    /// The acceptor, which requires a client certificate.
+    pub acceptor: tokio_rustls::TlsAcceptor,
+}
+
+impl std::fmt::Debug for Tls {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tls").finish_non_exhaustive()
+    }
+}

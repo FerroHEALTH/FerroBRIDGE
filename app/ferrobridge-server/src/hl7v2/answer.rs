@@ -37,6 +37,9 @@ pub enum Settled {
     Unkeyed,
     /// MSH-4 names a sending facility the face does not accept.
     Sender,
+    /// The connection's client certificate does not name the sender MSH-4
+    /// names.
+    Certificate,
     /// The message names a health care facility outside the senders' list.
     Facility(Box<crate::hl7v2::origin::Facility>),
     /// A message carrying results names no clinician, and its sender is no
@@ -88,6 +91,16 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
                 code: ErrorCode::RequiredFieldMissing,
                 text: String::from(
                     "the message names no clinician (EVN-5, OBX-16, ORC-12 or OBR-16) to be the composer of its results",
+                ),
+            }],
+        ),
+        Settled::Certificate => (
+            Code::Reject,
+            vec![Error {
+                location: Some(ferrobridge_hl7v2::parse::Location::segment("MSH", 1).with_field(4)),
+                code: ErrorCode::Application,
+                text: String::from(
+                    "the connection's client certificate does not name the sender MSH-4 names",
                 ),
             }],
         ),

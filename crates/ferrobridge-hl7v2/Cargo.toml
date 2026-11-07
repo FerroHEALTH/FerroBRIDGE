@@ -4,7 +4,7 @@
 name = "ferrobridge-hl7v2"
 description = "The FerroBRIDGE HL7 v2 face: MLLP framing, MSH-18 decoding, positional parsing over the generated v2 tables, the acknowledgment, and the v2-to-FHIR ConceptMap interpreter"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.193"
+version = "0.1.194"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -51,12 +51,16 @@ fhirconnect = { workspace = true, optional = true }
 fhir-types = { workspace = true, features = ["r4", "resources"], optional = true }
 ferrobridge-term = { workspace = true, optional = true }
 hl7v2-types.workspace = true
+# MLLP over TLS with client certificates (`mllp::tls`).
+rustls.workspace = true
+rustls-webpki.workspace = true
 serde_json = { workspace = true, optional = true }
 # The digest a created resource's urn:uuid is derived from.
 sha2 = { workspace = true, optional = true }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["net", "io-util", "rt", "sync", "macros", "time"] }
 tokio-util.workspace = true
+tokio-rustls.workspace = true
 tracing.workspace = true
 uuid = { workspace = true, optional = true }
 

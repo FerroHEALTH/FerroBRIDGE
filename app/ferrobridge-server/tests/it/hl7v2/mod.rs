@@ -5,8 +5,8 @@
 //! the CDR calls out.
 //!
 //! Every case starts the listener on an ephemeral port over a `wiremock` CDR
-//! and a `wiremock` terminology server, sends a synthetic ORU^R01 from a plain
-//! `TcpStream`, and asserts the answer (HL7 v2.5.1 chapter 2 §2.9.2.2 for the
+//! and a `wiremock` terminology server, sends a synthetic ORU^R01 over TLS with the
+//! sender's client certificate, and asserts the answer (HL7 v2.5.1 chapter 2 §2.9.2.2 for the
 //! codes) and what the CDR received. The mapping set is one synthetic
 //! Observation context under `hl7v2_fixtures/`, which the face's configured
 //! profile points the message's Observation at. Behind `FERROBRIDGE_E2E` the
@@ -23,6 +23,7 @@ use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::mllp::listener::Timeouts;
 use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::config::Hl7v2Settings;
+use ferrobridge_server::config::hl7v2::{Sender, Subject, Tls};
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::ingest::UnmappedEntries;
@@ -30,6 +31,7 @@ use ferrobridge_server::facade::programs;
 use ferrobridge_server::hl7v2::Face;
 use ferrobridge_server::hl7v2::Listener;
 use ferrobridge_server::hl7v2::Listening;
+use ferrobridge_testkit::mllp_tls::{ClientIdentity, Pki};
 use ferrobridge_testkit::stubs::terminology;
 use ferrohealth_usage_report::window::{Counts, Window};
 use std::collections::BTreeMap;
@@ -37,9 +39,10 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use wiremock::Mock;
@@ -125,7 +128,7 @@ fn frame(message: &[u8]) -> Vec<u8> {
 }
 
 /// Reads one framed acknowledgment and returns its text.
-async fn read_ack(stream: &mut TcpStream) -> Result<String, Box<dyn Error>> {
+async fn read_ack(stream: &mut (impl AsyncRead + Unpin)) -> Result<String, Box<dyn Error>> {
     let mut buffer = Vec::new();
     let mut byte = [0u8; 1];
     loop {
@@ -213,6 +216,24 @@ fn package() -> PathBuf {
         .join("../../tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package")
 }
 
+/// The TLS material every case serves and sends with, generated once.
+pub(crate) static PKI: LazyLock<Pki> = LazyLock::new(|| Pki::generate().expect("the TLS material"));
+
+/// The DNS name the sending facility NORTHLAB's client certificate carries.
+const NORTHLAB_SUBJECT: &str = "northlab.example.org";
+
+/// The client certificate of the sending facility NORTHLAB.
+static NORTHLAB: LazyLock<ClientIdentity> =
+    LazyLock::new(|| PKI.client(NORTHLAB_SUBJECT).expect("a client certificate"));
+
+/// Connects to `address` over TLS as NORTHLAB.
+pub(crate) async fn connect(
+    address: SocketAddr,
+) -> Result<tokio_rustls::client::TlsStream<tokio::net::TcpStream>, Box<dyn Error>> {
+    let connector = PKI.connector(Some(&NORTHLAB))?;
+    Ok(ferrobridge_testkit::mllp_tls::connect(address, &connector).await?)
+}
+
 /// Returns the face's settings, claiming [`PROFILE`] for an Observation when
 /// `claim` is set.
 pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
@@ -232,8 +253,20 @@ pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
         timeouts: Timeouts::default(),
         frame_limit: 1024 * 1024,
         log_outcomes: true,
-        senders: Vec::new(),
+        senders: vec![Sender::Namespace(String::from("NORTHLAB"))],
         devices: Vec::new(),
+        subjects: vec![Subject {
+            sender: Sender::Namespace(String::from("NORTHLAB")),
+            name: String::from(NORTHLAB_SUBJECT),
+        }],
+        tls: Tls {
+            acceptor: ferrobridge_hl7v2::mllp::tls::acceptor(
+                PKI.server_certificate().as_bytes(),
+                PKI.server_key().as_bytes(),
+                PKI.ca().as_bytes(),
+            )
+            .expect("the acceptor builds"),
+        },
     }
 }
 
@@ -298,7 +331,7 @@ impl Serving {
 
     /// Sends one framed message on a new connection and reads the answer.
     async fn send(&self, message: &[u8]) -> Result<String, Box<dyn Error>> {
-        let mut stream = TcpStream::connect(self.address).await?;
+        let mut stream = connect(self.address).await?;
         stream.write_all(&frame(message)).await?;
         read_ack(&mut stream).await
     }
@@ -442,6 +475,7 @@ fn assert_counted(counts: &Counts, (aa, ae, ar): (u64, u64, u64), mapping_failur
 }
 
 mod answers;
+mod certificate;
 mod clinician;
 mod facility;
 mod feeder_audit;

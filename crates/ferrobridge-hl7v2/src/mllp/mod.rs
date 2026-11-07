@@ -27,6 +27,7 @@ use tokio_util::codec::{Decoder, Encoder};
 
 pub mod listener;
 pub mod sender;
+pub mod tls;
 
 /// The start block, `0x0B`.
 pub const START_BLOCK: u8 = 0x0B;

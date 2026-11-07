@@ -22,6 +22,9 @@ base64.workspace = true
 jiff.workspace = true
 jsonwebtoken.workspace = true
 reqwest.workspace = true
+# The MLLP face's TLS material (`mllp_tls`), generated in memory per case.
+rcgen.workspace = true
+rustls.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
@@ -29,7 +32,8 @@ sqlx.workspace = true
 tempfile.workspace = true
 testcontainers.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["time", "net"] }
+tokio-rustls.workspace = true
 # The redirect an approved authorization request is answered with.
 url.workspace = true
 wiremock.workspace = true
