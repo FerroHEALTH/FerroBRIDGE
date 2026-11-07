@@ -94,6 +94,15 @@ syntax in the variable. The section holds no secret.
    typed by the message type (`ORU^R01`), as the first
    `feeder_system_item_ids` entry. A message without order numbers records
    none.
+   The health care facility (`EVENT_CONTEXT.health_care_facility`) is read
+   from the first field that names one: the assigned location's facility
+   (PV1-3.4), the servicing facility (PV1-39), the ordering facility
+   (ORC-21), and the sending facility (MSH-4) last. A composition with no
+   `EVENT_CONTEXT` names it as `originating_system_audit.location` instead.
+   With `[[hl7v2.senders]]` set, a facility no sender names is answered `AE`
+   with an `ERR` at its field naming it, and nothing is committed. The
+   performing organisation (OBX-23) is `originating_system_audit.provider`,
+   never the facility or the composer.
 6. The acknowledgment is sent once the ingest settled, so `AA` means the CDR
    holds the message's compositions.
 

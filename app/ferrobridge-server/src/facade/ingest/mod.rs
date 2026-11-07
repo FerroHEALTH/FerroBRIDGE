@@ -34,6 +34,7 @@ use fhir_types::codec::Value;
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::demographics::NoDemographics;
 use fhirconnect::engine::origin::ItemId;
+use fhirconnect::engine::origin::Party;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
@@ -443,6 +444,11 @@ pub struct Ingest<'a> {
     originating_items: Option<Vec<ItemId>>,
     /// The identifiers of the item in the bridge, the feeder system.
     feeder_items: Vec<ItemId>,
+    /// The health care facility every composition names, when the face named
+    /// one.
+    facility: Option<Party>,
+    /// Who created or handled the item in the originating system.
+    provider: Option<Party>,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -476,6 +482,8 @@ impl<'a> Ingest<'a> {
             originating: None,
             originating_items: None,
             feeder_items: Vec::new(),
+            facility: None,
+            provider: None,
         }
     }
 
@@ -499,6 +507,16 @@ impl<'a> Ingest<'a> {
     pub fn with_item_ids(mut self, originating: Vec<ItemId>, feeder: Vec<ItemId>) -> Self {
         self.originating_items = Some(originating);
         self.feeder_items = feeder;
+        self
+    }
+
+    /// Returns this ingest naming `facility` as the health care facility of
+    /// every composition no mapping gave one, and `provider` as who created or
+    /// handled the item in the originating system.
+    #[must_use]
+    pub fn with_parties(mut self, facility: Option<Party>, provider: Option<Party>) -> Self {
+        self.facility = facility;
+        self.provider = provider;
         self
     }
 

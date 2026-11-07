@@ -294,3 +294,88 @@ fn named_item_ids_replace_the_source_item_and_lead_the_feeder_ids() -> Result<()
     );
     Ok(())
 }
+
+/// Returns the synthetic facility party the facility cases name.
+fn north_ward() -> fhirconnect::engine::origin::Party {
+    fhirconnect::engine::origin::Party {
+        name: Some(String::from("North ward")),
+        identifiers: vec![fhirconnect::engine::origin::ItemId {
+            id: String::from("NORTHWARD"),
+            kind: String::from("HD"),
+            issuer: None,
+        }],
+    }
+}
+
+#[test]
+fn a_default_facility_is_the_context_s_health_care_facility() -> Result<(), Box<dyn Error>> {
+    // RM EHR IM, EVENT_CONTEXT.health_care_facility: "The health care facility
+    // under whose care the event took place".
+    let program = compiled("ferrobridge_diagnose_minimal")?;
+    let index = template()?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_document()?,
+        &Seams::default(),
+        &defaults()
+            .with_facility(north_ward())
+            .with_origin(Origin::new("ferrobridge.test")),
+        &CallContext::new(),
+    )?;
+    let composition = inbound.value().value();
+    let facility = composition
+        .pointer("/context/health_care_facility")
+        .ok_or("the context names a facility")?;
+    assert_eq!(Some("North ward"), facility["name"].as_str(), "{facility}");
+    assert_eq!(
+        Some("NORTHWARD"),
+        facility
+            .pointer("/identifiers/0/id")
+            .and_then(serde_json::Value::as_str),
+        "{facility}"
+    );
+    assert!(
+        composition
+            .pointer("/feeder_audit/originating_system_audit/location")
+            .is_none(),
+        "a placed facility is not the location as well"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_origin_provider_is_the_originating_system_s_provider() -> Result<(), Box<dyn Error>> {
+    // RM Common IM, FEEDER_AUDIT_DETAILS.provider: "provider(s) who created,
+    // committed, forwarded or otherwise handled the item".
+    let program = compiled("ferrobridge_diagnose_minimal")?;
+    let index = template()?;
+    let origin =
+        Origin::new("ferrobridge.test").with_provider(fhirconnect::engine::origin::Party {
+            name: Some(String::from("Synthetic performing laboratory")),
+            identifiers: Vec::new(),
+        });
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_document()?,
+        &Seams::default(),
+        &defaults().with_origin(origin),
+        &CallContext::new(),
+    )?;
+    let audit = inbound
+        .value()
+        .value()
+        .get("feeder_audit")
+        .ok_or("the composition carries a FEEDER_AUDIT")?;
+    assert_eq!(
+        Some("Synthetic performing laboratory"),
+        audit
+            .pointer("/originating_system_audit/provider/name")
+            .and_then(serde_json::Value::as_str),
+        "{audit}"
+    );
+    Ok(())
+}

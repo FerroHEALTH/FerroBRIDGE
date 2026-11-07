@@ -99,6 +99,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let under = rm::family_of(&segments);
         match value {
             RmValue::Party(ref party) => {
+                if under
+                    .iter()
+                    .any(|segment| segment.name == family::HEALTH_CARE_FACILITY)
+                {
+                    self.facility_written = true;
+                }
                 self.families
                     .extend(family::provider(node, &binding.openehr, &under, party));
             }

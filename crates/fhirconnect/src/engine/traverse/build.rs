@@ -18,6 +18,7 @@ use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::support::terminology::openehr_terminology_group_identifiers::OpenehrTerminologyGroupIdentifiersData;
 
+use crate::engine::family;
 use crate::engine::outcome::Location;
 use crate::engine::outcome::Loss;
 use crate::engine::outcome::Warning;
@@ -36,6 +37,12 @@ use crate::resolve::compile::openehr::occurrences;
 
 /// The archetype path of `COMPOSITION.composer`.
 pub(super) const COMPOSER: &str = "/composer";
+
+/// The archetype path of `COMPOSITION.context`.
+const CONTEXT: &str = "/context";
+
+/// The path a defaulted health care facility is recorded under.
+const HEALTH_CARE_FACILITY_PATH: &str = "/context/health_care_facility";
 
 /// The RM type of an `INSTRUCTION` entry (RM EHR IM §INSTRUCTION).
 const INSTRUCTION: &str = "INSTRUCTION";
@@ -107,6 +114,34 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
         }
         self.declare_narratives(&mut filled)?;
         Ok(filled)
+    }
+
+    /// Writes the default facility as the `_health_care_facility` family of the
+    /// `context` node when the template has one and no mapping wrote the
+    /// family, and answers whether the composition has no `EVENT_CONTEXT` to
+    /// hold it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Template`] when the template cannot answer for
+    /// the context node.
+    pub(super) fn place_facility(
+        &mut self,
+        defaults: &Defaults,
+        filled: &mut Vec<String>,
+    ) -> Result<bool, EngineError> {
+        let Some(facility) = defaults.facility.as_ref() else {
+            return Ok(false);
+        };
+        let Some(context) = self.node_at(CONTEXT)? else {
+            return Ok(true);
+        };
+        if !self.facility_written {
+            self.families
+                .extend(family::health_care_facility(context, facility));
+            self.defaulted(filled, HEALTH_CARE_FACILITY_PATH);
+        }
+        Ok(false)
     }
 
     /// Declares every `INSTRUCTION.narrative` the run leaves to the FLAT

@@ -211,20 +211,22 @@ impl Ingest<'_> {
     /// Returns the origin a run of `inbound` records in its `FEEDER_AUDIT`: the
     /// bridge, the source item `provenance` names, and what the face named
     /// apart from it.
-    fn origin(
-        &self,
-        provenance: &Provenance,
-        inbound: &Inbound,
-    ) -> fhirconnect::engine::origin::Origin {
-        let origin = engine::origin_of(
+    fn origin(&self, provenance: &Provenance, inbound: &Inbound) -> engine::Recorded {
+        let recorded = engine::origin_of(
             self.settings,
             provenance.source_for(inbound.document()),
             self.originating.as_deref(),
-        )
-        .with_feeder_items(self.feeder_items.clone());
-        match self.originating_items.as_ref() {
-            Some(items) => origin.with_originating_items(items.clone()),
-            None => origin,
+        );
+        let mut origin = recorded.origin.with_feeder_items(self.feeder_items.clone());
+        if let Some(items) = self.originating_items.as_ref() {
+            origin = origin.with_originating_items(items.clone());
+        }
+        if let Some(provider) = self.provider.as_ref() {
+            origin = origin.with_provider(provider.clone());
+        }
+        engine::Recorded {
+            origin,
+            facility: self.facility.clone(),
         }
     }
 
