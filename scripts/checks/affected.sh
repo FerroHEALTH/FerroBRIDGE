@@ -36,6 +36,8 @@
 #   lint_matrix    the clippy and msrv shards as a matrix (JSON, one line)
 #   journeys       ferrobridge-console or ferrobridge-server is affected (the
 #                  console's browser journeys, which run both)
+#   perf           ferrobridge-server is affected (the performance gate,
+#                  which measures its release build)
 #
 # A path reaches a package in three ways. A path under a member's directory
 # reaches that member and every member whose Rust source names that
@@ -167,6 +169,9 @@ classify() {
     scripts/checks/stray-literals.*) echo "packages ferrobridge-console" ;;
     # Installs the browser the console's journeys drive.
     scripts/release/journey-tools.sh) echo "packages ferrobridge-console" ;;
+    # The performance gate measures the server: its plans, its script and
+    # the workflow and action that run it.
+    perf/* | scripts/perf/* | .github/workflows/perf.yml | .github/actions/perf-attempt/*) echo "packages ferrobridge-server" ;;
     # Read by the testkit's screenshot guard: every console screenshot and
     # every book page that shows one.
     website/book/src/*) echo "only ferrobridge-testkit" ;;
@@ -368,6 +373,8 @@ emit() {
     flag=false
   fi
   echo "journeys=$flag"
+  if has "$packages" ferrobridge-server; then flag=true; else flag=false; fi
+  echo "perf=$flag"
   echo "test_matrix=$(matrix "$graph" "$packages" "$TEST_SHARDS" test_weight)"
   echo "lint_matrix=$(matrix "$graph" "$packages" "$LINT_SHARDS" lint_weight)"
 }
@@ -576,6 +583,10 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the book theme is inert" "website/book/theme/favicon.svg" false ""
   check "the journeys' browser install reaches the console" "scripts/release/journey-tools.sh" false \
     "+ferrobridge-console +ferrobridge-testkit -ferrobridge-server"
+  check "the performance plan reaches the server it measures" "perf/plan.toml" false \
+    "+ferrobridge-server -fhirconnect -ferrobridge-console"
+  check "the performance workflow reaches the server it measures" ".github/workflows/perf.yml" false \
+    "+ferrobridge-server -fhirconnect -ferrobridge-console"
   # The console's image recipe and release lane are read by tier-1 jobs and
   # the release lane alone, never by a cargo lane.
   check "the console image recipe is inert" "docker/console/Dockerfile" false ""

@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
+# The plan of the performance gate (ferrohealth-perf, FerroHEALTH/FerroSYS
+# #249), run by scripts/perf/gate.sh against the bridge of
+# perf/ferrobridge.toml over the pinned FerroEHR CDR. The gate seeds the CDR
+# through the facade and fills each upper-case placeholder between at signs
+# with what the seed made, so the committed plan names no id. The creates
+# write into one subject's EHR and the read and the search read another's,
+# whose content never changes, so a read is as fast at the end of the window
+# as at its start. The HL7 v2 face is measured idle only: ferrohealth-perf
+# sends HTTP. No specification governs this: our own design.
+
+[idle]
+duration_secs = 60
+max_cpu_percent = 2.0
+# The events lane reads the CDR's outbox once a second with nothing to
+# deliver, about four transactions a second with the CDR's own; the planted
+# poller makes thousands.
+max_transactions_per_second = 5.0
+settle_secs = 11
+
+[load]
+rate = 20.0
+warmup_secs = 10
+duration_secs = 60
+
+# The CapabilityStatement built from the loaded programs (R4 http.html
+# "capabilities").
+[[requests]]
+group = "metadata"
+method = "GET"
+path = "/fhir/metadata"
+status = 200
+
+# A create mapped through FHIRconnect and committed as one composition
+# (R4 http.html "create").
+[[requests]]
+group = "create"
+method = "POST"
+path = "/fhir/Condition"
+status = 201
+body = '''@CREATE_BODY@'''
+headers = { content-type = "application/fhir+json" }
+
+# A read of the seeded Condition, its composition mapped back to FHIR
+# (R4 http.html "read").
+[[requests]]
+group = "read"
+method = "GET"
+path = "/fhir/Condition/@READ_ID@"
+status = 200
+
+# A search over the AQL projection the search file declares, held to the
+# seeded subject (R4 search.html).
+[[requests]]
+group = "search"
+method = "GET"
+path = "/fhir/Condition?@SEARCH@"
+status = 200

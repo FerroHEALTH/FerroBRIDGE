@@ -169,9 +169,9 @@ in code is the matching constant in
 | Item | Pin | Repeated in |
 |---|---|---|
 | PostgreSQL image | `postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280` | the `POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, the `sqlx-offline` service in `.github/workflows/ci.yml` |
-| RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs` |
-| FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.6.0-rc10@sha256:c8bfd44a5a87c4a4df14ba4f8100e29e9720a5954e9bd792c551dc098f1f13ee` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs` |
-| FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.6.0-rc10@sha256:ab451cd45ffe33ecd3ab140d274c34a003349a41bf7a0ef8221460dd022e29e3` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs` |
+| RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.6.0-rc10@sha256:c8bfd44a5a87c4a4df14ba4f8100e29e9720a5954e9bd792c551dc098f1f13ee` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.6.0-rc10@sha256:ab451cd45ffe33ecd3ab140d274c34a003349a41bf7a0ef8221460dd022e29e3` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.1.6@sha256:7ec4c9622e88e3028faf7c74a2384fb02e57dc3163c282b21274121a26aa3d5b` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 
 The CDR runs against its own published database image rather than the plain
@@ -487,6 +487,8 @@ container images, pinned by tag and by digest. The `sqlx-offline` job installs
 `sqlx-cli` is not in its own tool list. `sqlx-cli` carries the
 `sqlx` crate's version, because the CLI writes the query metadata the crate's
 macros read.
+The performance gate installs `ferrohealth-perf` from crates.io at its exact
+version (`cargo install --locked`), as every FerroHEALTH product does.
 
 | Item | Pin | Repeated in |
 |---|---|---|
@@ -495,6 +497,7 @@ macros read.
 | `shellcheck` | 0.11.0 | `.github/workflows/ci.yml` |
 | `hadolint` | 2.15.1 | `.github/workflows/ci.yml` |
 | `sqlx-cli` | 0.9.0 | `.github/workflows/ci.yml` (the `sqlx-offline` job) |
+| `ferrohealth-perf` | 0.4.2 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
 
 The clone detector of `scripts/checks/duplication.sh` (#1359) also runs on a
 developer machine, so its pins live here and the guard reads them from this

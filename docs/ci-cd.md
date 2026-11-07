@@ -89,6 +89,7 @@ A changed path reaches packages in one of these ways:
 | `scripts/checks/conformance.sh`, `README.md`, a `conformance/` path no corpus names | the packages `conformance.sh` runs |
 | `docs/VERSIONS.md` | `ferrobridge-testkit`, and through it every member testing with it (`matrix_pin`) |
 | `docs/architecture.md` | the testkit's own tests |
+| `perf/**`, `scripts/perf/**`, `.github/workflows/perf.yml`, `.github/actions/perf-attempt/**` | `ferrobridge-server` (the performance gate measures its release build) |
 | `scripts/checks/sqlx-offline.sh` | `omop-cdm` |
 | `.claude/rules/console-ui.md`, `scripts/release/journey-tools.sh`, `scripts/checks/stray-literals.*` | `ferrobridge-console` (the rule holds what its pages, posts and journeys keep; the scripts install the browser its journeys drive and check its sources for stray literals) |
 | `website/book/src/**` | the testkit's own tests (its screenshot guard reads every page of the book and every console screenshot) |
@@ -108,6 +109,7 @@ maps it. Each lane then reads one output:
 | `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |
 | `sqlx-offline` | `omop-cdm` is reached |
 | `journeys (browser)` | `ferrobridge-console` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console, with FerroUI's script modules loaded and refused |
+| `perf` | `ferrobridge-server` is reached: the performance gate of `perf.yml`, the idle and load phases of `ferrohealth-perf` against the release build over the pinned FerroEHR CDR, retried on a fresh runner only on a CPU model listed as stall-prone (the book's Contribute page "The performance gate") |
 | `conformance` | a package `conformance.sh` runs is reached |
 | `e2e (containers)` | one of `omop-cdm`, `ferrobridge-server`, `ferrobridge-term`, `ferrobridge-testkit` is reached; it runs those of them that are |
 | `rustfmt`, `cargo-deny`, `dependency-review` and every tier-1 job | always (`cargo-deny` because the advisory database moves without a change) |
