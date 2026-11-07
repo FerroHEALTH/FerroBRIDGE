@@ -449,6 +449,22 @@ const CONCEPT_MAPS: [&str; 6] = [
     "table-hl70001-to-administrative-gender",
 ];
 
+/// Writes the MLLP listener's TLS material under `tree` and returns the
+/// `[hl7v2.tls]` table naming it; no key is committed, each is generated here.
+fn mllp_tls(tree: &Path) -> Result<String, Box<dyn Error>> {
+    let pki = ferrobridge_testkit::mllp_tls::Pki::generate()?;
+    let [chain, key, ca] =
+        ["mllp-chain.pem", "mllp-key.pem", "mllp-ca.pem"].map(|name| tree.join(name));
+    std::fs::write(&chain, pki.server_certificate())?;
+    std::fs::write(&key, pki.server_key())?;
+    std::fs::write(&ca, pki.ca())?;
+    let [chain, key, ca] =
+        [chain, key, ca].map(|file| toml::Value::String(file.display().to_string()));
+    Ok(format!(
+        "\n[hl7v2.tls]\ncertificate_file = {chain}\nkey_file = {key}\nclient_ca_file = {ca}\n"
+    ))
+}
+
 /// Starts the bridge over the tree at `tree` and the CDR `cdr` on the
 /// loopback port `port` (`0` for one the system chooses), trusting the
 /// operator's token `provider` issues, and returns its base URL.
@@ -471,6 +487,7 @@ async fn bridge(
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
+    let mllp_tls = mllp_tls(tree)?;
     let events = match lanes {
         Lanes::WithEvents => events_lane(cdr, tree).await?,
         Lanes::All | Lanes::WithoutOperations | Lanes::WithEtl => String::new(),
@@ -491,7 +508,8 @@ async fn bridge(
          [[auth.issuer]]\nissuer = \"{issuer}\"\nkind = \"persons\"\naudience = [\"{bridge}/fhir\"]\n\
          first_party_clients = [\"ferrobridge-console\"]\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
-         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\nconcept_maps = {v2mappings}\n\n\
+         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\nconcept_maps = {v2mappings}\n\
+         senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}]\n{mllp_tls}\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
