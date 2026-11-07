@@ -34,7 +34,7 @@ use crate::engine::seam::BundleReferences;
 use crate::engine::seam::Seams;
 use crate::engine::seam::identity::ResourceRequest;
 use crate::engine::traverse;
-use crate::engine::traverse::Defaults;
+use crate::engine::traverse::defaults::Defaults;
 use crate::operations::contract::CompositionPayload;
 use crate::operations::contract::Format;
 use crate::operations::contract::ToFhirRequest;

@@ -8,7 +8,7 @@
 //! constructed to describe the origin of data that have been transformed into
 //! openEHR form and committed to the system"
 //! (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html#_feeder_audit_class>).
-//! A run carries one [`Origin`] on its [`crate::engine::traverse::Defaults`],
+//! A run carries one [`Origin`] on its [`crate::engine::traverse::defaults::Defaults`],
 //! and the engine writes it into the composition beside the fields it
 //! defaulted, so a reader of the stored composition sees both.
 

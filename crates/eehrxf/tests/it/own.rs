@@ -17,7 +17,7 @@ use eehrxf::document::EPS_BUNDLE;
 use eehrxf::receive::ReceivedDocument;
 use fhir_types::codec::{Json, Value};
 use fhir_types::r4::resource::Resource;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::operations::run::Settings;
 use openehr_rm::v1_2::composition::composition::Composition;
 use openehr_rm::v1_2::data_types::encapsulated::dv_encapsulated::DvEncapsulated;

@@ -15,7 +15,7 @@ use fhirconnect::engine::demographics::IssuerDemographics;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::Outcome;
 use fhirconnect::engine::seam::Seams;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::engine::traverse::to_openehr;
 use openehr_mapping_core::composition::CanonicalComposition;
 

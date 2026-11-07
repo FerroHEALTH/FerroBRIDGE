@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::demographics::NoDemographics;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::operations::programs::ProgramSet;
 use fhirconnect::operations::run;
 

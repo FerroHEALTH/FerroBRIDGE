@@ -28,10 +28,10 @@ use crate::engine::rm::RmValue;
 
 use crate::tree::element::Table;
 
-use crate::engine::traverse::Defaults;
 use crate::engine::traverse::Held;
 use crate::engine::traverse::Routed;
 use crate::engine::traverse::Run;
+use crate::engine::traverse::defaults::Defaults;
 use crate::engine::traverse::error::EngineError;
 use crate::resolve::compile::openehr::occurrences;
 

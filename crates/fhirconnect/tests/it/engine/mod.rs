@@ -50,7 +50,7 @@ use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::ReferenceSource;
 use fhirconnect::engine::seam::identity::IdentityRequest;
 use fhirconnect::engine::seam::identity::IdentitySink;
-use fhirconnect::engine::traverse::Defaults;
+use fhirconnect::engine::traverse::defaults::Defaults;
 
 use fhirconnect::resolve::program::Program;
 use fhirconnect::resolve::program::binding::ResourceType;
