@@ -95,6 +95,8 @@ pub struct Face {
     senders: Vec<Sender>,
     /// The senders that are devices.
     devices: Vec<crate::config::hl7v2::Device>,
+    /// The DNS name each sender's client certificate carries.
+    subjects: Vec<crate::config::hl7v2::Subject>,
     /// The usage report's window each message and acknowledgment is counted
     /// in.
     usage: Arc<Window>,
@@ -135,6 +137,26 @@ fn sending_facility(message: &Message) -> Option<&str> {
         .and_then(|component| component.subcomponent(1))
 }
 
+/// Returns whether the client certificate of `connection` names the subject
+/// of the sender MSH-4 of `message` names.
+///
+/// A sender is tied to the DNS name its certificate carries, so a peer sends
+/// only as the sender its certificate names (our own design).
+#[must_use]
+pub fn certified(
+    subjects: &[crate::config::hl7v2::Subject],
+    message: &Message,
+    connection: &Connection,
+) -> bool {
+    let Some(certificate) = connection.certificate() else {
+        return false;
+    };
+    subjects.iter().any(|subject| {
+        subject.sender.names(message)
+            && ferrobridge_hl7v2::mllp::tls::names(certificate, &subject.name)
+    })
+}
+
 /// Returns whether `senders` accepts the sending facility of `message`; an
 /// empty list accepts any.
 #[must_use]
@@ -173,6 +195,7 @@ impl Face {
             log_outcomes: settings.log_outcomes,
             senders: settings.senders.clone(),
             devices: settings.devices.clone(),
+            subjects: settings.subjects.clone(),
             usage: Arc::new(crate::usage_report::window()),
             access_log: None,
         }
@@ -244,6 +267,15 @@ impl Face {
                         return self.acknowledge(
                             &inbound,
                             &Settled::Sender,
+                            &Tally::default(),
+                            &stamped,
+                        );
+                    }
+                    if !certified(&self.subjects, inbound.parsed().message(), connection) {
+                        connection.refuse();
+                        return self.acknowledge(
+                            &inbound,
+                            &Settled::Certificate,
                             &Tally::default(),
                             &stamped,
                         );
@@ -534,10 +566,12 @@ impl Listening {
 }
 
 /// How the MLLP listener runs.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Listener {
     /// The frame codec, with its ceiling.
     pub codec: Codec,
+    /// The TLS the listener serves, requiring a client certificate.
+    pub tls: crate::config::hl7v2::Tls,
     /// How long a connection and a frame may wait on the peer.
     pub timeouts: Timeouts,
     /// How long the drain may take after the stop signal.
@@ -547,9 +581,10 @@ pub struct Listener {
 impl Listener {
     /// Returns the listener `settings` describe, draining within `drain`.
     #[must_use]
-    pub const fn of(settings: &Hl7v2Settings, drain: Duration) -> Self {
+    pub fn of(settings: &Hl7v2Settings, drain: Duration) -> Self {
         Self {
             codec: Codec::new(settings.frame_limit),
+            tls: settings.tls.clone(),
             timeouts: settings.timeouts,
             drain,
         }
@@ -582,8 +617,9 @@ where
     let inner = Arc::clone(&signalled);
     let flag = listening.clone();
     listening.set(true);
-    let server = listener::serve_with(
+    let server = listener::serve_tls(
         socket,
+        listener.tls.acceptor.clone(),
         face,
         listener.codec,
         listener.timeouts,

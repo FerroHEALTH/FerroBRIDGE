@@ -12,8 +12,49 @@ use std::time::Duration;
 use super::env;
 use super::refusal;
 
-/// A facade the HL7 v2 face can write through, with `face` as its section.
+/// The listener's TLS material, written once to files the cases name.
+static TLS: std::sync::LazyLock<tempfile::TempDir> = std::sync::LazyLock::new(|| {
+    let pki = ferrobridge_testkit::mllp_tls::Pki::generate().expect("the TLS material");
+    let directory = tempfile::tempdir().expect("a directory");
+    for (name, pem) in [
+        ("chain.pem", pki.server_certificate().to_owned()),
+        ("key.pem", pki.server_key().to_owned()),
+        ("authorities.pem", pki.ca()),
+    ] {
+        std::fs::write(directory.path().join(name), pem).expect("the file is written");
+    }
+    directory
+});
+
+/// The sender a case names when it sets none.
+const SENDER: &str =
+    "senders = [{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }]\n";
+
+/// Returns the `[hl7v2.tls]` table naming the case's TLS files.
+fn tls_table() -> String {
+    let path = |name: &str| TLS.path().join(name).display().to_string();
+    format!(
+        "\n[hl7v2.tls]\ncertificate_file = \"{}\"\nkey_file = \"{}\"\nclient_ca_file = \"{}\"\n",
+        path("chain.pem"),
+        path("key.pem"),
+        path("authorities.pem"),
+    )
+}
+
+/// A facade the HL7 v2 face can write through, with `face` as its section,
+/// the default sender when `face` names none, and the TLS table.
 fn with_face(face: &str) -> String {
+    let sender = if face.contains("senders =") {
+        ""
+    } else {
+        SENDER
+    };
+    format!("{}{sender}{}", bare_face(face), tls_table())
+}
+
+/// A facade the HL7 v2 face can write through, with `face` as its whole
+/// section and no TLS table.
+fn bare_face(face: &str) -> String {
     format!(
         "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[hl7v2]\nenabled = true\n{face}"
     )
@@ -42,7 +83,7 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
         "frame_timeout_ms = 5000\n",
         "frame_limit_bytes = 65536\n",
         "log_outcomes = true\n",
-        "senders = [{ namespace_id = \"NORTHLAB\" }, { universal_id = \"1.2.3.4\", universal_id_type = \"ISO\" }]\n",
+        "senders = [{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }, { universal_id = \"1.2.3.4\", universal_id_type = \"ISO\", certificate_subject = \"iso.example.org\" }]\n",
         "profiles = [{ resource_type = \"Observation\", profile = \"http://example.org/fhir/StructureDefinition/lab\" }]\n",
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
@@ -112,7 +153,7 @@ fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn 
     assert_eq!(Some(Duration::from_secs(30)), face.timeouts.frame);
     assert_eq!(1024 * 1024, face.frame_limit);
     assert!(!face.log_outcomes);
-    assert!(face.senders.is_empty(), "an empty list accepts any sender");
+    assert_eq!(1, face.senders.len(), "the case names its one sender");
     Ok(())
 }
 
@@ -226,7 +267,7 @@ fn an_unknown_hl7v2_key_refuses_to_boot() {
 fn a_device_sender_resolves_with_its_identifier_issuer() -> Result<(), Box<dyn std::error::Error>> {
     let text = with_face(concat!(
         "concept_maps = \"/srv/v2mappings/package\"\n",
-        "senders = [{ namespace_id = \"NORTHLAB\" }, { namespace_id = \"ANALYSER\", origin = \"device\", device_identifier_issuer = \"urn:example:devices\" }]\n",
+        "senders = [{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }, { namespace_id = \"ANALYSER\", origin = \"device\", device_identifier_issuer = \"urn:example:devices\", certificate_subject = \"analyser.example.org\" }]\n",
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let face = settings.hl7v2.ok_or("the face is on")?;
@@ -237,6 +278,72 @@ fn a_device_sender_resolves_with_its_identifier_issuer() -> Result<(), Box<dyn s
             identifier_issuer: String::from("urn:example:devices"),
         }],
         face.devices
+    );
+    Ok(())
+}
+
+#[test]
+fn an_hl7v2_face_without_senders_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    let text = format!(
+        "{}{}",
+        bare_face("concept_maps = \"/srv/v2mappings/package\"\n"),
+        tls_table()
+    );
+    match &refusal(&text)? {
+        Error::Needs { key, needs } => {
+            assert_eq!("hl7v2.enabled", key);
+            assert_eq!("hl7v2.senders", needs);
+        }
+        other => return Err(format!("expected a needs error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_sender_without_its_certificate_subject_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
+    let text = with_face(concat!(
+        "concept_maps = \"/srv/v2mappings/package\"\n",
+        "senders = [{ namespace_id = \"NORTHLAB\" }]\n",
+    ));
+    match &refusal(&text)? {
+        Error::CertificateSubject { key } => assert_eq!("hl7v2.senders", key),
+        other => return Err(format!("expected a subject refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn an_hl7v2_face_without_tls_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    // The MLLP face serves TLS with client certificates and nothing else.
+    let text = format!(
+        "{}{SENDER}",
+        bare_face("concept_maps = \"/srv/v2mappings/package\"\n")
+    );
+    match &refusal(&text)? {
+        Error::Needs { key, needs } => {
+            assert_eq!("hl7v2.enabled", key);
+            assert_eq!("hl7v2.tls.certificate_file", needs);
+        }
+        other => return Err(format!("expected a needs error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn tls_material_that_makes_no_listener_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    let empty = tempfile::NamedTempFile::new()?;
+    let text = format!(
+        "{}{SENDER}{}",
+        bare_face("concept_maps = \"/srv/v2mappings/package\"\n"),
+        tls_table().replace(
+            &TLS.path().join("authorities.pem").display().to_string(),
+            &empty.path().display().to_string()
+        )
+    );
+    assert!(
+        matches!(refusal(&text)?, Error::Hl7v2Tls { .. }),
+        "client authorities that hold nothing refuse the start"
     );
     Ok(())
 }

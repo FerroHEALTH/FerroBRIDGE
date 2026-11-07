@@ -411,6 +411,10 @@ pub struct Hl7v2Settings {
     pub senders: Vec<hl7v2::Sender>,
     /// The senders that are devices, whose results commit as device acts.
     pub devices: Vec<hl7v2::Device>,
+    /// The DNS name the client certificate of each sender carries.
+    pub subjects: Vec<hl7v2::Subject>,
+    /// The TLS the listener serves, requiring a client certificate.
+    pub tls: hl7v2::Tls,
 }
 
 /// The settings the run path holds, with every secret already read.

@@ -25,6 +25,7 @@ use super::section::Cdr;
 use super::section::Etl;
 use super::section::Hl7v2;
 use super::section::Hl7v2Sender;
+use super::section::Hl7v2Tls;
 use super::section::Mappings;
 use super::section::Operator;
 use super::section::Terminology;
@@ -280,6 +281,67 @@ fn sender_of(key: &str, sender: &Hl7v2Sender) -> Result<super::hl7v2::Sender, Er
     }
 }
 
+/// Returns the certificate subject of every sender of `senders`.
+///
+/// # Errors
+/// Returns [`Error::Needs`] for an empty list, and [`Error::CertificateSubject`]
+/// for a sender that names no subject.
+fn subjects_of(senders: &[Hl7v2Sender]) -> Result<Vec<super::hl7v2::Subject>, Error> {
+    if senders.is_empty() {
+        return Err(Error::Needs {
+            key: String::from("hl7v2.enabled"),
+            needs: String::from("hl7v2.senders"),
+        });
+    }
+    senders
+        .iter()
+        .map(|sender| {
+            if sender.certificate_subject.is_empty() {
+                return Err(Error::CertificateSubject {
+                    key: String::from("hl7v2.senders"),
+                });
+            }
+            Ok(super::hl7v2::Subject {
+                sender: sender_of("hl7v2.senders", sender)?,
+                name: sender.certificate_subject.clone(),
+            })
+        })
+        .collect()
+}
+
+/// Returns the TLS `tls` describes: its three PEM files read once and the
+/// acceptor built from them.
+///
+/// # Errors
+/// Returns [`Error::Needs`] for a file not named, [`Error::TlsFile`] for
+/// one that cannot be read, and [`Error::Hl7v2Tls`] for material the
+/// acceptor refuses.
+fn tls_of(tls: &Hl7v2Tls) -> Result<super::hl7v2::Tls, Error> {
+    let read = |key: &str, path: Option<&std::path::PathBuf>| {
+        let path = path.ok_or_else(|| Error::Needs {
+            key: String::from("hl7v2.enabled"),
+            needs: key.to_owned(),
+        })?;
+        std::fs::read(path).map_err(|source| Error::TlsFile {
+            key: key.to_owned(),
+            source,
+        })
+    };
+    let chain = read("hl7v2.tls.certificate_file", tls.certificate_file.as_ref())?;
+    let key = read("hl7v2.tls.key_file", tls.key_file.as_ref())?;
+    let authorities = read(
+        "hl7v2.tls.client_ca_file",
+        tls.client_ca_file.as_ref(),
+    )?;
+    let acceptor =
+        ferrobridge_hl7v2::mllp::tls::acceptor(&chain, &key, &authorities).map_err(|source| {
+            Error::Hl7v2Tls {
+                source: Box::new(source),
+            }
+        })?;
+    Ok(super::hl7v2::Tls { acceptor })
+}
+
 /// Returns the senders of `senders` declared `origin = "device"`.
 ///
 /// # Errors
@@ -406,6 +468,8 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
             .map(|sender| sender_of("hl7v2.senders", sender))
             .collect::<Result<Vec<_>, Error>>()?,
         devices: devices_of(&hl7v2.senders)?,
+        subjects: subjects_of(&hl7v2.senders)?,
+        tls: tls_of(&hl7v2.tls)?,
     })
 }
 

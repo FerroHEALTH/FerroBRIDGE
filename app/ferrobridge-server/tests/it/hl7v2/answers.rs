@@ -17,7 +17,6 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
@@ -216,7 +215,7 @@ async fn a_cdr_that_fails_is_answered_ar_so_the_sender_resends() -> Result<(), B
 async fn a_message_in_flight_when_the_stop_arrives_is_committed_and_answered()
 -> Result<(), Box<dyn Error>> {
     let Running { cdr, mut serving } = Running::start(true, Duration::from_millis(500)).await?;
-    let mut stream = TcpStream::connect(serving.address).await?;
+    let mut stream = super::connect(serving.address).await?;
     stream.write_all(&frame(&oru_r01(CONTROL_ID))).await?;
     let looked_up = || async {
         cdr.received_requests()

@@ -28,6 +28,18 @@ fn with_visit(text: &str) -> String {
     text.replace("\rORC|", "\rPV1|1|O|ROOM-1^^^NORTHWARD\rORC|")
 }
 
+/// Starts the face with the facilities the cases name listed beside the
+/// sending facility, since every facility a composition names is a sender's.
+async fn listing_facilities() -> Result<Running, Box<dyn Error>> {
+    let mut lane = face_settings(true);
+    lane.senders.extend([
+        Sender::Namespace(String::from("NORTHWARD")),
+        Sender::Namespace(String::from("ORDERDESK")),
+    ]);
+    let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
+    Running::start_with(lane, lookup).await
+}
+
 /// Returns every composition of the one contribution the CDR received.
 async fn compositions(running: &Running) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
     let committed = running
@@ -59,7 +71,7 @@ async fn facilities(running: &Running) -> Result<Vec<Option<String>>, Box<dyn Er
 
 #[tokio::test]
 async fn the_visit_location_s_facility_is_named_before_any_other() -> Result<(), Box<dyn Error>> {
-    let running = Running::start(true, Duration::ZERO).await?;
+    let running = listing_facilities().await?;
     running
         .send(&edited("MSG-FAC-PV1", |text| {
             with_visit(&text).replace(
@@ -81,7 +93,7 @@ async fn the_visit_location_s_facility_is_named_before_any_other() -> Result<(),
 
 #[tokio::test]
 async fn the_ordering_facility_is_named_when_no_visit_names_one() -> Result<(), Box<dyn Error>> {
-    let running = Running::start(true, Duration::ZERO).await?;
+    let running = listing_facilities().await?;
     running
         .send(&edited("MSG-FAC-ORC", |text| {
             text.replace(
