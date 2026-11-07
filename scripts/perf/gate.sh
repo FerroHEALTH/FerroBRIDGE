@@ -43,6 +43,9 @@ readonly DB_NAME=ferrobridge-perf-cdr-db
 readonly CDR_NAME=ferrobridge-perf-cdr
 readonly BROKER_NAME=ferrobridge-perf-broker
 readonly DB_PORT=15432
+# The role the CDR database image creates, in the gate's own throwaway
+# container, which the run removes when it ends.
+readonly CDR_DB_PASSWORD="${PERF_CDR_DB_PASSWORD:-ferroehr}"
 readonly ADMIN_URL="postgresql://postgres:postgres@127.0.0.1:${DB_PORT}/ferroehr?sslmode=disable"
 readonly TEMPLATE=tools/ferrobridge-testkit/fixtures/opt/diagnoses.opt
 readonly CONDITION=tools/ferrobridge-testkit/fixtures/fhir/r4/condition.json
@@ -84,14 +87,16 @@ render() {
 
 # idle_table PLAN: the [idle] table of PLAN, blank lines off.
 idle_table() {
+  local plan="$1"
   awk '/^\[/ { inside = ($0 == "[idle]"); next }
-       inside && !/^[[:space:]]*$/ { print }' "$1"
+       inside && !/^[[:space:]]*$/ { print }' "$plan"
 }
 
 # condition SUBJECT: the synthetic Condition of the testkit, claiming the
 # facade fixtures' profile, for the subject named by identifier SUBJECT.
 condition() {
-  jq --compact-output --arg profile "$PROFILE" --arg system "$SUBJECTS" --arg value "$1" \
+  local subject="$1"
+  jq --compact-output --arg profile "$PROFILE" --arg system "$SUBJECTS" --arg value "$subject" \
     'del(.id) | .meta = {profile: [$profile]}
      | .subject = {identifier: {system: $system, value: $value}}' "$root/$CONDITION"
 }
@@ -156,7 +161,7 @@ start() {
     pg_isready --host 127.0.0.1 --username ferroehr --dbname ferroehr
   "$engine" run --quiet --detach --name "$CDR_NAME" --network "$NETWORK" \
     --publish 127.0.0.1:18090:8080 \
-    --env "FERROEHR__DB__URL=postgres://ferroehr:ferroehr@${DB_NAME}:5432/ferroehr" \
+    --env "FERROEHR__DB__URL=postgres://ferroehr:${CDR_DB_PASSWORD}@${DB_NAME}:5432/ferroehr" \
     --env FERROEHR__AUTH__ENABLED=false --env FERROEHR__EHR_INDEX__PROVIDER=local \
     --env FERROEHR__USAGE_REPORT__ENABLED=false --env "FERROEHR__OUTBOX__READERS=${READER}" \
     "$cdr_image" > /dev/null
@@ -219,10 +224,11 @@ busy_loop() {
 }
 
 report_busy_loop() {
+  local outcome="$1" summary="$2"
   [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
   {
-    printf '## The planted idle busy-loop\n\nA poller of the CDR database that never waits %s.\n\n' "$1"
-    awk '/^### Breaches/ { on = 1 } /^### Checks/ { on = 0 } on' "$2"
+    printf '## The planted idle busy-loop\n\nA poller of the CDR database that never waits %s.\n\n' "$outcome"
+    awk '/^### Breaches/ { on = 1 } /^### Checks/ { on = 0 } on' "$summary"
   } >> "$GITHUB_STEP_SUMMARY"
 }
 
@@ -261,9 +267,10 @@ self_test() {
   # shellcheck disable=SC2064 # expand $work now
   trap "rm -r -- '$work'" EXIT
   check() {
+    local label="$1" want="$2" got="$3"
     n=$((n + 1))
-    if [[ "$2" != "$3" ]]; then
-      echo "  FAIL: $1: expected [$2], got [$3]" >&2
+    if [[ "$want" != "$got" ]]; then
+      echo "  FAIL: $label: expected [$want], got [$got]" >&2
       failed=1
     fi
   }
