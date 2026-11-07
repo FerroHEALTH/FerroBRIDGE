@@ -48,10 +48,11 @@
 #   scripts/checks/duplication.sh              # measure the tree
 #   scripts/checks/duplication.sh --update     # record a count that held or fell, and the keys
 #   scripts/checks/duplication.sh --install    # fetch the pinned release binary into target/tools/
+#   scripts/checks/duplication.sh --pull       # pull the pinned image through docker or podman, retried
 #   scripts/checks/duplication.sh --self-test  # the detector order, a rise, a fall, an unchanged count, a move
 #
-# Exit 0 = the count held or fell, 1 = it rose, 2 = usage, a missing pin or
-# no detector.
+# Exit 0 = the count held or fell, 1 = it rose, 2 = usage, a missing pin, no
+# detector, a detector that stopped or an image that could not be pulled.
 #
 # No specification governs this: our own design. The flags are jscpd's own
 # (https://github.com/kucherenko/jscpd/blob/v5.4.2/docs/rust.md).
@@ -432,6 +433,40 @@ install_local() {
   echo "duplication: installed jscpd $JSCPD_VERSION at $dest/jscpd"
 }
 
+# Pulls the pinned image through the engine $1, up to $2 attempts with $3
+# seconds between them, and names the registry host when every one fails. A
+# runner's network drops a pull now and then, and the engine then stops with
+# 125 before the detector reads a file.
+pull_image() {
+  local engine="$1" attempts="$2" delay="$3"
+  local attempt=1 registry="${JSCPD_IMAGE%%/*}"
+  until "$engine" pull --quiet "$JSCPD_IMAGE" >"$stage_root/pull.log" 2>&1; do
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      echo "duplication: $engine could not pull $JSCPD_IMAGE from $registry after $attempts attempts:" >&2
+      cat "$stage_root/pull.log" >&2
+      return 2
+    fi
+    echo "duplication: pull $attempt of $attempts from $registry failed; trying again in ${delay}s" >&2
+    attempt=$((attempt + 1))
+    sleep "$delay"
+  done
+  echo "duplication: pulled $JSCPD_IMAGE through $engine"
+}
+
+# Pulls the pinned image through the engine detector_kind picks, so the guard
+# and its self-test that run next find it in place.
+pull_pinned() {
+  local kind
+  kind="$(detector_kind)"
+  case "$kind" in
+    docker | podman) pull_image "$kind" 4 15 ;;
+    *)
+      echo "duplication: --pull needs docker or podman to answer, and this machine runs '${kind:-no detector}'" >&2
+      return 2
+      ;;
+  esac
+}
+
 # Every scratch directory of a run lives under one directory the exit trap
 # removes. It sits under the ignored target/ of this checkout, which a podman
 # machine on macOS shares with its containers.
@@ -501,6 +536,7 @@ if [[ "${1:-}" == "--self-test" ]]; then
   # pinned version. Each stub is a program of its own directory, and a run
   # sees only the PATH and the local list it is handed.
   stubs="$work/stubs"
+  host_path="$PATH"
   stub() {
     local path="$1" body="$2"
     mkdir -p "$(dirname "$path")"
@@ -555,20 +591,59 @@ if [[ "${1:-}" == "--self-test" ]]; then
   [[ "$status" == 2 ]] || fail "a machine with no detector answered $status, not 2"
   grep -Fq -- '--install' "$work/answer" ||
     fail "a machine with no detector was not told how to install one: $(cat "$work/answer")"
+  # Runs the ratchet in the mode $1 and leaves its exit status in $outcome.
+  # The guard's own outcomes are 0 and 1; any other means the detector never
+  # measured the tree (an engine that could not pull the image stops with
+  # 125), and the self-test fails as that, never as a check that passed.
   run() {
     local mode="$1"
-    local status=0
-    ratchet "$tree" "$count_file" "$baseline" "$mode" >"$work/answer" 2>&1 || status=$?
-    printf '%s\n' "$status"
+    outcome=0
+    ratchet "$tree" "$count_file" "$baseline" "$mode" >"$work/answer" 2>&1 || outcome=$?
+    if [[ "$outcome" != 0 && "$outcome" != 1 ]]; then
+      fail "the detector did not measure the tree (status $outcome): $(cat "$work/answer")"
+    fi
   }
 
-  [[ "$(run check)" == 1 ]] || fail "a tree with no committed count passed: $(cat "$work/answer")"
-  [[ "$(run update)" == 0 ]] || fail "--update refused to record the first count: $(cat "$work/answer")"
+  # An engine that answers and then stops before the detector runs is
+  # reported as a detector that stopped, with the engine's status.
+  stub "$stubs/unpulled/jscpd" "echo 'jscpd 0.0.1'"
+  # shellcheck disable=SC2016 # the stub expands its own $1 when it runs
+  stub "$stubs/unpulled/docker" '[[ "$1" != run ]] || { echo "Unable to find image: i/o timeout" >&2; exit 125; }'
+  status=0
+  (
+    PATH="$stubs/unpulled:$host_path"
+    LOCAL_JSCPD=()
+    run check
+  ) >/dev/null 2>"$work/stopped" || status=$?
+  [[ "$status" == 1 ]] || fail "a detector that stopped left the self-test at status $status, not 1"
+  grep -Fq 'the detector did not measure the tree (status 2)' "$work/stopped" ||
+    fail "a detector that stopped was not reported as one: $(cat "$work/stopped")"
+  grep -Fq 'stopped with status 125' "$work/stopped" ||
+    fail "a detector that stopped was not named with the engine's status: $(cat "$work/stopped")"
+  ! grep -Fq 'passed' "$work/stopped" ||
+    fail "a detector that stopped was reported as a check that passed: $(cat "$work/stopped")"
+
+  # The pull: a failed attempt is retried, and the last failure names the
+  # registry host and the engine's answer.
+  stub "$stubs/flaky/docker" "if [[ -e '$work/pulled-once' ]]; then exit 0; fi; touch '$work/pulled-once'; echo 'i/o timeout' >&2; exit 1"
+  stub "$stubs/offline/docker" "echo 'dial tcp: i/o timeout' >&2; exit 1"
+  pull_image "$stubs/flaky/docker" 2 0 >/dev/null 2>"$work/pull" ||
+    fail "a pull that failed once was not retried: $(cat "$work/pull")"
+  status=0
+  pull_image "$stubs/offline/docker" 3 0 >/dev/null 2>"$work/pull" || status=$?
+  [[ "$status" == 2 ]] || fail "a pull that never succeeded answered $status, not 2"
+  grep -Fq "from ${JSCPD_IMAGE%%/*} after 3 attempts" "$work/pull" ||
+    fail "a pull that never succeeded did not name the registry host: $(cat "$work/pull")"
+  grep -Fq 'dial tcp: i/o timeout' "$work/pull" ||
+    fail "a pull that never succeeded did not carry the engine's answer: $(cat "$work/pull")"
+
+  run check; [[ "$outcome" == 1 ]] || fail "a tree with no committed count passed: $(cat "$work/answer")"
+  run update; [[ "$outcome" == 0 ]] || fail "--update refused to record the first count: $(cat "$work/answer")"
   first="$(committed_count "$count_file")"
   [[ "$first" =~ ^[1-9][0-9]*$ ]] || fail "--update recorded '$first' for a tree with one duplicated block"
 
   # Unchanged: the one pair, and nothing from the places the scan skips.
-  [[ "$(run check)" == 0 ]] || fail "an unchanged count was refused: $(cat "$work/answer")"
+  run check; [[ "$outcome" == 0 ]] || fail "an unchanged count was refused: $(cat "$work/answer")"
   grep -q 'in two places: 1$' "$work/answer" ||
     fail "the scan did not count exactly the one pair: $(cat "$work/answer")"
   grep -Fq 'app/demo/src/one.rs:1-8 = tools/demo/src/two.rs:1-8' "$work/answer" ||
@@ -586,47 +661,47 @@ if [[ "${1:-}" == "--self-test" ]]; then
   } >"$work/two.rs"
   mv "$work/two.rs" "$tree/tools/demo/src/two.rs"
   printf 'pub fn unrelated(left: u32, right: u32) -> u32 {\n    left.max(right)\n}\n' >"$tree/app/demo/src/unrelated.rs"
-  [[ "$(run check)" == 0 ]] || fail "a change beside the block was refused: $(cat "$work/answer")"
+  run check; [[ "$outcome" == 0 ]] || fail "a change beside the block was refused: $(cat "$work/answer")"
   grep -Fq 'tools/demo/src/two.rs:3-10' "$work/answer" ||
     fail "the block did not move down with the code above it: $(cat "$work/answer")"
   grep -q 'every block in' "$work/answer" ||
     fail "a block that did not change was reported as new: $(cat "$work/answer")"
-  [[ "$(run update)" == 0 ]] || fail "--update refused an unchanged count: $(cat "$work/answer")"
+  run update; [[ "$outcome" == 0 ]] || fail "--update refused an unchanged count: $(cat "$work/answer")"
   cmp -s "$baseline" "$work/baseline.before" ||
     fail "a change beside the block changed the baseline: $(diff "$work/baseline.before" "$baseline")"
 
   # A rise: a new pair across two crates fails and is named by both places.
   other_block seventh >"$tree/app/demo/src/three.rs"
   other_block eighth >"$tree/crates/demo/src/four.rs"
-  [[ "$(run check)" == 1 ]] || fail "a rise passed"
+  run check; [[ "$outcome" == 1 ]] || fail "a rise passed"
   grep -q 'rose from' "$work/answer" || fail "a rise was not reported as one: $(cat "$work/answer")"
   new_block="$(grep -A3 'does not carry' "$work/answer" | grep 'three.rs' || true)"
   [[ "$new_block" == *four.rs* ]] ||
     fail "a rise did not name the new block by both places: $(cat "$work/answer")"
-  [[ "$(run update)" == 1 ]] || fail "--update raised the count"
+  run update; [[ "$outcome" == 1 ]] || fail "--update raised the count"
   [[ "$(committed_count "$count_file")" == "$first" ]] || fail "--update wrote a higher count"
 
   # A fall: passes with a note, and --update lowers the count, which then holds.
   rm "$tree/app/demo/src/three.rs" "$tree/crates/demo/src/four.rs"
   block second_moved >"$tree/app/demo/src/one.rs"
   printf 'pub fn empty() {}\n' >"$tree/tools/demo/src/two.rs"
-  [[ "$(run check)" == 0 ]] || fail "a fall was refused: $(cat "$work/answer")"
+  run check; [[ "$outcome" == 0 ]] || fail "a fall was refused: $(cat "$work/answer")"
   grep -q 'fell from' "$work/answer" || fail "a fall was not reported as one: $(cat "$work/answer")"
   [[ "$(committed_count "$count_file")" == "$first" ]] || fail "a check wrote the count file"
-  [[ "$(run update)" == 0 ]] || fail "--update refused a fall: $(cat "$work/answer")"
+  run update; [[ "$outcome" == 0 ]] || fail "--update refused a fall: $(cat "$work/answer")"
   [[ "$(committed_count "$count_file")" == 0 ]] || fail "--update did not record the lower count"
-  [[ "$(run check)" == 0 ]] || fail "the lowered count was refused: $(cat "$work/answer")"
+  run check; [[ "$outcome" == 0 ]] || fail "the lowered count was refused: $(cat "$work/answer")"
 
   # A lowered count that lands on a tree grown since it was measured (#1633):
   # the ratchet pull request's merge group carries a pull request merged
   # after the measurement, so the guard measures that tree and refuses it.
   other_block ninth >"$tree/app/demo/src/five.rs"
   other_block tenth >"$tree/crates/demo/src/six.rs"
-  [[ "$(run check)" == 1 ]] || fail "a count lowered below the tree it lands on passed"
+  run check; [[ "$outcome" == 1 ]] || fail "a count lowered below the tree it lands on passed"
   grep -q 'rose from 0' "$work/answer" ||
     fail "a count below the tree it lands on was not reported as a rise: $(cat "$work/answer")"
 
-  echo "duplication: self-test OK (the pins, the detector order, a rise, a fall, an unchanged count, a move around a block and a lowered count below the tree it lands on)."
+  echo "duplication: self-test OK (the pins, the detector order, a rise, a fall, an unchanged count, a move around a block and a lowered count below the tree it lands on, a detector that stopped and a retried pull)."
   exit 0
 fi
 
@@ -634,8 +709,9 @@ case "${1:-}" in
   "") ratchet "$root" "$COUNT_FILE" "$BASELINE_FILE" check ;;
   --update) ratchet "$root" "$COUNT_FILE" "$BASELINE_FILE" update ;;
   --install) install_local ;;
+  --pull) pull_pinned ;;
   *)
-    echo "usage: $0 [--update | --install | --self-test]" >&2
+    echo "usage: $0 [--update | --install | --pull | --self-test]" >&2
     exit 2
     ;;
 esac
