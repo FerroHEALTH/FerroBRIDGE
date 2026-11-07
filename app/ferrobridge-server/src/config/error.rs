@@ -376,6 +376,15 @@ pub enum Error {
         /// The key that holds it.
         key: String,
     },
+    /// A sender's `origin` is neither empty nor `device`, or a device names no
+    /// `device_identifier_issuer`, or a person sender names one.
+    #[error(
+        "{key}: origin is empty or \"device\", and device_identifier_issuer is set with origin = \"device\" alone"
+    )]
+    SenderOrigin {
+        /// The key that holds it.
+        key: String,
+    },
     /// A size that would refuse every message.
     #[error("{key} is 0; a frame carries at least one byte")]
     FrameLimit {

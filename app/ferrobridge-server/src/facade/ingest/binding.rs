@@ -227,6 +227,7 @@ impl Ingest<'_> {
         engine::Recorded {
             origin,
             facility: self.facility.clone(),
+            composer: self.composer.clone(),
         }
     }
 

@@ -280,6 +280,32 @@ fn sender_of(key: &str, sender: &Hl7v2Sender) -> Result<super::hl7v2::Sender, Er
     }
 }
 
+/// Returns the senders of `senders` declared `origin = "device"`.
+///
+/// # Errors
+/// Returns [`Error::SenderOrigin`] for an origin other than empty and
+/// `device`, and for a device without its `device_identifier_issuer`.
+fn devices_of(senders: &[Hl7v2Sender]) -> Result<Vec<super::hl7v2::Device>, Error> {
+    let mut devices = Vec::new();
+    for sender in senders {
+        match sender.origin.as_str() {
+            "" if sender.device_identifier_issuer.is_empty() => {}
+            "device" if !sender.device_identifier_issuer.is_empty() => {
+                devices.push(super::hl7v2::Device {
+                    sender: sender_of("hl7v2.senders", sender)?,
+                    identifier_issuer: sender.device_identifier_issuer.clone(),
+                });
+            }
+            _ => {
+                return Err(Error::SenderOrigin {
+                    key: String::from("hl7v2.senders"),
+                });
+            }
+        }
+    }
+    Ok(devices)
+}
+
 /// Returns the EHR policy `value` names under `key`.
 fn ehr_policy_of(key: &str, value: &str) -> Result<crate::facade::ehr::Policy, Error> {
     match value {
@@ -379,6 +405,7 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
             .iter()
             .map(|sender| sender_of("hl7v2.senders", sender))
             .collect::<Result<Vec<_>, Error>>()?,
+        devices: devices_of(&hl7v2.senders)?,
     })
 }
 

@@ -61,7 +61,7 @@ syntax in the variable. The section holds no secret.
 | `frame_timeout_ms` | `30000` | How long one message may take from its first byte to its trailer before it is answered `AR`; `0` waits |
 | `frame_limit_bytes` | `1048576` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes of the run, by kind, at debug level |
-| `senders` | `[]` | The sending facilities (MSH-4) the face accepts, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3); empty accepts any |
+| `senders` | `[]` | The sending facilities (MSH-4) the face accepts, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3); empty accepts any. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
 
 ## What happens to one message
 
@@ -103,6 +103,13 @@ syntax in the variable. The section holds no secret.
    with an `ERR` at its field naming it, and nothing is committed. The
    performing organisation (OBX-23) is `originating_system_audit.provider`,
    never the facility or the composer.
+   The composer is the clinician the message names, from the first of EVN-5,
+   OBX-16, ORC-12 and OBR-16 (`XCN`: the given and family name, XCN.1 as
+   the identifier in the namespace XCN.9), never the committer. A message
+   carrying a result (an `OBX`) that names no clinician is answered `AE`.
+   A device sender's result is an act of the device: the composer is the
+   equipment instance (OBX-18), or MSH-3 when none, in the sender's
+   `device_identifier_issuer`, and the device is the originating system.
 6. The acknowledgment is sent once the ingest settled, so `AA` means the CDR
    holds the message's compositions.
 
@@ -213,6 +220,8 @@ ERR-3 and the text in ERR-8.
 | A required field or segment missing, an undecoded escape | `AE` | `101`, `100` or `102`, located |
 | MSH-4 names a sending facility `senders` does not list | `AR` | `207` at MSH^1^4 |
 | MSH-10 empty | `AE` | `101` at MSH-10 |
+| A result whose message names no clinician, from a sender that is no device | `AE` | `101` at OBX^1^16 |
+| A health care facility no listed sender names | `AE` | `207` at its field |
 | A condition of the guide that stops the mapper, a Bundle with no `MessageHeader` | `AE` | `101` or `207` |
 | No program maps any entry, an entry that does not map, a second subject, a conflict with the identity map | `AE` | `207`, one per refused entry, naming its `fullUrl` |
 | The terminology server refused or did not answer a translation | `AR` | `207` |

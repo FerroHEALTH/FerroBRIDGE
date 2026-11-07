@@ -39,6 +39,9 @@ pub enum Settled {
     Sender,
     /// The message names a health care facility outside the senders' list.
     Facility(Box<crate::hl7v2::origin::Facility>),
+    /// A message carrying results names no clinician, and its sender is no
+    /// device.
+    NoClinician,
     /// The message's import record could not be stored, so its commit is not
     /// acknowledged.
     Unrecorded,
@@ -73,6 +76,18 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
                 text: format!(
                     "{} is not a facility of a sender this receiver accepts",
                     facility.display()
+                ),
+            }],
+        ),
+        Settled::NoClinician => (
+            Code::Error,
+            vec![Error {
+                location: Some(
+                    ferrobridge_hl7v2::parse::Location::segment("OBX", 1).with_field(16),
+                ),
+                code: ErrorCode::RequiredFieldMissing,
+                text: String::from(
+                    "the message names no clinician (EVN-5, OBX-16, ORC-12 or OBR-16) to be the composer of its results",
                 ),
             }],
         ),
