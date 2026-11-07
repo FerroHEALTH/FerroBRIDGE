@@ -337,7 +337,7 @@ The issuer's `profile` picks the grant:
 | Key | Default | Meaning |
 |---|---|---|
 | `issuer` | none, required | The issuer of the onward tokens; its metadata names the token endpoint unless `token_endpoint` is set |
-| `kind` | none, required | `persons` for a same-organisation person, `federation` for a professional of another party |
+| `kind` | none, required | `persons` for a same-organisation person, `federation` for a professional of another party, `patients` for a patient |
 | `profile` | `rfc9068` | The preset the issuer's profile starts from: `rfc9068`, `entra`, `keycloak` and the others `[[auth.issuer]]` takes |
 | `token_endpoint` | none | The token endpoint itself |
 | `client_id` | the `oauth` table's | The bridge's client id at this issuer |
@@ -352,7 +352,10 @@ its `aud` lies inside `audiences`, it lives no longer than
 `max_onward_lifetime`, it names the bridge's client as its actor (`act`, or
 the profile's client claim such as `azp`), and it names the caller's person
 by the profile's `person_equality` claims (`iss` and `sub` by default, `oid`
-and `tid` under `entra`, so a different pairwise `sub` is accepted). The
+and `tid` under `entra`, so a different pairwise `sub` is accepted). A
+`patients` issuer's token must also read as a patient token, a `patient/`
+grant with no `user/` or `system/` one, and carry the caller's `patient`
+launch context unchanged. The
 bridge caches the token under the caller's token and the target until
 `refresh_margin_ms` before the earlier of its own and the caller's token's
 expiry, and checks it again on every use. The caller's token appears in no
@@ -365,7 +368,8 @@ Who reaches the CDR how:
 | A machine (a client credentials token) | Under the bridge's own token of `[cdr.credentials.oauth]`, never exchanged; its composition names the machine's client in `originating_system_audit.system_id` |
 | A person, a delegated or representing person, under `kind = "persons"` | Under the exchanged token |
 | A professional of another party, under `kind = "federation"` | Under the exchanged token |
-| A patient, another party's organisation, a guest, a Basic user | Refused with `403` |
+| A patient, under `kind = "patients"` | Under the exchanged token |
+| A caller no issuer's kind carries, another party's organisation, a guest, a Basic user | Refused with `403` |
 
 A failed exchange fails the request, and the bridge's own token is never sent
 in its place. The token endpoint's `400` or `403` (RFC 8693 §2.2.2,
@@ -400,6 +404,44 @@ As environment variables, the table reads
 `FERROBRIDGE__CDR__CREDENTIALS__ONWARD__KIND`,
 `FERROBRIDGE__CDR__CREDENTIALS__ONWARD__PROFILE` and the other keys the same
 way.
+
+### `[[cdr.onward]]`
+
+Each `[[cdr.onward]]` table adds one more onward issuer beside
+`[cdr.credentials.onward]`, with the same keys. The bridge then carries
+each caller through the issuer whose `kind` carries it: a person to the
+`persons` issuer, a professional of another party to the `federation`
+issuer, and a patient to the `patients` issuer. Every table authenticates
+with the client of `[cdr.credentials.oauth]`, which it requires. Two issuers
+of one kind refuse the start, across `[cdr.credentials.onward]` and the
+array, and so does the array on a server whose `[auth]` is off. Either form
+may stand alone: a deployment that carries only patients declares one
+`[[cdr.onward]]` table and no `[cdr.credentials.onward]`.
+
+Patients usually sign in at an issuer of their own, a separate Keycloak
+realm or Entra ID tenant, whose tokens the facade admits through an
+`[[auth.issuer]]` of `kind = "patients"`. The onward table then names that
+realm or tenant. Under the default `rfc9068` profile:
+
+```toml
+[cdr.credentials.onward]
+issuer = "https://id.example.org/realms/staff"
+kind = "persons"
+audiences = ["cdr"]
+indicators = ["cdr"]
+
+[cdr.credentials.onward.keys]
+max_onward_lifetime = 300
+
+[[cdr.onward]]
+issuer = "https://id.example.org/realms/patients"
+kind = "patients"
+audiences = ["cdr"]
+indicators = ["cdr"]
+
+[cdr.onward.keys]
+max_onward_lifetime = 300
+```
 
 ### `[terminology]`
 

@@ -149,7 +149,6 @@ mod tests {
     use ferrohealth_smart::client::TokenError;
     use ferrohealth_smart::client::onward::OnwardError;
     use ferrohealth_smart::client::onward::Rejected;
-    use ferrohealth_smart::kind::IssuerKind;
     use http::StatusCode;
 
     fn oauth(error: &str) -> OAuthError {
@@ -166,10 +165,7 @@ mod tests {
 
     #[test]
     fn a_caller_not_carried_is_forbidden() {
-        let answer = of_onward_refusal(&OnwardRefusal::NotCarried {
-            caller: "patient",
-            issuer: IssuerKind::Persons,
-        });
+        let answer = of_onward_refusal(&OnwardRefusal::NotCarried { caller: "guest" });
         assert_eq!(ONWARD_NOT_CARRIED.status(), answer.status());
         assert_eq!(StatusCode::FORBIDDEN, answer.status());
         assert_eq!(

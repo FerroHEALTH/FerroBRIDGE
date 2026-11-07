@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use ferrohealth_smart::config::CredentialsSection;
+use ferrohealth_smart::config::onward::OnwardSection;
 
 use ferrohealth_secret::secret::Secret;
 
@@ -229,6 +230,9 @@ pub struct Cdr {
     /// Whether the bridge reaches the ITS-REST 1.1.0 Demographic API of the
     /// CDR, a module the release marks `x-status: DEVELOPMENT`.
     pub demographic: bool,
+    /// The onward issuers beside `credentials.onward`, one per kind, each
+    /// authenticated with `credentials.oauth`.
+    pub onward: Vec<OnwardSection>,
 }
 
 impl Default for Cdr {
@@ -239,6 +243,7 @@ impl Default for Cdr {
             retry: Retry::default(),
             credentials: CredentialsSection::default(),
             demographic: false,
+            onward: Vec::new(),
         }
     }
 }

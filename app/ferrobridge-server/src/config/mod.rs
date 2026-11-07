@@ -233,7 +233,7 @@ impl Config {
             && self
                 .cdr
                 .as_ref()
-                .is_some_and(|cdr| cdr.credentials.onward.is_some())
+                .is_some_and(|cdr| cdr.credentials.onward.is_some() || !cdr.onward.is_empty())
         {
             return Err(Error::Needs {
                 key: String::from("cdr.credentials.onward"),

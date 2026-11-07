@@ -496,16 +496,10 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
         }
         None => {}
     }
-    let lane = cdr
-        .credentials
-        .onward()
-        .map_err(|source| Error::Credentials {
-            section: String::from("cdr.credentials"),
-            source: Box::new(source),
-        })?;
+    let onward = resolve_onward(cdr)?;
     // NOTE: RFC 8707 §2 and Microsoft's `scope=api://<cdr>/.default`: a machine's commit
     // goes under the bridge's own token, which must name the CDR alone.
-    if cdr.credentials.onward.is_some()
+    if onward.is_some()
         && cdr
             .credentials
             .oauth
@@ -519,15 +513,68 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             ),
         });
     }
-    let kind = cdr
-        .credentials
-        .onward
-        .as_ref()
-        .and_then(|onward| onward.kind);
-    if let (Some(lane), Some(kind)) = (lane, kind) {
-        config = config.with_onward(crate::cdr::onward::CdrOnward::new(lane, kind));
+    if let Some(onward) = onward {
+        config = config.with_onward(onward);
     }
     Ok(config)
+}
+
+/// Returns the onward lane of `cdr`: the issuer of `credentials.onward`
+/// and each `[[cdr.onward]]` issuer, at most one of each kind, or `None`
+/// when it declares none.
+fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Error> {
+    let refused = |section: &str, source| Error::Credentials {
+        section: String::from(section),
+        source: Box::new(source),
+    };
+    let mut issuers = Vec::new();
+    if let (Some(lane), Some(kind)) = (
+        cdr.credentials
+            .onward()
+            .map_err(|source| refused("cdr.credentials", source))?,
+        cdr.credentials
+            .onward
+            .as_ref()
+            .and_then(|onward| onward.kind),
+    ) {
+        issuers.push((lane, kind));
+    }
+    for section in &cdr.onward {
+        let oauth = cdr.credentials.oauth.as_ref().ok_or_else(|| {
+            refused(
+                "cdr.onward",
+                ferrohealth_smart::config::ConfigError::Missing {
+                    key: "cdr.credentials.oauth, which cdr.onward authenticates with",
+                },
+            )
+        })?;
+        let lane = oauth
+            .resolve()
+            .and_then(|credentials| section.resolve(credentials))
+            .map_err(|source| refused("cdr.onward", source))?;
+        let kind = section.kind.ok_or_else(|| {
+            refused(
+                "cdr.onward",
+                ferrohealth_smart::config::ConfigError::Missing {
+                    key: "credentials.onward.kind",
+                },
+            )
+        })?;
+        if issuers.iter().any(|(_, seen)| *seen == kind) {
+            return Err(Error::Duplicate {
+                key: String::from("cdr.onward.kind"),
+                value: String::from(kind.as_str()),
+            });
+        }
+        issuers.push((lane, kind));
+    }
+    let mut issuers = issuers.into_iter();
+    Ok(issuers.next().map(|(lane, kind)| {
+        issuers.fold(
+            crate::cdr::onward::CdrOnward::new(lane, kind),
+            |onward, (lane, kind)| onward.with_issuer(lane, kind),
+        )
+    }))
 }
 
 /// Returns the terminology client configuration `terminology` describes.

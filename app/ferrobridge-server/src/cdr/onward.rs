@@ -1,9 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The facade's caller carried onto the CDR: the access token a person
-//! presented, exchanged for a token of the CDR's issuer that names the same
-//! person, as `[cdr.credentials.onward]` declares it.
+//! The facade's caller carried onto the CDR, its token exchanged at the
+//! onward issuer of its kind.
+//!
+//! The access token a person or a patient presented is exchanged for a
+//! token of the CDR's issuer that names the same person, as
+//! `[cdr.credentials.onward]` and each `[[cdr.onward]]` table declare it.
 //!
 //! `ferrohealth-smart` runs the grant its issuer profile picks: token
 //! exchange (RFC 8693 §2.1), the caller's token as `subject_token` and the
@@ -34,12 +37,21 @@ use secrecy::SecretString;
 /// The scheme of an RFC 6750 §2.1 bearer credential.
 const BEARER: &str = "bearer";
 
-/// The onward lane of the CDR: the client of the issuer's grant, the target
-/// it asks for, and the kind of that issuer.
+/// The onward lane of the CDR: for each issuer, the client of its grant,
+/// the target it asks for, and its kind.
 ///
-/// The client is cheap to clone: clones share one cache.
+/// It holds at most one issuer per kind: a `persons`, a `federation` and a
+/// `patients` issuer, each carrying the callers of its kind. The client is
+/// cheap to clone: clones share one cache per lane.
 #[derive(Debug, Clone)]
 pub struct CdrOnward {
+    /// The issuers, at most one per kind.
+    lanes: Vec<Lane>,
+}
+
+/// One onward issuer and the target it issues tokens for.
+#[derive(Debug, Clone)]
+struct Lane {
     /// The client of the issuer's onward grant, with its cache.
     client: Onward,
     /// The CDR, as the grant names it.
@@ -88,13 +100,11 @@ pub struct Exchanged {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum OnwardRefusal {
-    /// The caller is of a kind the onward issuer does not carry.
-    #[error("a {caller} caller is never exchanged onto a {issuer} issuer")]
+    /// The caller is of a kind no onward issuer of the lane carries.
+    #[error("no onward issuer of the CDR lane carries a {caller} caller")]
     NotCarried {
         /// The caller's kind, as the audit line names it.
         caller: &'static str,
-        /// The onward issuer's kind.
-        issuer: IssuerKind,
     },
     /// The caller authenticated without a bearer token the grant can send.
     #[error("the caller presented no bearer token to exchange")]
@@ -105,44 +115,70 @@ pub enum OnwardRefusal {
 }
 
 impl CdrOnward {
-    /// Returns the lane `lane` resolves to, whose issuer signs tokens of
-    /// `kind`.
+    /// Returns the onward lane of the one issuer `lane` resolves to, whose
+    /// issuer signs tokens of `kind`.
     #[must_use]
     pub fn new(lane: OnwardLane, kind: IssuerKind) -> Self {
-        Self {
+        Self { lanes: Vec::new() }.with_issuer(lane, kind)
+    }
+
+    /// Returns this lane carrying the callers of `kind` through the issuer
+    /// `lane` resolves to, beside its other issuers.
+    #[must_use]
+    pub fn with_issuer(mut self, lane: OnwardLane, kind: IssuerKind) -> Self {
+        self.lanes.push(Lane {
             client: lane.onward,
             target: lane.target,
             kind,
+        });
+        self
+    }
+
+    /// Returns the kind of every onward issuer, in declaration order.
+    #[must_use]
+    pub fn kinds(&self) -> Vec<IssuerKind> {
+        self.lanes.iter().map(|lane| lane.kind).collect()
+    }
+
+    /// Returns the target the issuer of `kind` asks for, when the lane has one.
+    #[must_use]
+    pub fn target(&self, kind: IssuerKind) -> Option<&Target> {
+        self.lanes
+            .iter()
+            .find(|lane| lane.kind == kind)
+            .map(|lane| &lane.target)
+    }
+
+    /// Returns how a caller of `kind` reaches the CDR under this lane, with
+    /// the issuer that carries it when it is exchanged.
+    fn route_of(&self, kind: &CallerKind) -> (Route, Option<&Lane>) {
+        if matches!(kind, CallerKind::System) {
+            return (Route::Own, None);
         }
-    }
-
-    /// Returns the kind of the onward issuer.
-    #[must_use]
-    pub const fn kind(&self) -> IssuerKind {
-        self.kind
-    }
-
-    /// Returns the target the grant asks for.
-    #[must_use]
-    pub const fn target(&self) -> &Target {
-        &self.target
+        self.lanes
+            .iter()
+            .find(|lane| route(kind, lane.kind) == Route::Exchanged)
+            .map_or((Route::Refused, None), |lane| {
+                (Route::Exchanged, Some(lane))
+            })
     }
 
     /// Returns how a caller of `kind` reaches the CDR under this lane.
     #[must_use]
-    pub const fn route(&self, kind: &CallerKind) -> Route {
-        route(kind, self.kind)
+    pub fn route(&self, kind: &CallerKind) -> Route {
+        self.route_of(kind).0
     }
 
     /// Returns the token the caller behind `access` reaches the CDR with,
-    /// exchanged for the bearer token `headers` carry, or `None` when the
-    /// caller is a machine and reaches it under the bridge's own credential.
+    /// exchanged for the bearer token `headers` carry at the issuer of its
+    /// kind, or `None` when the caller is a machine and reaches it under the
+    /// bridge's own credential.
     ///
     /// # Errors
     ///
-    /// [`OnwardRefusal::NotCarried`] for a caller this lane does not carry,
-    /// an open surface included; [`OnwardRefusal::NoBearer`] for a caller
-    /// without a bearer token, as a Basic user is; and
+    /// [`OnwardRefusal::NotCarried`] for a caller no issuer of this lane
+    /// carries, an open surface included; [`OnwardRefusal::NoBearer`] for a
+    /// caller without a bearer token, as a Basic user is; and
     /// [`OnwardRefusal::Exchange`] with the upstream status when the token
     /// endpoint refused, or its token failed the onward check.
     pub async fn token(
@@ -153,19 +189,19 @@ impl CdrOnward {
         let Access::Caller(caller) = access else {
             return Err(OnwardRefusal::NotCarried {
                 caller: "anonymous",
-                issuer: self.kind,
             });
         };
-        match self.route(caller.kind()) {
-            Route::Own => Ok(None),
-            Route::Refused => Err(OnwardRefusal::NotCarried {
+        match self.route_of(caller.kind()) {
+            (Route::Own, _) => Ok(None),
+            (Route::Exchanged, Some(lane)) => lane.exchange(caller, headers).await.map(Some),
+            (Route::Refused | Route::Exchanged, _) => Err(OnwardRefusal::NotCarried {
                 caller: caller.kind().as_str(),
-                issuer: self.kind,
             }),
-            Route::Exchanged => self.exchange(caller, headers).await.map(Some),
         }
     }
+}
 
+impl Lane {
     /// Returns the token the onward issuer exchanges `caller`'s for.
     async fn exchange(
         &self,
@@ -211,9 +247,10 @@ impl CdrOnward {
 /// A machine keeps the bridge's credential: the on-behalf-of flow "only
 /// works for user principals" (Microsoft identity platform, "On-behalf-of
 /// flow"). A person of this organisation, acting alone, through a client or
-/// for another, is exchanged at a `persons` issuer, and a professional of
-/// another party at a `federation` issuer. A patient, another party's
-/// organisation and a guest are carried by neither, so they are refused.
+/// for another, is exchanged at a `persons` issuer, a professional of another
+/// party at a `federation` issuer, and a patient at the deployment's
+/// `patients` issuer. Another party's organisation and a guest are carried by
+/// none, so they are refused.
 #[must_use]
 pub const fn route(caller: &CallerKind, issuer: IssuerKind) -> Route {
     match (caller, issuer) {
@@ -222,7 +259,8 @@ pub const fn route(caller: &CallerKind, issuer: IssuerKind) -> Route {
             CallerKind::Person | CallerKind::Delegated { .. } | CallerKind::Representative { .. },
             IssuerKind::Persons,
         )
-        | (CallerKind::ExternalPerson(_), IssuerKind::Federation) => Route::Exchanged,
+        | (CallerKind::ExternalPerson(_), IssuerKind::Federation)
+        | (CallerKind::Patient, IssuerKind::Patients) => Route::Exchanged,
         _ => Route::Refused,
     }
 }
@@ -280,6 +318,7 @@ mod tests {
             Route::Own,
             route(&CallerKind::System, IssuerKind::Federation)
         );
+        assert_eq!(Route::Own, route(&CallerKind::System, IssuerKind::Patients));
     }
 
     #[test]
@@ -296,11 +335,34 @@ mod tests {
     }
 
     #[test]
-    fn a_patient_and_a_guest_are_never_exchanged() {
+    fn a_patient_is_exchanged_at_a_patients_issuer_alone() {
+        assert_eq!(
+            Route::Exchanged,
+            route(&CallerKind::Patient, IssuerKind::Patients)
+        );
+        assert_eq!(
+            Route::Refused,
+            route(&CallerKind::Patient, IssuerKind::Persons)
+        );
+        assert_eq!(
+            Route::Refused,
+            route(&CallerKind::Patient, IssuerKind::Federation)
+        );
+        assert_eq!(
+            Route::Refused,
+            route(&CallerKind::Person, IssuerKind::Patients)
+        );
+    }
+
+    #[test]
+    fn a_guest_is_never_exchanged() {
         let guest = CallerKind::Guest(Box::new(CallerKind::Person));
-        for kind in [&CallerKind::Patient, &guest] {
-            assert_eq!(Route::Refused, route(kind, IssuerKind::Persons));
-            assert_eq!(Route::Refused, route(kind, IssuerKind::Federation));
+        for issuer in [
+            IssuerKind::Persons,
+            IssuerKind::Federation,
+            IssuerKind::Patients,
+        ] {
+            assert_eq!(Route::Refused, route(&guest, issuer));
         }
     }
 
