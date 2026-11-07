@@ -4,8 +4,11 @@
 # The release lane. One workflow owns the `v*` tag, and every ordering in it is
 # a `needs` edge:
 #
-#   plan ── github-release (draft) ─┬─ build-binaries ─┬─ build-image ─┬─ vulnerability-record ─┬─ finalize-release ── crates ── milestone
-#                                   └─ build-console ──┴───────────────┘                        └─ scan-and-tag ─────────────────┘
+#   plan ── perf ── github-release (draft) ─┬─ build-binaries ─┬─ build-image ─┬─ vulnerability-record ─┬─ finalize-release ── crates ── milestone
+#                                           └─ build-console ──┴───────────────┘                        └─ scan-and-tag ─────────────────┘
+#
+# perf runs the performance gate on the tagged commit (#1656, perf.yml), with
+# no build cache, so a release the gate fails is never drafted.
 #
 # plan refuses a tag whose milestone (titled exactly as the tag) is missing or
 # still holds an open item, whose changelog section breaks the structure or
@@ -178,11 +181,22 @@ jobs:
             ehds/*.md
           if-no-files-found: error
 
+  # ---- perf: the performance gate on the release commit ---------------------
+
+  perf:
+    name: perf
+    needs: plan
+    permissions:
+      contents: read
+    uses: ./.github/workflows/perf.yml
+    with:
+      cache: false
+
   # ---- github-release: create the release as a DRAFT ------------------------
 
   github-release:
     name: github release (draft)
-    needs: plan
+    needs: [plan, perf]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

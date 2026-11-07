@@ -379,6 +379,9 @@ jobs:
       # The crate bump guard over synthetic histories, on every run, because
       # its own job runs on pull requests only and skips under its label.
       - run: bash scripts/checks/crate-version-guard.sh --self-test
+      # The performance gate reads its pins, fills its plan and holds its two
+      # idle tables equal, offline (#1656).
+      - run: bash scripts/perf/gate.sh --self-test
 
   # The profile validator's package set (#435), fetched at build time and
   # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/
@@ -517,6 +520,7 @@ jobs:
       test-matrix: ${{ steps.affected.outputs.test_matrix }}
       lint-matrix: ${{ steps.affected.outputs.lint_matrix }}
       journeys: ${{ steps.affected.outputs.journeys }}
+      perf: ${{ steps.affected.outputs.perf }}
     steps:
       # Two commits: a pull request runs on GitHub's merge commit, whose first
       # parent is the base it merges into, so HEAD^1..HEAD is the change.
@@ -1083,6 +1087,20 @@ jobs:
           cargo nextest run --locked -p ferrobridge-testkit
           -E 'test(/^journeys::/)'
 
+  # The performance gate (#1656): the idle phase and the load phase of
+  # ferrohealth-perf against the release build, in perf.yml, which the release
+  # lane calls on the release commit too. Every run writes the entry of a host
+  # shape the baseline lacks, which perf/baseline.toml takes from the artifact.
+  perf:
+    name: perf
+    needs: detect
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/perf.yml
+    with:
+      update: true
+
   doc:
     name: rustdoc
     needs: detect
@@ -1558,6 +1576,7 @@ jobs:
       - publish-dry-run
       - dependency-review
       - journeys
+      - perf
       - conflict-markers
     if: always()
     runs-on: ubuntu-latest

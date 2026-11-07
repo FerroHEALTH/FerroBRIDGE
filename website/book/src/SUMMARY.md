@@ -51,5 +51,6 @@
 
 - [How the work is organised](contribute/how-the-work-is-organised.md)
 - [Checks and gates](contribute/checks-and-gates.md)
+- [The performance gate](contribute/performance-gate.md)
 - [Crate versions and the bump rule](contribute/crate-versions.md)
 - [Cutting a release](contribute/release.md)
