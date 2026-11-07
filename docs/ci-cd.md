@@ -109,7 +109,7 @@ maps it. Each lane then reads one output:
 | `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |
 | `sqlx-offline` | `omop-cdm` is reached |
 | `journeys (browser)` | `ferrobridge-console` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console, with FerroUI's script modules loaded and refused |
-| `perf` | `ferrobridge-server` is reached: the performance gate of `perf.yml`, the idle and load phases of `ferrohealth-perf` against the release build over the pinned FerroEHR CDR, retried on a fresh runner only on a CPU model listed as stall-prone (the book's Contribute page "The performance gate") |
+| `perf` | `ferrobridge-server` is reached: the performance gate of `perf.yml`, the idle and load phases of `ferrohealth-perf` against the release build over the pinned FerroEHR CDR, retried on a fresh runner after a run that could not be judged on any CPU model, and after a breach only on a CPU model listed as stall-prone (the book's Contribute page "The performance gate") |
 | `conformance` | a package `conformance.sh` runs is reached |
 | `e2e (containers)` | one of `omop-cdm`, `ferrobridge-server`, `ferrobridge-term`, `ferrobridge-testkit` is reached; it runs those of them that are |
 | `rustfmt`, `cargo-deny`, `dependency-review` and every tier-1 job | always (`cargo-deny` because the advisory database moves without a change) |
