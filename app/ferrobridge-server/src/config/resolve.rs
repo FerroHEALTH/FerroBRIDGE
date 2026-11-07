@@ -329,10 +329,7 @@ fn tls_of(tls: &Hl7v2Tls) -> Result<super::hl7v2::Tls, Error> {
     };
     let chain = read("hl7v2.tls.certificate_file", tls.certificate_file.as_ref())?;
     let key = read("hl7v2.tls.key_file", tls.key_file.as_ref())?;
-    let authorities = read(
-        "hl7v2.tls.client_ca_file",
-        tls.client_ca_file.as_ref(),
-    )?;
+    let authorities = read("hl7v2.tls.client_ca_file", tls.client_ca_file.as_ref())?;
     let acceptor =
         ferrobridge_hl7v2::mllp::tls::acceptor(&chain, &key, &authorities).map_err(|source| {
             Error::Hl7v2Tls {
