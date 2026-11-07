@@ -60,6 +60,9 @@ use crate::facade::stub::mount_echo;
 use crate::facade::stub::mount_ehr;
 use crate::facade::stub::mount_read;
 use crate::facade::transaction_of;
+use ferrobridge_server::smart::SmartSettings;
+
+mod kinds;
 
 /// The bridge's client id at the authorization server.
 const BRIDGE_CLIENT: &str = "ferrobridge";
@@ -137,13 +140,16 @@ struct World {
     key: SigningKey,
     /// The facade and its stub CDR.
     harness: Harness,
+    /// The issuers the facade trusts, the authorization server's first.
+    trusted: SmartSettings,
     /// The bridge's client assertion key, kept on disk for the case.
     _assertion_key: tempfile::NamedTempFile,
 }
 
 impl World {
-    /// Starts a world whose CDR lane exchanges each caller under `grant`.
-    async fn start(grant: Grant) -> Result<Self, Box<dyn Error>> {
+    /// Starts a world whose CDR lane exchanges each caller under `grant`,
+    /// with the CDR tables of `tail` after the onward table.
+    async fn start(grant: Grant, tail: &str) -> Result<Self, Box<dyn Error>> {
         let key = ec_key("k1", Algorithm::ES256);
         let issuer = Issuer::start(&[&key]).await;
         let cdr = MockServer::start().await;
@@ -173,7 +179,7 @@ impl World {
                 "client_auth = \"private_key_jwt\"\n",
                 "private_key_file = \"{key}\"\n",
                 "resource = \"{audience}\"\n\n",
-                "{onward}"
+                "{onward}{tail}"
             ),
             cdr = cdr.uri(),
             issuer = issuer.uri(),
@@ -181,6 +187,7 @@ impl World {
             audience = CDR_AUDIENCE,
             key = assertion_key.path().display(),
             onward = grant.table(&issuer.uri()),
+            tail = tail,
         );
         let resolved = Config::from_sources(Some(&text), &std::collections::BTreeMap::new())?
             .resolve(Process::Job)?;
@@ -196,6 +203,7 @@ impl World {
             settings(),
         ));
         Ok(Self {
+            trusted: issuer.settings(),
             issuer,
             key,
             harness: Harness { cdr, store, facade },
@@ -372,7 +380,7 @@ fn assert_every_call_under(calls: &[(String, Option<String>)], expected: &str) {
 
 /// Creates and reads a Condition as `token`, asserting both succeed.
 async fn create_and_read(world: &World, token: &str) -> Result<(), Box<dyn Error>> {
-    let authority = authority(world.issuer.settings()).await;
+    let authority = authority(world.trusted.clone()).await;
     let resource = condition_of("p-1");
     let created = raw(
         secured(&world.harness, &authority),
@@ -399,7 +407,7 @@ async fn read_once(
     world: &World,
     token: &str,
 ) -> Result<http::Response<axum::body::Body>, Box<dyn Error>> {
-    let authority = authority(world.issuer.settings()).await;
+    let authority = authority(world.trusted.clone()).await;
     raw(
         secured(&world.harness, &authority),
         bearing(get("/fhir/Condition/c-1"), token),
@@ -410,7 +418,7 @@ async fn read_once(
 #[tokio::test]
 async fn a_person_writes_and_reads_under_the_rfc_8693_exchanged_token() -> Result<(), Box<dyn Error>>
 {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
@@ -456,7 +464,7 @@ async fn a_person_writes_and_reads_under_the_rfc_8693_exchanged_token() -> Resul
 
 #[tokio::test]
 async fn the_keycloak_exchange_names_the_cdr_by_audience() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Keycloak).await?;
+    let world = World::start(Grant::Keycloak, "").await?;
     let issued = mint(&world.key, &world.issued_claims(Grant::Keycloak, 300));
     world
         .mount_token_endpoint(Grant::Keycloak, &issued, 300)
@@ -489,7 +497,7 @@ async fn the_keycloak_exchange_names_the_cdr_by_audience() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn the_entra_on_behalf_of_grant_names_the_person_by_oid() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Entra).await?;
+    let world = World::start(Grant::Entra, "").await?;
     let issued = mint(&world.key, &world.issued_claims(Grant::Entra, 3269));
     world
         .mount_token_endpoint(Grant::Entra, &issued, 3269)
@@ -524,7 +532,7 @@ async fn the_entra_on_behalf_of_grant_names_the_person_by_oid() -> Result<(), Bo
 
 #[tokio::test]
 async fn an_entra_token_naming_another_person_is_refused() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Entra).await?;
+    let world = World::start(Grant::Entra, "").await?;
     let mut claims = world.issued_claims(Grant::Entra, 300);
     claims["oid"] = serde_json::json!("synthetic-oid-2");
     let issued = mint(&world.key, &claims);
@@ -544,7 +552,7 @@ async fn an_entra_token_naming_another_person_is_refused() -> Result<(), Box<dyn
 #[tokio::test]
 async fn an_entra_interaction_required_answer_is_a_401_with_the_claims_challenge()
 -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Entra).await?;
+    let world = World::start(Grant::Entra, "").await?;
     world.mount_own_token().await;
     // Microsoft, "On-behalf-of flow", "Error response example".
     Mock::given(matchers::method("POST"))
@@ -579,7 +587,7 @@ async fn an_entra_interaction_required_answer_is_a_401_with_the_claims_challenge
 
 #[tokio::test]
 async fn the_exchanged_token_is_reused_while_it_lives() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     let resource = condition_of("p-1");
     world.mount_cdr(&resource).await;
     let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
@@ -598,7 +606,7 @@ async fn the_exchanged_token_is_reused_while_it_lives() -> Result<(), Box<dyn Er
 
 #[tokio::test]
 async fn an_expiring_exchanged_token_is_exchanged_again() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     world.mount_cdr(&condition_of("p-1")).await;
     let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 2));
     world
@@ -618,7 +626,7 @@ async fn an_expiring_exchanged_token_is_exchanged_again() -> Result<(), Box<dyn 
 
 #[tokio::test]
 async fn a_refused_exchange_answers_its_status_and_reaches_no_cdr() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     world.mount_own_token().await;
     world.mount_cdr(&condition_of("p-1")).await;
     // RFC 8693 §2.2.2: an unacceptable subject token is `invalid_request`.
@@ -661,7 +669,7 @@ async fn a_refused_exchange_answers_its_status_and_reaches_no_cdr() -> Result<()
 
 #[tokio::test]
 async fn an_issued_token_for_another_audience_is_never_sent() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     world.mount_cdr(&condition_of("p-1")).await;
     let mut claims = world.issued_claims(Grant::Standard, 300);
     claims["aud"] = serde_json::json!("https://other.example/api");
@@ -683,7 +691,7 @@ async fn an_issued_token_for_another_audience_is_never_sent() -> Result<(), Box<
 
 #[tokio::test]
 async fn an_issued_token_naming_another_client_is_never_sent() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     world.mount_cdr(&condition_of("p-1")).await;
     let mut claims = world.issued_claims(Grant::Standard, 300);
     claims["client_id"] = serde_json::json!("synthetic-other-client");
@@ -706,7 +714,7 @@ async fn an_issued_token_naming_another_client_is_never_sent() -> Result<(), Box
 #[tokio::test]
 async fn a_machine_is_never_exchanged_and_reaches_the_cdr_under_the_bridge_token()
 -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     world.mount_own_token().await;
     world.mount_cdr(&condition_of("p-1")).await;
     let token = mint(
@@ -741,7 +749,7 @@ fn placeholder(world: &World) -> serde_json::Value {
 
 #[tokio::test]
 async fn a_header_commit_under_an_onward_token_states_no_committer() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
@@ -781,7 +789,7 @@ async fn a_header_commit_under_an_onward_token_states_no_committer() -> Result<(
 #[tokio::test]
 async fn a_contribution_under_an_onward_token_carries_the_placeholder_committer()
 -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard).await?;
+    let world = World::start(Grant::Standard, "").await?;
     let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
@@ -789,7 +797,7 @@ async fn a_contribution_under_an_onward_token_carries_the_placeholder_committer(
     mount_ehr(&world.harness.cdr).await;
     mount_echo(&world.harness.cdr, ECHOED, Echo::Sent).await;
     let token = mint(&world.key, &world.person_claims());
-    let authority = authority(world.issuer.settings()).await;
+    let authority = authority(world.trusted.clone()).await;
     let bundle = transaction_of(&[("urn:uuid:0000-onward", condition_of("p-1"))]);
     let request = http::Request::post("/fhir")
         .header(header::CONTENT_TYPE, "application/fhir+json")
@@ -829,14 +837,14 @@ async fn a_contribution_under_an_onward_token_carries_the_placeholder_committer(
 /// Creates a Condition as a machine under `grant` and returns the composition
 /// the CDR received and the client credentials request the bridge sent.
 async fn machine_create(grant: Grant) -> Result<(serde_json::Value, String), Box<dyn Error>> {
-    let world = World::start(grant).await?;
+    let world = World::start(grant, "").await?;
     world.mount_own_token().await;
     world.mount_cdr(&condition_of("p-1")).await;
     let token = mint(
         &world.key,
         &world.issuer.machine_claims("system/Condition.cru"),
     );
-    let authority = authority(world.issuer.settings()).await;
+    let authority = authority(world.trusted.clone()).await;
     let created = raw(
         secured(&world.harness, &authority),
         bearing(post_condition(&condition_of("p-1")), &token),

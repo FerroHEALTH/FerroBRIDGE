@@ -359,7 +359,7 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
-    /// A resource type named twice.
+    /// A value named twice in one list.
     #[error("{key} names {value} twice")]
     Duplicate {
         /// The list that holds it.
