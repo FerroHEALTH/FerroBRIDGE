@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.193"
+version = "0.1.194"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1780,11 +1780,14 @@ dependencies = [
  "hl7v2-types",
  "insta",
  "logos",
+ "rustls",
+ "rustls-webpki",
  "serde_json",
  "sha2 0.11.1",
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
  "tracing",
  "url",
@@ -1860,6 +1863,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-postgres",
+ "tokio-rustls",
  "toml",
  "tower",
  "tracing",
@@ -1909,8 +1913,10 @@ dependencies = [
  "jsonwebtoken",
  "omop-cdm",
  "png",
+ "rcgen",
  "reqwest",
  "rustix",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.11.1",
@@ -1921,6 +1927,7 @@ dependencies = [
  "thirtyfour",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "toml",
  "tracing-subscriber",
  "url",

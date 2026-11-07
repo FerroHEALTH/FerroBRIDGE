@@ -162,9 +162,12 @@ The ones to know before you deploy:
   a port published on `0.0.0.0` is reachable from the network whatever the
   host firewall says
   ([running it with compose](../operate/container.md#running-it-with-compose)).
-- **The HL7 v2 face checks no credential.** Its allow list matches MSH-4
-  alone, a value the sender writes itself, so keep the MLLP port on a network
-  only your senders reach ([limits](../operate/hl7v2-face.md#limits)).
+- **A sender's client certificate leaking.** The HL7 v2 face serves MLLP
+  over TLS and admits a message only on a connection whose client certificate
+  carries the `certificate_subject` of the sender its MSH-4 names, so a
+  stolen client key sends as that sender until its authority revokes it.
+  Keep the keys of `[[hl7v2.senders]]` with the senders
+  ([the HL7 v2 face](../operate/hl7v2-face.md)).
 - **A lost or shared identity store.** A lost file makes the next create of
   a resource the CDR already holds write a second composition, and two
   processes with a file each keep two maps that disagree

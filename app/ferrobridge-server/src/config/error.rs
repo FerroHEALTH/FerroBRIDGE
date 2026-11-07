@@ -376,6 +376,28 @@ pub enum Error {
         /// The key that holds it.
         key: String,
     },
+    /// A sender names no `certificate_subject`.
+    #[error("{key}: every sender names the certificate_subject its client certificate carries")]
+    CertificateSubject {
+        /// The key that holds it.
+        key: String,
+    },
+    /// A TLS file of the HL7 v2 face could not be read.
+    #[error("{key} could not be read")]
+    TlsFile {
+        /// The key that names it.
+        key: String,
+        /// What the file system reported.
+        #[source]
+        source: std::io::Error,
+    },
+    /// The HL7 v2 face's TLS material does not make an acceptor.
+    #[error("[hl7v2.tls] does not make a TLS listener")]
+    Hl7v2Tls {
+        /// What the acceptor reported.
+        #[source]
+        source: Box<ferrobridge_hl7v2::mllp::tls::TlsError>,
+    },
     /// A sender's `origin` is neither empty nor `device`, or a device names no
     /// `device_identifier_issuer`, or a person sender names one.
     #[error(

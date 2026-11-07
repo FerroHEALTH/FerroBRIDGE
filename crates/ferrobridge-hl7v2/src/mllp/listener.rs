@@ -11,11 +11,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use bytes::BytesMut;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use rustls::pki_types::CertificateDer;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
+use tokio_rustls::TlsAcceptor;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing::Instrument;
 
@@ -31,6 +33,7 @@ use super::{Codec, FrameError, Malformed, READ_CHUNK};
 pub struct Connection {
     refused: AtomicUsize,
     peer: Option<SocketAddr>,
+    certificate: Option<CertificateDer<'static>>,
 }
 
 impl Connection {
@@ -40,7 +43,23 @@ impl Connection {
         Self {
             refused: AtomicUsize::new(0),
             peer,
+            certificate: None,
         }
+    }
+
+    /// Returns these counts of a connection whose peer authenticated with
+    /// `certificate`, its end-entity certificate.
+    #[must_use]
+    pub fn with_certificate(mut self, certificate: Option<CertificateDer<'static>>) -> Self {
+        self.certificate = certificate;
+        self
+    }
+
+    /// Returns the end-entity certificate the peer authenticated with over
+    /// TLS, `None` on a plain connection.
+    #[must_use]
+    pub const fn certificate(&self) -> Option<&CertificateDer<'static>> {
+        self.certificate.as_ref()
     }
 
     /// Returns the address of the connection's peer, as the socket reported
@@ -133,6 +152,90 @@ pub async fn serve_with<H: Handler>(
     timeouts: Timeouts,
     shutdown: impl Future<Output = ()> + Send,
 ) -> std::io::Result<()> {
+    accept(
+        listener,
+        handler,
+        codec,
+        timeouts,
+        shutdown,
+        |stream| async move { Ok((stream, None)) },
+    )
+    .await
+}
+
+/// Accepts connections on `listener` as [`serve_with`] does, each over TLS
+/// through `acceptor`, whose configuration decides whether a client
+/// certificate is required ([`crate::mllp::tls::acceptor`] requires one).
+///
+/// The handshake must finish within the frame timeout, or ten seconds when
+/// none is set; a connection whose handshake fails or stalls is closed and
+/// logged, and the handler sees its peer's end-entity certificate on the
+/// [`Connection`]. MLLP Release 1 rides on any stream, so TLS beneath it
+/// changes no frame (no specification governs the handshake limit: our own
+/// design).
+///
+/// # Errors
+///
+/// Returns the I/O error of a failed `accept`.
+pub async fn serve_tls<H: Handler>(
+    listener: TcpListener,
+    acceptor: TlsAcceptor,
+    handler: Arc<H>,
+    codec: Codec,
+    timeouts: Timeouts,
+    shutdown: impl Future<Output = ()> + Send,
+) -> std::io::Result<()> {
+    let limit = timeouts.frame.unwrap_or(HANDSHAKE);
+    accept(
+        listener,
+        handler,
+        codec,
+        timeouts,
+        shutdown,
+        move |stream| {
+            let acceptor = acceptor.clone();
+            async move {
+                let tls = tokio::time::timeout(limit, acceptor.accept(stream))
+                    .await
+                    .map_err(|_elapsed| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::TimedOut,
+                            "the TLS handshake stalled",
+                        )
+                    })??;
+                let certificate = tls
+                    .get_ref()
+                    .1
+                    .peer_certificates()
+                    .and_then(<[CertificateDer<'static>]>::first)
+                    .cloned();
+                Ok((tls, certificate))
+            }
+        },
+    )
+    .await
+}
+
+/// How long a TLS handshake may take when no frame timeout is set.
+const HANDSHAKE: Duration = Duration::from_secs(10);
+
+/// Accepts connections on `listener` until `shutdown` completes, turning each
+/// through `upgrade` into the stream its frames are read from and the
+/// certificate its peer authenticated with.
+async fn accept<H, U, F, S>(
+    listener: TcpListener,
+    handler: Arc<H>,
+    codec: Codec,
+    timeouts: Timeouts,
+    shutdown: impl Future<Output = ()> + Send,
+    upgrade: U,
+) -> std::io::Result<()>
+where
+    H: Handler,
+    U: Fn(TcpStream) -> F,
+    F: Future<Output = std::io::Result<(S, Option<CertificateDer<'static>>)>> + Send + 'static,
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
     let (stop, stopped) = watch::channel(false);
     let mut connections = JoinSet::new();
     tokio::pin!(shutdown);
@@ -142,6 +245,7 @@ pub async fn serve_with<H: Handler>(
             accepted = listener.accept() => {
                 let (stream, peer) = accepted?;
                 tracing::debug!(peer = %peer, "MLLP connection accepted");
+                let upgraded = upgrade(stream);
                 let handler = Arc::clone(&handler);
                 let stopped = stopped.clone();
                 let span = tracing::info_span!(
@@ -152,8 +256,16 @@ pub async fn serve_with<H: Handler>(
                 );
                 connections.spawn(
                     async move {
+                        let (stream, certificate) = match upgraded.await {
+                            Ok(upgraded) => upgraded,
+                            Err(error) => {
+                                tracing::warn!(error = %error, "MLLP connection refused before its first frame");
+                                return;
+                            }
+                        };
+                        let counts = Connection::with_peer(Some(peer)).with_certificate(certificate);
                         let ended =
-                            connection(stream, handler.as_ref(), codec, timeouts, stopped).await;
+                            connection(stream, counts, handler.as_ref(), codec, timeouts, stopped).await;
                         if let Err(error) = ended {
                             tracing::warn!(error = %error, "MLLP connection closed on an error");
                         }
@@ -180,17 +292,15 @@ pub async fn serve_with<H: Handler>(
 /// Answers the frames of one connection until the peer closes it, a frame is
 /// malformed or stalls, the connection idles past its timeout, or the
 /// listener stops.
-async fn connection<H: Handler>(
-    mut stream: TcpStream,
+async fn connection<H: Handler, S: AsyncRead + AsyncWrite + Unpin>(
+    mut stream: S,
+    counts: Connection,
     handler: &H,
     mut codec: Codec,
     timeouts: Timeouts,
     mut stopped: watch::Receiver<bool>,
 ) -> Result<(), FrameError> {
     let mut buffer = BytesMut::new();
-    // NOTE: no specification governs this: our own design; a peer address the operating
-    // system cannot report is absent, and the handler is told so.
-    let counts = Connection::with_peer(stream.peer_addr().ok());
     let mut messages = 0usize;
     let mut idle_since = Instant::now();
     let mut frame_since: Option<Instant> = None;
@@ -275,8 +385,8 @@ async fn expiry(deadline: Option<Instant>) {
 
 /// Sends the handler's answer to a malformed frame, when it has one, and
 /// ends the connection.
-async fn refuse<H: Handler>(
-    stream: &mut TcpStream,
+async fn refuse<H: Handler, S: AsyncWrite + Unpin>(
+    stream: &mut S,
     handler: &H,
     codec: &mut Codec,
     kind: Malformed,

@@ -40,12 +40,21 @@ ehr_policy = "create_on_first_write"
 profiles = [
   { resource_type = "Observation", profile = "https://example.org/fhir/StructureDefinition/lab-result" },
 ]
+senders = [
+  { namespace_id = "NORTHLAB", certificate_subject = "northlab.example.org" },
+]
+
+[hl7v2.tls]
+certificate_file = "/run/secrets/mllp_chain.pem"
+key_file = "/run/secrets/mllp_key.pem"
+client_ca_file = "/run/secrets/mllp_clients_ca.pem"
 ```
 
 ## The keys
 
 Every key is settable as `FERROBRIDGE__HL7V2__<KEY>`, and a list takes TOML
-syntax in the variable. The section holds no secret.
+syntax in the variable. The section holds no secret; the TLS key is read
+from the file `tls.key_file` names.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -61,7 +70,19 @@ syntax in the variable. The section holds no secret.
 | `frame_timeout_ms` | `30000` | How long one message may take from its first byte to its trailer before it is answered `AR`; `0` waits |
 | `frame_limit_bytes` | `1048576` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes of the run, by kind, at debug level |
-| `senders` | `[]` | The sending facilities (MSH-4) the face accepts, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3); empty accepts any. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
+| `senders` | none, required | The sending facilities (MSH-4) the face accepts, at least one, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3) with `certificate_subject = "..."`, the DNS name its client certificate carries in its subject alternative name; a facility a composition names is one of them too. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
+
+| `tls.certificate_file` | none, required | The PEM certificate chain the listener serves |
+| `tls.key_file` | none, required | The PEM private key of that chain |
+| `tls.client_ca_file` | none, required | The PEM authorities a sender's client certificate must chain to |
+
+The listener serves MLLP over TLS and requires a client certificate that
+chains to `tls.client_ca_file`; a peer without one never completes the
+handshake. A message is accepted only on a connection whose certificate
+carries the `certificate_subject` of the sender its MSH-4 names, so a
+sender cannot send as another. The bridge refuses to start without the
+`[hl7v2.tls]` files, without a sender, or with a sender that names no
+`certificate_subject`.
 
 ## What happens to one message
 
@@ -219,6 +240,7 @@ ERR-3 and the text in ERR-8.
 | A message structure the definitions or the guide do not carry | `AR` | `200` |
 | A required field or segment missing, an undecoded escape | `AE` | `101`, `100` or `102`, located |
 | MSH-4 names a sending facility `senders` does not list | `AR` | `207` at MSH^1^4 |
+| The connection's client certificate does not carry the `certificate_subject` of the sender MSH-4 names | `AR` | `207` at MSH^1^4 |
 | MSH-10 empty | `AE` | `101` at MSH-10 |
 | A result whose message names no clinician, from a sender that is no device | `AE` | `101` at OBX^1^16 |
 | A health care facility no listed sender names | `AE` | `207` at its field |
@@ -285,8 +307,8 @@ acknowledged, and the connection closes, within the same
   one process per identity store and point every sender of a feed at it.
 - MLLP Release 2's commit acknowledgment is not spoken, and enhanced-mode
   acknowledgments are not sent.
-- The allow list matches MSH-4 alone; the sending application (MSH-3) is not
-  checked.
+- The allow list matches MSH-4, tied to the client certificate of the
+  connection; the sending application (MSH-3) is not checked.
 
 ## Until a mapping context covers the guide's resources
 
