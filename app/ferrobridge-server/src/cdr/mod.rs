@@ -578,7 +578,7 @@ pub fn ehr_id_from_etag(status: StatusCode, etag: Option<&str>) -> Result<EhrId,
         status,
         header: "ETag",
     })?;
-    EhrId::new(ids::entity_tag(etag)).map_err(|source| CdrError::MalformedHeader {
+    EhrId::new(&ids::entity_tag(etag)).map_err(|source| CdrError::MalformedHeader {
         operation: "ehr_create",
         header: "ETag",
         source: Box::new(source),
@@ -601,7 +601,7 @@ pub fn contribution_uid_from_etag(
         status,
         header: "ETag",
     })?;
-    ContributionUid::new(ids::entity_tag(etag)).map_err(|source| CdrError::MalformedHeader {
+    ContributionUid::new(&ids::entity_tag(etag)).map_err(|source| CdrError::MalformedHeader {
         operation,
         header: "ETag",
         source: Box::new(source),

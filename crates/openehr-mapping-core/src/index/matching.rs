@@ -123,12 +123,9 @@ pub fn archetype_release_version(id: &str) -> Option<&str> {
 /// `openEHR-EHR-EVALUATION.note.v1`. A local code carries neither, so it is
 /// returned unchanged.
 fn interface_form(id: &str) -> String {
-    let without_namespace = id.rsplit_once("::").map_or(id, |(_, rest)| rest);
-    let Some((concept, version)) = without_namespace.rsplit_once(".v") else {
-        return without_namespace.to_owned();
-    };
-    let major = version.split('.').next().unwrap_or(version);
-    format!("{concept}.v{major}")
+    // NOTE: a node id that is no archetype HRID (a local `at` code) legitimately is its own form.
+    id.parse::<ArchetypeHrid>()
+        .map_or_else(|_| id.to_owned(), |hrid| hrid.local_semantic_id())
 }
 
 #[cfg(test)]

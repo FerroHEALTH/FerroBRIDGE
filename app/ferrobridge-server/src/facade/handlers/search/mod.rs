@@ -35,7 +35,6 @@ use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
-use crate::cdr::ids::versioned_object_uid;
 use crate::cdr::query::QueryPageError;
 use crate::facade::Facade;
 use crate::facade::engine;
@@ -595,7 +594,7 @@ fn matched(
         });
     }
     let mut entries = chosen.unwrap_or(every);
-    let container = versioned_object_uid(&read.version);
+    let container = read.version.versioned_object_id();
     for bindings in &plan.ids {
         let mut named = Vec::new();
         for binding in bindings {

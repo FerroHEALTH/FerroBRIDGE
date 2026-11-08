@@ -4,6 +4,8 @@
 //! The composition fields the engine fills when no mapping does
 //! (`engine/defaults-for-fields.adoc`).
 
+use openehr_term::codes as term;
+
 use crate::engine::origin::Origin;
 use crate::engine::origin::Party;
 
@@ -52,8 +54,8 @@ impl Defaults {
             composer: String::from("FHIRconnect"),
             start_time: now.into(),
             setting: Setting {
-                code: String::from("238"),
-                value: String::from("other care"),
+                code: String::from(term::Setting::OtherCare.code()),
+                value: String::from(term::Setting::OtherCare.rubric()),
             },
             language: None,
             territory: None,
