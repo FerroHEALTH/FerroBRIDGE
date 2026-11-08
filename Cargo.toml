@@ -45,10 +45,10 @@ rust_decimal = { version = "1.43.0", default-features = false, features = ["std"
 regex = "1.13.1"
 # The openEHR RM model and the BASE path parser: the code conforms to RM
 # Release 1.1.0 and compiles against the `v1_2` generation (docs/VERSIONS.md).
-openehr-rm = "0.0.130"
+openehr-rm = "0.0.133"
 # The BASE identification types the RM leaves to it: TERMINOLOGY_ID is a
 # CODE_PHRASE field, so a lens that builds one names this crate.
-openehr-base = "0.0.130"
+openehr-base = "0.0.133"
 # anyhow is a binary-only error type (.claude/rules/rust-style.md).
 anyhow = "1.0.104"
 # The forwarder ratchet parses the hand-written Rust (tools/forwarders).
@@ -90,6 +90,10 @@ ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.13
 # Published from this workspace and consumed by the published eehrxf, so the
 # requirement carries both a path and a version.
 ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "0.1.151" }
+# The FHIR R4 search value grammar, published from this workspace for the
+# facade and the family's FHIR servers, so the requirement carries both a path
+# and a version.
+fhir-search = { path = "crates/fhir-search", version = "0.1.128" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
@@ -110,19 +114,19 @@ omocl = { path = "crates/omocl" }
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
 # engines (FLAT, STRUCTURED, Web Template, TDD, RM-instance validation) live in
 # openehr-sdt, taken without its `cache` feature (`moka`).
-openehr-its = { version = "0.0.130", default-features = false, features = ["opt14", "json"] }
-openehr-sdt = { version = "0.0.130", default-features = false, features = ["flat"] }
-openehr-am = "0.0.130"
+openehr-its = { version = "0.0.133", default-features = false, features = ["opt14", "json"] }
+openehr-sdt = { version = "0.0.133", default-features = false, features = ["flat"] }
+openehr-am = "0.0.133"
 # The AQL 1.1.0 parser: the ETL checks its configured queries at load
 # (docs/architecture.md section 5.4).
-openehr-query = "0.0.130"
+openehr-query = "0.0.133"
 # The ADL 2 parser: openehr-mapping-core compiles its ADL 2 test fixtures from
 # their .adls sources with it, and the server reads the archetype HRID an adl2
 # template ETag carries with its `hrid::parse_hrid`.
-openehr-adl = "0.0.130"
+openehr-adl = "0.0.133"
 # The openEHR terminology: the `audit_change_type` and
 # `version_lifecycle_state` concepts a commit codes (`codes`).
-openehr-term = "0.0.130"
+openehr-term = "0.0.133"
 # The HTTP client for the CDR wire. reqwest 0.13 spells the rustls selection
 # "rustls"; it carries its own platform verifier and aws-lc-rs provider.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }
@@ -194,6 +198,9 @@ redb = "4.3.0"
 # composition field from (docs/architecture.md section 7). UTC only, so the
 # platform time-zone database features stay off.
 jiff = { version = "0.2.37", default-features = false, features = ["std"] }
+# The canonical decomposition fhir-search folds a string value with before the
+# default and the :contains match compare it.
+unicode-normalization = "0.1.26"
 url = "2.5.8"
 http = "1.5.0"
 # The `serde` feature reads a configured secret straight into a `SecretString`.

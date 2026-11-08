@@ -23,10 +23,9 @@ use crate::facade::search::criteria::Filter;
 use crate::facade::search::criteria::Test;
 use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
-use crate::facade::search::value::DateValue;
-use crate::facade::search::value::Prefix;
-use crate::facade::search::value::System;
-use crate::facade::search::value::Token;
+use fhir_search::date::DateValue;
+use fhir_search::prefix::Prefix;
+use fhir_search::token::{System, Token};
 
 /// What the identity map answered for the subject parameters and `_id`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -161,8 +160,8 @@ fn condition(
             .collect::<Result<Vec<String>, CriteriaError>>()?,
         (Test::Date(values), ParameterType::Date) => values
             .iter()
-            .map(|value| date_condition(conditions, &path, value))
-            .collect(),
+            .map(|value| date_condition(conditions, &path, value, &filter.name))
+            .collect::<Result<Vec<String>, CriteriaError>>()?,
         _ => {
             return Err(CriteriaError::Invalid {
                 name: filter.name.clone(),
@@ -201,19 +200,19 @@ fn token_condition(
         })
     };
     let mut parts = Vec::new();
-    match token.system {
+    match token.system() {
         System::Any => {}
         System::Absent => parts.push(format!("NOT EXISTS {}", needs_system()?)),
-        System::Is(ref uri) => {
+        System::Is(uri) => {
             let path = needs_system()?;
             // NOTE: no specification maps a FHIR system URI to an openEHR terminology id:
             // our own design, the declaration's `systems` table, else the URI verbatim.
-            let terminology = systems.get(uri).map_or(uri.as_str(), String::as_str);
+            let terminology = systems.get(uri).map_or(uri, String::as_str);
             parts.push(format!("{path} = {}", conditions.bind(terminology)));
         }
     }
-    if let Some(ref code) = token.code {
-        parts.push(format!("{code_path} = {}", conditions.bind(code.as_str())));
+    if let Some(code) = token.code() {
+        parts.push(format!("{code_path} = {}", conditions.bind(code)));
     }
     Ok(parts.join(" AND "))
 }
@@ -223,25 +222,34 @@ fn token_condition(
 /// The target is the single instant an openEHR `DV_DATE_TIME` records, so the
 /// R4 range rules (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.5) reduce
 /// to comparisons of that instant with the search range `[low, high)`.
-fn date_condition(conditions: &mut Conditions, path: &str, value: &DateValue) -> String {
-    match value.prefix {
-        Prefix::Equal => {
-            let low = conditions.bind(value.low.as_str());
-            let high = conditions.bind(value.high.as_str());
-            format!("{path} >= {low} AND {path} < {high}")
+fn date_condition(
+    conditions: &mut Conditions,
+    path: &str,
+    value: &DateValue,
+    name: &str,
+) -> Result<String, CriteriaError> {
+    let range = value.date().range();
+    let low = range.low().to_string();
+    let high = range.high().map(ToString::to_string);
+    let mut bind = |text: &str| conditions.bind(text);
+    Ok(match (value.prefix(), high) {
+        (Prefix::Eq | Prefix::Ap, Some(high)) => {
+            format!("{path} >= {} AND {path} < {}", bind(&low), bind(&high))
         }
-        Prefix::NotEqual => {
-            let low = conditions.bind(value.low.as_str());
-            let high = conditions.bind(value.high.as_str());
-            format!("{path} < {low} OR {path} >= {high}")
+        (Prefix::Ne, Some(high)) => format!("{path} < {} OR {path} >= {}", bind(&low), bind(&high)),
+        (Prefix::Eq | Prefix::Ap | Prefix::Ge, None) | (Prefix::Ge, Some(_)) => {
+            format!("{path} >= {}", bind(&low))
         }
-        Prefix::Less | Prefix::EndsBefore => {
-            format!("{path} < {}", conditions.bind(value.low.as_str()))
+        (Prefix::Ne | Prefix::Lt | Prefix::Eb, _) => format!("{path} < {}", bind(&low)),
+        (Prefix::Gt | Prefix::Sa, Some(high)) => format!("{path} >= {}", bind(&high)),
+        (Prefix::Le, Some(high)) => format!("{path} < {}", bind(&high)),
+        (Prefix::Gt | Prefix::Sa | Prefix::Le, None) => {
+            return Err(CriteriaError::Unsupported {
+                name: name.to_owned(),
+                reason: String::from(
+                    "the range of this date runs past the year 9999, and the CDR compares no date beyond it",
+                ),
+            });
         }
-        Prefix::GreaterOrEqual => format!("{path} >= {}", conditions.bind(value.low.as_str())),
-        Prefix::Greater | Prefix::StartsAfter => {
-            format!("{path} >= {}", conditions.bind(value.high.as_str()))
-        }
-        Prefix::LessOrEqual => format!("{path} < {}", conditions.bind(value.high.as_str())),
-    }
+    })
 }

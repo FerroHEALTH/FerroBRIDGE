@@ -277,14 +277,21 @@ every attribute the reference model gives a value survives. Never add a
 per-class FLAT table back: what a class carries is `openehr_rm::v1_2::model`.
 
 The resolver records the RM class of the last attribute a tail names
-(`OpenehrTarget::leaf_class`). The engine reads the tail from the node's
-canonical JSON with `paths::item_at_path` and writes it by merging into the
-value the place holds. `engine::rm::carried` looks the tail up in the
-attribute model: it is carried when every attribute exists on the node's
-class or a concrete descendant, no step is a list, and the node is a data
-value (or the tail is a `FAMILIES` entry such as `ENTRY.provider`). A generic
-node (`DV_INTERVAL<DV_QUANTITY>`) is looked up by its class, and a bound
-below it is its parameter (`resolve::derive::attribute_class`). A `manual`
+(`OpenehrTarget::leaf_class`), typing every step with
+`openehr_rm::v1_2::typing::path_type`, so a generic holder gives its argument
+to the attribute it types (`range/lower` of a `REFERENCE_RANGE<DV_QUANTITY>`
+is a `DV_QUANTITY`). The engine reads the tail from the node's canonical
+JSON with `paths::item_at_path` and writes it into the value the place holds
+with `paths::write::set_at_path`. `engine::rm::carried` looks the tail up
+through the same typing: it is carried when every step types on the node's
+class or a concrete descendant, no step is a `Set` or a `Hash`, the last is
+no container, and the node is a data value (or the tail is a `FAMILIES`
+entry such as `ENTRY.provider`). A step through a `List` is an occurrence
+axis inside the node's value (`OpenehrTarget::lists`): each element is one
+occurrence at its 1-based position, and a `List` the tail ends on is an
+axis whose elements the mapping's children fill. A `DV_INTERVAL` a tail
+wrote bound by bound gets every flag it lacks from its bounds when the
+composition is built (`engine::rm::interval`). A `manual`
 path must also end on a `String` attribute, because `merge` writes text. A
 tail outside that is refused at load (`fc-uncarried-tail`, naming the mapping,
 the class and the tail); `EngineError::UnsupportedTail` in both directions is

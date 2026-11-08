@@ -23,6 +23,7 @@ use crate::resolve::program::mapping::Derived;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::mapping::Pairing;
 use crate::resolve::program::target::FhirTarget;
+use crate::resolve::program::target::ListAxis;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::Occurrence;
 
@@ -286,6 +287,16 @@ impl<T: Table + ?Sized> Run<'_, T> {
             .collect()
     }
 
+    /// Returns the element of each `List` axis of `target` that `bound`
+    /// fixes, as far as the two share them.
+    ///
+    /// A list the binding holds no element of is read whole, the way a
+    /// repeating node the binding does not fix reads its first instance.
+    pub(super) fn bound_elements(target: &OpenehrTarget, bound: &Binding) -> Vec<RmPosition> {
+        let shared = bound.shared_lists(target);
+        bound.elements.get(..shared).unwrap_or_default().to_vec()
+    }
+
     /// Returns the next free instance of one axis under one prefix, in the
     /// document of `level` coming out of openEHR.
     pub(super) fn next_index(&mut self, level: usize, axis: &str, prefix: &[usize]) -> usize {
@@ -350,7 +361,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             // positions come back through the index the counters speak.
             Direction::FhirToOpenehr => {
                 let mut held = Vec::with_capacity(parent.openehr.len());
-                for position in &parent.openehr {
+                for position in parent.openehr.iter().chain(&parent.elements) {
                     let index = FlatIndex::from(*position).get();
                     held.push(usize::try_from(index).map_err(|_refused| {
                         EngineError::Position {
@@ -358,6 +369,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
                             source: PositionError::Overflow,
                         }
                     })?);
+                }
+                if let Some(target) = mapping.openehr()
+                    && parent.shared_lists(target) == 0
+                {
+                    held.truncate(parent.openehr.len());
                 }
                 held
             }
@@ -407,21 +423,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         },
                     )?);
                 }
-                Ok(Binding {
-                    fhir: input.clone(),
-                    axes: parent.axes_of(mapping.openehr(), positions.len()),
-                    openehr: positions,
-                    level,
-                })
+                Ok(parent.of_openehr(mapping.openehr(), input.clone(), positions, level))
             }
             Direction::OpenehrToFhir => {
                 let openehr = rm_positions(mapping.name(), input.indices())?;
-                Ok(Binding {
-                    fhir: Occurrence::new(indices),
-                    axes: parent.axes_of(mapping.openehr(), openehr.len()),
-                    openehr,
-                    level,
-                })
+                Ok(parent.of_openehr(mapping.openehr(), Occurrence::new(indices), openehr, level))
             }
         }
     }
@@ -434,6 +440,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     .occurrences()
                     .iter()
                     .map(|axis| String::from(axis.as_str()))
+                    .chain(target.lists().iter().map(ListAxis::key))
                     .collect()
             }),
             Direction::OpenehrToFhir => mapping.fhir().map_or_else(Vec::new, fhir_axes),
@@ -458,11 +465,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
 /// Returns how many axes of the output side the parent bound.
 ///
 /// Going into openEHR those are the repeating nodes the mapping's node shares
-/// with the parent's, and every one the parent bound when it has no openEHR side.
+/// with the parent's, followed by the `List` axes below the node the two
+/// share, and every one the parent bound when it has no openEHR side.
 fn parent_depth(parent: &Binding, mapping: &Mapping, direction: Direction) -> usize {
     match direction {
         Direction::FhirToOpenehr => mapping.openehr().map_or(parent.openehr.len(), |target| {
-            parent.shared(target.occurrences())
+            parent
+                .shared(target.occurrences())
+                .saturating_add(parent.shared_lists(target))
         }),
         Direction::OpenehrToFhir => parent.fhir.indices().len(),
     }

@@ -43,6 +43,7 @@ use openehr_sdt::flat::path::Segment;
 use serde_json::Value;
 
 pub mod carried;
+pub mod interval;
 pub mod null_flavour;
 
 use crate::engine::rm::null_flavour::NULL_FLAVOUR;

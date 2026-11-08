@@ -92,10 +92,11 @@ fn medication_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let template =
         openehr_adl::assemble::parse_artefact(FERROBRIDGE_MEDICATION_TEMPLATE, Dialect::Adl2)
             .map_err(|errors| format!("the template: {errors:?}"))?;
-    let opt = openehr_adl::opt::create_opt(&template, &repository)
+    let raw = openehr_adl::opt::create_opt(&template, &repository)
         .map_err(|errors| format!("the operational template: {errors:?}"))?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt2 {
-        template: Box::new(opt),
+        template: Box::new(raw.template),
+        prohibited_attributes: raw.prohibited_attributes,
         resolved_id: String::from(FERROBRIDGE_MEDICATION_TEMPLATE_ID),
     })?)
 }
