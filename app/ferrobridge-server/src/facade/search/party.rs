@@ -222,7 +222,7 @@ pub fn page(mut request: AdhocQueryExecute, offset: i64, fetch: i64) -> AdhocQue
 mod tests {
     use super::{NameInexpressible, NameSearch, page};
     use crate::facade::search::identifier::IdentifierSearch;
-    use crate::facade::search::value::{System, Token};
+    use fhir_search::token::Token;
 
     #[test]
     fn a_page_binds_the_identifier_and_pages_the_query() {
@@ -231,10 +231,7 @@ mod tests {
             None,
         )
         .expect("the query binds the identifier");
-        let token = Token {
-            system: System::Any,
-            code: Some(String::from("SYN-0001")),
-        };
+        let token = Token::Code(String::from("SYN-0001"));
         let request = page(
             query.request(&token).expect("the token is expressible"),
             20,

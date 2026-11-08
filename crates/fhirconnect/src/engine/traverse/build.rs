@@ -335,8 +335,10 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             if let Held::Partial(ref object) = written.value
                 && PartyClass::from_rm_type(node.rm_type()).is_some()
             {
+                let mut whole = serde_json::Value::Object(object.clone());
+                rm::interval::fill_flags(&mut whole, node.rm_type());
                 values.push(
-                    NodeValue::new(node, serde_json::Value::Object(object.clone()))
+                    NodeValue::new(node, whole)
                         .with_occurrences(written.positions.clone())
                         .with_datum(rm::RAW),
                 );
@@ -357,12 +359,10 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
                         .get("_type")
                         .and_then(serde_json::Value::as_str)
                         .unwrap_or(node.rm_type());
-                    RmValue::from_canonical(
-                        rm_type,
-                        node.aql_path().as_str(),
-                        &serde_json::Value::Object(object.clone()),
-                    )
-                    .map_err(refuse)?
+                    let mut whole = serde_json::Value::Object(object.clone());
+                    rm::interval::fill_flags(&mut whole, rm_type);
+                    RmValue::from_canonical(rm_type, node.aql_path().as_str(), &whole)
+                        .map_err(refuse)?
                 }
             };
             values.push(

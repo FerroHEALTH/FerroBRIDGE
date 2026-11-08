@@ -55,11 +55,11 @@ v0.0.4 (OMOP). Nothing is scaffolded before its issues are filed.
 ## Repo map
 
 The Cargo workspace (#107) holds the root manifests with the full lint set,
-twelve library crates (three at 0.0.0, the version that holds their crates.io
+thirteen library crates (three at 0.0.0, the version that holds their crates.io
 names until a first publish, and `fhir-types`, `hl7v2-types`,
 `openehr-mapping-core`, `fhirconnect`, `ferrobridge-term`,
-`ferrobridge-hl7v2`, `ferrobridge-fhirpath`, `ferrobridge-validator` and
-`eehrxf` on the published crate line), and
+`ferrobridge-hl7v2`, `ferrobridge-fhirpath`, `ferrobridge-validator`,
+`fhir-search` and `eehrxf` on the published crate line), and
 the testkit tool crate. Beside it:
 
 - `app/ferrobridge-server`: the bridge's one binary, `ferrobridge` (#21). A thin
@@ -223,6 +223,14 @@ the testkit tool crate. Beside it:
   extensions by `url`. `report` holds typed issues and every slicing,
   invariant, binding and profile it met and did not evaluate, and converts to
   an R4 `OperationOutcome`.
+- `crates/fhir-search`: the FHIR R4 search value grammar (#1718,
+  search.html §3.1.1.4), the one copy the facade, `ihe-atna` and `ihe-iti`
+  read search values with: `escape` (the `\` escape, the split at `,`, `|`
+  and `$`, and its inverse), `token` (the four token forms and `:of-type`),
+  `string` (the three string matches and the fold the default compares),
+  `prefix` (the nine prefixes) and `date` (a date to any precision, the
+  range its precision implies, its instants in a caller's zone, and the
+  `ap` margin). No error and no `Debug` output carries a value.
 - `crates/eehrxf`: the European interoperability software component of an
   EHR system under Regulation (EU) 2025/327 (Art 25(1)), moved here from
   FerroFED by the owner decision of 2026-10-28 (#1314), where every further

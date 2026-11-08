@@ -280,7 +280,8 @@ impl<'a> Compiler<'a> {
     ///
     /// A value reaches the wire whole under `|raw`, so a tail is carried when
     /// it names attributes the reference model gives the node's class, walks no
-    /// container and sits below a data value or a FLAT family
+    /// `Set` or `Hash`, ends on no container and sits below a data value or a
+    /// FLAT family
     /// (`engine::rm::carried`); the crate refuses any other tail at load,
     /// never on the request that first reaches it. A `manual` path writes text,
     /// so an empty one writes the node's `value` and a tail that ends on no
@@ -312,18 +313,28 @@ impl<'a> Compiler<'a> {
         if carried {
             return;
         }
+        let message = if target.ends_on_list() && !manual {
+            format!(
+                "`{mapping}` names the list `{}` below the {class} node `{}` and no child that \
+                 fills one of its elements, so no element would reach the wire",
+                written.join("/"),
+                target.node().aql_path().as_str()
+            )
+        } else {
+            format!(
+                "`{mapping}` names `{}` below the {class} node `{}`, which the engine cannot \
+                 carry as one {class} value, so the value would never reach the wire",
+                written.join("/"),
+                target.node().aql_path().as_str()
+            )
+        };
         self.diagnostics.push(diagnostic(
             file.file(),
             file.header().name().value(),
             ResolveCode::UncarriedTail,
             position,
             path,
-            format!(
-                "`{mapping}` names `{}` below the {class} node `{}`, which the engine cannot carry \
-                 as one {class} value, so the value would never reach the wire",
-                written.join("/"),
-                target.node().aql_path().as_str()
-            ),
+            message,
         ));
     }
 

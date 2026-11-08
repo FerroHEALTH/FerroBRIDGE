@@ -106,14 +106,14 @@ carries the exact patch.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `openehr-base` | 0.0.130 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-rm` | 0.0.130 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-its` | 0.0.130 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-sdt` | 0.0.130 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
-| `openehr-query` | 0.0.130 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-am` | 0.0.130 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
-| `openehr-adl` | 0.0.130 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
-| `openehr-term` | 0.0.130 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
+| `openehr-base` | 0.0.133 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-rm` | 0.0.133 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-its` | 0.0.133 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-sdt` | 0.0.133 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
+| `openehr-query` | 0.0.133 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-am` | 0.0.133 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
+| `openehr-adl` | 0.0.133 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
+| `openehr-term` | 0.0.133 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
 
 ## Third-party crates
 
@@ -395,7 +395,7 @@ the line exactly (owner decision 2026-10-17, #510).
 first publish (#397), and `ferrobridge-term`, `ferrobridge-fhirpath` and
 `ferrobridge-validator` joined it at 0.1.126 (#432), `hl7v2-types` and
 `ferrobridge-hl7v2` at 0.1.127 (#1131), and `eehrxf` at 0.1.128 when it moved
-here from FerroFED, where it reached 0.0.40 unpublished (#1314). Every other library crate holds its name with a 0.0.0
+here from FerroFED, where it reached 0.0.40 unpublished (#1314), and `fhir-search` at 0.1.128 when it was created (#1718). Every other library crate holds its name with a 0.0.0
 placeholder (#107), outside the line until its first publish, when it joins
 at the line's current value.
 

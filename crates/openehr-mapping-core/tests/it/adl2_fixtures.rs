@@ -17,6 +17,7 @@ use std::error::Error;
 use ferrobridge_testkit::fixtures::MINIMAL_EVALUATION_OPT;
 use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::assemble::parse_artefact;
+use openehr_adl::opt::RawOpt;
 use openehr_adl::opt::create_opt;
 use openehr_adl::parse::Dialect;
 use openehr_mapping_core::index::WebTemplateIndex;
@@ -36,9 +37,10 @@ fn adl2_index() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let minimal = parse_artefact(MINIMAL, Dialect::Adl2).map_err(|errors| format!("{errors:?}"))?;
     let mut repository = ArchetypeRepository::default();
     repository.insert(note);
-    let template = create_opt(&minimal, &repository)?;
+    let raw = create_opt(&minimal, &repository)?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt2 {
-        template: Box::new(template),
+        template: Box::new(raw.template),
+        prohibited_attributes: raw.prohibited_attributes,
         resolved_id: String::from("openEHR-EHR-COMPOSITION.ferrobridge_minimal.v1.0.0"),
     })?)
 }
@@ -80,10 +82,7 @@ fn the_adl2_twin_builds_the_content_paths_of_the_adl14_template() -> Result<(), 
 }
 
 /// Compiles the two ADL 2 sources into an operational template.
-fn adl2_opt() -> Result<
-    openehr_am::v2_4::aom2::archetype::operational_template::OperationalTemplate,
-    Box<dyn Error>,
-> {
+fn adl2_opt() -> Result<RawOpt, Box<dyn Error>> {
     let note = parse_artefact(NOTE, Dialect::Adl2).map_err(|errors| format!("{errors:?}"))?;
     let minimal = parse_artefact(MINIMAL, Dialect::Adl2).map_err(|errors| format!("{errors:?}"))?;
     let mut repository = ArchetypeRepository::default();
@@ -94,10 +93,11 @@ fn adl2_opt() -> Result<
 #[test]
 fn an_opt2_root_carries_the_parent_its_template_states() -> Result<(), Box<dyn Error>> {
     // AM Release-2.3.0 AOM2 §3.6.6: an OPERATIONAL_TEMPLATE is specialised.
-    let mut opt = adl2_opt()?;
-    opt.parent_archetype_id = Some(String::from("openEHR-EHR-COMPOSITION.report.v1"));
+    let mut raw = adl2_opt()?;
+    raw.template.parent_archetype_id = Some(String::from("openEHR-EHR-COMPOSITION.report.v1"));
     let index = WebTemplateIndex::build(&TemplateSource::Opt2 {
-        template: Box::new(opt),
+        template: Box::new(raw.template),
+        prohibited_attributes: raw.prohibited_attributes,
         resolved_id: String::from("openEHR-EHR-COMPOSITION.minimal.v1.0.0"),
     })?;
     assert_eq!(index.root_lineage(), ["openEHR-EHR-COMPOSITION.report.v1"]);
@@ -107,8 +107,10 @@ fn an_opt2_root_carries_the_parent_its_template_states() -> Result<(), Box<dyn E
 #[test]
 fn an_opt2_that_states_no_parent_carries_the_lineage_a_caller_passes() -> Result<(), Box<dyn Error>>
 {
+    let raw = adl2_opt()?;
     let index = WebTemplateIndex::build(&TemplateSource::Opt2 {
-        template: Box::new(adl2_opt()?),
+        template: Box::new(raw.template),
+        prohibited_attributes: raw.prohibited_attributes,
         resolved_id: String::from("openEHR-EHR-COMPOSITION.minimal.v1.0.0"),
     })?;
     assert_eq!(index.root_lineage().len(), 0, "{:?}", index.root_lineage());
