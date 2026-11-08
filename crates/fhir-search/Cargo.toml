@@ -4,7 +4,7 @@
 name = "fhir-search"
 description = "The FHIR R4 search value grammar: the escaped value list, tokens, string matching and dates with their prefixes and ranges"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.128"
+version = "0.1.129"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -19,9 +19,16 @@ categories = ["parser-implementations", "science"]
 publish = true
 include = ["src/**", "README.md", "LICENSE"]
 
+[features]
+# The instants a date's range holds and the calendar day it starts on, as jiff
+# types. A consumer that reads tokens and escapes alone turns it off and
+# compiles no time library; the grammar, the calendar check and the range
+# need none (no specification governs this: our own design).
+default = ["jiff"]
+jiff = ["dep:jiff"]
+
 [dependencies]
-# The calendar and the instants a date value's range spans.
-jiff.workspace = true
+jiff = { workspace = true, optional = true }
 thiserror.workspace = true
 # The combining characters the default string match ignores.
 unicode-normalization.workspace = true

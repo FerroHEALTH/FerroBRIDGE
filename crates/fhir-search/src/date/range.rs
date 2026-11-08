@@ -3,10 +3,7 @@
 
 //! The range a date's precision implies (§3.1.1.4.5 and §3.1.1.4.7).
 
-use jiff::ToSpan;
-use jiff::civil::{Date, DateTime};
-
-use super::{Clock, Range, SearchDate, Second};
+use super::{Clock, Range, SearchDate};
 
 /// The last year a FHIR date writes.
 const LAST_YEAR: i16 = 9999;
@@ -32,47 +29,51 @@ impl SearchDate {
     /// The first date after this one at the same precision, `None` past the
     /// year 9999.
     fn next(&self) -> Option<Self> {
-        // NOTE: no specification governs this: our own design; the fields were
-        // checked at parse, so jiff refuses only a step past 9999-12-31.
         let (Some(month), Some(day)) = (self.month, self.day) else {
             return self.next_month_or_year();
         };
         let Some(clock) = &self.time else {
-            let next = Date::new(self.year, month, day)
-                .ok()?
-                .checked_add(1.day())
-                .ok()?;
-            return Self::on(next, None);
+            let (year, month, day) = next_day(self.year, month, day)?;
+            return Some(Self {
+                year,
+                month: Some(month),
+                day: Some(day),
+                time: None,
+            });
         };
-        let whole = clock.second.as_ref().map_or(0, |second| second.whole);
-        let now = DateTime::new(self.year, month, day, clock.hour, clock.minute, whole, 0).ok()?;
-        let (next, fraction) = match &clock.second {
-            None => (now.checked_add(1.minute()).ok()?, None),
-            Some(Second { fraction: None, .. }) => (now.checked_add(1.second()).ok()?, None),
-            Some(Second {
-                fraction: Some(digits),
-                ..
-            }) => match increment(digits) {
-                Some(digits) => (now, Some(digits)),
-                None => (
-                    now.checked_add(1.second()).ok()?,
-                    Some("0".repeat(digits.len())),
-                ),
-            },
+        let mut next = clock.clone();
+        let into_day = match &mut next.second {
+            None => step_minute(&mut next),
+            Some(second) => {
+                let read = second
+                    .fraction
+                    .as_deref()
+                    .map(|digits| (increment(digits), digits.len()));
+                let carried = match read {
+                    None => true,
+                    Some((Some(raised), _)) => {
+                        second.fraction = Some(raised);
+                        false
+                    }
+                    Some((None, width)) => {
+                        second.fraction = Some("0".repeat(width));
+                        true
+                    }
+                };
+                carried && step_second(&mut next)
+            }
         };
-        let second = clock.second.as_ref().map(|_| Second {
-            whole: next.second(),
-            fraction,
-        });
-        Self::on(
-            next.date(),
-            Some(Clock {
-                hour: next.hour(),
-                minute: next.minute(),
-                second,
-                offset: clock.offset,
-            }),
-        )
+        let (year, month, day) = if into_day {
+            next_day(self.year, month, day)?
+        } else {
+            (self.year, month, day)
+        };
+        Some(Self {
+            year,
+            month: Some(month),
+            day: Some(day),
+            time: Some(next),
+        })
     }
 
     /// The next month or year of a date written to the month or the year.
@@ -89,15 +90,57 @@ impl SearchDate {
             time: None,
         })
     }
+}
 
-    /// The date of `date` with `time`, `None` past the year 9999.
-    fn on(date: Date, time: Option<Clock>) -> Option<Self> {
-        (date.year() <= LAST_YEAR).then_some(Self {
-            year: date.year(),
-            month: Some(date.month()),
-            day: Some(date.day()),
-            time,
-        })
+/// Moves `clock` on by one second, and answers whether that carried into
+/// the next day.
+fn step_second(clock: &mut Clock) -> bool {
+    let Some(second) = clock.second.as_mut() else {
+        return step_minute(clock);
+    };
+    if second.whole < 59 {
+        second.whole += 1;
+        return false;
+    }
+    second.whole = 0;
+    step_minute(clock)
+}
+
+/// Moves `clock` on by one minute, and answers whether that carried into the
+/// next day.
+fn step_minute(clock: &mut Clock) -> bool {
+    if clock.minute < 59 {
+        clock.minute += 1;
+        return false;
+    }
+    clock.minute = 0;
+    if clock.hour < 23 {
+        clock.hour += 1;
+        return false;
+    }
+    clock.hour = 0;
+    true
+}
+
+/// The day after `year-month-day`, `None` past 9999-12-31.
+fn next_day(year: i16, month: i8, day: i8) -> Option<(i16, i8, i8)> {
+    if day < days_in_month(year, month) {
+        return Some((year, month, day + 1));
+    }
+    if month < 12 {
+        return Some((year, month + 1, 1));
+    }
+    (year < LAST_YEAR).then_some((year + 1, 1, 1))
+}
+
+/// The days of `month` in `year` in the proleptic Gregorian calendar, the
+/// calendar of XML Schema and so of the FHIR date types.
+pub(super) fn days_in_month(year: i16, month: i8) -> i8 {
+    match month {
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
     }
 }
 

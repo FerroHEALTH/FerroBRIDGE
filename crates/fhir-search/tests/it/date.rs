@@ -277,6 +277,7 @@ fn debug_never_shows_the_date() {
     assert!(shown.contains("Day"), "{shown}");
 }
 
+#[cfg(feature = "jiff")]
 #[test]
 fn first_day_is_the_calendar_day_a_range_starts_on() {
     let day = |text: &str| SearchDate::parse(text).unwrap().first_day().to_string();
@@ -296,4 +297,55 @@ fn first_day_is_the_calendar_day_a_range_starts_on() {
             .as_deref(),
         Some("2024-03-01")
     );
+}
+
+#[test]
+fn a_time_steps_across_its_minute_hour_day_month_and_year() {
+    for (text, high) in [
+        ("2026-09-15T09:59", "2026-09-15T10:00"),
+        ("2026-09-15T23:59", "2026-09-16T00:00"),
+        ("2026-09-30T23:59:59Z", "2026-10-01T00:00:00Z"),
+        ("2024-02-29T23:59:59.99", "2024-03-01T00:00:00.00"),
+        ("2023-02-28T23:59", "2023-03-01T00:00"),
+        ("2000-02-28T23:59", "2000-02-29T00:00"),
+        ("1900-02-28T23:59", "1900-03-01T00:00"),
+        ("2026-12-31T23:59:59.9+01:00", "2027-01-01T00:00:00.0+01:00"),
+        ("2026-09-15T09:00:00.09", "2026-09-15T09:00:00.10"),
+    ] {
+        assert_eq!(bounds(text), range(text, high), "{text}");
+    }
+}
+
+#[test]
+fn the_calendar_knows_every_month_and_leap_year() {
+    for (month, days) in [
+        (1, 31),
+        (3, 31),
+        (4, 30),
+        (5, 31),
+        (6, 30),
+        (7, 31),
+        (8, 31),
+        (9, 30),
+        (10, 31),
+        (11, 30),
+        (12, 31),
+    ] {
+        let last = format!("2026-{month:02}-{days:02}");
+        assert!(SearchDate::parse(&last).is_ok(), "{last}");
+        if days < 31 {
+            let past = format!("2026-{month:02}-{:02}", days + 1);
+            assert_eq!(SearchDate::parse(&past), Err(DateError::Calendar), "{past}");
+        }
+    }
+    for (year, leap) in [
+        (2024, true),
+        (2023, false),
+        (2000, true),
+        (1900, false),
+        (2400, true),
+    ] {
+        let text = format!("{year}-02-29");
+        assert_eq!(SearchDate::parse(&text).is_ok(), leap, "{text}");
+    }
 }
