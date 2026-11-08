@@ -176,6 +176,20 @@ fn a_typed_reference_range_is_another_reference_range_of_the_result() -> Result<
         treatment["range"].get("lower").is_none_or(Value::is_null),
         "the treatment range has no lower bound: {treatment}"
     );
+    // NOTE: ITS-JSON `INTERVAL` requires all four flags, and BASE foundation types
+    // §Interval makes an absent bound unbounded and not included.
+    for (flag, expected) in [
+        ("lower_unbounded", true),
+        ("lower_included", false),
+        ("upper_unbounded", false),
+        ("upper_included", true),
+    ] {
+        assert_eq!(
+            treatment["range"][flag].as_bool(),
+            Some(expected),
+            "{flag}: {treatment}"
+        );
+    }
     Ok(())
 }
 

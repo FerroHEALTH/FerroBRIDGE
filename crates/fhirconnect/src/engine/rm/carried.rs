@@ -7,6 +7,9 @@
 use crate::resolve::derive;
 use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::model::Container;
+use openehr_rm::v1_2::paths::RmPath;
+use openehr_rm::v1_2::typing::RmType;
+use openehr_rm::v1_2::typing::path_type;
 
 use super::{ENTRY_TIMES, FAMILIES, PARTY_ROOTS};
 
@@ -79,10 +82,10 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
         return Some((owner, Carried::Value));
     }
     let walked = walk(rm_type, tail)?;
-    if walked.last.container != Container::None {
+    if walked.container != Container::None {
         return None;
     }
-    Some((walked.owner, held(walked.declared)?))
+    Some((walked.owner, held(&walked.declared)?))
 }
 
 /// Returns the position in `tail` of each attribute that is a `List`, in
@@ -103,49 +106,41 @@ pub fn list_steps(rm_type: &str, tail: &[&str]) -> Option<Vec<usize>> {
 struct Walked {
     /// The class that declares the tail's first attribute.
     owner: &'static str,
-    /// The last attribute the tail names.
-    last: &'static model::RmAttribute,
-    /// The class that attribute holds.
-    declared: &'static str,
+    /// The container shape of the last attribute the tail names.
+    container: Container,
+    /// The class one value of that attribute holds.
+    declared: String,
     /// The position in the tail of each `List` attribute.
     lists: Vec<usize>,
 }
 
-/// Walks a tail below a data value by attribute name.
+/// Walks a tail below a data value, typing each step with
+/// `openehr_rm::v1_2::typing::path_type`.
 ///
 /// A step through a `Set` or `Hash` is `None`, since neither orders its
 /// members (openEHR BASE Release 1.2.0, foundation types §Container types),
 /// and so is a walk below a structural node.
 fn walk(rm_type: &str, tail: &[&str]) -> Option<Walked> {
-    let class = derive::base_class(rm_type);
-    if model::is_a(class, derive::STRUCTURAL) {
+    let class = rm_type.parse::<RmType>().ok()?;
+    if model::is_a(class.name(), derive::STRUCTURAL) {
         return None;
     }
-    let (&first, rest) = tail.split_first()?;
-    let owner = owner_of(class, first)?;
-    let mut attribute = model::attribute(owner, first)?;
-    let mut declared = derive::attribute_class(rm_type, attribute);
+    let owner = owner_of(class.name(), tail.first()?)?;
+    let path = tail.join("/").parse::<RmPath>().ok()?;
+    let steps = path_type(&class, &path).ok()?;
     let mut lists = Vec::new();
-    for (position, &segment) in rest.iter().enumerate() {
-        match attribute.container {
+    for (position, step) in steps.iter().enumerate() {
+        match step.container() {
             Container::None => {}
             Container::List => lists.push(position),
             Container::Set | Container::Hash => return None,
         }
-        attribute = concrete_forms(declared)
-            .into_iter()
-            .find_map(|form| model::attribute(form, segment))?;
-        declared = attribute.declared_type;
     }
-    match attribute.container {
-        Container::None => {}
-        Container::List => lists.push(rest.len()),
-        Container::Set | Container::Hash => return None,
-    }
+    let last = steps.last()?;
     Some(Walked {
         owner,
-        last: attribute,
-        declared,
+        container: last.container(),
+        declared: String::from(last.item().name()),
         lists,
     })
 }

@@ -52,9 +52,10 @@ fn index() -> Result<WebTemplateIndex, Box<dyn Error>> {
         repository.insert(parse_artefact(source, Dialect::Adl2).map_err(|e| format!("{e:?}"))?);
     }
     let template = parse_artefact(TEMPLATE, Dialect::Adl2).map_err(|e| format!("{e:?}"))?;
-    let opt = create_opt(&template, &repository).map_err(|e| format!("{e:?}"))?;
+    let raw = create_opt(&template, &repository).map_err(|e| format!("{e:?}"))?;
     Ok(WebTemplateIndex::build(&TemplateSource::Opt2 {
-        template: Box::new(opt),
+        template: Box::new(raw.template),
+        prohibited_attributes: raw.prohibited_attributes,
         resolved_id: String::from(TEMPLATE_ID),
     })?)
 }

@@ -13,6 +13,8 @@ use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::RmPath;
 use openehr_rm::v1_2::paths::item_at_path;
 use openehr_rm::v1_2::paths::items_at_path;
+use openehr_rm::v1_2::paths::write::set_at_path;
+use openehr_rm::v1_2::typing::RmType;
 use openehr_sdt::flat::path::Segment;
 
 use crate::engine::cell;
@@ -164,7 +166,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if carried == Carried::Family {
             return self.convert_family(mapping, target, openehr, view, binding);
         }
-        let mut object = self
+        let object = self
             .held_object(&binding.openehr, node.flat_id())
             .map_err(refuse_rm)?;
         let written = if carried == Carried::Value && openehr.leaf_class() == Some(PARTY_REF) {
@@ -206,9 +208,24 @@ impl<T: Table + ?Sized> Run<'_, T> {
         } else {
             self.scalar_written(mapping, target, binding, view, (carried, class, node))?
         };
-        let along = elements_along(openehr, &segments, &binding.elements)
-            .ok_or_else(|| unsupported_tail(mapping, openehr))?;
-        merge_value(&mut object, &along, written);
+        if openehr.lists().len() > binding.elements.len() {
+            return Err(unsupported_tail(mapping, openehr));
+        }
+        let mut whole = serde_json::Value::Object(object);
+        set_at_path(
+            &mut whole,
+            &RmType::simple(class),
+            &positioned(openehr, &binding.elements),
+            written,
+        )
+        .map_err(|source| EngineError::TailWrite {
+            mapping: String::from(mapping.name()),
+            node: String::from(node.aql_path().as_str()),
+            source: Box::new(source),
+        })?;
+        let serde_json::Value::Object(mut object) = whole else {
+            return Err(unsupported_tail(mapping, openehr));
+        };
         let kept = object
             .get("_type")
             .and_then(serde_json::Value::as_str)
@@ -434,97 +451,6 @@ pub(super) fn unsupported_tail(mapping: &Mapping, target: &OpenehrTarget) -> Eng
         node: String::from(target.node().aql_path().as_str()),
         tail: target.tail().to_string(),
     }
-}
-
-/// Merges one value into an object at an attribute path, in the element
-/// `elements` names of each `List` attribute the path steps through.
-///
-/// An intermediate attribute that holds no object is replaced by one, since
-/// a path below it names its members. An element past the end of its list
-/// extends the list with `null`, which [`compact_lists`] removes once every
-/// mapping has written.
-fn merge_value(
-    object: &mut serde_json::Map<String, serde_json::Value>,
-    segments: &[(&str, Option<usize>)],
-    value: serde_json::Value,
-) {
-    let Some((&(first, element), rest)) = segments.split_first() else {
-        return;
-    };
-    if rest.is_empty() && element.is_none() {
-        object.insert(String::from(first), value);
-        return;
-    }
-    let entry = object
-        .entry(String::from(first))
-        .or_insert(serde_json::Value::Null);
-    let slot = match element {
-        Some(index) => {
-            if !entry.is_array() {
-                *entry = serde_json::Value::Array(Vec::new());
-            }
-            let serde_json::Value::Array(ref mut items) = *entry else {
-                return;
-            };
-            if items.len() <= index {
-                items.resize(index.saturating_add(1), serde_json::Value::Null);
-            }
-            let Some(slot) = items.get_mut(index) else {
-                return;
-            };
-            if rest.is_empty() {
-                *slot = value;
-                return;
-            }
-            slot
-        }
-        None => entry,
-    };
-    if !slot.is_object() {
-        *slot = serde_json::Value::Object(serde_json::Map::new());
-    }
-    if let serde_json::Value::Object(ref mut nested) = *slot {
-        merge_value(nested, rest, value);
-    }
-}
-
-/// Removes the `null` a list holds where [`merge_value`] reserved an element
-/// that no mapping then wrote, at every depth of `value`.
-///
-/// No specification governs the reservation: our own design, an element of
-/// an RM `List` is a value, so the list keeps the elements written in order.
-pub(super) fn compact_lists(value: &mut serde_json::Value) {
-    match *value {
-        serde_json::Value::Array(ref mut items) => {
-            items.retain(|item| !item.is_null());
-            items.iter_mut().for_each(compact_lists);
-        }
-        serde_json::Value::Object(ref mut members) => {
-            members.values_mut().for_each(compact_lists);
-        }
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => {}
-    }
-}
-
-/// Returns the attributes a tail walks, each with the 0-based element
-/// `elements` names where the attribute is a `List`.
-fn elements_along<'tail>(
-    target: &OpenehrTarget,
-    segments: &[&'tail str],
-    elements: &[RmPosition],
-) -> Option<Vec<(&'tail str, Option<usize>)>> {
-    let mut walked: Vec<(&str, Option<usize>)> =
-        segments.iter().map(|segment| (*segment, None)).collect();
-    for (axis, position) in target.lists().iter().zip(elements) {
-        let index = usize::try_from(position.get()).ok()?.checked_sub(1)?;
-        if let Some(step) = walked.get_mut(axis.depth()) {
-            step.1 = Some(index);
-        }
-    }
-    (target.lists().len() <= elements.len()).then_some(walked)
 }
 
 /// Returns the canonical JSON of one scalar tail attribute, from the FHIR
