@@ -39,9 +39,9 @@ time.
 |---|---|
 | the composition | `composition-eu-hdr`, of type LOINC `34105-7` |
 | the composition's `context/start_time` and `context/end_time` | `encounter-eu-hdr`, its `period` |
-| each `EVALUATION.problem_diagnosis.v1` of the diagnostic summary | one `condition-eu-core` entry of `sectionDiagnosticSummary`: its `code`, `onset[x]`, `assertedDate` extension, `bodySite` and `note` |
-| each `ACTION.procedure.v1` of the significant procedures | one `procedure-eu-core` entry of `sectionSignificantProcedures`: its `status` from the careflow step, `code`, `performed[x]` from the action's time, `bodySite` and `note` |
-| each `INSTRUCTION.medication_order.v3` of the discharge medications | one `medicationRequest-eu-core` entry of `sectionDischargeMedications`: its `medicationCodeableConcept`, the overall directions as `dosageInstruction.text`, and `note` |
+| each `EVALUATION.problem_diagnosis.v1` of the diagnostic summary | one `condition-eu-core` entry of `sectionDiagnosticSummary`: its `code`, `onset[x]`, `assertedDate` extension, `severity`, `abatement[x]` from the date of resolution, `verificationStatus` from the diagnostic certainty, `bodySite` and `note` |
+| each `ACTION.procedure.v1` of the significant procedures | one `procedure-eu-core` entry of `sectionSignificantProcedures`: its `status` from the careflow step, `code`, `performed[x]` from the action's time, `bodySite`, `reasonCode`, `outcome`, `complication` and `note` |
+| each `INSTRUCTION.medication_order.v3` of the discharge medications | one `medicationRequest-eu-core` entry of `sectionDischargeMedications`: its `medicationCodeableConcept`, one `dosageInstruction` holding the overall directions as `text`, the route as `route` and the order start as `timing.repeat.boundsPeriod.start`, and `note` |
 
 The template records neither the status nor the class of the stay, and
 `encounter-eu-hdr` requires both. The mapping writes the status `finished`
@@ -53,6 +53,15 @@ the CKM procedure action at which it was performed. An `INSTRUCTION` records
 no request status, so a discharge medication is `unknown` and an `order`, as
 in the MPD project. A section is written only when the composition holds an
 entry for it.
+
+The archetypes code a problem's severity locally (mild, moderate, severe),
+and R4 `Condition.severity` prefers SNOMED CT, so the local code is served
+and a received severity is not read. R4 `Condition.verificationStatus`
+requires `condition-ver-status`: a suspected or probable diagnosis is served
+`provisional` and a confirmed one `confirmed`, and a received status is not
+read. The profiles have no place for a problem's clinical description, a
+procedure's method or type, or a medication order's `ACTIVITY.timing`, a
+`DV_PARSABLE` no FHIRconnect data-type page pairs with R4 `Timing`.
 
 ## Mapping out of openEHR
 
@@ -66,6 +75,14 @@ becomes the document's encounter, every other resource becomes an entry, and
 the method answers each section of the run placed in the form's slot by its
 LOINC code, with the `fullUrl` of each entry. A section whose code names no
 slot of the form, or an entry the run does not hold, is refused.
+
+Every archetype element the composition holds that no mapping reads, such
+as a clinical description, a method or an order's timing, is a `warning`
+issue of the run's `OperationOutcome`, its `details` naming the element's
+openEHR path. The document leaves that `OperationOutcome` out, because R4
+`documents.html` §3.3.1 admits only entries the Composition references, so a
+system that serves the report hands the run's outcome to its reader beside
+the document.
 
 `composition-eu-hdr` requires a discharge summary or a hospital course
 section (`cmp-hdr-2`). Both are narrative sections the document assembly

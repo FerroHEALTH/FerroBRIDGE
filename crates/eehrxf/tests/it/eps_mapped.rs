@@ -44,6 +44,7 @@ use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::operations::run::Settings;
 use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
@@ -293,31 +294,29 @@ fn reference(url: &str) -> Reference {
 }
 
 /// The resources one run of `mapping` over `composition` answers, its
-/// `OperationOutcome` refused, since a run that declares a loss is no
-/// conformant entry.
+/// `OperationOutcome` left out, refusing a run that declares a loss other than
+/// an element the project does not read: the synthetic order's
+/// `ACTIVITY.timing`, a `DV_PARSABLE` no FHIRconnect data-type page pairs with
+/// R4 `Timing`.
 fn run(
     mapping: &Mapping,
     composition: &str,
     context: CallContext,
 ) -> Result<Vec<Resource>, Box<dyn Error>> {
-    let answer = mapping.to_fhir_with(composition, &settings(), context)?;
-    let resources: Vec<Resource> = answer
+    let (answer, warnings) = mapping.to_fhir_with_warnings(composition, &settings(), context)?;
+    if let Some(warning) = warnings
+        .iter()
+        .find(|warning| !matches!(warning.loss(), Loss::Unread { .. }))
+    {
+        return Err(format!("the run declared a loss: {warning}").into());
+    }
+    Ok(answer
         .bundle()
         .entry
         .iter()
         .filter_map(|entry| entry.resource.clone())
-        .collect();
-    if let Some(outcome) = resources
-        .iter()
-        .find(|resource| matches!(resource, Resource::OperationOutcome(_)))
-    {
-        return Err(format!(
-            "the run declared a loss: {}",
-            serde_json::to_string(outcome)?
-        )
-        .into());
-    }
-    Ok(resources)
+        .filter(|resource| !matches!(resource, Resource::OperationOutcome(_)))
+        .collect())
 }
 
 /// The codes of `resource`'s medicine or vaccine.

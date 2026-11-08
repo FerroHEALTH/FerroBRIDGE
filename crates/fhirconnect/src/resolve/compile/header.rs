@@ -6,6 +6,7 @@
 
 use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
+use openehr_mapping_core::diagnostic::Severity;
 use openehr_mapping_core::header::archetype::ArchetypeId;
 use openehr_mapping_core::header::metadata::MappingType;
 use openehr_mapping_core::index::ResolvedNode;
@@ -32,16 +33,22 @@ use crate::resolve::compile::Compiler;
 
 impl<'a> Compiler<'a> {
     /// Reports every listed extension whose target model the program never
-    /// reached.
+    /// reached, and refuses the edits of one that would be refused if it were.
     ///
     /// An extension applies when the model mapping it extends is merged, so
     /// one whose model no slot of the chain reaches changes nothing. The
     /// context still compiles, and the listing is reported as a warning
-    /// because an author who lists an extension expects it to act. No
-    /// specification governs this: our own design.
+    /// because an author who lists an extension expects it to act. Its edits
+    /// are still applied to the model on their own, so an `overwrite` or an
+    /// `appendTo` that names no single method is refused whether or not the
+    /// chain reaches the model: a mapping name means nothing beyond the edits
+    /// that address it (`basics/body.adoc`), and one context's reach must not
+    /// decide whether such an edit is legal. No specification governs the
+    /// warning: our own design.
     pub(super) fn unreached_extensions(&mut self, file: &ContextMappingFile) {
         let owner = file.header().name().value();
         let path = ModelPath::root().field("context").field("extensions");
+        let mut unreached: Vec<(&'a ModelMappingFile, &'a ModelMappingFile)> = Vec::new();
         for (index, declared) in file.context().extensions.iter().enumerate() {
             let Some(extension) = self.set.model(declared.value()) else {
                 continue;
@@ -58,6 +65,9 @@ impl<'a> Compiler<'a> {
             if applied {
                 continue;
             }
+            if let Some(model) = self.set.model(extends.value()) {
+                unreached.push((model, extension));
+            }
             self.diagnostics.push(
                 Diagnostic::warning(
                     file.file().to_path_buf(),
@@ -72,6 +82,28 @@ impl<'a> Compiler<'a> {
                 .with_position(declared.position())
                 .with_mapping_name(owner.clone())
                 .with_model_path(path.index(index)),
+            );
+        }
+        let mut models: Vec<&'a ModelMappingFile> = Vec::new();
+        for &(model, _) in &unreached {
+            if !models.iter().any(|seen| core::ptr::eq(*seen, model)) {
+                models.push(model);
+            }
+        }
+        for model in models {
+            let edits: Vec<&'a ModelMappingFile> = unreached
+                .iter()
+                .filter(|&&(of, _)| core::ptr::eq(of, model))
+                .map(|&(_, extension)| extension)
+                .collect();
+            let mut found = Vec::new();
+            apply(model, &edits, &mut found);
+            // NOTE: no specification governs this: our own design, the model's own warnings
+            // belong to a merge that never happens, so only the refusals of the edits are kept.
+            self.diagnostics.extend(
+                found
+                    .into_iter()
+                    .filter(|found| found.severity() == Severity::Error),
             );
         }
     }

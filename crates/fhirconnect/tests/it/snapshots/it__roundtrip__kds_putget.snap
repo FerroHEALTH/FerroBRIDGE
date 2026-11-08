@@ -15,7 +15,8 @@ expression: declared
     "the engine filled /territory"
   ],
   "second_leg": [
-    "the mapping problemDiagnose.coding.codeIcd10Diagnosesicherheit.extensionValueText did not run: its unidirectional marker names the other direction"
+    "the mapping problemDiagnose.coding.codeIcd10Diagnosesicherheit.extensionValueText did not run: its unidirectional marker names the other direction",
+    "the composition holds the element at0063, which no mapping carries into the resource"
   ],
   "lost": [
     "id = \"ferrobridge-kds-condition-1\"",

@@ -3,8 +3,11 @@
 # FerroBRIDGE's model mapping of the CKM EVALUATION.problem_diagnosis.v1 to
 # the HL7 Europe Base and Core 2.0.1 condition-eu-core profile, the entry
 # the Hospital Discharge Report's diagnostic summary section takes: the
-# name, onset, clinical recognition, body site and comment of the problem
-# or diagnosis (no specification governs which elements: our own design).
+# name, onset, clinical recognition, severity, resolution, diagnostic
+# certainty, body site and comment of the problem or diagnosis, each element
+# the profile has a place for. A run out of openEHR declares every other
+# element the composition holds (no specification governs which elements:
+# our own design).
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -75,3 +78,58 @@ mappings:
     with:
       fhir: "$resource.note.text"
       openehr: "$archetype/data[at0001]/items[at0069]"
+
+  # NOTE: R4 Condition.severity binds SNOMED CT by preference, and the archetype codes its
+  # severity locally (at0047 to at0049), so the local code is served and none is received.
+  - name: "severity"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.severity"
+      openehr: "$archetype/data[at0001]/items[at0005]"
+
+  - name: "resolution"
+    with:
+      fhir: "$resource.abatement.as(DateTime)"
+      openehr: "$archetype/data[at0001]/items[at0030]"
+
+  # NOTE: R4 Condition.verificationStatus binds condition-ver-status as required; a suspected
+  # or probable diagnosis is provisional there and a confirmed one confirmed.
+  - name: "certainty"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.verificationStatus.coding"
+      openehr: "$archetype/data[at0001]/items[at0073]"
+    manual:
+      - name: "suspected"
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+          - path: "code"
+            value: "provisional"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0074"
+      - name: "probable"
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+          - path: "code"
+            value: "provisional"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0075"
+      - name: "confirmed"
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/condition-ver-status"
+          - path: "code"
+            value: "confirmed"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0076"

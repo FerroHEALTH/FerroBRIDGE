@@ -15,6 +15,7 @@ expression: "serde_json::json!({\n    \"first_leg\": rows(inbound.warnings()), \
     "the engine filled /territory | - | /territory"
   ],
   "second_leg": [
-    "the mapping problemDiagnose.coding.codeIcd10Diagnosesicherheit.extensionValueText did not run: its unidirectional marker names the other direction | Condition.code.coding[0].extension[0].value | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0073,'Diagnosesicherheit']/value"
+    "the mapping problemDiagnose.coding.codeIcd10Diagnosesicherheit.extensionValueText did not run: its unidirectional marker names the other direction | Condition.code.coding[0].extension[0].value | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[at0073,'Diagnosesicherheit']/value",
+    "the composition holds the element at0063, which no mapping carries into the resource | - | /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Diagnose']/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2,'Klinischer Status']/items[at0063,'Diagnoserolle']/value"
   ]
 }

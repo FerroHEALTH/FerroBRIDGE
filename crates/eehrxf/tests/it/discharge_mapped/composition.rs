@@ -143,9 +143,23 @@ fn the_report_maps_its_procedure_and_discharge_medication() -> Result<(), Box<dy
             .with_who(reference("Device/gateway")),
     )?;
     let bundle = run.bundle();
+    // NOTE: R4 Dosage.timing is a Timing, and the order's ACTIVITY.timing a DV_PARSABLE no
+    // FHIRconnect data-type page pairs with it, so the run declares the timing it holds.
+    let outcomes = of_type(bundle, "OperationOutcome")?;
+    let declared: Vec<&Value> = outcomes
+        .iter()
+        .flat_map(|outcome| outcome["issue"].as_array().into_iter().flatten())
+        .collect();
+    assert_eq!(
+        declared.len(),
+        1,
+        "the run declares the timing alone: {declared:?}"
+    );
     assert!(
-        of_type(bundle, "OperationOutcome")?.is_empty(),
-        "the run declares no loss"
+        declared[0]["details"]["coding"][0]["code"]
+            .as_str()
+            .is_some_and(|path| path.ends_with("/activities[at0001]/timing")),
+        "{declared:?}"
     );
     assert_eq!(
         of_type(bundle, "Provenance")?.len(),
