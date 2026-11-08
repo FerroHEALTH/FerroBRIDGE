@@ -395,7 +395,7 @@ the line exactly (owner decision 2026-10-17, #510).
 first publish (#397), and `ferrobridge-term`, `ferrobridge-fhirpath` and
 `ferrobridge-validator` joined it at 0.1.126 (#432), `hl7v2-types` and
 `ferrobridge-hl7v2` at 0.1.127 (#1131), and `eehrxf` at 0.1.128 when it moved
-here from FerroFED, where it reached 0.0.40 unpublished (#1314). Every other library crate holds its name with a 0.0.0
+here from FerroFED, where it reached 0.0.40 unpublished (#1314), and `fhir-search` at 0.1.128 when it was created (#1718). Every other library crate holds its name with a 0.0.0
 placeholder (#107), outside the line until its first publish, when it joins
 at the line's current value.
 

@@ -20,8 +20,7 @@ use std::collections::BTreeMap;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::ResultSetRow;
 
-use crate::facade::search::value::System;
-use crate::facade::search::value::Token;
+use fhir_search::token::{System, Token};
 
 /// The name every surface built on the dialect carries.
 pub const EXTENSION: &str = "Cadasto experimental AQL demographic extension";
@@ -91,20 +90,20 @@ impl IdentifierSearch {
     /// absence of a system (`|value`), and one naming a system when no
     /// system query is configured.
     pub fn request(&self, token: &Token) -> Result<AdhocQueryExecute, Inexpressible> {
-        let value = token.code.as_deref().ok_or(Inexpressible::NoValue)?;
+        let value = token.code().ok_or(Inexpressible::NoValue)?;
         let mut parameters = BTreeMap::new();
         parameters.insert(
             String::from(IDENTIFIER_PARAMETER),
             serde_json::Value::String(value.to_owned()),
         );
-        let text = match token.system {
+        let text = match token.system() {
             System::Any => self.query.clone(),
             System::Absent => return Err(Inexpressible::NoSystem),
-            System::Is(ref system) => {
+            System::Is(system) => {
                 let text = self.system_query.clone().ok_or(Inexpressible::System)?;
                 parameters.insert(
                     String::from(SYSTEM_PARAMETER),
-                    serde_json::Value::String(system.clone()),
+                    serde_json::Value::String(system.to_owned()),
                 );
                 text
             }
@@ -209,16 +208,9 @@ fn object_id(uid: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{IdentifierQueryError, IdentifierSearch, Inexpressible, uids};
-    use crate::facade::search::value::{System, Token};
+    use fhir_search::token::Token;
 
     const QUERY: &str = "SELECT p/uid/value FROM PERSON p WHERE p/x = $identifier";
-
-    fn token(system: System, code: Option<&str>) -> Token {
-        Token {
-            system,
-            code: code.map(str::to_owned),
-        }
-    }
 
     #[test]
     fn a_query_must_bind_the_identifier() {
@@ -253,7 +245,7 @@ mod tests {
     fn a_value_binds_the_identifier() {
         let search = IdentifierSearch::new(QUERY, None).expect("a legal query");
         let request = search
-            .request(&token(System::Any, Some("MRN-1")))
+            .request(&Token::Code(String::from("MRN-1")))
             .expect("a value alone resolves");
         assert_eq!(request.q, QUERY);
         assert_eq!(
@@ -267,7 +259,10 @@ mod tests {
     #[test]
     fn a_system_needs_a_system_query() {
         let search = IdentifierSearch::new(QUERY, None).expect("a legal query");
-        let with_system = token(System::Is(String::from("urn:x")), Some("MRN-1"));
+        let with_system = Token::SystemCode {
+            system: String::from("urn:x"),
+            code: String::from("MRN-1"),
+        };
         assert_eq!(
             search.request(&with_system).err(),
             Some(Inexpressible::System)
@@ -290,13 +285,13 @@ mod tests {
     fn no_value_and_no_system_are_inexpressible() {
         let search = IdentifierSearch::new(QUERY, None).expect("a legal query");
         assert_eq!(
-            search
-                .request(&token(System::Is(String::from("urn:x")), None))
-                .err(),
+            search.request(&Token::System(String::from("urn:x"))).err(),
             Some(Inexpressible::NoValue)
         );
         assert_eq!(
-            search.request(&token(System::Absent, Some("MRN-1"))).err(),
+            search
+                .request(&Token::NoSystem(String::from("MRN-1")))
+                .err(),
             Some(Inexpressible::NoSystem)
         );
     }

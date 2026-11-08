@@ -2143,6 +2143,7 @@ published `openehr-*` crates do.
 | `ferrobridge-hl7v2` | the HL7 v2 face (#254): `mllp` (the MLLP Release 1 frame codec on `tokio-util` and the listener, plain or over TLS with client certificates through `tokio-rustls`, #1638), `decode` (MSH-18 through `encoding_rs`, a byte outside the declared set refused), `parse` (positional split, escape decoding, the grouping by the `hl7v2-types` structure tree), `ack` (original-mode `AA`, `AE`, `AR`), `inbound` (one message through those steps), `map` (the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, read from a directory at run time, writing through `fhirconnect::tree` and translating every table value through `ferrobridge-term`; conditions and target notation on `logos` and `chumsky`) | hand-written | yes |
 | `ferrobridge-fhirpath` | the FHIRPath evaluator (#436): FHIRPath Normative Release 2.0.0 with the FHIR R4 additions over the `fhir-types` `Value` tree, typed by the element table behind a version trait (`model::r4::R4`); a `logos` and `chumsky` parser, exact decimals, dates and times with their precision, a static path check against the context type, and the outward functions (`resolve()`, `memberOf()`, `conformsTo()` and the rest) over caller-supplied seams | hand-written | yes |
 | `ferrobridge-validator` | the FHIR R4 profile validator (#432, section 4.9): `package` (a FHIR package from a `.tgz` through `flate2` and `tar`, or an unpacked directory), `set` (the dependency closure and canonical resolution into the generated `fhir_types::r4` model), `validate` (the walk over the element table and the profile snapshot), `issue` and `report` (typed issues, the unevaluated list, the R4 `OperationOutcome`) | hand-written | yes |
+| `fhir-search` | the FHIR R4 search value grammar (#1718, search.html §3.1.1.4), shared by the facade and the family's FHIR servers (`ihe-atna`, `ihe-iti`): `escape`, `token`, `string`, `prefix` and `date`; a crate of its own because `fhir-types` is emitted whole by its generator under Apache-2.0 (no specification governs the home: our own design) | hand-written | yes |
 | `eehrxf` | the European interoperability software component of an EHR system under Regulation (EU) 2025/327 (Art 2(2)(n), Art 25(1)), moved here from FerroFED (#1314): `dataset` (the format-neutral dataset model read from the Xt-EHR EHDS Logical Information Models package), one feature per Art 14(1) category with its `crosswalk` to the HL7 Europe profiles, `fhir-r4` (the R4 serialisation: `document`, `medication`, `receive`, `terminology`, `transformation`, with no openEHR crate) and `openehr` (`mapping`, FHIRconnect contexts run in process through `fhirconnect`); full validation of a received document is `ferrobridge-validator`; it links no logging component and no application, so the two harmonised components stay independent (Art 2(2)(n) and (o)) | hand-written | yes |
 | `ferrobridge-operator-api` | the documents of the bridge's health and operator surfaces (#777): the build and lane information, readiness with its indicators, the engine state, the file listing and the load report, as serde types the server serializes and the operator console decodes; each diagnostic is the `openehr-mapping-core` `Diagnostic` in its own serde form | hand-written | yes (0.0.0 reservation) |
 | `app/ferrobridge-server` | the one binary, `ferrobridge`: `serve` (the FHIR facade, the FHIRconnect operations, the ETL job API), `etl` (a batch run), `cdm init` (apply the DDL), `vocab load`, `mapping check`; thin `main.rs` over a `lib.rs`; the `cdr` module over the generated ITS-REST client of `openehr-its` (the commit headers, the kept upstream answer, the ids an `ETag` names, the template fetch, the AQL paging); the `redb` identity store; the `hl7v2` face beside the FHIR facade (the `[hl7v2]` MLLP listener, each message written through the facade's ingest service, the acknowledgment chosen from the commit outcome); the change-feed adapter | hand-written | no |
@@ -2171,6 +2172,7 @@ flowchart BT
     EX --> VA
     EX --> TC
     OA["ferrobridge-operator-api<br/>(the health and operator documents)"] --> MC
+    FS["fhir-search<br/>(the R4 search value grammar)"]
     SV["app/ferrobridge-server<br/>(the one binary)"] --> FC
     SV --> OM
     SV --> OC
@@ -2178,6 +2180,7 @@ flowchart BT
     SV --> TC
     SV -->|"the HL7 v2 face"| HL
     SV --> OA
+    SV -->|"search values"| FS
     TK["tools/ferrobridge-testkit<br/>(path-only dev-dependency)"] -.-> SV
     CG["tools/fhir-codegen"] -.->|"emits"| FT
     OG["tools/omop-cdm-codegen"] -.->|"emits"| OC

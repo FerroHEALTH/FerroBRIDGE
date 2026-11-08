@@ -27,8 +27,8 @@ use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::search::identifier;
-use crate::facade::search::value::Token;
 use crate::facade::status;
+use fhir_search::token::Token;
 
 /// Returns the EHRs of every patient one identifier value of the chained
 /// parameter `name` names, in the order the identifier query returns them.

@@ -21,8 +21,8 @@ use crate::facade::search::party::ID;
 use crate::facade::search::party::IDENTIFIER;
 use crate::facade::search::party::NAME;
 use crate::facade::search::party::PartyQueries;
-use crate::facade::search::value;
-use crate::facade::search::value::Token;
+use fhir_search::escape::{split, unescape};
+use fhir_search::token::Token;
 
 use super::bad_request;
 
@@ -127,16 +127,16 @@ pub(super) fn read(
 
 /// Reads one value of `parameter` as the criterion it names.
 fn criterion_of(parameter: &str, text: &str) -> Result<Criterion, Refusal> {
-    if value::split(text, ',').len() > 1 {
+    if split(text, ',').len() > 1 {
         return Err(bad_request(&format!(
             "{parameter} names more than one value, and a party search matches one"
         )));
     }
     match parameter {
-        IDENTIFIER => value::token(text)
+        IDENTIFIER => Token::parse(text)
             .map(Criterion::Identifier)
             .map_err(|error| bad_request(&format!("{IDENTIFIER}: {error}"))),
-        NAME => value::unescape(text)
+        NAME => unescape(text)
             .map(Criterion::Name)
             .map_err(|error| bad_request(&format!("{NAME}: {error}"))),
         ID => Ok(Criterion::Id(text.to_owned())),
