@@ -16,9 +16,6 @@ const OPTS: &str = concat!(
     "/../../tools/ferrobridge-testkit/fixtures/opt"
 );
 
-/// The timestamp the builder fills the `ctx/time` default from.
-const NOW: &str = "2026-11-03T09:00:00Z";
-
 /// Returns every `.opt` file under `directory`, sorted.
 fn opts(directory: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let mut found = Vec::new();
@@ -50,7 +47,7 @@ fn every_composition_template_has_an_example_the_builder_accepts() -> Result<(),
         if index.web_template().tree.rm_type != "COMPOSITION" {
             assert!(
                 matches!(
-                    index.example_composition(NOW),
+                    index.example_composition(),
                     Err(PathError::NotComposition { .. })
                 ),
                 "{}",
@@ -59,7 +56,7 @@ fn every_composition_template_has_an_example_the_builder_accepts() -> Result<(),
             continue;
         }
         let example = index
-            .example_composition(NOW)
+            .example_composition()
             .map_err(|error| format!("{}: {error}", path.display()))?;
         assert_eq!(index.template_id(), example.template_id());
         let reread = index.accept(example.into_value());
@@ -73,7 +70,7 @@ fn every_composition_template_has_an_example_the_builder_accepts() -> Result<(),
 #[test]
 fn an_example_holds_synthetic_content_beside_its_context() -> Result<(), Box<dyn Error>> {
     let index = index(&Path::new(OPTS).join("diagnose.opt"))?;
-    let example = index.example_composition(NOW)?;
+    let example = index.example_composition()?;
     let flat = index.flatten(&example)?;
     assert!(
         flat.keys().any(|key| key.contains('/')
@@ -88,13 +85,11 @@ fn an_example_holds_synthetic_content_beside_its_context() -> Result<(), Box<dyn
 #[test]
 fn an_example_is_the_same_at_every_build() -> Result<(), Box<dyn Error>> {
     let index = index(&Path::new(OPTS).join("diagnose.opt"))?;
-    let first = index.example_composition(NOW)?.into_value();
-    let second = index
-        .example_composition("2027-01-01T00:00:00Z")?
-        .into_value();
+    let first = index.example_composition()?.into_value();
+    let second = index.example_composition()?.into_value();
     assert_eq!(first, second);
     assert_eq!(
-        "0b6c5a3e-1d3f-4c7e-9a43-00000000e1a0::ferrobridge.example::1",
+        "a213bfc1-6634-51ad-a9a2-da1828f12832::example.server::1",
         first["uid"]["value"]
     );
     Ok(())

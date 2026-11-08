@@ -13,12 +13,14 @@
 //! (<https://hl7.org/fhir/R4/datatypes.html#dateTime>): a year from 0001, an
 //! offset up to `14:00`, any number of fraction digits.
 
+#[cfg(feature = "jiff")]
 mod instant;
 mod parse;
 mod range;
 
 use core::fmt;
 
+#[cfg(feature = "jiff")]
 use jiff::Timestamp;
 
 use crate::escape::{EscapeError, unescape};
@@ -118,16 +120,18 @@ impl Range {
 }
 
 /// The instants a date's range holds, `[from, until)`, on the UTC time line
-/// at nanosecond resolution.
+/// at nanosecond resolution (feature `jiff`).
 ///
 /// `until` is `None` when the range runs past the last representable
 /// instant.
+#[cfg(feature = "jiff")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Instants {
     from: Timestamp,
     until: Option<Timestamp>,
 }
 
+#[cfg(feature = "jiff")]
 impl Instants {
     /// The first instant of the range.
     #[must_use]
@@ -250,7 +254,7 @@ impl SearchDate {
     }
 
     /// The calendar day the date starts on: its day, or the first day of
-    /// its month or year.
+    /// its month or year (feature `jiff`).
     ///
     /// A consumer that compares days, such as a birth date's, reads a range
     /// as `range().low().first_day()` up to `range().high()`'s.
@@ -258,10 +262,11 @@ impl SearchDate {
     /// # Panics
     ///
     /// Never: every date this crate holds is a calendar date jiff represents.
+    #[cfg(feature = "jiff")]
     #[must_use]
     #[expect(
         clippy::expect_used,
-        reason = "parse admits years 0001 to 9999 and checks the day against the calendar, all of which jiff's Date holds, and next() builds its dates from jiff"
+        reason = "parse admits years 0001 to 9999 and checks the day against the Gregorian calendar, and next() steps within it, all of which jiff's Date holds"
     )]
     pub fn first_day(&self) -> jiff::civil::Date {
         jiff::civil::Date::new(self.year, self.month.unwrap_or(1), self.day.unwrap_or(1))

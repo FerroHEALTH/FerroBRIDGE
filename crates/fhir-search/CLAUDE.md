@@ -25,3 +25,10 @@ shows the form, never the value. `Display` of a date is the explicit way out.
 Lexical bounds are exact at any precision (fraction digits are incremented as
 text). Instants are at nanosecond resolution, both bounds rounded up, which is
 exact for nanosecond targets. Past the year 9999 a high bound is `None`.
+
+## jiff is a feature, never a requirement of the grammar
+
+Parse, the calendar check and the range are hand-written calendar arithmetic
+(the proleptic Gregorian leap rule, the month lengths). Only what hands out a
+jiff type sits behind the default feature `jiff`; CI runs the suites with no
+default feature too.
