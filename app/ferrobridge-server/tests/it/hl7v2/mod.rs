@@ -391,6 +391,23 @@ impl Running {
         lookup: ResponseTemplate,
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, Box<dyn Error>> {
+        Self::start_serving(
+            lane,
+            lookup,
+            log,
+            ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
+        )
+        .await
+    }
+
+    /// Starts the face under `lane` over a CDR whose EHR lookup answers
+    /// `lookup` and whose `ferrobridge.diagnose.v1` is `opt`.
+    pub(crate) async fn start_serving(
+        lane: Hl7v2Settings,
+        lookup: ResponseTemplate,
+        log: Option<Arc<AccessLog>>,
+        opt: &str,
+    ) -> Result<Self, Box<dyn Error>> {
         let cdr = MockServer::start().await;
         Mock::given(matchers::method("GET"))
             .and(matchers::path(
@@ -399,7 +416,7 @@ impl Running {
             .respond_with(
                 ResponseTemplate::new(200)
                     .insert_header("Content-Type", "application/xml")
-                    .set_body_string(ferrobridge_testkit::fixtures::DIAGNOSE_OPT),
+                    .set_body_string(opt),
             )
             .mount(&cdr)
             .await;

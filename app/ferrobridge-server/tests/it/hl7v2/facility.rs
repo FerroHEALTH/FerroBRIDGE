@@ -5,12 +5,15 @@
 //! `EVENT_CONTEXT.health_care_facility`, "the most specific workgroup or
 //! delivery unit"), read from PV1-3, PV1-39, ORC-21 and MSH-4 in that order,
 //! the refusal of one outside the senders' list, and the performing
-//! organisation (OBX-23) as the originating system's provider.
+//! organisation (OBX-23) as the originating system's provider, and the
+//! facility of a composition whose template prohibits the context as the
+//! originating system's location.
 
 use std::error::Error;
 use std::time::Duration;
 
 use ferrobridge_server::config::hl7v2::Sender;
+use openehr_its::opt14::types::{CAttribute, CSingleAttribute, Intervalofinteger};
 use wiremock::ResponseTemplate;
 
 use super::{CONTROL_ID, Running, face_settings, oru_r01, segments};
@@ -206,6 +209,65 @@ async fn the_performing_organisation_is_the_provider_and_never_the_facility()
         assert!(
             !composer.contains("performing"),
             "OBX-23 is never the composer: {composer}"
+        );
+    }
+    running.stop().await
+}
+
+/// Returns the testkit's diagnosis template with its `COMPOSITION.context`
+/// prohibited (existence `0..0`), which the RM allows since the attribute is
+/// `0..1` (RM EHR IM, `COMPOSITION.context`).
+fn without_context() -> Result<String, Box<dyn Error>> {
+    let mut opt = openehr_its::opt14::from_xml(ferrobridge_testkit::fixtures::DIAGNOSE_OPT)?;
+    let prohibited = Intervalofinteger {
+        lower_included: Some(true),
+        upper_included: Some(true),
+        lower_unbounded: false,
+        upper_unbounded: false,
+        lower: Some(0),
+        upper: Some(0),
+    };
+    opt.definition
+        .attributes
+        .retain(|attribute| match attribute {
+            CAttribute::CSingleAttribute(single) => single.rm_attribute_name != "context",
+            CAttribute::CMultipleAttribute(multiple) => multiple.rm_attribute_name != "context",
+        });
+    opt.definition
+        .attributes
+        .push(CAttribute::CSingleAttribute(CSingleAttribute {
+            rm_attribute_name: String::from("context"),
+            existence: prohibited,
+            children: Vec::new(),
+        }));
+    Ok(openehr_its::opt14::to_xml(&opt)?)
+}
+
+#[tokio::test]
+async fn a_composition_without_context_names_the_facility_as_the_originating_location()
+-> Result<(), Box<dyn Error>> {
+    let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
+    let running =
+        Running::start_serving(face_settings(true), lookup, None, &without_context()?).await?;
+    let ack = running.send(&oru_r01("MSG-FAC-NOCTX")).await?;
+    assert_eq!(
+        vec![String::from("MSA|AA|MSG-FAC-NOCTX")],
+        segments(&ack, "MSA"),
+        "{ack}"
+    );
+    let compositions = compositions(&running).await?;
+    assert!(!compositions.is_empty(), "one composition");
+    for composition in &compositions {
+        assert!(
+            composition.get("context").is_none(),
+            "a template that prohibits the context gets none: {composition}"
+        );
+        assert_eq!(
+            Some("NORTHLAB"),
+            composition
+                .pointer("/feeder_audit/originating_system_audit/location/name")
+                .and_then(serde_json::Value::as_str),
+            "RM Common IM, FEEDER_AUDIT_DETAILS.location holds the facility: {composition}"
         );
     }
     running.stop().await
