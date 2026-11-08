@@ -169,7 +169,7 @@ macro_rules! source_translate_request {
     };
 }
 
-/// The writers and readers R4 to R6 share: every parameter a [`Request`]
+/// The writers and readers R4 to R6 share: every parameter a [`Request`](crate::request::Request)
 /// carries outside `$translate` is declared under the same name and type,
 /// with the terminology ecosystem's additions
 /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
