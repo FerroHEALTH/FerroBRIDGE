@@ -8,7 +8,8 @@ description: >-
   retry on a fresh runner may help, and the perf workflow's verdict job
   decides. A retry may help when the gate ended with exit 2, a run that
   could not be judged, on any CPU model, or with exit 1, a breach, on a CPU
-  model the workflow lists as stall-prone. The calling job checks out
+  model the workflow lists as stall-prone; the workflow also retries an
+  attempt whose job did not finish. The calling job checks out
   the repository and installs the Rust toolchain first. No specification
   governs this: our own design.
 inputs:
@@ -47,7 +48,22 @@ runs:
       shell: bash
       env:
         BASE: ${{ inputs.base }}
-      run: bash scripts/perf/gate.sh build "$BASE"
+      # The free memory and disk are logged each minute while both arms
+      # build, so a runner that shuts down mid-build leaves the last reading
+      # in its log.
+      run: |
+        set -euo pipefail
+        sample() {
+          while true; do
+            free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB, ", $3, $2 }'
+            df -m . | awk 'NR == 2 { printf "disk free %s MB\n", $4 }'
+            sleep 60
+          done
+        }
+        sample &
+        sampler=$!
+        trap 'kill "$sampler" 2> /dev/null || true' EXIT
+        bash scripts/perf/gate.sh build "$BASE"
     - name: Gate the performance
       id: gate
       shell: bash

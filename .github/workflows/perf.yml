@@ -15,9 +15,12 @@
 # An attempt that ends with exit 2 could not be judged and says nothing about
 # the code, so it is retried on a fresh runner on any CPU model. Some runners
 # stall the gate for a whole job (FerroHEALTH/FerroPIX#511), so an attempt
-# that ends with exit 1 on a CPU model STALL_PRONE lists is retried too. At
-# most two retries run. The verdict job passes the gate when the last attempt
-# that ran passed; a breach on any other model fails at once, with no retry.
+# that ends with exit 1 on a CPU model STALL_PRONE lists is retried too, and
+# so is an attempt job that did not finish while the run itself was not
+# cancelled (a runner that shut down mid-job ends with no exit code). At most
+# two retries run. The verdict job passes the gate when the last attempt that
+# ran passed; a breach on any other model fails at once, with no retry, and a
+# run cancelled by its concurrency group or by a person retries nothing.
 # No specification governs this: our own design.
 name: Perf
 
@@ -41,6 +44,11 @@ on:
 permissions: {}
 
 env:
+  # A called workflow does not inherit the caller's env, so the cap ci.yml
+  # sets is repeated here: the hosted runner has four cores and seven
+  # gigabytes, and two release builds of four crates at a time ran it out of
+  # memory (exit 143, "The runner has received a shutdown signal").
+  CARGO_BUILD_JOBS: "2"
   FERROHEALTH_PERF_VERSION: 0.5.2
   FERROBRIDGE__USAGE_REPORT__ENABLED: "false"
   # The CPU models whose runners stall every route for 100 to 300 ms for a
@@ -79,7 +87,9 @@ jobs:
   perf-retry:
     name: perf (attempt 2)
     needs: perf
-    if: needs.perf.outputs.retryable == 'true'
+    if: >-
+      ${{ !cancelled() && (needs.perf.outputs.retryable == 'true'
+      || needs.perf.result == 'failure' || needs.perf.result == 'cancelled') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -107,7 +117,9 @@ jobs:
   perf-retry-2:
     name: perf (attempt 3)
     needs: perf-retry
-    if: needs.perf-retry.outputs.retryable == 'true'
+    if: >-
+      ${{ !cancelled() && (needs.perf-retry.outputs.retryable == 'true'
+      || needs.perf-retry.result == 'failure' || needs.perf-retry.result == 'cancelled') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -132,8 +144,9 @@ jobs:
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
-  # The gate passes when the last attempt that ran passed; an attempt job
-  # that did not finish fails it.
+  # The gate passes when the last attempt that ran passed. An attempt job
+  # that did not finish was retried while attempts were left; one that is
+  # the last to run fails the gate.
   verdict:
     name: perf verdict
     needs: [perf, perf-retry, perf-retry-2]
@@ -145,19 +158,43 @@ jobs:
       - name: The last attempt passed
         env:
           RESULTS: ${{ needs.perf.result }} ${{ needs.perf-retry.result }} ${{ needs.perf-retry-2.result }}
-          CODES: ${{ needs.perf.outputs.code }} ${{ needs.perf-retry.outputs.code }} ${{ needs.perf-retry-2.outputs.code }}
+          CODE_1: ${{ needs.perf.outputs.code }}
+          CODE_2: ${{ needs.perf-retry.outputs.code }}
+          CODE_3: ${{ needs.perf-retry-2.outputs.code }}
         run: |
           set -euo pipefail
-          echo "attempt results: ${RESULTS}; exit codes: ${CODES}"
-          case " ${RESULTS} " in
-            *" failure "* | *" cancelled "*)
-              echo "::error title=Performance gate::an attempt did not finish"
-              exit 1
-              ;;
-          esac
-          last="$(awk '{ print $NF }' <<< "${CODES}")"
-          if [ "$last" != "0" ]; then
-            echo "::error title=Performance gate::the last attempt ended with exit ${last}"
+          read -r -a results <<< "${RESULTS}"
+          codes=("${CODE_1}" "${CODE_2}" "${CODE_3}")
+          echo "attempt results: ${RESULTS}; exit codes: ${codes[*]}"
+          {
+            echo "## Performance gate verdict"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          last=""
+          for i in 0 1 2; do
+            result="${results[$i]:-skipped}"
+            [ "$result" = skipped ] && continue
+            last="$i"
+            if [ "$result" = failure ] || [ "$result" = cancelled ]; then
+              if [ "$i" -lt 2 ] && [ "${results[$((i + 1))]:-skipped}" != skipped ]; then
+                why="it says nothing about the code, so attempt $((i + 2)) ran on a fresh runner"
+              else
+                why="no attempt was left to retry it, or the run was cancelled"
+              fi
+              echo "Attempt $((i + 1)) did not finish (${result}, no exit code: the runner may have shut down); ${why}." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          if [ -z "$last" ]; then
+            echo "::error title=Performance gate::no attempt ran"
+            exit 1
+          fi
+          if [ "${results[$last]}" != success ]; then
+            echo "::error title=Performance gate::the last attempt did not finish (${results[$last]})"
+            exit 1
+          fi
+          code="${codes[$last]}"
+          if [ "$code" != "0" ]; then
+            echo "::error title=Performance gate::the last attempt ended with exit ${code}"
             exit 1
           fi
           echo "the last attempt passed"

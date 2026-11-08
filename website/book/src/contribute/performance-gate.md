@@ -85,9 +85,16 @@ tails reach 100 to 300 ms while the p50 holds
 attempt that ends with exit 2 runs again on a fresh runner on any CPU model,
 since a run that cannot be judged says nothing about the code. An attempt
 that ends with exit 1 runs again only on a CPU model the perf workflow lists
-in `STALL_PRONE`. At most two retries run, and the gate passes when the last
-attempt passed. A breach on any other model fails at once. The job summary
-names each attempt's CPU model, its verdict and why a retry ran.
+in `STALL_PRONE`. An attempt whose job did not finish, because its runner
+shut down mid-job and left no exit code, runs again on a fresh runner too,
+unless the run itself was cancelled by a newer push or by a person. At most
+two retries run, and the gate passes when the last attempt passed. A breach
+on any other model fails at once. The job summary names each attempt's CPU
+model, its verdict and why a retry ran, and the verdict's summary names an
+attempt that did not finish. The workflow builds two crates at a time
+(`CARGO_BUILD_JOBS=2`), since the two release builds otherwise run the
+seven-gigabyte runner out of memory, and the build step logs the runner's
+free memory and disk each minute.
 
 ## Running it yourself
 
