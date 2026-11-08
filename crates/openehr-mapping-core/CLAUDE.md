@@ -40,7 +40,9 @@ the language crate applies its own grammar to them.
 - **A party is built through the `openehr-sdt` template walk.**
   `party::build_party` writes every value below the root under `raw` and
   builds the party with `openehr_sdt::flat::build::build_party`, naming
-  `rm_version` 1.1.0, then decodes the result strictly as the root's class.
+  `rm_version` 1.1.0, then decodes the result strictly as the root's class
+  and validates it with `openehr_sdt::rm_instance::validate_party`, as
+  `accept_party` does a served party (`PartyError::Unvalidated`).
   A value at the root node passes each of its members, an attribute of the
   root's class, to the builder as `<root>/<attribute>|raw` (`ROLE.performer`,
   #1000); and a `ROLE` with no `performer`, built or accepted, is
