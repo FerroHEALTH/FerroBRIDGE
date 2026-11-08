@@ -46,7 +46,9 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   type map maps the components, and a table map is answered by
   `ConceptMap/$translate` on a terminology server or, offline, by the same
   table maps read from the corpus (`map::translate`). `map::single` maps one
-  segment to one resource, a PID to a `Patient`. The FHIR side is written
+  segment to one resource, a PID to a `Patient`. `map::inverse` writes a resource
+  back as a segment through the same maps, a `Patient` as a PID, with every
+  element it does not write back counted. The FHIR side is written
   through `fhirconnect::tree` over the `fhir-types` R4 element table, and the
   output is an R4 message `Bundle`. Every condition, target or value the run
   cannot carry is a typed, counted outcome.

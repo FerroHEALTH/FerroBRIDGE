@@ -1,0 +1,82 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "table-name-use-to-hl70200",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-name-use-to-hl70200",
+  "name": "FerroBRIDGENameUseToHl70200",
+  "title": "FerroBRIDGE supplement: name-use to HL7 table 0200",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds the FHIR-to-v2 direction of ConceptMap/table-hl70200-to-name-use of hl7.fhir.uv.v2mappings 1.0.0, which maps v2 to FHIR only. Reversed, that map gives official two sources (L and R) and temp two (NAV and TEMP); this map names L (Official Registry Name) for official, since R is the registered name of an animal, and TEMP (Temporary Name) for temp, since NAV states a name temporarily unavailable, and each other code its one source. Used by the PID inverse of FerroBRIDGE #1716.",
+  "group": [
+    {
+      "source": "http://hl7.org/fhir/name-use",
+      "target": "http://terminology.hl7.org/CodeSystem/v2-0200",
+      "element": [
+        {
+          "code": "usual",
+          "target": [
+            {
+              "code": "D",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "official",
+          "target": [
+            {
+              "code": "L",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "temp",
+          "target": [
+            {
+              "code": "TEMP",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "nickname",
+          "target": [
+            {
+              "code": "N",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "anonymous",
+          "target": [
+            {
+              "code": "MSK",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "old",
+          "target": [
+            {
+              "code": "BAD",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "maiden",
+          "target": [
+            {
+              "code": "M",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
