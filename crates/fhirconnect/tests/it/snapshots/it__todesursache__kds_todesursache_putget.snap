@@ -1,0 +1,34 @@
+---
+source: crates/fhirconnect/tests/it/todesursache.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "the mapping category did not run: its unidirectional marker names the other direction",
+    "the mapping metaURL did not run: its unidirectional marker names the other direction",
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [
+    "subject.reference = \"Patient/synthetic-1\""
+  ],
+  "added": [
+    "category[0].coding[0].code = \"79378-6\"",
+    "category[0].coding[0].system = \"http://loinc.org\"",
+    "category[0].coding[1].code = \"16100001\"",
+    "category[0].coding[1].system = \"http://snomed.info/sct\"",
+    "clinicalStatus.text = \"active\"",
+    "code.text = \"I21.9\"",
+    "meta.profile[0] = \"https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/Todesursache\"",
+    "onsetPeriod.start = \"2026-09-12T10:00:00+02:00\"",
+    "recorder.display = \"FHIRconnect\""
+  ],
+  "changed": [
+    "onsetDateTime: \"2026-09-11T22:30:00+02:00\" became \"2026-09-12T10:00:00+02:00\""
+  ]
+}

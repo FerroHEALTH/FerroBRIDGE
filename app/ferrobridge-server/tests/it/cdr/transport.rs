@@ -6,6 +6,8 @@
 //! the upstream answer kept beside every refusal.
 
 use super::support;
+use crate::support::basic_authorization;
+use crate::support::random_secret;
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::config::CdrConfig;
@@ -182,23 +184,23 @@ async fn the_credential_travels_beside_the_request_id_and_never_reaches_the_debu
         .mount(&server)
         .await;
 
+    let token = random_secret();
     let client = CdrClient::new(
         &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
-            .with_basic("bridge", SecretString::from("synthetic-token")),
+            .with_basic("bridge", SecretString::from(token.as_str())),
     )?;
     let client = client.with_request_id(RequestId::new("corr-42")?);
     let _answered = client.ehr(&EhrId::new(EHR)?).await?;
 
-    // NOTE: RFC 7617 §2; `YnJpZGdlOnN5bnRoZXRpYy10b2tlbg==` is `bridge:synthetic-token`.
     assert_eq!(
-        vec!["Basic YnJpZGdlOnN5bnRoZXRpYy10b2tlbg==".to_owned()],
+        vec![basic_authorization("bridge", &token)],
         support::request_header(&server, 0, "authorization").await?
     );
     assert_eq!(
         vec!["corr-42".to_owned()],
         support::request_header(&server, 0, "x-request-id").await?
     );
-    assert!(!format!("{client:?}").contains("synthetic-token"));
+    assert!(!format!("{client:?}").contains(&token));
     Ok(())
 }
 
@@ -211,19 +213,19 @@ async fn basic_credentials_travel_as_rfc_7617() -> Result<(), Box<dyn Error>> {
         .mount(&server)
         .await;
 
+    let password = random_secret();
     let client = CdrClient::new(
         &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
-            .with_basic("bridge", SecretString::from("synthetic-password")),
+            .with_basic("bridge", SecretString::from(password.as_str())),
     )?;
     let _answered = client.ehr(&EhrId::new(EHR)?).await?;
 
-    // NOTE: RFC 7617 §2, the credentials are base64 of `user:password`;
-    // `YnJpZGdlOnN5bnRoZXRpYy1wYXNzd29yZA==` is `bridge:synthetic-password`.
+    // NOTE: RFC 7617 §2, the credentials are base64 of `user:password`.
     assert_eq!(
-        vec!["Basic YnJpZGdlOnN5bnRoZXRpYy1wYXNzd29yZA==".to_owned()],
+        vec![basic_authorization("bridge", &password)],
         support::request_header(&server, 0, "authorization").await?
     );
-    assert!(!format!("{client:?}").contains("synthetic-password"));
+    assert!(!format!("{client:?}").contains(&password));
     Ok(())
 }
 
@@ -309,6 +311,7 @@ const PROBE_PATH: &str = "/v1/definition/template/adl1.4";
 #[tokio::test]
 async fn a_reachability_probe_lists_templates_with_the_configured_credential()
 -> Result<(), Box<dyn Error>> {
+    let token = random_secret();
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path(PROBE_PATH))
@@ -318,7 +321,7 @@ async fn a_reachability_probe_lists_templates_with_the_configured_credential()
         ))
         .and(wiremock::matchers::header(
             "authorization",
-            "Basic YnJpZGdlOnN5bnRoZXRpYy10b2tlbg==",
+            basic_authorization("bridge", &token).as_str(),
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
         .expect(1)
@@ -326,7 +329,7 @@ async fn a_reachability_probe_lists_templates_with_the_configured_credential()
         .await;
     let client = CdrClient::new(
         &CdrConfig::new(format!("{}/v1", server.uri()).parse()?)
-            .with_basic("bridge", SecretString::from("synthetic-token")),
+            .with_basic("bridge", SecretString::from(token.as_str())),
     )?;
 
     assert_eq!(http::StatusCode::OK, client.reachability().await?);

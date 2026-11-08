@@ -86,13 +86,13 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
         .get(LABORATORIES.get(1).ok_or("lab-2")?.ehr)
         .ok_or("an EHR")?;
     delete(&client, doomed_ehr, doomed).await?;
-    let doomed_uid = versioned_object_uid(doomed).value().to_owned();
+    let doomed_object = versioned_object_uid(doomed).value().to_owned();
 
     let second = etl_run(&config).await?;
     assert_eq!(2, second.compositions.committed, "{second}");
     assert_eq!(1, second.deletions.checked, "{second}");
     assert_eq!(
-        vec![doomed_uid.clone()],
+        vec![doomed_object.clone()],
         second.deletions.removed,
         "{second}"
     );
@@ -106,7 +106,7 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
         cell(
             &postgres,
             &format!(
-                "SELECT count(*) FROM ferrobridge.record WHERE versioned_object_uid = '{doomed_uid}'"
+                "SELECT count(*) FROM ferrobridge.record WHERE versioned_object_uid = '{doomed_object}'"
             )
         )
         .await?

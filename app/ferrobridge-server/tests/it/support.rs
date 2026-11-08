@@ -18,6 +18,22 @@ use std::time::Duration;
 use tracing_subscriber::fmt::MakeWriter;
 use wiremock::MockServer;
 
+/// Returns a synthetic secret drawn at random for this run, so no credential
+/// literal sits in the tree.
+pub(crate) fn random_secret() -> String {
+    uuid::Uuid::new_v4().simple().to_string()
+}
+
+/// Returns the `Authorization` value of the Basic credential of `user` and
+/// `password`: RFC 7617 §2, `Basic` and the base64 of `user:password`.
+pub(crate) fn basic_authorization(user: &str, password: &str) -> String {
+    use base64::Engine as _;
+    format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD.encode(format!("{user}:{password}"))
+    )
+}
+
 /// Returns the subject link in `namespace` with the reference id form and the
 /// `PERSON` type, the facade's defaults.
 pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subject::SubjectLink {
