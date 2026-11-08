@@ -42,7 +42,7 @@ runs:
       shell: bash
       env:
         VERSION: ${{ inputs.version }}
-      run: cargo install --git https://github.com/FerroHEALTH/FerroSYS --rev f401384303509b03493485cdf6964ee416a7db75 ferrohealth-perf --locked
+      run: cargo install ferrohealth-perf --version "=${VERSION}" --locked
     - name: Build the base and the head
       shell: bash
       env:
