@@ -378,22 +378,28 @@ impl<'a> Run<'a> {
             .ok_or_else(|| MapError::NoMessageMap {
                 structure: String::from(structure),
             })?;
-        let mut visits = Vec::new();
-        collect(
-            self.parsed.items(),
-            structure,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
-            self.parsed.structure().nodes,
-            &mut visits,
-        );
-        visits.sort_by_key(|visit| visit.index);
-        for visit in visits {
+        for visit in placed(self.parsed) {
             self.visit(map, &visit)?;
         }
         Ok(())
     }
+}
+
+/// Every placed segment of `parsed` with what its walk needs, in message
+/// order.
+fn placed(parsed: &Parsed) -> Vec<Visit<'_>> {
+    let mut visits = Vec::new();
+    collect(
+        parsed.items(),
+        parsed.structure_name(),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        parsed.structure().nodes,
+        &mut visits,
+    );
+    visits.sort_by_key(|visit| visit.index);
+    visits
 }
 
 impl Base {

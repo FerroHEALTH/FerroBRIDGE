@@ -11,7 +11,7 @@ use hl7v2_types::model::Max;
 use crate::map::corpus::{Map, Origin};
 use crate::map::notation::Target;
 use crate::map::run::segment::row_ref;
-use crate::map::run::{Base, Identity, Run, Scope, Visit};
+use crate::map::run::{Base, Identity, Run, Scope, Visit, placed};
 use crate::map::single::SegmentError;
 use crate::map::{MapError, Outcome};
 use crate::parse::{Item, Location};
@@ -152,18 +152,7 @@ impl<'a> Run<'a> {
         index: usize,
         resource_type: &str,
     ) -> Result<String, SegmentError> {
-        let structure = self.parsed.structure_name();
-        let mut visits = Vec::new();
-        collect(
-            self.parsed.items(),
-            structure,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
-            self.parsed.structure().nodes,
-            &mut visits,
-        );
-        let visit = visits
+        let visit = placed(self.parsed)
             .into_iter()
             .find(|visit| visit.index == index)
             .ok_or(SegmentError::Unplaced { index })?;
