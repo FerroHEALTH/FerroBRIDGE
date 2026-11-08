@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 
-# The bridge the performance gate measures (scripts/perf/gate.sh): every
-# lane a deployment runs at once, over the pinned FerroEHR CDR and RabbitMQ
-# the gate starts on loopback. The facade serves the request set; the HL7 v2
-# listener and the change feed's events lane run beside it, so the idle phase
-# measures them with nothing to do. Every path is relative to the checkout,
-# and target/perf-run/ is the gate's own work directory. No specification
-# governs this: our own design.
+# The bridge the performance gate measures (scripts/perf/gate.sh), as the
+# head and as the base: every lane a deployment runs at once, over the pinned
+# FerroEHR CDR and RabbitMQ the gate starts on loopback. The facade serves the
+# requests and the HL7 v2 face the ORU^R01 of the plan; the change feed's
+# events lane runs beside them, so the idle phase measures it with nothing to
+# do. Every path is relative to the arm's tree; the gate sets the listeners,
+# the CDR, the mapping directory and the work files of each arm through
+# FERROBRIDGE__ variables. No specification governs this: our own design.
 
 [server]
 listen = "127.0.0.1:18080"
@@ -39,6 +40,9 @@ enabled = true
 listen = "127.0.0.1:12575"
 concept_maps = "tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
 senders = [{ namespace_id = "PERFLAB", certificate_subject = "perflab.example.org" }]
+# The profile of the face's Observation context in
+# app/ferrobridge-server/tests/it/hl7v2_fixtures, so an OBX reaches it.
+profiles = [{ resource_type = "Observation", profile = "http://example.org/fhir/StructureDefinition/ferrobridge-hl7v2-observation" }]
 
 [hl7v2.tls]
 certificate_file = "target/perf-run/tls/mllp-chain.pem"

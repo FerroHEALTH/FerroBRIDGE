@@ -3,13 +3,15 @@
 
 # The performance gate (#1656), called by ci.yml on a change that reaches the
 # bridge and by release.yml on the release commit. Each attempt job builds
-# the bridge in release mode, installs ferrohealth-perf
+# the release binary of the commit and of its base, installs ferrohealth-perf
 # (FerroHEALTH/FerroSYS#249) at its docs/VERSIONS.md pin and runs
-# scripts/perf/gate.sh once through .github/actions/perf-attempt: the idle
-# phase with every background worker running, the load phase over
-# perf/plan.toml judged against the entry of the runner's host shape in
-# perf/baseline.toml, and the planted poller of the CDR database the idle
-# phase must fail.
+# scripts/perf/gate.sh once through .github/actions/perf-attempt: the tool's
+# A/B mode, the head's idle phase held to absolute limits with every
+# background worker running, then pairs of load phases against the base and
+# the head on the same runner, the head judged over the base, and the
+# planted poller of the head's CDR database the idle phase must fail. The
+# base is the merge base of the commit with the `base` input, or with none
+# the previous release.
 # An attempt that ends with exit 2 could not be judged and says nothing about
 # the code, so it is retried on a fresh runner on any CPU model. Some runners
 # stall the gate for a whole job (FerroHEALTH/FerroPIX#511), so an attempt
@@ -22,11 +24,14 @@ name: Perf
 on:
   workflow_call:
     inputs:
-      update:
-        description: Write the entry of the runner's host shape in the baselines from a run that passes.
+      base:
+        description: >-
+          The commit or ref the base is the merge base with: the pull
+          request's base, the merge group's, or the commit before a push.
+          Empty takes the previous release.
         required: false
-        default: false
-        type: boolean
+        default: ""
+        type: string
       cache:
         description: Restore and save the Rust build cache; the release lane passes false.
         required: false
@@ -36,7 +41,7 @@ on:
 permissions: {}
 
 env:
-  FERROHEALTH_PERF_VERSION: 0.4.2
+  FERROHEALTH_PERF_VERSION: 0.5.2
   FERROBRIDGE__USAGE_REPORT__ENABLED: "false"
   # The CPU models whose runners stall every route for 100 to 300 ms for a
   # whole job (FerroHEALTH/FerroPIX#511), one per line. A breach is retried
@@ -58,6 +63,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The base is built from history, so every commit is fetched.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-rust
         with:
           cache: ${{ inputs.cache && 'true' || 'false' }}
@@ -65,7 +72,7 @@ jobs:
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "1"
-          update: ${{ inputs.update }}
+          base: ${{ inputs.base }}
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
@@ -84,6 +91,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The base is built from history, so every commit is fetched.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-rust
         with:
           cache: ${{ inputs.cache && 'true' || 'false' }}
@@ -91,7 +100,7 @@ jobs:
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "2"
-          update: ${{ inputs.update }}
+          base: ${{ inputs.base }}
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
@@ -110,6 +119,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The base is built from history, so every commit is fetched.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-rust
         with:
           cache: ${{ inputs.cache && 'true' || 'false' }}
@@ -117,7 +128,7 @@ jobs:
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "3"
-          update: ${{ inputs.update }}
+          base: ${{ inputs.base }}
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
