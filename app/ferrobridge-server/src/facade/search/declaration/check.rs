@@ -74,10 +74,20 @@ pub(super) fn check_parameter(
             name: name.to_owned(),
             reason,
         })?;
+    let refuse = |reason: String| DeclarationError::Path {
+        file: file.to_path_buf(),
+        name: name.to_owned(),
+        path: written.path.clone(),
+        reason,
+    };
+    let path = crate::facade::search::aql::check_path(&format!("c/{}", written.path))
+        .map_err(refuse)?
+        .path
+        .ok_or_else(|| refuse(String::from("it names no attribute below its node")))?;
     Ok(Parameter {
         kind,
         node,
-        path: written.path.clone(),
+        path,
         coded,
         systems: written.systems.clone(),
     })
@@ -124,13 +134,15 @@ mod tests {
         assert_eq!(Some(Coded::Text), token.coded);
         assert_eq!(
             "n0/data[at0001]/items[at0002]/value/defining_code/code_string",
-            token.value_path("n0")
+            token.value_path("n0").column_path_with_variable()
         );
         assert_eq!(
             Some(String::from(
                 "n0/data[at0001]/items[at0002]/value/defining_code/terminology_id/value"
             )),
-            token.system_path("n0")
+            token
+                .system_path("n0")
+                .map(|path| path.column_path_with_variable())
         );
         assert!(!token.sortable());
     }
@@ -140,7 +152,10 @@ mod tests {
         let date = check("context: c\nparameters:\n  recorded:\n    type: date\n    path: context/start_time/value\n")
             .expect("a composition-level date checks");
         assert!(date.sortable());
-        assert_eq!("c/context/start_time/value", date.value_path("c"));
+        assert_eq!(
+            "c/context/start_time/value",
+            date.value_path("c").column_path_with_variable()
+        );
     }
 
     #[test]

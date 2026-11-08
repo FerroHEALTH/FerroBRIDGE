@@ -41,6 +41,7 @@ use crate::facade::search::declaration::DeclarationError;
 use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::template::Placement;
+use openehr_query::ast::IdentifiedPath;
 
 /// The page sizes a deployment configured.
 ///
@@ -89,7 +90,7 @@ impl PatientScope {
 }
 
 /// One checked declaration, bound to the program it searches.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Declared {
     /// The file it was read from.
     file: PathBuf,
@@ -101,8 +102,8 @@ pub struct Declared {
     template_id: String,
     /// The subject parameters, when any.
     patient: Option<PatientScope>,
-    /// The total order every page is read in.
-    order: Vec<String>,
+    /// The total order every page is read in, each path parsed at load.
+    order: Vec<IdentifiedPath>,
     /// The declared parameters, by name.
     parameters: BTreeMap<String, Parameter>,
     /// Where the template places the context's entry, which an entry count
@@ -143,7 +144,7 @@ impl Declared {
 
     /// Returns the total order, first key first.
     #[must_use]
-    pub fn order(&self) -> &[String] {
+    pub fn order(&self) -> &[IdentifiedPath] {
         &self.order
     }
 
@@ -177,7 +178,7 @@ impl Declared {
 }
 
 /// Every declaration this deployment loaded, by resource type.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Catalog {
     /// The declarations of each type, in context-name order.
     by_type: BTreeMap<String, Vec<Declared>>,
@@ -280,13 +281,13 @@ pub fn bind(
     for name in &patient_names {
         declaration::check_standard(file, resource_type, name, ParameterType::Reference)?;
     }
-    let order = written.order.unwrap_or_else(|| {
+    let written_order = written.order.unwrap_or_else(|| {
         aql::DEFAULT_ORDER
             .iter()
             .map(|path| (*path).to_owned())
             .collect()
     });
-    if order.is_empty() {
+    if written_order.is_empty() {
         return Err(DeclarationError::Path {
             file: file.to_path_buf(),
             name: String::from("order"),
@@ -294,6 +295,17 @@ pub fn bind(
             reason: String::from("a declared order names at least one path"),
         });
     }
+    let order = written_order
+        .iter()
+        .map(|path| {
+            aql::check_path(path).map_err(|reason| DeclarationError::Path {
+                file: file.to_path_buf(),
+                name: String::from("order"),
+                path: path.clone(),
+                reason,
+            })
+        })
+        .collect::<Result<Vec<IdentifiedPath>, DeclarationError>>()?;
     let declared = Declared {
         file: file.to_path_buf(),
         context: written.context,
@@ -342,31 +354,14 @@ fn check_patient(
 /// Checks every path one declaration names, alone and inside the widest
 /// query it can build.
 fn check_paths(declared: &Declared) -> Result<(), DeclarationError> {
-    let refuse = |name: &str, path: &str, reason: String| DeclarationError::Path {
-        file: declared.file.clone(),
-        name: name.to_owned(),
-        path: path.to_owned(),
-        reason,
-    };
-    for path in &declared.order {
-        aql::check_path(path).map_err(|reason| refuse("order", path, reason))?;
-    }
     let mut conditions = Conditions::new(&declared.template_id);
     let mut order: Vec<OrderKey> = Vec::new();
-    for (name, parameter) in &declared.parameters {
-        let probe = if parameter.node().is_some() {
-            aql::NODE_ALIAS
-        } else {
-            "c"
-        };
-        for path in parameter.paths(probe) {
-            aql::check_path(&path).map_err(|reason| refuse(name, &path, reason))?;
-        }
+    for parameter in declared.parameters.values() {
         let alias = conditions.alias(parameter.node());
         for path in parameter.paths(&alias) {
             let bound = conditions.bind("probe");
-            conditions.push(format!("{path} = {bound}"));
-            conditions.push(format!("NOT EXISTS {path}"));
+            conditions.push(aql::equals(path.clone(), &bound));
+            conditions.push(aql::not(aql::exists(path)));
         }
         if parameter.sortable() {
             order.push(OrderKey {

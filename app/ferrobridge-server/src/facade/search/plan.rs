@@ -15,6 +15,7 @@
 use crate::cdr::ids::EhrId;
 use crate::facade::identity::record::CompositionBinding;
 use crate::facade::search::Declared;
+use crate::facade::search::aql;
 use crate::facade::search::aql::Conditions;
 use crate::facade::search::aql::OrderKey;
 use crate::facade::search::criteria::Criteria;
@@ -26,6 +27,9 @@ use crate::facade::search::declaration::ParameterType;
 use fhir_search::date::DateValue;
 use fhir_search::prefix::Prefix;
 use fhir_search::token::{System, Token};
+use openehr_query::ast::IdentifiedPath;
+use openehr_query::ast::WhereExpr;
+use openehr_query::lexer::CompOp;
 
 /// What the identity map answered for the subject parameters and `_id`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -50,35 +54,33 @@ pub fn conditions(
 ) -> Result<Option<Conditions>, CriteriaError> {
     let mut conditions = Conditions::new(declared.template_id());
     for ehrs in &resolved.ehrs {
-        if ehrs.is_empty() {
-            return Ok(None);
-        }
-        let clause = ehrs
+        let alternatives: Vec<WhereExpr> = ehrs
             .iter()
-            .map(|ehr| format!("e/ehr_id/value = {}", conditions.bind(ehr.as_str())))
-            .collect::<Vec<String>>()
-            .join(" OR ");
+            .map(|ehr| aql::equals(ehr_path(), &conditions.bind(ehr.as_str())))
+            .collect();
+        let Some(clause) = aql::any(alternatives) else {
+            return Ok(None);
+        };
         conditions.push(clause);
     }
     for bindings in &resolved.ids {
-        let mine: Vec<&CompositionBinding> = bindings
+        let alternatives: Vec<WhereExpr> = bindings
             .iter()
             .filter(|binding| binding.template_id == declared.template_id())
-            .collect();
-        if mine.is_empty() {
-            return Ok(None);
-        }
-        let clause = mine
-            .iter()
-            .map(|binding| {
+            .filter_map(|binding| {
                 let ehr = conditions.bind(binding.ehr_id.as_str());
                 // NOTE: openEHR RM Common `OBJECT_VERSION_ID` is `object_id::system::tree`,
                 // so `<object_id>::*` (QUERY AQL §3.8.1.1) matches every version of it.
                 let versions = conditions.bind(format!("{}::*", binding.versioned_object_uid));
-                format!("(e/ehr_id/value = {ehr} AND v/uid/value LIKE {versions})")
+                aql::all([
+                    aql::equals(ehr_path(), &ehr),
+                    aql::like(aql::attribute_path("v", &["uid", "value"]), &versions),
+                ])
             })
-            .collect::<Vec<String>>()
-            .join(" OR ");
+            .collect();
+        let Some(clause) = aql::any(alternatives) else {
+            return Ok(None);
+        };
         conditions.push(clause);
     }
     for filter in &criteria.filters {
@@ -89,6 +91,11 @@ pub fn conditions(
         conditions.push(clause);
     }
     Ok(Some(conditions))
+}
+
+/// Returns the path of the EHR's id.
+fn ehr_path() -> IdentifiedPath {
+    aql::attribute_path("e", &["ehr_id", "value"])
 }
 
 /// Returns the `ORDER BY` of `declared` for `criteria`: the `_sort` keys,
@@ -127,10 +134,10 @@ fn condition(
     conditions: &mut Conditions,
     filter: &Filter,
     parameter: &Parameter,
-) -> Result<String, CriteriaError> {
+) -> Result<WhereExpr, CriteriaError> {
     let alias = conditions.alias(parameter.node());
     let path = parameter.value_path(&alias);
-    let alternatives: Vec<String> = match (&filter.test, parameter.kind()) {
+    let alternatives: Vec<WhereExpr> = match (&filter.test, parameter.kind()) {
         (Test::Token(values), ParameterType::Token) => {
             let system = parameter.system_path(&alias);
             values
@@ -139,29 +146,29 @@ fn condition(
                     token_condition(
                         conditions,
                         token,
-                        (&path, system.as_deref(), parameter.systems()),
+                        (&path, system.as_ref(), parameter.systems()),
                         &filter.name,
                     )
                 })
-                .collect::<Result<Vec<String>, CriteriaError>>()?
+                .collect::<Result<Vec<WhereExpr>, CriteriaError>>()?
         }
         (Test::Text { matching, values }, ParameterType::String) => values
             .iter()
             .map(
                 |text| match crate::facade::search::value::like_pattern(text, *matching) {
-                    Ok(Some(pattern)) => Ok(format!("{path} LIKE {}", conditions.bind(pattern))),
-                    Ok(None) => Ok(format!("{path} = {}", conditions.bind(text.as_str()))),
+                    Ok(Some(pattern)) => Ok(aql::like(path.clone(), &conditions.bind(pattern))),
+                    Ok(None) => Ok(aql::equals(path.clone(), &conditions.bind(text.as_str()))),
                     Err(error) => Err(CriteriaError::Unsupported {
                         name: filter.name.clone(),
                         reason: error.to_string(),
                     }),
                 },
             )
-            .collect::<Result<Vec<String>, CriteriaError>>()?,
+            .collect::<Result<Vec<WhereExpr>, CriteriaError>>()?,
         (Test::Date(values), ParameterType::Date) => values
             .iter()
             .map(|value| date_condition(conditions, &path, value, &filter.name))
-            .collect::<Result<Vec<String>, CriteriaError>>()?,
+            .collect::<Result<Vec<WhereExpr>, CriteriaError>>()?,
         _ => {
             return Err(CriteriaError::Invalid {
                 name: filter.name.clone(),
@@ -169,11 +176,10 @@ fn condition(
             });
         }
     };
-    Ok(alternatives
-        .iter()
-        .map(|alternative| format!("({alternative})"))
-        .collect::<Vec<String>>()
-        .join(" OR "))
+    aql::any(alternatives).ok_or_else(|| CriteriaError::Invalid {
+        name: filter.name.clone(),
+        reason: String::from("the parameter names no value"),
+    })
 }
 
 /// Returns the condition of one token value.
@@ -184,15 +190,15 @@ fn token_condition(
     conditions: &mut Conditions,
     token: &Token,
     paths: (
-        &str,
-        Option<&str>,
+        &IdentifiedPath,
+        Option<&IdentifiedPath>,
         &std::collections::BTreeMap<String, String>,
     ),
     name: &str,
-) -> Result<String, CriteriaError> {
+) -> Result<WhereExpr, CriteriaError> {
     let (code_path, system_path, systems) = paths;
     let needs_system = || {
-        system_path.ok_or_else(|| CriteriaError::Unsupported {
+        system_path.cloned().ok_or_else(|| CriteriaError::Unsupported {
             name: name.to_owned(),
             reason: String::from(
                 "this parameter is declared over a code alone, so a value naming a system cannot be matched",
@@ -202,19 +208,22 @@ fn token_condition(
     let mut parts = Vec::new();
     match token.system() {
         System::Any => {}
-        System::Absent => parts.push(format!("NOT EXISTS {}", needs_system()?)),
+        System::Absent => parts.push(aql::not(aql::exists(needs_system()?))),
         System::Is(uri) => {
             let path = needs_system()?;
             // NOTE: no specification maps a FHIR system URI to an openEHR terminology id:
             // our own design, the declaration's `systems` table, else the URI verbatim.
             let terminology = systems.get(uri).map_or(uri, String::as_str);
-            parts.push(format!("{path} = {}", conditions.bind(terminology)));
+            parts.push(aql::equals(path, &conditions.bind(terminology)));
         }
     }
     if let Some(code) = token.code() {
-        parts.push(format!("{code_path} = {}", conditions.bind(code)));
+        parts.push(aql::equals(code_path.clone(), &conditions.bind(code)));
     }
-    Ok(parts.join(" AND "))
+    aql::all(parts).ok_or_else(|| CriteriaError::Invalid {
+        name: name.to_owned(),
+        reason: String::from("the token names neither a system nor a code"),
+    })
 }
 
 /// Returns the condition of one date value over `path`.
@@ -224,25 +233,31 @@ fn token_condition(
 /// to comparisons of that instant with the search range `[low, high)`.
 fn date_condition(
     conditions: &mut Conditions,
-    path: &str,
+    path: &IdentifiedPath,
     value: &DateValue,
     name: &str,
-) -> Result<String, CriteriaError> {
+) -> Result<WhereExpr, CriteriaError> {
     let range = value.date().range();
     let low = range.low().to_string();
     let high = range.high().map(ToString::to_string);
-    let mut bind = |text: &str| conditions.bind(text);
+    let mut at = |op: CompOp, text: &str| aql::compare(path.clone(), op, &conditions.bind(text));
     Ok(match (value.prefix(), high) {
         (Prefix::Eq | Prefix::Ap, Some(high)) => {
-            format!("{path} >= {} AND {path} < {}", bind(&low), bind(&high))
+            let from = at(CompOp::Ge, &low);
+            let to = at(CompOp::Lt, &high);
+            WhereExpr::And(Box::new(from), Box::new(to))
         }
-        (Prefix::Ne, Some(high)) => format!("{path} < {} OR {path} >= {}", bind(&low), bind(&high)),
+        (Prefix::Ne, Some(high)) => {
+            let before = at(CompOp::Lt, &low);
+            let after = at(CompOp::Ge, &high);
+            WhereExpr::Or(Box::new(before), Box::new(after))
+        }
         (Prefix::Eq | Prefix::Ap | Prefix::Ge, None) | (Prefix::Ge, Some(_)) => {
-            format!("{path} >= {}", bind(&low))
+            at(CompOp::Ge, &low)
         }
-        (Prefix::Ne | Prefix::Lt | Prefix::Eb, _) => format!("{path} < {}", bind(&low)),
-        (Prefix::Gt | Prefix::Sa, Some(high)) => format!("{path} >= {}", bind(&high)),
-        (Prefix::Le, Some(high)) => format!("{path} < {}", bind(&high)),
+        (Prefix::Ne | Prefix::Lt | Prefix::Eb, _) => at(CompOp::Lt, &low),
+        (Prefix::Gt | Prefix::Sa, Some(high)) => at(CompOp::Ge, &high),
+        (Prefix::Le, Some(high)) => at(CompOp::Lt, &high),
         (Prefix::Gt | Prefix::Sa | Prefix::Le, None) => {
             return Err(CriteriaError::Unsupported {
                 name: name.to_owned(),
