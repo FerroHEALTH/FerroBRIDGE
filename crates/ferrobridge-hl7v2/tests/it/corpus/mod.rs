@@ -33,6 +33,7 @@ use bytes::BytesMut;
 use ferrobridge_hl7v2::batch;
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Received};
+use ferrobridge_hl7v2::map::translate::Translator;
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
 use ferrobridge_hl7v2::mllp::Codec;
 use ferrobridge_hl7v2::parse;
@@ -359,7 +360,7 @@ async fn one(
         outcomes.insert(String::from("acknowledgment-not-mapped"), 1);
         return Case::pass(id).with_outcomes(outcomes);
     }
-    let mapped = match map(parsed, guide, Some(client)).await {
+    let mapped = match map(parsed, guide, Some(Translator::Server(client))).await {
         Ok(mapped) => mapped,
         Err(error) => {
             return Case::fail(id, format!("the map refuses it: {}", chain(&error)));

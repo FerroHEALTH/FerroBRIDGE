@@ -39,7 +39,9 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   from a directory at run time (the corpus is never packaged). The message
   map names a resource per segment, the segment map maps the fields, a data
   type map maps the components, and a table map is answered by
-  `ConceptMap/$translate` on a terminology server. The FHIR side is written
+  `ConceptMap/$translate` on a terminology server or, offline, by the same
+  table maps read from the corpus (`map::translate`). `map::single` maps one
+  segment to one resource, a PID to a `Patient`. The FHIR side is written
   through `fhirconnect::tree` over the `fhir-types` R4 element table, and the
   output is an R4 message `Bundle`. Every condition, target or value the run
   cannot carry is a typed, counted outcome.
