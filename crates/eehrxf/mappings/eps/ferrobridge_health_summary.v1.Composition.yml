@@ -1,0 +1,92 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM COMPOSITION.health_summary.v1 to the
+# FHIR R4 Composition of a patient summary. Each section of FerroBRIDGE's
+# patient summary template is entered through its sub-context by its section
+# path (FHIRconnect 1.0.0, types-of-mapping-files/sub-contexts.adoc,
+# §slotContext), and the section's LOINC code selects the sub-context going
+# in.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.health_summary.v1.Composition
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.health_summary.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Composition
+
+mappings:
+  # No node of the template records the summary's status or title: a committed
+  # composition is reported final, under the document's own title.
+  - name: "status"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  # NOTE: composition-eu-eps 1.0.0-ballot fixes Composition.type to LOINC 60591-5.
+  - name: "type"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.type.coding"
+    manual:
+      - name: "patientSummary"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "60591-5"
+
+  - name: "title"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "patientSummary"
+        fhir:
+          - path: "title"
+            value: "Patient Summary"
+
+  - name: "date"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.date"
+      openehr: "$composition/context/start_time"
+
+  # The document names its own authors, so a received author is not
+  # resolved into the composer, which the engine defaults going in.
+  - name: "author"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.author"
+      openehr: "$composition/composer"
+
+  - name: "sectionMedications"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1]"
+    slotContext: "ferrobridge_eu_eps_medication.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "10160-0"
+
+  - name: "sectionImmunizations"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.immunisation_list.v0]"
+    slotContext: "ferrobridge_eu_eps_immunization.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "11369-6"

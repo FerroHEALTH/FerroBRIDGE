@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's root context for the HL7 Europe Patient Summary 1.0.0-ballot
+# over FerroBRIDGE's patient summary template: the composition becomes one
+# composition-eu-eps, and each section of the template is entered through
+# the sub-context its section path names (FHIRconnect 1.0.0,
+# types-of-mapping-files/sub-contexts.adoc). The section path places an
+# entry, so a medication action under the medication summary section is a
+# medication summary entry and one under the immunisations section an
+# immunisation.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_eps.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps"
+    version: "1.0.0-ballot"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "COMPOSITION.health_summary.v1.Composition"
+  contexts:
+    - "ferrobridge_eu_eps_medication.context"
+    - "ferrobridge_eu_eps_immunization.context"
+  start: "COMPOSITION.health_summary.v1.Composition"

@@ -16,6 +16,7 @@
 use std::error::Error;
 use std::io::Write;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use ferrobridge_server::cdr::CdrClient;
@@ -60,6 +61,7 @@ use crate::facade::stub::mount_echo;
 use crate::facade::stub::mount_ehr;
 use crate::facade::stub::mount_read;
 use crate::facade::transaction_of;
+use crate::support::random_secret;
 use ferrobridge_server::smart::SmartSettings;
 
 mod kinds;
@@ -70,8 +72,9 @@ const BRIDGE_CLIENT: &str = "ferrobridge";
 /// The audience, and the resource indicator, the CDR's tokens name.
 const CDR_AUDIENCE: &str = "https://cdr.example/openehr";
 
-/// The token the client credentials grant issues the bridge for itself.
-const OWN_TOKEN: &str = "synthetic-bridge-own-token";
+/// The token the client credentials grant issues the bridge for itself,
+/// drawn for this run.
+static OWN_TOKEN: LazyLock<String> = LazyLock::new(random_secret);
 
 /// The grant type of token exchange, form-encoded (RFC 8693 §2.1).
 const TOKEN_EXCHANGE: &str = "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange";
@@ -290,7 +293,7 @@ impl World {
                 "grant_type=client_credentials",
             ))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "access_token": OWN_TOKEN,
+                "access_token": OWN_TOKEN.as_str(),
                 "token_type": "Bearer",
                 "expires_in": 300,
             })))
@@ -728,7 +731,7 @@ async fn a_machine_is_never_exchanged_and_reaches_the_cdr_under_the_bridge_token
         world.onward_requests().await.is_empty(),
         "a machine was exchanged"
     );
-    assert_every_call_under(&world.cdr_calls().await, OWN_TOKEN);
+    assert_every_call_under(&world.cdr_calls().await, &OWN_TOKEN);
     Ok(())
 }
 
@@ -855,7 +858,7 @@ async fn machine_create(grant: Grant) -> Result<(serde_json::Value, String), Box
         world.onward_requests().await.is_empty(),
         "a machine was exchanged"
     );
-    assert_every_call_under(&world.cdr_calls().await, OWN_TOKEN);
+    assert_every_call_under(&world.cdr_calls().await, &OWN_TOKEN);
     let commit = world
         .harness
         .cdr

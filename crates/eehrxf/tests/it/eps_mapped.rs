@@ -6,11 +6,14 @@
 //! patient summary template, whose operational template the suite builds
 //! from the vendored CKM archetypes.
 //!
-//! One synthetic composition holds a medicine, recorded as a medication
-//! order in the template's medication summary section, and a vaccine,
-//! recorded as a medication action in its immunisations section. Each
-//! context writes its own entry alone, and the document places each in the
-//! section the crosswalk's source names, held to the vendored profiles.
+//! The project's root context maps the composition and enters each section
+//! through the sub-context its section path names (FHIRconnect 1.0.0,
+//! `types-of-mapping-files/sub-contexts.adoc`). A medicine recorded as a
+//! medication order or a medication action in the medication summary section
+//! is a medication summary entry, and a vaccine recorded as a medication
+//! action in the immunisations section an immunisation, so the section, never
+//! the archetype, places an entry. The document takes the run's sections,
+//! held to the vendored profiles.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -24,8 +27,8 @@ use eehrxf::crosswalk::patient_summary::{
 };
 use eehrxf::document::form::slot;
 use eehrxf::document::section::{EmptyReason, Section};
-use eehrxf::document::{Document, EPS_BUNDLE};
-use eehrxf::mapping::{Mapping, MappingError};
+use eehrxf::document::{Document, DocumentError, EPS_BUNDLE};
+use eehrxf::mapping::Mapping;
 use eehrxf::mappings::EPS;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::conform::check_resource;
@@ -41,8 +44,6 @@ use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
-use fhirconnect::engine::traverse::error::EngineError;
-use fhirconnect::operations::error::OperationError;
 use fhirconnect::operations::run::Settings;
 use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
@@ -50,11 +51,14 @@ use openehr_mapping_core::template::TemplateSource;
 
 use super::support::{emit, eps, vendored};
 
-/// The medication summary context of the EPS project.
-const MEDICATION: &str = "ferrobridge_eu_eps_medication.context";
+/// The root context of the EPS project.
+const ROOT: &str = "ferrobridge_eu_eps.context";
 
-/// The immunisations context of the EPS project.
-const IMMUNIZATION: &str = "ferrobridge_eu_eps_immunization.context";
+/// The LOINC code of the medication summary section.
+const MEDICATIONS: &str = "10160-0";
+
+/// The LOINC code of the immunisations section.
+const IMMUNIZATIONS: &str = "11369-6";
 
 /// The EPS profile of a medication summary entry.
 const MEDICATION_STATEMENT: &str =
@@ -96,22 +100,9 @@ fn template() -> Result<TemplateSource, Box<dyn Error>> {
     })
 }
 
-/// The medication summary context of the EPS project, compiled from its
-/// embedded files.
-fn medication() -> Result<Mapping, Box<dyn Error>> {
-    Ok(Mapping::compile_project(
-        &template()?,
-        &EPS.with_context(MEDICATION)?,
-    )?)
-}
-
-/// The immunisations context of the EPS project, compiled from its embedded
-/// files.
-fn immunization() -> Result<Mapping, Box<dyn Error>> {
-    Ok(Mapping::compile_project(
-        &template()?,
-        &EPS.with_context(IMMUNIZATION)?,
-    )?)
+/// The EPS project, its one root context compiled from its embedded files.
+fn summary() -> Result<Mapping, Box<dyn Error>> {
+    Ok(Mapping::compile_project(&template()?, &EPS)?)
 }
 
 /// A synthetic coded text of the local synthetic code system.
@@ -193,6 +184,33 @@ fn administered(code: &str) -> String {
 }}"#,
         details = details("openEHR-EHR-ACTION.medication.v1"),
         vaccine = coded("Synthetic vaccine", code),
+    )
+}
+
+/// A medication action recording the medicine `code` the patient takes.
+fn taken(code: &str) -> String {
+    format!(
+        r#"{{
+  "_type": "ACTION",
+  "name": {{ "_type": "DV_TEXT", "value": "Medication action" }},
+  {details},
+  {ENTRY},
+  "time": {{ "_type": "DV_DATE_TIME", "value": "2026-09-20T08:00:00Z" }},
+  "ism_transition": {{
+    "_type": "ISM_TRANSITION",
+    "current_state": {{ "_type": "DV_CODED_TEXT", "value": "active", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "openehr" }}, "code_string": "245" }} }}
+  }},
+  "description": {{
+    "_type": "ITEM_TREE",
+    "name": {{ "_type": "DV_TEXT", "value": "Tree" }},
+    "archetype_node_id": "at0017",
+    "items": [
+      {{ "_type": "ELEMENT", "name": {{ "_type": "DV_TEXT", "value": "Medication item" }}, "archetype_node_id": "at0020", "value": {medicine} }}
+    ]
+  }}
+}}"#,
+        details = details("openEHR-EHR-ACTION.medication.v1"),
+        medicine = coded("Synthetic tablet 500 mg", code),
     )
 }
 
@@ -329,16 +347,55 @@ fn of_type<'a>(resources: &'a [Resource], name: &str) -> Result<Vec<&'a Resource
     Ok(found)
 }
 
+/// The resources the section of `resources`' one `Composition` whose LOINC
+/// code is `code` names as its entries, in its order.
+fn section_entries<'a>(
+    resources: &'a [Resource],
+    code: &str,
+) -> Result<Vec<&'a Resource>, Box<dyn Error>> {
+    let composition = of_type(resources, "Composition")?;
+    let [composition] = composition.as_slice() else {
+        return Err(format!("{} compositions", composition.len()).into());
+    };
+    let composition = serde_json::to_value(composition)?;
+    let named: Vec<String> = composition["section"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|section| section["code"]["coding"][0]["code"] == code)
+        .flat_map(|section| section["entry"].as_array().cloned().unwrap_or_default())
+        .filter_map(|entry| entry["reference"].as_str().map(ToOwned::to_owned))
+        .collect();
+    let mut found = Vec::new();
+    for reference in named {
+        let resource = resources
+            .iter()
+            .find(|resource| {
+                serde_json::to_value(resource).is_ok_and(|object| {
+                    format!(
+                        "{}/{}",
+                        object["resourceType"].as_str().unwrap_or_default(),
+                        object["id"].as_str().unwrap_or_default()
+                    ) == reference
+                })
+            })
+            .ok_or_else(|| format!("the section names {reference}, which the run holds not"))?;
+        found.push(resource);
+    }
+    Ok(found)
+}
+
 #[test]
 fn a_medication_order_maps_to_the_medication_summary_entry() -> Result<(), Box<dyn Error>> {
     let composition = composition(&[section(MEDICATION_SUMMARY, &[order(MEDICINE)])]);
     let resources = run(
-        &medication()?,
+        &summary()?,
         &composition,
         call("Patient/synthetic-subject", "Device/gateway"),
     )?;
-    let statements = of_type(&resources, "MedicationStatement")?;
+    let statements = section_entries(&resources, MEDICATIONS)?;
     assert_eq!(1, statements.len(), "one statement per order");
+    assert_eq!(1, of_type(&resources, "MedicationStatement")?.len());
     let statement = statements.first().ok_or("the statement")?;
     assert_eq!(vec![MEDICINE.to_owned()], codes(statement)?);
     let object = Json::to_json(*statement)?;
@@ -357,30 +414,52 @@ fn a_medication_order_maps_to_the_medication_summary_entry() -> Result<(), Box<d
 }
 
 #[test]
+fn a_medication_action_under_the_medication_summary_is_a_medication_summary_entry()
+-> Result<(), Box<dyn Error>> {
+    let composition = composition(&[section(MEDICATION_SUMMARY, &[taken(MEDICINE)])]);
+    let resources = run(
+        &summary()?,
+        &composition,
+        call("Patient/synthetic-subject", "Device/gateway"),
+    )?;
+    let statements = section_entries(&resources, MEDICATIONS)?;
+    assert_eq!(1, statements.len(), "one statement per action");
+    assert_eq!(0, of_type(&resources, "Immunization")?.len());
+    let statement = statements.first().ok_or("the statement")?;
+    assert_eq!(vec![MEDICINE.to_owned()], codes(statement)?);
+    let object = Json::to_json(*statement)?;
+    assert_eq!(object.get("status"), Some(&Value::String("active".into())));
+    assert_eq!(
+        object.get("effectiveDateTime"),
+        Some(&Value::String("2026-09-20T08:00:00Z".into()))
+    );
+    check_resource(
+        &vendored(MEDICATION_STATEMENT)?,
+        "MedicationStatement",
+        &object,
+    )?;
+    Ok(())
+}
+
+#[test]
 fn a_vaccine_and_a_medicine_are_each_placed_by_their_template_section() -> Result<(), Box<dyn Error>>
 {
     let composition = medicine_and_vaccine();
-    let subject = "Patient/synthetic-subject";
-    let medicines = run(
-        &medication()?,
+    let resources = run(
+        &summary()?,
         &composition,
-        call(subject, "Device/gateway"),
+        call("Patient/synthetic-subject", "Device/gateway"),
     )?;
-    let vaccines = run(
-        &immunization()?,
-        &composition,
-        call(subject, "Device/gateway"),
-    )?;
-    let statements = of_type(&medicines, "MedicationStatement")?;
-    let immunizations = of_type(&vaccines, "Immunization")?;
+    let statements = section_entries(&resources, MEDICATIONS)?;
+    let immunizations = section_entries(&resources, IMMUNIZATIONS)?;
     assert_eq!(1, statements.len(), "the medicine alone is a statement");
     assert_eq!(
         1,
         immunizations.len(),
         "the vaccine alone is an immunisation"
     );
-    assert_eq!(0, of_type(&medicines, "Immunization")?.len());
-    assert_eq!(0, of_type(&vaccines, "MedicationStatement")?.len());
+    assert_eq!(1, of_type(&resources, "MedicationStatement")?.len());
+    assert_eq!(1, of_type(&resources, "Immunization")?.len());
     let statement = statements.first().ok_or("the statement")?;
     let immunization = immunizations.first().ok_or("the immunisation")?;
     assert_eq!(vec![MEDICINE.to_owned()], codes(statement)?);
@@ -395,23 +474,48 @@ fn a_vaccine_and_a_medicine_are_each_placed_by_their_template_section() -> Resul
 }
 
 #[test]
+fn one_archetype_in_two_sections_is_placed_by_the_section_that_holds_it()
+-> Result<(), Box<dyn Error>> {
+    let composition = composition(&[
+        section(MEDICATION_SUMMARY, &[taken(MEDICINE)]),
+        section(IMMUNISATIONS, &[administered(VACCINE)]),
+    ]);
+    let resources = run(
+        &summary()?,
+        &composition,
+        call("Patient/synthetic-subject", "Device/gateway"),
+    )?;
+    let statements = section_entries(&resources, MEDICATIONS)?;
+    let immunizations = section_entries(&resources, IMMUNIZATIONS)?;
+    assert_eq!(1, statements.len(), "{statements:?}");
+    assert_eq!(1, immunizations.len(), "{immunizations:?}");
+    assert_eq!(
+        vec![MEDICINE.to_owned()],
+        codes(statements.first().ok_or("the statement")?)?
+    );
+    assert_eq!(
+        vec![VACCINE.to_owned()],
+        codes(immunizations.first().ok_or("the immunisation")?)?
+    );
+    assert_eq!(1, of_type(&resources, "MedicationStatement")?.len());
+    assert_eq!(1, of_type(&resources, "Immunization")?.len());
+    Ok(())
+}
+
+#[test]
 fn a_vaccine_alone_writes_no_medication_summary_entry() -> Result<(), Box<dyn Error>> {
     let composition = composition(&[section(IMMUNISATIONS, &[administered(VACCINE)])]);
-    let refused = medication()?.to_fhir_with(
+    let resources = run(
+        &summary()?,
         &composition,
-        &settings(),
         call("Patient/synthetic-subject", "Device/gateway"),
-    );
-    let Err(MappingError::Run { source }) = refused else {
-        return Err(format!("a composition with no order wrote a statement: {refused:?}").into());
-    };
-    let OperationError::Mapping { source } = *source else {
-        return Err(format!("not a mapping refusal: {source:?}").into());
-    };
+    )?;
     assert!(
-        matches!(*source, EngineError::NotApplicable { .. }),
-        "an action in the immunisations section never feeds the medication summary: {source:?}"
+        section_entries(&resources, MEDICATIONS)?.is_empty(),
+        "an action in the immunisations section never feeds the medication summary"
     );
+    assert_eq!(0, of_type(&resources, "MedicationStatement")?.len());
+    assert_eq!(1, section_entries(&resources, IMMUNIZATIONS)?.len());
     Ok(())
 }
 
@@ -443,10 +547,6 @@ fn every_source_names_the_template_section_that_holds_it() -> Result<(), Box<dyn
             overlay.contains(&format!(", {archetype}]")),
             "{path}: the template's {section} holds {archetype}"
         );
-        let elsewhere = FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE
-            .matches(&format!(", {archetype}]"))
-            .count();
-        assert_eq!(1, elsewhere, "{path}: the template holds {archetype} once");
         let row = PATIENT_SUMMARY
             .row(path)
             .ok_or_else(|| format!("{path} is a crosswalk row"))?;
@@ -456,28 +556,51 @@ fn every_source_names_the_template_section_that_holds_it() -> Result<(), Box<dyn
 }
 
 #[test]
-fn every_eps_context_starts_at_a_source_and_maps_to_its_row() -> Result<(), Box<dyn Error>> {
-    assert_eq!(
-        EPS.contexts(),
-        &[MEDICATION, IMMUNIZATION],
-        "the project compiles both contexts"
-    );
-    for mapping in [medication()?, immunization()?] {
-        let context = mapping.contexts().next().ok_or("one context")?;
-        let start = mapping
-            .start_archetype(context.template)
-            .ok_or("a start archetype")?;
-        let source = SOURCES
-            .iter()
-            .find(|source| source.archetype == start && source.template == context.template)
-            .ok_or_else(|| format!("{}: {start} is no source", context.name))?;
-        let row = PATIENT_SUMMARY.row(source.path).ok_or("the source's row")?;
+fn every_source_feeds_its_row_from_its_section() -> Result<(), Box<dyn Error>> {
+    assert_eq!(EPS.contexts(), &[ROOT], "the project compiles its root");
+    let mapping = summary()?;
+    for Source {
+        path,
+        section: held_by,
+        archetype,
+        ..
+    } in SOURCES
+    {
+        let (holder, code) = if *held_by == MEDICATION_SUMMARY.1 {
+            (MEDICATION_SUMMARY, MEDICATIONS)
+        } else if *held_by == IMMUNISATIONS.1 {
+            (IMMUNISATIONS, IMMUNIZATIONS)
+        } else {
+            return Err(format!("{path}: {held_by} is no section of the suite").into());
+        };
+        let item = match *archetype {
+            "openEHR-EHR-INSTRUCTION.medication_order.v3" => order(MEDICINE),
+            "openEHR-EHR-ACTION.medication.v1" if code == MEDICATIONS => taken(MEDICINE),
+            "openEHR-EHR-ACTION.medication.v1" => administered(VACCINE),
+            other => return Err(format!("{path}: no synthetic {other}").into()),
+        };
+        let resources = run(
+            &mapping,
+            &composition(&[section(holder, &[item])]),
+            call("Patient/synthetic-subject", "Device/gateway"),
+        )?;
+        let entries = section_entries(&resources, code)?;
+        let [entry] = entries.as_slice() else {
+            return Err(format!("{path}: {} entries", entries.len()).into());
+        };
+        let profiles: Vec<String> = serde_json::to_value(entry)?["meta"]["profile"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|profile| profile.as_str().map(ToOwned::to_owned))
+            .collect();
+        let row = PATIENT_SUMMARY.row(path).ok_or("the source's row")?;
         assert!(
-            row.contexts.contains(&context.profile),
-            "{}: {} admits {}",
-            context.name,
-            source.path,
-            context.profile
+            profiles
+                .iter()
+                .any(|profile| row.contexts.contains(&profile.as_str())),
+            "{path}: {profiles:?} is admitted by {:?}",
+            row.contexts
         );
     }
     Ok(())
@@ -538,30 +661,17 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
         name: Some("Synthetic operator".into()),
         ..Organization::default()
     })))?;
-    let medicines = document.add(&run(&medication()?, &composition, call(&subject, &device))?)?;
-    let vaccines = document.add(&run(
-        &immunization()?,
-        &composition,
-        call(&subject, &device),
-    )?)?;
-    let statement = medicines
-        .iter()
-        .find(|url| url.contains("/MedicationStatement/"))
-        .ok_or("the statement's entry")?;
-    let immunization = vaccines
-        .iter()
-        .find(|url| url.contains("/Immunization/"))
-        .ok_or("the immunisation's entry")?;
-    document.with_section(section_of(
-        "sectionMedications",
-        "One synthetic medicine.",
-        Some(statement),
-    )?)?;
-    document.with_section(section_of(
-        "sectionImmunizations",
-        "One synthetic vaccine.",
-        Some(immunization),
-    )?)?;
+    let answer = summary()?.to_fhir_with(&composition, &settings(), call(&subject, &device))?;
+    let mut placed = Vec::new();
+    for mapped in document.with_mapped_composition(answer.bundle())? {
+        placed.push(mapped.slot.slice);
+        let paragraph = match mapped.slot.slice {
+            "sectionMedications" => "One synthetic medicine.",
+            _ => "One synthetic vaccine.",
+        };
+        document.with_section(mapped.into_section(vec![String::from(paragraph)]))?;
+    }
+    assert_eq!(placed, ["sectionMedications", "sectionImmunizations"]);
     for slice in [
         "sectionProblems",
         "sectionAllergies",
@@ -604,15 +714,99 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
     Ok(())
 }
 
+#[test]
+fn a_document_takes_one_section_of_a_run_and_nothing_another_section_names()
+-> Result<(), Box<dyn Error>> {
+    let mut document = Document::new(
+        BASE,
+        String::from("urn:uuid:4f5c1d1e-0000-4000-8000-000000001324"),
+        String::from("2026-10-06T10:00:00Z"),
+        String::from("Patient Summary"),
+    );
+    let subject = document.with_patient(patient())?;
+    let answer = summary()?.to_fhir_with(
+        &medicine_and_vaccine(),
+        &settings(),
+        call(&subject, "Device/gateway"),
+    )?;
+    let section = document
+        .with_mapped_section(answer.bundle(), "sectionMedications")?
+        .ok_or("the run holds a medication summary")?;
+    assert_eq!(section.slot.slice, "sectionMedications");
+    assert_eq!(1, section.entries.len(), "{:?}", section.entries);
+    let entry = section.entries.first().ok_or("the entry")?;
+    assert!(entry.contains("/MedicationStatement/"), "{entry}");
+    document.with_section(section.into_section(vec![String::from("One synthetic medicine.")]))?;
+    for slice in [
+        "sectionProblems",
+        "sectionAllergies",
+        "sectionProceduresHx",
+        "sectionMedicalDevices",
+    ] {
+        document.with_section(section_of(slice, "Nothing recorded.", None)?)?;
+    }
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    let kinds: Vec<&str> = bundle["entry"]
+        .as_array()
+        .ok_or("the entries")?
+        .iter()
+        .filter_map(|entry| entry["resource"]["resourceType"].as_str())
+        .collect();
+    assert!(!kinds.contains(&"Immunization"), "{kinds:?}");
+    let provenance = bundle["entry"]
+        .as_array()
+        .ok_or("the entries")?
+        .iter()
+        .find(|entry| entry["resource"]["resourceType"] == "Provenance")
+        .ok_or("the run's Provenance")?;
+    let targets = provenance["resource"]["target"]
+        .as_array()
+        .ok_or("the targets")?;
+    assert!(
+        targets.iter().all(|target| target["reference"]
+            .as_str()
+            .is_some_and(|reference| reference.contains("MedicationStatement"))),
+        "{targets:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_run_with_no_section_in_the_slot_gives_none() -> Result<(), Box<dyn Error>> {
+    let mut document = Document::new(
+        BASE,
+        String::from("urn:uuid:4f5c1d1e-0000-4000-8000-000000001325"),
+        String::from("2026-10-06T10:00:00Z"),
+        String::from("Patient Summary"),
+    );
+    let subject = document.with_patient(patient())?;
+    let answer = summary()?.to_fhir_with(
+        &composition(&[section(MEDICATION_SUMMARY, &[order(MEDICINE)])]),
+        &settings(),
+        call(&subject, "Device/gateway"),
+    )?;
+    assert!(
+        document
+            .with_mapped_section(answer.bundle(), "sectionImmunizations")?
+            .is_none()
+    );
+    assert!(
+        matches!(
+            document.with_mapped_section(answer.bundle(), "sectionUnknown"),
+            Err(DocumentError::Unslotted { .. })
+        ),
+        "a slice the form has no slot for is refused"
+    );
+    Ok(())
+}
+
 // NOTE: no specification governs this: our own design; a spawned thread gets the 2 MiB
 // default stack (std::thread "Stack size"), so the engine must compile and map within it.
 #[test]
 fn the_project_compiles_and_maps_on_a_default_stack_thread() -> Result<(), Box<dyn Error>> {
     let source = template()?;
     let spawned = std::thread::Builder::new().spawn(move || -> Result<usize, String> {
-        let project = EPS
-            .with_context(MEDICATION)
-            .map_err(|error| error.to_string())?;
+        let project = EPS.with_context(ROOT).map_err(|error| error.to_string())?;
         let mapping =
             Mapping::compile_project(&source, &project).map_err(|error| error.to_string())?;
         let composition = medicine_and_vaccine();

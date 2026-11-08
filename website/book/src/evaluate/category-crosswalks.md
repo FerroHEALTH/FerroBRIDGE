@@ -52,32 +52,42 @@ of the openEHR International Patient Summary template:
 | Entry row | Archetype | Template section |
 |---|---|---|
 | `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-INSTRUCTION.medication_order.v3` | IPS Medication Summary |
+| `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-ACTION.medication.v1` | IPS Medication Summary |
 | `EHDSPatientSummary.immunisations.immunisation` | `openEHR-EHR-ACTION.medication.v1` | IPS Immunizations |
 
 The template section is the placement criterion. A CDR often keeps the
-current medication list as medication orders, so the medication summary
-takes the order. The template holds the medication action in its
-immunisations section alone, so a vaccine recorded as an action is placed
-in the immunisations and never in the medication summary. No entry is placed
-by reading its content. A test holds each source to the vendored template.
+current medication list as medication orders, and it may record a medicine
+the patient takes as a medication action, so the medication summary takes
+both. The same medication action in the immunisations section is a vaccine.
+No entry is placed by reading its content. A test holds each source to the
+vendored template.
 
-The shipped `eps` mapping project writes the two entries:
+The shipped `eps` mapping project has one root context,
+`ferrobridge_eu_eps.context`. It maps the composition and enters each
+section through the sub-context its section path names, as FHIRconnect's
+sub-contexts do. Each sub-context writes its section and that section's
+entries:
 
-- `ferrobridge_eu_eps_medication.context` maps each order to a
-  `MedicationStatement-eu-eps`. Its status is `unknown`, because no
-  published crosswalk pairs an order with a statement status. The template
-  leaves out the order details, so the statement's period carries the data
-  absent reason `unknown`.
-- `ferrobridge_eu_eps_immunization.context` maps each action at the careflow
-  step "Dose administered" to a `completed` `immunization-eu-core`, and each
-  action at "Dose administration aborted" to a `not-done` one. An action at
-  "Medication double checked" records no administration, so the mapping
-  writes no `Immunization` for it.
+- `ferrobridge_eu_eps_medication.context` maps each order and each action
+  of the medication summary section to a `MedicationStatement-eu-eps`. An
+  order's status is `unknown`, because no published crosswalk pairs an order
+  with a statement status, and the template leaves out the order details, so
+  its period carries the data absent reason `unknown`. An action's status
+  follows its instruction state where R4 has a matching code (active,
+  on-hold, stopped, completed) and is `unknown` otherwise. Its time is the
+  statement's `effectiveDateTime`.
+- `ferrobridge_eu_eps_immunization.context` maps each action of the
+  immunisations section at the careflow step "Dose administered" to a
+  `completed` `immunization-eu-core`, and each action at "Dose
+  administration aborted" to a `not-done` one. An action at "Medication
+  double checked" records no administration, so the mapping writes no
+  `Immunization` for it.
 
-A test runs both contexts over one composition that holds a medicine and a
-vaccine. Each context writes its own entry alone, and the document holds
-each in its own section. HL7's FHIR Validator checks that document in the
-`fhir-validator` job.
+A document takes the run's sections with
+`Document::with_mapped_composition`. A test runs the project over
+compositions that hold a medicine as an order or an action, and a vaccine,
+and checks that each lands in its own section. HL7's FHIR Validator checks
+that document in the `fhir-validator` job.
 
 ## The medication crosswalks
 

@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension that makes the CKM vaccination list the
+# immunisations section of the HL7 Europe Patient Summary 1.0.0-ballot
+# (Composition slice sectionImmunizations, LOINC 11369-6), loaded by
+# ferrobridge_eu_eps_immunization.context alone. Each medication action its
+# "Vaccinations administered" slot holds is one entry, the Immunization it
+# maps to.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_eps_immunization_section
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: SECTION.immunisation_list.v0
+
+mappings:
+  - name: "title"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$fhirRoot"
+    manual:
+      - name: "title"
+        fhir:
+          - path: "title"
+            value: "Immunisations"
+
+  - name: "code"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "code.coding"
+    manual:
+      - name: "loinc"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "11369-6"
+
+  - name: "actions"
+    extension: "add"
+    with:
+      fhir: "entry"
+      openehr: "$archetype/items[openEHR-EHR-ACTION.medication.v1]"
+    followedBy:
+      mappings:
+        - name: "action"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$reference"
+          reference:
+            resourceType: "Immunization"
+            mappings:
+              - name: "profile"
+                unidirectional: "openEHR->fhir"
+                with:
+                  fhir: "$fhirRoot.meta"
+                manual:
+                  - name: "profileUrl"
+                    fhir:
+                      - path: "profile"
+                        value: "http://hl7.eu/fhir/base/StructureDefinition/immunization-eu-core"
+              - name: "vaccination"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$openehrRoot"
+                slotArchetype: "ACTION.medication.v1.Immunization"

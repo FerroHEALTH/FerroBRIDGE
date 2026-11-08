@@ -1,25 +1,29 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# FerroBRIDGE's context for the medication summary of the HL7 Europe Patient
-# Summary 1.0.0-ballot over FerroBRIDGE's patient summary template, whose
-# archetypes are CKM's: each medication order of its medication summary
-# section becomes one MedicationStatement-eu-eps, the profile the section's
-# medicationStatementOrRequest entry slice admits. A CDR that keeps the
-# current medication list as orders so has them in the summary.
+# FerroBRIDGE's sub-context for the medication summary of the HL7 Europe
+# Patient Summary 1.0.0-ballot, entered from ferrobridge_eu_eps.context at the
+# template's medication summary section: each medication order and each
+# medication action the section holds becomes one MedicationStatement-eu-eps,
+# the profile the section's medicationStatementOrRequest entry slice admits.
 grammar: FHIRConnect/v1.0.0
 type: context
 metadata:
   name: ferrobridge_eu_eps_medication.context
-  version: 1.0.0
+  version: 2.0.0
 spec:
   system: FHIR
   version: R4
 context:
+  scope: sub
   profile:
-    url: "http://hl7.eu/fhir/eps/StructureDefinition/MedicationStatement-eu-eps"
+    url: "http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps"
     version: "1.0.0-ballot"
   template:
     id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
   archetypes:
+    - "SECTION.adhoc.v1"
     - "INSTRUCTION.medication_order.v3.MedicationStatement"
-  start: "INSTRUCTION.medication_order.v3.MedicationStatement"
+    - "ACTION.medication.v1.MedicationStatement"
+  extensions:
+    - "ferrobridge_eu_eps_medication_section"
+  start: "SECTION.adhoc.v1"
