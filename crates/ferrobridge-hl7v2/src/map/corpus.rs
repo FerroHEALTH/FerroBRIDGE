@@ -26,7 +26,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use fhir_types::codec::{Json, Value};
-use fhir_types::r4::concept_map::{ConceptMap, ConceptMapGroupElementTarget};
+use fhir_types::r4::concept_map::{
+    ConceptMap, ConceptMapGroupElement, ConceptMapGroupElementTarget,
+};
 use fhir_types::r4::extension::{Extension, ExtensionValue};
 
 use crate::map::condition::{self, AssignmentError, ConditionError, Expr, Part};
@@ -145,6 +147,30 @@ pub struct TableGroup {
     pub source: String,
     /// `group.target`.
     pub target: String,
+    /// `group.element`: each source code and its targets, in map order.
+    pub elements: Vec<TableElement>,
+}
+
+/// One element of a table map group: a source code and what it maps to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableElement {
+    /// `element.code`.
+    pub code: String,
+    /// `element.display`.
+    pub display: Option<String>,
+    /// `element.target`, in map order.
+    pub targets: Vec<TableTarget>,
+}
+
+/// One target of a table map element.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableTarget {
+    /// `target.code`, absent for an `unmatched` target.
+    pub code: Option<String>,
+    /// `target.display`.
+    pub display: Option<String>,
+    /// `target.equivalence`.
+    pub equivalence: Option<String>,
 }
 
 /// Where a loaded `ConceptMap` came from.
@@ -553,6 +579,7 @@ fn decode_map(path: &Path, bytes: &[u8]) -> Result<Map, CorpusError> {
             groups.push(TableGroup {
                 source: text(group.source.as_ref()),
                 target: text(group.target.as_ref()),
+                elements: group.element.iter().map(table_element).collect(),
             });
             continue;
         }
@@ -581,6 +608,27 @@ fn decode_map(path: &Path, bytes: &[u8]) -> Result<Map, CorpusError> {
         groups,
         origin: Origin::Guide,
     })
+}
+
+/// Reads one element of a table map group.
+fn table_element(element: &ConceptMapGroupElement) -> TableElement {
+    TableElement {
+        code: element
+            .code
+            .as_ref()
+            .and_then(|code| code.value.clone())
+            .unwrap_or_default(),
+        display: element.display.as_ref().and_then(|text| text.value.clone()),
+        targets: element
+            .target
+            .iter()
+            .map(|target| TableTarget {
+                code: target.code.as_ref().and_then(|code| code.value.clone()),
+                display: target.display.as_ref().and_then(|text| text.value.clone()),
+                equivalence: target.equivalence.value.clone(),
+            })
+            .collect(),
+    }
 }
 
 /// Reads one target into a row.

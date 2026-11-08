@@ -38,6 +38,7 @@ use ferrobridge_hl7v2::ack::{self, Code, Header};
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Inbound, Received};
 use ferrobridge_hl7v2::map::corpus::{Corpus, CorpusError};
+use ferrobridge_hl7v2::map::translate::Translator;
 use ferrobridge_hl7v2::mllp::listener::{self, Connection, Handler, Timeouts};
 use ferrobridge_hl7v2::mllp::{Codec, Malformed};
 use ferrobridge_hl7v2::parse::Message;
@@ -392,7 +393,7 @@ impl Face {
         let mapped = match ferrobridge_hl7v2::map::map(
             inbound.parsed(),
             &self.corpus,
-            self.terminology.as_ref(),
+            self.terminology.as_ref().map(Translator::Server),
         )
         .await
         {

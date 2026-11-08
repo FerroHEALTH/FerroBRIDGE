@@ -8,8 +8,10 @@
 //! structure names, per segment, the resource it maps to; the segment map for
 //! that segment and resource maps each field; a data type map maps the
 //! components of a complex field; and a table map, named by `mappedVia`, is
-//! answered by `ConceptMap/$translate` on a terminology server loaded with the
-//! guide's table maps, never by a table evaluated here.
+//! answered through a [`translate::Translator`]: `ConceptMap/$translate` on a
+//! terminology server loaded with the guide's table maps, or the same table
+//! maps read from the corpus in process. [`single`] maps one segment to one
+//! resource with no message map.
 //!
 //! The FHIR side is written through `fhirconnect::tree::write` over the
 //! `fhir-types` R4 element table, so every element, cardinality and choice
@@ -37,7 +39,9 @@ pub mod convert;
 pub mod corpus;
 pub mod notation;
 mod run;
+pub mod single;
 pub mod supplement;
+pub mod translate;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -47,6 +51,7 @@ use fhirconnect::tree::error::{ParseError, ResolveError, WriteError};
 use crate::map::convert::ConvertError;
 use crate::map::corpus::Corpus;
 use crate::map::notation::NotationError;
+use crate::map::translate::Translator;
 use crate::parse::{Location, Parsed, Unplaced};
 
 /// The row an outcome is about.
@@ -267,14 +272,14 @@ pub enum Outcome {
         /// The `mappedVia` as written.
         mapped_via: String,
     },
-    /// A table map was reached and no terminology server is configured.
+    /// A table map was reached and no translator was given.
     NoTerminology {
         /// Where.
         at: Location,
         /// The row.
         row: RowRef,
     },
-    /// The terminology server found no equivalent translation.
+    /// The translator found no equivalent translation.
     Untranslated {
         /// Where.
         at: Location,
@@ -691,7 +696,7 @@ impl Mapped {
         counts
     }
 
-    /// Returns how many `ConceptMap/$translate` calls the run made.
+    /// Returns how many translations the run asked for.
     ///
     /// A table value costs one call per target code system its table map
     /// names (`ConceptMap.group.target`), in group order, until one answers
@@ -710,15 +715,17 @@ impl Mapped {
     }
 }
 
-/// Maps `parsed` through `corpus`, translating table values on
-/// `terminology`.
+/// Maps `parsed` through `corpus`, translating table values through
+/// `translator`.
 ///
-/// Each translation names its table map by canonical `url`, which an R4 or
-/// R4B terminology server takes. An STU3 server is not supported: STU3
-/// `ConceptMap/$translate` declares no `url`
+/// With [`Translator::Server`], each translation names its table map by
+/// canonical `url`, which an R4 or R4B terminology server takes. An STU3
+/// server is not supported: STU3 `ConceptMap/$translate` declares no `url`
 /// (<https://hl7.org/fhir/STU3/conceptmap-operations.html#translate>), and
 /// addressing the map by `source` and `target` instead would let the server
-/// answer from another map.
+/// answer from another map. With [`Translator::Offline`], the table maps of
+/// a corpus answer in process. With no translator, a table value is counted
+/// as [`Outcome::NoTerminology`].
 ///
 /// # Errors
 ///
@@ -726,16 +733,17 @@ impl Mapped {
 /// the structure, [`MapError::Stopped`] when a `NOT VALUED ERROR` condition
 /// holds, [`MapError::Terminology`] when the terminology server refuses a
 /// translation or cannot be reached, or the client speaks STU3 (the
-/// client's `UnsupportedParameter`, sent before any request), and [`MapError::NoMessageHeader`] when
-/// the message Bundle would carry no `MessageHeader`.
+/// client's `UnsupportedParameter`, sent before any request), and
+/// [`MapError::NoMessageHeader`] when the message Bundle would carry no
+/// `MessageHeader`.
 pub async fn map(
     parsed: &Parsed,
     corpus: &Corpus,
-    terminology: Option<&ferrobridge_term::client::Client>,
+    translator: Option<Translator<'_>>,
 ) -> Result<Mapped, MapError> {
     let mut run = run::Run::new(corpus, parsed);
     run.message()?;
-    let translations = run.translate(terminology).await?;
+    let translations = run.translate(translator).await?;
     let applied = run.take_applied();
     let (bundle, outcomes) = run.finish()?;
     Ok(Mapped {

@@ -330,7 +330,7 @@ struct Recorded {
 
 /// A run in progress.
 #[derive(Debug)]
-pub(super) struct Run<'a> {
+pub(in crate::map) struct Run<'a> {
     corpus: &'a Corpus,
     parsed: &'a Parsed,
     resources: Vec<Resource>,
@@ -345,7 +345,7 @@ pub(super) struct Run<'a> {
 
 impl<'a> Run<'a> {
     /// Starts a run with the envelope Bundle as its first resource.
-    pub(super) fn new(corpus: &'a Corpus, parsed: &'a Parsed) -> Self {
+    pub(in crate::map) fn new(corpus: &'a Corpus, parsed: &'a Parsed) -> Self {
         let mut run = Self {
             corpus,
             parsed,
