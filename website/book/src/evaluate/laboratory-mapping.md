@@ -78,7 +78,13 @@ exactly one value element `items[at0001]` in each, and `analyteMeasurement`
 writes that `DV_QUANTITY` whole, so the bounds merge into it as its
 children. A mapping of its own onto `items[at0001]` would write a second
 value with no `magnitude`, which the reference model refuses. R4 reads a
-range with no `type` as the normal range, so only such a range maps; the
+range with no `type` as the normal range, so such a range maps to
+`normal_range`. A range with a `type`, such as a treatment range, maps to
+one element of the quantity's `other_reference_ranges`: its `type` is the
+element's `meaning`, and its `low` and `high` the bounds of the element's
+`range`. Served out of openEHR, each element of `other_reference_ranges`
+comes back as a `referenceRange` with that `type`, after the normal range,
+in the order the composition holds them. The
 order a report answers maps by its identifier into the template's test
 request details (`protocol[at0004]/items[at0094]/items[at0063]`), which
 `KDS_Laborbericht` annotates with `DiagnosticReport.basedOn`, and comes
@@ -89,5 +95,5 @@ The laboratory project accounts for `DiagnosticReport.basedOn`,
 (`LABORATORY.accounted()`). Each received instance of one that the run
 carries into no structured element is a `warning` issue in the
 composition's `OperationOutcome`, its `expression` the element's path: a
-range with a `type`, a range's `text`, the order a result answers, or an
+range's `text`, the order a result answers, or an
 order named by `reference` alone. The original document still holds them.

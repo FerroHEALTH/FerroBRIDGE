@@ -138,6 +138,11 @@ impl<'a> Compiler<'a> {
             children,
         } = sides;
         let class = openehr.leaf_class().unwrap_or(openehr.node().rm_type());
+        // NOTE: DV_QUANTITY.adoc §Range maps a range other than the normal one to the
+        // `other_reference_ranges` List, whose elements only a mapping's children can fill.
+        if openehr.ends_on_list() {
+            return children.then_some(Derived::Anchor);
+        }
         if model::is_a(class, derive::STRUCTURAL) {
             if let Some(event) = self.event_time(file, fhir, openehr, position, path) {
                 return Some(event);

@@ -98,3 +98,27 @@ mappings:
                 with:
                   fhir: "high"
                   openehr: "value/normal_range/upper"
+        # NOTE: FHIRconnect DV_QUANTITY.adoc §Range: a range other than the normal range maps to
+        # `other_reference_ranges`, each element's `meaning` the R4 referenceRange.type.
+        - name: "otherReferenceRange"
+          with:
+            fhir: "$resource.referenceRange"
+            openehr: "value/other_reference_ranges"
+          fhirCondition:
+            targetRoot: "$resource.referenceRange"
+            targetAttribute: "type"
+            operator: "not empty"
+          followedBy:
+            mappings:
+              - name: "meaning"
+                with:
+                  fhir: "type"
+                  openehr: "meaning"
+              - name: "low"
+                with:
+                  fhir: "low"
+                  openehr: "range/lower"
+              - name: "high"
+                with:
+                  fhir: "high"
+                  openehr: "range/upper"

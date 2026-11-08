@@ -123,6 +123,13 @@ fn composition_with(
     Ok(index.accept(document)?)
 }
 
+/// Builds the synthetic composition whose problem name carries no mapping.
+pub(crate) fn composition_without_mappings(
+    index: &WebTemplateIndex,
+) -> Result<CanonicalComposition, Box<dyn Error>> {
+    composition_with(index, &serde_json::Map::new())
+}
+
 /// Builds the synthetic composition whose problem name carries a mapping
 /// with `relation` to the withheld term, then an `=` mapping to `SYN-001`.
 pub(crate) fn annotated_composition(
