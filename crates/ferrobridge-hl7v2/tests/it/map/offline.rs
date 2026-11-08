@@ -6,7 +6,8 @@
 
 use ferrobridge_hl7v2::map::map;
 use ferrobridge_hl7v2::map::translate::Translator;
-use ferrobridge_term::outcome::{TranslateOutcome, Translation};
+use ferrobridge_term::outcome::TranslateOutcome;
+use ferrobridge_term::request::Translation;
 
 use crate::fixtures;
 use crate::map::{mapped, summary};

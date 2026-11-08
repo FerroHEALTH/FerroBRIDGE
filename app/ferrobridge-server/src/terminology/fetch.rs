@@ -10,9 +10,8 @@ use std::sync::Arc;
 
 use ferrobridge_term::client::Client;
 use ferrobridge_term::concept::{Concept, Match};
-use ferrobridge_term::outcome::{
-    BatchOutcome, LookupOutcome, Request, TranslateOutcome, Translation,
-};
+use ferrobridge_term::outcome::{BatchOutcome, LookupOutcome, TranslateOutcome};
+use ferrobridge_term::request::{Request, Translation};
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::operations::code_system_lookup::CodeSystemLookupResponse;
 use fhir_types::r4::operations::concept_map_translate::{
@@ -48,6 +47,7 @@ impl Lookup {
             code: self.code.clone(),
             version: self.version.clone(),
             date: None,
+            display_language: None,
         }
     }
 }
@@ -153,13 +153,15 @@ pub struct UnexpectedAnswer;
 /// the engine reads none of them.
 fn response(outcome: &TranslateOutcome) -> Answer {
     match outcome {
-        TranslateOutcome::Translated { matches, message } => Ok(ConceptMapTranslateResponse {
+        TranslateOutcome::Translated {
+            matches, message, ..
+        } => Ok(ConceptMapTranslateResponse {
             result: Boolean::from(true),
             message: message.as_deref().map(primitives::String::from),
             r#match: matches.iter().map(matched).collect(),
             ..ConceptMapTranslateResponse::default()
         }),
-        TranslateOutcome::NoMatch { message } => Ok(ConceptMapTranslateResponse {
+        TranslateOutcome::NoMatch { message, .. } => Ok(ConceptMapTranslateResponse {
             result: Boolean::from(false),
             message: message.as_deref().map(primitives::String::from),
             ..ConceptMapTranslateResponse::default()

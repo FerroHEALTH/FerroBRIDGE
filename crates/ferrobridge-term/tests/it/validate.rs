@@ -85,6 +85,7 @@ async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome()
         let ValidateOutcome::Invalid {
             message,
             outcome: issues,
+            ..
         } = &outcome
         else {
             return Err(format!("expected an invalid code, got {outcome:?}").into());

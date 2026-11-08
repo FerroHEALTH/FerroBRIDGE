@@ -11,7 +11,7 @@ use fhir_types::definition::ElementDefinitionRead;
 use fhir_types::schema::Schemas;
 
 use ferrobridge_term::concept::Concept;
-use ferrobridge_term::outcome::Validation;
+use ferrobridge_term::request::Validation;
 
 use crate::canonical::Canonical;
 use crate::release::Release;
@@ -256,7 +256,7 @@ impl<R: Release> Walk<'_, '_, '_, R> {
                 let Some(code) = coded.codes.first().and_then(|code| code.code) else {
                     return Ok(None);
                 };
-                ferrobridge_term::outcome::Coded::Code {
+                ferrobridge_term::request::Coded::Code {
                     system,
                     code: code.to_owned(),
                     version: None,
@@ -264,20 +264,17 @@ impl<R: Release> Walk<'_, '_, '_, R> {
                 }
             }
             Form::Coding => match coded.codes.first() {
-                Some(code) => ferrobridge_term::outcome::Coded::Coding(concept(code)),
+                Some(code) => ferrobridge_term::request::Coded::Coding(concept(code)),
                 None => return Ok(None),
             },
-            Form::CodeableConcept => ferrobridge_term::outcome::Coded::CodeableConcept {
+            Form::CodeableConcept => ferrobridge_term::request::Coded::CodeableConcept {
                 coding: coded.codes.iter().map(concept).collect(),
                 text: coded.text.map(str::to_owned),
             },
         };
-        Ok(Some(Validation {
-            value_set_url: canonical.url().to_owned(),
-            value_set_version: canonical.version().map(str::to_owned),
-            date: None,
-            coded,
-        }))
+        let mut validation = Validation::new(canonical.url(), coded);
+        validation.value_set_version = canonical.version().map(str::to_owned);
+        Ok(Some(validation))
     }
 
     /// Warns of every coding whose display is none the code system, carried

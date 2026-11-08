@@ -18,9 +18,11 @@ mod batch;
 mod date;
 mod end_to_end;
 mod expand;
+mod forms;
 mod lookup;
 mod oauth;
 mod pins;
+mod releases;
 mod search;
 #[cfg(feature = "smart")]
 mod smart;

@@ -15,10 +15,8 @@ use ferrobridge_term::client::FHIR_JSON;
 use ferrobridge_term::concept::{Concept, Equivalence};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::{BodyError, Error};
-use ferrobridge_term::outcome::{
-    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
-    Validation,
-};
+use ferrobridge_term::outcome::{BatchOutcome, LookupOutcome, TranslateOutcome, ValidateOutcome};
+use ferrobridge_term::request::{Coded, Request, Target, Translation, Validation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers::{method, path};
@@ -64,7 +62,9 @@ fn parameters(parameters: &[serde_json::Value]) -> ResponseTemplate {
 /// Returns the member validation of the fixture value set, with `coded`.
 fn validation(coded: Coded) -> Validation {
     Validation {
-        value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
+        value_set: Target::Canonical(fixtures::TERM_VALUE_SET_URL.to_owned()),
+        display_language: None,
+        active_only: None,
         value_set_version: None,
         date: None,
         coded,
@@ -290,7 +290,7 @@ async fn an_stu3_translation_with_no_match_is_no_match() -> Result<(), Box<dyn s
         )
         .await?;
     assert!(
-        matches!(&outcome, TranslateOutcome::NoMatch { message: Some(text) } if text == "no mapping for the code"),
+        matches!(&outcome, TranslateOutcome::NoMatch { message: Some(text), .. } if text == "no mapping for the code"),
         "{outcome:?}"
     );
     Ok(())
@@ -419,7 +419,10 @@ async fn a_false_stu3_validation_is_invalid_with_its_message()
             fixtures::TERM_NON_MEMBER_CODE,
         )
         .await?;
-    let ValidateOutcome::Invalid { message, outcome } = &outcome else {
+    let ValidateOutcome::Invalid {
+        message, outcome, ..
+    } = &outcome
+    else {
         return Err(format!("expected an invalid code, got {outcome:?}").into());
     };
     assert_eq!(Some("the code is not in the value set"), message.as_deref());
@@ -526,6 +529,7 @@ async fn an_stu3_batch_answers_each_entry_by_position() -> Result<(), Box<dyn st
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
         Request::Translate(
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
@@ -580,6 +584,7 @@ async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing()
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
         Request::Translate(
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
