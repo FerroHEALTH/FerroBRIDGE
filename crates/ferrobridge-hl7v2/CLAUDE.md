@@ -17,10 +17,14 @@ under `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/`), and FHIR R4.
 The ConceptMaps are data. Nothing here maps a message, segment or table by
 hand: the message map names a resource per segment, the segment map maps the
 fields, a data type map maps the components, a table map goes through
-`ferrobridge_term::client::Client::translate`, and every FHIR element is
-written through `fhirconnect::tree::write::write` over
-`fhir_types::r4::schema::SCHEMAS`. Never add a second FHIR writer, a table
-evaluator, or a per-message code path. A gap in the corpus is a counted
+`map::translate::Translator`, and every FHIR element is written through
+`fhirconnect::tree::write::write` over `fhir_types::r4::schema::SCHEMAS`.
+The translator is a closed choice of two (owner ruling on #1716):
+`ferrobridge_term::client::Client::translate` against a server, and the
+offline reading of the same table maps from the corpus, which answers as
+R4 `ConceptMap/$translate` does, `reverse` included, so the maps stay one
+source. Never add a second FHIR writer, a table evaluated in code, or a
+per-message code path. A gap in the corpus is a counted
 outcome here and a ConceptMap in a supplement, in the guide's own shape.
 
 ## Supplements are ConceptMaps, shipped under `supplements/`
