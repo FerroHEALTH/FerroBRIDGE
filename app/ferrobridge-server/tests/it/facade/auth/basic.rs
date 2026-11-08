@@ -7,6 +7,7 @@
 
 use std::error::Error;
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 use argon2::Argon2;
 use argon2::password_hash::PasswordHasher;
@@ -30,6 +31,7 @@ use crate::facade::condition;
 use crate::facade::harness;
 use crate::facade::post_condition;
 use crate::facade::raw;
+use crate::support::random_secret;
 
 /// The read every case sends: an id the map does not know, so a request the
 /// layer admits answers the handler's `404`.
@@ -48,6 +50,9 @@ fn hash(password: &str) -> Result<SecretString, Box<dyn Error>> {
 /// The Basic user every case authenticates as, a person.
 const USER: &str = "clinician";
 
+/// The password of [`USER`], drawn for this run.
+static PASSWORD: LazyLock<String> = LazyLock::new(random_secret);
+
 /// Returns the router of a facade that admits the Basic user [`USER`] with
 /// `user/Condition.r` beside the issuer's tokens.
 async fn app() -> Result<axum::Router, Box<dyn Error>> {
@@ -62,7 +67,7 @@ async fn app_granting(scope: &str) -> Result<axum::Router, Box<dyn Error>> {
     let mut settings = issuer.settings();
     settings.basic = Some(Arc::new(PasswordStore::new().with_user(
         USER,
-        hash("synthetic-password")?,
+        hash(&PASSWORD)?,
         scope,
     )?));
     let harness = harness().await;
@@ -85,17 +90,9 @@ fn basic(
 #[tokio::test]
 async fn a_basic_user_reaches_what_its_scopes_grant() -> Result<(), Box<dyn Error>> {
     let app = app().await?;
-    let read = raw(
-        app.clone(),
-        basic(get(UNKNOWN), USER, "synthetic-password")?,
-    )
-    .await?;
+    let read = raw(app.clone(), basic(get(UNKNOWN), USER, &PASSWORD)?).await?;
     assert_eq!(StatusCode::NOT_FOUND, read.status());
-    let create = raw(
-        app,
-        basic(post_condition(&condition()), USER, "synthetic-password")?,
-    )
-    .await?;
+    let create = raw(app, basic(post_condition(&condition()), USER, &PASSWORD)?).await?;
     assert_eq!(StatusCode::FORBIDDEN, create.status(), "no c on Condition");
     Ok(())
 }
@@ -103,7 +100,8 @@ async fn a_basic_user_reaches_what_its_scopes_grant() -> Result<(), Box<dyn Erro
 #[tokio::test]
 async fn a_wrong_password_or_an_unknown_user_is_the_same_401() -> Result<(), Box<dyn Error>> {
     let app = app().await?;
-    for (user, password) in [(USER, "another-password"), ("nobody", "synthetic-password")] {
+    let another = random_secret();
+    for (user, password) in [(USER, another.as_str()), ("nobody", PASSWORD.as_str())] {
         let response = raw(app.clone(), basic(get(UNKNOWN), user, password)?).await?;
         assert_eq!(StatusCode::UNAUTHORIZED, response.status(), "{user}");
         // NOTE: RFC 7617 §2 and §2.1, the Basic challenge names a realm and
@@ -137,7 +135,7 @@ fn a_basic_caller_is_audited_as_a_person_never_a_system() -> Result<(), Box<dyn 
         let app = app().await.expect("the facade starts");
         let response = raw(
             app,
-            basic(get(UNKNOWN), USER, "synthetic-password").expect("a legal credential"),
+            basic(get(UNKNOWN), USER, &PASSWORD).expect("a legal credential"),
         )
         .await
         .expect("an answer");
@@ -156,7 +154,7 @@ fn a_basic_caller_is_audited_as_a_person_never_a_system() -> Result<(), Box<dyn 
         ("user/Condition.r system/*.read", "system/*.read"),
     ] {
         let error = PasswordStore::new()
-            .with_user(USER, hash("synthetic-password")?, scopes)
+            .with_user(USER, hash(&PASSWORD)?, scopes)
             .err()
             .ok_or("a Basic user with a system scope is refused")?;
         assert!(

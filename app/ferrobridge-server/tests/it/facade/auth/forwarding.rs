@@ -10,6 +10,7 @@
 
 use std::error::Error;
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 use axum::body::Body;
 use ferrobridge_server::cdr::CdrClient;
@@ -49,14 +50,17 @@ use crate::facade::raw;
 use crate::facade::settings;
 use crate::facade::stub::mount_ehr;
 use crate::facade::stub::mount_read;
+use crate::support::basic_authorization;
+use crate::support::random_secret;
 
 /// The basic authentication password the bridge is configured to reach the
-/// CDR with, as user `bridge`.
-const BRIDGE_CREDENTIAL: &str = "synthetic-bridge-credential";
+/// CDR with, as user `bridge`, drawn for this run.
+static BRIDGE_CREDENTIAL: LazyLock<String> = LazyLock::new(random_secret);
 
 /// The `Authorization` value [`BRIDGE_CREDENTIAL`] travels as: RFC 7617 §2,
-/// base64 of `bridge:synthetic-bridge-credential`.
-const BRIDGE_AUTHORIZATION: &str = "Basic YnJpZGdlOnN5bnRoZXRpYy1icmlkZ2UtY3JlZGVudGlhbA==";
+/// base64 of `bridge:` and the credential.
+static BRIDGE_AUTHORIZATION: LazyLock<String> =
+    LazyLock::new(|| basic_authorization("bridge", &BRIDGE_CREDENTIAL));
 
 /// Returns a harness whose facade reaches its CDR with [`BRIDGE_CREDENTIAL`]
 /// and answers search as the fixture declarations state.
@@ -77,7 +81,8 @@ async fn credentialed() -> Result<Harness, Box<dyn Error>> {
     let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     let bridge = CdrClient::new(
-        &CdrConfig::new(format!("{}/", cdr.uri()).parse()?).with_basic("bridge", BRIDGE_CREDENTIAL),
+        &CdrConfig::new(format!("{}/", cdr.uri()).parse()?)
+            .with_basic("bridge", BRIDGE_CREDENTIAL.as_str()),
     )?;
     let store = Arc::new(MemoryStore::default());
     let built = Facade::new(compiled, handle(&store), bridge, settings());
@@ -127,7 +132,7 @@ fn assert_bridge_credential_only(
     }
     for (call, credential) in calls {
         assert_eq!(
-            Some(BRIDGE_AUTHORIZATION),
+            Some(BRIDGE_AUTHORIZATION.as_str()),
             credential.as_deref(),
             "{call} carries the bridge's credential"
         );

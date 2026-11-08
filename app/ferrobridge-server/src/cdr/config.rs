@@ -133,16 +133,17 @@ mod tests {
 
     #[test]
     fn a_basic_password_is_not_in_the_debug_rendering() {
+        let password = uuid::Uuid::new_v4().simple().to_string();
         let config = CdrConfig::new("http://cdr.invalid/v1".parse().expect("a valid URL"))
-            .with_basic("bridge", "s3cr3t-password");
+            .with_basic("bridge", password.as_str());
         let rendered = format!("{config:?}");
-        assert!(!rendered.contains("s3cr3t-password"));
+        assert!(!rendered.contains(&password));
         assert!(rendered.contains("bridge"));
         let credentials = config
             .credentials
             .as_ref()
             .expect("the credentials are set");
-        assert!(!format!("{credentials:?}").contains("s3cr3t-password"));
+        assert!(!format!("{credentials:?}").contains(&password));
     }
 
     #[test]
