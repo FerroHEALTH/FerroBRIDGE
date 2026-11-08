@@ -167,6 +167,19 @@ pub enum Request {
 }
 
 impl Request {
+    /// Returns the `CodeSystem/$lookup` of `code` in `system`, at `version`
+    /// and `date` when given, with no display language.
+    #[must_use]
+    pub fn lookup(system: &str, code: &str, version: Option<&str>, date: Option<&str>) -> Self {
+        Self::Lookup {
+            system: system.to_owned(),
+            code: code.to_owned(),
+            version: version.map(str::to_owned),
+            date: date.map(str::to_owned),
+            display_language: None,
+        }
+    }
+
     /// Returns the operation, as `Resource/$code`.
     #[must_use]
     pub const fn operation(&self) -> &'static str {

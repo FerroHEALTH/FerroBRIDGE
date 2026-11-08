@@ -4,6 +4,26 @@
 //! The `per_release` macro, which generates the reader and writer of one
 //! release over its own generated model.
 
+/// Returns the `designation` parts `$designations` carries, `$label` naming
+/// the mandatory value in an error; `$lookup` and `$expand` declare them alike.
+macro_rules! designations {
+    ($designations:expr, $label:literal) => {
+        $designations
+            .iter()
+            .map(|designation| {
+                Ok(Designation {
+                    language: designation
+                        .language
+                        .as_ref()
+                        .and_then(|code| code.value.clone()),
+                    usage: designation.r#use.as_ref().map(concept),
+                    value: super::required(designation.value.value.clone(), $label)?,
+                })
+            })
+            .collect::<Result<Vec<_>, BodyError>>()?
+    };
+}
+
 /// Generates the reader and writer of one FHIR release, with the
 /// release-specific writers and readers `$contracts` expands to.
 macro_rules! per_release {
@@ -393,23 +413,7 @@ macro_rules! per_release {
             pub(crate) fn lookup_found(body: &str) -> Result<LookupOutcome, BodyError> {
                 let parameters = serde_json::from_str::<Parameters>(body)?;
                 let found = CodeSystemLookupResponse::from_parameters(&parameters)?;
-                let designations = found
-                    .designation
-                    .iter()
-                    .map(|designation| {
-                        Ok(Designation {
-                            language: designation
-                                .language
-                                .as_ref()
-                                .and_then(|code| code.value.clone()),
-                            usage: designation.r#use.as_ref().map(concept),
-                            value: super::required(
-                                designation.value.value.clone(),
-                                "designation.value",
-                            )?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, BodyError>>()?;
+                let designations = designations!(found.designation, "designation.value");
                 let properties = found
                     .property
                     .iter()
@@ -539,23 +543,7 @@ macro_rules! per_release {
             /// Returns one `expansion.contains` entry with the entries
             /// nested under it.
             fn contains(entry: &ValueSetExpansionContains) -> Result<ExpansionContains, BodyError> {
-                let designations = entry
-                    .designation
-                    .iter()
-                    .map(|designation| {
-                        Ok(Designation {
-                            language: designation
-                                .language
-                                .as_ref()
-                                .and_then(|code| code.value.clone()),
-                            usage: designation.r#use.as_ref().map(concept),
-                            value: super::required(
-                                designation.value.value.clone(),
-                                "contains.designation.value",
-                            )?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, BodyError>>()?;
+                let designations = designations!(entry.designation, "contains.designation.value");
                 Ok(ExpansionContains {
                     system: entry.system.as_ref().and_then(|uri| uri.value.clone()),
                     version: entry.version.as_ref().and_then(|text| text.value.clone()),

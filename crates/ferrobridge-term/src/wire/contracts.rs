@@ -78,6 +78,97 @@ macro_rules! modern_issues {
     };
 }
 
+/// Returns a `$translate` match of STU3 to R4B with its `equivalence`,
+/// `concept`, `source` and `product` parts, which those releases declare
+/// alike.
+macro_rules! equivalence_match {
+    ($found:expr) => {
+        $found
+            .product
+            .iter()
+            .map(|product| {
+                Ok(crate::concept::MatchValue {
+                    name: product.element.as_ref().and_then(|uri| uri.value.clone()),
+                    value: product
+                        .concept
+                        .clone()
+                        .map(|coding| {
+                            property_value(ParametersParameterValue::Coding(Box::new(coding)))
+                        })
+                        .transpose()?,
+                })
+            })
+            .collect::<Result<Vec<_>, BodyError>>()
+            .map(|products| crate::concept::Match {
+                equivalence: $found
+                    .equivalence
+                    .as_ref()
+                    .and_then(|code| code.value.as_deref())
+                    .map(crate::concept::Equivalence::new),
+                concept: $found.concept.as_ref().map(concept),
+                source: $found.source.as_ref().and_then(|url| url.value.clone()),
+                products,
+                ..Default::default()
+            })
+    };
+}
+
+/// Returns `$base` with the match parts R4 to R6 declare alike: `originMap`,
+/// `noMap`, `sourceConcept` and the two comments.
+macro_rules! match_notes {
+    ($found:expr, $base:expr) => {
+        crate::concept::Match {
+            origin_map: $found.origin_map.as_ref().and_then(|url| url.value.clone()),
+            no_map: $found.no_map.as_ref().and_then(|flag| flag.value),
+            source_concept: $found.source_concept.as_ref().map(concept),
+            source_comment: $found
+                .source_comment
+                .as_ref()
+                .and_then(|text| text.value.clone()),
+            target_comment: $found
+                .target_comment
+                .as_ref()
+                .and_then(|text| text.value.clone()),
+            ..$base
+        }
+    };
+}
+
+/// Returns the `$translate` request of STU3 to R4B: `code`, `system`,
+/// `version`, `targetsystem` and `reverse`, which those releases declare
+/// alike.
+macro_rules! code_translate_request {
+    ($translation:expr) => {
+        ConceptMapTranslateRequest {
+            code: Some($translation.code.as_str().into()),
+            system: Some($translation.system.as_str().into()),
+            version: $translation.version.as_deref().map(Into::into),
+            targetsystem: $translation.target_system.as_deref().map(Into::into),
+            reverse: $translation.reverse.map(Into::into),
+            ..Default::default()
+        }
+    };
+}
+
+/// Returns the `$translate` request of R5 and R6: `url`,
+/// `conceptMapVersion`, `sourceCode` and `targetSystem`, with the system and
+/// its version under the names `$system` and `$version` the release gives
+/// them.
+macro_rules! source_translate_request {
+    ($translation:expr, $system:ident, $version:ident) => {
+        ConceptMapTranslateRequest {
+            url: $translation.concept_map_url.as_deref().map(Into::into),
+            concept_map_version: $translation.concept_map_version.as_deref().map(Into::into),
+            source_code: Some($translation.code.as_str().into()),
+            $system: Some($translation.system.as_str().into()),
+            $version: $translation.version.as_deref().map(Into::into),
+            target_system: $translation.target_system.as_deref().map(Into::into),
+            ..Default::default()
+        }
+        .into_parameters()
+    };
+}
+
 /// The writers and readers R4 to R6 share: every parameter a [`Request`]
 /// carries outside `$translate` is declared under the same name and type,
 /// with the terminology ecosystem's additions
@@ -105,6 +196,13 @@ macro_rules! modern_contracts {
         /// Sets `systemVersion`, the version of the code's system.
         fn set_system_version(request: &mut ValueSetValidateCodeRequest, version: Option<&str>) {
             request.system_version = version.map(Into::into);
+        }
+
+        /// Sets the `$validate-code` inputs beside the coded value.
+        fn validate_code_extras(request: &mut ValueSetValidateCodeRequest, validation: &Validation) {
+            request.value_set_version = validation.value_set_version.as_deref().map(Into::into);
+            request.display_language = validate_language(validation.display_language.as_deref());
+            request.active_only = validation.active_only.map(Into::into);
         }
 
         /// Sets `valueSetVersion`.
@@ -169,6 +267,24 @@ macro_rules! modern_contracts {
     };
 }
 
+/// The `$validate-code` `displayLanguage` and the `compose.include.filter.value`
+/// of R4 to R5, which declare the first `0..1` and the second a `string`.
+macro_rules! single_language_contracts {
+    ($release:ident) => {
+        /// Returns `displayLanguage`, declared `0..1`.
+        fn validate_language(
+            language: Option<&str>,
+        ) -> Option<fhir_types::$release::primitives::Code> {
+            language.map(Into::into)
+        }
+
+        /// Returns `value` as `compose.include.filter.value`, a `string`.
+        fn filter_value(value: &str) -> fhir_types::$release::primitives::String {
+            value.into()
+        }
+    };
+}
+
 /// The request writers and readers of R4 and R4B, after
 /// `OperationDefinition-ConceptMap-translate` of `hl7.fhir.r4.core` 4.0.1 and
 /// `hl7.fhir.r4b.core` 4.3.0.
@@ -183,17 +299,7 @@ macro_rules! r4_contracts {
             None
         }
 
-        /// Sets the `$validate-code` inputs beside the coded value.
-        fn validate_code_extras(request: &mut ValueSetValidateCodeRequest, validation: &Validation) {
-            request.value_set_version = validation.value_set_version.as_deref().map(Into::into);
-            request.display_language = validation.display_language.as_deref().map(Into::into);
-            request.active_only = validation.active_only.map(Into::into);
-        }
-
-        /// Returns `value` as `compose.include.filter.value`, a `string`.
-        fn filter_value(value: &str) -> fhir_types::$release::primitives::String {
-            value.into()
-        }
+        single_language_contracts!($release);
 
         /// Returns no `definition`, which R4 and R4B do not declare.
         const fn lookup_definition(_found: &CodeSystemLookupResponse) -> Option<String> {
@@ -201,17 +307,12 @@ macro_rules! r4_contracts {
         }
 
         /// Returns the `Parameters` of one `$translate`: `code`, `system`,
-        /// `version` and `targetsystem`.
+        /// `version` and `targetsystem`, with `url` and `conceptMapVersion`.
         fn translate_parameters(translation: &crate::request::Translation) -> Parameters {
             ConceptMapTranslateRequest {
                 url: translation.concept_map_url.as_deref().map(Into::into),
                 concept_map_version: translation.concept_map_version.as_deref().map(Into::into),
-                code: Some(translation.code.as_str().into()),
-                system: Some(translation.system.as_str().into()),
-                version: translation.version.as_deref().map(Into::into),
-                targetsystem: translation.target_system.as_deref().map(Into::into),
-                reverse: translation.reverse.map(Into::into),
-                ..Default::default()
+                ..code_translate_request!(translation)
             }
             .into_parameters()
         }
@@ -221,35 +322,8 @@ macro_rules! r4_contracts {
         fn translate_match(
             found: &fhir_types::$release::operations::concept_map_translate::ConceptMapTranslateResponseMatch,
         ) -> Result<crate::concept::Match, BodyError> {
-            Ok(crate::concept::Match {
-                equivalence: found
-                    .equivalence
-                    .as_ref()
-                    .and_then(|code| code.value.as_deref())
-                    .map(crate::concept::Equivalence::new),
-                concept: found.concept.as_ref().map(concept),
-                source: found.source.as_ref().and_then(|url| url.value.clone()),
-                origin_map: found.origin_map.as_ref().and_then(|url| url.value.clone()),
-                no_map: found.no_map.as_ref().and_then(|flag| flag.value),
-                source_concept: found.source_concept.as_ref().map(concept),
-                source_comment: found.source_comment.as_ref().and_then(|text| text.value.clone()),
-                target_comment: found.target_comment.as_ref().and_then(|text| text.value.clone()),
-                products: found
-                    .product
-                    .iter()
-                    .map(|product| {
-                        Ok(crate::concept::MatchValue {
-                            name: product.element.as_ref().and_then(|uri| uri.value.clone()),
-                            value: product
-                                .concept
-                                .clone()
-                                .map(|coding| property_value(ParametersParameterValue::Coding(Box::new(coding))))
-                                .transpose()?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, BodyError>>()?,
-                ..Default::default()
-            })
+            let base = equivalence_match!(found)?;
+            Ok(match_notes!(found, base))
         }
     };
 }
@@ -270,18 +344,13 @@ macro_rules! relationship_match {
                     value: Some(property_value(value.clone())?),
                 })
             };
-            Ok(crate::concept::Match {
+            let base = crate::concept::Match {
                 relationship: found
                     .relationship
                     .as_ref()
                     .and_then(|code| code.value.as_deref())
                     .map(crate::concept::Relationship::new),
                 concept: found.concept.as_ref().map(concept),
-                origin_map: found.origin_map.as_ref().and_then(|url| url.value.clone()),
-                no_map: found.no_map.as_ref().and_then(|flag| flag.value),
-                source_concept: found.source_concept.as_ref().map(concept),
-                source_comment: found.source_comment.as_ref().and_then(|text| text.value.clone()),
-                target_comment: found.target_comment.as_ref().and_then(|text| text.value.clone()),
                 products: found
                     .product
                     .iter()
@@ -298,7 +367,8 @@ macro_rules! relationship_match {
                     .map(|property| part(&property.uri, &property.value))
                     .collect::<Result<Vec<_>, BodyError>>()?,
                 ..Default::default()
-            })
+            };
+            Ok(match_notes!(found, base))
         }
 
         /// Returns `definition`, which R5 and R6 declare.
@@ -329,34 +399,12 @@ macro_rules! r5_contracts {
         modern_contracts!($release);
         relationship_match!($release);
 
-        /// Sets the `$validate-code` inputs beside the coded value.
-        fn validate_code_extras(
-            request: &mut ValueSetValidateCodeRequest,
-            validation: &Validation,
-        ) {
-            request.value_set_version = validation.value_set_version.as_deref().map(Into::into);
-            request.display_language = validation.display_language.as_deref().map(Into::into);
-            request.active_only = validation.active_only.map(Into::into);
-        }
-
-        /// Returns `value` as `compose.include.filter.value`, a `string`.
-        fn filter_value(value: &str) -> fhir_types::$release::primitives::String {
-            value.into()
-        }
+        single_language_contracts!($release);
 
         /// Returns the `Parameters` of one `$translate`: `sourceCode`,
         /// `system`, `version` and `targetSystem`.
         fn translate_parameters(translation: &crate::request::Translation) -> Parameters {
-            ConceptMapTranslateRequest {
-                url: translation.concept_map_url.as_deref().map(Into::into),
-                concept_map_version: translation.concept_map_version.as_deref().map(Into::into),
-                source_code: Some(translation.code.as_str().into()),
-                system: Some(translation.system.as_str().into()),
-                version: translation.version.as_deref().map(Into::into),
-                target_system: translation.target_system.as_deref().map(Into::into),
-                ..Default::default()
-            }
-            .into_parameters()
+            source_translate_request!(translation, system, version)
         }
     };
 }
@@ -370,21 +418,12 @@ macro_rules! r6_contracts {
         modern_contracts!($release);
         relationship_match!($release);
 
-        /// Sets the `$validate-code` inputs beside the coded value;
-        /// `displayLanguage` repeats in R6
+        /// Returns `displayLanguage`, which repeats in R6
         /// (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
-        fn validate_code_extras(
-            request: &mut ValueSetValidateCodeRequest,
-            validation: &Validation,
-        ) {
-            request.value_set_version = validation.value_set_version.as_deref().map(Into::into);
-            request.display_language = validation
-                .display_language
-                .as_deref()
-                .map(Into::into)
-                .into_iter()
-                .collect();
-            request.active_only = validation.active_only.map(Into::into);
+        fn validate_language(
+            language: Option<&str>,
+        ) -> Vec<fhir_types::$release::primitives::Code> {
+            language.map(Into::into).into_iter().collect()
         }
 
         /// Returns `value` as `compose.include.filter.value`, which R6 makes
@@ -396,24 +435,11 @@ macro_rules! r6_contracts {
         /// Returns the `Parameters` of one `$translate`: `sourceCode`,
         /// `sourceSystem`, `sourceVersion` and `targetSystem`.
         fn translate_parameters(translation: &crate::request::Translation) -> Parameters {
-            ConceptMapTranslateRequest {
-                url: translation.concept_map_url.as_deref().map(Into::into),
-                concept_map_version: translation.concept_map_version.as_deref().map(Into::into),
-                source_code: Some(translation.code.as_str().into()),
-                source_system: Some(translation.system.as_str().into()),
-                source_version: translation.version.as_deref().map(Into::into),
-                target_system: translation.target_system.as_deref().map(Into::into),
-                ..Default::default()
-            }
-            .into_parameters()
+            source_translate_request!(translation, source_system, source_version)
         }
     };
 }
 
-/// The request writers and readers of STU3, after
-/// `OperationDefinition-CodeSystem-lookup`, `-ConceptMap-translate`,
-/// `-ValueSet-validate-code` and `-ValueSet-expand` of `hl7.fhir.r3.core`
-/// 3.0.2.
 macro_rules! stu3_contracts {
     ($release:ident) => {
         /// Returns whether STU3 defines no such operation: it has no
@@ -523,15 +549,7 @@ macro_rules! stu3_contracts {
         /// Returns the `Parameters` of one STU3 `$translate`, which
         /// `unsupported` has passed.
         fn translate_parameters(translation: &crate::request::Translation) -> Parameters {
-            ConceptMapTranslateRequest {
-                code: Some(translation.code.as_str().into()),
-                system: Some(translation.system.as_str().into()),
-                version: translation.version.as_deref().map(Into::into),
-                targetsystem: translation.target_system.as_deref().map(Into::into),
-                reverse: translation.reverse.map(Into::into),
-                ..Default::default()
-            }
-            .into_parameters()
+            code_translate_request!(translation).into_parameters()
         }
 
         /// Returns one STU3 match: `equivalence`, `concept`, `product` and
@@ -539,30 +557,7 @@ macro_rules! stu3_contracts {
         fn translate_match(
             found: &fhir_types::$release::operations::concept_map_translate::ConceptMapTranslateResponseMatch,
         ) -> Result<crate::concept::Match, BodyError> {
-            Ok(crate::concept::Match {
-                equivalence: found
-                    .equivalence
-                    .as_ref()
-                    .and_then(|code| code.value.as_deref())
-                    .map(crate::concept::Equivalence::new),
-                concept: found.concept.as_ref().map(concept),
-                source: found.source.as_ref().and_then(|url| url.value.clone()),
-                products: found
-                    .product
-                    .iter()
-                    .map(|product| {
-                        Ok(crate::concept::MatchValue {
-                            name: product.element.as_ref().and_then(|uri| uri.value.clone()),
-                            value: product
-                                .concept
-                                .clone()
-                                .map(|coding| property_value(ParametersParameterValue::Coding(Box::new(coding))))
-                                .transpose()?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, BodyError>>()?,
-                ..Default::default()
-            })
+            equivalence_match!(found)
         }
 
         /// Returns no `used-conceptmap`, which STU3 does not declare.

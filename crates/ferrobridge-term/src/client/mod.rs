@@ -265,14 +265,8 @@ impl Client {
         code: &str,
         version: Option<&str>,
     ) -> Result<LookupOutcome, Error> {
-        self.send_lookup(Request::Lookup {
-            system: system.to_owned(),
-            code: code.to_owned(),
-            version: version.map(str::to_owned),
-            date: None,
-            display_language: None,
-        })
-        .await
+        self.send_lookup(Request::lookup(system, code, version, None))
+            .await
     }
 
     /// Resolves the display of `code` in `system` as the code system stood
@@ -288,14 +282,8 @@ impl Client {
         version: Option<&str>,
         date: &str,
     ) -> Result<LookupOutcome, Error> {
-        self.send_lookup(Request::Lookup {
-            system: system.to_owned(),
-            code: code.to_owned(),
-            version: version.map(str::to_owned),
-            date: Some(date.to_owned()),
-            display_language: None,
-        })
-        .await
+        self.send_lookup(Request::lookup(system, code, version, Some(date)))
+            .await
     }
 
     /// Returns the outcome of the `$lookup` `request`.
