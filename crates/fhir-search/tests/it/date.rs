@@ -276,3 +276,24 @@ fn debug_never_shows_the_date() {
     assert!(!shown.contains("1958"), "{shown}");
     assert!(shown.contains("Day"), "{shown}");
 }
+
+#[test]
+fn first_day_is_the_calendar_day_a_range_starts_on() {
+    let day = |text: &str| SearchDate::parse(text).unwrap().first_day().to_string();
+    assert_eq!(day("1958"), "1958-01-01");
+    assert_eq!(day("1958-04"), "1958-04-01");
+    assert_eq!(day("1958-04-27"), "1958-04-27");
+    assert_eq!(
+        day("1958-04-27T23:59:59.9-05:00"),
+        "1958-04-27",
+        "the written day"
+    );
+    let range = SearchDate::parse("2024-02").unwrap().range();
+    assert_eq!(
+        range
+            .high()
+            .map(|high| high.first_day().to_string())
+            .as_deref(),
+        Some("2024-03-01")
+    );
+}

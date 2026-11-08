@@ -249,6 +249,25 @@ impl SearchDate {
         }
     }
 
+    /// The calendar day the date starts on: its day, or the first day of
+    /// its month or year.
+    ///
+    /// A consumer that compares days, such as a birth date's, reads a range
+    /// as `range().low().first_day()` up to `range().high()`'s.
+    ///
+    /// # Panics
+    ///
+    /// Never: every date this crate holds is a calendar date jiff represents.
+    #[must_use]
+    #[expect(
+        clippy::expect_used,
+        reason = "parse admits years 0001 to 9999 and checks the day against the calendar, all of which jiff's Date holds, and next() builds its dates from jiff"
+    )]
+    pub fn first_day(&self) -> jiff::civil::Date {
+        jiff::civil::Date::new(self.year, self.month.unwrap_or(1), self.day.unwrap_or(1))
+            .expect("a date read by parse or stepped by next should be a calendar date")
+    }
+
     /// The offset the time writes, `None` for a date with no time or a time
     /// with no offset.
     #[must_use]
