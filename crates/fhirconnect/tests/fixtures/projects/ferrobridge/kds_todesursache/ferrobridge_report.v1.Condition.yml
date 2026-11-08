@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/composition/org.openehr/report.v1.Condition.yml, a
+# derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published lines 44 to 67 and 74 to 97 are two methods named
+# `contextStartTimeEmpty`, which no overwrite can reach, and they and
+# `composerEmpty` (lines 125 to 141) write `null_flavour` below
+# `context/start_time` (a DV_DATE_TIME) and `composer` (a PARTY_PROXY),
+# while the openEHR RM carries `null_flavour` on ELEMENT only (#101). Lines 99
+# to 118 name `function` and `performer` below `context/participations`,
+# which the engine carries only through `participationsFunction` (#101).
+# Those four methods are left out; every other method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.report.v1.Condition
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.report.v1
+    revision: 1.2.4
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: context
+    with:
+      fhir: $resource
+      openehr: $composition/context
+      type: NONE
+    followedBy:
+      mappings:
+        - name: onset
+          with:
+            fhir: onset.ofType(Period)
+            openehr: $reference
+          followedBy:
+            mappings:
+              - name: onsetEnd
+                with:
+                  fhir: end
+                  openehr: end_time
+
+              - name: onsetStart
+                with:
+                  fhir: start
+                  openehr: start_time
+
+        - name: onsetDateTime
+          with:
+            fhir: onset.ofType(dateTime)
+            openehr: start_time
+
+  - name: contextStartTime
+    with:
+      fhir: $resource.recordedDate
+      openehr: $composition/context/start_time
+
+  - name: composer
+    with:
+      fhir: $resource.recorder
+      openehr: $composition/composer
