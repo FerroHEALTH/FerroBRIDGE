@@ -7,6 +7,9 @@
 use crate::resolve::derive;
 use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::model::Container;
+use openehr_rm::v1_2::paths::RmPath;
+use openehr_rm::v1_2::typing::RmType;
+use openehr_rm::v1_2::typing::path_type;
 
 use super::{ENTRY_TIMES, FAMILIES, PARTY_ROOTS};
 
@@ -50,11 +53,12 @@ pub enum Carried {
 /// The class is the most general concrete one that declares the tail's first
 /// attribute. A generic node (`DV_INTERVAL<DV_QUANTITY>`) is looked up by its
 /// class, and a bound below it is its parameter
-/// ([`derive::attribute_class`]). A tail below a structural node other than a [`FAMILIES`] or
-/// [`PARTY_ROOTS`] entry,
-/// and a tail that steps through or ends on a container attribute, is `None`:
-/// the engine walks a tail by attribute name and writes one value into the
-/// node. No specification governs the walk: our own design.
+/// ([`derive::attribute_class`]). A tail may step through a `List` attribute,
+/// and then names one element of the list ([`list_steps`]). A tail below a
+/// structural node other than a [`FAMILIES`] or [`PARTY_ROOTS`] entry, one
+/// that steps through a `Set` or `Hash`, whose members have no position, and
+/// one that ends on a container attribute, which holds no single value, is
+/// `None`. No specification governs the walk: our own design.
 #[must_use]
 pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> {
     let wanted = tail.join("/");
@@ -77,26 +81,68 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
     {
         return Some((owner, Carried::Value));
     }
-    if model::is_a(class, derive::STRUCTURAL) {
+    let walked = walk(rm_type, tail)?;
+    if walked.container != Container::None {
         return None;
     }
-    let (&first, rest) = tail.split_first()?;
-    let owner = owner_of(class, first)?;
-    let mut attribute = model::attribute(owner, first)?;
-    let mut declared = derive::attribute_class(rm_type, attribute);
-    for &segment in rest {
-        if attribute.container != Container::None {
-            return None;
+    Some((walked.owner, held(&walked.declared)?))
+}
+
+/// Returns the position in `tail` of each attribute that is a `List`, in
+/// order, `None` when the engine cannot walk the tail at all.
+///
+/// An openEHR RM `List` attribute holds an ordered sequence, so one element
+/// is addressed by its 1-based position (openEHR BASE Release 1.2.0 §Paths
+/// and Locators, "Using Positional Predicates"); the engine gives each such
+/// step its own occurrence axis inside the node's value. A tail that ends on
+/// a `List` names the list as an axis whose elements the mapping's children
+/// fill. No specification governs the axis: our own design.
+#[must_use]
+pub fn list_steps(rm_type: &str, tail: &[&str]) -> Option<Vec<usize>> {
+    walk(rm_type, tail).map(|walked| walked.lists)
+}
+
+/// The attribute a tail ends on, reached by [`walk`].
+struct Walked {
+    /// The class that declares the tail's first attribute.
+    owner: &'static str,
+    /// The container shape of the last attribute the tail names.
+    container: Container,
+    /// The class one value of that attribute holds.
+    declared: String,
+    /// The position in the tail of each `List` attribute.
+    lists: Vec<usize>,
+}
+
+/// Walks a tail below a data value, typing each step with
+/// `openehr_rm::v1_2::typing::path_type`.
+///
+/// A step through a `Set` or `Hash` is `None`, since neither orders its
+/// members (openEHR BASE Release 1.2.0, foundation types §Container types),
+/// and so is a walk below a structural node.
+fn walk(rm_type: &str, tail: &[&str]) -> Option<Walked> {
+    let class = rm_type.parse::<RmType>().ok()?;
+    if model::is_a(class.name(), derive::STRUCTURAL) {
+        return None;
+    }
+    let owner = owner_of(class.name(), tail.first()?)?;
+    let path = tail.join("/").parse::<RmPath>().ok()?;
+    let steps = path_type(&class, &path).ok()?;
+    let mut lists = Vec::new();
+    for (position, step) in steps.iter().enumerate() {
+        match step.container() {
+            Container::None => {}
+            Container::List => lists.push(position),
+            Container::Set | Container::Hash => return None,
         }
-        attribute = concrete_forms(declared)
-            .into_iter()
-            .find_map(|form| model::attribute(form, segment))?;
-        declared = attribute.declared_type;
     }
-    if attribute.container != Container::None {
-        return None;
-    }
-    Some((owner, held(declared)?))
+    let last = steps.last()?;
+    Some(Walked {
+        owner,
+        container: last.container(),
+        declared: String::from(last.item().name()),
+        lists,
+    })
 }
 
 /// Returns the most general concrete class at or below `rm_type` that
@@ -135,7 +181,7 @@ fn concrete_forms(rm_type: &str) -> Vec<&'static str> {
 /// (<https://specifications.openehr.org/releases/BASE/Release-1.2.0/foundation_types.html>).
 fn held(declared_type: &str) -> Option<Carried> {
     match declared_type {
-        "String" => Some(Carried::Text),
+        "String" | "Character" => Some(Carried::Text),
         "Real" => Some(Carried::Real),
         "Integer" | "Integer64" => Some(Carried::Integer),
         "Boolean" => Some(Carried::Boolean),
@@ -145,7 +191,7 @@ fn held(declared_type: &str) -> Option<Carried> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Carried, carried};
+    use super::{Carried, carried, list_steps};
 
     #[test]
     fn a_tail_reaches_every_attribute_the_model_gives_the_class() {
@@ -214,10 +260,50 @@ mod tests {
     }
 
     #[test]
-    fn a_container_tail_and_a_structural_tail_are_not_carried() {
-        assert_eq!(carried("DV_TEXT", &["mappings", "match"]), None);
+    fn a_tail_that_ends_on_a_list_or_below_a_structure_is_not_carried() {
+        // RM 1.1.0 data_types §DV_TEXT: `mappings` is a List<TERM_MAPPING>, no single value.
         assert_eq!(carried("DV_TEXT", &["mappings"]), None);
+        assert_eq!(carried("DV_QUANTITY", &["other_reference_ranges"]), None);
         assert_eq!(carried("EVALUATION", &["other_participations"]), None);
         assert_eq!(carried("DV_TEXT", &["no_such_attribute"]), None);
+    }
+
+    #[test]
+    fn a_tail_through_a_list_reaches_the_attributes_of_one_element() {
+        // RM 1.1.0 data_types §DV_TEXT `mappings`, §DV_ORDERED `other_reference_ranges`.
+        assert_eq!(
+            carried("DV_TEXT", &["mappings", "match"]),
+            Some(("DV_TEXT", Carried::Text))
+        );
+        assert_eq!(
+            carried("DV_TEXT", &["mappings", "target", "code_string"]),
+            Some(("DV_TEXT", Carried::Text))
+        );
+        assert_eq!(
+            carried("DV_QUANTITY", &["other_reference_ranges", "meaning"]),
+            Some(("DV_QUANTITY", Carried::Value))
+        );
+        assert_eq!(
+            carried("DV_QUANTITY", &["other_reference_ranges", "range", "upper"]),
+            Some(("DV_QUANTITY", Carried::Value))
+        );
+    }
+
+    #[test]
+    fn each_list_a_tail_steps_through_is_named_by_its_place_in_the_tail() {
+        assert_eq!(list_steps("DV_TEXT", &["mappings"]), Some(vec![0]));
+        assert_eq!(
+            list_steps("DV_TEXT", &["mappings", "target", "code_string"]),
+            Some(vec![0])
+        );
+        assert_eq!(
+            list_steps("DV_QUANTITY", &["other_reference_ranges", "range", "lower"]),
+            Some(vec![0])
+        );
+        assert_eq!(
+            list_steps("DV_QUANTITY", &["normal_range", "upper"]),
+            Some(Vec::new())
+        );
+        assert_eq!(list_steps("EVALUATION", &["other_participations"]), None);
     }
 }

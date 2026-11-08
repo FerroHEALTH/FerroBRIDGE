@@ -8,13 +8,15 @@ use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::template::PathError;
 use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::RmPath;
+use openehr_rm::v1_2::typing::RmType;
+use openehr_rm::v1_2::typing::TypingError;
+use openehr_rm::v1_2::typing::path_type;
 
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::openehr::LocateError;
 use crate::resolve::compile::openehr::Reached;
 use crate::resolve::compile::openehr::constrains;
 use crate::resolve::compile::openehr::names_same_place;
-use crate::resolve::derive;
 
 impl<'a> Compiler<'a> {
     /// Returns the deepest template node an openEHR path names, and the
@@ -181,79 +183,35 @@ const ELEMENT_VALUE: &str = "value";
 /// deepest template node it reaches.
 ///
 /// A Web Template carries the nodes an archetype constrains and stops there, so
-/// everything below the deepest one is plain reference model. The attribute
-/// model `openehr-rm` generates from the RM BMM is the oracle for it
-/// (<https://docs.rs/openehr-rm/0.0.69/openehr_rm/v1_2/model/fn.attribute.html>):
-/// an attribute is looked up on the node's type and on the concrete subtypes of
-/// it, because a declared type may be abstract (`ELEMENT.value` is
-/// `DATA_VALUE`) and the attribute then belongs to one of its descendants.
-///
-/// A generic node (`DV_INTERVAL<DV_QUANTITY>`) is walked by its class, and a
-/// bound below it is its parameter ([`derive::attribute_class`]).
+/// everything below the deepest one is plain reference model, typed step by
+/// step by `openehr_rm::v1_2::typing::path_type`: a step is read on the node's
+/// type or on the concrete descendants that declare it (`ELEMENT.value` is
+/// `DATA_VALUE`), and a generic holder gives its argument to the attribute it
+/// types (`lower` of a `DV_INTERVAL<DV_QUANTITY>` is a `DV_QUANTITY`).
 ///
 /// A type the model does not carry stops the walk rather than refusing it: the
 /// mapping is then checked as far as the model reaches and no further.
 ///
 /// Returns the class of the last attribute the tail names, `None` for an
 /// empty tail and for a walk the model stopped before its end. The class is
-/// the declared type, or its one concrete descendant when the declared type is
+/// the item type's class, or its one concrete descendant when that class is
 /// abstract and has exactly one.
 pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, String> {
-    let mut candidates = concrete_forms(derive::base_class(rm_type));
-    if candidates.is_empty() {
+    let Ok(class) = rm_type.parse::<RmType>() else {
+        return Ok(None);
+    };
+    if model::class(class.name()).is_none() {
         return Ok(None);
     }
-    let mut leaf: Option<&'static str> = None;
-    let mut holder = String::from(rm_type);
-    for (position, segment) in tail.segments.iter().enumerate() {
-        let attribute = segment.attribute.as_str();
-        let mut declared: Option<&'static str> = None;
-        let mut typed: Option<String> = None;
-        let mut next: Vec<&'static str> = Vec::new();
-        for candidate in &candidates {
-            let Some(found) = model::attribute(candidate, attribute) else {
-                continue;
-            };
-            let held = derive::attribute_class(&holder, found);
-            declared.get_or_insert(held);
-            typed.get_or_insert_with(|| instantiated(held, found));
-            for form in concrete_forms(held) {
-                if !next.contains(&form) {
-                    next.push(form);
-                }
-            }
-        }
-        let Some(declared) = declared else {
-            return Err(format!(
-                "`{attribute}` is no attribute of `{}` in the openEHR reference model",
-                candidates.join("`, `")
-            ));
-        };
-        leaf = Some(declared);
-        holder = typed.unwrap_or_else(|| String::from(declared));
-        if next.is_empty() {
-            let last = position.saturating_add(1) == tail.segments.len();
-            return Ok(last.then(|| String::from(declared)));
-        }
-        candidates = next;
-    }
-    Ok(leaf.map(concrete_leaf))
-}
-
-/// Returns the class `held` with the one type argument `attribute` declares
-/// it with (`DV_INTERVAL<DV_QUANTITY>` for `DV_QUANTITY.normal_range`), so a
-/// bound below it reads as that argument.
-fn instantiated(held: &str, attribute: &model::RmAttribute) -> String {
-    match *attribute.type_params {
-        [ref only] if held == attribute.declared_type && only.params.is_empty() => {
-            format!("{held}<{}>", only.name)
-        }
-        _ => String::from(held),
+    match path_type(&class, tail) {
+        Ok(steps) => Ok(steps.last().map(|step| concrete_leaf(step.item().name()))),
+        Err(TypingError::UnknownClass(_)) => Ok(None),
+        Err(error) => Err(error.to_string()),
     }
 }
 
 /// Returns the one concrete form of an abstract class, or the class itself.
-fn concrete_leaf(declared: &'static str) -> String {
+fn concrete_leaf(declared: &str) -> String {
     let Some(class) = model::class(declared) else {
         return String::from(declared);
     };
@@ -287,4 +245,45 @@ pub(super) fn concrete_forms(rm_type: &str) -> Vec<&'static str> {
         }
     }
     forms
+}
+
+#[cfg(test)]
+mod tests {
+    use core::str::FromStr;
+
+    use openehr_rm::v1_2::paths::RmPath;
+
+    use super::rm_tail;
+
+    /// Returns the class `tail` ends on below a node of `rm_type`.
+    fn leaf(rm_type: &str, tail: &str) -> Option<String> {
+        let path = RmPath::from_str(tail).expect("the tail parses");
+        rm_tail(rm_type, &path).expect("the tail walks")
+    }
+
+    #[test]
+    fn a_bound_of_another_reference_range_is_the_quantity_the_range_belongs_to() {
+        // RM 1.1.0 data_types §REFERENCE_RANGE: `range` is a DV_INTERVAL<T>.
+        assert_eq!(
+            leaf("DV_QUANTITY", "other_reference_ranges/range/lower").as_deref(),
+            Some("DV_QUANTITY")
+        );
+        assert_eq!(
+            leaf("DV_COUNT", "other_reference_ranges/range/upper").as_deref(),
+            Some("DV_COUNT")
+        );
+        assert_eq!(
+            leaf("DV_QUANTITY", "other_reference_ranges/meaning").as_deref(),
+            Some("DV_TEXT")
+        );
+    }
+
+    #[test]
+    fn an_element_of_a_list_reads_as_the_class_the_list_holds() {
+        assert_eq!(leaf("DV_TEXT", "mappings").as_deref(), Some("TERM_MAPPING"));
+        assert_eq!(
+            leaf("DV_TEXT", "mappings/target").as_deref(),
+            Some("CODE_PHRASE")
+        );
+    }
 }

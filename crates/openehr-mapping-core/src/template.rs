@@ -72,6 +72,10 @@ pub enum TemplateSource {
         template: Box<OperationalTemplate>,
         /// The full HRID the request resolved to, as the client read it.
         resolved_id: String,
+        /// The path of every attribute the template removed for `existence
+        /// matches {0}` (`openehr_adl::opt::RawOpt`), which the Web Template
+        /// leaves out; empty for an OPT2 received with none.
+        prohibited_attributes: Vec<String>,
     },
 }
 
@@ -133,9 +137,14 @@ pub fn web_template(source: &TemplateSource) -> Result<WebTemplate, PathError> {
         TemplateSource::Opt14(ref opt) => {
             openehr_sdt::flat::webtemplate::builder::build_web_template(opt)
         }
-        TemplateSource::Opt2 { ref template, .. } => {
-            openehr_sdt::flat::webtemplate::builder_v2_4::build_web_template_v2_4(template)
-        }
+        TemplateSource::Opt2 {
+            ref template,
+            ref prohibited_attributes,
+            ..
+        } => openehr_sdt::flat::webtemplate::builder_v2_4::build_web_template_v2_4(
+            template,
+            prohibited_attributes,
+        ),
     };
     built.map_err(|source_error| PathError::TemplateBuild {
         generation: source.generation(),

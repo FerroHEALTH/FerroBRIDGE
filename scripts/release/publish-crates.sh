@@ -35,6 +35,7 @@ cd "$(dirname "$0")/../.."
 readonly CRATES=(
   fhir-types
   hl7v2-types
+  fhir-search
   openehr-mapping-core
   ferrobridge-operator-api
   fhirconnect

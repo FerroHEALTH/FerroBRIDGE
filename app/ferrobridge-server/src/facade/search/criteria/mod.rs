@@ -26,11 +26,11 @@ use crate::facade::search::Declared;
 use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::identifier::IdentifierSearch;
 use crate::facade::search::value;
-use crate::facade::search::value::DateValue;
-use crate::facade::search::value::StringMatch;
-use crate::facade::search::value::System;
-use crate::facade::search::value::Token;
 use crate::facade::search::value::ValueError;
+use fhir_search::date::DateValue;
+use fhir_search::escape::{split, unescape};
+use fhir_search::string::StringMatch;
+use fhir_search::token::Token;
 
 /// The parameter that names the page a `next` link continues from.
 ///
@@ -431,11 +431,11 @@ impl Reader<'_> {
             return;
         }
         let mut ids = Vec::new();
-        for part in value::split(text, ',') {
-            match value::unescape(&part) {
+        for part in split(text, ',') {
+            match unescape(&part) {
                 Ok(id) => ids.push(id),
                 Err(error) => {
-                    self.invalid_value(name, &error);
+                    self.invalid_value(name, &ValueError::from(error));
                     return;
                 }
             }
@@ -460,7 +460,7 @@ impl Reader<'_> {
         let read = match kind {
             ParameterType::Reference => self.subject(modifier, text),
             ParameterType::Token => no_modifier(modifier).and_then(|()| {
-                each(text, value::token).map(|values| {
+                each(text, Token::parse).map(|values| {
                     self.criteria.filters.push(Filter {
                         name: base.to_owned(),
                         test: Test::Token(values),
@@ -490,16 +490,16 @@ impl Reader<'_> {
     /// Reads a string parameter with its optional `:exact` or `:contains`
     /// (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.8).
     fn text(&mut self, base: &str, modifier: Option<&str>, text: &str) -> Result<(), Refused> {
-        let matching = match modifier {
+        let matching = match modifier.map(|named| (named, StringMatch::from_modifier(Some(named))))
+        {
             None => StringMatch::Start,
-            Some("exact") => StringMatch::Exact,
-            Some("contains") => StringMatch::Contains,
-            Some(other) => return Err(Refused::Modifier(other.to_owned())),
+            Some((_, Some(matching))) => matching,
+            Some((other, None)) => return Err(Refused::Modifier(other.to_owned())),
         };
         let values = each(text, |part| {
-            let plain = value::unescape(part)?;
+            let plain = unescape(part)?;
             value::like_pattern(&plain, matching)?;
-            Ok(plain)
+            Ok::<_, ValueError>(plain)
         })?;
         self.criteria.filters.push(Filter {
             name: base.to_owned(),
@@ -516,7 +516,7 @@ impl Reader<'_> {
         let typed = match modifier {
             None => None,
             Some("identifier") => {
-                let tokens = each(text, value::token)?;
+                let tokens = each(text, Token::parse)?;
                 let subjects = tokens
                     .into_iter()
                     .map(reference_identifier)
@@ -529,8 +529,8 @@ impl Reader<'_> {
         };
         let own = format!("{}/", self.base.trim_end_matches('/'));
         let subjects = each(text, |part| {
-            let plain = value::unescape(part)?;
-            Ok(subject_of(&plain, typed, &own))
+            let plain = unescape(part)?;
+            Ok::<_, ValueError>(subject_of(&plain, typed, &own))
         })?;
         self.criteria.subjects.push(subjects);
         Ok(())
@@ -610,10 +610,13 @@ fn no_modifier(modifier: Option<&str>) -> Result<(), Refused> {
 }
 
 /// Reads every comma-separated value of `text` with `read`.
-fn each<T>(text: &str, read: impl Fn(&str) -> Result<T, ValueError>) -> Result<Vec<T>, Refused> {
-    value::split(text, ',')
+fn each<T, E>(text: &str, read: impl Fn(&str) -> Result<T, E>) -> Result<Vec<T>, Refused>
+where
+    ValueError: From<E>,
+{
+    split(text, ',')
         .iter()
-        .map(|part| read(part).map_err(Refused::Value))
+        .map(|part| read(part).map_err(|error| Refused::Value(ValueError::from(error))))
         .collect()
 }
 
@@ -627,15 +630,16 @@ fn each<T>(text: &str, read: impl Fn(&str) -> Result<T, ValueError>) -> Result<V
 /// across systems, is refused because the identity map keys a subject by
 /// system and value (no specification governs the map: our own design).
 fn reference_identifier(token: Token) -> Result<Subject, ValueError> {
-    let Some(value) = token.code else {
-        return Err(ValueError::Unsupported(String::from(
+    match token {
+        Token::SystemCode { system, code } => Ok(Subject::ReferenceIdentifier {
+            system,
+            value: code,
+        }),
+        Token::NoSystem(_) => Ok(Subject::Never),
+        Token::System(_) => Err(ValueError::Unsupported(String::from(
             "an :identifier value names the identifier value, and this one names a system alone",
-        )));
-    };
-    match token.system {
-        System::Is(system) => Ok(Subject::ReferenceIdentifier { system, value }),
-        System::Absent => Ok(Subject::Never),
-        System::Any => Err(ValueError::Unsupported(String::from(
+        ))),
+        Token::Code(_) => Err(ValueError::Unsupported(String::from(
             "an :identifier value names its system, as [system]|[value], because a subject is keyed by system and value",
         ))),
     }

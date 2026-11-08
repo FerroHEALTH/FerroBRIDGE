@@ -10,7 +10,12 @@ use std::error::Error;
 use eehrxf::receive::ReceivedDocument;
 use serde_json::Value;
 
-use super::{mapping, received_text, received_text_of, report, result, settings};
+use fhirconnect::engine::context::CallContext;
+use fhirconnect::operations::run::Settings;
+
+use super::{
+    NOW, committed, mapping, only, received_text, received_text_of, report, result, settings,
+};
 
 /// The element paths the run's outcome declares not carried into the
 /// composition, mapping the report `report` of the result `result`.
@@ -57,6 +62,41 @@ fn quantity_of(value: &Value, magnitude: f64) -> Option<&Value> {
     }
 }
 
+/// The synthetic result with one further range per `(meaning, low, high)`,
+/// each typed by its code in the R4 `referencerange-meaning` code system.
+fn typed_result(ranges: &[(&str, Option<u32>, Option<u32>)]) -> Result<Value, Box<dyn Error>> {
+    let quantity = |value: u32| {
+        serde_json::json!({
+            "value": value,
+            "unit": "mg/dL",
+            "system": "http://unitsofmeasure.org",
+            "code": "mg/dL"
+        })
+    };
+    let mut typed = result();
+    let held = typed["referenceRange"]
+        .as_array_mut()
+        .ok_or("the synthetic ranges")?;
+    for &(meaning, low, high) in ranges {
+        let mut range = serde_json::json!({"type": {"coding": [{
+            "system": REFERENCE_RANGE_MEANING,
+            "code": meaning
+        }]}});
+        if let Some(low) = low {
+            range["low"] = quantity(low);
+        }
+        if let Some(high) = high {
+            range["high"] = quantity(high);
+        }
+        held.push(range);
+    }
+    Ok(typed)
+}
+
+/// The R4 code system of `Observation.referenceRange.type`.
+const REFERENCE_RANGE_MEANING: &str =
+    "http://terminology.hl7.org/CodeSystem/referencerange-meaning";
+
 // NOTE: openEHR RM data_types §DV_ORDERED `normal_range`, and R4 Observation.referenceRange.type:
 // "If this element is not present then the normal range is assumed".
 #[test]
@@ -97,28 +137,13 @@ fn a_received_order_identifier_is_the_order_the_template_holds() -> Result<(), B
     Ok(())
 }
 
+// NOTE: openEHR RM data_types §DV_ORDERED `other_reference_ranges` and FHIRconnect DV_QUANTITY.adoc
+// §Range: a range that is not the normal range is one of the quantity's other reference ranges.
 #[test]
-fn a_typed_reference_range_is_declared_not_carried() -> Result<(), Box<dyn Error>> {
-    let mut typed = result();
-    let ranges = typed["referenceRange"]
-        .as_array_mut()
-        .ok_or("the synthetic ranges")?;
-    ranges.push(serde_json::json!({
-        "type": {"coding": [{
-            "system": "http://terminology.hl7.org/CodeSystem/referencerange-meaning",
-            "code": "treatment"
-        }]},
-        "high": {
-            "value": 160,
-            "unit": "mg/dL",
-            "system": "http://unitsofmeasure.org",
-            "code": "mg/dL"
-        }
-    }));
-    assert_eq!(
-        not_carried(&typed, &report())?,
-        ["Observation.referenceRange[1]"]
-    );
+fn a_typed_reference_range_is_another_reference_range_of_the_result() -> Result<(), Box<dyn Error>>
+{
+    let typed = typed_result(&[("treatment", None, Some(160))])?;
+    assert_eq!(not_carried(&typed, &report())?, Vec::<String>::new());
     let document = ReceivedDocument::read(&received_text_of(&typed, &report())?)?;
     let composition = mapping()?.to_openehr(&document, &settings())?;
     let canonical: Value = serde_json::from_str(composition.composition())?;
@@ -128,6 +153,43 @@ fn a_typed_reference_range_is_declared_not_carried() -> Result<(), Box<dyn Error
         Some(200.0),
         "the treatment range is no normal range: {measured}"
     );
+    let others = measured["other_reference_ranges"]
+        .as_array()
+        .ok_or("the quantity's other reference ranges")?;
+    assert_eq!(others.len(), 1, "{measured}");
+    let treatment = &others[0];
+    // NOTE: RM REFERENCE_RANGE.meaning is a DV_TEXT, and FHIRconnect DV_TEXT.adoc §CodeableConcept
+    // carries each coding as a TERM_MAPPING of it.
+    let coded = &treatment["meaning"]["mappings"][0]["target"];
+    assert_eq!(coded["code_string"], "treatment", "{treatment}");
+    assert_eq!(
+        coded["terminology_id"]["value"], REFERENCE_RANGE_MEANING,
+        "{treatment}"
+    );
+    assert_eq!(
+        treatment["range"]["upper"]["magnitude"].as_f64(),
+        Some(160.0),
+        "{treatment}"
+    );
+    assert_eq!(treatment["range"]["upper"]["units"], "mg/dL", "{treatment}");
+    assert!(
+        treatment["range"].get("lower").is_none_or(Value::is_null),
+        "the treatment range has no lower bound: {treatment}"
+    );
+    // NOTE: ITS-JSON `INTERVAL` requires all four flags, and BASE foundation types
+    // §Interval makes an absent bound unbounded and not included.
+    for (flag, expected) in [
+        ("lower_unbounded", true),
+        ("lower_included", false),
+        ("upper_unbounded", false),
+        ("upper_included", true),
+    ] {
+        assert_eq!(
+            treatment["range"][flag].as_bool(),
+            Some(expected),
+            "{flag}: {treatment}"
+        );
+    }
     Ok(())
 }
 
@@ -161,5 +223,63 @@ fn an_order_named_by_reference_alone_is_declared_not_carried() -> Result<(), Box
         not_carried(&result(), &referenced)?,
         ["DiagnosticReport.basedOn[0].reference"]
     );
+    Ok(())
+}
+
+// NOTE: R4 Observation.referenceRange.type: "Codes to indicate what part of the targeted reference
+// population it applies to"; each other reference range is served with its meaning as the type.
+#[test]
+fn each_other_reference_range_of_a_result_is_served_with_its_type() -> Result<(), Box<dyn Error>> {
+    let typed = typed_result(&[
+        ("treatment", None, Some(160)),
+        ("normal", Some(100), Some(190)),
+    ])?;
+    let document = ReceivedDocument::read(&received_text_of(&typed, &report())?)?;
+    let mapping = mapping()?;
+    let composition = mapping.to_openehr(&document, &settings())?;
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let measured = quantity_of(&canonical, 182.0).ok_or("the result's quantity")?;
+    assert_eq!(
+        measured["other_reference_ranges"].as_array().map(Vec::len),
+        Some(2),
+        "{measured}"
+    );
+    let (run, warnings) = mapping.to_fhir_with_warnings(
+        &committed(composition.composition())?,
+        &Settings::new("Device/ferrobridge-eehrxf-test", NOW),
+        CallContext::new(),
+    )?;
+    let bundle = serde_json::to_value(run.bundle())?;
+    let served = only(&bundle, "Observation")?;
+    let ranges = served["referenceRange"]
+        .as_array()
+        .ok_or("the served ranges")?;
+    assert_eq!(ranges.len(), 3, "{served}");
+    let normal = &ranges[0];
+    assert!(normal.get("type").is_none(), "{normal}");
+    assert_eq!(normal["low"]["value"], 120, "{normal}");
+    assert_eq!(normal["high"]["value"], 200, "{normal}");
+    for (range, (meaning, low, high)) in ranges[1..]
+        .iter()
+        .zip([("treatment", None, 160), ("normal", Some(100), 190)])
+    {
+        assert_eq!(
+            range["type"]["coding"][0],
+            serde_json::json!({"system": REFERENCE_RANGE_MEANING, "code": meaning}),
+            "{range}"
+        );
+        assert_eq!(range["high"]["value"], high, "{range}");
+        assert_eq!(range["high"]["unit"], "mg/dL", "{range}");
+        match low {
+            Some(low) => assert_eq!(range["low"]["value"], low, "{range}"),
+            None => assert!(range.get("low").is_none(), "{range}"),
+        }
+    }
+    let declared: Vec<String> = warnings
+        .iter()
+        .filter_map(|warning| warning.location().fhir().map(String::from))
+        .filter(|path| path.starts_with("Observation.referenceRange"))
+        .collect();
+    assert_eq!(declared, Vec::<String>::new(), "{warnings:?}");
     Ok(())
 }

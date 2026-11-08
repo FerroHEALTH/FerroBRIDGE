@@ -126,10 +126,11 @@ fn template(id: &str) -> Result<WebTemplateIndex, Box<dyn Error>> {
     let repository = repository()?;
     let template = openehr_adl::assemble::parse_artefact(source, Dialect::Adl2)
         .map_err(|errors| format!("{id}: {errors:?}"))?;
-    let opt = openehr_adl::opt::create_opt(&template, &repository)
+    let raw = openehr_adl::opt::create_opt(&template, &repository)
         .map_err(|errors| format!("{id}: the operational template: {errors:?}"))?;
     let index = WebTemplateIndex::build(&TemplateSource::Opt2 {
-        template: Box::new(opt),
+        template: Box::new(raw.template),
+        prohibited_attributes: raw.prohibited_attributes,
         resolved_id: id.to_owned(),
     })?;
     Ok(index.with_root_lineage(lineage(&template, &repository)?))

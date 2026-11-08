@@ -67,6 +67,7 @@ use crate::engine::seam::Seams;
 use crate::engine::subject::SubjectIdentifier;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::Program;
+use crate::resolve::program::target::ListAxis;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::Occurrence;
 
@@ -98,6 +99,11 @@ struct Binding {
     /// The repeating openEHR nodes `openehr` holds an instance of, one per
     /// position, outermost first.
     axes: Vec<FlatId>,
+    /// The element of each `List` attribute below the node `elements` holds
+    /// an instance of, one per position, outermost first.
+    elements: Vec<RmPosition>,
+    /// The `List` attributes `elements` holds an element of.
+    lists: Vec<ListAxis>,
     /// How many references deep the document the FHIR occurrence indexes
     /// lies, the program's own resource being `0`.
     level: usize,
@@ -128,6 +134,66 @@ impl Binding {
             fhir,
             openehr: self.openehr.clone(),
             axes: self.axes.clone(),
+            elements: self.elements.clone(),
+            lists: self.lists.clone(),
+            level,
+        }
+    }
+
+    /// Returns how many of the `List` axes of `target` this binding holds an
+    /// element of.
+    ///
+    /// A list lies inside the value of one node instance, so the binding
+    /// holds its element only while it holds every repeating node of the
+    /// target and names the same attributes below the same node.
+    fn shared_lists(&self, target: &OpenehrTarget) -> usize {
+        let depth = target.occurrences().len();
+        if self.shared(target.occurrences()) != depth || self.openehr.len() != depth {
+            return 0;
+        }
+        self.lists
+            .iter()
+            .zip(target.lists())
+            .zip(&self.elements)
+            .take_while(|&((held, wanted), _)| held == wanted)
+            .count()
+    }
+
+    /// Returns the binding of an openEHR occurrence's `positions`, its node's
+    /// instance followed by the element of each `List` axis of `target`.
+    ///
+    /// A mapping with no openEHR side reads the instance its parent bound, so
+    /// it keeps the parent's elements.
+    fn of_openehr(
+        &self,
+        target: Option<&OpenehrTarget>,
+        fhir: Occurrence,
+        mut positions: Vec<RmPosition>,
+        level: usize,
+    ) -> Self {
+        let Some(target) = target else {
+            return Self {
+                fhir,
+                axes: self.axes_of(None, positions.len()),
+                openehr: positions,
+                elements: self.elements.clone(),
+                lists: self.lists.clone(),
+                level,
+            };
+        };
+        let depth = target.occurrences().len().min(positions.len());
+        let elements = positions.split_off(depth);
+        let lists = target
+            .lists()
+            .get(..elements.len())
+            .unwrap_or(target.lists())
+            .to_vec();
+        Self {
+            fhir,
+            axes: self.axes_of(Some(target), positions.len()),
+            openehr: positions,
+            elements,
+            lists,
             level,
         }
     }
