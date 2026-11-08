@@ -39,7 +39,7 @@ macro_rules! shipped {
 
 /// Every shipped supplement, as its file name and its text, in file name
 /// order.
-pub const SHIPPED: [(&str, &str); 37] = [
+pub const SHIPPED: [(&str, &str); 38] = [
     shipped!("ConceptMap-datatype-ce-to-codeableconcept.json"),
     shipped!("ConceptMap-datatype-cf-to-codeableconcept.json"),
     shipped!("ConceptMap-datatype-cwe-to-codeableconcept.json"),
@@ -47,6 +47,7 @@ pub const SHIPPED: [(&str, &str); 37] = [
     shipped!("ConceptMap-datatype-hd-name-to-messageheader-destination.json"),
     shipped!("ConceptMap-datatype-hd-name-to-messageheader-source.json"),
     shipped!("ConceptMap-datatype-pl-to-location.json"),
+    shipped!("ConceptMap-datatype-xad-to-address.json"),
     shipped!("ConceptMap-datatype-xpn-to-string.json"),
     shipped!("ConceptMap-message-adt-a03-to-bundle.json"),
     shipped!("ConceptMap-message-adt-a05-to-bundle.json"),

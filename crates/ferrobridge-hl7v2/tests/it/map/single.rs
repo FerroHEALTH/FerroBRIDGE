@@ -67,6 +67,16 @@ async fn a_pid_maps_to_one_patient_through_the_guide_s_maps() {
         "table 0200 L"
     );
     assert_eq!(patient.address.len(), 1);
+    let lines: Vec<Option<&str>> = patient.address[0]
+        .line
+        .iter()
+        .map(|line| line.value.as_deref())
+        .collect();
+    assert_eq!(
+        lines,
+        [Some("Main Street 1")],
+        "the shipped datatype-xad-to-address supplement runs SAD into line"
+    );
     assert_eq!(
         patient.address[0]
             .r#use
