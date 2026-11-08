@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# A FerroBRIDGE-authored model mapping that names DV_TEXT.mappings/match below
-# the DV_CODED_TEXT node of items[at0073]. `mappings` is a list, and the engine
-# walks a tail by attribute name into one value, so it refuses the tail.
+# A FerroBRIDGE-authored model mapping that names DV_TEXT.mappings below the
+# DV_CODED_TEXT node of items[at0073]. `mappings` is a list, which holds no
+# single value, and no child fills one of its elements, so the compiler
+# refuses the tail.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -26,4 +27,4 @@ mappings:
   - name: "certaintyLink"
     with:
       fhir: "$resource.verificationStatus.text"
-      openehr: "$archetype/data[at0001]/items[at0073]/value/mappings/match"
+      openehr: "$archetype/data[at0001]/items[at0073]/value/mappings"

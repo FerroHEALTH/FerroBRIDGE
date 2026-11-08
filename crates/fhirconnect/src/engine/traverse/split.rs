@@ -323,7 +323,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             // the element sees, and any other structure by its JSON.
             let text = read
                 .as_ref()
-                .and_then(|value| attribute_at(value, target))
+                .and_then(|value| attribute_at(value, target, &[]))
                 .map(|value| {
                     scalar(value)
                         .or_else(|| value.get("value").and_then(scalar))

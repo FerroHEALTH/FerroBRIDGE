@@ -216,7 +216,7 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
             };
             let held = derive::attribute_class(&holder, found);
             declared.get_or_insert(held);
-            typed.get_or_insert_with(|| instantiated(held, found));
+            typed.get_or_insert_with(|| instantiated(&holder, held, found));
             for form in concrete_forms(held) {
                 if !next.contains(&form) {
                     next.push(form);
@@ -243,13 +243,39 @@ pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, St
 /// Returns the class `held` with the one type argument `attribute` declares
 /// it with (`DV_INTERVAL<DV_QUANTITY>` for `DV_QUANTITY.normal_range`), so a
 /// bound below it reads as that argument.
-fn instantiated(held: &str, attribute: &model::RmAttribute) -> String {
+///
+/// An attribute of a generic `holder` that declares a generic class with no
+/// argument is typed by the holder's argument where the two classes bound
+/// their one parameter alike: `REFERENCE_RANGE<T: DV_ORDERED>.range` is a
+/// `DV_INTERVAL<T>`
+/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_reference_range_class>),
+/// so the range of a `REFERENCE_RANGE<DV_QUANTITY>` is a
+/// `DV_INTERVAL<DV_QUANTITY>`.
+fn instantiated(holder: &str, held: &str, attribute: &model::RmAttribute) -> String {
     match *attribute.type_params {
         [ref only] if held == attribute.declared_type && only.params.is_empty() => {
             format!("{held}<{}>", only.name)
         }
+        // NOTE: the RM 1.2.0 BMM declares `REFERENCE_RANGE.range` a plain `DV_INTERVAL`
+        // property, so the parameter the RM text gives it is read from the holder.
+        [] if held == attribute.declared_type => {
+            elided_argument(holder, held).map_or_else(|| String::from(held), String::from)
+        }
         _ => String::from(held),
     }
+}
+
+/// Returns `held<A>` when `holder` is `C<A>`, `C` and `held` each have one
+/// generic parameter with the same bound, and `A` conforms to it.
+fn elided_argument(holder: &str, held: &str) -> Option<String> {
+    let argument = derive::type_argument(holder)?;
+    let bound_of = |class: &str| match *model::class(class)?.generic_params {
+        [ref only] => only.conforms_to,
+        _ => None,
+    };
+    let bound = bound_of(derive::base_class(holder))?;
+    (bound_of(held) == Some(bound) && model::is_a(argument, bound))
+        .then(|| format!("{held}<{argument}>"))
 }
 
 /// Returns the one concrete form of an abstract class, or the class itself.
@@ -287,4 +313,45 @@ pub(super) fn concrete_forms(rm_type: &str) -> Vec<&'static str> {
         }
     }
     forms
+}
+
+#[cfg(test)]
+mod tests {
+    use core::str::FromStr;
+
+    use openehr_rm::v1_2::paths::RmPath;
+
+    use super::rm_tail;
+
+    /// Returns the class `tail` ends on below a node of `rm_type`.
+    fn leaf(rm_type: &str, tail: &str) -> Option<String> {
+        let path = RmPath::from_str(tail).expect("the tail parses");
+        rm_tail(rm_type, &path).expect("the tail walks")
+    }
+
+    #[test]
+    fn a_bound_of_another_reference_range_is_the_quantity_the_range_belongs_to() {
+        // RM 1.1.0 data_types §REFERENCE_RANGE: `range` is a DV_INTERVAL<T>.
+        assert_eq!(
+            leaf("DV_QUANTITY", "other_reference_ranges/range/lower").as_deref(),
+            Some("DV_QUANTITY")
+        );
+        assert_eq!(
+            leaf("DV_COUNT", "other_reference_ranges/range/upper").as_deref(),
+            Some("DV_COUNT")
+        );
+        assert_eq!(
+            leaf("DV_QUANTITY", "other_reference_ranges/meaning").as_deref(),
+            Some("DV_TEXT")
+        );
+    }
+
+    #[test]
+    fn an_element_of_a_list_reads_as_the_class_the_list_holds() {
+        assert_eq!(leaf("DV_TEXT", "mappings").as_deref(), Some("TERM_MAPPING"));
+        assert_eq!(
+            leaf("DV_TEXT", "mappings/target").as_deref(),
+            Some("CODE_PHRASE")
+        );
+    }
 }

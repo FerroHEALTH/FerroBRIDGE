@@ -389,10 +389,9 @@ fn uncompiled(certainty: Mapping) -> Result<Arc<Program>, Box<dyn Error>> {
 
 #[test]
 fn a_tail_no_flat_part_carries_is_refused_in_both_directions() -> Result<(), Box<dyn Error>> {
-    // DV_TEXT.mappings is a list of the reference model, and the engine walks
-    // a tail by attribute name into one value, so a write through it would be
-    // lost on the way to the wire. The compiler refuses it at load; this is
-    // the engine's backstop.
+    // DV_TEXT.mappings is a list of the reference model, which holds no single
+    // value, so a write of one value into it would be lost on the way to the
+    // wire. The compiler refuses it at load; this is the engine's backstop.
     let carrier = compiled("ferrobridge_tail")?;
     let node = mapping(&carrier, "certainty")
         .and_then(Mapping::openehr)
@@ -402,7 +401,7 @@ fn a_tail_no_flat_part_carries_is_refused_in_both_directions() -> Result<(), Box
         ..value_parts(
             "certaintyLink",
             condition_target("$resource.verificationStatus.text")?,
-            with_tail(node, "mappings/match")?.with_leaf_class("String"),
+            with_tail(node, "mappings")?.with_leaf_class("TERM_MAPPING"),
         )?
     }))?;
     let index = template()?;
@@ -415,7 +414,7 @@ fn a_tail_no_flat_part_carries_is_refused_in_both_directions() -> Result<(), Box
         &defaults(),
         &CallContext::new(),
     )
-    .expect_err("the engine carries no tail through a list");
+    .expect_err("the engine writes no single value into a list");
     assert!(
         matches!(error, EngineError::UnsupportedTail { ref tail, .. } if tail.contains("mappings")),
         "the refusal names the tail: {error}"
