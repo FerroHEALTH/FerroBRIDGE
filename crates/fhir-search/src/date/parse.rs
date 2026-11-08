@@ -3,8 +3,6 @@
 
 //! Reads a date to the lexical form of §3.1.1.4.7.
 
-use jiff::civil::Date;
-
 use super::{Clock, DateError, Offset, SearchDate, Second};
 
 impl SearchDate {
@@ -40,7 +38,9 @@ impl SearchDate {
             if !(1..=31).contains(&day) {
                 return Err(DateError::Form);
             }
-            Date::new(year, month, day).map_err(|_absent| DateError::Calendar)?;
+            if day > super::range::days_in_month(year, month) {
+                return Err(DateError::Calendar);
+            }
         }
         let time = match time_part {
             None => None,
