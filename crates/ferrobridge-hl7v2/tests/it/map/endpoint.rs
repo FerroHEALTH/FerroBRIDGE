@@ -3,6 +3,7 @@
 
 //! The `MessageHeader` source and destination endpoints.
 
+use ferrobridge_hl7v2::map::translate::Translator;
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
 use fhir_types::codec::{Json, Path, Value};
 
@@ -350,7 +351,7 @@ async fn a_message_whose_source_no_row_completes_maps_to_no_bundle() {
     let corpus = support::corpus();
     let tables = tables();
     let (_server, client) = tables.serve().await;
-    let refused = map(&parsed, &corpus, Some(&client)).await;
+    let refused = map(&parsed, &corpus, Some(Translator::Server(&client))).await;
     match refused {
         Err(ferrobridge_hl7v2::map::MapError::NoMessageHeader { dropped }) => {
             assert!(

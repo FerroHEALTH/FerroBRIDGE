@@ -59,6 +59,9 @@ expression: pretty(mapped.bundle())
           {
             "city": "BOULDER",
             "country": "US",
+            "line": [
+              "3003 TESTING RD LOT 92"
+            ],
             "postalCode": "12345-2144",
             "state": "CO"
           }

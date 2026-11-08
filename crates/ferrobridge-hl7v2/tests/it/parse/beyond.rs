@@ -110,3 +110,38 @@ fn empty_trailing_constituents_are_not_counted() {
     ));
     assert_eq!(beyond(&parsed), []);
 }
+
+#[test]
+fn the_user_parameters_of_a_qpd_continue_in_successive_fields() {
+    // NOTE: HL7 v2.5 QPD-3 is "User Parameters (in successive fields)" (chapter 5), so QPD-4 is one.
+    let parsed = support::parsed(&fixtures::message(&[
+        b"MSH|^~\\&|CONSUMER|EAST|PIX|NORTH|20261025100000||QBP^Q23^QBP_Q21|Q-1|P|2.5",
+        b"QPD|IHE PIX Query|TAG-1|A1^^^EAST&2.999.1.1&ISO|^^^&2.999.1.2&ISO",
+        b"RCP|I",
+    ]));
+    assert!(
+        !parsed
+            .unplaced()
+            .iter()
+            .any(|outcome| matches!(outcome, Unplaced::ExtraField { .. })),
+        "{:?}",
+        parsed.unplaced()
+    );
+}
+
+#[test]
+fn a_field_beyond_a_table_that_ends_in_a_typed_field_is_still_counted() {
+    let parsed = support::parsed(&fixtures::message(&[
+        b"MSH|^~\\&|CONSUMER|EAST|PIX|NORTH|20261025100000||QBP^Q23^QBP_Q21|Q-1|P|2.5",
+        b"QPD|IHE PIX Query|TAG-1|A1^^^EAST&2.999.1.1&ISO",
+        b"RCP|I||||||||extra",
+    ]));
+    assert!(
+        parsed
+            .unplaced()
+            .iter()
+            .any(|outcome| matches!(outcome, Unplaced::ExtraField { location } if location.segment == "RCP")),
+        "{:?}",
+        parsed.unplaced()
+    );
+}

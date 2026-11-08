@@ -33,8 +33,7 @@ pub async fn example(State(operator): State<Arc<Operator>>, Path(id): Path<Strin
             "the running set holds no template of this id",
         );
     };
-    let now = jiff::Timestamp::now().to_string();
-    match tokio::task::spawn_blocking(move || index.example_composition(&now)).await {
+    match tokio::task::spawn_blocking(move || index.example_composition()).await {
         Ok(Ok(composition)) => axum::Json(composition.into_value()).into_response(),
         Ok(Err(error)) => {
             if !matches!(error, PathError::NotComposition { .. }) {

@@ -37,6 +37,10 @@ A server percent-decodes a parameter's value and reads it in two steps:
   has no offset read in the server's zone. `SearchDate::approximate` widens
   the range by the recommended 10% of its gap to now, for `ap`.
 
+The default feature `jiff` carries the instants, `approximate` and
+`first_day`. With `default-features = false` everything else compiles with
+no time library, for a consumer that reads tokens and escapes alone.
+
 No error and no `Debug` output carries a value: a code may be an identifier
 and a date a birth date.
 

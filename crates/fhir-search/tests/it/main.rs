@@ -15,6 +15,7 @@
 
 mod date;
 mod escape;
+#[cfg(feature = "jiff")]
 mod instant;
 mod prefix;
 mod string;
