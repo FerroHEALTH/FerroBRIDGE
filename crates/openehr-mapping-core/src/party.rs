@@ -131,6 +131,16 @@ pub enum PartyError {
         #[source]
         source: Box<JsonParseError>,
     },
+    /// The party does not validate against its template, the RM invariants
+    /// or the RM-mandated openEHR terminology
+    /// (`openehr_sdt::rm_instance::validate_party`).
+    #[error("the party does not validate against `{template_id}`: {}", messages.join("; "))]
+    Unvalidated {
+        /// The template the party was validated against.
+        template_id: String,
+        /// One rendered message per violation.
+        messages: Vec<String>,
+    },
     /// A `ROLE` names no `performer`, which the RM makes mandatory.
     #[error(
         "the ROLE of the template `{template_id}` names no performer, which `ROLE.performer` \
@@ -216,8 +226,9 @@ impl WebTemplateIndex {
     /// builder refuses the values, [`PartyError::UnknownAttribute`] for a root
     /// value naming an attribute the root's class does not have,
     /// [`PartyError::RoleWithoutPerformer`] for a `ROLE` with no `performer`,
-    /// and [`PartyError::Invalid`] when the result does not decode as the
-    /// root's class.
+    /// [`PartyError::Invalid`] when the result does not decode as the root's
+    /// class, and [`PartyError::Unvalidated`] when it does not validate against
+    /// the template.
     pub fn build_party(&self, values: &[NodeValue]) -> Result<CanonicalParty, PartyError> {
         let kind = self.party_kind()?;
         let root = self.root().flat_id().as_str().to_owned();
@@ -264,11 +275,7 @@ impl WebTemplateIndex {
             class: kind,
             source: Box::new(source),
         })?;
-        Ok(CanonicalParty {
-            value,
-            template_id: self.template_id().to_owned(),
-            class: kind,
-        })
+        self.validated(kind, value)
     }
 
     /// Wraps canonical JSON a CDR served as a party of this template, decoded
@@ -278,8 +285,9 @@ impl WebTemplateIndex {
     ///
     /// Returns [`PartyError::NotAParty`] for a template rooted at no party,
     /// [`PartyError::RoleWithoutPerformer`] for a `ROLE` with no `performer`,
-    /// and [`PartyError::Invalid`] when the document does not decode as the
-    /// root's class.
+    /// [`PartyError::Invalid`] when the document does not decode as the root's
+    /// class, and [`PartyError::Unvalidated`] when it does not validate against
+    /// the template.
     pub fn accept_party(&self, value: &Value) -> Result<CanonicalParty, PartyError> {
         let kind = self.party_kind()?;
         self.performed(kind, value)?;
@@ -288,6 +296,23 @@ impl WebTemplateIndex {
             class: kind,
             source: Box::new(source),
         })?;
+        self.validated(kind, value)
+    }
+
+    /// Returns `value` as a party of `kind` once it validates against the
+    /// template, the RM invariants and the RM-mandated openEHR terminology
+    /// (`openehr_sdt::rm_instance::validate_party`).
+    fn validated(&self, kind: PartyClass, value: Value) -> Result<CanonicalParty, PartyError> {
+        let messages = openehr_sdt::rm_instance::validate_party(&value, self.web_template());
+        if !messages.is_empty() {
+            return Err(PartyError::Unvalidated {
+                template_id: self.template_id().to_owned(),
+                messages: messages
+                    .iter()
+                    .map(|message| format!("{}: {}", message.path, message.message))
+                    .collect(),
+            });
+        }
         Ok(CanonicalParty {
             value,
             template_id: self.template_id().to_owned(),

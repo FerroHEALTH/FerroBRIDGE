@@ -330,3 +330,29 @@ fn a_root_value_naming_no_attribute_of_the_class_is_refused() {
         "{refused:?}"
     );
 }
+
+/// A person a CDR serves whose details item names a node the template does
+/// not define decodes as a `PERSON` and is refused by its template, with the
+/// `openehr-sdt` validation's messages.
+#[test]
+fn a_served_person_breaking_its_template_is_refused() {
+    let index = index_of(PERSON_OPT);
+    let mut served = index
+        .build_party(&person_values(&index))
+        .expect("the person builds")
+        .into_value();
+    if let Some(node) = served.pointer_mut("/details/items/0/archetype_node_id") {
+        *node = Value::from("at9999");
+    }
+    openehr_its::json::from_canonical_value::<Person>(&served)
+        .expect("the served person still decodes as a PERSON");
+    let refused = index.accept_party(&served);
+    assert!(
+        matches!(
+            refused,
+            Err(PartyError::Unvalidated { ref template_id, ref messages })
+                if template_id == PERSON_TEMPLATE_ID && !messages.is_empty()
+        ),
+        "{refused:?}"
+    );
+}
