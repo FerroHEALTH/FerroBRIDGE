@@ -3,8 +3,10 @@
 # FerroBRIDGE's model mapping of the CKM INSTRUCTION.medication_order.v3 to
 # the HL7 Europe Base and Core 2.0.1 medicationRequest-eu-core profile, the
 # entry the Hospital Discharge Report's discharge medications section takes:
-# the medication item, the overall directions and the comment of the order's
-# activity. As in the MPD project, an INSTRUCTION records no request status,
+# the medication item, the overall directions, route and start of the
+# order's dosage and the comment of the order's activity, each element the
+# profile has a place for; a run out of openEHR declares every other
+# element the composition holds. As in the MPD project, an INSTRUCTION records no request status,
 # so the resource says `unknown`, and it is always an `order` (no
 # specification governs the two fixed values: our own design).
 grammar: FHIRConnect/v1.0.0
@@ -62,10 +64,28 @@ mappings:
             fhir: "medication.as(CodeableConcept)"
             openehr: "description[at0002]/items[at0070]"
 
-        - name: "directions"
+        # NOTE: FHIRconnect recurrence/PopulatingAnEntry.adoc: the dosage anchors its children, so
+        # the directions, the route and the start fill one R4 Dosage.
+        - name: "dosage"
           with:
-            fhir: "dosageInstruction.text"
-            openehr: "description[at0002]/items[at0009]"
+            fhir: "dosageInstruction"
+            openehr: "description[at0002]"
+          followedBy:
+            mappings:
+              - name: "directions"
+                with:
+                  fhir: "text"
+                  openehr: "items[at0009]"
+
+              - name: "route"
+                with:
+                  fhir: "route"
+                  openehr: "items[at0091]"
+
+              - name: "start"
+                with:
+                  fhir: "timing.repeat.bounds.as(Period).start"
+                  openehr: "items[at0113]/items[at0012]"
 
         - name: "comment"
           with:

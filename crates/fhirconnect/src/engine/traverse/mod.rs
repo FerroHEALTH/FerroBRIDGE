@@ -40,6 +40,7 @@ pub mod reference;
 pub mod split;
 pub mod tail;
 pub mod translate;
+mod unread;
 pub mod walk;
 
 use std::collections::BTreeMap;
@@ -229,13 +230,7 @@ pub fn to_openehr<T: Table + ?Sized>(
         .iter()
         .map(|axis| (axis.clone(), RmPosition::first()))
         .collect();
-    run.admits_context()?;
-    run.split_or_run(
-        program.mappings(),
-        program.hierarchy(),
-        program.start().as_str(),
-        &Binding::default(),
-    )?;
+    run.whole_program()?;
     let mut defaulted = run.apply_defaults(defaults)?;
     let unplaced = run.place_facility(defaults, &mut defaulted)?;
     if let Some(origin) = defaults.origin() {
@@ -294,7 +289,16 @@ pub fn to_fhir<T: Table + ?Sized>(
     composition_program(program)?;
     let instances = root_instances(program, index, composition)?;
     let first = instances.first().cloned().unwrap_or_default();
-    let mut outcome = read_out(program, table, index, composition, seams, context, &first)?;
+    let mut outcome = read_out(
+        program,
+        table,
+        index,
+        composition,
+        Some(composition),
+        seams,
+        context,
+        &first,
+    )?;
     let further = instances.len().saturating_sub(1);
     if further > 0 {
         outcome.warn(Warning::new(
@@ -375,6 +379,7 @@ pub fn to_fhir_each<T: Table + ?Sized>(
             table,
             index,
             composition,
+            Some(composition),
             seams,
             context,
             &instance,
@@ -480,11 +485,16 @@ pub(crate) fn start_archetype(program: &Program) -> String {
 /// Runs `program` over a canonical document, a composition or a party,
 /// producing a FHIR resource, with the start archetype's axes pinned to
 /// `instance` when it names one.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the three composition entry points and the party one share this one run"
+)]
 fn read_out<T: Table + ?Sized>(
     program: &Program,
     table: &T,
     index: &WebTemplateIndex,
     document: &dyn CanonicalDocument,
+    composition: Option<&CanonicalComposition>,
     seams: &Seams<'_>,
     context: &CallContext,
     instance: &[RmPosition],
@@ -505,13 +515,24 @@ fn read_out<T: Table + ?Sized>(
         .cloned()
         .zip(instance.iter().copied())
         .collect();
-    run.admits_context()?;
-    run.split_or_run(
-        program.mappings(),
-        program.hierarchy(),
-        program.start().as_str(),
-        &Binding::default(),
-    )?;
+    run.whole_program()?;
+    if let Some(composition) = composition {
+        let read = run.carried.take();
+        let unread = unread::unread(program, index, composition, instance, &read)?;
+        // NOTE: no specification governs this: our own design, an element a warning of the run
+        // already names (a mapping it skipped) is declared once.
+        let named: std::collections::BTreeSet<String> = run
+            .warnings
+            .iter()
+            .filter_map(|warning| warning.location().openehr().map(String::from))
+            .collect();
+        run.warnings.extend(unread.into_iter().filter(|warning| {
+            warning
+                .location()
+                .openehr()
+                .is_none_or(|path| !named.contains(path))
+        }));
+    }
     let created = core::mem::take(&mut run.created);
     for document in core::iter::once(&run.fhir).chain(&created) {
         invariant::check(document).map_err(|breach| EngineError::Invariant {
@@ -595,6 +616,24 @@ struct Run<'a, T: Table + ?Sized> {
     intervals: Vec<event::Interval>,
     /// The FHIR elements the run read going into openEHR.
     reads: Vec<Location>,
+    /// The template node instances whose value the run read going out of
+    /// openEHR.
+    carried: core::cell::RefCell<std::collections::BTreeSet<unread::Instance>>,
+}
+
+impl<T: Table + ?Sized> Run<'_, T> {
+    /// Runs the whole program from its start, once the program's own
+    /// condition admits the input.
+    fn whole_program(&mut self) -> Result<(), EngineError> {
+        self.admits_context()?;
+        let program = self.program;
+        self.split_or_run(
+            program.mappings(),
+            program.hierarchy(),
+            program.start().as_str(),
+            &Binding::default(),
+        )
+    }
 }
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
@@ -640,6 +679,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             subject: Vec::new(),
             intervals: Vec::new(),
             reads: Vec::new(),
+            carried: core::cell::RefCell::default(),
         }
     }
 }

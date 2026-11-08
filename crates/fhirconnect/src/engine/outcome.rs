@@ -432,6 +432,17 @@ pub enum Loss {
         /// The extension's `valueCode`.
         reason: String,
     },
+    /// An element of the composition, at the occurrence the run mapped, that
+    /// no mapping of the program read going out to FHIR.
+    ///
+    /// A composition may hold elements a context's mappings do not name, and
+    /// the resource the run answers then carries nothing of them; the run
+    /// names each so a reader of the resource is told the source holds more
+    /// (no specification governs the declaration: our own design).
+    Unread {
+        /// The node identifier of the element in its archetype (`at0009`).
+        node: String,
+    },
 }
 
 impl fmt::Display for Loss {
@@ -467,6 +478,10 @@ impl fmt::Display for Loss {
             Self::Absent { ref reason } => write!(
                 f,
                 "the element is written absent, data-absent-reason `{reason}`"
+            ),
+            Self::Unread { ref node } => write!(
+                f,
+                "the composition holds the element {node}, which no mapping carries into the resource"
             ),
         }
     }

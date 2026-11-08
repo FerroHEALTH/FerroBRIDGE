@@ -58,6 +58,8 @@ fn a_received_discharge_report_maps_into_one_composition_that_keeps_it()
             "the mapping diagnosticSummary.title did not run: its unidirectional marker names the other direction",
             "the mapping diagnosticSummary.code did not run: its unidirectional marker names the other direction",
             "the mapping metaURL did not run: its unidirectional marker names the other direction",
+            "the mapping severity did not run: its unidirectional marker names the other direction",
+            "the mapping certainty did not run: its unidirectional marker names the other direction",
             "the engine filled /composer",
             "the engine filled /context/setting",
             "the engine filled /language",

@@ -46,6 +46,7 @@ use crate::engine::traverse::tail::attribute_at;
 use crate::engine::traverse::tail::scalar;
 use crate::engine::traverse::tail::tail_segments;
 use crate::engine::traverse::tail::unsupported_tail;
+use crate::engine::traverse::unread;
 
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Refuses an input the program's own condition does not admit.
@@ -198,9 +199,22 @@ impl<T: Table + ?Sized> Run<'_, T> {
         gate: &crate::resolve::program::condition::Condition,
         instance: &Binding,
     ) -> Result<bool, EngineError> {
+        self.openehr_condition(name, gate, instance)
+            .map(|(holds, _)| holds)
+    }
+
+    /// Evaluates an `openehrCondition` at one instance, answering the
+    /// verdict and the node instances it read.
+    pub(super) fn openehr_condition(
+        &self,
+        name: &str,
+        gate: &crate::resolve::program::condition::Condition,
+        instance: &Binding,
+    ) -> Result<(bool, Vec<unread::Instance>), EngineError> {
         let Some(composition) = self.composition else {
-            return Ok(true);
+            return Ok((true, Vec::new()));
         };
+        let mut read_at = Vec::new();
         let mut found = condition::Attributes::default();
         for attribute in gate.attributes() {
             let Target::Openehr(ref target) = *attribute else {
@@ -223,13 +237,14 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let Some(at_tail) = attribute_at(&value, target) else {
                 continue;
             };
+            read_at.push(unread::instance_of(target.node().flat_id(), &positions));
             found.present = found.present.saturating_add(1);
             found.types.push(String::from(target.node().rm_type()));
             if let Some(text) = scalar(at_tail) {
                 found.values.push(text);
             }
         }
-        Ok(condition::decide(gate, &found))
+        Ok((condition::decide(gate, &found), read_at))
     }
 
     /// Returns the positions one input occurrence names, as it was read.
@@ -458,12 +473,19 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return Ok(None);
         };
         let node = input.node();
-        self.read_target(composition, input, positions)
+        let value = self
+            .read_target(composition, input, positions)
             .map_err(|source| EngineError::Template {
                 mapping: String::from(name),
                 node: String::from(node.aql_path().as_str()),
                 source: Box::new(source),
-            })
+            })?;
+        if value.is_some() {
+            self.carried
+                .borrow_mut()
+                .insert(unread::instance_of(node.flat_id(), positions));
+        }
+        Ok(value)
     }
 
     /// Returns the value one instance of the input holds at the end of its

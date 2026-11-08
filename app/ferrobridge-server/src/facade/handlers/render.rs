@@ -489,6 +489,7 @@ pub(crate) const fn loss_kind(loss: &Loss) -> &'static str {
         Loss::UnmappedOccurrences { .. } => "unmapped-occurrences",
         Loss::InapplicableOccurrences { .. } => "inapplicable-occurrences",
         Loss::Absent { .. } => "absent",
+        Loss::Unread { .. } => "unread",
     }
 }
 

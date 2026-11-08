@@ -5,7 +5,7 @@
 # Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
 # under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
 # file carries no copyright line to keep.
-# The two overwrites are projects/ferrobridge/kds_diagnose's; the KDS case
+# The overwrite is projects/ferrobridge/kds_diagnose's; the KDS case
 # identification methods are left out.
 grammar: FHIRConnect/v1.0.0
 type: extension
@@ -18,17 +18,11 @@ spec:
   extends: COMPOSITION.report.v1.Condition
 
 mappings:
-  # The published model's lines 60 to 67, 90 to 97 and 134 to 141 write
-  # `null_flavour` below `context/start_time` (a DV_DATE_TIME) and `composer`
-  # (a PARTY_PROXY); the openEHR RM carries `null_flavour` on ELEMENT only,
-  # so against KDS_Diagnose these methods map nothing.
-  - name: "contextStartTimeEmpty"
-    extension: "overwrite"
-    with:
-      fhir: "$resource"
-      openehr: "$composition/context"
-      type: "NONE"
-
+  # The published model's lines 134 to 141 write `null_flavour` below
+  # `composer` (a PARTY_PROXY); the openEHR RM carries `null_flavour` on
+  # ELEMENT only, so against KDS_Diagnose the method maps nothing. Its lines
+  # 44 and 74 both name `contextStartTimeEmpty`, so basics/body.adoc leaves
+  # no single method for an overwrite of that name to address (#101).
   - name: "composerEmpty"
     extension: "overwrite"
     with:

@@ -3,8 +3,10 @@
 # FerroBRIDGE's model mapping of the CKM ACTION.procedure.v1 to the HL7
 # Europe Base and Core 2.0.1 procedure-eu-core profile, the entry the
 # Hospital Discharge Report's significant procedures section takes: the
-# procedure's name, the time it reached its careflow step, its body site and
-# its comment. A procedure commenced is in progress, one completed is
+# procedure's name, the time it reached its careflow step, its body site,
+# its reasons, outcomes and complications and its comment, each element the
+# profile has a place for; a run out of openEHR declares every other
+# element the composition holds. A procedure commenced is in progress, one completed is
 # completed and one aborted is stopped, the three careflow steps of the
 # archetype at which a procedure was performed (no specification governs
 # the pairing: our own design).
@@ -138,3 +140,18 @@ mappings:
     with:
       fhir: "$resource.note.text"
       openehr: "$archetype/description[at0001]/items[at0005]"
+
+  - name: "reason"
+    with:
+      fhir: "$resource.reasonCode"
+      openehr: "$archetype/description[at0001]/items[at0014]"
+
+  - name: "outcome"
+    with:
+      fhir: "$resource.outcome"
+      openehr: "$archetype/description[at0001]/items[at0048]"
+
+  - name: "complication"
+    with:
+      fhir: "$resource.complication"
+      openehr: "$archetype/description[at0001]/items[at0006]"

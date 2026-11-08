@@ -38,6 +38,7 @@ use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::operations::run::Settings;
 use openehr_adl::artefact::ArchetypeRepository;
@@ -222,6 +223,11 @@ fn with_sections(document: &mut Document, study: &str) -> Result<(), Box<dyn Err
 
 /// The synthetic imaging report document a member sends.
 fn received_text() -> Result<String, Box<dyn Error>> {
+    received_text_of(&report())
+}
+
+/// The received document of [`received_text`], its report `report`.
+fn received_text_of(report: &Value) -> Result<String, Box<dyn Error>> {
     let (mut document, _, _) = imaging_document("urn:uuid:5b0c3f7e-0000-4000-8000-00000000d001")?;
     let urls = document.add(&[
         Resource::Organization(Box::new(Organization {
@@ -233,7 +239,7 @@ fn received_text() -> Result<String, Box<dyn Error>> {
     ])?;
     let study_url = urls.get(1).ok_or("the study's fullUrl")?.clone();
     with_sections(&mut document, &study_url)?;
-    let Resource::DiagnosticReport(report) = resource("DiagnosticReport", &report())? else {
+    let Resource::DiagnosticReport(report) = resource("DiagnosticReport", report)? else {
         return Err("the synthetic report is no DiagnosticReport".into());
     };
     document.with_report(*report)?;
@@ -590,6 +596,131 @@ fn the_report_identifier_the_archetype_holds_one_of_is_declared_lost() -> Result
             .iter()
             .any(|held| held.starts_with("DiagnosticReport.identifier")),
         "the dropped identifier is declared: {declared:?}"
+    );
+    Ok(())
+}
+
+/// The composition the received document of `report` maps into, as a CDR
+/// answers it once committed.
+fn composition_of(report: &Value) -> Result<String, Box<dyn Error>> {
+    let document = ReceivedDocument::read(&received_text_of(report)?)?;
+    let composition = mapping()?.to_openehr(&document, &settings())?;
+    committed(composition.composition())
+}
+
+// NOTE: R4 DiagnosticReport.conclusionCode, "One or more codes that represent the summary
+// conclusion": each imaging diagnosis (at0020) is one, in both directions.
+#[test]
+fn each_imaging_diagnosis_is_a_conclusion_code_both_ways() -> Result<(), Box<dyn Error>> {
+    let mut coded = report();
+    coded["conclusionCode"] = serde_json::json!([{
+        "coding": [{"system": "http://example.org/fhir/CodeSystem/synthetic-findings", "code": "SYN-DX-1"}],
+        "text": "A synthetic imaging diagnosis"
+    }]);
+    let composition = composition_of(&coded)?;
+    let canonical: Value = serde_json::from_str(&composition)?;
+    assert!(
+        canonical
+            .to_string()
+            .contains("A synthetic imaging diagnosis"),
+        "the diagnosis is in the composition"
+    );
+    let run = mapping()?.to_fhir_with(
+        &composition,
+        &Settings::new("Device/ferrobridge-eehrxf-test", NOW),
+        CallContext::new().with_patient(reference("Patient/synthetic-patient")),
+    )?;
+    let bundle = serde_json::to_value(run.bundle())?;
+    let served = only(&bundle, "DiagnosticReport")?;
+    assert_eq!(
+        served["conclusionCode"][0]["text"], "A synthetic imaging diagnosis",
+        "{served}"
+    );
+    assert_eq!(
+        served["conclusionCode"][0]["coding"][0]["code"], "SYN-DX-1",
+        "{served}"
+    );
+    Ok(())
+}
+
+/// Adds `items` to the result data (`at0003`) of the first event `value`
+/// holds, answering whether it found one.
+fn add_findings(value: &mut Value, items: &[Value]) -> bool {
+    match value {
+        Value::Object(members) => {
+            if members.get("archetype_node_id").and_then(Value::as_str) == Some("at0003")
+                && let Some(Value::Array(held)) = members.get_mut("items")
+            {
+                held.extend(items.iter().cloned());
+                return true;
+            }
+            members
+                .values_mut()
+                .any(|member| add_findings(member, items))
+        }
+        Value::Array(held) => held.iter_mut().any(|item| add_findings(item, items)),
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => false,
+    }
+}
+
+// NOTE: no element of DiagnosticReportEuImaging or CompositionEuImaging the project writes holds
+// a findings narrative, a differential, a comparison, a clinical summary, a recommendation or a
+// comment, so a served report declares each the composition records.
+#[test]
+fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), Box<dyn Error>> {
+    let mut canonical: Value = serde_json::from_str(&composition_of(&report())?)?;
+    let element = |at: &str, name: &str, text: &str| {
+        serde_json::json!({
+            "_type": "ELEMENT",
+            "name": {"_type": "DV_TEXT", "value": name},
+            "archetype_node_id": at,
+            "value": {"_type": "DV_TEXT", "value": text}
+        })
+    };
+    let added = add_findings(
+        &mut canonical,
+        &[
+            element(
+                "at0014",
+                "Clinical summary",
+                "A synthetic clinical summary.",
+            ),
+            element("at0008", "Imaging findings", "Synthetic findings."),
+            element("at0056", "Comparison findings", "A synthetic comparison."),
+            element(
+                "at0058",
+                "Imaging differential diagnosis",
+                "A synthetic differential",
+            ),
+            element("at0059", "Recommendation", "A synthetic recommendation"),
+            element("at0023", "Comment", "A synthetic comment"),
+        ],
+    );
+    assert!(added, "the composition holds the result data");
+    let (run, warnings) = mapping()?.to_fhir_with_warnings(
+        &canonical.to_string(),
+        &Settings::new("Device/ferrobridge-eehrxf-test", NOW),
+        CallContext::new().with_patient(reference("Patient/synthetic-patient")),
+    )?;
+    let mut unread: Vec<String> = warnings
+        .iter()
+        .filter_map(|warning| match *warning.loss() {
+            Loss::Unread { ref node } => Some(node.clone()),
+            _ => None,
+        })
+        .collect();
+    unread.sort();
+    assert_eq!(
+        unread,
+        ["at0008", "at0014", "at0023", "at0056", "at0058", "at0059"],
+        "{warnings:?}"
+    );
+    let bundle = serde_json::to_value(run.bundle())?;
+    let outcome = only(&bundle, "OperationOutcome")?;
+    assert_eq!(
+        outcome["issue"].as_array().map(Vec::len),
+        Some(6),
+        "the run's outcome names each: {outcome}"
     );
     Ok(())
 }

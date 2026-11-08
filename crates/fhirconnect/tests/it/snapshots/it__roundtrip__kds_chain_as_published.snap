@@ -16,7 +16,6 @@ expression: rows(&diagnostics)
   "anatomical_location.v1.yml:33 error fc-unknown-fhir-element",
   "case_identification.v0.yml:16 error fc-unpaired-types",
   "case_identification.v0.yml:16 error fc-unpaired-types",
-  "ferrobridge_kds_composition.Condition.yml:57 error fc-duplicate-method-name",
   "multiple_coding_icd10gm.v1.yml:23 error fc-uncarried-tail",
   "multiple_coding_icd10gm.v1.yml:30 error fc-unknown-fhir-element",
   "multiple_coding_icd10gm.v1.yml:49 error fc-uncarried-tail",
