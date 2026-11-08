@@ -12,7 +12,7 @@ use std::time::Duration;
 use ferrobridge_server::config::hl7v2::{Device, Sender};
 use wiremock::ResponseTemplate;
 
-use super::{CONTROL_ID, Running, face_settings, oru_r01, segments};
+use super::{CONTROL_ID, Running, adt_a01, face_settings, oru_r01, segments};
 use crate::facade::EHR_ID;
 use crate::facade::ehr_body;
 
@@ -82,6 +82,36 @@ async fn the_responsible_observer_wins_over_the_ordering_provider() -> Result<()
             Some("Omar Observer"),
             composition["composer"]["name"].as_str(),
             "OBX-16 is read before ORC-12 and OBR-16: {composition}"
+        );
+    }
+    running.stop().await
+}
+
+#[tokio::test]
+async fn the_event_operator_is_the_composer_of_an_admission() -> Result<(), Box<dyn Error>> {
+    let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
+    let running = Running::start_with(face_settings(true), lookup).await?;
+    let ack = running.send(&adt_a01("MSG-CLIN-EVN5")).await?;
+    assert_eq!(
+        vec![String::from("MSA|AA|MSG-CLIN-EVN5")],
+        segments(&ack, "MSA"),
+        "{ack}"
+    );
+    let compositions = compositions(&running).await?;
+    assert!(!compositions.is_empty(), "one composition");
+    for composition in &compositions {
+        let composer = &composition["composer"];
+        assert_eq!(
+            Some("Olive Operator"),
+            composer["name"].as_str(),
+            "EVN-5 is read first: {composer}"
+        );
+        assert_eq!(
+            Some("OP-1"),
+            composer
+                .pointer("/external_ref/id/value")
+                .and_then(serde_json::Value::as_str),
+            "{composer}"
         );
     }
     running.stop().await

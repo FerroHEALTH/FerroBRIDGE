@@ -92,6 +92,31 @@ async fn the_visit_location_s_facility_is_named_before_any_other() -> Result<(),
 }
 
 #[tokio::test]
+async fn the_servicing_facility_is_named_when_the_location_names_none() -> Result<(), Box<dyn Error>>
+{
+    let running = listing_facilities().await?;
+    let servicing = format!("PV1|1|O|ROOM-1{}NORTHWARD", "|".repeat(36));
+    running
+        .send(&edited("MSG-FAC-PV139", |text| {
+            text.replace("\rORC|", &format!("\r{servicing}\rORC|"))
+                .replace(
+                    "ORC|RE|PLC-1|FIL-1",
+                    "ORC|RE|PLC-1|FIL-1||||||||||||||||||Synthetic order desk^^^^^^^^^ORDERDESK",
+                )
+        })?)
+        .await?;
+    let named = facilities(&running).await?;
+    assert!(!named.is_empty(), "one composition");
+    assert!(
+        named
+            .iter()
+            .all(|name| name.as_deref() == Some("NORTHWARD")),
+        "PV1-39 wins over ORC-21 and MSH-4: {named:?}"
+    );
+    running.stop().await
+}
+
+#[tokio::test]
 async fn the_ordering_facility_is_named_when_no_visit_names_one() -> Result<(), Box<dyn Error>> {
     let running = listing_facilities().await?;
     running
