@@ -811,6 +811,11 @@ jobs:
             cargo nextest run -p "$package" --all-features --locked --no-tests=pass
             cargo test --doc -p "$package" --all-features --locked
           done
+      # fhir-search keeps jiff behind its default feature, so a token reader
+      # compiles no time library (#1730): its suites also run with none.
+      - name: Test fhir-search with no default feature
+        if: contains(matrix.packages, 'fhir-search')
+        run: cargo nextest run -p fhir-search --no-default-features --locked
       - name: Upload the emitted exchange-format documents
         if: contains(matrix.packages, 'eehrxf')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

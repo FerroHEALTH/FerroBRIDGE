@@ -17,10 +17,14 @@ under `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/`), and FHIR R4.
 The ConceptMaps are data. Nothing here maps a message, segment or table by
 hand: the message map names a resource per segment, the segment map maps the
 fields, a data type map maps the components, a table map goes through
-`ferrobridge_term::client::Client::translate`, and every FHIR element is
-written through `fhirconnect::tree::write::write` over
-`fhir_types::r4::schema::SCHEMAS`. Never add a second FHIR writer, a table
-evaluator, or a per-message code path. A gap in the corpus is a counted
+`map::translate::Translator`, and every FHIR element is written through
+`fhirconnect::tree::write::write` over `fhir_types::r4::schema::SCHEMAS`.
+The translator is a closed choice of two (owner ruling on #1716):
+`ferrobridge_term::client::Client::translate` against a server, and the
+offline reading of the same table maps from the corpus, which answers as
+R4 `ConceptMap/$translate` does, `reverse` included, so the maps stay one
+source. Never add a second FHIR writer, a table evaluated in code, or a
+per-message code path. A gap in the corpus is a counted
 outcome here and a ConceptMap in a supplement, in the guide's own shape.
 
 ## Supplements are ConceptMaps, shipped under `supplements/`
@@ -197,6 +201,17 @@ both: the guide's `ORM_O01.PATIENT.VISIT.PV1` reaches the 2.3
 counts, and two at the fewest stay unmapped. The rule holds for v2.9.1
 trees too, since the guide's paths disagree with the v2.9.1 definitions as
 well (`OML_O21`, and `MDM_T02`, whose observation group is `FIXME`).
+
+## One writer for every message
+
+`write` is the one place a v2 message is composed: `ack::render`, every
+reply header (`ack::Header::reply`) and every message a consumer originates
+go through `write::Writer`. Never join delimiters or escape a value by hand
+elsewhere. A field read from a message is echoed through `Writer::echo` as
+the message wrote it, and only into the delimiters it was read in, since the
+lexer keeps the formatting sequences of `FT` in a decoded value as written.
+`Writer::compose` checks a composed message with the same lexer and grouping
+a received message takes, so a structure rule lives once, in `parse`.
 
 ## Logs
 

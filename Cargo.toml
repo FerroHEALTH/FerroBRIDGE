@@ -93,7 +93,7 @@ ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "0.1.
 # The FHIR R4 search value grammar, published from this workspace for the
 # facade and the family's FHIR servers, so the requirement carries both a path
 # and a version.
-fhir-search = { path = "crates/fhir-search", version = "0.1.128" }
+fhir-search = { path = "crates/fhir-search", version = "0.1.129" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.

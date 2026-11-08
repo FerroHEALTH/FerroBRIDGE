@@ -201,6 +201,7 @@ impl Lexer<'_> {
                 let position = first.saturating_add(offset);
                 let at = location.clone().with_field(position);
                 Field {
+                    written: String::from(text),
                     repetitions: text
                         .split(delimiters.repetition)
                         .enumerate()
@@ -240,7 +241,7 @@ impl Lexer<'_> {
 
     /// Decodes the escape sequences of one value (chapter 2 §2.7).
     ///
-    /// `\F\`, `\S\`, `\T\`, `\R\` and `\E\` become the delimiter they name and
+    /// `\F\`, `\S\`, `\T\`, `\R\`, `\E\` and `\P\` become the delimiter they name and
     /// `\Xhh..\` the bytes it spells in the message's character set. The
     /// highlighting and formatting sequences (`\H\`, `\N\`, `\.br\` and the
     /// other `\.` commands) are text formatting of the `FT` type and stay in
@@ -297,6 +298,12 @@ impl Lexer<'_> {
             "T" => one(delimiters.subcomponent),
             "R" => one(delimiters.repetition),
             "E" => one(delimiters.escape),
+            "P" => match delimiters.truncation {
+                Some(truncation) => one(truncation),
+                None => Err(
+                    "a truncation escape sequence in a message that declares no truncation character",
+                ),
+            },
             "H" | "N" => Ok(None),
             _ if sequence.starts_with('.') => Ok(None),
             _ => match sequence.strip_prefix('X') {
@@ -345,6 +352,7 @@ impl Lexer<'_> {
 /// A field holding one value as written.
 fn literal(text: &str) -> Field {
     Field {
+        written: String::from(text),
         repetitions: vec![Repetition {
             components: vec![Component {
                 subcomponents: vec![String::from(text)],
