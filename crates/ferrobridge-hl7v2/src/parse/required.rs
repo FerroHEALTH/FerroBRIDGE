@@ -19,7 +19,9 @@ const ANSWER_FIELDS: [usize; 3] = [9, 10, 12];
 /// Checks the fields of the segment at `index` against the definition its
 /// node places: an empty required field is counted as
 /// [`Unplaced::MissingRequiredField`], one of [`ANSWER_FIELDS`] refuses, and
-/// a valued field beyond the table is counted as [`Unplaced::ExtraField`].
+/// a valued field beyond the table is counted as [`Unplaced::ExtraField`],
+/// unless the table ends in a `varies` field that continues in successive
+/// fields.
 pub(super) fn check_fields(parsed: &mut Parsed, index: usize, node: &'static SegmentRef) {
     let location = parsed.location(index);
     let Some(segment) = parsed.message.segments.get(index) else {
@@ -51,6 +53,16 @@ pub(super) fn check_fields(parsed: &mut Parsed, index: usize, node: &'static Seg
                 version: parsed.structure.version,
             });
         }
+    }
+    // NOTE: HL7 v2.5 QPD-3 is "User Parameters (in successive fields)" and RDT-1 a column per
+    // field (chapter 5), so a segment whose last field is `varies` continues it.
+    if definition
+        .fields
+        .last()
+        .and_then(|last| last.data_type)
+        .is_some_and(|data_type| data_type.code().eq_ignore_ascii_case("varies"))
+    {
+        return;
     }
     for (offset, field) in segment
         .fields

@@ -46,3 +46,19 @@ fn a_location_renders_its_known_erl_components() {
     assert_eq!(location.erl('^'), "PID^1^5");
     assert_eq!(location.to_string(), "PID[1]-5");
 }
+
+#[test]
+fn the_truncation_escape_decodes_to_the_declared_truncation_character() -> Result<(), LexError> {
+    let lexed = lex("MSH|^~\\&#|A\rNTE|||a\\P\\b", Charset::Ascii)?;
+    assert!(lexed.refusals.is_empty(), "{:?}", lexed.refusals);
+    assert_eq!(lexed.message.segments()[1].text(3), Some("a#b"));
+    Ok(())
+}
+
+#[test]
+fn a_truncation_escape_with_no_truncation_character_declared_is_refused() -> Result<(), LexError> {
+    let lexed = lex("MSH|^~\\&|A\rNTE|||a\\P\\b", Charset::Ascii)?;
+    assert_eq!(lexed.refusals.len(), 1);
+    assert_eq!(lexed.refusals[0].code, ErrorCode::DataType);
+    Ok(())
+}
