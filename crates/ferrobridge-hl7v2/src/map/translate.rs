@@ -20,7 +20,8 @@
 
 use ferrobridge_term::concept::{Concept, Equivalence, Match};
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::{TranslateOutcome, Translation};
+use ferrobridge_term::outcome::TranslateOutcome;
+use ferrobridge_term::request::Translation;
 
 use crate::map::corpus::{Corpus, TableGroup};
 
@@ -58,6 +59,8 @@ fn offline(corpus: &Corpus, translation: &Translation) -> TranslateOutcome {
     else {
         return TranslateOutcome::NoMatch {
             message: Some(String::from("the corpus holds no table map at this url")),
+            matches: Vec::new(),
+            used_maps: Vec::new(),
         };
     };
     let reverse = translation.reverse == Some(true);
@@ -86,9 +89,14 @@ fn offline(corpus: &Corpus, translation: &Translation) -> TranslateOutcome {
         TranslateOutcome::Translated {
             matches,
             message: None,
+            used_maps: Vec::new(),
         }
     } else {
-        TranslateOutcome::NoMatch { message: None }
+        TranslateOutcome::NoMatch {
+            message: None,
+            matches,
+            used_maps: Vec::new(),
+        }
     }
 }
 
@@ -140,6 +148,6 @@ fn found(
             code: Some(String::from(code)),
             display: display.map(String::from),
         }),
-        source: None,
+        ..Match::default()
     }
 }

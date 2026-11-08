@@ -36,7 +36,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use ferrobridge_term::client::Client;
-use ferrobridge_term::outcome::Translation;
+use ferrobridge_term::request::Translation;
 use fhir_types::r4::operations::code_system_lookup::{
     CodeSystemLookupRequest, CodeSystemLookupResponse,
 };

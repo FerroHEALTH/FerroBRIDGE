@@ -58,6 +58,7 @@ async fn a_found_code_answers_its_display_in_both_releases()
             display,
             designations,
             properties,
+            ..
         } = outcome
         else {
             return Err(format!(

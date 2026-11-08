@@ -10,7 +10,8 @@ use crate::support::{RELEASES, client, parameter, release_path, request_body};
 use ferrobridge_term::concept::Concept;
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::{Coded, ValidateOutcome, Validation};
+use ferrobridge_term::outcome::ValidateOutcome;
+use ferrobridge_term::request::{Coded, Target, Validation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use http::StatusCode;
@@ -52,7 +53,9 @@ fn member() -> Concept {
 /// A validation of `coded` against the fixture value set.
 fn validation(coded: Coded) -> Validation {
     Validation {
-        value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
+        value_set: Target::Canonical(fixtures::TERM_VALUE_SET_URL.to_owned()),
+        display_language: None,
+        active_only: None,
         value_set_version: None,
         date: None,
         coded,

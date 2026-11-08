@@ -8,7 +8,7 @@
 //! [`crate::error::Error`] carrying the upstream status and body. Nothing is
 //! ever flattened into an empty value.
 
-use crate::concept::{Concept, Designation, Match, Property};
+use crate::concept::{CodeableConcept, Designation, Match, Property, PropertyValue};
 use crate::error::{Outcome, UpstreamError};
 
 /// What `CodeSystem/$lookup` answered.
@@ -23,6 +23,9 @@ pub enum LookupOutcome {
         version: Option<String>,
         /// `display`, the preferred display. The operation declares it `1..1`.
         display: String,
+        /// `definition`, which R5 and R6 declare
+        /// (<https://hl7.org/fhir/R5/codesystem-operation-lookup.html>).
+        definition: Option<String>,
         /// Every `designation` the server returned.
         designations: Vec<Designation>,
         /// Every `property` the server returned.
@@ -41,29 +44,38 @@ pub enum LookupOutcome {
 pub enum TranslateOutcome {
     /// `result` was `true`: the server found at least one match.
     ///
-    /// Every match is carried with its equivalence, including the ones that
-    /// are not translations, because the specification asks the caller to
-    /// check `match.equivalence` for each one.
+    /// Every match is carried with its equivalence or relationship, including
+    /// the ones that are not translations, because the specification asks the
+    /// caller to check each one.
     Translated {
         /// The matches, in the order the server sent them.
         matches: Vec<Match>,
         /// `message`, when the server sent one.
         message: Option<String>,
+        /// Every `used-conceptmap`, the maps the server consulted.
+        used_maps: Vec<String>,
     },
     /// `result` was `false`: the server found no acceptable match.
     NoMatch {
         /// `message`, the server's error detail for a false `result`.
         message: Option<String>,
+        /// The matches the answer still carries, such as a `noMap` match or a
+        /// `not-related-to` one, in the order the server sent them.
+        matches: Vec<Match>,
+        /// Every `used-conceptmap`, the maps the server consulted.
+        used_maps: Vec<String>,
     },
 }
 
 impl TranslateOutcome {
     /// Returns every match that is a translation.
     ///
-    /// Only `equivalent` and `equal` matches are yielded
-    /// (<https://hl7.org/fhir/R4/valueset-concept-map-equivalence.html>), so a
-    /// `wider`, `narrower` or `inexact` match never reaches a target system as
-    /// a translation.
+    /// Only `equivalent` and `equal` matches (R4,
+    /// <https://hl7.org/fhir/R4/valueset-concept-map-equivalence.html>) and
+    /// `equivalent` relationships (R5,
+    /// <https://hl7.org/fhir/R5/valueset-concept-map-relationship.html>) are
+    /// yielded, so a wider, narrower or inexact match never reaches a target
+    /// system as a translation. A `NoMatch` answer yields none.
     pub fn accepted(&self) -> impl Iterator<Item = &Match> {
         let matches = match self {
             Self::Translated { matches, .. } => matches.as_slice(),
@@ -73,222 +85,75 @@ impl TranslateOutcome {
     }
 }
 
-/// What `ValueSet/$validate-code` answered.
+/// What `ValueSet/$validate-code` or `CodeSystem/$validate-code` answered.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ValidateOutcome {
-    /// `result` was `true`: the code is a member of the value set.
+    /// `result` was `true`: the code is valid where it was checked.
     Valid {
         /// `display`, "a valid display for the concept if the system wishes to
         /// display this to a user".
         display: Option<String>,
         /// `message`, which carries hints and warnings beside a true `result`.
         message: Option<String>,
+        /// `issues`, the warnings the server itemised beside a true `result`.
+        outcome: Option<Outcome>,
+        /// The other elements of the answer.
+        details: Box<ValidationDetails>,
     },
-    /// `result` was `false`: the code is not a member of the value set.
+    /// `result` was `false`: the code is not valid where it was checked.
     Invalid {
+        /// `display`, the display the server prefers for the code, when it
+        /// knows the code.
+        display: Option<String>,
         /// `message`, the server's error detail.
         message: Option<String>,
         /// `issues`, the itemised `OperationOutcome` the terminology ecosystem
         /// asks for beside a false `result`
         /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
         outcome: Option<Outcome>,
+        /// The other elements of the answer.
+        details: Box<ValidationDetails>,
     },
 }
 
 impl ValidateOutcome {
-    /// Returns whether the code is a member of the value set.
+    /// Returns whether the code is valid where it was checked.
     #[must_use]
     pub fn is_valid(&self) -> bool {
         matches!(self, Self::Valid { .. })
     }
 }
 
-/// One operation to send, for a single call or as a batch entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum Request {
-    /// `CodeSystem/$lookup`.
-    Lookup {
-        /// The code system the code is in.
-        system: String,
-        /// The code to look up.
-        code: String,
-        /// The code system version, when the source data named one.
-        version: Option<String>,
-        /// `date`, the date the information is wanted for, as a FHIR
-        /// `dateTime`, when the caller asks for the code system as it stood
-        /// then.
-        date: Option<String>,
-    },
-    /// `ConceptMap/$translate`.
-    Translate(Translation),
-    /// `ValueSet/$validate-code`.
-    ValidateCode(Validation),
-    /// `ValueSet/$expand`.
-    Expand(Expansion),
-    /// `CodeSystem/$subsumes`.
-    Subsumes(Subsumption),
-}
-
-impl Request {
-    /// Returns the operation, as `Resource/$code`.
-    #[must_use]
-    pub const fn operation(&self) -> &'static str {
-        match self {
-            Self::Lookup { .. } => crate::LOOKUP,
-            Self::Translate(_) => crate::TRANSLATE,
-            Self::ValidateCode(_) => crate::VALIDATE_CODE,
-            Self::Expand(_) => crate::EXPAND,
-            Self::Subsumes(_) => crate::SUBSUMES,
-        }
-    }
-}
-
-/// One `ConceptMap/$translate` question: what `code` from `system` maps to.
+/// The elements of a `$validate-code` answer beside `result`, `message`,
+/// `display` and `issues`.
 ///
-/// R4 declares `url`, `targetsystem` and `reverse` each `0..1`
-/// (<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>), so each
-/// is sent only when it is set here.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Translation {
-    /// `system`, the code system the code is in.
-    pub system: String,
-    /// `code`, the code to translate.
-    pub code: String,
-    /// `version`, the version of the system, if one was provided in the
-    /// source data.
+/// R4 to R6 declare them with the terminology ecosystem's additions
+/// (`OperationDefinition-ValueSet-validate-code`,
+/// <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>); STU3 declares
+/// none, so an STU3 answer leaves every one empty.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ValidationDetails {
+    /// `code`, the code that was validated.
+    pub code: Option<String>,
+    /// `system`, the code system it was validated against.
+    pub system: Option<String>,
+    /// `version`, the code system version it was validated in.
     pub version: Option<String>,
-    /// `url`, the canonical URL of the concept map to use, when one is named.
-    ///
-    /// STU3 `$translate` has no `url` parameter, so an STU3 client refuses a
-    /// translation that names one.
-    pub concept_map_url: Option<String>,
-    /// `targetsystem`, the code system to translate into, when one is named.
-    pub target_system: Option<String>,
-    /// `reverse`: "if this is true, then the operation should return all the
-    /// codes that might be mapped to this code".
-    pub reverse: Option<bool>,
-}
-
-impl Translation {
-    /// Returns the translation of `code` from `system`, naming no concept
-    /// map, no target system and no direction yet.
-    #[must_use]
-    pub fn new(system: impl Into<String>, code: impl Into<String>) -> Self {
-        Self {
-            system: system.into(),
-            code: code.into(),
-            version: None,
-            concept_map_url: None,
-            target_system: None,
-            reverse: None,
-        }
-    }
-
-    /// Names the version of the code system, sent as `version`.
-    #[must_use]
-    pub fn with_version(mut self, version: impl Into<String>) -> Self {
-        self.version = Some(version.into());
-        self
-    }
-
-    /// Names the concept map, sent as `url`.
-    #[must_use]
-    pub fn with_concept_map(mut self, url: impl Into<String>) -> Self {
-        self.concept_map_url = Some(url.into());
-        self
-    }
-
-    /// Names the code system to translate into, sent as `targetsystem`.
-    #[must_use]
-    pub fn with_target_system(mut self, system: impl Into<String>) -> Self {
-        self.target_system = Some(system.into());
-        self
-    }
-
-    /// Sets `reverse`, which asks for the codes that map to this one.
-    #[must_use]
-    pub const fn with_reverse(mut self, reverse: bool) -> Self {
-        self.reverse = Some(reverse);
-        self
-    }
-}
-
-/// One `ValueSet/$validate-code` question: is the coded value a member of
-/// the value set.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Validation {
-    /// `url`, the canonical URL of the value set, without a version.
-    pub value_set_url: String,
-    /// `valueSetVersion`, the version of the value set, when the binding
-    /// names one.
-    ///
-    /// STU3 `$validate-code` has no such parameter, so an STU3 client
-    /// refuses a validation that names one.
-    pub value_set_version: Option<String>,
-    /// `date`, the date the validation is wanted for, as a FHIR `dateTime`,
-    /// when the caller asks for the value set and code system as they stood
-    /// then.
-    pub date: Option<String>,
-    /// The coded value, in one of the three forms the operation accepts.
-    pub coded: Coded,
-}
-
-/// The coded value `ValueSet/$validate-code` tests, in the input forms the
-/// operation declares
-/// (<https://hl7.org/fhir/R4/valueset-operation-validate-code.html>).
-///
-/// R4 and R4B read "If a code is provided, a system or a context must be
-/// provided" (`OperationDefinition-ValueSet-validate-code`, `code`), so a
-/// bare code carries one of the two by construction: [`Coded::Code`] its
-/// system, [`Coded::InContext`] its context.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[non_exhaustive]
-pub enum Coded {
-    /// The `code`, `system`, `systemVersion` and `display` parameters. "If a
-    /// code is provided, a system or a context must be provided", so the
-    /// system is mandatory here.
-    Code {
-        /// `system`.
-        system: String,
-        /// `code`.
-        code: String,
-        /// `systemVersion`, the version of the system, if one was provided in
-        /// the source data. STU3 names this parameter `version`.
-        version: Option<String>,
-        /// `display`, the display associated with the code, if provided.
-        display: Option<String>,
-    },
-    /// The `code`, `context` and `display` parameters: a code whose system
-    /// the context implies, such as an element bound to a value set.
-    ///
-    /// `context` is "the context of the value set, so that the server can
-    /// resolve this to a value set to validate against", recommended as
-    /// `[Structure Definition URL]#[name or path into structure definition]`.
-    /// STU3 declares `context` but reads "If a code is provided, a system
-    /// must be provided" (`hl7.fhir.r3.core` 3.0.2), so an STU3 client
-    /// refuses this form with
-    /// [`Error::SystemRequired`](crate::error::Error::SystemRequired) and
-    /// sends nothing.
-    InContext {
-        /// `context`.
-        context: String,
-        /// `code`.
-        code: String,
-        /// `display`, the display associated with the code, if provided.
-        display: Option<String>,
-    },
-    /// The `coding` parameter.
-    Coding(Concept),
-    /// The `codeableConcept` parameter: "the server returns true if one of the
-    /// coding values is in the value set".
-    CodeableConcept {
-        /// `CodeableConcept.coding`.
-        coding: Vec<Concept>,
-        /// `CodeableConcept.text`.
-        text: Option<String>,
-    },
+    /// `codeableConcept`, the concept the server echoed.
+    pub codeable_concept: Option<CodeableConcept>,
+    /// `normalized-code`, the code as the system spells it.
+    pub normalized_code: Option<String>,
+    /// `inactive`, whether the concept is inactive in its code system.
+    pub inactive: Option<bool>,
+    /// `status`, the concept's status where its system states one.
+    pub status: Option<String>,
+    /// Every `x-caused-by-unknown-system`, the code systems the server does
+    /// not hold that the answer turned on.
+    pub caused_by_unknown_systems: Vec<String>,
+    /// Every `x-unknown-system`, a code system of a coding the server does
+    /// not hold.
+    pub unknown_systems: Vec<String>,
 }
 
 /// What one batch entry answered, in the shape of the request that produced
@@ -296,96 +161,18 @@ pub enum Coded {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum BatchOutcome {
-    /// The answer to a [`Request::Lookup`].
+    /// The answer to a [`Request::Lookup`](crate::request::Request::Lookup).
     Lookup(LookupOutcome),
-    /// The answer to a [`Request::Translate`].
+    /// The answer to a [`Request::Translate`](crate::request::Request::Translate).
     Translate(TranslateOutcome),
-    /// The answer to a [`Request::ValidateCode`].
+    /// The answer to a [`Request::ValidateCode`](crate::request::Request::ValidateCode).
     ValidateCode(ValidateOutcome),
-    /// The answer to a [`Request::Expand`].
+    /// The answer to a [`Request::CodeSystemValidateCode`](crate::request::Request::CodeSystemValidateCode).
+    CodeSystemValidateCode(ValidateOutcome),
+    /// The answer to a [`Request::Expand`](crate::request::Request::Expand).
     Expand(ExpandOutcome),
-    /// The answer to a [`Request::Subsumes`].
+    /// The answer to a [`Request::Subsumes`](crate::request::Request::Subsumes).
     Subsumes(SubsumesOutcome),
-}
-
-/// One `ValueSet/$expand` question: the codes the value set holds.
-///
-/// R4 declares every input used here `0..1`
-/// (<https://hl7.org/fhir/R4/valueset-operation-expand.html>), so each is
-/// sent only when it is set.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Expansion {
-    /// `url`, the canonical URL of the value set, without a version.
-    pub value_set_url: String,
-    /// `valueSetVersion`, the version of the value set, when one is named.
-    ///
-    /// STU3 `$expand` has no such parameter, so an STU3 client refuses an
-    /// expansion that names one.
-    pub value_set_version: Option<String>,
-    /// `date`, the date the expansion is wanted for, as a FHIR `dateTime`.
-    pub date: Option<String>,
-    /// `filter`, the text filter the server applies to the codes it returns.
-    pub filter: Option<String>,
-    /// `offset`, the number of codes to skip in a paged flat expansion.
-    pub offset: Option<u32>,
-    /// `count`, the number of codes a page holds; `0` asks for the size of
-    /// the expansion alone.
-    pub count: Option<u32>,
-    /// `includeDesignations`, whether the codes carry their designations.
-    pub include_designations: Option<bool>,
-}
-
-impl Expansion {
-    /// Returns the expansion of the value set `value_set_url`, with no other
-    /// input set yet.
-    #[must_use]
-    pub fn new(value_set_url: impl Into<String>) -> Self {
-        Self {
-            value_set_url: value_set_url.into(),
-            value_set_version: None,
-            date: None,
-            filter: None,
-            offset: None,
-            count: None,
-            include_designations: None,
-        }
-    }
-
-    /// Names the version of the value set, sent as `valueSetVersion`.
-    #[must_use]
-    pub fn with_version(mut self, version: impl Into<String>) -> Self {
-        self.value_set_version = Some(version.into());
-        self
-    }
-
-    /// Names the date the expansion is wanted for, sent as `date`.
-    #[must_use]
-    pub fn with_date(mut self, date: impl Into<String>) -> Self {
-        self.date = Some(date.into());
-        self
-    }
-
-    /// Sets the text filter, sent as `filter`.
-    #[must_use]
-    pub fn with_filter(mut self, filter: impl Into<String>) -> Self {
-        self.filter = Some(filter.into());
-        self
-    }
-
-    /// Asks for one page, sent as `offset` and `count`.
-    #[must_use]
-    pub const fn with_page(mut self, offset: u32, count: u32) -> Self {
-        self.offset = Some(offset);
-        self.count = Some(count);
-        self
-    }
-
-    /// Sets `includeDesignations`.
-    #[must_use]
-    pub const fn with_designations(mut self, include: bool) -> Self {
-        self.include_designations = Some(include);
-        self
-    }
 }
 
 /// What `ValueSet/$expand` answered.
@@ -413,8 +200,31 @@ pub struct Expanded {
     pub total: Option<i32>,
     /// `expansion.offset`, where this page starts, when the server states it.
     pub offset: Option<i32>,
+    /// `expansion.parameter`, the inputs the server says it applied, in its
+    /// order.
+    pub parameters: Vec<ExpansionParameter>,
+    /// The `valueset-unclosed` mark: present when the server says the value
+    /// set holds codes this expansion does not list.
+    pub unclosed: Option<Unclosed>,
     /// `expansion.contains`, with its nesting kept.
     pub contains: Vec<ExpansionContains>,
+}
+
+/// One `ValueSet.expansion.parameter`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpansionParameter {
+    /// `parameter.name`.
+    pub name: String,
+    /// `parameter.value[x]`, as the member that carried it and its JSON.
+    pub value: Option<PropertyValue>,
+}
+
+/// The `valueset-unclosed` extension on `ValueSet.expansion`, set `true`
+/// (<https://hl7.org/fhir/R4/extension-valueset-unclosed.html>).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Unclosed {
+    /// Every `valueset-unclosed-reason` string, in the server's order.
+    pub reasons: Vec<String>,
 }
 
 /// One entry of `ValueSet.expansion.contains`, the same in every release
@@ -437,44 +247,6 @@ pub struct ExpansionContains {
     pub designations: Vec<Designation>,
     /// `contains`, the entries nested under this one.
     pub contains: Vec<ExpansionContains>,
-}
-
-/// One `CodeSystem/$subsumes` question: how `code_a` relates to `code_b` in
-/// `system`.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Subsumption {
-    /// `system`, the code system the subsumption is tested in.
-    pub system: String,
-    /// `codeA`.
-    pub code_a: String,
-    /// `codeB`.
-    pub code_b: String,
-    /// `version`, the version of the code system, when one is named.
-    pub version: Option<String>,
-}
-
-impl Subsumption {
-    /// Returns the question of how `code_a` relates to `code_b` in `system`.
-    #[must_use]
-    pub fn new(
-        system: impl Into<String>,
-        code_a: impl Into<String>,
-        code_b: impl Into<String>,
-    ) -> Self {
-        Self {
-            system: system.into(),
-            code_a: code_a.into(),
-            code_b: code_b.into(),
-            version: None,
-        }
-    }
-
-    /// Names the version of the code system, sent as `version`.
-    #[must_use]
-    pub fn with_version(mut self, version: impl Into<String>) -> Self {
-        self.version = Some(version.into());
-        self
-    }
 }
 
 /// What `CodeSystem/$subsumes` answered: the `outcome` code.
@@ -523,10 +295,8 @@ impl SubsumesOutcome {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        Expansion, Request, SubsumesOutcome, Subsumption, TranslateOutcome, ValidateOutcome,
-    };
-    use crate::concept::{Concept, Equivalence, Match};
+    use super::{SubsumesOutcome, TranslateOutcome, ValidateOutcome, ValidationDetails};
+    use crate::concept::{Concept, Equivalence, Match, Relationship};
 
     fn found(equivalence: &str, code: &str) -> Match {
         Match {
@@ -536,7 +306,7 @@ mod tests {
                 code: Some(code.to_owned()),
                 ..Concept::default()
             }),
-            source: None,
+            ..Match::default()
         }
     }
 
@@ -550,6 +320,7 @@ mod tests {
                 found("equal", "identical"),
             ],
             message: None,
+            used_maps: Vec::new(),
         };
         let accepted: Vec<Option<String>> = outcome
             .accepted()
@@ -567,9 +338,29 @@ mod tests {
     }
 
     #[test]
+    fn accepted_yields_only_the_equivalent_relationship() {
+        let related = |code: &str| Match {
+            relationship: Some(Relationship::new(code)),
+            ..Match::default()
+        };
+        let outcome = TranslateOutcome::Translated {
+            matches: vec![
+                related("source-is-narrower-than-target"),
+                related("equivalent"),
+                related("related-to"),
+            ],
+            message: None,
+            used_maps: Vec::new(),
+        };
+        assert_eq!(1, outcome.accepted().count());
+    }
+
+    #[test]
     fn a_no_match_outcome_accepts_nothing() {
         let outcome = TranslateOutcome::NoMatch {
             message: Some("no map".to_owned()),
+            matches: vec![found("equivalent", "same")],
+            used_maps: Vec::new(),
         };
         assert_eq!(0, outcome.accepted().count());
     }
@@ -577,29 +368,12 @@ mod tests {
     #[test]
     fn an_invalid_outcome_is_not_valid() {
         let outcome = ValidateOutcome::Invalid {
+            display: None,
             message: Some("not in the value set".to_owned()),
             outcome: None,
+            details: Box::new(ValidationDetails::default()),
         };
         assert!(!outcome.is_valid());
-    }
-
-    #[test]
-    fn a_request_names_its_operation() {
-        let lookup = Request::Lookup {
-            system: "http://example.org/cs".to_owned(),
-            code: "a".to_owned(),
-            version: None,
-            date: None,
-        };
-        assert_eq!("CodeSystem/$lookup", lookup.operation());
-        assert_eq!(
-            "ValueSet/$expand",
-            Request::Expand(Expansion::new("http://example.org/vs")).operation()
-        );
-        assert_eq!(
-            "CodeSystem/$subsumes",
-            Request::Subsumes(Subsumption::new("http://example.org/cs", "a", "b")).operation()
-        );
     }
 
     #[test]

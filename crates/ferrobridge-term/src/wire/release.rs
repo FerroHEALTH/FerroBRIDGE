@@ -4,24 +4,46 @@
 //! The `per_release` macro, which generates the reader and writer of one
 //! release over its own generated model.
 
-/// Generates the reader and writer of one FHIR release, with the request
-/// writers `$contracts` expands to.
+/// Returns the `designation` parts `$designations` carries, `$label` naming
+/// the mandatory value in an error; `$lookup` and `$expand` declare them alike.
+macro_rules! designations {
+    ($designations:expr, $label:literal) => {
+        $designations
+            .iter()
+            .map(|designation| {
+                Ok(Designation {
+                    language: designation
+                        .language
+                        .as_ref()
+                        .and_then(|code| code.value.clone()),
+                    usage: designation.r#use.as_ref().map(concept),
+                    value: super::required(designation.value.value.clone(), $label)?,
+                })
+            })
+            .collect::<Result<Vec<_>, BodyError>>()?
+    };
+}
+
+/// Generates the reader and writer of one FHIR release, with the
+/// release-specific writers and readers `$contracts` expands to.
 macro_rules! per_release {
     ($module:ident, $release:ident, $contracts:ident) => {
         /// The bodies of one FHIR release, over its own generated model.
         pub(crate) mod $module {
             use super::{BatchEntry, RequestError, BATCH, BATCH_RESPONSE, POST};
-            use crate::concept::{
-                Concept, Designation, Equivalence, Match, Property, PropertyValue,
-            };
+            use crate::concept::{Concept, Designation, Property, PropertyValue};
             use crate::error::{BodyError, Issue, Outcome, TxIssue};
             use crate::outcome::{
-                Coded, ExpandOutcome, Expanded, Expansion, ExpansionContains, LookupOutcome, Request,
-                SubsumesOutcome, Subsumption, TranslateOutcome, ValidateOutcome, Validation,
+                ExpandOutcome, Expanded, ExpansionContains, ExpansionParameter, LookupOutcome,
+                SubsumesOutcome, TranslateOutcome, Unclosed, ValidateOutcome,
+            };
+            use crate::request::{
+                Coded, Expansion, InlineValueSet, Request, Subsumption, Validation, ValueSetSource,
             };
             use fhir_types::$release::bundle::{Bundle, BundleEntry, BundleEntryRequest};
             use fhir_types::$release::codeable_concept::CodeableConcept;
             use fhir_types::$release::coding::Coding;
+            use fhir_types::$release::extension::ExtensionValue;
             use fhir_types::$release::operation_outcome::OperationOutcome;
             use fhir_types::$release::operations::code_system_lookup::CodeSystemLookupRequest;
             use fhir_types::$release::operations::code_system_lookup::CodeSystemLookupResponse;
@@ -36,14 +58,22 @@ macro_rules! per_release {
                 Parameters, ParametersParameter, ParametersParameterValue,
             };
             use fhir_types::$release::resource::Resource;
-            use fhir_types::$release::value_set::{ValueSet, ValueSetExpansionContains};
+            use fhir_types::$release::value_set::{
+                ValueSet, ValueSetCompose, ValueSetComposeInclude, ValueSetComposeIncludeFilter,
+                ValueSetExpansion, ValueSetExpansionContains,
+            };
             use fhir_types::codec::Json;
 
-            $contracts!();
+            $contracts!($release);
 
             /// Returns the `Parameters` that carries `request`, or the
             /// parameter this release cannot carry.
             fn encode(request: &Request) -> Result<Parameters, RequestError> {
+                if undefined(request) {
+                    return Err(RequestError::UndefinedOperation {
+                        operation: request.operation(),
+                    });
+                }
                 if let Some(parameter) = unsupported(request) {
                     return Err(RequestError::Unsupported {
                         operation: request.operation(),
@@ -56,6 +86,35 @@ macro_rules! per_release {
                     });
                 }
                 parameters(request)
+            }
+
+            /// Returns the `Parameters` that carries `request`, which
+            /// `encode` has checked.
+            fn parameters(request: &Request) -> Result<Parameters, RequestError> {
+                Ok(match request {
+                    Request::Lookup {
+                        system,
+                        code,
+                        version,
+                        date,
+                        display_language,
+                    } => CodeSystemLookupRequest {
+                        system: Some(system.as_str().into()),
+                        code: Some(code.as_str().into()),
+                        version: version.as_deref().map(Into::into),
+                        date: date.as_deref().map(Into::into),
+                        display_language: display_language.as_deref().map(Into::into),
+                        ..Default::default()
+                    }
+                    .into_parameters(),
+                    Request::Translate(translation) => translate_parameters(translation),
+                    Request::ValidateCode(validation) => validate_code_parameters(validation),
+                    Request::CodeSystemValidateCode(validation) => {
+                        code_system_validate_parameters(validation)?
+                    }
+                    Request::Expand(expansion) => expand_parameters(expansion)?,
+                    Request::Subsumes(subsumption) => subsumes_parameters(subsumption),
+                })
             }
 
             /// Returns `concept` as a `Coding` of this release.
@@ -79,6 +138,123 @@ macro_rules! per_release {
                 }
             }
 
+            /// Returns the `Parameters` of one `ValueSet/$validate-code`; an
+            /// instance-level run sends no `url`, since the address names the
+            /// value set.
+            fn validate_code_parameters(validation: &Validation) -> Parameters {
+                let mut request = ValueSetValidateCodeRequest {
+                    url: validation.value_set.canonical().map(Into::into),
+                    date: validation.date.as_deref().map(Into::into),
+                    ..Default::default()
+                };
+                match &validation.coded {
+                    Coded::Code {
+                        system,
+                        code,
+                        version,
+                        display,
+                    } => {
+                        request.system = Some(system.as_str().into());
+                        request.code = Some(code.as_str().into());
+                        set_system_version(&mut request, version.as_deref());
+                        request.display = display.as_deref().map(Into::into);
+                    }
+                    Coded::InContext {
+                        context,
+                        code,
+                        display,
+                    } => {
+                        request.context = Some(context.as_str().into());
+                        request.code = Some(code.as_str().into());
+                        request.display = display.as_deref().map(Into::into);
+                    }
+                    Coded::Coding(concept) => request.coding = Some(coding(concept)),
+                    Coded::CodeableConcept {
+                        coding: codings,
+                        text,
+                    } => {
+                        request.codeable_concept =
+                            Some(codeable_concept(codings, text.as_deref()));
+                    }
+                }
+                validate_code_extras(&mut request, validation);
+                request.into_parameters()
+            }
+
+            /// Returns the `Parameters` of one `ValueSet/$expand`.
+            fn expand_parameters(expansion: &Expansion) -> Result<Parameters, RequestError> {
+                let (url, value_set) = match &expansion.value_set {
+                    ValueSetSource::Stored(target) => (target.canonical().map(Into::into), None),
+                    ValueSetSource::Inline(inline) => (None, Some(inline_value_set(inline))),
+                };
+                let mut request = ValueSetExpandRequest {
+                    url,
+                    value_set,
+                    date: expansion.date.as_deref().map(Into::into),
+                    filter: expansion.filter.as_deref().map(Into::into),
+                    offset: super::integer(expansion.offset, "offset")?.map(Into::into),
+                    count: super::integer(expansion.count, "count")?.map(Into::into),
+                    include_designations: expansion.include_designations.map(Into::into),
+                    active_only: expansion.active_only.map(Into::into),
+                    exclude_nested: expansion.exclude_nested.map(Into::into),
+                    display_language: expansion.display_language.as_deref().map(Into::into),
+                    ..Default::default()
+                };
+                set_value_set_version(&mut request, expansion.value_set_version.as_deref());
+                Ok(request.into_parameters())
+            }
+
+            /// Returns `inline` as this release's `ValueSet`, with the one
+            /// status a request-scoped value set can carry
+            /// (<https://hl7.org/fhir/R4/valueset.html>, `status` `1..1`).
+            fn inline_value_set(inline: &InlineValueSet) -> ValueSet {
+                let include = inline
+                    .include
+                    .iter()
+                    .map(|include| ValueSetComposeInclude {
+                        system: Some(include.system.as_str().into()),
+                        version: include.version.as_deref().map(Into::into),
+                        filter: include
+                            .filters
+                            .iter()
+                            .map(|filter| ValueSetComposeIncludeFilter {
+                                property: filter.property.as_str().into(),
+                                op: filter.op.as_str().into(),
+                                value: filter_value(&filter.value),
+                                ..Default::default()
+                            })
+                            .collect(),
+                        ..Default::default()
+                    })
+                    .collect();
+                ValueSet {
+                    status: "active".into(),
+                    compose: Some(ValueSetCompose {
+                        include,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }
+            }
+
+            /// Returns the `Parameters` of one `CodeSystem/$subsumes`, which
+            /// every release declares with the same inputs.
+            fn subsumes_parameters(subsumption: &Subsumption) -> Parameters {
+                CodeSystemSubsumesRequest {
+                    system: subsumption.code_system.canonical().map(Into::into),
+                    code_a: Some(subsumption.code_a.as_str().into()),
+                    code_b: Some(subsumption.code_b.as_str().into()),
+                    version: subsumption.version.as_deref().map(Into::into),
+                    ..Default::default()
+                }
+                .into_parameters()
+            }
+
+            /// Returns whether this release defines no such operation.
+            pub(crate) const fn undefined_operation(request: &Request) -> bool {
+                undefined(request)
+            }
+
             /// Returns the parameter of `request` this release cannot carry.
             pub(crate) const fn unsupported_parameter(request: &Request) -> Option<&'static str> {
                 unsupported(request)
@@ -95,6 +271,40 @@ macro_rules! per_release {
                 Ok(serde_json::to_string(&encode(request)?)?)
             }
 
+            /// Returns the query that carries `request` in the `GET` form,
+            /// `None` when an input is not primitive.
+            ///
+            /// The `GET` form is open only when "there are no parameters with
+            /// complex types (including resources)", each parameter then
+            /// sent as a query parameter of its own name
+            /// (<https://hl7.org/fhir/R4/operations.html#request>).
+            pub(crate) fn request_query(
+                request: &Request,
+            ) -> Result<Option<Vec<(String, String)>>, RequestError> {
+                let mut query = Vec::new();
+                for parameter in encode(request)?.parameter {
+                    let Some(name) = parameter.name.value.clone() else {
+                        return Ok(None);
+                    };
+                    if parameter.resource.is_some() || !parameter.part.is_empty() {
+                        return Ok(None);
+                    }
+                    let written = parameter.to_json()?;
+                    let value = written
+                        .into_iter()
+                        .find(|(key, _)| key.starts_with("value"))
+                        .map(|(_, value)| value);
+                    let text = match value {
+                        Some(fhir_types::codec::Value::String(text)) => text,
+                        Some(fhir_types::codec::Value::Bool(flag)) => flag.to_string(),
+                        Some(fhir_types::codec::Value::Number(number)) => number.to_string(),
+                        _ => return Ok(None),
+                    };
+                    query.push((name, text));
+                }
+                Ok(Some(query))
+            }
+
             /// Returns the FHIR JSON `batch` Bundle that carries `requests`.
             ///
             /// A request this release cannot carry refuses the whole batch,
@@ -106,7 +316,7 @@ macro_rules! per_release {
                         Ok(BundleEntry {
                             request: Some(BundleEntryRequest {
                                 method: POST.into(),
-                                url: super::path_of(request).into(),
+                                url: super::path_of(request).as_str().into(),
                                 ..Default::default()
                             }),
                             resource: Some(Resource::Parameters(Box::new(encode(request)?))),
@@ -170,6 +380,14 @@ macro_rules! per_release {
                                 .and_then(|text| text.value.clone()),
                             tx_issue_type: details
                                 .and_then(|held| held.coding.iter().find_map(tx_issue)),
+                            codings: details
+                                .map(|held| held.coding.iter().map(concept).collect())
+                                .unwrap_or_default(),
+                            expression: issue
+                                .expression
+                                .iter()
+                                .filter_map(|path| path.value.clone())
+                                .collect(),
                         })
                     })
                     .collect::<Result<Vec<_>, BodyError>>()?;
@@ -195,23 +413,7 @@ macro_rules! per_release {
             pub(crate) fn lookup_found(body: &str) -> Result<LookupOutcome, BodyError> {
                 let parameters = serde_json::from_str::<Parameters>(body)?;
                 let found = CodeSystemLookupResponse::from_parameters(&parameters)?;
-                let designations = found
-                    .designation
-                    .iter()
-                    .map(|designation| {
-                        Ok(Designation {
-                            language: designation
-                                .language
-                                .as_ref()
-                                .and_then(|code| code.value.clone()),
-                            usage: designation.r#use.as_ref().map(concept),
-                            value: super::required(
-                                designation.value.value.clone(),
-                                "designation.value",
-                            )?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, BodyError>>()?;
+                let designations = designations!(found.designation, "designation.value");
                 let properties = found
                     .property
                     .iter()
@@ -237,6 +439,7 @@ macro_rules! per_release {
                     name: super::required(found.name.value.clone(), "name")?,
                     version: found.version.as_ref().and_then(|text| text.value.clone()),
                     display: super::required(found.display.value.clone(), "display")?,
+                    definition: lookup_definition(&found),
                     designations,
                     properties,
                 })
@@ -247,53 +450,27 @@ macro_rules! per_release {
                 let parameters = serde_json::from_str::<Parameters>(body)?;
                 let answer = ConceptMapTranslateResponse::from_parameters(&parameters)?;
                 let message = answer.message.as_ref().and_then(|text| text.value.clone());
-                if !super::required_flag(answer.result.value, "result")? {
-                    return Ok(TranslateOutcome::NoMatch { message });
+                let matches = answer.r#match.iter().map(translate_match).collect::<Result<Vec<_>, BodyError>>()?;
+                let used_maps = used_maps(&answer);
+                if super::required_flag(answer.result.value, "result")? {
+                    return Ok(TranslateOutcome::Translated {
+                        matches,
+                        message,
+                        used_maps,
+                    });
                 }
-                let matches = answer
-                    .r#match
-                    .iter()
-                    .map(|found| Match {
-                        equivalence: found
-                            .equivalence
-                            .as_ref()
-                            .and_then(|code| code.value.as_deref())
-                            .map(Equivalence::new),
-                        concept: found.concept.as_ref().map(concept),
-                        source: found.source.as_ref().and_then(|url| url.value.clone()),
-                    })
-                    .collect();
-                Ok(TranslateOutcome::Translated { matches, message })
+                Ok(TranslateOutcome::NoMatch {
+                    message,
+                    matches,
+                    used_maps,
+                })
             }
 
             /// Returns the `ValueSet/$validate-code` answer `body` carries.
             pub(crate) fn validate_code(body: &str) -> Result<ValidateOutcome, BodyError> {
                 let parameters = serde_json::from_str::<Parameters>(body)?;
                 let answer = ValueSetValidateCodeResponse::from_parameters(&parameters)?;
-                let message = answer.message.as_ref().and_then(|text| text.value.clone());
-                if super::required_flag(answer.result.value, "result")? {
-                    return Ok(ValidateOutcome::Valid {
-                        display: answer.display.as_ref().and_then(|text| text.value.clone()),
-                        message,
-                    });
-                }
-                Ok(ValidateOutcome::Invalid {
-                    message,
-                    outcome: invalid_issues(&answer)?,
-                })
-            }
-
-            /// Returns the `Parameters` of one `CodeSystem/$subsumes`, which
-            /// every release declares with the same inputs.
-            fn subsumes_parameters(subsumption: &Subsumption) -> Parameters {
-                CodeSystemSubsumesRequest {
-                    system: Some(subsumption.system.as_str().into()),
-                    code_a: Some(subsumption.code_a.as_str().into()),
-                    code_b: Some(subsumption.code_b.as_str().into()),
-                    version: subsumption.version.as_deref().map(Into::into),
-                    ..Default::default()
-                }
-                .into_parameters()
+                validated!(answer, validation_details(&answer), validation_issues(&answer)?)
             }
 
             /// Returns the `ValueSet/$expand` answer `body` carries.
@@ -314,6 +491,24 @@ macro_rules! per_release {
                     version: value_set.version.as_ref().and_then(|text| text.value.clone()),
                     total: expansion.total.as_ref().and_then(|number| number.value),
                     offset: expansion.offset.as_ref().and_then(|number| number.value),
+                    parameters: expansion
+                        .parameter
+                        .iter()
+                        .map(|parameter| {
+                            Ok(ExpansionParameter {
+                                name: super::required(
+                                    parameter.name.value.clone(),
+                                    "expansion.parameter.name",
+                                )?,
+                                value: parameter
+                                    .to_json()?
+                                    .into_iter()
+                                    .find(|(key, _)| key.starts_with("value"))
+                                    .map(|(member, value)| PropertyValue { member, value }),
+                            })
+                        })
+                        .collect::<Result<Vec<_>, BodyError>>()?,
+                    unclosed: unclosed(expansion),
                     contains: expansion
                         .contains
                         .iter()
@@ -322,26 +517,33 @@ macro_rules! per_release {
                 }))
             }
 
+            /// Returns the `valueset-unclosed` mark of `expansion` with its
+            /// stated reasons, `None` unless the mark is set `true`.
+            fn unclosed(expansion: &ValueSetExpansion) -> Option<Unclosed> {
+                let marked = expansion.extension.iter().any(|extension| {
+                    extension.url == super::UNCLOSED
+                        && matches!(
+                            &extension.value,
+                            Some(ExtensionValue::Boolean(flag)) if flag.value == Some(true)
+                        )
+                });
+                marked.then(|| Unclosed {
+                    reasons: expansion
+                        .extension
+                        .iter()
+                        .filter(|extension| extension.url == super::UNCLOSED_REASON)
+                        .filter_map(|extension| match &extension.value {
+                            Some(ExtensionValue::String(text)) => text.value.clone(),
+                            _ => None,
+                        })
+                        .collect(),
+                })
+            }
+
             /// Returns one `expansion.contains` entry with the entries
             /// nested under it.
             fn contains(entry: &ValueSetExpansionContains) -> Result<ExpansionContains, BodyError> {
-                let designations = entry
-                    .designation
-                    .iter()
-                    .map(|designation| {
-                        Ok(Designation {
-                            language: designation
-                                .language
-                                .as_ref()
-                                .and_then(|code| code.value.clone()),
-                            usage: designation.r#use.as_ref().map(concept),
-                            value: super::required(
-                                designation.value.value.clone(),
-                                "contains.designation.value",
-                            )?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, BodyError>>()?;
+                let designations = designations!(entry.designation, "contains.designation.value");
                 Ok(ExpansionContains {
                     system: entry.system.as_ref().and_then(|uri| uri.value.clone()),
                     version: entry.version.as_ref().and_then(|text| text.value.clone()),
@@ -393,7 +595,7 @@ macro_rules! per_release {
                 }
             }
 
-            /// Returns one property value as the choice member that carried it
+            /// Returns one parameter value as the choice member that carried it
             /// and that member's lexical JSON.
             fn property_value(value: ParametersParameterValue) -> Result<PropertyValue, BodyError> {
                 let parameter = ParametersParameter {

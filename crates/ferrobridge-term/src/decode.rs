@@ -14,9 +14,9 @@ use crate::client::Answer;
 use crate::config::WireVersion;
 use crate::error::{Error, UpstreamError};
 use crate::outcome::{
-    BatchOutcome, ExpandOutcome, LookupOutcome, Request, SubsumesOutcome, TranslateOutcome,
-    ValidateOutcome,
+    BatchOutcome, ExpandOutcome, LookupOutcome, SubsumesOutcome, TranslateOutcome, ValidateOutcome,
 };
+use crate::request::Request;
 use http::StatusCode;
 
 /// The `tx-issue-type` codes that say the server does not know the concept.
@@ -69,6 +69,24 @@ pub(crate) fn validate_code(
     }
     let upstream = UpstreamError::new(version, answer.status, answer.body.clone());
     Err(refusal(crate::VALIDATE_CODE, answer, upstream))
+}
+
+/// Returns the `CodeSystem/$validate-code` outcome `answer` carries.
+pub(crate) fn code_system_validate_code(
+    version: WireVersion,
+    answer: &Answer,
+) -> Result<ValidateOutcome, Error> {
+    let operation = crate::CODE_SYSTEM_VALIDATE_CODE;
+    if answer.status.is_success() {
+        return crate::wire::code_system_validate_code(version, &answer.body)
+            .ok_or(Error::UnsupportedOperation {
+                operation,
+                wire_version: version,
+            })?
+            .map_err(|source| body(operation, answer, source));
+    }
+    let upstream = UpstreamError::new(version, answer.status, answer.body.clone());
+    Err(refusal(operation, answer, upstream))
 }
 
 /// Returns the `ValueSet/$expand` outcome `answer` carries.
@@ -126,6 +144,9 @@ pub(crate) fn batch_entry(
         Request::Lookup { .. } => lookup(version, answer).map(BatchOutcome::Lookup),
         Request::Translate(_) => translate(version, answer).map(BatchOutcome::Translate),
         Request::ValidateCode(_) => validate_code(version, answer).map(BatchOutcome::ValidateCode),
+        Request::CodeSystemValidateCode(_) => {
+            code_system_validate_code(version, answer).map(BatchOutcome::CodeSystemValidateCode)
+        }
         Request::Expand(_) => expand(version, answer).map(BatchOutcome::Expand),
         Request::Subsumes(_) => subsumes(version, answer).map(BatchOutcome::Subsumes),
     }
