@@ -3,31 +3,41 @@
 # SPDX-License-Identifier: BUSL-1.1
 #
 # The performance gate of the bridge (#1656): ferrohealth-perf
-# (FerroHEALTH/FerroSYS#249) against the release build of ferrobridge, over
-# the FerroEHR CDR and its database at the "FerroEHR CDR image" and "FerroEHR
-# CDR database image" pins of docs/VERSIONS.md, and RabbitMQ at its pin.
+# (FerroHEALTH/FerroSYS#249) in its A/B mode, the head of a change judged
+# against its base measured beside it on the same runner. Each arm is the
+# release build of ferrobridge over its own FerroEHR CDR and its own CDR
+# database, at the "FerroEHR CDR image" and "FerroEHR CDR database image"
+# pins of docs/VERSIONS.md, with one RabbitMQ at its pin for both.
 #
-#   scripts/perf/gate.sh build
-#       Builds target/release/ferrobridge.
-#   scripts/perf/gate.sh run [--update]
-#       Starts the CDR, its database and RabbitMQ on loopback, loads the
-#       synthetic template, starts target/release/ferrobridge with
-#       perf/ferrobridge.toml, seeds a Condition through the facade, renders
-#       perf/plan.toml with what the seed made, and runs the gate against
-#       perf/baseline.toml, one entry per host shape. Then it plants a poller
-#       of the CDR's database that never waits and runs the idle phase of
+#   scripts/perf/gate.sh build [BASE]
+#       Builds target/release/ferrobridge of the checkout, the head, and of
+#       its base: the merge base of HEAD with BASE, a commit or ref, or with
+#       no BASE the newest v* tag before HEAD, else HEAD's first parent. The
+#       base is built from `git archive` of that commit under target/, with
+#       its own toolchain pin, into the same target directory, so the
+#       dependencies build once.
+#   scripts/perf/gate.sh run
+#       Starts both CDRs, their databases and RabbitMQ on loopback, loads the
+#       two synthetic templates into each CDR, starts each arm's ferrobridge
+#       with its own tree's perf/ferrobridge.toml (the head's when the base
+#       has none) over its tree's facade and HL7 v2 mapping fixtures, seeds a
+#       Condition through each facade, and runs `ferrohealth-perf ab` over
+#       perf/plan.toml with each arm's values: the head's idle phase held to
+#       absolute limits, then pairs of load phases, the facade's requests and
+#       an ORU^R01 over MLLP with TLS. Then it plants a poller of the head's
+#       CDR database that never waits and runs the idle phase of
 #       perf/busy-loop.toml beside it, which must fail on idle transactions.
-#       --update writes the entry of the runner's host shape from a run that
-#       passes. Exit 0 when both hold, 1 when the gate fails or the planted
-#       poller passes, 2 when the run cannot be judged or set up.
+#       Exit 0 when both hold, 1 when the gate fails or the planted poller
+#       passes, 2 when the run cannot be judged or set up.
 #   scripts/perf/gate.sh --self-test
-#       Proves the pin reader, the plan rendering and the agreement of the
-#       two plans' idle limits offline.
+#       Proves the pin reader, the plan's placeholders, the seeded Condition,
+#       the agreement of the two plans' idle limits and the base resolution
+#       offline.
 #
-# Needs Docker (or Podman through PERF_ENGINE=podman), curl, jq, openssl and
-# ferrohealth-perf on PATH; the server's CPU and memory are read from /proc,
-# so the gate judges them on Linux alone. No specification governs this: our
-# own design.
+# Needs Docker (or Podman through PERF_ENGINE=podman), curl, git, jq,
+# openssl and ferrohealth-perf on PATH; the servers' CPU and memory are read
+# from /proc, so the gate judges them on Linux alone. No specification
+# governs this: our own design.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -35,23 +45,24 @@ readonly PLAN=perf/plan.toml
 readonly BUSY_PLAN=perf/busy-loop.toml
 readonly CONFIG=perf/ferrobridge.toml
 readonly WORK=target/perf-run
-readonly BASE=http://127.0.0.1:18080
-readonly CDR=http://127.0.0.1:18090/ferroehr/rest/openehr/v1
-readonly CDR_ORIGIN=http://127.0.0.1:18090
+readonly BASE_TREE=target/perf-base
 readonly NETWORK=ferrobridge-perf
-readonly DB_NAME=ferrobridge-perf-cdr-db
-readonly CDR_NAME=ferrobridge-perf-cdr
 readonly BROKER_NAME=ferrobridge-perf-broker
-readonly DB_PORT=15432
 # The role the CDR database image creates, in the gate's own throwaway
-# container, which the run removes when it ends.
+# containers, which the run removes when it ends.
 readonly CDR_DB_PASSWORD="${PERF_CDR_DB_PASSWORD:-ferroehr}"
-readonly ADMIN_URL="postgresql://postgres:postgres@127.0.0.1:${DB_PORT}/ferroehr?sslmode=disable"
-readonly TEMPLATE=tools/ferrobridge-testkit/fixtures/opt/diagnoses.opt
+readonly TEMPLATES=(tools/ferrobridge-testkit/fixtures/opt/diagnoses.opt tools/ferrobridge-testkit/fixtures/opt/diagnose.opt)
+# The facade's mapping set and the HL7 v2 face's Observation context, under
+# each arm's own tree.
+readonly MAPPINGS=(app/ferrobridge-server/tests/it/repeated app/ferrobridge-server/tests/it/hl7v2_fixtures)
+readonly CONCEPT_MAPS=tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package
 readonly CONDITION=tools/ferrobridge-testkit/fixtures/fhir/r4/condition.json
 readonly PROFILE=http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis
 readonly SUBJECTS=http://example.org/fhir/sid/ferrobridge-subject
 readonly READER=ferrobridge-perf-events
+# The subject named in the HL7 v2 face's sender list and the PERFLAB
+# client certificate.
+readonly SENDER_SUBJECT=perflab.example.org
 # A poll of a table of the CDR's database with no wait between two reads.
 readonly POLL='SELECT count(*) FROM public.perf_busy_loop;'
 engine="${PERF_ENGINE:-docker}"
@@ -61,6 +72,26 @@ die() {
   exit 2
 }
 
+# The loopback ports of each arm: the facade, the MLLP listener, the CDR and
+# its database.
+port() {
+  case "$1:$2" in
+    head:facade) echo 18080 ;;
+    base:facade) echo 18081 ;;
+    head:mllp) echo 12575 ;;
+    base:mllp) echo 12576 ;;
+    head:cdr) echo 18090 ;;
+    base:cdr) echo 18091 ;;
+    head:db) echo 15432 ;;
+    base:db) echo 15433 ;;
+    *) die "no port $2 for $1" ;;
+  esac
+}
+
+facade() { echo "http://127.0.0.1:$(port "$1" facade)"; }
+cdr_origin() { echo "http://127.0.0.1:$(port "$1" cdr)"; }
+admin_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" db)/ferroehr?sslmode=disable"; }
+
 # pin ITEM [MATRIX]: the pin of the docs/VERSIONS.md row whose first cell is
 # ITEM, backticks off.
 pin() {
@@ -69,20 +100,9 @@ pin() {
     $2 == item { v = $3; gsub(/[[:space:]`]/, "", v); print v; exit }' "$matrix"
 }
 
-# render PLAN OUT NAME=VALUE...: PLAN with each @NAME@ replaced by its VALUE,
-# refused when a placeholder is left.
-render() {
-  local plan="$1" out="$2" text pair
-  shift 2
-  text="$(< "$plan")"
-  for pair in "$@"; do
-    text="${text//@${pair%%=*}@/${pair#*=}}"
-  done
-  if grep -qE '@[A-Z_]+@' <<< "$text"; then
-    echo "perf-gate: $plan holds a placeholder the gate does not fill" >&2
-    return 1
-  fi
-  printf '%s\n' "$text" > "$out"
+# placeholders PLAN: the names of PLAN's placeholders, sorted, one per line.
+placeholders() {
+  grep -oE '@[A-Z][A-Z0-9_]*@' "$1" | tr -d '@' | sort -u
 }
 
 # idle_table PLAN: the [idle] table of PLAN, blank lines off.
@@ -116,99 +136,198 @@ broker_up() {
   "$engine" logs "$BROKER_NAME" 2>&1 | grep -qF "Server startup complete"
 }
 
-server_pid=""
+# base_rev [BASE] [AT]: the commit the base is built from, as `build` names
+# it, resolved from AT (HEAD by default).
+base_rev() {
+  local base="${1:-}" at="${2:-HEAD}" tag
+  # The commit before the push that created a branch is all zeros.
+  [[ "$base" =~ ^0+$ ]] && base=""
+  if [[ -n "$base" ]]; then
+    git -C "$root" merge-base "$at" "$base"
+  elif tag="$(git -C "$root" describe --tags --abbrev=0 --match 'v*' "$at^" 2> /dev/null)"; then
+    git -C "$root" rev-parse "$tag^{commit}"
+  else
+    git -C "$root" rev-parse "$at^1"
+  fi
+}
+
+# build [BASE]: the base's release binary into target/perf-base/ferrobridge,
+# then the head's into target/release/ferrobridge.
+build() {
+  local rev
+  cd "$root"
+  rev="$(base_rev "${1:-}")" || die "the base of ${1:-the previous release} cannot be resolved"
+  echo "perf-gate: the base is $rev"
+  rm -rf "$BASE_TREE"
+  mkdir -p "$BASE_TREE/src"
+  git archive "$rev" | tar -x -C "$BASE_TREE/src"
+  printf '%s\n' "$rev" > "$BASE_TREE/rev"
+  # From inside the base's tree, so its own toolchain pin builds it.
+  (cd "$BASE_TREE/src" && cargo build --release --locked -p ferrobridge-server --bin ferrobridge --target-dir "$root/target")
+  cp target/release/ferrobridge "$BASE_TREE/ferrobridge"
+  cargo build --release --locked -p ferrobridge-server --bin ferrobridge
+}
+
+head_pid=""
+base_pid=""
 poller_pid=""
 cleanup() {
   [[ -n "$poller_pid" ]] && kill "$poller_pid" 2> /dev/null || true
-  [[ -n "$server_pid" ]] && kill "$server_pid" 2> /dev/null || true
-  [[ -n "$server_pid" ]] && wait "$server_pid" 2> /dev/null || true
-  "$engine" rm --force "$CDR_NAME" "$DB_NAME" "$BROKER_NAME" > /dev/null 2>&1 || true
+  local pid arm
+  for pid in "$head_pid" "$base_pid"; do
+    [[ -n "$pid" ]] && kill "$pid" 2> /dev/null || true
+    [[ -n "$pid" ]] && wait "$pid" 2> /dev/null || true
+  done
+  for arm in head base; do
+    "$engine" rm --force "ferrobridge-perf-$arm-cdr" "ferrobridge-perf-$arm-db" > /dev/null 2>&1 || true
+  done
+  "$engine" rm --force "$BROKER_NAME" > /dev/null 2>&1 || true
   "$engine" network rm "$NETWORK" > /dev/null 2>&1 || true
 }
 
-# mllp_tls: a CA and the MLLP listener's certificate for 127.0.0.1, under
-# $WORK/tls, as perf/ferrobridge.toml names them.
-mllp_tls() {
-  local tls="$WORK/tls"
-  mkdir -p "$tls"
+# tls: a CA, the MLLP listeners' certificate for 127.0.0.1, and the PERFLAB
+# sender's client identity (its certificate and key in one file), under
+# $WORK/tls.
+tls() {
+  local dir="$WORK/tls"
+  mkdir -p "$dir"
   openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=ferrobridge perf CA" \
-    -keyout "$tls/ca.key" -out "$tls/ca.pem" 2> /dev/null
+    -keyout "$dir/ca.key" -out "$dir/ca.pem" 2> /dev/null
   openssl req -newkey rsa:2048 -nodes -subj "/CN=127.0.0.1" \
-    -keyout "$tls/mllp-key.pem" -out "$tls/mllp.csr" 2> /dev/null
-  printf 'subjectAltName = IP:127.0.0.1, DNS:localhost\n' > "$tls/ext.cnf"
-  openssl x509 -req -in "$tls/mllp.csr" -CA "$tls/ca.pem" -CAkey "$tls/ca.key" \
-    -CAcreateserial -days 1 -extfile "$tls/ext.cnf" -out "$tls/mllp-chain.pem" 2> /dev/null
+    -keyout "$dir/mllp-key.pem" -out "$dir/mllp.csr" 2> /dev/null
+  printf 'subjectAltName = IP:127.0.0.1, DNS:localhost\n' > "$dir/server.cnf"
+  openssl x509 -req -in "$dir/mllp.csr" -CA "$dir/ca.pem" -CAkey "$dir/ca.key" \
+    -CAcreateserial -days 1 -extfile "$dir/server.cnf" -out "$dir/mllp-chain.pem" 2> /dev/null
+  openssl req -newkey rsa:2048 -nodes -subj "/CN=$SENDER_SUBJECT" \
+    -keyout "$dir/perflab-key.pem" -out "$dir/perflab.csr" 2> /dev/null
+  printf 'subjectAltName = DNS:%s\nextendedKeyUsage = clientAuth\n' "$SENDER_SUBJECT" > "$dir/client.cnf"
+  openssl x509 -req -in "$dir/perflab.csr" -CA "$dir/ca.pem" -CAkey "$dir/ca.key" \
+    -CAcreateserial -days 1 -extfile "$dir/client.cnf" -out "$dir/perflab-cert.pem" 2> /dev/null
+  cat "$dir/perflab-cert.pem" "$dir/perflab-key.pem" > "$dir/perflab.pem"
+}
+
+# cdr ARM: starts ARM's CDR database and CDR on the gate's network.
+cdr() {
+  local arm="$1" db_image="$2" cdr_image="$3" db="ferrobridge-perf-$1-db"
+  "$engine" run --quiet --detach --name "$db" --network "$NETWORK" \
+    --publish "127.0.0.1:$(port "$arm" db):5432" --env POSTGRES_PASSWORD=postgres \
+    "$db_image" > /dev/null
+  wait_for "the $arm CDR's PostgreSQL" 120 "$engine" exec "$db" \
+    pg_isready --host 127.0.0.1 --username ferroehr --dbname ferroehr
+  "$engine" run --quiet --detach --name "ferrobridge-perf-$arm-cdr" --network "$NETWORK" \
+    --publish "127.0.0.1:$(port "$arm" cdr):8080" \
+    --env "FERROEHR__DB__URL=postgres://ferroehr:${CDR_DB_PASSWORD}@${db}:5432/ferroehr" \
+    --env FERROEHR__AUTH__ENABLED=false --env FERROEHR__EHR_INDEX__PROVIDER=local \
+    --env FERROEHR__USAGE_REPORT__ENABLED=false --env "FERROEHR__OUTBOX__READERS=${READER}" \
+    "$cdr_image" > /dev/null
+}
+
+# templates ARM TREE: loads TREE's synthetic templates into ARM's CDR.
+templates() {
+  local arm="$1" tree="$2" template status
+  for template in "${TEMPLATES[@]}"; do
+    status="$(curl --silent --output "$WORK/$arm/template.json" --write-out '%{http_code}' \
+      --header 'content-type: application/xml' --data-binary "@$tree/$template" \
+      "$(cdr_origin "$arm")/ferroehr/rest/openehr/v1/definition/template/adl1.4")"
+    [[ "$status" = 201 ]] ||
+      die "the $arm CDR answered $status to $template: $(head -c 400 "$WORK/$arm/template.json")"
+  done
+}
+
+# serve ARM BINARY TREE: starts ARM's bridge in TREE with TREE's own
+# perf/ferrobridge.toml, or the head's when TREE has none, over TREE's
+# mapping fixtures, and prints its process id.
+serve() {
+  local arm="$1" binary="$2" tree="$3" dir="$root/$WORK/$1" config="$root/$CONFIG" fixtures
+  [[ -f "$tree/$CONFIG" ]] && config="$tree/$CONFIG"
+  mkdir -p "$dir/mappings"
+  for fixtures in "${MAPPINGS[@]}"; do
+    cp "$tree/$fixtures"/*.yml "$dir/mappings/"
+  done
+  (
+    cd "$tree"
+    FERROBRIDGE__USAGE_REPORT__ENABLED=false \
+      FERROBRIDGE__SERVER__LISTEN="127.0.0.1:$(port "$arm" facade)" \
+      FERROBRIDGE__CDR__BASE_URL="$(cdr_origin "$arm")/ferroehr/rest/openehr/v1" \
+      FERROBRIDGE__MAPPINGS__DIRECTORY="$dir/mappings" \
+      FERROBRIDGE__FACADE__BASE_URL="$(facade "$arm")/fhir" \
+      FERROBRIDGE__FACADE__IDENTITY_STORE="$dir/identity.redb" \
+      FERROBRIDGE__HL7V2__LISTEN="127.0.0.1:$(port "$arm" mllp)" \
+      FERROBRIDGE__HL7V2__CONCEPT_MAPS="$tree/$CONCEPT_MAPS" \
+      FERROBRIDGE__HL7V2__TLS__CERTIFICATE_FILE="$root/$WORK/tls/mllp-chain.pem" \
+      FERROBRIDGE__HL7V2__TLS__KEY_FILE="$root/$WORK/tls/mllp-key.pem" \
+      FERROBRIDGE__HL7V2__TLS__CLIENT_CA_FILE="$root/$WORK/tls/ca.pem" \
+      FERROBRIDGE__CHANGE_FEED__URL="$(cdr_origin "$arm")/ferroehr/rest/extensions/v1" \
+      FERROBRIDGE__CHANGE_FEED__DEAD_LETTERS="$dir/dead-letters.redb" \
+      FERROBRIDGE__EVENTS__EXCHANGE="ferrobridge.perf.$arm" \
+      exec "$binary" --config "$config" serve > "$dir/server.log" 2>&1
+  ) &
+  echo "$!"
 }
 
 start() {
-  local cdr_image db_image broker_image
+  local cdr_image db_image broker_image arm
   cdr_image="$(pin "FerroEHR CDR image")"
   db_image="$(pin "FerroEHR CDR database image")"
   broker_image="$(pin "RabbitMQ image")"
   [[ -n "$cdr_image" && -n "$db_image" && -n "$broker_image" ]] ||
     die "docs/VERSIONS.md pins no FerroEHR CDR, CDR database or RabbitMQ image"
   [[ -x target/release/ferrobridge ]] || die "target/release/ferrobridge is not built"
+  [[ -x "$BASE_TREE/ferrobridge" ]] || die "$BASE_TREE/ferrobridge is not built: run gate.sh build first"
   rm -rf "$WORK"
-  mkdir -p "$WORK"
+  mkdir -p "$WORK/head" "$WORK/base"
   chmod 0700 "$WORK"
-  mllp_tls
+  tls
 
   "$engine" network create "$NETWORK" > /dev/null
-  "$engine" run --quiet --detach --name "$DB_NAME" --network "$NETWORK" \
-    --publish "127.0.0.1:${DB_PORT}:5432" --env POSTGRES_PASSWORD=postgres \
-    "$db_image" > /dev/null
-  wait_for "the CDR's PostgreSQL" 120 "$engine" exec "$DB_NAME" \
-    pg_isready --host 127.0.0.1 --username ferroehr --dbname ferroehr
-  "$engine" run --quiet --detach --name "$CDR_NAME" --network "$NETWORK" \
-    --publish 127.0.0.1:18090:8080 \
-    --env "FERROEHR__DB__URL=postgres://ferroehr:${CDR_DB_PASSWORD}@${DB_NAME}:5432/ferroehr" \
-    --env FERROEHR__AUTH__ENABLED=false --env FERROEHR__EHR_INDEX__PROVIDER=local \
-    --env FERROEHR__USAGE_REPORT__ENABLED=false --env "FERROEHR__OUTBOX__READERS=${READER}" \
-    "$cdr_image" > /dev/null
   "$engine" run --quiet --detach --name "$BROKER_NAME" --publish 127.0.0.1:15672:5672 \
     "$broker_image" > /dev/null
-  wait_for "the CDR" 120 curl --fail --silent "$CDR_ORIGIN/health/readiness"
+  for arm in head base; do
+    cdr "$arm" "$db_image" "$cdr_image"
+  done
+  for arm in head base; do
+    wait_for "the $arm CDR" 120 curl --fail --silent "$(cdr_origin "$arm")/health/readiness"
+  done
   wait_for "RabbitMQ" 120 broker_up
+  templates head "$root"
+  templates base "$root/$BASE_TREE/src"
 
-  local status
-  status="$(curl --silent --output "$WORK/template.json" --write-out '%{http_code}' \
-    --header 'content-type: application/xml' --data-binary "@$TEMPLATE" \
-    "$CDR/definition/template/adl1.4")"
-  [[ "$status" = 201 ]] || die "the CDR answered $status to the template upload: $(head -c 400 "$WORK/template.json")"
-
-  FERROBRIDGE__USAGE_REPORT__ENABLED=false target/release/ferrobridge --config "$CONFIG" serve \
-    > "$WORK/server.log" 2>&1 &
-  server_pid=$!
-  wait_for "the bridge" 120 curl --fail --silent "$BASE/health/readiness" ||
-    die "the bridge did not come up: $(tail -n 20 "$WORK/server.log")"
+  head_pid="$(serve head "$root/target/release/ferrobridge" "$root")"
+  base_pid="$(serve base "$root/$BASE_TREE/ferrobridge" "$root/$BASE_TREE/src")"
+  for arm in head base; do
+    wait_for "the $arm bridge" 120 curl --fail --silent "$(facade "$arm")/health/readiness" ||
+      die "the $arm bridge did not come up: $(tail -n 20 "$WORK/$arm/server.log")"
+  done
 }
 
-# seed: creates the Condition of the subject the read and the search keep to,
-# and prints its logical id.
+# seed ARM: creates the Condition of the subject the read and the search
+# keep to through ARM's facade, and prints its logical id.
 seed() {
-  local status
-  status="$(condition synthetic-subject-perf-read | curl --silent --output "$WORK/seed.json" \
+  local arm="$1" status
+  status="$(condition synthetic-subject-perf-read | curl --silent --output "$WORK/$arm/seed.json" \
     --write-out '%{http_code}' --header 'content-type: application/fhir+json' \
-    --data-binary @- "$BASE/fhir/Condition")"
-  [[ "$status" = 201 ]] || die "the facade answered $status to the seed: $(head -c 400 "$WORK/seed.json")"
-  jq --exit-status --raw-output '.id' "$WORK/seed.json"
+    --data-binary @- "$(facade "$arm")/fhir/Condition")"
+  [[ "$status" = 201 ]] ||
+    die "the $arm facade answered $status to the seed: $(head -c 400 "$WORK/$arm/seed.json")"
+  jq --exit-status --raw-output '.id' "$WORK/$arm/seed.json"
 }
 
-# busy_loop: the planted poller must fail the idle phase on its
+# busy_loop: the planted poller must fail the head's idle phase on its
 # transactions.
 busy_loop() {
-  local code=0 summary="$WORK/busy-loop.md"
-  "$engine" exec "$DB_NAME" psql --quiet --username postgres --dbname ferroehr \
+  local code=0 summary="$WORK/busy-loop.md" db=ferrobridge-perf-head-db
+  "$engine" exec "$db" psql --quiet --username postgres --dbname ferroehr \
     --command 'CREATE TABLE IF NOT EXISTS public.perf_busy_loop (id integer)' > /dev/null
-  yes "$POLL" | "$engine" exec --interactive --env PGAPPNAME=perf-busy-loop "$DB_NAME" \
+  yes "$POLL" | "$engine" exec --interactive --env PGAPPNAME=perf-busy-loop "$db" \
     psql --quiet --no-psqlrc --username postgres --dbname ferroehr > /dev/null 2>&1 &
   poller_pid=$!
-  GITHUB_STEP_SUMMARY='' ferrohealth-perf run --plan "$BUSY_PLAN" --pid "$server_pid" \
-    --base-url "$BASE" --database-url "$ADMIN_URL" --baseline "$WORK/no-baseline.toml" \
+  GITHUB_STEP_SUMMARY='' ferrohealth-perf run --plan "$BUSY_PLAN" --pid "$head_pid" \
+    --base-url "$(facade head)" --database-url "$(admin_url head)" \
+    --baseline "$WORK/no-baseline.toml" \
     --out-dir target/perf/busy-loop --summary "$summary" > /dev/null || code=$?
   kill "$poller_pid" 2> /dev/null || true
   poller_pid=""
-  "$engine" exec "$DB_NAME" psql --quiet --username postgres --dbname ferroehr --command \
+  "$engine" exec "$db" psql --quiet --username postgres --dbname ferroehr --command \
     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'perf-busy-loop'" > /dev/null
   local breaches
   breaches="$(awk '/^### Breaches/ { on = 1; next } /^### / { on = 0 } on' "$summary")"
@@ -227,36 +346,39 @@ report_busy_loop() {
   local outcome="$1" summary="$2"
   [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
   {
-    printf '## The planted idle busy-loop\n\nA poller of the CDR database that never waits %s.\n\n' "$outcome"
+    printf '## The planted idle busy-loop\n\nA poller of the head CDR database that never waits %s.\n\n' "$outcome"
     awk '/^### Breaches/ { on = 1 } /^### Checks/ { on = 0 } on' "$summary"
   } >> "$GITHUB_STEP_SUMMARY"
 }
 
 run() {
-  local update=()
-  case "${1:-}" in
-    --update) update=(--update) ;;
-    "") ;;
-    *) die "usage: gate.sh run [--update]" ;;
-  esac
+  [[ $# -eq 0 ]] || die "usage: gate.sh run"
   cd "$root"
   command -v ferrohealth-perf > /dev/null || die "ferrohealth-perf is not on PATH"
   trap cleanup EXIT
   start
-  local read_id code=0
-  read_id="$(seed)" || exit 2
-  render "$PLAN" "$WORK/plan.toml" \
-    "CREATE_BODY=$(condition synthetic-subject-perf-write)" \
-    "READ_ID=$read_id" \
-    "SEARCH=subject:identifier=$(jq --raw-input --raw-output '@uri' <<< "$SUBJECTS|synthetic-subject-perf-read")" ||
-    exit 2
-  ferrohealth-perf run --plan "$WORK/plan.toml" --pid "$server_pid" --base-url "$BASE" \
-    --database-url "$ADMIN_URL" --baseline perf/baseline.toml --out-dir target/perf \
-    ${update[@]+"${update[@]}"} || code=$?
+  local head_id base_id body search code=0 arm
+  head_id="$(seed head)" || exit 2
+  base_id="$(seed base)" || exit 2
+  body="$(condition synthetic-subject-perf-write)"
+  search="subject:identifier=$(jq --raw-input --raw-output '@uri' <<< "$SUBJECTS|synthetic-subject-perf-read")"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    printf "The base is \`%s\`.\n\n" "$(< "$BASE_TREE/rev")" >> "$GITHUB_STEP_SUMMARY"
+  fi
+  ferrohealth-perf ab --plan "$PLAN" \
+    --base-url "$(facade base)" --base-pid "$base_pid" \
+    --base-mllp-address "127.0.0.1:$(port base mllp)" --base-database-url "$(admin_url base)" \
+    --base-var "READ_ID=$base_id" --base-var "CREATE_BODY=$body" --base-var "SEARCH=$search" \
+    --head-url "$(facade head)" --head-pid "$head_pid" \
+    --head-mllp-address "127.0.0.1:$(port head mllp)" --head-database-url "$(admin_url head)" \
+    --head-var "READ_ID=$head_id" --head-var "CREATE_BODY=$body" --head-var "SEARCH=$search" \
+    --out-dir target/perf || code=$?
   busy_loop || { [[ "$code" -ne 0 ]] || code=1; }
   if [[ "$code" -ne 0 ]]; then
-    echo "perf-gate: the bridge log follows" >&2
-    tail -n 50 "$WORK/server.log" >&2
+    for arm in head base; do
+      echo "perf-gate: the $arm bridge's log follows" >&2
+      tail -n 50 "$WORK/$arm/server.log" >&2
+    done
   fi
   exit "$code"
 }
@@ -282,16 +404,22 @@ self_test() {
   for item in "FerroEHR CDR image" "FerroEHR CDR database image" "RabbitMQ image"; do
     check "the $item is pinned by digest" 1 "$([[ "$(pin "$item")" == *@sha256:* ]] && echo 1 || echo 0)"
   done
-  printf "path = \"/fhir/Condition/@READ_ID@\"\nbody = '''@CREATE_BODY@'''\n" > "$work/plan.toml"
-  render "$work/plan.toml" "$work/out.toml" "READ_ID=c-1" 'CREATE_BODY={"a":"b"}'
-  check "the placeholders are filled" "$(printf "path = \"/fhir/Condition/c-1\"\nbody = '''{\"a\":\"b\"}'''")" "$(< "$work/out.toml")"
-  check "a placeholder left is refused" 1 \
-    "$(render "$work/plan.toml" "$work/out.toml" "READ_ID=c-1" 2> /dev/null && echo 0 || echo 1)"
-  check "the committed plan is filled by the gate's three values" 0 \
-    "$(render "$root/$PLAN" "$work/out.toml" CREATE_BODY=x READ_ID=x SEARCH=x 2> /dev/null && echo 0 || echo 1)"
+  printf "path = \"/x/@READ_ID@/@A_1@\"\nbody = 'a@b.org @lower@ @READ_ID@'\n" > "$work/plan.toml"
+  check "the placeholders are read once each" "$(printf 'A_1\nREAD_ID')" "$(placeholders "$work/plan.toml")"
+  check "the committed plan holds the three placeholders the gate gives each arm" \
+    "$(printf 'CREATE_BODY\nREAD_ID\nSEARCH')" "$(placeholders "$root/$PLAN")"
   check "the seeded Condition names its subject and the profile" \
     "$PROFILE s-1" "$(condition s-1 | jq --raw-output '"\(.meta.profile[0]) \(.subject.identifier.value)"')"
   check "the seeded Condition carries no id" null "$(condition s-1 | jq --raw-output '.id')"
+  check "the arms listen apart" "18080 18081 12575 12576" \
+    "$(port head facade) $(port base facade) $(port head mllp) $(port base mllp)"
+  local file
+  for file in "${TEMPLATES[@]}" "$CONDITION" perf/messages/oru-r01.hl7; do
+    check "$file exists" 1 "$([[ -f "$root/$file" ]] && echo 1 || echo 0)"
+  done
+  for file in "${MAPPINGS[@]}"; do
+    check "$file holds mapping files" 1 "$(compgen -G "$root/$file/*.yml" > /dev/null && echo 1 || echo 0)"
+  done
   printf '[idle]\n# a note\nmax = 1.0\n\n[load]\nrate = 2.0\n' > "$work/plan.toml"
   check "the idle table is read alone" "$(printf '# a note\nmax = 1.0')" "$(idle_table "$work/plan.toml")"
   check "the gate and the busy-loop plan hold the same idle limits" \
@@ -300,19 +428,41 @@ self_test() {
     echo "  FAIL: $PLAN holds no [idle] table" >&2
     failed=1
   }
+  local repo="$work/repo" saved_root="$root"
+  git init --quiet "$repo"
+  commit() { git -C "$repo" -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false commit --quiet --allow-empty -m "$1"; }
+  commit one
+  commit two
+  git -C "$repo" -c tag.gpgsign=false tag v0.0.1
+  commit three
+  git -C "$repo" branch side
+  commit four
+  git -C "$repo" checkout --quiet side
+  commit side-only
+  git -C "$repo" checkout --quiet -
+  root="$repo"
+  check "with no BASE the base is the newest tag before HEAD" \
+    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev "")"
+  check "a BASE names its merge base with HEAD" \
+    "$(git -C "$repo" rev-parse HEAD~1)" "$(base_rev side)"
+  check "an all-zero BASE takes the previous release" \
+    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev 0000000000000000000000000000000000000000)"
+  check "with no tag before it the base is the first parent" \
+    "$(git -C "$repo" rev-parse v0.0.1~1)" "$(base_rev "" v0.0.1)"
+  root="$saved_root"
   [[ "$failed" -eq 0 ]] || exit 1
   echo "perf-gate: self-test OK ($n checks)."
 }
 
 case "${1:-}" in
   build)
-    cd "$root"
-    cargo build --release --locked -p ferrobridge-server --bin ferrobridge
+    shift
+    build "$@"
     ;;
   run)
     shift
     run "$@"
     ;;
   --self-test) self_test ;;
-  *) die "usage: gate.sh build | run [--update] | --self-test" ;;
+  *) die "usage: gate.sh build [BASE] | run | --self-test" ;;
 esac

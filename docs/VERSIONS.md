@@ -497,7 +497,7 @@ version (`cargo install --locked`), as every FerroHEALTH product does.
 | `shellcheck` | 0.11.0 | `.github/workflows/ci.yml` |
 | `hadolint` | 2.15.1 | `.github/workflows/ci.yml` |
 | `sqlx-cli` | 0.9.0 | `.github/workflows/ci.yml` (the `sqlx-offline` job) |
-| `ferrohealth-perf` | 0.4.2 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
+| `ferrohealth-perf` | 0.5.2 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
 
 The clone detector of `scripts/checks/duplication.sh` (#1359) also runs on a
 developer machine, so its pins live here and the guard reads them from this

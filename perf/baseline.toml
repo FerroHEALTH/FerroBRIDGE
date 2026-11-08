@@ -1,4 +1,0 @@
-# The performance baseline of ferrohealth-perf, one [[baseline]] per host
-# shape. `ferrohealth-perf run --update` writes or lowers the entry of the
-# runner's shape; a raise is a hand edit in a change that says why.
-schema = 3
