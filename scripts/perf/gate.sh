@@ -21,8 +21,9 @@
 #       Starts both CDRs, their databases, RabbitMQ and FerroTERM over the
 #       v2-to-FHIR guide's table ConceptMaps on loopback, loads the
 #       two synthetic templates into each CDR, starts each arm's ferrobridge
-#       with its own tree's perf/ferrobridge.toml (the head's when the base
-#       has none) over its tree's facade and HL7 v2 mapping fixtures, seeds a
+#       in its own tree with the head's perf/ferrobridge.toml, the harness the
+#       plan is written for, over its tree's facade and HL7 v2 mapping
+#       fixtures, seeds a
 #       Condition through each facade, and runs `ferrohealth-perf ab` over
 #       perf/plan.toml with each arm's values: the head's idle phase held to
 #       absolute limits, then pairs of load phases, the facade's requests and
@@ -238,12 +239,13 @@ templates() {
   done
 }
 
-# serve ARM BINARY TREE: starts ARM's bridge in TREE with TREE's own
-# perf/ferrobridge.toml, or the head's when TREE has none, over TREE's
-# mapping fixtures, and prints its process id.
+# serve ARM BINARY TREE: starts ARM's bridge in TREE with the head's
+# perf/ferrobridge.toml over TREE's mapping fixtures, and prints its process
+# id. Both arms take the head's harness, as they take the head's plan, so a
+# change to the harness reaches both; a key the base binary does not know
+# stops the base at boot, which the run reports with exit 2.
 serve() {
   local arm="$1" binary="$2" tree="$3" dir="$root/$WORK/$1" config="$root/$CONFIG" fixtures
-  [[ -f "$tree/$CONFIG" ]] && config="$tree/$CONFIG"
   mkdir -p "$dir/mappings"
   for fixtures in "${MAPPINGS[@]}"; do
     cp "$tree/$fixtures"/*.yml "$dir/mappings/"

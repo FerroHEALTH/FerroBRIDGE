@@ -35,8 +35,10 @@ installs `ferrohealth-perf` at its pin in `docs/VERSIONS.md`. Then
    each at its pin in `docs/VERSIONS.md`, and loads the
    testkit's synthetic `ferrobridge.diagnoses.v1` and
    `ferrobridge.diagnose.v1` templates into each CDR;
-2. starts each arm's `ferrobridge` with its own tree's
-   `perf/ferrobridge.toml` (the head's when the base has none): the FHIR
+2. starts each arm's `ferrobridge` in its own tree with the head's
+   `perf/ferrobridge.toml`, the harness the plan is written for, so a change
+   to the harness reaches both arms (a key the base binary does not know
+   stops the base at boot, exit 2): the FHIR
    facade over the facade tests' mapping set, the HL7 v2 face over TLS
    through the face tests' Observation context, and the change feed with its
    events lane following its CDR's outbox;
