@@ -198,6 +198,17 @@ counts, and two at the fewest stay unmapped. The rule holds for v2.9.1
 trees too, since the guide's paths disagree with the v2.9.1 definitions as
 well (`OML_O21`, and `MDM_T02`, whose observation group is `FIXME`).
 
+## One writer for every message
+
+`write` is the one place a v2 message is composed: `ack::render`, every
+reply header (`ack::Header::reply`) and every message a consumer originates
+go through `write::Writer`. Never join delimiters or escape a value by hand
+elsewhere. A field read from a message is echoed through `Writer::echo` as
+the message wrote it, and only into the delimiters it was read in, since the
+lexer keeps the formatting sequences of `FT` in a decoded value as written.
+`Writer::compose` checks a composed message with the same lexer and grouping
+a received message takes, so a structure rule lives once, in `parse`.
+
 ## Logs
 
 Libraries speak `tracing`, and no message content reaches a log: the listener

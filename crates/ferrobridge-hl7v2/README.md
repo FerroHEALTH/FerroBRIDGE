@@ -33,6 +33,11 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   required segment or field is a refusal.
 - `ack`: the original-mode acknowledgment, `AA`, `AE` with one `ERR` per
   refusal, or `AR`, echoing MSH-10 in MSA-2.
+- `write`: any message composed from segments, fields, repetitions,
+  components and subcomponents in the message's delimiters, each value
+  escaped by HL7 v2.9 chapter 2 §2.7.1 or echoed as read, checked against the
+  message structure its MSH declares and encoded in the character set MSH-18
+  names. The acknowledgment and every reply's header are built on it.
 - `inbound`: the steps above for one message, settling the `AR` and `AE`
   answers a message owes before it is mapped.
 - `map`: the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, loaded

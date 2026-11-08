@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.199"
+version = "0.1.200"
 dependencies = [
  "bytes",
  "chumsky",

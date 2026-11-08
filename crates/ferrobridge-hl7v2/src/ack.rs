@@ -6,20 +6,25 @@
 //! The receiver answers `AA` when it processed the message, `AE` when it
 //! sends "an error response, providing error information", and `AR` when it
 //! failed to process the message "for reasons unrelated to content" (HL7
-//! v2.5.1 chapter 2 §2.9.2.2; the codes are HL7 table 0008,
+//! v2.9 chapter 2 §2.9.2; the codes are HL7 table 0008,
 //! `CodeSystem/v2-0008` in the vendored `hl7.terminology` package). MSA-2
-//! carries MSH-10 of the message acknowledged (§2.9.2.2), and each refusal
+//! carries MSH-10 of the message acknowledged (§2.14.8.2), and each refusal
 //! is one `ERR` segment with its location in ERR-2, its table 0357 code in
-//! ERR-3 and the severity `E` in ERR-4.
+//! ERR-3 and the severity `E` in ERR-4 (§2.14.5).
 //!
-//! The acknowledgment's header swaps the sending and receiving application
-//! and facility of the message (MSH-3 to MSH-6), keeps its delimiters,
-//! processing id, version and character set, and names the message type
-//! `ACK` with the trigger event of the message. The values echoed are taken
-//! as written, escapes included, so they travel unchanged.
+//! A reply's header is constructed anew (§2.9.2.1): it swaps the sending
+//! and receiving application and facility of the message (MSH-3 to MSH-6),
+//! keeps its delimiters, processing id, version and character set, and
+//! carries a control id and a time of its own ([`Header::reply`]). The
+//! acknowledgment names the message type `ACK` with the trigger event of the
+//! message. The values echoed are taken as written, escapes included, so
+//! they travel unchanged. Every segment is written by [`crate::write`].
 
 use crate::decode::{Charset, DecodeError};
-use crate::parse::{ErrorCode, Location, Refusal};
+use crate::parse::{Delimiters, ErrorCode, Location, Refusal};
+use crate::write::Writer;
+use crate::write::header::Msh;
+use crate::write::value::{Component, Field, Repetition, Segment};
 
 /// An acknowledgment code of HL7 table 0008, original mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -47,9 +52,7 @@ impl Code {
 /// The header fields of the message acknowledged, as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
-    field: char,
-    encoding: String,
-    component: char,
+    delimiters: Delimiters,
     fields: Vec<String>,
 }
 
@@ -64,16 +67,17 @@ impl Header {
         let rest = line.strip_prefix("MSH")?;
         let field = rest.chars().next()?;
         let mut pieces = rest.get(field.len_utf8()..)?.split(field);
-        let encoding = String::from(pieces.next()?);
-        let mut encoding_characters = encoding.chars();
-        let component = encoding_characters.next()?;
-        if encoding_characters.count() < 3 {
-            return None;
-        }
-        Some(Self {
+        let mut encoding = pieces.next()?.chars();
+        let delimiters = Delimiters {
             field,
-            encoding,
-            component,
+            component: encoding.next()?,
+            repetition: encoding.next()?,
+            escape: encoding.next()?,
+            subcomponent: encoding.next()?,
+            truncation: encoding.next(),
+        };
+        Some(Self {
+            delimiters,
             fields: pieces.map(String::from).collect(),
         })
     }
@@ -96,12 +100,23 @@ impl Header {
         Self::from_text(core::str::from_utf8(line).ok()?)
     }
 
+    /// Returns the delimiters MSH-1 and MSH-2 declare, which a reply keeps.
+    #[must_use]
+    pub const fn delimiters(&self) -> &Delimiters {
+        &self.delimiters
+    }
+
     /// Returns the field at `position` as written, from MSH-3; `None` for
     /// MSH-1 and MSH-2 and for an absent field.
     fn field(&self, position: usize) -> Option<&str> {
         self.fields
             .get(position.checked_sub(3)?)
             .map(String::as_str)
+    }
+
+    /// Returns the field at `position` as written, to be echoed unchanged.
+    fn echoed(&self, position: usize) -> Field {
+        Field::written(self.field(position).unwrap_or_default())
     }
 
     /// Returns MSH-10 as written.
@@ -126,8 +141,51 @@ impl Header {
     /// Returns the component at `position` of MSH-9 as written, from 1.
     fn message_type(&self, position: usize) -> Option<&str> {
         self.field(9)?
-            .split(self.component)
+            .split(self.delimiters.component)
             .nth(position.checked_sub(1)?)
+    }
+
+    /// Returns the header of a reply to this message (HL7 v2.9 chapter 2
+    /// §2.9.2.1): MSH-3 to MSH-6 swapped, `message_type` in MSH-9, the
+    /// stamp's time and control id in MSH-7 and MSH-10, and MSH-11, MSH-12
+    /// and MSH-18 echoed as written.
+    #[must_use]
+    pub fn reply(&self, message_type: Field, stamp: Stamp<'_>) -> Segment {
+        Segment::from(Msh {
+            sending_application: self.echoed(5),
+            sending_facility: self.echoed(6),
+            receiving_application: self.echoed(3),
+            receiving_facility: self.echoed(4),
+            timestamp: Field::from(stamp.timestamp),
+            message_type,
+            control_id: Field::from(stamp.control_id),
+            processing_id: self.echoed(11),
+            version: self.echoed(12),
+            charset: self
+                .field(18)
+                .filter(|charset| !charset.is_empty())
+                .map(Field::written)
+                .unwrap_or_default(),
+        })
+    }
+
+    /// Returns the `MSA` segment of a reply to this message: `code` in
+    /// MSA-1 and MSH-10 of the message, as written, in MSA-2 (§2.14.8.2).
+    #[must_use]
+    pub fn msa(&self, code: Code) -> Segment {
+        Segment::new(
+            "MSA",
+            [
+                Field::from(code.as_str()),
+                Field::written(self.control_id().unwrap_or_default()),
+            ],
+        )
+    }
+
+    /// Returns a writer in the delimiters of this message.
+    #[must_use]
+    pub const fn writer(&self) -> Writer {
+        Writer::new(self.delimiters)
     }
 }
 
@@ -162,6 +220,34 @@ impl From<&Refusal> for Error {
     }
 }
 
+/// Writes the error as one `ERR` segment: ERR-2 the location, ERR-3 the
+/// table 0357 code, ERR-4 the severity `E` and ERR-8 the text (HL7 v2.9
+/// chapter 2 §2.14.5).
+impl From<&Error> for Segment {
+    fn from(error: &Error) -> Self {
+        let location = error
+            .location
+            .as_ref()
+            .map(|location| location.components().into_iter().collect::<Repetition>())
+            .map(Field::from)
+            .unwrap_or_default();
+        let condition = Repetition::from_iter([error.code.code(), error.code.display(), "HL70357"]);
+        Self::new(
+            "ERR",
+            [
+                Field::default(),
+                location,
+                Field::from(condition),
+                Field::from("E"),
+                Field::default(),
+                Field::default(),
+                Field::default(),
+                Field::from(error.text.as_str()),
+            ],
+        )
+    }
+}
+
 /// Renders the acknowledgment of the message `header` names.
 ///
 /// # Examples
@@ -184,64 +270,15 @@ impl From<&Refusal> for Error {
 /// ```
 #[must_use]
 pub fn render(header: &Header, code: Code, errors: &[Error], stamp: Stamp<'_>) -> String {
-    let field = header.field.to_string();
-    let component = header.component.to_string();
-    let escape_character = header.encoding.chars().nth(2);
-    let escape = |text: &str| escape_with(header, escape_character, text);
-    let echoed = |position: usize| header.field(position).unwrap_or_default();
-    let event = header.message_type(2).unwrap_or_default();
-    let mut msh = vec![
-        String::from("MSH"),
-        header.encoding.clone(),
-        String::from(echoed(5)),
-        String::from(echoed(6)),
-        String::from(echoed(3)),
-        String::from(echoed(4)),
-        escape(stamp.timestamp),
-        String::new(),
-        ["ACK", event, "ACK"].join(&component),
-        escape(stamp.control_id),
-        String::from(echoed(11)),
-        String::from(echoed(12)),
-    ];
-    if let Some(charset) = header.field(18).filter(|value| !value.is_empty()) {
-        msh.resize(17, String::new());
-        msh.push(String::from(charset));
-    }
+    let event = Component::written(header.message_type(2).unwrap_or_default());
+    let message_type =
+        Repetition::from_iter([Component::from("ACK"), event, Component::from("ACK")]);
     let mut segments = vec![
-        msh.join(&field),
-        [
-            "MSA",
-            code.as_str(),
-            header.control_id().unwrap_or_default(),
-        ]
-        .join(&field),
+        header.reply(Field::from(message_type), stamp),
+        header.msa(code),
     ];
-    for error in errors {
-        let location = error
-            .location
-            .as_ref()
-            .map(|location| location.erl(header.component))
-            .unwrap_or_default();
-        let condition = [error.code.code(), error.code.display(), "HL70357"].join(&component);
-        segments.push(
-            [
-                "ERR",
-                "",
-                &location,
-                &condition,
-                "E",
-                "",
-                "",
-                "",
-                &escape(&error.text),
-            ]
-            .join(&field),
-        );
-    }
-    let mut text = segments.join("\r");
-    text.push('\r');
-    text
+    segments.extend(errors.iter().map(Segment::from));
+    header.writer().message(&segments)
 }
 
 /// Renders and encodes the acknowledgment in the message's character set.
@@ -271,33 +308,6 @@ pub fn reject_frame(partial: &[u8], detail: &str, stamp: Stamp<'_>) -> Option<Ve
         text: String::from(detail),
     };
     Some(render(&header, Code::Reject, &[error], stamp).into_bytes())
-}
-
-/// Escapes our own text with the message's delimiters (chapter 2 §2.7.1).
-fn escape_with(header: &Header, escape: Option<char>, text: &str) -> String {
-    let Some(escape) = escape else {
-        return String::from(text);
-    };
-    let mut specials: Vec<(char, char)> = vec![(header.field, 'F')];
-    let mut encoding = header.encoding.chars();
-    for code in ['S', 'R', 'E', 'T'] {
-        if let Some(character) = encoding.next() {
-            specials.push((character, code));
-        }
-    }
-    let mut out = String::with_capacity(text.len());
-    for character in text.chars() {
-        match specials.iter().find(|(special, _)| *special == character) {
-            Some((_, code)) => {
-                out.push(escape);
-                out.push(*code);
-                out.push(escape);
-            }
-            None if character == '\r' => out.push(' '),
-            None => out.push(character),
-        }
-    }
-    out
 }
 
 #[cfg(test)]
