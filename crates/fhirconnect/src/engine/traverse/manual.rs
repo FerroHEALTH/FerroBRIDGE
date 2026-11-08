@@ -134,7 +134,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         source: Box::new(source),
                     })
             }
-            Direction::OpenehrToFhir => self.openehr_holds_carrying(mapping.name(), gate, binding),
+            Direction::OpenehrToFhir => {
+                // NOTE: manual.adoc: an entry's fixed FHIR values stand for the code its
+                // `openehrCondition` matched, so the element it read is carried when it holds.
+                let (holds, read) = self.openehr_condition(mapping.name(), gate, binding)?;
+                if holds {
+                    self.carried.borrow_mut().extend(read);
+                }
+                Ok(holds)
+            }
         }
     }
 

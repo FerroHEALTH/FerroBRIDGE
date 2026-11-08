@@ -203,29 +203,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
             .map(|(holds, _)| holds)
     }
 
-    /// Returns whether an `openehrCondition` holds at one instance, as
-    /// [`Self::openehr_holds`] does, and records the instances it read as
-    /// carried when it holds.
-    ///
-    /// A `manual` entry carries an element by its condition: the entry's
-    /// fixed FHIR values stand for the code the condition matched
-    /// (`types-of-mappings/concept-type/manual.adoc`).
-    pub(super) fn openehr_holds_carrying(
-        &self,
-        name: &str,
-        gate: &crate::resolve::program::condition::Condition,
-        instance: &Binding,
-    ) -> Result<bool, EngineError> {
-        let (holds, read) = self.openehr_condition(name, gate, instance)?;
-        if holds {
-            self.carried.borrow_mut().extend(read);
-        }
-        Ok(holds)
-    }
-
     /// Evaluates an `openehrCondition` at one instance, answering the
     /// verdict and the node instances it read.
-    fn openehr_condition(
+    pub(super) fn openehr_condition(
         &self,
         name: &str,
         gate: &crate::resolve::program::condition::Condition,

@@ -75,23 +75,16 @@ pub fn issue(severity: &str, code: &str, text: &str) -> OperationOutcomeIssue {
 /// [`OPENEHR_PATH_SYSTEM`], when it has one.
 #[must_use]
 pub fn of_warning(warning: &Warning) -> OperationOutcomeIssue {
-    let severity = match *warning.loss() {
-        Loss::Defaulted { .. } | Loss::InapplicableOccurrences { .. } => INFORMATION,
+    let (severity, code) = match *warning.loss() {
+        Loss::Defaulted { .. } | Loss::InapplicableOccurrences { .. } => {
+            (INFORMATION, "informational")
+        }
         Loss::Skipped { .. }
         | Loss::LastOfMany { .. }
         | Loss::OneWayFallback { .. }
         | Loss::UnmappedOccurrences { .. }
         | Loss::Absent { .. }
-        | Loss::Unread { .. } => WARNING,
-    };
-    let code = match *warning.loss() {
-        Loss::Defaulted { .. } | Loss::InapplicableOccurrences { .. } => "informational",
-        Loss::Skipped { .. }
-        | Loss::LastOfMany { .. }
-        | Loss::OneWayFallback { .. }
-        | Loss::UnmappedOccurrences { .. }
-        | Loss::Absent { .. }
-        | Loss::Unread { .. } => "incomplete",
+        | Loss::Unread { .. } => (WARNING, "incomplete"),
     };
     let mut rendered = issue(severity, code, &warning.to_string());
     let location = warning.location();

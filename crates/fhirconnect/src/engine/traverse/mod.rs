@@ -230,13 +230,7 @@ pub fn to_openehr<T: Table + ?Sized>(
         .iter()
         .map(|axis| (axis.clone(), RmPosition::first()))
         .collect();
-    run.admits_context()?;
-    run.split_or_run(
-        program.mappings(),
-        program.hierarchy(),
-        program.start().as_str(),
-        &Binding::default(),
-    )?;
+    run.whole_program()?;
     let mut defaulted = run.apply_defaults(defaults)?;
     let unplaced = run.place_facility(defaults, &mut defaulted)?;
     if let Some(origin) = defaults.origin() {
@@ -521,13 +515,7 @@ fn read_out<T: Table + ?Sized>(
         .cloned()
         .zip(instance.iter().copied())
         .collect();
-    run.admits_context()?;
-    run.split_or_run(
-        program.mappings(),
-        program.hierarchy(),
-        program.start().as_str(),
-        &Binding::default(),
-    )?;
+    run.whole_program()?;
     if let Some(composition) = composition {
         let read = run.carried.take();
         let unread = unread::unread(program, index, composition, instance, &read)?;
@@ -631,6 +619,21 @@ struct Run<'a, T: Table + ?Sized> {
     /// The template node instances whose value the run read going out of
     /// openEHR.
     carried: core::cell::RefCell<std::collections::BTreeSet<unread::Instance>>,
+}
+
+impl<T: Table + ?Sized> Run<'_, T> {
+    /// Runs the whole program from its start, once the program's own
+    /// condition admits the input.
+    fn whole_program(&mut self) -> Result<(), EngineError> {
+        self.admits_context()?;
+        let program = self.program;
+        self.split_or_run(
+            program.mappings(),
+            program.hierarchy(),
+            program.start().as_str(),
+            &Binding::default(),
+        )
+    }
 }
 
 impl<'a, T: Table + ?Sized> Run<'a, T> {
