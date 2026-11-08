@@ -9,7 +9,7 @@ use crate::facade::search::criteria::Refused;
 use crate::facade::search::criteria::Subject;
 use crate::facade::search::criteria::each;
 use crate::facade::search::criteria::is_type_name;
-use crate::facade::search::value;
+use fhir_search::token::Token;
 
 impl Reader<'_> {
     /// Reads a chained subject parameter, `patient.identifier`,
@@ -63,7 +63,7 @@ impl Reader<'_> {
             });
             return true;
         }
-        let tokens = match each(text, value::token) {
+        let tokens = match each(text, Token::parse) {
             Ok(tokens) => tokens,
             Err(Refused::Value(error)) => {
                 self.invalid_value(name, &error);

@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that names the List attribute
+# DV_TEXT.mappings below the problem name of the synthetic ferrobridge.diagnose.v1
+# template: the mapping anchors the list, and its children name the attributes
+# of one TERM_MAPPING, so each element of the list is one Condition.code.coding.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_list_mappings
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  # NOTE: TERM_MAPPING.adoc: `match` is "hard coded to `=`, other operators not mappable to
+  # FHIR", so no FHIR element fills the mandatory `match` and the list is read out only.
+  - name: "problemCodings"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.code.coding"
+      openehr: "$archetype/data[at0001]/items[at0002]/value/mappings"
+    followedBy:
+      mappings:
+        - name: "code"
+          with:
+            fhir: "code"
+            openehr: "target/code_string"
+        - name: "system"
+          with:
+            fhir: "system"
+            openehr: "target/terminology_id/value"

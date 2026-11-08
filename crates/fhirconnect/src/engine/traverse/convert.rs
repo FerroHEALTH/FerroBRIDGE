@@ -46,6 +46,7 @@ use crate::engine::traverse::demographic::Shape;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::place::rm_positions;
 use crate::engine::traverse::tail::tail_segments;
+use crate::engine::traverse::tail::unsupported_tail;
 use crate::engine::traverse::translate::Output;
 
 impl<T: Table + ?Sized> Run<'_, T> {
@@ -100,6 +101,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let (Some(_fhir), Some(_openehr)) = (mapping.fhir(), mapping.openehr()) else {
             return Ok(bindings);
         };
+        // NOTE: no specification governs this: our own design, a list holds no single value,
+        // so a cell aimed at one refuses whether or not the run meets an element of it.
+        if let Some(openehr) = converted(mapping).filter(|target| target.ends_on_list()) {
+            return Err(unsupported_tail(mapping, openehr));
+        }
         for (input, binding) in inputs.iter().zip(bindings.iter()) {
             self.convert(mapping, input, binding)?;
             if self.direction == Direction::FhirToOpenehr {
@@ -486,13 +492,17 @@ impl<T: Table + ?Sized> Run<'_, T> {
         }
     }
 
-    /// Returns the positions one input occurrence names for an openEHR node.
+    /// Returns the positions one input occurrence names for an openEHR node,
+    /// followed by the element of each `List` axis below it.
     pub(super) fn positions_of(
         mapping: &Mapping,
         input: &Occurrence,
         target: &OpenehrTarget,
     ) -> Result<Vec<RmPosition>, EngineError> {
-        let depth = target.occurrences().len();
+        let depth = target
+            .occurrences()
+            .len()
+            .saturating_add(target.lists().len());
         let taken = input.indices().get(..depth).unwrap_or(input.indices());
         let mut positions = rm_positions(mapping.name(), taken)?;
         positions.resize(depth, RmPosition::first());

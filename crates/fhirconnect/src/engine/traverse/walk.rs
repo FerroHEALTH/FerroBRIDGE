@@ -43,6 +43,7 @@ use crate::engine::traverse::place::fhir_axes;
 use crate::engine::traverse::place::openehr_occurrence;
 use crate::engine::traverse::place::rm_positions;
 use crate::engine::traverse::tail::attribute_at;
+use crate::engine::traverse::tail::list_length;
 use crate::engine::traverse::tail::scalar;
 use crate::engine::traverse::tail::tail_segments;
 use crate::engine::traverse::tail::unsupported_tail;
@@ -173,11 +174,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let mut admitted = Vec::with_capacity(inputs.len());
                 for input in inputs {
                     let openehr = Self::positions_at(mapping, &input)?;
-                    let held = Binding {
-                        axes: parent.axes_of(mapping.openehr(), openehr.len()),
-                        openehr,
-                        ..Binding::default()
-                    };
+                    let held =
+                        parent.of_openehr(mapping.openehr(), Occurrence::default(), openehr, 0);
                     if self.openehr_holds(mapping.name(), gate, &held)? {
                         admitted.push(input);
                     }
@@ -234,7 +232,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let Some(value) = read else {
                 continue;
             };
-            let Some(at_tail) = attribute_at(&value, target) else {
+            let elements = Self::bound_elements(target, instance);
+            let Some(at_tail) = attribute_at(&value, target, &elements) else {
                 continue;
             };
             read_at.push(unread::instance_of(target.node().flat_id(), &positions));
@@ -335,6 +334,72 @@ impl<T: Table + ?Sized> Run<'_, T> {
         input: &OpenehrTarget,
         parent: &Binding,
     ) -> Result<Vec<Vec<RmPosition>>, EngineError> {
+        let nodes = self.node_instances(name, input, parent)?;
+        if input.lists().is_empty() {
+            return Ok(nodes);
+        }
+        let mut found = Vec::new();
+        for positions in nodes {
+            found.extend(self.element_instances(name, input, parent, positions)?);
+        }
+        Ok(found)
+    }
+
+    /// Returns the instance of the input node followed by every element of
+    /// each `List` axis of the input inside it, the element a parent bound
+    /// keeping its place.
+    ///
+    /// The list holds its elements in order, so element `n` is the
+    /// positional predicate `[n]` of openEHR BASE Release 1.2.0 §Paths and
+    /// Locators.
+    fn element_instances(
+        &self,
+        name: &str,
+        input: &OpenehrTarget,
+        parent: &Binding,
+        node: Vec<RmPosition>,
+    ) -> Result<Vec<Vec<RmPosition>>, EngineError> {
+        let Some(value) = self.node_value(name, input, &node)? else {
+            return Ok(Vec::new());
+        };
+        let depth = node.len();
+        let bound = parent.shared_lists(input);
+        let mut found = vec![node];
+        for (offset, axis) in input.lists().iter().enumerate() {
+            let mut deeper = Vec::new();
+            for partial in found {
+                if let Some(&held) = parent.elements.get(offset).filter(|_| offset < bound) {
+                    let mut positions = partial;
+                    positions.push(held);
+                    deeper.push(positions);
+                    continue;
+                }
+                let outer = partial.get(depth..).unwrap_or_default();
+                let length = list_length(&value, input, axis, outer);
+                let ceiling = u32::try_from(length).unwrap_or(INSTANCE_CEILING);
+                for element in 1..=ceiling.min(INSTANCE_CEILING) {
+                    let mut positions = partial.clone();
+                    positions.push(RmPosition::new(element).map_err(|source| {
+                        EngineError::Position {
+                            mapping: String::from(name),
+                            source,
+                        }
+                    })?);
+                    deeper.push(positions);
+                }
+            }
+            found = deeper;
+        }
+        Ok(found)
+    }
+
+    /// Returns the instances of the input node under the parent binding.
+    fn node_instances(
+        &self,
+        name: &str,
+        input: &OpenehrTarget,
+        parent: &Binding,
+    ) -> Result<Vec<Vec<RmPosition>>, EngineError> {
         let axes = input.occurrences();
         let depth = axes.len();
         let bound = parent.shared(axes);
@@ -427,6 +492,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         target: &OpenehrTarget,
         positions: &[RmPosition],
     ) -> Result<Option<serde_json::Value>, PathError> {
+        let positions = at_node(target, positions);
         if target.on_element() {
             self.index
                 .read_element(composition, target.node(), positions)
@@ -448,6 +514,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return Ok(false);
         };
         let node = input.node();
+        let positions = at_node(input, positions);
         let held = if input.on_element() {
             self.index
                 .read_element(composition, node, positions)
@@ -518,7 +585,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         source: Box::new(source),
                     });
             }
-            let Some(found) = attribute_at(&value, input) else {
+            let elements = positions
+                .get(input.occurrences().len()..)
+                .unwrap_or_default();
+            let Some(found) = attribute_at(&value, input, elements) else {
                 return Ok(None);
             };
             if !matches!(
@@ -740,4 +810,15 @@ enum Ran {
     /// The unidirectional marker or the input side's condition kept it from
     /// running.
     Gated,
+}
+
+/// Returns the positions of a target's node among `positions`, which may go
+/// on with the element of each `List` axis below it.
+fn at_node<'positions>(
+    target: &OpenehrTarget,
+    positions: &'positions [RmPosition],
+) -> &'positions [RmPosition] {
+    positions
+        .get(..target.occurrences().len())
+        .unwrap_or(positions)
 }

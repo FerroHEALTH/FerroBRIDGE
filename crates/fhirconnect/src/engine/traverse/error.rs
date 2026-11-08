@@ -8,6 +8,7 @@ use core::fmt;
 use openehr_mapping_core::composition::PositionError;
 use openehr_mapping_core::template::PathError;
 use openehr_rm::v1_2::paths::EhrUriError;
+use openehr_rm::v1_2::paths::write::SetPathError;
 
 use crate::engine::condition::ConditionError;
 use crate::engine::demographics::DemographicsError;
@@ -124,6 +125,19 @@ pub enum EngineError {
         /// The refusal the value model returned.
         #[source]
         source: Box<RmError>,
+    },
+    /// A tail attribute could not be written into the openEHR value at its
+    /// place (`openehr_rm::v1_2::paths::set_at_path`), such as an element of a
+    /// `List` past the one after its last.
+    #[error("{mapping} could not write its tail into the openEHR value at {node}")]
+    TailWrite {
+        /// The mapping being run.
+        mapping: String,
+        /// The node the value belongs to.
+        node: String,
+        /// The refusal the path writer returned.
+        #[source]
+        source: Box<SetPathError>,
     },
     /// A FHIR element could not be read or written.
     #[error("{mapping} could not carry the FHIR element {element}")]

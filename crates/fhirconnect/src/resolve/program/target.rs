@@ -149,27 +149,112 @@ pub struct OpenehrTarget {
     node: ResolvedNode,
     tail: RmPath,
     occurrences: Vec<FlatId>,
+    lists: Vec<ListAxis>,
     leaf_class: Option<String>,
     on_element: bool,
+}
+
+/// One `List` attribute a tail steps through: an occurrence axis inside the
+/// value of a template node, whose instances are the list's elements.
+///
+/// An openEHR RM `List` is ordered, so an element is addressed by its 1-based
+/// position (openEHR BASE Release 1.2.0 §Paths and Locators, "Using
+/// Positional Predicates"). Two targets share the axis when they name the same
+/// attributes below the same node, which is what pairs a mapping anchored on
+/// the list with the children that name the attributes of one element. No
+/// specification governs the axis: our own design.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListAxis {
+    node: FlatId,
+    on_element: bool,
+    attributes: Vec<String>,
+}
+
+impl ListAxis {
+    /// Returns the position in the tail of the list attribute, the last of
+    /// [`Self::attributes`].
+    #[must_use]
+    pub fn depth(&self) -> usize {
+        self.attributes.len().saturating_sub(1)
+    }
+
+    /// Returns the attributes from the node down to the list, outermost first.
+    #[must_use]
+    pub fn attributes(&self) -> &[String] {
+        &self.attributes
+    }
+
+    /// Returns the name the recurrence counters key the axis by, distinct
+    /// from every template node's flat id since a flat id holds no `|`.
+    #[must_use]
+    pub fn key(&self) -> String {
+        let side = if self.on_element { "element" } else { "value" };
+        format!(
+            "{}|{side}|{}",
+            self.node.as_str(),
+            self.attributes.join("/")
+        )
+    }
 }
 
 impl OpenehrTarget {
     /// Pairs a resolved path with the template node it names.
     #[must_use]
-    pub const fn new(
-        path: RmPath,
-        node: ResolvedNode,
-        tail: RmPath,
-        occurrences: Vec<FlatId>,
-    ) -> Self {
-        Self {
+    pub fn new(path: RmPath, node: ResolvedNode, tail: RmPath, occurrences: Vec<FlatId>) -> Self {
+        let mut target = Self {
             path,
             node,
             tail,
             occurrences,
+            lists: Vec::new(),
             leaf_class: None,
             on_element: false,
-        }
+        };
+        target.lists = target.list_axes();
+        target
+    }
+
+    /// Returns the `List` attributes the tail steps through, outermost first.
+    fn list_axes(&self) -> Vec<ListAxis> {
+        let segments: Vec<&str> = self
+            .tail
+            .segments
+            .iter()
+            .map(|segment| segment.attribute.as_str())
+            .collect();
+        // NOTE: a tail the engine cannot walk is refused at load
+        // (`fc-uncarried-tail`), so it legitimately has no list axis here.
+        let steps = crate::engine::rm::carried::list_steps(self.tail_class(), &segments)
+            .unwrap_or_default();
+        steps
+            .into_iter()
+            .map(|depth| ListAxis {
+                node: self.node.flat_id().clone(),
+                on_element: self.on_element,
+                attributes: segments
+                    .get(..=depth)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|segment| String::from(*segment))
+                    .collect(),
+            })
+            .collect()
+    }
+
+    /// Returns the `List` attributes the tail steps through, outermost first,
+    /// each an occurrence axis below the node's own [`Self::occurrences`].
+    #[must_use]
+    pub fn lists(&self) -> &[ListAxis] {
+        &self.lists
+    }
+
+    /// Returns whether the tail ends on a `List` attribute, which names the
+    /// list as an axis and holds no single value.
+    #[must_use]
+    pub fn ends_on_list(&self) -> bool {
+        self.lists
+            .last()
+            .is_some_and(|axis| axis.attributes.len() == self.tail.segments.len())
     }
 
     /// Returns this target with its tail naming attributes of the `ELEMENT`
@@ -179,8 +264,9 @@ impl OpenehrTarget {
     /// path that names one reaches its `links` although the template carries
     /// only the node of its value.
     #[must_use]
-    pub const fn with_element_tail(mut self) -> Self {
+    pub fn with_element_tail(mut self) -> Self {
         self.on_element = true;
+        self.lists = self.list_axes();
         self
     }
 
@@ -268,6 +354,14 @@ impl fmt::Display for OpenehrTarget {
         if !self.occurrences.is_empty() {
             let axes: Vec<&str> = self.occurrences.iter().map(FlatId::as_str).collect();
             write!(f, " occurrences [{}]", axes.join(", "))?;
+        }
+        if !self.lists.is_empty() {
+            let lists: Vec<String> = self
+                .lists
+                .iter()
+                .map(|axis| axis.attributes.join("/"))
+                .collect();
+            write!(f, " lists [{}]", lists.join(", "))?;
         }
         Ok(())
     }

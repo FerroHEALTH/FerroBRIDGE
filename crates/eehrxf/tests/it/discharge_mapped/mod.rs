@@ -88,14 +88,16 @@ fn template() -> Result<TemplateSource, Box<dyn Error>> {
     let template =
         openehr_adl::assemble::parse_artefact(FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE, Dialect::Adl2)
             .map_err(|errors| format!("the template: {errors:?}"))?;
-    let mut opt = openehr_adl::opt::create_opt(&template, &repository)
+    let mut raw = openehr_adl::opt::create_opt(&template, &repository)
         .map_err(|errors| format!("the operational template: {errors:?}"))?;
     // NOTE: AM Release-2.3.0 AOM2 §3.6.6, an operational template is specialised; the root's
     // parent is the CKM archetype the template specialises, which the built OPT2 leaves unstated.
-    opt.parent_archetype_id
+    raw.template
+        .parent_archetype_id
         .get_or_insert_with(|| String::from(TRANSFER_SUMMARY));
     Ok(TemplateSource::Opt2 {
-        template: Box::new(opt),
+        template: Box::new(raw.template),
+        prohibited_attributes: raw.prohibited_attributes,
         resolved_id: String::from(FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE_ID),
     })
 }
