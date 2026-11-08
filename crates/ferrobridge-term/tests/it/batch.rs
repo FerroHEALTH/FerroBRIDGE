@@ -8,9 +8,9 @@ use crate::support::{RELEASES, client, release_path, request_body};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
 use ferrobridge_term::outcome::{
-    BatchOutcome, Coded, ExpandOutcome, Expansion, LookupOutcome, Request, SubsumesOutcome,
-    Subsumption, ValidateOutcome, Validation,
+    BatchOutcome, ExpandOutcome, LookupOutcome, SubsumesOutcome, ValidateOutcome,
 };
+use ferrobridge_term::request::{Coded, Expansion, Request, Subsumption, Target, Validation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers::{method, path};
@@ -33,15 +33,19 @@ fn requests() -> Vec<Request> {
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
         Request::Lookup {
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_UNKNOWN_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
         Request::ValidateCode(Validation {
-            value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
+            value_set: Target::Canonical(fixtures::TERM_VALUE_SET_URL.to_owned()),
+            display_language: None,
+            active_only: None,
             value_set_version: None,
             date: None,
             coded: Coded::Code {
@@ -202,7 +206,9 @@ async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn std::
 
     let sent = vec![
         Request::ValidateCode(Validation {
-            value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
+            value_set: Target::Canonical(fixtures::TERM_VALUE_SET_URL.to_owned()),
+            display_language: None,
+            active_only: None,
             value_set_version: None,
             date: None,
             coded: Coded::Code {
@@ -217,6 +223,7 @@ async fn a_failed_entry_is_that_entrys_typed_error() -> Result<(), Box<dyn std::
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
     ];
     let outcomes = client(&server, WireVersion::R4)?.batch(&sent).await?;

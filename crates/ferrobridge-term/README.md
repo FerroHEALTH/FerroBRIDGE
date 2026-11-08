@@ -50,7 +50,8 @@ upstream status, the body, and any `tx-issue-type` coding the
 string, so the caller decides between a refusal and a configured fallback.
 
 `translate` returns every match with its equivalence and offers `accepted()`,
-which yields the `equivalent` and `equal` matches alone. The `$translate`
+which yields the `equivalent` and `equal` matches alone, and the `equivalent`
+relationship of R5 and R6. The `$translate`
 definition asks the caller to check `match.equivalence` for each match, so a
 `wider`, `narrower` or `inexact` answer never reaches a target system as a
 translation.
@@ -59,20 +60,59 @@ The request and response contracts come from the generated
 [`fhir-types`](https://docs.rs/fhir-types) operation modules; this crate models
 no FHIR of its own.
 
-## Three wire versions
+## Any request, the `GET` form, and your own transport
 
-`WireVersion` selects STU3, R4 or R4B, and the release decides which generated
-model writes the request and reads the answer. R4 and R4B declare the same `in`
-and `out` parameters for the five operations. STU3 (3.0.2) differs:
+`Client::send` sends any `request::Request`: the five operations above,
+`CodeSystem/$validate-code` (`Request::CodeSystemValidateCode`), and the
+instance-level forms (`ValueSet/[id]/$validate-code`,
+`CodeSystem/[id]/$validate-code`, `CodeSystem/[id]/$subsumes`), named with
+`request::Target::Instance`. `$expand` also takes an inline value set
+(`request::ValueSetSource::Inline`), sent as the `valueSet` resource, and the
+inputs `activeOnly`, `excludeNested` and `displayLanguage`.
+
+`Config::with_form(Form::Get)` invokes each operation as a `GET` with its
+inputs in the query, which the operations framework allows when no input is
+complex; a request with a `Coding`, a `CodeableConcept` or an inline value set
+goes as a `POST`.
+
+`invocation::Invocation::new` writes a request (method, path segments, query,
+body) without sending it, and `invocation::answer` reads a status and a body
+exactly as the client does. A caller that sends through a transport of its
+own, such as a server forwarding a signed-in user's token, uses the two and
+writes no terminology client of its own.
+
+The answers carry what the operations declare beside the verdict:
+`ValidationDetails` (`code`, `system`, `version`, `codeableConcept`,
+`normalized-code`, `inactive`, `status`, the unknown systems) and the issues of
+a true answer too, every `details.coding` and `expression` of each issue, the
+`used-conceptmap` list and each match's `relationship`, `noMap`,
+`sourceConcept`, `originMap`, comments and parts, the echoed
+`expansion.parameter` and the `valueset-unclosed` mark, and R5's `$lookup`
+`definition`.
+
+## Five wire versions
+
+`WireVersion` selects STU3, R4, R4B, R5 or the R6 ballot (6.0.0-ballot5), and
+the release decides which generated model writes the request and reads the
+answer. R4 to R6 declare the same `in` and `out` parameters outside
+`$translate`. `$translate` is spelled three ways: R4 and R4B take `code`,
+`system`, `version` and `targetsystem` and answer `match.equivalence`; R5 takes
+`sourceCode` and `targetSystem` and answers `match.relationship`; R6 also
+renames `system` and `version` to `sourceSystem` and `sourceVersion`. R5 and R6
+have no `reverse`, so they refuse it. STU3 (3.0.2) differs:
+
+- STU3 defines no `CodeSystem/$validate-code`, so an STU3 client refuses it
+  with `Error::UnsupportedOperation`.
 
 - `$validate-code` names the code system version `version` where R4 names it
   `systemVersion`, and the client sends it under that name. STU3 has no
-  `valueSetVersion`.
+  `valueSetVersion` and no `activeOnly`.
 - `$validate-code` requires a system for a code, where R4 and R4B accept a
   `context` in its place, so an STU3 client refuses `Coded::InContext` with
   `Error::SystemRequired` before anything is sent.
 - `$expand` has no `valueSetVersion` either.
-- `$translate` has no `url`, so STU3 cannot name the concept map to use.
+- `$translate` has no `url` and no `conceptMapVersion`, so STU3 cannot name
+  the concept map to use.
 - `$lookup` types `property.value` as `code`, so every property value of an
   STU3 answer is a `valueCode`.
 - `$translate` answers the same `match` parts (`equivalence`, `concept`,

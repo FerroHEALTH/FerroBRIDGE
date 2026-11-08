@@ -99,7 +99,10 @@ fn a_value_set_the_set_lacks_is_listed_and_pending_without_a_server() -> TestRes
     );
     let pending = report.pending_bindings();
     assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0].validation().value_set_url, STATUSES);
+    assert_eq!(
+        pending[0].validation().value_set,
+        ferrobridge_term::request::Target::Canonical(STATUSES.to_owned())
+    );
     Ok(())
 }
 

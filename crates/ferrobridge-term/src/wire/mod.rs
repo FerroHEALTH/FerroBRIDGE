@@ -6,27 +6,33 @@
 //! Each release has its own generated model, so the same code is generated
 //! once per release by `per_release` and the functions below dispatch on
 //! [`WireVersion`]. The request and response contracts come from
-//! `fhir_types::stu3::operations`, `fhir_types::r4::operations` and
-//! `fhir_types::r4b::operations`; this module writes no FHIR by hand.
+//! `fhir_types::{stu3,r4,r4b,r5,r6}::operations`; this module writes no FHIR
+//! by hand.
 //!
-//! R4 and R4B declare identical `in` and `out` parameter sets for the five
-//! operations (the vendored `OperationDefinition-CodeSystem-lookup`,
-//! `-ConceptMap-translate`, `-ValueSet-validate-code`, `-ValueSet-expand` and
-//! `-CodeSystem-subsumes` of both packages), so they share `r4_contracts`.
-//! STU3 differs in four places, which `stu3_contracts` carries (the same
-//! definitions in `hl7.fhir.r3.core` 3.0.2): `$validate-code` names the code
-//! system version `version` and has no `valueSetVersion`, `$expand` has no
-//! `valueSetVersion`, `$translate` has no `url`, and `$lookup` types
-//! `property.value` as `code`. `$subsumes` is the same in all three. A parameter the request
-//! carries and STU3 does not declare is refused before anything is sent, and
-//! so is a `$validate-code` code with a context and no system, since STU3
-//! requires a system for a code where R4 and R4B accept a context.
+//! R4 to R6 declare the same `in` and `out` parameters outside `$translate`
+//! (the vendored `OperationDefinition`s of `hl7.fhir.r4.core` 4.0.1,
+//! `hl7.fhir.r4b.core` 4.3.0, `hl7.fhir.r5.core` 5.0.0 and `hl7.fhir.r6.core`
+//! 6.0.0-ballot5, with the terminology ecosystem's additions), which
+//! `modern_contracts` carries; R6 repeats `$validate-code`
+//! `displayLanguage` and makes `compose.include.filter.value` optional.
+//! `$translate` is spelled three ways: R4 and R4B take `code` and
+//! `targetsystem` and answer `match.equivalence`, R5 takes `sourceCode` and
+//! `targetSystem` and answers `match.relationship`, and R6 also renames
+//! `system` and `version` to `sourceSystem` and `sourceVersion`. STU3 differs
+//! as `stu3_contracts` records: no `CodeSystem/$validate-code`, its
+//! `$validate-code` names the code system version `version` and has no
+//! `valueSetVersion` or `activeOnly`, `$expand` has no `valueSetVersion`,
+//! `$translate` has no `url` or `conceptMapVersion`, and `$lookup` types
+//! `property.value` as `code`. A parameter the request carries and the
+//! release does not declare is refused before anything is sent, and so is an
+//! STU3 `$validate-code` code with a context and no system.
 
 use crate::config::WireVersion;
 use crate::error::{BodyError, Error, Outcome};
 use crate::outcome::{
-    ExpandOutcome, LookupOutcome, Request, SubsumesOutcome, TranslateOutcome, ValidateOutcome,
+    ExpandOutcome, LookupOutcome, SubsumesOutcome, TranslateOutcome, ValidateOutcome,
 };
+use crate::request::Request;
 use http::StatusCode;
 
 /// The `HTTPVerb` code a batch entry carries for the `POST` form of an
@@ -43,6 +49,15 @@ const BATCH_RESPONSE: &str = "batch-response";
 /// The `BundleType` code the server answers a search with.
 const SEARCHSET: &str = "searchset";
 
+/// The extension marking an expansion that does not list every code the
+/// value set holds (<https://hl7.org/fhir/R4/extension-valueset-unclosed.html>).
+const UNCLOSED: &str = "http://hl7.org/fhir/StructureDefinition/valueset-unclosed";
+
+/// The extension stating why an expansion is unclosed, as a string.
+// NOTE: no core package defines it; the terminology ecosystem suite uses it
+// (<https://github.com/HL7/fhir-tx-ecosystem-ig>).
+const UNCLOSED_REASON: &str = "http://hl7.org/fhir/StructureDefinition/valueset-unclosed-reason";
+
 /// One entry of a `batch-response` `Bundle`, in request order.
 #[derive(Debug)]
 pub(crate) struct BatchEntry {
@@ -58,6 +73,15 @@ pub(crate) enum RequestError {
     /// The `Parameters` or the `Bundle` could not be written as JSON.
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    /// A parameter could not be written for its query string.
+    #[error(transparent)]
+    Encode(#[from] fhir_types::codec::EncodeError),
+    /// The release defines no such operation.
+    #[error("the release defines no {operation} operation")]
+    UndefinedOperation {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+    },
     /// The request carries a parameter the release's operation does not
     /// declare and has no equivalent for.
     #[error("the {operation} request carries `{parameter}`, which the release does not declare")]
@@ -93,6 +117,11 @@ impl RequestError {
     pub(crate) fn into_error(self, operation: &'static str, version: WireVersion) -> Error {
         match self {
             Self::Json(source) => Error::RequestBody { operation, source },
+            Self::Encode(source) => Error::RequestEncode { operation, source },
+            Self::UndefinedOperation { operation } => Error::UnsupportedOperation {
+                operation,
+                wire_version: version,
+            },
             Self::Unsupported {
                 operation,
                 parameter,
@@ -126,17 +155,32 @@ mod release;
 per_release!(stu3, stu3, stu3_contracts);
 per_release!(r4, r4, r4_contracts);
 per_release!(r4b, r4b, r4_contracts);
+per_release!(r5, r5, r5_contracts);
+per_release!(r6, r6, r6_contracts);
+
+/// Calls the function `$function` of the module of `$version`.
+macro_rules! dispatch {
+    ($version:expr, $function:ident($($argument:expr),*)) => {
+        match $version {
+            WireVersion::Stu3 => stu3::$function($($argument),*),
+            WireVersion::R4 => r4::$function($($argument),*),
+            WireVersion::R4B => r4b::$function($($argument),*),
+            WireVersion::R5 => r5::$function($($argument),*),
+            WireVersion::R6 => r6::$function($($argument),*),
+        }
+    };
+}
 
 /// Returns the relative URL of `request`, the form a batch entry carries
-/// (<https://hl7.org/fhir/R4/http.html#transaction>).
-fn path_of(request: &Request) -> &'static str {
-    match request {
-        Request::Lookup { .. } => crate::LOOKUP,
-        Request::Translate(_) => crate::TRANSLATE,
-        Request::ValidateCode(_) => crate::VALIDATE_CODE,
-        Request::Expand(_) => crate::EXPAND,
-        Request::Subsumes(_) => crate::SUBSUMES,
-    }
+/// (<https://hl7.org/fhir/R4/http.html#transaction>), each segment
+/// percent-encoded so an id stays one segment.
+fn path_of(request: &Request) -> String {
+    request
+        .segments()
+        .iter()
+        .map(|segment| crate::invocation::path_segment(segment))
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Returns `value` as the FHIR `integer` the `$expand` input `parameter` is
@@ -179,29 +223,22 @@ fn required_flag(value: Option<bool>, parameter: &'static str) -> Result<bool, B
 
 /// Returns the `OperationOutcome` that `body` carries, read in `version`.
 pub(crate) fn outcome(version: WireVersion, body: &str) -> Result<Outcome, BodyError> {
-    match version {
-        WireVersion::Stu3 => stu3::outcome(body),
-        WireVersion::R4 => r4::outcome(body),
-        WireVersion::R4B => r4b::outcome(body),
-    }
+    dispatch!(version, outcome(body))
+}
+
+/// Returns whether `version` defines no operation for `request`.
+pub(crate) const fn undefined(version: WireVersion, request: &Request) -> bool {
+    dispatch!(version, undefined_operation(request))
 }
 
 /// Returns the parameter of `request` that `version` cannot carry.
 pub(crate) const fn unsupported(version: WireVersion, request: &Request) -> Option<&'static str> {
-    match version {
-        WireVersion::Stu3 => stu3::unsupported_parameter(request),
-        WireVersion::R4 => r4::unsupported_parameter(request),
-        WireVersion::R4B => r4b::unsupported_parameter(request),
-    }
+    dispatch!(version, unsupported_parameter(request))
 }
 
 /// Returns whether `request` names no system where `version` requires one.
 pub(crate) const fn requires_system(version: WireVersion, request: &Request) -> bool {
-    match version {
-        WireVersion::Stu3 => stu3::requires_system(request),
-        WireVersion::R4 => r4::requires_system(request),
-        WireVersion::R4B => r4b::requires_system(request),
-    }
+    dispatch!(version, requires_system(request))
 }
 
 /// Returns the FHIR JSON body that carries `request`, written in `version`.
@@ -209,11 +246,16 @@ pub(crate) fn request_body(
     version: WireVersion,
     request: &Request,
 ) -> Result<String, RequestError> {
-    match version {
-        WireVersion::Stu3 => stu3::request_body(request),
-        WireVersion::R4 => r4::request_body(request),
-        WireVersion::R4B => r4b::request_body(request),
-    }
+    dispatch!(version, request_body(request))
+}
+
+/// Returns the query that carries `request` in the `GET` form, written in
+/// `version`, `None` when an input is not primitive.
+pub(crate) fn request_query(
+    version: WireVersion,
+    request: &Request,
+) -> Result<Option<Vec<(String, String)>>, RequestError> {
+    dispatch!(version, request_query(request))
 }
 
 /// Returns the FHIR JSON `batch` Bundle that carries `requests`.
@@ -221,11 +263,7 @@ pub(crate) fn batch_body(
     version: WireVersion,
     requests: &[Request],
 ) -> Result<String, RequestError> {
-    match version {
-        WireVersion::Stu3 => stu3::batch_body(requests),
-        WireVersion::R4 => r4::batch_body(requests),
-        WireVersion::R4B => r4b::batch_body(requests),
-    }
+    dispatch!(version, batch_body(requests))
 }
 
 /// Returns the entries of the `batch-response` `body` carries.
@@ -233,29 +271,17 @@ pub(crate) fn batch_entries(
     version: WireVersion,
     body: &str,
 ) -> Result<Vec<BatchEntry>, BodyError> {
-    match version {
-        WireVersion::Stu3 => stu3::batch_entries(body),
-        WireVersion::R4 => r4::batch_entries(body),
-        WireVersion::R4B => r4b::batch_entries(body),
-    }
+    dispatch!(version, batch_entries(body))
 }
 
 /// Returns the `CodeSystem/$lookup` answer `body` carries.
 pub(crate) fn lookup_found(version: WireVersion, body: &str) -> Result<LookupOutcome, BodyError> {
-    match version {
-        WireVersion::Stu3 => stu3::lookup_found(body),
-        WireVersion::R4 => r4::lookup_found(body),
-        WireVersion::R4B => r4b::lookup_found(body),
-    }
+    dispatch!(version, lookup_found(body))
 }
 
 /// Returns the `ConceptMap/$translate` answer `body` carries.
 pub(crate) fn translate(version: WireVersion, body: &str) -> Result<TranslateOutcome, BodyError> {
-    match version {
-        WireVersion::Stu3 => stu3::translate(body),
-        WireVersion::R4 => r4::translate(body),
-        WireVersion::R4B => r4b::translate(body),
-    }
+    dispatch!(version, translate(body))
 }
 
 /// Returns the `ValueSet/$validate-code` answer `body` carries.
@@ -263,45 +289,44 @@ pub(crate) fn validate_code(
     version: WireVersion,
     body: &str,
 ) -> Result<ValidateOutcome, BodyError> {
+    dispatch!(version, validate_code(body))
+}
+
+/// Returns the `CodeSystem/$validate-code` answer `body` carries, `None` in
+/// STU3, which defines no such operation.
+pub(crate) fn code_system_validate_code(
+    version: WireVersion,
+    body: &str,
+) -> Option<Result<ValidateOutcome, BodyError>> {
     match version {
-        WireVersion::Stu3 => stu3::validate_code(body),
-        WireVersion::R4 => r4::validate_code(body),
-        WireVersion::R4B => r4b::validate_code(body),
+        WireVersion::Stu3 => None,
+        WireVersion::R4 => Some(r4::code_system_validate_code(body)),
+        WireVersion::R4B => Some(r4b::code_system_validate_code(body)),
+        WireVersion::R5 => Some(r5::code_system_validate_code(body)),
+        WireVersion::R6 => Some(r6::code_system_validate_code(body)),
     }
 }
 
 /// Returns the `ValueSet/$expand` answer `body` carries.
 pub(crate) fn expanded(version: WireVersion, body: &str) -> Result<ExpandOutcome, BodyError> {
-    match version {
-        WireVersion::Stu3 => stu3::expanded(body),
-        WireVersion::R4 => r4::expanded(body),
-        WireVersion::R4B => r4b::expanded(body),
-    }
+    dispatch!(version, expanded(body))
 }
 
 /// Returns the `CodeSystem/$subsumes` answer `body` carries.
 pub(crate) fn subsumes(version: WireVersion, body: &str) -> Result<SubsumesOutcome, BodyError> {
-    match version {
-        WireVersion::Stu3 => stu3::subsumes(body),
-        WireVersion::R4 => r4::subsumes(body),
-        WireVersion::R4B => r4b::subsumes(body),
-    }
+    dispatch!(version, subsumes(body))
 }
 
 /// Returns the `Bundle.total` of the `searchset` `body` carries.
 pub(crate) fn search_total(version: WireVersion, body: &str) -> Result<u32, BodyError> {
-    match version {
-        WireVersion::Stu3 => stu3::search_total(body),
-        WireVersion::R4 => r4::search_total(body),
-        WireVersion::R4B => r4b::search_total(body),
-    }
+    dispatch!(version, search_total(body))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{batch_body, request_body, status_of};
     use crate::config::WireVersion;
-    use crate::outcome::Request;
+    use crate::request::Request;
     use http::StatusCode;
 
     fn lookup() -> Request {
@@ -310,6 +335,7 @@ mod tests {
             code: "a".to_owned(),
             version: Some("1.0.0".to_owned()),
             date: None,
+            display_language: None,
         }
     }
 

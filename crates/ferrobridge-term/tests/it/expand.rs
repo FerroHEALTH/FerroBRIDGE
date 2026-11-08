@@ -9,7 +9,8 @@
 use crate::support::{RELEASES, client, parameter, release_path, request_body};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::{ExpandOutcome, Expanded, Expansion};
+use ferrobridge_term::outcome::{ExpandOutcome, Expanded};
+use ferrobridge_term::request::Expansion;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers::{method, path};
