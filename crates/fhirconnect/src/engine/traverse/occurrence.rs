@@ -121,6 +121,7 @@ pub fn to_fhir_at<T: Table + ?Sized>(
         table,
         index,
         composition,
+        Some(composition),
         seams,
         context,
         &instance,

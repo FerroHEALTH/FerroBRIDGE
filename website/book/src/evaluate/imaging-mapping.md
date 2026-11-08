@@ -31,8 +31,8 @@ crate ships under `mappings/` and embeds in `eehrxf::mappings`.
 | `ferrobridge_eu_imaging.context` | `OBSERVATION.imaging_exam_result.v1` | `DiagnosticReportEuImaging`, with the `ImagingStudyEuImaging` it references |
 
 The report takes the event's time, the study name as its `code`, the
-overall impression as its `conclusion`, the report identifier, and the
-overall result status. The archetype's status codes are the R4
+overall impression as its `conclusion`, each imaging diagnosis as one
+`conclusionCode`, the report identifier, and the overall result status. The archetype's status codes are the R4
 `diagnostic-report-status` codes except `entered-in-error`, which the
 archetype does not define. The study takes the study instance identifier,
 which `ImagingStudyEuImaging` requires as a DICOM UID (`urn:dicom:uid`, an
@@ -45,6 +45,13 @@ sits below the event, so `ImagingStudy.modality` and `ImagingStudy.started`
 come from the event the report describes, and the identifier, the status
 and the description from the protocol outside it, through the `$archetype`
 paths FHIRconnect resolves against the archetype root.
+
+`DiagnosticReportEuImaging` and the elements of `CompositionEuImaging` the
+project writes have no place for the findings narrative, a structured
+finding, a differential diagnosis, the comparison findings, the clinical
+summary, a recommendation or a comment. Served out of openEHR, each one the
+composition records is a `warning` issue of the run's `OperationOutcome`,
+which names its openEHR path.
 
 ## Mapping out of openEHR
 

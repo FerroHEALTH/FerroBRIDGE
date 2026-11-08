@@ -2,14 +2,15 @@
 # SPDX-License-Identifier: BUSL-1.1
 
 # The plan of the performance gate (ferrohealth-perf, FerroHEALTH/FerroSYS
-# #249), run by scripts/perf/gate.sh against the bridge of
-# perf/ferrobridge.toml over the pinned FerroEHR CDR. The gate seeds the CDR
-# through the facade and fills each upper-case placeholder between at signs
-# with what the seed made, so the committed plan names no id. The creates
+# #249), run by scripts/perf/gate.sh in the A/B mode against the base and the
+# head bridge of perf/ferrobridge.toml, each over its own FerroEHR CDR. The
+# gate seeds each arm's CDR through its facade and gives each arm the values
+# of the upper-case placeholders between at signs, so the committed plan names
+# no id and the read names the Condition each arm's CDR stored. The creates
 # write into one subject's EHR and the read and the search read another's,
 # whose content never changes, so a read is as fast at the end of the window
-# as at its start. The HL7 v2 face is measured idle only: ferrohealth-perf
-# sends HTTP. No specification governs this: our own design.
+# as at its start. The ORU^R01 goes to the HL7 v2 face over MLLP with TLS as
+# the PERFLAB sender. No specification governs this: our own design.
 
 [idle]
 duration_secs = 60
@@ -24,6 +25,10 @@ settle_secs = 11
 rate = 20.0
 warmup_secs = 10
 duration_secs = 60
+# The PERFLAB sender's certificate and key, and the CA of the face's
+# certificate, both written by the gate.
+client_identity_file = "target/perf-run/tls/perflab.pem"
+trust_roots_file = "target/perf-run/tls/ca.pem"
 
 # The CapabilityStatement built from the loaded programs (R4 http.html
 # "capabilities").
@@ -58,3 +63,12 @@ group = "search"
 method = "GET"
 path = "/fhir/Condition?@SEARCH@"
 status = 200
+
+# A laboratory result written through the HL7 v2 face's Observation context,
+# acknowledged AA (HL7 v2.5.1 chapter 2 §2.9.2.2).
+[mllp]
+tls = true
+
+[[messages]]
+group = "oru"
+file = "perf/messages/oru-r01.hl7"

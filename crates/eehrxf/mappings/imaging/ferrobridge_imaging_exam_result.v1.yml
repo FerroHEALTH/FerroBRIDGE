@@ -3,7 +3,8 @@
 # FerroBRIDGE's model mapping of the CKM OBSERVATION.imaging_exam_result.v1
 # (revision as vendored in fixtures/ckm/imaging) to a FHIR R4
 # DiagnosticReport: the event's time, the study name as the report's code,
-# the overall impression as its conclusion, the overall result status over
+# the overall impression as its conclusion, each imaging diagnosis as a
+# conclusion code, the overall result status over
 # the archetype's local codes, which are the R4 diagnostic-report-status
 # codes but entered-in-error, and the report identifier. The study the
 # result reports is the ImagingStudy the report references, mapped below
@@ -49,6 +50,13 @@ mappings:
           with:
             fhir: "conclusion"
             openehr: "data[at0003]/items[at0021]"
+
+        # NOTE: R4 DiagnosticReport.conclusionCode: "One or more codes that represent the summary
+        # conclusion"; each imaging diagnosis is one, every other finding element is declared.
+        - name: "diagnosis"
+          with:
+            fhir: "conclusionCode"
+            openehr: "data[at0003]/items[at0020]"
 
         # NOTE: DV_CODED_TEXT.adoc, a FHIR `code` cannot convert to a DV_CODED_TEXT, so the
         # status maps through a `manual` table over the archetype's local codes.

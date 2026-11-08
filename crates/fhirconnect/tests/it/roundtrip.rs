@@ -630,3 +630,67 @@ fn conformance_the_round_trip_chains_hold_their_pass_list() -> Result<(), Box<dy
     );
     Ok(())
 }
+
+/// An `overwrite` of `contextStartTimeEmpty`, a name two methods of the
+/// published `COMPOSITION.report.v1.Condition` share, is refused in the
+/// diagnose chain too, although no slot of that chain reaches the model:
+/// "the name … apart from being used when referenced in extension methods
+/// … serve no deeper meaning" (`basics/body.adoc`), so an edit that
+/// addresses two methods has no single target whatever the chain reaches,
+/// and `KDS_Todesursache` refuses the same edit
+/// (`todesursache::the_kds_todesursache_chain_as_published_is_refused_exactly`).
+#[test]
+fn an_overwrite_of_a_shared_name_is_refused_although_the_chain_never_reaches_it()
+-> Result<(), Box<dyn Error>> {
+    let directory = tempfile::tempdir()?;
+    let extension = directory.path().join("ferrobridge_shared_name.yml");
+    std::fs::write(
+        &extension,
+        "grammar: FHIRConnect/v1.0.0\ntype: extension\nmetadata:\n  name: ferrobridge_shared_name\n  \
+         version: 1.0.0\nspec:\n  system: FHIR\n  version: R4\n  extends: \
+         COMPOSITION.report.v1.Condition\n\nmappings:\n  - name: \"contextStartTimeEmpty\"\n    \
+         extension: \"overwrite\"\n    with:\n      fhir: \"$resource\"\n      openehr: \
+         \"$composition/context\"\n      type: \"NONE\"\n",
+    )?;
+    let context = std::fs::read_to_string(project("ferrobridge_kds_diagnose.context.yml"))?
+        .replace(
+            "    - \"ferrobridge_kds_composition.Condition\"\n",
+            "    - \"ferrobridge_kds_composition.Condition\"\n    - \"ferrobridge_shared_name\"\n",
+        );
+    let context_file = directory.path().join("shared.context.yml");
+    std::fs::write(&context_file, context)?;
+    let files: Vec<String> = PUBLISHED
+        .iter()
+        .map(|file| published(file))
+        .chain(
+            PROJECT
+                .iter()
+                .filter(|file| !file.ends_with(".context.yml"))
+                .map(|file| project(file)),
+        )
+        .chain([
+            extension.to_string_lossy().into_owned(),
+            context_file.to_string_lossy().into_owned(),
+        ])
+        .collect();
+    let set = load_set(files, &StaticMappingCodes::default()).map_err(|d| render(&d))?;
+    let diagnostics = compile(
+        &set,
+        &MappingName::new(CONTEXT)?,
+        &kds_template()?,
+        &SCHEMAS,
+        &StaticMappingCodes::default(),
+    )
+    .err()
+    .ok_or("the overwrite of a shared name compiled")?;
+    let refused: Vec<String> = rows(&diagnostics)
+        .into_iter()
+        .filter(|row| row.contains(" error "))
+        .collect();
+    assert_eq!(
+        refused,
+        ["ferrobridge_shared_name.yml:12 error fc-duplicate-method-name"],
+        "{diagnostics:?}"
+    );
+    Ok(())
+}

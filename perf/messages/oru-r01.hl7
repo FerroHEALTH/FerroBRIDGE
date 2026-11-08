@@ -1,0 +1,5 @@
+MSH|^~\&|LAB|PERFLAB|EHR|SOUTHCLINIC|20260925143000+0200||ORU^R01^ORU_R01|PERF-1|P|2.5.1
+PID|1||synthetic-subject-perf-v2^^^PERFLAB^MR||Synthetic^Sam^^^^^L||19800101|M
+ORC|RE|PLC-1|FIL-1
+OBR|1|PLC-1|FIL-1|2345-7^Glucose^LN|||20260925120000+0200|||||||||DR-1^Doctor^Dana^^^^^^PERFLAB
+OBX|1|NM|2345-7^Glucose^LN^^^^^^Synthetic glucose||5.4|mmol/L^mmol/L^UCUM|3.9-5.8|N|||F|||20260925130000+0200
