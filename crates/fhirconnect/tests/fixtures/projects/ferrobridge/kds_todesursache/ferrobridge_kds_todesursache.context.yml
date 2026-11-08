@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/todesursache/KDS_Todesursache.context.yaml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's; the profile, the
+# template and the start are the published file's. CLUSTER.case_identification.v0
+# and the KDS_composition extension are not listed, because a run through the
+# published KDS_composition refuses at its `encounterMapping` link (#1695).
+# FerroBRIDGE's overwrite of the problem qualifier's statusCoded follows the
+# published extensions.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_todesursache.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/Todesursache
+    version: 2025.0.0
+  template:
+    id: KDS_Todesursache
+    sem_ver: 7.0.0
+  archetypes:
+    - EVALUATION.cause_of_death.v1
+    - CLUSTER.problem_qualifier.v2
+    - COMPOSITION.report.v1.Condition
+  extensions:
+    - KDS_cause_of_death
+    - KDS_problem_qualifier_todesursache
+    - ferrobridge_problem_qualifier_terminology_id
+  start: EVALUATION.cause_of_death.v1

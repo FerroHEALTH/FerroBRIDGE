@@ -1,0 +1,25 @@
+---
+source: crates/fhirconnect/tests/it/todesursache.rs
+expression: rows(&diagnostics)
+---
+[
+  "case_identification.v0.yml:16 error fc-unpaired-types",
+  "case_identification.v0.yml:16 error fc-unpaired-types",
+  "problem_qualifier.v2.yml:109 error fc-uncarried-tail",
+  "problem_qualifier.v2.yml:136 error fc-uncarried-tail",
+  "problem_qualifier.v2.yml:28 error fc-uncarried-tail",
+  "problem_qualifier.v2.yml:55 error fc-uncarried-tail",
+  "problem_qualifier.v2.yml:82 error fc-uncarried-tail",
+  "report.v1.Condition.yml:113 error fc-uncarried-tail",
+  "report.v1.Condition.yml:115 error fc-uncarried-tail",
+  "report.v1.Condition.yml:136 error fc-unknown-template-node",
+  "report.v1.Condition.yml:138 error fc-unknown-template-node",
+  "report.v1.Condition.yml:140 error fc-unknown-template-node",
+  "report.v1.Condition.yml:62 error fc-unknown-template-node",
+  "report.v1.Condition.yml:64 error fc-unknown-template-node",
+  "report.v1.Condition.yml:66 error fc-unknown-template-node",
+  "report.v1.Condition.yml:74 warning fc-duplicate-method-name",
+  "report.v1.Condition.yml:92 error fc-unknown-template-node",
+  "report.v1.Condition.yml:94 error fc-unknown-template-node",
+  "report.v1.Condition.yml:96 error fc-unknown-template-node"
+]

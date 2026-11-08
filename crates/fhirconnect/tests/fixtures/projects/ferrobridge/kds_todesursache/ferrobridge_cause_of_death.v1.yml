@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/evaluation/org.openehr/cause_of_death.v1.yml, a
+# derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published lines 16 to 21 add `compositionMapping` with
+# `extension: add`, which a model may not carry, so the method is left out;
+# KDS_cause_of_death adds it. Lines 23 to 42 name `function` and `performer`
+# below `other_participations`, which the engine carries only through
+# `participationsFunction` (#101), so that method is left out too. Every
+# other method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name:  EVALUATION.cause_of_death.v1
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.cause_of_death.v1
+    revision: 1.0.2
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: provider
+    with:
+      fhir: $resource.recorder
+      openehr: $archetype/provider
+
+  - name: status #clincalStatus
+    with:
+      fhir: $resource
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]
+    slotArchetype: CLUSTER.problem_qualifier.v2
+
+  - name: causeOfDeath
+    with:
+      fhir: $resource.code
+      openehr: $archetype/data[at0001]/items[at0002]
+
+  - name: category
+    with:
+      fhir: $resource.category
+      openehr: $archetype
+    unidirectional: openEHR->fhir
+    followedBy:
+      mappings:
+        - name: categoryCodeCodingLoinc
+          with:
+            fhir: coding
+            openehr: $archetype
+          manual:
+            - name: loincCode
+              fhir:
+                - path: code
+                  value: 79378-6
+
+            - name: loincSystem
+              fhir:
+                - path: system
+                  value: http://loinc.org
+
+
+        - name: categoryCodeCodingSnomed
+          with:
+            fhir: coding
+            openehr: $archetype
+          manual:
+            - name: snomedCode
+              fhir:
+                - path: code
+                  value: "16100001"
+
+            - name: snomedSystem
+              fhir:
+                - path: system
+                  value: http://snomed.info/sct
+
+
+  - name: comment
+    with:
+      fhir: $resource.note.text
+      openehr: $archetype/data[at0001]/items[at0013]
+
+# unmapped openEHR  (archetype 1.0.2)
+# data[at0001]/items[at0003]/items[at0004]  Cause
+# data[at0001]/items[at0003]/items[at0005]  Order
+# data[at0001]/items[at0003]/items[at0009]  Duration
+# data[at0001]/items[at0017]                Direct cause duration
+# data[at0001]/items[at0019]                Description
+# data[at0001]/items[at0020]/items[at0018]  Condition
+# data[at0001]/items[at0020]/items[at0021]  Duration
+# protocol[at0014]/items[at0015]            Last updated
+# unmapped FHIR  (Condition R4)
+# Condition.identifier
+# Condition.clinicalStatus
+# Condition.verificationStatus
+# Condition.severity
+# Condition.bodySite
+# Condition.onset[x]
+# Condition.abatement[x]
+# Condition.recordedDate
+# Condition.stage
+# Condition.evidence
