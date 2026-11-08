@@ -1,4 +1,4 @@
-- The `openehr-*` crates move to 0.0.134. The null flavours, the default
+- The null flavours, the default
   `EVENT_CONTEXT.setting`, the version container of an `OBJECT_VERSION_ID`,
   the `ETag` entity tag, the ISO 8601 parts of a `DV_DURATION`, a `DV_TIME`
   and a visit's start and end, and the interface form of an archetype id are

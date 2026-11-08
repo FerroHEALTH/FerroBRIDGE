@@ -91,7 +91,9 @@ fn matches_segment(query: &PathSegment, node: &PathSegment, name: Option<&str>) 
 ///
 /// An at-code is compared exactly. An archetype id is compared in its
 /// interface form, which is what the Simplified Formats specification carries
-/// in an `aqlPath` predicate and what a mapping file writes. A mapping
+/// in an `aqlPath` predicate and what a mapping file writes, namespace
+/// included: "a namespace is never a wildcard" (BASE `master07-referencing.adoc`
+/// §Referencing). A mapping
 /// language that names an archetype outside a path compares it the same way,
 /// which is why this is public.
 #[must_use]
@@ -118,14 +120,15 @@ pub fn archetype_release_version(id: &str) -> Option<&str> {
 
 /// Returns the interface form of an archetype identifier.
 ///
-/// The interface form drops the namespace and every version part below the
-/// major: `org.example::openEHR-EHR-EVALUATION.note.v1.2.3` reads
-/// `openEHR-EHR-EVALUATION.note.v1`. A local code carries neither, so it is
-/// returned unchanged.
+/// The interface form keeps the namespace and drops every version part below
+/// the major (AM `ARCHETYPE_HRID.semantic_id`):
+/// `org.example::openEHR-EHR-EVALUATION.note.v1.2.3` reads
+/// `org.example::openEHR-EHR-EVALUATION.note.v1`. A local code carries
+/// neither, so it is returned unchanged.
 fn interface_form(id: &str) -> String {
     // NOTE: a node id that is no archetype HRID (a local `at` code) legitimately is its own form.
     id.parse::<ArchetypeHrid>()
-        .map_or_else(|_| id.to_owned(), |hrid| hrid.local_semantic_id())
+        .map_or_else(|_| id.to_owned(), |hrid| hrid.semantic_id())
 }
 
 #[cfg(test)]
@@ -165,9 +168,15 @@ mod tests {
             "openEHR-EHR-EVALUATION.note.v1.0.0",
             "openEHR-EHR-EVALUATION.note.v1"
         ));
-        assert!(node_id_matches(
+        // BASE master07-referencing.adoc §Referencing: "a namespace is never a
+        // wildcard", so a namespaced reference names no legacy id without one.
+        assert!(!node_id_matches(
             "org.example::openEHR-EHR-EVALUATION.note.v1.0.0",
             "openEHR-EHR-EVALUATION.note.v1"
+        ));
+        assert!(node_id_matches(
+            "org.example::openEHR-EHR-EVALUATION.note.v1.0.0",
+            "org.example::openEHR-EHR-EVALUATION.note.v1"
         ));
         assert!(!node_id_matches(
             "openEHR-EHR-EVALUATION.note.v2",
