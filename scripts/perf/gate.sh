@@ -7,7 +7,8 @@
 # against its base measured beside it on the same runner. Each arm is the
 # release build of ferrobridge over its own FerroEHR CDR and its own CDR
 # database, at the "FerroEHR CDR image" and "FerroEHR CDR database image"
-# pins of docs/VERSIONS.md, with one RabbitMQ at its pin for both.
+# pins of docs/VERSIONS.md, with one RabbitMQ and one FerroTERM terminology
+# server at their pins for both.
 #
 #   scripts/perf/gate.sh build [BASE]
 #       Builds target/release/ferrobridge of the checkout, the head, and of
@@ -17,7 +18,8 @@
 #       its own toolchain pin, into the same target directory, so the
 #       dependencies build once.
 #   scripts/perf/gate.sh run
-#       Starts both CDRs, their databases and RabbitMQ on loopback, loads the
+#       Starts both CDRs, their databases, RabbitMQ and FerroTERM over the
+#       v2-to-FHIR guide's table ConceptMaps on loopback, loads the
 #       two synthetic templates into each CDR, starts each arm's ferrobridge
 #       with its own tree's perf/ferrobridge.toml (the head's when the base
 #       has none) over its tree's facade and HL7 v2 mapping fixtures, seeds a
@@ -48,6 +50,8 @@ readonly WORK=target/perf-run
 readonly BASE_TREE=target/perf-base
 readonly NETWORK=ferrobridge-perf
 readonly BROKER_NAME=ferrobridge-perf-broker
+readonly TERMINOLOGY_NAME=ferrobridge-perf-terminology
+readonly TERMINOLOGY=http://127.0.0.1:18100
 # The role the CDR database image creates, in the gate's own throwaway
 # containers, which the run removes when it ends.
 readonly CDR_DB_PASSWORD="${PERF_CDR_DB_PASSWORD:-ferroehr}"
@@ -181,7 +185,7 @@ cleanup() {
   for arm in head base; do
     "$engine" rm --force "ferrobridge-perf-$arm-cdr" "ferrobridge-perf-$arm-db" > /dev/null 2>&1 || true
   done
-  "$engine" rm --force "$BROKER_NAME" > /dev/null 2>&1 || true
+  "$engine" rm --force "$BROKER_NAME" "$TERMINOLOGY_NAME" > /dev/null 2>&1 || true
   "$engine" network rm "$NETWORK" > /dev/null 2>&1 || true
 }
 
@@ -260,18 +264,34 @@ serve() {
       FERROBRIDGE__CHANGE_FEED__URL="$(cdr_origin "$arm")/ferroehr/rest/extensions/v1" \
       FERROBRIDGE__CHANGE_FEED__DEAD_LETTERS="$dir/dead-letters.redb" \
       FERROBRIDGE__EVENTS__EXCHANGE="ferrobridge.perf.$arm" \
+      FERROBRIDGE__TERMINOLOGY__BASE_URL="$TERMINOLOGY/r4" \
+      FERROBRIDGE__TERMINOLOGY__WIRE_VERSION=r4 \
       exec "$binary" --config "$config" serve > "$dir/server.log" 2>&1
   ) &
   echo "$!"
 }
 
+# terminology IMAGE: starts FerroTERM over the guide's table ConceptMaps,
+# which the HL7 v2 face translates every table value through.
+terminology() {
+  local maps="$WORK/terminology"
+  mkdir -p "$maps"
+  cp "$root/$CONCEPT_MAPS"/ConceptMap-table-*.json "$maps/"
+  chmod 0755 "$maps"
+  chmod 0644 "$maps"/*.json
+  "$engine" run --quiet --detach --name "$TERMINOLOGY_NAME" --publish 127.0.0.1:18100:8080 \
+    --volume "$root/$maps:/data/codesystems:ro" --env FERROTERM_CODESYSTEMS=/data/codesystems \
+    --env FERROTERM_UI=off --env FERROTERM__USAGE_REPORT__ENABLED=false "$1" > /dev/null
+}
+
 start() {
-  local cdr_image db_image broker_image arm
+  local cdr_image db_image broker_image terminology_image arm
   cdr_image="$(pin "FerroEHR CDR image")"
   db_image="$(pin "FerroEHR CDR database image")"
   broker_image="$(pin "RabbitMQ image")"
-  [[ -n "$cdr_image" && -n "$db_image" && -n "$broker_image" ]] ||
-    die "docs/VERSIONS.md pins no FerroEHR CDR, CDR database or RabbitMQ image"
+  terminology_image="$(pin "FerroTERM terminology server image")"
+  [[ -n "$cdr_image" && -n "$db_image" && -n "$broker_image" && -n "$terminology_image" ]] ||
+    die "docs/VERSIONS.md pins no FerroEHR CDR, CDR database, RabbitMQ or FerroTERM image"
   [[ -x target/release/ferrobridge ]] || die "target/release/ferrobridge is not built"
   [[ -x "$BASE_TREE/ferrobridge" ]] || die "$BASE_TREE/ferrobridge is not built: run gate.sh build first"
   rm -rf "$WORK"
@@ -282,6 +302,7 @@ start() {
   "$engine" network create "$NETWORK" > /dev/null
   "$engine" run --quiet --detach --name "$BROKER_NAME" --publish 127.0.0.1:15672:5672 \
     "$broker_image" > /dev/null
+  terminology "$terminology_image"
   for arm in head base; do
     cdr "$arm" "$db_image" "$cdr_image"
   done
@@ -289,6 +310,7 @@ start() {
     wait_for "the $arm CDR" 120 curl --fail --silent "$(cdr_origin "$arm")/health/readiness"
   done
   wait_for "RabbitMQ" 120 broker_up
+  wait_for "FerroTERM" 120 curl --fail --silent "$TERMINOLOGY/health"
   templates head "$root"
   templates base "$root/$BASE_TREE/src"
 
@@ -401,7 +423,7 @@ self_test() {
   check "a pin is read without its backticks" "rabbitmq:1@sha256:00" "$(pin "RabbitMQ image" "$work/matrix.md")"
   check "a missing row reads empty" "" "$(pin "Nothing" "$work/matrix.md")"
   local item
-  for item in "FerroEHR CDR image" "FerroEHR CDR database image" "RabbitMQ image"; do
+  for item in "FerroEHR CDR image" "FerroEHR CDR database image" "RabbitMQ image" "FerroTERM terminology server image"; do
     check "the $item is pinned by digest" 1 "$([[ "$(pin "$item")" == *@sha256:* ]] && echo 1 || echo 0)"
   done
   printf "path = \"/x/@READ_ID@/@A_1@\"\nbody = 'a@b.org @lower@ @READ_ID@'\n" > "$work/plan.toml"
@@ -417,6 +439,8 @@ self_test() {
   for file in "${TEMPLATES[@]}" "$CONDITION" perf/messages/oru-r01.hl7; do
     check "$file exists" 1 "$([[ -f "$root/$file" ]] && echo 1 || echo 0)"
   done
+  check "the guide's table ConceptMaps are vendored" 1 \
+    "$(compgen -G "$root/$CONCEPT_MAPS/ConceptMap-table-*.json" > /dev/null && echo 1 || echo 0)"
   for file in "${MAPPINGS[@]}"; do
     check "$file holds mapping files" 1 "$(compgen -G "$root/$file/*.yml" > /dev/null && echo 1 || echo 0)"
   done

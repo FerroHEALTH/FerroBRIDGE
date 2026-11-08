@@ -30,8 +30,9 @@ the base from `git archive` of its commit with its own toolchain pin, and
 installs `ferrohealth-perf` at its pin in `docs/VERSIONS.md`. Then
 `scripts/perf/gate.sh run`:
 
-1. starts two FerroEHR CDRs, each with its own PostgreSQL, and one RabbitMQ
-   on loopback, each at its pin in `docs/VERSIONS.md`, and loads the
+1. starts two FerroEHR CDRs, each with its own PostgreSQL, one RabbitMQ and
+   one FerroTERM over the v2-to-FHIR guide's table ConceptMaps on loopback,
+   each at its pin in `docs/VERSIONS.md`, and loads the
    testkit's synthetic `ferrobridge.diagnoses.v1` and
    `ferrobridge.diagnose.v1` templates into each CDR;
 2. starts each arm's `ferrobridge` with its own tree's
