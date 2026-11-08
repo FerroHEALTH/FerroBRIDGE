@@ -346,6 +346,7 @@ The issuer's `profile` picks the grant:
 | `scope` | none | The `scope` the request names; the on-behalf-of grant requires it |
 | `correlation_claim` | none | The claim a chained `federation` route carries from the caller's token to the onward one |
 | `keys` | none | The profile keys over the preset; `max_onward_lifetime`, in seconds, is required |
+| `cache` | `true` | `false` holds no onward token, so every CDR call exchanges one at the issuer, with a warning logged at start; a setting for a performance measurement, never for production |
 
 Each issued token is decoded and refused unless its issuer is the one asked,
 its `aud` lies inside `audiences`, it lives no longer than
@@ -355,8 +356,9 @@ by the profile's `person_equality` claims (`iss` and `sub` by default, `oid`
 and `tid` under `entra`, so a different pairwise `sub` is accepted). A
 `patients` issuer's token must also read as a patient token, a `patient/`
 grant with no `user/` or `system/` one, and carry the caller's `patient`
-launch context unchanged. The
-bridge caches the token under the caller's token and the target until
+launch context unchanged. Unless
+`cache = false`, the bridge caches the token under the caller's token and the
+target until
 `refresh_margin_ms` before the earlier of its own and the caller's token's
 expiry, and checks it again on every use. The caller's token appears in no
 log, span or metric.
