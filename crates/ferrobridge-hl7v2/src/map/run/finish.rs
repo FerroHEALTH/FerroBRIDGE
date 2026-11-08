@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ferrobridge_term::outcome::Translation;
+use ferrobridge_term::request::Translation;
 use fhir_types::codec::{Json, Value};
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::tree::Occurrence;
