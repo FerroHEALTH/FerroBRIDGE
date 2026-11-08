@@ -66,19 +66,29 @@ pub struct Source {
 ///
 /// The medication summary takes the medication order (CKM
 /// `openEHR-EHR-INSTRUCTION.medication_order.v3`, revision 3.2.1), in which a
-/// CDR often keeps the current medication list. The immunisations take the
-/// medication action (CKM `openEHR-EHR-ACTION.medication.v1`, revision
-/// 1.6.0) the CKM vaccination list section
+/// CDR often keeps the current medication list, and the medication action
+/// (CKM `openEHR-EHR-ACTION.medication.v1`, revision 1.6.0) recording a
+/// medicine taken, each held by the ad hoc medication summary section. The
+/// immunisations take the medication action the CKM vaccination list section
 /// (`openEHR-EHR-SECTION.immunisation_list.v0`) holds in its "Vaccinations
-/// administered" slot, so a vaccine recorded as an action is never in the
-/// medication summary (no specification governs the placement: our own
-/// design).
+/// administered" slot. The section path places an entry, through the
+/// sub-context the root context enters there (FHIRconnect 1.0.0,
+/// `types-of-mapping-files/sub-contexts.adoc`), so a vaccine recorded as an
+/// action is never in the medication summary and a medicine recorded as an
+/// action never in the immunisations (no specification governs the choice of
+/// sections: our own design).
 pub const SOURCES: &[Source] = &[
     Source {
         path: "EHDSPatientSummary.medicationSummary.medicationUse",
         template: PATIENT_SUMMARY_TEMPLATE,
         section: "openEHR-EHR-SECTION.adhoc.v1",
         archetype: "openEHR-EHR-INSTRUCTION.medication_order.v3",
+    },
+    Source {
+        path: "EHDSPatientSummary.medicationSummary.medicationUse",
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.adhoc.v1",
+        archetype: "openEHR-EHR-ACTION.medication.v1",
     },
     Source {
         path: "EHDSPatientSummary.immunisations.immunisation",

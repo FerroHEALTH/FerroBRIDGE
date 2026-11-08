@@ -238,28 +238,36 @@ pub const LABORATORY: Project = Project {
 ///
 /// It maps over FerroBRIDGE's patient summary template, which places the
 /// medication as the openEHR International Patient Summary template does. Its
-/// two contexts map that one template, so a run compiles one of them with
-/// [`Project::with_context`]: `ferrobridge_eu_eps_medication.context` maps
-/// each medication order of the template's medication summary section to a
-/// `MedicationStatement-eu-eps`, the medication summary's entry, and
+/// one root context, `ferrobridge_eu_eps.context`, maps the composition to a
+/// `composition-eu-eps` and enters each section of the template through the
+/// sub-context its section path names (FHIRconnect 1.0.0,
+/// `types-of-mapping-files/sub-contexts.adoc`):
+/// `ferrobridge_eu_eps_medication.context` maps each medication order and
+/// each medication action of the medication summary section to a
+/// `MedicationStatement-eu-eps`, and
 /// `ferrobridge_eu_eps_immunization.context` maps each medication action of
-/// the template's immunisations section to an `immunization-eu-core`. The
-/// template path is the placement criterion: each context starts at the
-/// archetype the template holds in its section alone.
+/// the immunisations section to an `immunization-eu-core`. The section path
+/// is the placement criterion, so one archetype held in two sections is
+/// placed by the section that holds it. A document takes the run with
+/// [`crate::document::Document::with_mapped_composition`].
 #[cfg(feature = "patient-summary")]
 pub const EPS: Project = Project {
     directory: "eps",
-    contexts: &[
-        "ferrobridge_eu_eps_medication.context",
-        "ferrobridge_eu_eps_immunization.context",
-    ],
+    contexts: &["ferrobridge_eu_eps.context"],
     files: &[
+        shipped!("eps", "ferrobridge_eu_eps.context.yml"),
+        shipped!("eps", "ferrobridge_health_summary.v1.Composition.yml"),
         shipped!("eps", "ferrobridge_eu_eps_medication.context.yml"),
+        shipped!("eps", "ferrobridge_section_adhoc.v1.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_medication_section.yml"),
         shipped!(
             "eps",
             "ferrobridge_medication_order.v3.MedicationStatement.yml"
         ),
+        shipped!("eps", "ferrobridge_medication.v1.MedicationStatement.yml"),
         shipped!("eps", "ferrobridge_eu_eps_immunization.context.yml"),
+        shipped!("eps", "ferrobridge_section_immunisation_list.v0.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_immunization_section.yml"),
         shipped!("eps", "ferrobridge_medication.v1.Immunization.yml"),
     ],
     accounted: &[],

@@ -6,6 +6,7 @@
 
 use fhir_types::codec::Json;
 use fhir_types::r4::bundle::Bundle;
+use fhir_types::r4::composition::CompositionSection;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
@@ -137,13 +138,7 @@ impl Document {
         };
         let keys = resources
             .iter()
-            .map(|resource| {
-                let object = Json::to_json(resource).map_err(codec)?;
-                Ok(match (text(&object, "resourceType"), text(&object, "id")) {
-                    (Some(kind), Some(id)) => Some(format!("{kind}/{id}")),
-                    _ => None,
-                })
-            })
+            .map(key_of)
             .collect::<Result<Vec<_>, DocumentError>>()?;
         let urls = self.add(&resources)?;
         let added = |reference: &Reference| -> Option<String> {
@@ -161,19 +156,7 @@ impl Document {
         }
         let mut sections = Vec::with_capacity(composition.section.len());
         for section in &composition.section {
-            let codes: Vec<&str> = section
-                .code
-                .iter()
-                .flat_map(|code| &code.coding)
-                .filter(|coding| {
-                    coding
-                        .system
-                        .as_ref()
-                        .and_then(|system| system.value.as_deref())
-                        == Some(LOINC)
-                })
-                .filter_map(|coding| coding.code.as_ref().and_then(|code| code.value.as_deref()))
-                .collect();
+            let codes = loinc_codes(section);
             let slot = self
                 .form
                 .slots
@@ -194,6 +177,96 @@ impl Document {
             });
         }
         Ok(sections)
+    }
+
+    /// Adds the entries the section of `run`'s `Composition` in the form's
+    /// slot `slice` names, the `Bundle` one mapping run answers, and returns
+    /// that section, or `None` when the composition holds no section in the
+    /// slot.
+    ///
+    /// A document assembled one section at a time, from runs over the
+    /// compositions each section selects, takes from each run the section it
+    /// assembles alone: the entries that section names, and each `Provenance`
+    /// of the run narrowed to the targets among them, so no resource another
+    /// section of the run names enters the document. The run's `Composition`
+    /// and its `OperationOutcome` stay out, as
+    /// [`Document::with_mapped_composition`] leaves them.
+    ///
+    /// # Errors
+    ///
+    /// [`DocumentError::Unslotted`] when the form has no slot `slice`,
+    /// [`DocumentError::Uncomposed`] when the run holds no `Composition` or
+    /// more than one, [`DocumentError::Dangling`] for an entry the run does
+    /// not hold, and the errors of [`Document::add`].
+    pub fn with_mapped_section(
+        &mut self,
+        run: &Bundle,
+        slice: &str,
+    ) -> Result<Option<MappedSection>, DocumentError> {
+        let slot = self
+            .form
+            .slots
+            .iter()
+            .find(|slot| slot.slice == slice)
+            .ok_or_else(|| DocumentError::Unslotted {
+                codes: vec![slice.to_owned()],
+            })?;
+        let mut compositions = Vec::new();
+        let mut keyed = Vec::new();
+        let mut provenances = Vec::new();
+        for resource in run.entry.iter().filter_map(|entry| entry.resource.clone()) {
+            match resource {
+                Resource::Composition(composition) => compositions.push(composition),
+                Resource::OperationOutcome(_) => {}
+                Resource::Provenance(provenance) => provenances.push(provenance),
+                other => keyed.push((key_of(&other)?, other)),
+            }
+        }
+        let [composition] = compositions.as_slice() else {
+            return Err(DocumentError::Uncomposed {
+                found: compositions.len(),
+            });
+        };
+        let Some(section) = composition
+            .section
+            .iter()
+            .find(|section| loinc_codes(section).contains(&slot.code))
+        else {
+            return Ok(None);
+        };
+        let mut named = Vec::with_capacity(section.entry.len());
+        for entry in &section.entry {
+            let reference = entry
+                .reference
+                .as_ref()
+                .and_then(|reference| reference.value.as_deref())
+                .ok_or(DocumentError::Dangling { slice: slot.slice })?;
+            let (_, resource) = keyed
+                .iter()
+                .find(|(key, _)| key.as_deref() == Some(reference))
+                .ok_or(DocumentError::Dangling { slice: slot.slice })?;
+            named.push((reference.to_owned(), resource.clone()));
+        }
+        let mut resources: Vec<Resource> =
+            named.iter().map(|(_, resource)| resource.clone()).collect();
+        for mut provenance in provenances {
+            provenance.target.retain(|target| {
+                target
+                    .reference
+                    .as_ref()
+                    .and_then(|reference| reference.value.as_deref())
+                    .is_some_and(|reference| named.iter().any(|(key, _)| key == reference))
+            });
+            if !provenance.target.is_empty() {
+                resources.push(Resource::Provenance(provenance));
+            }
+        }
+        let urls = self.add(&resources)?;
+        Ok(Some(MappedSection {
+            slot,
+            entries: urls.into_iter().take(named.len()).collect(),
+            empty_reason: section.empty_reason.clone(),
+        }))
     }
 
     /// Sets the entry at `url`, an `Encounter`, as the encounter the
@@ -218,4 +291,30 @@ impl Document {
         self.encounter = Some(format!("Encounter/{id}"));
         Ok(())
     }
+}
+
+/// Returns the `Type/id` key of `resource`, or `None` when it carries no id.
+fn key_of(resource: &Resource) -> Result<Option<String>, DocumentError> {
+    let object = Json::to_json(resource).map_err(codec)?;
+    Ok(match (text(&object, "resourceType"), text(&object, "id")) {
+        (Some(kind), Some(id)) => Some(format!("{kind}/{id}")),
+        _ => None,
+    })
+}
+
+/// Returns the LOINC codes the `code` of `section` carries.
+fn loinc_codes(section: &CompositionSection) -> Vec<&str> {
+    section
+        .code
+        .iter()
+        .flat_map(|code| &code.coding)
+        .filter(|coding| {
+            coding
+                .system
+                .as_ref()
+                .and_then(|system| system.value.as_deref())
+                == Some(LOINC)
+        })
+        .filter_map(|coding| coding.code.as_ref().and_then(|code| code.value.as_deref()))
+        .collect()
 }
