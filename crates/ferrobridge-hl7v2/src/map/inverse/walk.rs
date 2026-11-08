@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::pin::Pin;
 
-use ferrobridge_term::outcome::Translation;
+use ferrobridge_term::request::Translation;
 use fhir_types::codec::Value;
 
 use crate::map::condition::{self, Operand};
