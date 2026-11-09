@@ -28,6 +28,8 @@ mod batch;
 mod date;
 #[cfg(any(feature = "r4", feature = "r4b"))]
 mod end_to_end;
+#[cfg(all(feature = "smart", feature = "r4"))]
+mod endpoint;
 #[cfg(all(feature = "stu3", feature = "r4"))]
 mod expand;
 #[cfg(all(
@@ -55,7 +57,7 @@ mod stu3;
 mod subsumes;
 #[cfg(any(feature = "stu3", feature = "r4", feature = "r4b"))]
 mod support;
-#[cfg(feature = "r4")]
+#[cfg(all(feature = "smart", feature = "r4"))]
 mod tls;
 #[cfg(feature = "r4")]
 mod translate;

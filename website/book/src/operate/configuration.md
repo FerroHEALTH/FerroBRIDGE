@@ -1142,15 +1142,22 @@ specification governs the lane: it is FerroBRIDGE's own design.
 |---|---|---|
 | `enabled` | `false` | Whether the lane delivers |
 | `reader` | none, required | The reader name the lane follows the change feed under, another than `[events] reader` and `[omop_incremental] reader`: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
-| `base_url` | none, required | The FHIR service base each Bundle is posted to, `https` without a query or a fragment, never the facade's own `base_url` |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `timeout` | `"30s"` | How long one delivery may take |
 | `emitted` | none, required | The `redb` file the record of what was delivered for each composition is kept in, identifiers only |
-| `credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.credentials.oauth]`, the same table `[cdr.credentials]` takes |
+| `endpoint.url` | none, required | The FHIR service base each Bundle is posted to, `https` without a query or a fragment, never the facade's own `base_url` |
+| `endpoint.timeout` | `"30s"` | How long one delivery may take |
+| `endpoint.connect_timeout` | unset | How long opening the connection may take; unset, only `timeout` bounds it |
+| `endpoint.retry` | 3 attempts, `"200ms"` doubling to `"5s"` | `max_attempts`, `initial_backoff` and `max_backoff`: a delivery that got no answer or a `5xx` is tried again |
+| `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`), for an endpoint behind a private root or one that asks for a client certificate |
+| `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.endpoint.credentials.oauth]`, the same table `[cdr.credentials]` takes |
 
-A missing `reader`, `base_url` or `emitted`, a reader name outside its
+The `endpoint` table is the family's outbound endpoint table, sent through
+`ferrohealth-smart`'s outbound client, which follows no redirect and renews a
+token the endpoint refuses with `401` once.
+
+A missing `reader`, `endpoint.url` or `emitted`, a reader name outside its
 alphabet or another consumer's, an `http` base without `cleartext`, the
-facade's own base, a `timeout` of `"0s"`, and the lane without the change
+facade's own base, an `endpoint.timeout` of `"0s"`, and the lane without the change
 feed or the facade are each a boot error naming the key. A record file that
 cannot be opened refuses the start.
 
@@ -1191,23 +1198,25 @@ FerroBRIDGE's own design.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the facade and the HL7 v2 face record their accesses |
-| `base_url` | none, required | The repository's FHIR base; each record is created as `[base]/AuditEvent` |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `timeout` | `"10s"` | How long one delivery to the repository may take |
-| `retry_max` | `"1min"` | The longest wait between two delivery attempts |
+| `endpoint.url` | none, required | The repository's FHIR base; each record is created as `[base]/AuditEvent` |
+| `endpoint.timeout` | `"10s"` | How long one delivery to the repository may take |
+| `endpoint.connect_timeout` | unset | How long opening the connection may take |
+| `endpoint.retry` | 3 tries, `"200ms"` doubling to `"1min"` | The tries of one delivery, and `max_backoff` the wait between two rounds of tries |
+| `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`) |
+| `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.credentials]` takes |
 | `spool_dir` | none, required | The directory records wait in until the repository takes them; created when absent, and refused when its group or other users can reach it |
 | `max_records` | `10000` | The most records the spool holds at once |
 | `max_size` | `"64MiB"` | The most bytes the spool holds at once |
 | `write_timeout` | `"2s"` | The longest storing one record may take |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
-| `credentials` | none | `user` with `password` or `password_file`, or `[audit.credentials.oauth]`, the same table `[cdr.credentials]` takes |
 | `categories.national` | `[]` | The national categories the map may name, each `<system>\|<code>` |
 | `categories.templates` | `{}` | Each template id to its Art 14(1) categories, such as `["Patient-Summaries"]`, or to `"none"` |
 | `categories.archetypes` | `{}` | Each archetype id to its categories or to `"none"`; a template key wins for the same object |
 
 Template and archetype keys compare without case, as openEHR BASE compares
-every composite identifier. A missing `base_url` or `spool_dir`, an `http`
+every composite identifier. A missing `endpoint.url` or `spool_dir`, an `http`
 base without `cleartext`, a zero bound, a category code that names no
 category, and the lane without the facade or `[auth]` are each a boot error
 naming the key. A spool directory that cannot be opened refuses the start.
@@ -1271,10 +1280,10 @@ it carries.
 | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 | `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
-| `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__PASSWORD` | `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__PASSWORD_FILE` |
-| `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__FHIR_OUTBOUND__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
-| `FERROBRIDGE__AUDIT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__AUDIT__CREDENTIALS__PASSWORD_FILE` |
-| `FERROBRIDGE__AUDIT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__AUDIT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
+| `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
+| `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
+| `FERROBRIDGE__AUDIT__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__AUDIT__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
+| `FERROBRIDGE__AUDIT__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__AUDIT__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 
 Prefer the `_file` route: a Docker or Kubernetes secret arrives as a file, and
 a file never shows up in `docker inspect` or a process listing.

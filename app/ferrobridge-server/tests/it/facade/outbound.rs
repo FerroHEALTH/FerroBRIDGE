@@ -10,7 +10,6 @@
 //! unfinished.
 
 use std::error::Error;
-use std::time::Duration;
 
 use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::change_feed::ChangedVersion;
@@ -22,8 +21,11 @@ use ferrobridge_server::change_feed::follow::Consumer;
 use ferrobridge_server::change_feed::follow::Failure;
 use ferrobridge_server::outbound::Outbound;
 use ferrobridge_server::outbound::Settings;
-use ferrobridge_server::outbound::sink::Credentials;
 use ferrobridge_server::outbound::sink::Sink;
+use ferrohealth_secret::secret_url::SecretUrl;
+use ferrohealth_smart::client::outbound::OutboundClient;
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -61,11 +63,15 @@ async fn lane(harness: Harness, status: u16) -> Result<Lane, Box<dyn Error>> {
     let scratch = tempfile::tempdir()?;
     let settings = Settings {
         reader: ferrobridge_server::change_feed::ReaderName::new("fhir-outbound")?,
-        sink: Sink::new(
-            format!("{}/fhir", endpoint.uri()).parse()?,
-            Duration::from_secs(5),
-            Credentials::None,
-        )?,
+        sink: Sink::new(OutboundClient::build(
+            &EndpointSection {
+                url: SecretUrl::new(format!("{}/fhir", endpoint.uri())),
+                timeout: ferrohealth_config::units::Duration::from_secs(5),
+                ..EndpointSection::default()
+            },
+            "fhir_outbound.endpoint",
+            &ServerTls,
+        )?),
         emitted: scratch.path().join("emitted.redb"),
     };
     let outbound = Outbound::start(

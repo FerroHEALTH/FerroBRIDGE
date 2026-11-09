@@ -7,15 +7,12 @@
 //! No specification governs the lane: our own design.
 
 use super::Config;
-use super::credentials::Upstream;
-use super::credentials::resolve_credentials;
 use super::error::Error;
-use super::resolve::url_of;
 use crate::change_feed::ReaderName;
 use crate::outbound::Settings;
-use crate::outbound::sink::Credentials;
 use crate::outbound::sink::Sink;
-use ferrohealth_smart::client::cache::TokenSource;
+use ferrohealth_smart::client::outbound::OutboundClient;
+use ferrohealth_smart::config::ServerTls;
 
 /// Returns the lane `config` turns on, refused without the change feed or
 /// the facade whose programs it maps with, without a reader name, an
@@ -62,7 +59,12 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             value: section.reader.clone(),
         });
     }
-    let base = url_of("fhir_outbound.base_url", &section.base_url)?;
+    let client = OutboundClient::build(&section.endpoint, "fhir_outbound.endpoint", &ServerTls)
+        .map_err(|source| Error::Client {
+            upstream: "fhir_outbound",
+            source: Box::new(source),
+        })?;
+    let base = client.url().clone();
     let scheme_refused = match base.scheme() {
         "https" => false,
         "http" => !section.cleartext,
@@ -70,7 +72,7 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
     };
     if scheme_refused || base.query().is_some() || base.fragment().is_some() {
         return Err(Error::FetchBase {
-            key: String::from("fhir_outbound.base_url"),
+            key: String::from("fhir_outbound.endpoint.url"),
             value: base.to_string(),
         });
     }
@@ -78,36 +80,14 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
     // would commit each event back into the CDR it came from.
     if base.as_str().trim_end_matches('/') == config.facade.base_url.trim_end_matches('/') {
         return Err(Error::Duplicate {
-            key: String::from("fhir_outbound.base_url"),
+            key: String::from("fhir_outbound.endpoint.url"),
             value: base.to_string(),
-        });
-    }
-    if section.timeout.is_zero() {
-        return Err(Error::Bound {
-            key: String::from("fhir_outbound.timeout"),
-            value: 0,
-            reason: "a delivery waits at least one millisecond",
         });
     }
     let emitted = section.emitted.clone().ok_or(Error::Missing {
         key: String::from("fhir_outbound.emitted"),
     })?;
-    let credentials = match resolve_credentials("fhir_outbound.credentials", &section.credentials)?
-    {
-        Some(Upstream::Basic { user, password }) => Credentials::Basic { user, password },
-        Some(Upstream::OAuth(grant)) => {
-            Credentials::Bearer(TokenSource::new(*grant).map_err(|source| Error::Client {
-                upstream: "fhir_outbound",
-                source: Box::new(source),
-            })?)
-        }
-        None => Credentials::None,
-    };
-    let sink =
-        Sink::new(base, section.timeout.get(), credentials).map_err(|source| Error::Client {
-            upstream: "fhir_outbound",
-            source: Box::new(source),
-        })?;
+    let sink = Sink::new(client);
     Ok(Some(Settings {
         reader,
         sink,

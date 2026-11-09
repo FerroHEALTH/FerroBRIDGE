@@ -16,6 +16,10 @@ use std::time::Duration;
 use ehds_logging::map::CategoryMap;
 use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::audit::Settings;
+use ferrohealth_secret::secret_url::SecretUrl;
+use ferrohealth_smart::client::outbound::OutboundClient;
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::{EndpointSection, RetrySection};
 use ihe_atna::atna::feed::FeedRepository;
 use ihe_atna::atna::spool::Bounds;
 use wiremock::Mock;
@@ -48,18 +52,28 @@ pub(crate) fn access_log(
     categories: CategoryMap,
     max_bytes: u64,
 ) -> Result<Arc<AccessLog>, Box<dyn Error>> {
-    let http = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?;
+    let client = OutboundClient::build(
+        &EndpointSection {
+            url: SecretUrl::new(arr.uri()),
+            timeout: ferrohealth_config::units::Duration::from_secs(5),
+            retry: RetrySection {
+                max_attempts: 1,
+                initial_backoff: ferrohealth_config::units::Duration::from_millis(100),
+                max_backoff: ferrohealth_config::units::Duration::from_secs(1),
+            },
+            ..EndpointSection::default()
+        },
+        "audit.endpoint",
+        &ServerTls,
+    )?;
     let settings = Settings {
-        feed: FeedRepository::cleartext(arr.uri().parse()?, http, Duration::from_secs(5))?,
+        feed: FeedRepository::cleartext(client)?,
         spool: directory.join("spool"),
         bounds: Bounds {
             max_messages: 100,
             max_bytes,
             write_timeout: Duration::from_secs(2),
         },
-        retry_max: Duration::from_secs(1),
         source_id: String::from("ferrobridge.test"),
         site: None,
         categories,

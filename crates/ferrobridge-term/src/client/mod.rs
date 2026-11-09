@@ -21,6 +21,13 @@ use url::Url;
 use crate::client::transport::challenge;
 use crate::client::transport::dispatch;
 
+/// An authorization of the outbound client that this release of the crate
+/// does not carry.
+#[cfg(feature = "smart")]
+#[derive(Debug, thiserror::Error)]
+#[error("the outbound client resolved an authorization this client does not carry")]
+struct UnknownAuthorization;
+
 mod transport;
 
 /// The FHIR JSON media type (<https://hl7.org/fhir/R4/http.html#mime-type>).
@@ -55,7 +62,7 @@ pub struct Client {
 impl Client {
     /// Returns a client for the server `config` describes.
     ///
-    /// This constructor and [`Client::with_http`] are the only ways to
+    /// This constructor and `Client::from_endpoint` (feature `smart`) are the only ways to
     /// obtain a client, so a deployment that configures no terminology
     /// server holds no [`Client`] at all and the absence is a compile-time
     /// `Option<Client>` rather than a runtime fallback.
@@ -79,46 +86,68 @@ impl Client {
         })
     }
 
-    /// Returns a client for the server `config` describes that sends every
-    /// request through `http`, an HTTP client the caller built.
+    /// Returns a client for the terminology server `endpoint` describes, its
+    /// TLS built by `tls` (feature `smart`).
     ///
-    /// The caller's client carries what the deployment's transport needs and
-    /// [`Config`] does not hold: a client certificate for mutual TLS, trust
-    /// roots beside the platform's, a proxy. FHIR leaves transport security
-    /// to the deployment (<https://hl7.org/fhir/R4/security.html>). The
-    /// configured timeout still bounds every request, and the configured
-    /// credentials, retry budget and errors apply as they do for
-    /// [`Client::new`]. No specification governs this constructor: our own
-    /// design.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use ferrobridge_term::client::Client;
-    /// use ferrobridge_term::config::{Config, WireVersion};
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let pem = b"";
-    /// let http = reqwest::Client::builder()
-    ///     .identity(reqwest::Identity::from_pem(pem)?)
-    ///     .build()?;
-    /// let config = Config::new("https://tx.example.org/r4".parse()?, WireVersion::R4);
-    /// let client = Client::with_http(config, http)?;
-    /// # let _ = client;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// The client is built from `ferrohealth-smart`'s outbound client of the
+    /// table, so it speaks the HTTP engine every product of the family builds
+    /// for an outbound integration: `timeout` and `connect_timeout`, no
+    /// redirect, and the TLS `tls` builds from the table's `tls`. The table's
+    /// `retry` is the retry budget, and its `credentials` the credential every
+    /// request carries: HTTP Basic, or the client credentials grant's token,
+    /// renewed once on a `401`. `key` is the table's dotted key
+    /// (`terminology.endpoint`), which a refusal names. No specification
+    /// governs the table: our own design.
     ///
     /// # Errors
-    /// Returns [`Error::BaseUrl`] when the base URL cannot carry a path.
-    pub fn with_http(config: Config, http: reqwest::Client) -> Result<Self, Error> {
+    /// Returns [`Error::Endpoint`] when the outbound client refuses the
+    /// table, its TLS or its credential, and [`Error::BaseUrl`] when its URL
+    /// cannot carry a path.
+    #[cfg(feature = "smart")]
+    pub fn from_endpoint(
+        endpoint: &ferrohealth_smart::config::endpoint::EndpointSection,
+        key: &'static str,
+        tls: &dyn ferrohealth_smart::config::TlsBuilder,
+        wire_version: crate::config::WireVersion,
+    ) -> Result<Self, Error> {
+        use ferrohealth_smart::client::outbound::{Authorization, OutboundClient};
+        let outbound =
+            OutboundClient::build(endpoint, key, tls).map_err(|source| Error::Endpoint {
+                key,
+                source: Box::new(source),
+            })?;
+        let retry = outbound.retry();
+        let mut config = Config::new(outbound.url().clone(), wire_version)
+            .with_timeout(endpoint.timeout.get())
+            .with_retry(crate::config::RetryPolicy {
+                max_attempts: retry.max_attempts,
+                initial_backoff: retry.initial_backoff.get(),
+                max_backoff: retry.max_backoff.get(),
+            });
+        match outbound.authorization() {
+            None => {}
+            Some(Authorization::Basic(credential)) => {
+                config = config.with_credentials(Credentials::Header(credential.header_value()));
+            }
+            Some(Authorization::Bearer(source)) => {
+                config = config.with_credentials(Credentials::OAuth(Arc::new(
+                    crate::smart::SmartToken::from(source.clone()),
+                )));
+            }
+            Some(_) => {
+                return Err(Error::Endpoint {
+                    key,
+                    source: Box::new(UnknownAuthorization),
+                });
+            }
+        }
         if config.base_url.cannot_be_a_base() {
             return Err(Error::BaseUrl {
                 base: config.base_url.clone(),
             });
         }
         Ok(Self {
-            http,
+            http: outbound.http().clone(),
             config: Arc::new(config),
         })
     }
@@ -213,6 +242,12 @@ impl Client {
             None => return Ok((dispatch(url, build()).await?, None)),
             Some(Credentials::Basic { user, password }) => {
                 let request = build().basic_auth(user, Some(password.expose_secret()));
+                return Ok((dispatch(url, request).await?, None));
+            }
+            Some(Credentials::Header(value)) => {
+                let mut value = value.clone();
+                value.set_sensitive(true);
+                let request = build().header(http::header::AUTHORIZATION, value);
                 return Ok((dispatch(url, request).await?, None));
             }
             Some(Credentials::OAuth(provider)) => provider,

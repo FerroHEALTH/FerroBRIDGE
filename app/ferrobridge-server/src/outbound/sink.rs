@@ -13,35 +13,15 @@
 //! other failure may pass. The Bundle names patients, so it never reaches a
 //! log and no error carries it or the endpoint's answer.
 
-use std::time::Duration;
-
-use ferrohealth_smart::client::cache::TokenSource;
+use ferrohealth_smart::client::outbound::OutboundClient;
+use ferrohealth_smart::client::outbound::SendError;
+use http::Method;
 use http::StatusCode;
-use http::header::AUTHORIZATION;
 use http::header::CONTENT_TYPE;
-use secrecy::ExposeSecret;
-use secrecy::SecretString;
 use url::Url;
 
 /// The media type a Bundle is sent as (<https://hl7.org/fhir/R4/http.html#mime-type>).
 const FHIR_JSON: &str = "application/fhir+json";
-
-/// How the endpoint is authenticated.
-#[derive(Debug, Clone)]
-pub enum Credentials {
-    /// No credential.
-    None,
-    /// RFC 7617 Basic authentication.
-    Basic {
-        /// The user-id.
-        user: String,
-        /// The password.
-        password: SecretString,
-    },
-    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4), a bearer
-    /// token (RFC 6750) renewed once on a `401`.
-    Bearer(TokenSource),
-}
 
 /// Why a delivery was not accepted.
 #[derive(Debug, thiserror::Error)]
@@ -77,46 +57,26 @@ impl SinkError {
     }
 }
 
-/// The endpoint.
+/// The endpoint: the family's outbound client of `[fhir_outbound.endpoint]`,
+/// which follows no redirect, carries the credential and tries a call that
+/// got no answer or a `5xx` again.
 #[derive(Debug, Clone)]
 pub struct Sink {
-    /// The FHIR service base the Bundle is posted to.
-    base: Url,
-    /// The HTTP client, which follows no redirect.
-    http: reqwest::Client,
-    /// How long one delivery may take.
-    timeout: Duration,
-    /// How the endpoint is authenticated.
-    credentials: Credentials,
+    /// The client of the FHIR service.
+    client: OutboundClient,
 }
 
 impl Sink {
-    /// Returns the endpoint at `base`, each delivery bounded by `timeout`.
-    ///
-    /// # Errors
-    /// Returns the `reqwest` error when the HTTP client cannot be built.
-    pub fn new(
-        base: Url,
-        timeout: Duration,
-        credentials: Credentials,
-    ) -> Result<Self, reqwest::Error> {
-        // NOTE: no specification governs this: our own design; the Bundle names patients, so
-        // a redirect never sends it on to a location the configuration does not name.
-        let http = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
-        Ok(Self {
-            base,
-            http,
-            timeout,
-            credentials,
-        })
+    /// Returns the endpoint `client` reaches.
+    #[must_use]
+    pub const fn new(client: OutboundClient) -> Self {
+        Self { client }
     }
 
     /// Returns the FHIR service base.
     #[must_use]
     pub const fn base(&self) -> &Url {
-        &self.base
+        self.client.url()
     }
 
     /// Posts `bundle`, a `transaction` Bundle as FHIR JSON.
@@ -124,51 +84,21 @@ impl Sink {
     /// # Errors
     /// Returns [`SinkError`] for every answer but a `2xx`, and for no answer.
     pub async fn deliver(&self, bundle: &[u8]) -> Result<(), SinkError> {
-        let status = self.post(bundle).await?;
-        if status == StatusCode::UNAUTHORIZED
-            && let Credentials::Bearer(source) = &self.credentials
-        {
-            // NOTE: RFC 6750 §3.1: a 401 for an invalid token is answered with a new token, once.
-            let stale = source
-                .token()
-                .await
-                .map_err(|error| SinkError::Token(Box::new(error)))?;
-            source.invalidate(stale.header());
-            return outcome(self.post(bundle).await?);
-        }
-        outcome(status)
-    }
-
-    /// Posts `bundle` once and returns the status the endpoint answered.
-    async fn post(&self, bundle: &[u8]) -> Result<StatusCode, SinkError> {
-        let mut request = self
-            .http
-            .post(self.base.clone())
-            .header(CONTENT_TYPE, FHIR_JSON)
-            .header(http::header::ACCEPT, FHIR_JSON)
-            .header("Prefer", "return=minimal")
-            .body(bundle.to_vec())
-            .timeout(self.timeout);
-        match &self.credentials {
-            Credentials::None => {}
-            Credentials::Basic { user, password } => {
-                request = request.basic_auth(user, Some(password.expose_secret()));
-            }
-            Credentials::Bearer(source) => {
-                let token = source
-                    .token()
-                    .await
-                    .map_err(|error| SinkError::Token(Box::new(error)))?;
-                let mut value = token.header().clone();
-                value.set_sensitive(true);
-                request = request.header(AUTHORIZATION, value);
-            }
-        }
-        let answer = request
-            .send()
+        let answer = self
+            .client
+            .send(&Method::POST, self.client.url(), |request| {
+                request
+                    .header(CONTENT_TYPE, FHIR_JSON)
+                    .header(http::header::ACCEPT, FHIR_JSON)
+                    .header("Prefer", "return=minimal")
+                    .body(bundle.to_vec())
+            })
             .await
-            .map_err(|error| SinkError::Transport(error.without_url()))?;
-        Ok(answer.status())
+            .map_err(|error| match error {
+                SendError::Transport(source) => SinkError::Transport(source.without_url()),
+                other => SinkError::Token(Box::new(other)),
+            })?;
+        outcome(answer.status())
     }
 }
 

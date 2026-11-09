@@ -9,6 +9,6 @@
   `initial_backoff` and `max_backoff`; `[hl7v2]` `idle_timeout`,
   `frame_timeout` and `frame_limit`; `[change_feed]` `poll_interval`,
   `backoff` and `max_backoff`; `[events]` `confirm_timeout`; `[audit]`
-  `timeout`, `retry_max`, `max_size` and `write_timeout`; and the console's
+  `max_size` and `write_timeout`; and the console's
   `[bridge] timeout`. A file or an environment that sets an old key is
   refused as an unknown key; rewrite it in the new form.

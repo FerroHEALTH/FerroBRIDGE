@@ -23,7 +23,6 @@ mod spool;
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use ehds_logging::balp::BalpSink;
 use ehds_logging::label::LabelPolicy;
@@ -53,8 +52,6 @@ pub struct Settings {
     pub spool: PathBuf,
     /// The spool's bounds.
     pub bounds: Bounds,
-    /// The longest wait between two delivery attempts.
-    pub retry_max: Duration,
     /// How the bridge names itself as the recording system.
     pub source_id: String,
     /// The site the bridge runs at.
@@ -119,7 +116,7 @@ impl AccessLog {
                 path: settings.spool.clone(),
                 source,
             })?;
-        let forwarder = Forwarder::fhir_feed(spool, settings.feed.clone(), settings.retry_max);
+        let forwarder = Forwarder::fhir_feed(spool, settings.feed.clone());
         let observer = Observer {
             source_id: settings.source_id.clone(),
             site: settings.site.clone(),

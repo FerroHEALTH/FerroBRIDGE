@@ -16,7 +16,7 @@ use super::refusal;
 const FEED: &str = "[auth]\nenabled = false\n\n[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
 
 /// The keys every complete lane names.
-const COMPLETE: &str = "reader = \"fhir-outbound\"\nbase_url = \"https://fhir.example.org/r4\"\nemitted = \"/var/lib/ferrobridge/emitted.redb\"\n";
+const COMPLETE: &str = "reader = \"fhir-outbound\"\nendpoint.url = \"https://fhir.example.org/r4\"\nemitted = \"/var/lib/ferrobridge/emitted.redb\"\n";
 
 /// Returns a configuration whose `[fhir_outbound]` section adds `keys` to an
 /// enabled lane.
@@ -28,7 +28,7 @@ fn lane(keys: &str) -> String {
 fn the_outbound_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_sources(None, &BTreeMap::new())?;
     assert!(!config.fhir_outbound.enabled);
-    assert_eq!(30_000, config.fhir_outbound.timeout.as_millis());
+    assert_eq!(30_000, config.fhir_outbound.endpoint.timeout.as_millis());
     assert!(config.resolve(Process::Server)?.fhir_outbound.is_none());
     Ok(())
 }
@@ -36,7 +36,7 @@ fn the_outbound_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error
 #[test]
 fn an_enabled_lane_resolves_every_key_and_follows_the_change_feed()
 -> Result<(), Box<dyn std::error::Error>> {
-    let text = lane(&format!("{COMPLETE}timeout = \"5s\"\n"));
+    let text = lane(&format!("{COMPLETE}endpoint.timeout = \"5s\"\n"));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let outbound = settings.fhir_outbound.ok_or("the lane is on")?;
     assert!(
@@ -55,7 +55,7 @@ fn an_enabled_lane_resolves_every_key_and_follows_the_change_feed()
 #[test]
 fn the_environment_sets_the_endpoint() -> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([(
-        String::from("FERROBRIDGE__FHIR_OUTBOUND__BASE_URL"),
+        String::from("FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__URL"),
         String::from("https://fhir.example.org/other"),
     )]);
     let settings =
@@ -74,7 +74,7 @@ fn the_basic_password_reads_from_a_file() -> Result<(), Box<dyn std::error::Erro
     let file = directory.path().join("fhir-password");
     std::fs::write(&file, "synthetic-password\n")?;
     let text = lane(&format!(
-        "{COMPLETE}\n[fhir_outbound.credentials]\nuser = \"bridge\"\npassword_file = \"{}\"\n",
+        "{COMPLETE}\n[fhir_outbound.endpoint.credentials]\nuser = \"bridge\"\npassword_file = \"{}\"\n",
         file.display()
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
@@ -117,15 +117,11 @@ fn the_lane_needs_the_change_feed_and_the_facade() -> Result<(), Box<dyn std::er
 fn a_missing_key_is_refused_by_name() -> Result<(), Box<dyn std::error::Error>> {
     for (keys, missing) in [
         (
-            "base_url = \"https://fhir.example.org/r4\"\nemitted = \"/tmp/e.redb\"\n",
+            "endpoint.url = \"https://fhir.example.org/r4\"\nemitted = \"/tmp/e.redb\"\n",
             "fhir_outbound.reader",
         ),
         (
-            "reader = \"fhir-outbound\"\nemitted = \"/tmp/e.redb\"\n",
-            "fhir_outbound.base_url",
-        ),
-        (
-            "reader = \"fhir-outbound\"\nbase_url = \"https://fhir.example.org/r4\"\n",
+            "reader = \"fhir-outbound\"\nendpoint.url = \"https://fhir.example.org/r4\"\n",
             "fhir_outbound.emitted",
         ),
     ] {
@@ -135,6 +131,13 @@ fn a_missing_key_is_refused_by_name() -> Result<(), Box<dyn std::error::Error>> 
             "{missing}: {error:?}"
         );
     }
+    let error = refusal(&lane(
+        "reader = \"fhir-outbound\"\nemitted = \"/tmp/e.redb\"\n",
+    ))?;
+    assert!(
+        refused_endpoint(&error, "url"),
+        "the endpoint url: {error:?}"
+    );
     Ok(())
 }
 
@@ -143,7 +146,7 @@ fn a_cleartext_endpoint_is_refused_unless_accepted() -> Result<(), Box<dyn std::
     let keys = COMPLETE.replace("https://fhir.example.org", "http://fhir.invalid");
     let error = refusal(&lane(&keys))?;
     assert!(
-        matches!(&error, Error::FetchBase { key, .. } if key == "fhir_outbound.base_url"),
+        matches!(&error, Error::FetchBase { key, .. } if key == "fhir_outbound.endpoint.url"),
         "{error:?}"
     );
     let accepted = lane(&format!("{keys}cleartext = true\n"));
@@ -173,7 +176,7 @@ fn another_consumers_reader_is_refused() -> Result<(), Box<dyn std::error::Error
 #[test]
 fn the_facade_itself_is_refused_as_the_endpoint() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
-        "{}base_url = \"https://bridge.example.org/fhir\"\n",
+        "{}endpoint.url = \"https://bridge.example.org/fhir\"\n",
         lane("reader = \"fhir-outbound\"\nemitted = \"/tmp/e.redb\"\n")
     )
     .replace(
@@ -182,7 +185,7 @@ fn the_facade_itself_is_refused_as_the_endpoint() -> Result<(), Box<dyn std::err
     );
     let error = refusal(&text)?;
     assert!(
-        matches!(&error, Error::Duplicate { key, .. } if key == "fhir_outbound.base_url"),
+        matches!(&error, Error::Duplicate { key, .. } if key == "fhir_outbound.endpoint.url"),
         "{error:?}"
     );
     Ok(())
@@ -190,11 +193,8 @@ fn the_facade_itself_is_refused_as_the_endpoint() -> Result<(), Box<dyn std::err
 
 #[test]
 fn a_zero_timeout_and_an_unknown_key_are_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refusal(&lane(&format!("{COMPLETE}timeout = \"0s\"\n")))?;
-    assert!(
-        matches!(&error, Error::Bound { key, .. } if key == "fhir_outbound.timeout"),
-        "{error:?}"
-    );
+    let error = refusal(&lane(&format!("{COMPLETE}endpoint.timeout = \"0s\"\n")))?;
+    assert!(refused_endpoint(&error, "timeout"), "{error:?}");
     assert!(
         Config::from_sources(
             Some(&lane(&format!("{COMPLETE}url = \"x\"\n"))),
@@ -203,4 +203,20 @@ fn a_zero_timeout_and_an_unknown_key_are_refused() -> Result<(), Box<dyn std::er
         .is_err()
     );
     Ok(())
+}
+
+/// Whether `error` is the outbound client's refusal of
+/// `[fhir_outbound.endpoint]`, naming `key` in its cause.
+fn refused_endpoint(error: &Error, key: &str) -> bool {
+    let Error::Client { upstream, source } = error else {
+        return false;
+    };
+    let mut text = source.to_string();
+    let mut cause = std::error::Error::source(source.as_ref());
+    while let Some(next) = cause {
+        text.push_str(": ");
+        text.push_str(&next.to_string());
+        cause = next.source();
+    }
+    *upstream == "fhir_outbound" && text.contains("fhir_outbound.endpoint") && text.contains(key)
 }

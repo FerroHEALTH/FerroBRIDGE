@@ -21,22 +21,30 @@ use ferrohealth_config::provenance::Provenance;
 
 /// The secrets the tree holds as a value or through a `_file` sibling, by
 /// dotted key; a key under an array of tables names the array.
-const SECRETS: [&str; 6] = [
+const SECRETS: [&str; 10] = [
     "cdm.url",
     "cdr.credentials.password",
     "cdr.credentials.oauth.client_secret",
     "terminology.credentials.password",
     "terminology.credentials.oauth.client_secret",
+    "fhir_outbound.endpoint.credentials.password",
+    "fhir_outbound.endpoint.credentials.oauth.client_secret",
+    "audit.endpoint.credentials.password",
+    "audit.endpoint.credentials.oauth.client_secret",
     "auth.basic.users.password_hash",
 ];
 
 /// The keys that name the file of a private key, drawn as a secret read
 /// from that file.
-const KEY_FILES: [&str; 4] = [
+const KEY_FILES: [&str; 8] = [
     "cdr.credentials.oauth.private_key_file",
-    "cdr.credentials.oauth.client_key_file",
+    "cdr.credentials.oauth.tls.client_identity_file",
     "terminology.credentials.oauth.private_key_file",
-    "terminology.credentials.oauth.client_key_file",
+    "terminology.credentials.oauth.tls.client_identity_file",
+    "fhir_outbound.endpoint.credentials.oauth.private_key_file",
+    "fhir_outbound.endpoint.tls.client_identity_file",
+    "audit.endpoint.credentials.oauth.private_key_file",
+    "audit.endpoint.tls.client_identity_file",
 ];
 
 /// Returns the running configuration of `config`, read at `read_at`.
