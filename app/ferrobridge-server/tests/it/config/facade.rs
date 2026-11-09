@@ -152,7 +152,7 @@ fn by_default_the_facade_fetches_no_absolute_reference() -> Result<(), Box<dyn s
 fn the_reference_section_resolves_its_bases_and_its_depth() -> Result<(), Box<dyn std::error::Error>>
 {
     let text = format!(
-        "{ENABLED}\n[facade.references]\nfetch_bases = [\"https://sender.invalid/fhir\"]\nmax_depth = 1\ntimeout_ms = 2500\n"
+        "{ENABLED}\n[facade.references]\nfetch_bases = [\"https://sender.invalid/fhir\"]\nmax_depth = 1\ntimeout = \"2500ms\"\n"
     );
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;

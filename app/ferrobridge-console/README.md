@@ -66,15 +66,15 @@ listen = "0.0.0.0:3000"
 
 [bridge]
 base_url = "https://bridge.example.org/"
-timeout_ms = 30000
+timeout = "30s"
 
 [session]
 store = "memory"
 secure_cookie = true
-sign_in_timeout_s = 300
+sign_in_timeout = "5min"
 max_sign_ins = 1000
-idle_timeout_s = 1800
-absolute_timeout_s = 43200
+idle_timeout = "30min"
+absolute_timeout = "12h"
 max_sessions = 10000
 
 [oidc]

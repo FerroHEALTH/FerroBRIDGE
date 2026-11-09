@@ -323,7 +323,7 @@ where
         log.stop();
         // NOTE: no specification governs this: our own design; a record not yet delivered
         // stays in the spool on disk and is delivered by the next start.
-        if tokio::time::timeout(settings.server.shutdown_timeout(), delivery)
+        if tokio::time::timeout(settings.server.shutdown_timeout.get(), delivery)
             .await
             .is_err()
         {
@@ -334,7 +334,7 @@ where
         stop.send_replace(true);
         // NOTE: no specification governs this: our own design; an unacknowledged
         // event is read again on the next start, so a follower cut short loses nothing.
-        let drained = tokio::time::timeout(settings.server.shutdown_timeout(), async {
+        let drained = tokio::time::timeout(settings.server.shutdown_timeout.get(), async {
             for follower in followers {
                 if let Err(error) = follower.await {
                     tracing::warn!(%error, "a change-feed follower ended abnormally");

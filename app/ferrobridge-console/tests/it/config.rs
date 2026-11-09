@@ -32,7 +32,7 @@ fn no_file_and_no_environment_resolve_to_the_defaults() {
 
 #[test]
 fn an_override_wins_over_the_file_and_reads_as_toml_or_text() {
-    let text = "[bridge]\nbase_url = \"http://file.example/\"\ntimeout_ms = 10\n";
+    let text = "[bridge]\nbase_url = \"http://file.example/\"\ntimeout = \"10ms\"\n";
     let settings = Config::from_sources(
         Some(text),
         &environment(&[
@@ -40,7 +40,7 @@ fn an_override_wins_over_the_file_and_reads_as_toml_or_text() {
                 "FERROBRIDGE_CONSOLE__BRIDGE__BASE_URL",
                 "https://env.example/root",
             ),
-            ("FERROBRIDGE_CONSOLE__BRIDGE__TIMEOUT_MS", "2500"),
+            ("FERROBRIDGE_CONSOLE__BRIDGE__TIMEOUT", "2500ms"),
             ("FERROBRIDGE_CONSOLE__SERVER__LISTEN", "0.0.0.0:8443"),
         ]),
     )
@@ -109,7 +109,7 @@ fn each_value_its_key_does_not_admit_is_refused_by_key() {
             "[bridge]\nbase_url = \"https://bridge.example/?q=1\"\n",
             "bridge.base_url",
         ),
-        ("[bridge]\ntimeout_ms = 0\n", "bridge.timeout_ms"),
+        ("[bridge]\ntimeout = \"0s\"\n", "bridge.timeout"),
     ] {
         let error = Config::from_sources(Some(text), &BTreeMap::new())
             .expect("the tree reads")
@@ -202,8 +202,8 @@ fn each_oidc_or_session_value_its_key_does_not_admit_is_refused_by_key() {
             "session.max_sessions",
         ),
         (
-            String::from("[session]\nidle_timeout_s = 0\n"),
-            "session.idle_timeout_s",
+            String::from("[session]\nidle_timeout = \"0s\"\n"),
+            "session.idle_timeout",
         ),
     ] {
         let error = Config::from_sources(Some(&text), &BTreeMap::new())

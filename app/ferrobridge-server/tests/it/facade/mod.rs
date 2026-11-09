@@ -215,7 +215,7 @@ impl Harness {
 /// carries more than one resource.
 fn server_settings() -> ferrohealth_server::section::ServerSection {
     ferrohealth_server::section::ServerSection {
-        body_limit_bytes: 1024 * 1024,
+        body_limit: ferrohealth_config::units::ByteSize::from_bytes(1024 * 1024),
         ..support::settings()
     }
 }

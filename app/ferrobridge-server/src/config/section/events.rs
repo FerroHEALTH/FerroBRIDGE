@@ -7,6 +7,7 @@
 //! No specification governs the lane: our own design. It is off until
 //! `enabled` is set, and it follows the `[change_feed]` source.
 
+use ferrohealth_config::units::Duration;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -29,7 +30,7 @@ pub struct Events {
     /// The durable topic exchange the events are published to.
     pub exchange: String,
     /// How long one publish may wait for the broker's confirm.
-    pub confirm_timeout_ms: u64,
+    pub confirm_timeout: Duration,
     /// The durable queues declared and bound to the exchange.
     pub queues: Vec<EventsQueue>,
 }
@@ -43,7 +44,7 @@ impl Default for Events {
             url_file: None,
             tls: false,
             exchange: String::new(),
-            confirm_timeout_ms: 30_000,
+            confirm_timeout: Duration::from_secs(30),
             queues: Vec::new(),
         }
     }

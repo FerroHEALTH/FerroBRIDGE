@@ -3,6 +3,7 @@
 
 //! The `[facade]` section and the tables under it.
 
+use ferrohealth_config::units::Duration;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -136,7 +137,7 @@ pub struct FacadeReferences {
     /// How many levels of references are followed.
     pub max_depth: u32,
     /// How long one fetch may take, connection included.
-    pub timeout_ms: u64,
+    pub timeout: Duration,
 }
 
 impl Default for FacadeReferences {
@@ -144,7 +145,7 @@ impl Default for FacadeReferences {
         Self {
             fetch_bases: Vec::new(),
             max_depth: crate::facade::references::DEFAULT_MAX_DEPTH,
-            timeout_ms: crate::facade::references::DEFAULT_TIMEOUT_MS,
+            timeout: Duration::from_secs(10),
         }
     }
 }

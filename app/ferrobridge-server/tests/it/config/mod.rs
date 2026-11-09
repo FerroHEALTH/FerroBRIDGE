@@ -31,9 +31,9 @@ use std::collections::BTreeMap;
 const FULL: &str = r#"
 [server]
 listen = "0.0.0.0:9000"
-request_timeout_ms = 1000
-shutdown_timeout_ms = 2000
-body_limit_bytes = 4096
+request_timeout = "1s"
+shutdown_timeout = "2s"
+body_limit = "4KiB"
 
 [telemetry]
 format = "json"
@@ -42,12 +42,12 @@ logged_query_parameters = ["_count"]
 
 [cdr]
 base_url = "http://cdr.invalid/v1"
-timeout_ms = 5000
+timeout = "5s"
 
 [cdr.retry]
 max_attempts = 5
-initial_backoff_ms = 10
-max_backoff_ms = 20
+initial_backoff = "10ms"
+max_backoff = "20ms"
 
 [terminology]
 base_url = "http://tx.invalid/r4"

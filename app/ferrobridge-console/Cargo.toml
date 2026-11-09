@@ -55,7 +55,7 @@ clap.workspace = true
 # subcommands.
 ferrohealth-config.workspace = true
 ferrohealth-secret.workspace = true
-ferrohealth-server = { workspace = true, features = ["console"] }
+ferrohealth-server = { workspace = true, features = ["console", "otlp"] }
 ferrohealth-telemetry.workspace = true
 # The R4 CapabilityStatement the bridge client reads from `/fhir/metadata`
 # and the console reduces to the operator contract's `Capability`, and the
@@ -69,7 +69,7 @@ fhir-types = { workspace = true, features = ["r4", "terminology"] }
 ferrohealth-session = { workspace = true, features = ["axum"] }
 # The relying party the sign-in runs through, whose refusals a stopped
 # sign-in names, and the scope values the console checks `[oidc]` for.
-ferrohealth-smart = { workspace = true, features = ["oidc"] }
+ferrohealth-smart = { workspace = true, features = ["oidc", "server-tls"] }
 # The bridge client and the OpenID Provider's client.
 reqwest.workspace = true
 # The operator's access token on its way to the bridge, zeroed when dropped.

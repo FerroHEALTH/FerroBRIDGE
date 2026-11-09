@@ -35,7 +35,7 @@ async fn a_request_in_flight_finishes_after_the_stop_signal() -> Result<(), Box<
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let server = tokio::spawn(async move {
         let server = ferrohealth_server::section::ServerSection {
-            shutdown_timeout_ms: 5_000,
+            shutdown_timeout: ferrohealth_config::units::Duration::from_millis(5_000),
             ..support::settings()
         };
         serve_until(
@@ -75,7 +75,7 @@ async fn the_server_returns_once_the_drain_is_done() -> Result<(), Box<dyn Error
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let server = tokio::spawn(async move {
         let server = ferrohealth_server::section::ServerSection {
-            shutdown_timeout_ms: 500,
+            shutdown_timeout: ferrohealth_config::units::Duration::from_millis(500),
             ..support::settings()
         };
         serve_until(

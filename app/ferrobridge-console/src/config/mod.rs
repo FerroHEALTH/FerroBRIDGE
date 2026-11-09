@@ -49,6 +49,7 @@ pub mod load;
 pub mod settings;
 
 use ferrohealth_config::loader::Loader;
+use ferrohealth_config::units::Duration;
 use ferrohealth_session::config::{OidcSection, SessionSection};
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::{Deserialize, Serialize};
@@ -122,15 +123,15 @@ pub struct Bridge {
     /// The root of the bridge's HTTP surface, under which it serves `/fhir`
     /// and `/health`.
     pub base_url: String,
-    /// How long one call to the bridge may take, in milliseconds.
-    pub timeout_ms: u64,
+    /// How long one call to the bridge may take.
+    pub timeout: Duration,
 }
 
 impl Default for Bridge {
     fn default() -> Self {
         Self {
             base_url: String::from("http://127.0.0.1:8080/"),
-            timeout_ms: 30_000,
+            timeout: Duration::from_secs(30),
         }
     }
 }

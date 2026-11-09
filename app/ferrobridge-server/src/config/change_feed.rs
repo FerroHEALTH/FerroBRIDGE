@@ -5,8 +5,6 @@
 //!
 //! No specification governs the change feed: our own design.
 
-use std::time::Duration;
-
 use super::error::Error;
 use super::section::change_feed::ChangeFeed;
 use crate::change_feed::PageSize;
@@ -53,22 +51,22 @@ pub(super) fn resolve_change_feed(
         reason: "a read asks for 1 to 1000 events",
     })?;
     for (key, value) in [
-        ("change_feed.poll_interval_ms", section.poll_interval_ms),
-        ("change_feed.backoff_ms", section.backoff_ms),
+        ("change_feed.poll_interval", section.poll_interval),
+        ("change_feed.backoff", section.backoff),
     ] {
-        if value == 0 {
+        if value.is_zero() {
             return Err(Error::Bound {
                 key: key.to_owned(),
-                value,
+                value: 0,
                 reason: "a follower waits at least one millisecond",
             });
         }
     }
-    if section.max_backoff_ms < section.backoff_ms {
-        return Err(Error::Bound {
-            key: String::from("change_feed.max_backoff_ms"),
-            value: section.max_backoff_ms,
-            reason: "the longest wait is at least change_feed.backoff_ms",
+    if section.max_backoff < section.backoff {
+        return Err(Error::Span {
+            key: String::from("change_feed.max_backoff"),
+            value: section.max_backoff,
+            reason: "the longest wait is at least change_feed.backoff",
         });
     }
     let max_attempts = u32::try_from(section.max_attempts)
@@ -94,9 +92,9 @@ pub(super) fn resolve_change_feed(
         max_attempts,
         polling: Polling {
             page_size,
-            idle: Duration::from_millis(section.poll_interval_ms),
-            backoff: Duration::from_millis(section.backoff_ms),
-            max_backoff: Duration::from_millis(section.max_backoff_ms),
+            idle: section.poll_interval.get(),
+            backoff: section.backoff.get(),
+            max_backoff: section.max_backoff.get(),
         },
     })
 }

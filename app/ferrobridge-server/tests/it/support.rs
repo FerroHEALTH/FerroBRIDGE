@@ -84,9 +84,9 @@ impl<'a> MakeWriter<'a> for Logs {
 pub(crate) fn settings() -> ServerSection {
     ServerSection {
         listen: "127.0.0.1:0".parse().expect("a socket address"),
-        request_timeout_ms: 5_000,
-        shutdown_timeout_ms: 5_000,
-        body_limit_bytes: 1024,
+        request_timeout: ferrohealth_config::units::Duration::from_millis(5_000),
+        shutdown_timeout: ferrohealth_config::units::Duration::from_millis(5_000),
+        body_limit: ferrohealth_config::units::ByteSize::from_bytes(1024),
         compression: false,
         ..ServerSection::default()
     }

@@ -6,7 +6,6 @@
 //! No specification governs the configuration: our own design.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use base64::Engine as _;
 use ehds_logging::map::CategoryMap;
@@ -61,7 +60,7 @@ pub(super) fn resolve_audit(
             upstream: "audit",
             source: Box::new(source),
         })?;
-    let timeout = Duration::from_millis(audit.timeout_ms);
+    let timeout = audit.timeout.get();
     let feed = if audit.cleartext {
         FeedRepository::cleartext(base, http, timeout)
     } else {
@@ -87,12 +86,12 @@ pub(super) fn resolve_audit(
     let spool = audit.spool_dir.clone().ok_or(Error::Missing {
         key: String::from("audit.spool_dir"),
     })?;
-    for (key, value) in [
-        ("audit.timeout_ms", audit.timeout_ms),
-        ("audit.write_timeout_ms", audit.write_timeout_ms),
-        ("audit.max_bytes", audit.max_bytes),
+    for (key, zero) in [
+        ("audit.timeout", audit.timeout.is_zero()),
+        ("audit.write_timeout", audit.write_timeout.is_zero()),
+        ("audit.max_size", audit.max_size.is_zero()),
     ] {
-        if value == 0 {
+        if zero {
             return Err(Error::Bound {
                 key: key.to_owned(),
                 value: 0,
@@ -124,10 +123,10 @@ pub(super) fn resolve_audit(
         spool,
         bounds: Bounds {
             max_messages: audit.max_records,
-            max_bytes: audit.max_bytes,
-            write_timeout: Duration::from_millis(audit.write_timeout_ms),
+            max_bytes: audit.max_size.bytes(),
+            write_timeout: audit.write_timeout.get(),
         },
-        retry_max: Duration::from_millis(audit.retry_max_ms),
+        retry_max: audit.retry_max.get(),
         source_id: if audit.source_id.is_empty() {
             system_id.to_owned()
         } else {

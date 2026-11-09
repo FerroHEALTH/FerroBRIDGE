@@ -57,9 +57,10 @@ starts (OpenID Connect Discovery 1.0), and each endpoint you write takes the
 place of the discovered one. `config check` never contacts the provider: it
 checks the written keys, and builds the sign-in only when the authorization,
 token and key-set endpoints are all written. `revocation_endpoint` names
-where a sign-out revokes the operator's token (RFC 7009), `ca_file` adds PEM
-trust roots for a provider behind a private certificate authority, and
-`timeout_s` (default `10`) bounds one call to the provider.
+where a sign-out revokes the operator's token (RFC 7009), `tls.trust_roots_file` adds PEM
+trust roots for a provider behind a private certificate authority
+(`tls.client_identity_file` and `tls.min_version` complete the table), and
+`timeout` (default `"10s"`) bounds one call to the provider.
 
 The access token the provider issues is the one the bridge receives, so its
 audience and scopes must be ones the bridge's `[auth]` accepts, the console's
@@ -85,10 +86,10 @@ timeouts:
 | `store` | `"memory"` | `memory` keeps sessions in the console's process; `sealed` keeps each in one encrypted cookie |
 | `key`, `key_file` | none | The sealing key of a `sealed` store: base64 of at least 64 bytes, the same on every replica; refused beside `memory` |
 | `secure_cookie` | `true` | Cookies carry `Secure` and the `__Host-` prefix; `false` only for a console on `http` loopback |
-| `sign_in_timeout_s` | `300` | How long a started sign-in waits for the provider |
+| `sign_in_timeout` | `"5min"` | How long a started sign-in waits for the provider |
 | `max_sign_ins` | `1000` | Pending sign-ins a `memory` store holds; a new one drops the oldest |
-| `idle_timeout_s` | `1800` | How long a session lives without activity |
-| `absolute_timeout_s` | `43200` | How long a session lives from its sign-in; at least `idle_timeout_s` |
+| `idle_timeout` | `"30min"` | How long a session lives without activity |
+| `absolute_timeout` | `"12h"` | How long a session lives from its sign-in; at least `idle_timeout` |
 | `max_sessions` | `10000` | Sessions a `memory` store holds; a sign-in past it is refused |
 
 A `memory` store loses its sessions on a restart, so every operator signs in

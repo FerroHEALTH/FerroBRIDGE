@@ -61,7 +61,7 @@ impl Sides {
                 "audiences = [\"{audience}\"]\n",
                 "indicators = [\"{audience}\"]\n",
                 "[cdr.onward.keys]\n",
-                "max_onward_lifetime = 3600\n",
+                "max_onward_lifetime = \"1h\"\n",
             ),
             issuer = patients.uri(),
             audience = CDR_AUDIENCE,

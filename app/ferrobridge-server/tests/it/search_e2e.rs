@@ -399,8 +399,8 @@ fn app(facade: &Arc<Facade>) -> Router {
     ferrobridge_server::router(
         Arc::new(state),
         &ferrohealth_server::section::ServerSection {
-            body_limit_bytes: 1024 * 1024,
-            request_timeout_ms: 30_000,
+            body_limit: ferrohealth_config::units::ByteSize::from_bytes(1024 * 1024),
+            request_timeout: ferrohealth_config::units::Duration::from_millis(30_000),
             ..crate::support::settings()
         },
     )

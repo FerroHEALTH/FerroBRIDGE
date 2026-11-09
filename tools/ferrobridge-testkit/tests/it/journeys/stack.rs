@@ -476,7 +476,7 @@ async fn bridge(
         )
     });
     let text = format!(
-        "[cdr]\nbase_url = \"{cdr}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n\
+        "[cdr]\nbase_url = \"{cdr}/\"\ntimeout = \"2s\"\n\n[cdr.retry]\nmax_attempts = 1\n\n\
          [mappings]\ndirectory = {mappings}\ntemplates = {templates}\n\n\
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
@@ -631,10 +631,10 @@ async fn events_lane(cdr: &MockServer, tree: &Path) -> Result<String, Box<dyn Er
         .port();
     Ok(format!(
         "\n[change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\n\
-         poll_interval_ms = 200\nbackoff_ms = 200\nmax_backoff_ms = 1000\ndead_letters = {store}\n\n\
+         poll_interval = \"200ms\"\nbackoff = \"200ms\"\nmax_backoff = \"1s\"\ndead_letters = {store}\n\n\
          [events]\nenabled = true\nreader = \"{EVENTS_READER}\"\n\
          url = \"amqp://127.0.0.1:{closed}/%2f\"\nexchange = \"ferroehr.events\"\n\
-         confirm_timeout_ms = 500\n\
+         confirm_timeout = \"500ms\"\n\
          queues = [{{ name = \"ferroehr.events.analytics\", binding = \"COMPOSITION.*.*\" }}]\n",
         uri = cdr.uri(),
         store = toml::Value::String(store.display().to_string()),

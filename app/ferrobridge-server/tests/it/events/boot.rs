@@ -35,8 +35,8 @@ fn settings(
     let text = format!(
         "[usage_report]\nenabled = false\n\n\
          [cdr]\nbase_url = \"{uri}/v1\"\n\n\
-         [change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\npoll_interval_ms = 10\nbackoff_ms = 10\nmax_backoff_ms = 20\ndead_letters = \"{dead_letters}\"\n\n\
-         [events]\nenabled = true\nreader = \"ferrobridge-test\"\nurl = \"amqp://guest:guest@127.0.0.1:{broker_port}/%2f\"\nexchange = \"ferrobridge.test.events\"\nconfirm_timeout_ms = 500\n",
+         [change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\npoll_interval = \"10ms\"\nbackoff = \"10ms\"\nmax_backoff = \"20ms\"\ndead_letters = \"{dead_letters}\"\n\n\
+         [events]\nenabled = true\nreader = \"ferrobridge-test\"\nurl = \"amqp://guest:guest@127.0.0.1:{broker_port}/%2f\"\nexchange = \"ferrobridge.test.events\"\nconfirm_timeout = \"500ms\"\n",
         uri = cdr.uri(),
         dead_letters = store.path().join("dead-letters.redb").display(),
     );

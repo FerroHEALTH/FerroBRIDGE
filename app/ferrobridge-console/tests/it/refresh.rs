@@ -204,7 +204,7 @@ async fn the_absolute_timeout_ends_a_session_whatever_its_refresh_token()
     const IDLE: u32 = 3;
     let time = ManualClock::new(START);
     let (provider, state, service, cookie) = due_session_on(
-        &format!("idle_timeout_s = {IDLE}\nabsolute_timeout_s = 8"),
+        &format!("idle_timeout = \"{IDLE}s\"\nabsolute_timeout = \"8s\""),
         time.clock(),
     )
     .await?;

@@ -6,8 +6,6 @@
 //!
 //! No specification governs the lane: our own design.
 
-use std::time::Duration;
-
 use super::Config;
 use super::credentials::Upstream;
 use super::credentials::resolve_credentials;
@@ -84,9 +82,9 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             value: base.to_string(),
         });
     }
-    if section.timeout_ms == 0 {
+    if section.timeout.is_zero() {
         return Err(Error::Bound {
-            key: String::from("fhir_outbound.timeout_ms"),
+            key: String::from("fhir_outbound.timeout"),
             value: 0,
             reason: "a delivery waits at least one millisecond",
         });
@@ -105,12 +103,11 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
         }
         None => Credentials::None,
     };
-    let sink = Sink::new(base, Duration::from_millis(section.timeout_ms), credentials).map_err(
-        |source| Error::Client {
+    let sink =
+        Sink::new(base, section.timeout.get(), credentials).map_err(|source| Error::Client {
             upstream: "fhir_outbound",
             source: Box::new(source),
-        },
-    )?;
+        })?;
     Ok(Some(Settings {
         reader,
         sink,

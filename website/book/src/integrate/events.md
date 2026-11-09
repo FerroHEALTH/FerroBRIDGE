@@ -71,7 +71,7 @@ shows it read-only in the running configuration.
   source, which gives no order across EHRs when instants tie
   ([the AQL source's limits](change-feed.md)).
 - **No event is dropped.** A broker that is down, a broker that refuses a
-  message, a confirm that does not arrive within `confirm_timeout_ms`, and a
+  message, a confirm that does not arrive within `confirm_timeout`, and a
   CDR that refuses the feed each stop the lane where it is: the events wait at
   the source, the `events` health indicator reports `degraded`, and readiness
   stays up, since nothing else the server serves depends on the lane.

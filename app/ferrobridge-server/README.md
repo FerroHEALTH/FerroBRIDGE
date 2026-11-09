@@ -110,7 +110,7 @@ header cannot forge a log line.
 
 ## Stopping
 
-`SIGTERM` and `SIGINT` start a drain bounded by `[server] shutdown_timeout_ms`.
+`SIGTERM` and `SIGINT` start a drain bounded by `[server] shutdown_timeout`.
 A request in flight finishes; a connection still open when the drain elapses is
 dropped.
 

@@ -122,7 +122,7 @@ impl Grant {
                 "audiences = [\"{audience}\"]\n",
                 "{target}\n",
                 "[cdr.credentials.onward.keys]\n",
-                "max_onward_lifetime = 3600\n",
+                "max_onward_lifetime = \"1h\"\n",
                 "{keys}",
             ),
             issuer = issuer,

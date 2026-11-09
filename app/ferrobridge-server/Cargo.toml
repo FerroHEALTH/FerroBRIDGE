@@ -50,7 +50,7 @@ http.workspace = true
 jiff.workspace = true
 # The SMART resource server in front of the facade and the operator API, and
 # the client credentials token of the CDR and terminology lanes.
-ferrohealth-smart = { workspace = true, features = ["axum"] }
+ferrohealth-smart = { workspace = true, features = ["axum", "server-tls"] }
 # The family's process plumbing (FerroSYS): the configuration loader and its
 # secrets, the health registry, the stack around the routes with the listener,
 # the drain and the three common subcommands, the console and request log, and
@@ -58,7 +58,7 @@ ferrohealth-smart = { workspace = true, features = ["axum"] }
 ferrohealth-config.workspace = true
 ferrohealth-health = { workspace = true, features = ["registry"] }
 ferrohealth-secret.workspace = true
-ferrohealth-server.workspace = true
+ferrohealth-server = { workspace = true, features = ["otlp"] }
 ferrohealth-telemetry = { workspace = true, features = ["axum"] }
 ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
 # The facade's access record (EHDS Annex II 3.2) and its BALP `AuditEvent`,

@@ -64,9 +64,9 @@ from the file `tls.key_file` names.
 | `unmapped_entries` | `skip_and_count` | What an entry no program maps does: `skip_and_count` commits the others, `refuse` refuses the message |
 | `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
 | `profiles` | `[]` | A list of `{ resource_type, profile }`: the profile a resource of that type claims in `meta.profile` when the guide's maps wrote none |
-| `idle_timeout_ms` | `300000` | How long a connection may sit between messages before it is closed; `0` keeps it open |
-| `frame_timeout_ms` | `30000` | How long one message may take from its first byte to its trailer before it is answered `AR`; `0` waits |
-| `frame_limit_bytes` | `1048576` | The largest message one frame may carry |
+| `idle_timeout` | `"5min"` | How long a connection may sit between messages before it is closed; `"0s"` keeps it open |
+| `frame_timeout` | `"30s"` | How long one message may take from its first byte to its trailer before it is answered `AR`; `"0s"` waits |
+| `frame_limit` | `"1MiB"` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes of the run, by kind, at debug level |
 | `senders` | none, required | The sending facilities (MSH-4) the face accepts, at least one, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3) with `certificate_subject = "..."`, the DNS name its client certificate carries in its subject alternative name; a facility a composition names is one of them too. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
 
@@ -85,7 +85,7 @@ sender cannot send as another. The bridge refuses to start without the
 ## What happens to one message
 
 1. The listener reads one MLLP Release 1 frame. A frame that is malformed,
-   larger than `frame_limit_bytes`, or not complete within `frame_timeout_ms`
+   larger than `frame_limit`, or not complete within `frame_timeout`
    is answered `AR` when a header can be read from it, and the connection
    closes.
 2. The message is decoded in the character set its MSH-18 names, split by
@@ -352,7 +352,7 @@ naming the HL7 v2 face as another inbound path under the same identity and
 replay rules, only when the face is configured. On `SIGTERM`
 the listener stops accepting, every message in flight is mapped, committed and
 acknowledged, and the connection closes, within the same
-`[server] shutdown_timeout_ms` as the HTTP drain.
+`[server] shutdown_timeout` as the HTTP drain.
 
 ## Limits
 

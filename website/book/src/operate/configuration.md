@@ -69,22 +69,22 @@ The section is the FerroHEALTH family's (`ferrohealth-server`).
 |---|---|---|
 | `listen` | `127.0.0.1:8080` | The socket address to bind |
 | `base_path` | empty | The path every route is served under: empty, or starting with `/` and not ending with one |
-| `request_timeout_ms` | `30000` | How long one request may take before the server answers `408` (`504` under `/fhir`) |
-| `header_read_timeout_ms` | `30000` | How long a client may take to send a request head, counted from accept or from the first byte of each later head on a kept-alive connection; a client that has not sent one by then, one that sent nothing included, is disconnected |
-| `idle_timeout_ms` | `120000` | How long a kept-alive HTTP/1.1 connection may wait for its next request before the server closes it with a clean end of stream |
-| `body_limit_bytes` | `1048576` | The largest request body read before the server answers `413` |
-| `drain_delay_ms` | `0` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
-| `shutdown_timeout_ms` | `10000` | How long the requests in flight may take once the listener closed |
+| `request_timeout` | `"30s"` | How long one request may take before the server answers `408` (`504` under `/fhir`) |
+| `header_read_timeout` | `"30s"` | How long a client may take to send a request head, counted from accept or from the first byte of each later head on a kept-alive connection; a client that has not sent one by then, one that sent nothing included, is disconnected |
+| `idle_timeout` | `"2min"` | How long a kept-alive HTTP/1.1 connection may wait for its next request before the server closes it with a clean end of stream |
+| `body_limit` | `"1MiB"` | The largest request body read before the server answers `413` |
+| `drain_delay` | `"0s"` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
+| `shutdown_timeout` | `"10s"` | How long the requests in flight may take once the listener closed |
 | `max_concurrent_requests` | unset | How many requests the server serves at once; past it a request is answered `503` with `Retry-After`, and the health routes are never refused |
-| `retry_after_s` | `1` | The seconds a refused request is told to wait |
+| `retry_after` | `"1s"` | The seconds a refused request is told to wait |
 | `trusted_proxies` | `[]` | The reverse proxies, each an address or a CIDR block, whose forwarded client address is believed |
 | `forwarded_header` | `forwarded` | The header a trusted proxy names the client in: `forwarded` or `x-forwarded-for` |
 | `compression` | `true` | Whether a response is compressed with gzip or Brotli when the client accepts one |
-| `compression_min_bytes` | `1024` | The smallest response body that is compressed |
+| `compression_min_size` | `"1KiB"` | The smallest response body that is compressed |
 
 `[server.tls]` serves the listener over TLS: `certificate_file` and
 `key_file` (PEM), `client_auth` (`none`, `optional` or `required`) with
-`client_ca_file`, `reload_interval_s` (unset, only `SIGHUP` reads the files
+`client_ca_file`, `reload_interval` (unset, only `SIGHUP` reads the files
 again), `healthcheck_identity_file` for `ferrobridge healthcheck` against a
 listener that asks a client certificate, and `min_version` (`"1.3"` unless
 lowered to `"1.2"`). Without it the listener speaks plain HTTP behind a proxy
@@ -100,13 +100,28 @@ caller's rate; bound the server with `max_concurrent_requests`.
 | `logged_query_parameters` | `[]` | The query parameter names whose values may reach the request log, each value cut at 64 characters |
 | `environment` | unset | The deployment environment, such as `production` |
 
-The section is the FerroHEALTH family's (`ferrohealth-telemetry`). This build
-exports no traces and no metrics, so a `[telemetry.otlp]` table refuses the
-start.
+The section is the FerroHEALTH family's (`ferrohealth-telemetry`).
 
 Nothing else about a request is logged. Add a name to
 `logged_query_parameters` only for a parameter you know carries no identifying
 content.
+
+`[telemetry.otlp]` exports the traces and the metrics to an OpenTelemetry
+collector over OTLP/gRPC:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `endpoint` | none | The collector's OTLP/gRPC endpoint; `https://` speaks TLS, and the value is masked in `config check` |
+| `traces` | `true` | Whether the spans are exported |
+| `metrics` | `true` | Whether the metrics are pushed |
+| `sample_ratio` | `1.0` | The share of the traces that are sampled |
+| `tls.trust_roots_file` | unset | A PEM bundle of trust roots beside the platform's |
+| `tls.client_identity_file` | unset | The client certificate chain and its key in one PEM, for mutual TLS (or `tls.client_identity` inline) |
+| `tls.min_version` | `"1.3"` | The oldest TLS version spoken; `"1.2"` lowers it |
+
+The bridge reads `tls` with the family's outbound TLS reader and dials an
+`https://` collector through the platform verifier with those roots beside
+it. TLS material beside an endpoint that is not `https://` refuses the start.
 
 ### The console
 
@@ -182,7 +197,7 @@ server says so once at start-up, naming the section and never a value.
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
 | `base_url` | none, required | | The openEHR REST API root, usually ending in `/v1` |
-| `timeout_ms` | `30000` | | How long one call may take, connection included |
+| `timeout` | `"30s"` | | How long one call may take, connection included |
 | `demographic` | `false` | | Whether the bridge reaches the CDR's ITS-REST 1.1.0 Demographic API, which the release marks `x-status: DEVELOPMENT` |
 
 ### `[cdr.retry]` and `[terminology.retry]`
@@ -190,15 +205,15 @@ server says so once at start-up, naming the section and never a value.
 | Key | Default | Meaning |
 |---|---|---|
 | `max_attempts` | `3` | How many times a call is sent at most, the first try included; `1` disables retry |
-| `initial_backoff_ms` | `200` | The delay before the second attempt |
-| `max_backoff_ms` | `5000` | The ceiling every later delay is clamped to |
+| `initial_backoff` | `"200ms"` | The delay before the second attempt |
+| `max_backoff` | `"5s"` | The ceiling every later delay is clamped to |
 
 For the CDR, the bridge calls through the generated ITS-REST client of the
 `openehr-its` crate, and the three keys are that client's retry budget. Only a
 `GET`, `PUT` or `DELETE` is sent again, after a failure to connect, a
 timeout, or a `5xx` other than `501`; a `POST` is sent once. A `401`, a `403`
 and a status the operation does not document are never retried.
-`[cdr] timeout_ms` is the per-request timeout of the client's HTTP engine.
+`[cdr] timeout` is the per-request timeout of the client's HTTP engine.
 
 `[cdr] demographic` turns on the client of the ITS-REST 1.1.0 Demographic API,
 DEVELOPMENT: the reads, creates, updates and deletes of `PERSON`,
@@ -263,8 +278,9 @@ SMART tokens on writes, takes the same arrangement under
 | `scope` | none | | The `scope` parameter, space-delimited scope tokens (RFC 6749 §3.3); empty sends none |
 | `audience` | none | | An `audience` parameter, for an authorization server that reads one; no specification defines it for this grant |
 | `resource` | none | | The `resource` parameter, an absolute URI with no fragment (RFC 8707 §2) |
-| `refresh_margin_ms` | `30000` | | How long before the token expires a new one is fetched |
-| `timeout_ms` | `10000` | | How long one call to the authorization server may take |
+| `refresh_margin` | `"30s"` | | How long before the token expires a new one is fetched |
+| `timeout` | `"10s"` | | How long one call to the authorization server may take |
+| `tls.trust_roots_file`, `tls.client_identity_file`, `tls.min_version` | none, none, `"1.3"` | | The TLS to the authorization server: trust roots beside the platform's, the client certificate chain and key in one PEM for mutual TLS (or `tls.client_identity` inline), and the oldest TLS version spoken |
 
 Set exactly one of `token_endpoint` and `issuer`; both, or neither, is a boot
 error. With an `issuer`, the bridge reads the RFC 8414 metadata at
@@ -274,7 +290,7 @@ by `/.well-known/openid-configuration`. The document's `issuer` must equal
 the configured value exactly, or no token is requested (RFC 8414 §3.3).
 
 The bridge fetches the token on the first call to that upstream, not at boot,
-and every call to it shares it. It fetches a new one `refresh_margin_ms` before `expires_in`
+and every call to it shares it. It fetches a new one `refresh_margin` before `expires_in`
 runs out; the margin is capped at half the token's lifetime, so a short-lived
 token is still reused. A token without `expires_in` is reused until the
 upstream refuses it. Calls that find no usable token at the same time share
@@ -345,7 +361,7 @@ The issuer's `profile` picks the grant:
 | `indicators` | none | The `resource` or `audience` values the exchange names the CDR by |
 | `scope` | none | The `scope` the request names; the on-behalf-of grant requires it |
 | `correlation_claim` | none | The claim a chained `federation` route carries from the caller's token to the onward one |
-| `keys` | none | The profile keys over the preset; `max_onward_lifetime`, in seconds, is required |
+| `keys` | none | The profile keys over the preset; `max_onward_lifetime`, a duration such as `"1h"`, is required |
 | `cache` | `true` | `false` holds no onward token, so every CDR call exchanges one at the issuer, with a warning logged at start; a setting for a performance measurement, never for production |
 | `actor_assertion` | `false` | `true` names the bridge's client as the actor of every exchange it sends without an actor token, with an assertion signed by the `oauth` table's key (RFC 8693 §2.1); a lane with no assertion key, or under the JWT bearer grant, is refused at start |
 
@@ -360,7 +376,7 @@ grant with no `user/` or `system/` one, and carry the caller's `patient`
 launch context unchanged. Unless
 `cache = false`, the bridge caches the token under the caller's token and the
 target until
-`refresh_margin_ms` before the earlier of its own and the caller's token's
+`refresh_margin` before the earlier of its own and the caller's token's
 expiry, and checks it again on every use. The caller's token appears in no
 log, span or metric.
 
@@ -460,7 +476,7 @@ with no display keeps its code as the value.
 |---|---|---|
 | `base_url` | none, required | The FHIR service base URL |
 | `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
-| `timeout_ms` | `30000` | How long one call may take, connection included |
+| `timeout` | `"30s"` | How long one call may take, connection included |
 | `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT` or `DV_TEXT`, `false` refuses the resource. A failed call refuses either way |
 
 As an environment variable, `display_fallback` reads
@@ -758,7 +774,7 @@ FerroBRIDGE's own design.
 |---|---|---|
 | `fetch_bases` | `[]` | The FHIR service bases an absolute reference may be fetched from, each an `http` or `https` URL with no query or fragment |
 | `max_depth` | `2` | How many levels of references are followed: the request's own, then those of each resolved resource; `0` resolves none |
-| `timeout_ms` | `10000` | How long one fetch from a listed base may take, connection included |
+| `timeout` | `"10s"` | How long one fetch from a listed base may take, connection included |
 
 Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
 `fetch_bases` takes a TOML array:
@@ -890,7 +906,7 @@ sends and what each refusal looks like.
 | `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient`; each is one SMART App Launch 2.2.0 (Conformance, Capabilities) defines, or a full URI. `sso-openid-connect` also writes the issuer's `issuer`, which the document omits otherwise (Conformance, Metadata) |
 | `scopes_supported` | `[]` | The scopes the discovery document lists as `scopes_supported`; list only scopes the bridge honours, because "the server SHALL support all scopes listed here" (SMART App Launch 2.2.0, Conformance, Metadata). Empty omits the member |
 | `product_scope` | `__ferrobridge.operator` | The operator scope: it guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
-| `ca_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and for an issuer with `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start |
+| `tls.trust_roots_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and for an issuer with `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start. `tls.client_identity_file` and `tls.min_version` (`"1.3"` unless lowered to `"1.2"`) complete the table |
 
 Each trusted authorization server is one `[[auth.issuer]]` table, and every
 setting of an issuer lives on its table:
@@ -903,11 +919,11 @@ setting of an issuer lives on its table:
 | `first_party_clients` | `[]` | The deployment's own clients: a person's token of a `persons` issuer is admitted only through one of these or a declared delegate, so list the clients your clinicians and operators sign in with, the operator console's included |
 | `audience` | none, required | The audiences, a list, of which every token's `aud` must contain one, normally the facade's `base_url` (RFC 9068 §4) |
 | `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use; a symmetric `HS*` algorithm is refused and `none` is no algorithm |
-| `clock_skew_seconds` | `60` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
-| `jwks_max_age_seconds` | `600` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
-| `jwks_refresh_interval_seconds` | `60` | The shortest time between two reads of the key set that a token naming an unknown `kid`, or a failed read, triggers |
+| `clock_skew` | `"1min"` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
+| `jwks_max_age` | `"10min"` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
+| `jwks_refresh_interval` | `"1min"` | The shortest time between two reads of the key set that a token naming an unknown `kid`, or a failed read, triggers |
 | `jwks_file` | none | A JWK Set file handed over out of band, read in place of the issuer's `jwks_uri`; the issuer's metadata is then not read |
-| `timeout_ms` | `10000` | How long one call to the authorization server may take |
+| `timeout` | `"10s"` | How long one call to the authorization server may take |
 | `role_claims` | `["roles", "groups", "entitlements"]` | The claims this issuer's roles are read from, each a dotted path into the token's JSON (the default is the three RFC 9068 §2.2.3.1 names). A path with an empty step or with whitespace refuses the start. The bridge grants nothing by role: no route it guards asks for one, so the roles a token carries change no answer |
 | `mode` | `jwt` | `jwt` checks JWT access tokens against the issuer's key set; `introspection` asks the issuer's introspection endpoint |
 
@@ -952,8 +968,8 @@ SMART `user/` scopes and the operator scope the person is granted, which the
 facade checks as it checks a token's. A user listing a `system/` scope
 refuses the start, naming the user and the scope. A user's `roles` list is
 accepted and, as with `role_claims`, grants nothing on the bridge. `[auth.basic]
-cache_ttl_seconds` (default `300`) is how long a password that verified is
-remembered, so a repeat request skips the Argon2id derivation; `0`
+cache_ttl` (default `"5min"`) is how long a password that verified is
+remembered, so a repeat request skips the Argon2id derivation; `"0s"`
 remembers none.
 
 ```toml
@@ -976,10 +992,10 @@ on a `404` at the issuer followed by `/.well-known/openid-configuration`, and
 the key set its `jwks_uri` names. Metadata naming another issuer, metadata
 without a `jwks_uri`, a first issuer without a `token_endpoint`, and a key
 set that cannot be read each refuse the start. A key set older than
-`jwks_max_age_seconds` is read again before a token is checked against it. A
+`jwks_max_age` is read again before a token is checked against it. A
 token whose `kid` the key set does not hold makes the server read the key set
 once more, which is how a key rotation arrives, and never more often than
-`jwks_refresh_interval_seconds`.
+`jwks_refresh_interval`.
 
 An authorization server whose access tokens are opaque, so the bridge cannot
 check them against a key set, is checked by OAuth 2.0 Token Introspection
@@ -990,7 +1006,7 @@ the answer is `active: true` with `scope`, `client_id` and `exp` (SMART App
 Launch 2.2.0, Token Introspection), checks an `iss` and an `aud` the answer
 carries against `issuer` and `audience`, and reads the scopes and the
 `patient` launch context as it reads a JWT's. An answer is held until its
-`exp` and never longer than `cache_max_age_seconds`, so a revoked token
+`exp` and never longer than `cache_max_age`, so a revoked token
 passes for at most that long. An inactive token is refused with `401`; an
 endpoint that fails answers `503`. An introspected issuer takes no
 `jwks_file`, and sits beside issuers checked by their key sets.
@@ -998,9 +1014,9 @@ endpoint that fails answers `503`. An introspected issuer takes no
 | Key | Default | Meaning |
 |---|---|---|
 | `introspection.endpoint` | the metadata's | The introspection endpoint, an `https` URL, when the issuer's metadata names none or another |
-| `introspection.cache_max_age_seconds` | `60` | The longest an active answer is used before the endpoint is asked again; `0` asks on every request |
+| `introspection.cache_max_age` | `"1min"` | The longest an active answer is used before the endpoint is asked again; `"0s"` asks on every request |
 | `introspection.cache_capacity` | `10000` | The most answers held at once |
-| `introspection.client` | none | The bridge's client authentication at the endpoint: the keys of [`[cdr.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth) (`client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`, the TLS files); `issuer` defaults to the table's |
+| `introspection.client` | none | The bridge's client authentication at the endpoint: the keys of [`[cdr.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth) (`client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`, `tls`); `issuer` defaults to the table's |
 | `introspection.bearer` | none | Instead of `client`: a client credentials grant, in the same keys, whose token the bridge sends as `Authorization: Bearer`, the form SMART App Launch 2.2.0 has an EHR accept |
 
 ```toml
@@ -1012,22 +1028,16 @@ first_party_clients = ["clinic-portal"]
 mode = "introspection"
 
 [auth.issuer.introspection]
-cache_max_age_seconds = 30
+cache_max_age = "30s"
 
 [auth.issuer.introspection.client]
 client_id = "ferrobridge-rs"
 client_secret_file = "/run/secrets/introspection-secret"
 ```
 
-The shapes earlier releases took fail `config check` naming their
-replacement: the flat `[auth] issuer = "…"`, an issuer setting at section
-level (`audience`, `algorithms`, `clock_skew_seconds`, the `jwks_*` keys,
-`timeout_ms`, `mode`, `introspection`, `role_claims`), `token_profile`, and a
-`scopeless_subjects` entry written as a string.
-
 The `[[auth.issuer]]` tables live in the configuration file: an environment
-variable sets one key, and `FERROBRIDGE__AUTH__ISSUER` set to a URL is the
-removed flat form. The section's own keys read from the environment, such as
+variable sets one key, and `FERROBRIDGE__AUTH__ISSUER` set to a URL is refused,
+since `issuer` is a list of tables. The section's own keys read from the environment, such as
 `FERROBRIDGE__AUTH__ENABLED` and `FERROBRIDGE__AUTH__PRODUCT_SCOPE`.
 Apart from the Basic users' hashes and the introspection credential the
 section holds no secret: the resource server checks signatures with the
@@ -1050,9 +1060,9 @@ it answers.
 | `unmapped_entries` | `skip_and_count` | `skip_and_count` or `refuse`, for an entry no program maps |
 | `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
 | `profiles` | `[]` | `{ resource_type, profile }` pairs: the profile a resource of that R4 type claims when the guide wrote none |
-| `idle_timeout_ms` | `300000` | How long a connection may sit between messages; `0` keeps it open |
-| `frame_timeout_ms` | `30000` | How long one frame may take to arrive whole; `0` waits |
-| `frame_limit_bytes` | `1048576` | The largest message one frame may carry |
+| `idle_timeout` | `"5min"` | How long a connection may sit between messages; `"0s"` keeps it open |
+| `frame_timeout` | `"30s"` | How long one frame may take to arrive whole; `"0s"` waits |
+| `frame_limit` | `"1MiB"` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes by kind at debug level |
 | `senders` | none, required | The MSH-4 sending facilities accepted, at least one: `{ namespace_id }` or `{ universal_id, universal_id_type }`, each with its `certificate_subject` and an optional `origin = "device"` with its `device_identifier_issuer` |
 | `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none, required | The PEM chain and key the MLLP listener serves over TLS, and the authorities a sender's client certificate must chain to |
@@ -1081,12 +1091,12 @@ specification governs the change feed: it is FerroBRIDGE's own design.
 | `dead_letters` | none, required | The `redb` file the consumers park a poisoned event in and count its poisoned passes in; keep it beside `watermarks` |
 | `max_attempts` | `5` | How many passes an event may fail with a poisoned failure before it is parked, 1 to 1000 |
 | `page_size` | `100` | How many events one read asks for, 1 to 1000 |
-| `poll_interval_ms` | `1000` | How long a consumer waits after a read that found no full page |
-| `backoff_ms` | `1000` | How long a consumer waits after its first failed read, doubled per failure |
-| `max_backoff_ms` | `60000` | The longest wait after a failed read, at least `backoff_ms` |
+| `poll_interval` | `"1s"` | How long a consumer waits after a read that found no full page |
+| `backoff` | `"1s"` | How long a consumer waits after its first failed read, doubled per failure |
+| `max_backoff` | `"1min"` | The longest wait after a failed read, at least `backoff` |
 
 A missing `dead_letters`, an unknown `source`, a `start` that names no
-instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `0`,
+instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `"0s"`,
 and a `url` that is no http or https base without a query or a fragment are
 each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
@@ -1107,12 +1117,12 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `url` | none, required | Secret. The AMQP 0.9.1 broker URL, `amqp://` or `amqps://` |
 | `tls` | `false` | Whether an `amqp://` URL is upgraded to `amqps://` |
 | `exchange` | none, required | The durable topic exchange the events are published to |
-| `confirm_timeout_ms` | `30000` | How long one publish waits for the broker's confirm |
+| `confirm_timeout` | `"30s"` | How long one publish waits for the broker's confirm |
 | `queues` | `[]` | `{ name, binding }` pairs: the durable queues declared and bound to the exchange with each topic binding key |
 
 A missing `reader`, `url` or `exchange`, a reader name outside its alphabet,
 a URL that is not `amqp://` or `amqps://` (the refusal never repeats the URL,
-which may carry a password), a `confirm_timeout_ms` of `0`, and a queue named
+which may carry a password), a `confirm_timeout` of `"0s"`, and a queue named
 twice or with no binding are each a boot error naming the key. Over
 `[change_feed] source = "ferroehr"`, a CDR that answers `404` for the reader
 refuses the start.
@@ -1134,13 +1144,13 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `reader` | none, required | The reader name the lane follows the change feed under, another than `[events] reader` and `[omop_incremental] reader`: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
 | `base_url` | none, required | The FHIR service base each Bundle is posted to, `https` without a query or a fragment, never the facade's own `base_url` |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `timeout_ms` | `30000` | How long one delivery may take |
+| `timeout` | `"30s"` | How long one delivery may take |
 | `emitted` | none, required | The `redb` file the record of what was delivered for each composition is kept in, identifiers only |
 | `credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.credentials.oauth]`, the same table `[cdr.credentials]` takes |
 
 A missing `reader`, `base_url` or `emitted`, a reader name outside its
 alphabet or another consumer's, an `http` base without `cleartext`, the
-facade's own base, a `timeout_ms` of `0`, and the lane without the change
+facade's own base, a `timeout` of `"0s"`, and the lane without the change
 feed or the facade are each a boot error naming the key. A record file that
 cannot be opened refuses the start.
 
@@ -1183,12 +1193,12 @@ FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the facade and the HL7 v2 face record their accesses |
 | `base_url` | none, required | The repository's FHIR base; each record is created as `[base]/AuditEvent` |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `timeout_ms` | `10000` | How long one delivery to the repository may take |
-| `retry_max_ms` | `60000` | The longest wait between two delivery attempts |
+| `timeout` | `"10s"` | How long one delivery to the repository may take |
+| `retry_max` | `"1min"` | The longest wait between two delivery attempts |
 | `spool_dir` | none, required | The directory records wait in until the repository takes them; created when absent, and refused when its group or other users can reach it |
 | `max_records` | `10000` | The most records the spool holds at once |
-| `max_bytes` | `67108864` | The most bytes the spool holds at once |
-| `write_timeout_ms` | `2000` | The longest storing one record may take |
+| `max_size` | `"64MiB"` | The most bytes the spool holds at once |
+| `write_timeout` | `"2s"` | The longest storing one record may take |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
 | `credentials` | none | `user` with `password` or `password_file`, or `[audit.credentials.oauth]`, the same table `[cdr.credentials]` takes |
@@ -1279,7 +1289,7 @@ are refused:
 - an unknown key or an unknown section;
 - a value of the wrong type, or one that is not a socket address, a URL, a
   release name or a `tracing` filter;
-- `[server.caller_rate]`, and `[telemetry.otlp]` in this build;
+- `[server.caller_rate]`;
 - a user beside the OAuth section of the same credentials section, an OAuth
   section with both an `issuer` and a `token_endpoint` or neither, an
   `issuer` that is not an `https` URL free of a query and a fragment, a

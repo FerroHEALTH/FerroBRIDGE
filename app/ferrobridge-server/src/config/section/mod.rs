@@ -4,6 +4,7 @@
 //! The file tree: one struct per TOML section, each refusing an unknown key
 //! and holding its defaults in its own `Default` impl.
 
+use ferrohealth_config::units::{ByteSize, Duration};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -70,12 +71,12 @@ pub struct Hl7v2 {
     pub profiles: Vec<Hl7v2Profile>,
     /// How long a connection may sit between frames before it is closed; `0`
     /// never closes it.
-    pub idle_timeout_ms: u64,
+    pub idle_timeout: Duration,
     /// How long one frame may take from its first byte to its trailer before
     /// it is answered `AR`; `0` waits for the trailer.
-    pub frame_timeout_ms: u64,
+    pub frame_timeout: Duration,
     /// The largest message one frame may carry, in bytes.
-    pub frame_limit_bytes: usize,
+    pub frame_limit: ByteSize,
     /// Whether an `AE` or an `AR` also logs, at debug level, the counted
     /// outcomes of the run by kind.
     pub log_outcomes: bool,
@@ -111,9 +112,9 @@ impl Default for Hl7v2 {
             unmapped_entries: String::from("skip_and_count"),
             ehr_policy: None,
             profiles: Vec::new(),
-            idle_timeout_ms: 300_000,
-            frame_timeout_ms: 30_000,
-            frame_limit_bytes: 1024 * 1024,
+            idle_timeout: Duration::from_secs(300),
+            frame_timeout: Duration::from_secs(30),
+            frame_limit: ByteSize::from_mib(1),
             log_outcomes: false,
             senders: Vec::new(),
             tls: Hl7v2Tls::default(),
@@ -214,7 +215,7 @@ pub struct Cdr {
     /// The openEHR REST API root, the path `/ehr` and `/query` live under.
     pub base_url: String,
     /// How long one call may take, connection included.
-    pub timeout_ms: u64,
+    pub timeout: Duration,
     /// The retry budget for idempotent calls.
     pub retry: Retry,
     /// The credentials the CDR expects.
@@ -231,7 +232,7 @@ impl Default for Cdr {
     fn default() -> Self {
         Self {
             base_url: String::new(),
-            timeout_ms: 30_000,
+            timeout: Duration::from_secs(30),
             retry: Retry::default(),
             credentials: CredentialsSection::default(),
             demographic: false,
@@ -249,7 +250,7 @@ pub struct Terminology {
     /// The release the server answers in: `stu3`, `r4` or `r4b`.
     pub wire_version: String,
     /// How long one call may take, connection included.
-    pub timeout_ms: u64,
+    pub timeout: Duration,
     /// The retry budget.
     pub retry: Retry,
     /// The credentials the server expects.
@@ -264,7 +265,7 @@ impl Default for Terminology {
         Self {
             base_url: String::new(),
             wire_version: String::from("r4"),
-            timeout_ms: 30_000,
+            timeout: Duration::from_secs(30),
             retry: Retry::default(),
             credentials: CredentialsSection::default(),
             display_fallback: false,
@@ -399,17 +400,17 @@ pub struct Retry {
     /// How many times a call is sent at most, the first try included.
     pub max_attempts: u32,
     /// The delay before the second attempt.
-    pub initial_backoff_ms: u64,
+    pub initial_backoff: Duration,
     /// The ceiling every later delay is clamped to.
-    pub max_backoff_ms: u64,
+    pub max_backoff: Duration,
 }
 
 impl Default for Retry {
     fn default() -> Self {
         Self {
             max_attempts: 3,
-            initial_backoff_ms: 200,
-            max_backoff_ms: 5_000,
+            initial_backoff: Duration::from_millis(200),
+            max_backoff: Duration::from_secs(5),
         }
     }
 }

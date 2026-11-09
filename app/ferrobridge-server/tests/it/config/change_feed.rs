@@ -59,16 +59,16 @@ fn every_key_reads_from_the_environment() -> Result<(), Box<dyn std::error::Erro
             String::from("250"),
         ),
         (
-            String::from("FERROBRIDGE__CHANGE_FEED__POLL_INTERVAL_MS"),
-            String::from("5000"),
+            String::from("FERROBRIDGE__CHANGE_FEED__POLL_INTERVAL"),
+            String::from("5s"),
         ),
         (
-            String::from("FERROBRIDGE__CHANGE_FEED__BACKOFF_MS"),
-            String::from("200"),
+            String::from("FERROBRIDGE__CHANGE_FEED__BACKOFF"),
+            String::from("200ms"),
         ),
         (
-            String::from("FERROBRIDGE__CHANGE_FEED__MAX_BACKOFF_MS"),
-            String::from("30000"),
+            String::from("FERROBRIDGE__CHANGE_FEED__MAX_BACKOFF"),
+            String::from("30s"),
         ),
     ]);
     let config = Config::from_sources(None, &environment)?;
@@ -94,9 +94,9 @@ fn every_key_reads_from_the_environment() -> Result<(), Box<dyn std::error::Erro
         (250, 5000, 200, 30_000),
         (
             section.page_size,
-            section.poll_interval_ms,
-            section.backoff_ms,
-            section.max_backoff_ms
+            section.poll_interval.as_millis(),
+            section.backoff.as_millis(),
+            section.max_backoff.as_millis()
         )
     );
     Ok(())
@@ -198,16 +198,16 @@ fn a_page_size_outside_one_to_a_thousand_is_refused() -> Result<(), Box<dyn std:
 fn a_zero_wait_or_a_ceiling_below_the_backoff_is_refused() -> Result<(), Box<dyn std::error::Error>>
 {
     for (keys, refused) in [
-        ("poll_interval_ms = 0\n", "change_feed.poll_interval_ms"),
-        ("backoff_ms = 0\n", "change_feed.backoff_ms"),
+        ("poll_interval = \"0s\"\n", "change_feed.poll_interval"),
+        ("backoff = \"0s\"\n", "change_feed.backoff"),
         (
-            "backoff_ms = 5000\nmax_backoff_ms = 1000\n",
-            "change_feed.max_backoff_ms",
+            "backoff = \"5s\"\nmax_backoff = \"1s\"\n",
+            "change_feed.max_backoff",
         ),
     ] {
         let error = refused_with(&format!("watermarks = \"/tmp/feed.redb\"\n{keys}"))?;
         assert!(
-            matches!(&error, Error::Bound { key, .. } if key == refused),
+            matches!(&error, Error::Bound { key, .. } | Error::Span { key, .. } if key == refused),
             "{keys}: {error:?}"
         );
     }

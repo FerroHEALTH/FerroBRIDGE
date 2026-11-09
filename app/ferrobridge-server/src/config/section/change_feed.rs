@@ -7,6 +7,7 @@
 //! off until `enabled` is set, and a consumer section names the reader it
 //! follows the source under.
 
+use ferrohealth_config::units::Duration;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -35,11 +36,11 @@ pub struct ChangeFeed {
     /// How many events one read asks for, 1 to 1000.
     pub page_size: u64,
     /// How long to wait after a read that found no full page.
-    pub poll_interval_ms: u64,
+    pub poll_interval: Duration,
     /// How long to wait after the first failed pass, doubled per failure.
-    pub backoff_ms: u64,
+    pub backoff: Duration,
     /// The longest wait after a failed pass.
-    pub max_backoff_ms: u64,
+    pub max_backoff: Duration,
 }
 
 impl Default for ChangeFeed {
@@ -53,9 +54,9 @@ impl Default for ChangeFeed {
             max_attempts: 5,
             start: String::from("now"),
             page_size: 100,
-            poll_interval_ms: 1_000,
-            backoff_ms: 1_000,
-            max_backoff_ms: 60_000,
+            poll_interval: Duration::from_secs(1),
+            backoff: Duration::from_secs(1),
+            max_backoff: Duration::from_secs(60),
         }
     }
 }

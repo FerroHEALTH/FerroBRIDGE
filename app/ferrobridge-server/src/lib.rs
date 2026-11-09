@@ -65,7 +65,7 @@ use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::{Drained, ServeError};
 use ferrohealth_server::stack::{self, StackPolicy};
 use ferrohealth_telemetry::request_log::{RequestId, RequestLog};
-use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
+use ferrohealth_telemetry::telemetry::{Console, Service};
 use http::HeaderValue;
 use tokio::net::TcpListener;
 
@@ -147,7 +147,7 @@ async fn dispatch(cli: Cli) -> ExitCode {
         return Box::pin(job.run(settings)).await;
     }
     let service = Service::new("ferrobridge", build_info::VERSION);
-    let telemetry = match Telemetry::new(&settings.telemetry, service) {
+    let telemetry = match ferrohealth_server::telemetry::build(&settings.telemetry, service) {
         Ok(telemetry) => telemetry,
         Err(error) => {
             eprintln!("ferrobridge: cannot start: {}", chain(&error));
@@ -513,7 +513,7 @@ pub fn with_middleware(product: Router, state: Arc<AppState>, server: &ServerSec
     let product = product.layer(axum::middleware::from_fn(correlate));
     let policy = StackPolicy {
         panic_body: panic::body(),
-        refusal_body: facade::edge::body(server.body_limit_bytes, server.request_timeout()),
+        refusal_body: facade::edge::body(server.body_limit_bytes(), server.request_timeout.get()),
         request_log: RequestLog::new(state.logged_query_parameters())
             .with_recorder(state.usage_window().clone()),
     };
@@ -581,7 +581,7 @@ where
         ferrohealth_server::serve::run(listener, app, server, lifecycle, shutdown).await?;
     if drained == Drained::Cut {
         tracing::warn!(
-            drain_ms = server.shutdown_timeout().as_millis(),
+            drain_ms = server.shutdown_timeout.as_millis(),
             "the drain did not finish in time; the remaining connections are dropped"
         );
     }
