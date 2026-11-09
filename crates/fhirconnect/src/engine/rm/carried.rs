@@ -38,8 +38,8 @@ pub enum Carried {
     Family,
     /// A `DV_DATE_TIME` attribute of an entry the Web Template carries no
     /// node for, an `OBSERVATION`'s history origin or an `ACTION`'s time,
-    /// which FLAT writes under the entry's node with the key [`ENTRY_TIMES`]
-    /// names.
+    /// which FLAT writes under the entry's node with the key
+    /// [`super::entry_time_key`] answers.
     EntryTime,
 }
 
@@ -63,9 +63,9 @@ pub enum Carried {
 pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> {
     let wanted = tail.join("/");
     let class = derive::base_class(rm_type);
-    if let Some(&(owner, _, _)) = ENTRY_TIMES
+    if let Some(&(owner, _)) = ENTRY_TIMES
         .iter()
-        .find(|&&(owner, path, _)| path == wanted && model::is_a(class, owner))
+        .find(|&&(owner, path)| path == wanted && model::is_a(class, owner))
     {
         return Some((owner, Carried::EntryTime));
     }

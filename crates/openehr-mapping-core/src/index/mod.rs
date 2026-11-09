@@ -18,11 +18,10 @@
 
 mod alternative;
 mod amend;
-mod embedded;
+mod facts;
 pub mod matching;
 pub mod ordinals;
 pub mod paths;
-mod terms;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -231,10 +230,11 @@ impl WebTemplateIndex {
     pub fn build(source: &TemplateSource) -> Result<Self, PathError> {
         let web_template = web_template(source)?;
         let mut index = Self::over(web_template, source.generation())?;
-        if let TemplateSource::Opt14(ref template) = *source {
-            index.embedded = embedded::embedded_templates(template);
-            index.archetype_terms = terms::archetype_terms(template);
-            index.ordinals = ordinals::ordinal_options(template);
+        if let TemplateSource::Opt14(_) = *source {
+            let facts = facts::read(&index.web_template.tree);
+            index.embedded = facts.embedded;
+            index.archetype_terms = facts.archetype_terms;
+            index.ordinals = facts.ordinals;
         }
         if let TemplateSource::Opt2 { ref template, .. } = *source {
             index.root_lineage = template.parent_archetype_id.iter().cloned().collect();

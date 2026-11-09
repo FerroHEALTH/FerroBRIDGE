@@ -39,6 +39,7 @@ use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
 use openehr_rm::v1_2::data_types::uri::dv_uri::DvUri;
+use openehr_sdt::flat::attribute_keys::attribute_key;
 use openehr_sdt::flat::path::Segment;
 use serde_json::Value;
 
@@ -351,8 +352,8 @@ pub const FAMILIES: &[(&str, &str)] = &[
 
 /// The date-time attributes of an entry a Web Template carries no node for.
 ///
-/// Each row is the entry class, the tail that names the attribute, and the
-/// FLAT key Simplified Formats writes it under.
+/// Each row is the entry class and the tail that names the attribute; the
+/// FLAT key comes from `openehr_sdt::flat::attribute_keys::attribute_key`.
 ///
 /// `HISTORY.origin` is a `DV_DATE_TIME`
 /// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_structures.html#_history_class>),
@@ -362,10 +363,7 @@ pub const FAMILIES: &[(&str, &str)] = &[
 /// spelled `time` under the action's node
 /// (`docs/specs/its-rest/docs/simplified_formats/master05-rm_mapping.adoc`,
 /// §OBSERVATION and §ACTION).
-pub const ENTRY_TIMES: &[(&str, &str, &str)] = &[
-    ("OBSERVATION", "data/origin", "history_origin"),
-    ("ACTION", "time", "time"),
-];
+pub const ENTRY_TIMES: &[(&str, &str)] = &[("OBSERVATION", "data/origin"), ("ACTION", "time")];
 
 /// Returns the FLAT key the date-time attribute `tail` of an `owner` entry is
 /// written under, `None` when [`ENTRY_TIMES`] names no such attribute.
@@ -373,8 +371,10 @@ pub const ENTRY_TIMES: &[(&str, &str, &str)] = &[
 pub fn entry_time_key(owner: &str, tail: &str) -> Option<&'static str> {
     ENTRY_TIMES
         .iter()
-        .find(|&&(entry, path, _)| entry == owner && path == tail)
-        .map(|&(_, _, key)| key)
+        .any(|&(entry, path)| entry == owner && path == tail)
+        .then(|| attribute_key(owner, tail))
+        .flatten()
+        .map(|row| row.key)
 }
 
 /// The attributes of a party root a party context maps although no template
@@ -386,15 +386,15 @@ pub fn entry_time_key(owner: &str, tail: &str) -> Option<&'static str> {
 /// a party context: our own design.
 pub const PARTY_ROOTS: &[(&str, &str)] = &[("ROLE", "performer")];
 
-/// Returns the FLAT family a tail of [`carried::Carried::Family`] is written under.
+/// Returns the FLAT family a tail of [`carried::Carried::Family`] below an
+/// `owner` node is written under, `None` when no FLAT key names the attribute.
 #[must_use]
-pub fn family_of(tail: &[&str]) -> Vec<Segment> {
-    tail.iter()
-        .map(|segment| Segment {
-            name: format!("_{segment}"),
-            index: None,
-        })
-        .collect()
+pub fn family_of(owner: &str, tail: &[&str]) -> Option<Vec<Segment>> {
+    let row = attribute_key(owner, &tail.join("/"))?;
+    Some(vec![Segment {
+        name: row.key.to_owned(),
+        index: None,
+    }])
 }
 
 /// Returns the identifiers a party carries, as the container the model wants.
