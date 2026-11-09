@@ -9,10 +9,11 @@
 //! only. Each names FerroBRIDGE in its `title`, and its `description` opens
 //! with `Overrides ConceptMap/<id> of <package>.` when the guide carries the
 //! id, else with `Adds`, and names the tracker issue (`FerroBRIDGE #`). A
-//! structure override keeps the guide map's url, since the guide's rows name
-//! it; every other map FerroBRIDGE writes takes a url under
-//! [`CANONICAL_BASE`], so the terminology server holds the guide's map and
-//! FerroBRIDGE's beside each other. No specification governs this: our own
+//! structure override keeps the guide map's id and url, since the guide's
+//! rows name it. A value map never takes an id of the guide, since a
+//! terminology server holds one resource per id; a correction of a guide
+//! table map is added under an id of its own, which a structure override
+//! names. Every map FerroBRIDGE adds takes a url under [`CANONICAL_BASE`]. No specification governs this: our own
 //! design, under the guide's leave to add a mapping locally
 //! (`mapping_guidelines.md` §General Format/Approach).
 
@@ -188,6 +189,11 @@ fn check(
         )));
     }
     let own = format!("{CANONICAL_BASE}{}", map.id);
+    if table && guide.contains_key(&map.id) {
+        return Err(refused(String::from(
+            "a value map takes an id of its own: the terminology server holds the guide's",
+        )));
+    }
     if let Some(replaced) = guide.get(&map.id) {
         let opening = format!("Overrides ConceptMap/{} of {package}.", map.id);
         if !description.starts_with(&opening) {
@@ -195,13 +201,8 @@ fn check(
                 "the description does not open with `{opening}`"
             )));
         }
-        let url = if table {
-            own.as_str()
-        } else {
-            replaced.url.as_str()
-        };
-        if map.url != url {
-            return Err(refused(format!("the url is not {url}")));
+        if map.url != replaced.url {
+            return Err(refused(format!("the url is not {}", replaced.url)));
         }
     } else {
         if !description.starts_with("Adds ") {
@@ -244,24 +245,25 @@ mod tests {
     const PACKAGE: &str = "hl7.fhir.uv.v2mappings 1.0.0";
 
     #[test]
-    fn a_value_override_takes_ferrobridges_url() {
+    fn a_value_map_taking_an_id_of_the_guide_is_refused() {
         let id = "table-hl70202-to-contact-point-system";
         let description =
             format!("Overrides ConceptMap/{id} of {PACKAGE}. Because. FerroBRIDGE #1762.");
-        let own = map(
+        let reused = map(
             id,
             &format!("{CANONICAL_BASE}{id}"),
             Kind::Table,
             &description,
         );
-        assert!(check(&own, &guide(), PACKAGE, true).is_ok());
-        let guides = map(
-            id,
-            &format!("http://hl7.org/fhir/uv/v2mappings/ConceptMap/{id}"),
+        assert!(check(&reused, &guide(), PACKAGE, true).is_err());
+        let own_id = "table-hl70202-equipment-to-contact-point-system";
+        let added = map(
+            own_id,
+            &format!("{CANONICAL_BASE}{own_id}"),
             Kind::Table,
-            &description,
+            "Adds the corrected map. FerroBRIDGE #1762.",
         );
-        assert!(check(&guides, &guide(), PACKAGE, true).is_err());
+        assert!(check(&added, &guide(), PACKAGE, true).is_ok());
     }
 
     #[test]

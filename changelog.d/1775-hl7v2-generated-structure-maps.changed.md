@@ -9,10 +9,11 @@
   `Option<&ferrobridge_term::client::Client>`, and the `map` feature carries
   the client. A table map's `TableGroup` names its source and target systems
   only.
-- FerroBRIDGE's value maps for the HL7 v2 face (the corrected
-  `table-hl70202-to-contact-point-system`, the added
+- FerroBRIDGE's value maps for the HL7 v2 face (the corrected copy of
+  `table-hl70202-to-contact-point-system` as
+  `table-hl70202-equipment-to-contact-point-system`, the added
   `table-hl70202-to-contact-point-use` and the FHIR-to-v2 maps the PID
   inverse uses) ship as the FHIR package `terminology/hl7v2-values/`, each
-  under a url of `https://ferrobridge.eu/fhir/v2mappings/`. Load it into the
+  under an id of its own and a url of `https://ferrobridge.eu/fhir/v2mappings/`. Load it into the
   terminology server beside the guide's package; the HL7 v2 face page of the
   book says how.

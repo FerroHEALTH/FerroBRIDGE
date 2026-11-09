@@ -1,13 +1,13 @@
 {
   "resourceType": "ConceptMap",
-  "id": "table-hl70202-to-contact-point-system",
-  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-to-contact-point-system",
-  "name": "FerroBRIDGEHl70202ToContactPointSystem",
+  "id": "table-hl70202-equipment-to-contact-point-system",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-equipment-to-contact-point-system",
+  "name": "FerroBRIDGEHl70202EquipmentToContactPointSystem",
   "title": "FerroBRIDGE supplement: HL7 table 0202 to contact-point-system with CP as phone",
   "status": "active",
   "experimental": true,
   "publisher": "Cadasto B.V. (FerroBRIDGE)",
-  "description": "Overrides ConceptMap/table-hl70202-to-contact-point-system of hl7.fhir.uv.v2mappings 1.0.0. The guide's map has a second group that maps CP to the contact-point-use code mobile, and the XTN.3 row of datatype-xtn-to-contactpoint writes ContactPoint.system through this map, so a cell phone was written as system mobile, which the required R4 binding of ContactPoint.system (contact-point-system) does not hold. This supplement keeps the system group, adds CP as phone, and moves the use group to ConceptMap/table-hl70202-to-contact-point-use. Recorded as an upstream defect on FerroBRIDGE #1764; the fix is FerroBRIDGE #1762.",
+  "description": "Adds the corrected ConceptMap/table-hl70202-to-contact-point-system of hl7.fhir.uv.v2mappings 1.0.0 under an id and url of its own, so a terminology server holds both. The guide's map has a second group that maps CP to the contact-point-use code mobile, and the XTN.3 row of datatype-xtn-to-contactpoint writes ContactPoint.system through it, so a cell phone was written as system mobile, which the required R4 binding of ContactPoint.system (contact-point-system) does not hold. This map keeps the system group, adds CP as phone, and the override of datatype-xtn-to-contactpoint names it in place of the guide's; the use group moves to ConceptMap/table-hl70202-to-contact-point-use. Recorded as an upstream defect on FerroBRIDGE #1764; the fix is FerroBRIDGE #1762.",
   "sourceUri": "http://terminology.hl7.org/ValueSet/v2-0202",
   "group": [
     {

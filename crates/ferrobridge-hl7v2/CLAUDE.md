@@ -49,7 +49,10 @@ structure maps only and the value package table maps only, each names
 FerroBRIDGE in `title`, its `description` opens with `Overrides
 ConceptMap/<id> of hl7.fhir.uv.v2mappings 1.0.0.` or `Adds` and names the
 tracker issue (`FerroBRIDGE #N`), a structure override keeps the guide map's
-url, and every other correction takes a url under
+id and url, a value map never takes a guide map's id (the terminology server
+holds one resource per id, so a corrected table map is added under its own id
+and the structure override that uses it names it), and every added map takes
+a url under
 `https://ferrobridge.eu/fhir/v2mappings/ConceptMap/`, so the terminology
 server holds the guide's table map and ours side by side. A correction
 changes rows, never the interpreter: a gap a ConceptMap cannot express is an

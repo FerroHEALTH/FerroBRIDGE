@@ -565,7 +565,7 @@ fn condition(source: &str, depends_on: &[(&str, &str)]) -> Condition {
 
 #[cfg(test)]
 mod tests {
-    use super::{Maps, Origin};
+    use super::{MappedVia, Maps, Origin};
     use crate::map::generated;
 
     #[test]
@@ -594,19 +594,39 @@ mod tests {
     }
 
     #[test]
-    fn a_value_override_names_ferrobridges_map_by_the_guides_id() {
+    fn a_corrected_table_map_is_added_and_the_override_names_it() {
+        let guide = Maps::guide();
+        let corrected = Maps::corrected();
         let id = "table-hl70202-to-contact-point-system";
-        let guide = Maps::guide().get(id).expect("the guide's map");
-        let corrected = Maps::corrected().get(id).expect("the corrected map");
         assert_eq!(
-            guide.url,
-            "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70202-to-contact-point-system"
+            guide.get(id),
+            corrected.get(id),
+            "the guide's table map stays"
         );
+        let added = corrected
+            .get("table-hl70202-equipment-to-contact-point-system")
+            .expect("the corrected copy");
+        assert_eq!(added.origin, Origin::Supplement { overrides: false });
         assert_eq!(
-            corrected.url,
-            "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-to-contact-point-system"
+            added.url,
+            "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-equipment-to-contact-point-system"
         );
-        assert_eq!(guide.groups.len(), 2);
-        assert_eq!(corrected.groups.len(), 1);
+        assert_eq!(added.groups.len(), 1);
+        let names = |maps: &Maps| -> Vec<MappedVia> {
+            maps.get("datatype-xtn-to-contactpoint")
+                .expect("the XTN map")
+                .rows
+                .iter()
+                .filter(|row| row.source == "XTN.3" && row.target_code == "system")
+                .filter_map(|row| row.mapped_via.clone())
+                .collect()
+        };
+        assert_eq!(names(guide), vec![MappedVia::Table(String::from(id))]);
+        assert_eq!(
+            names(corrected),
+            vec![MappedVia::Table(String::from(
+                "table-hl70202-equipment-to-contact-point-system"
+            ))]
+        );
     }
 }

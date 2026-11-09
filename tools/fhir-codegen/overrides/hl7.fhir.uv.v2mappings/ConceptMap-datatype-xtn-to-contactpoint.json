@@ -7,7 +7,7 @@
   "status": "active",
   "experimental": true,
   "publisher": "Cadasto B.V. (FerroBRIDGE)",
-  "description": "Overrides ConceptMap/datatype-xtn-to-contactpoint of hl7.fhir.uv.v2mappings 1.0.0. It changes two rows. XTN.3 also writes ContactPoint.use through ConceptMap/table-hl70202-to-contact-point-use when XTN.2 is not valued, so CP is phone (the override of table-hl70202-to-contact-point-system) in mobile use (FerroBRIDGE #1762, upstream FerroBRIDGE #1764). The row that targets system.extension-data-absent-reason, a notation the mapping guidelines do not define, is written in the two-row form segment-msh-to-messageheader uses for MSH-24, system.extension.url with the canonical of the R4 data-absent-reason extension and system.extension.valueCode unknown, under the guide's condition, so a value with no XTN.3 and no XTN.4 keeps a system as R4 ContactPoint cpt-2 requires (FerroBRIDGE #1763, upstream FerroBRIDGE #1765). Every other row is the guide's.",
+  "description": "Overrides ConceptMap/datatype-xtn-to-contactpoint of hl7.fhir.uv.v2mappings 1.0.0. It changes two rows. XTN.3 also writes ContactPoint.use through ConceptMap/table-hl70202-to-contact-point-use when XTN.2 is not valued, and XTN.3 writes ContactPoint.system through ConceptMap/table-hl70202-equipment-to-contact-point-system in place of the guide's table-hl70202-to-contact-point-system, so CP is phone in mobile use (FerroBRIDGE #1762, upstream FerroBRIDGE #1764). The row that targets system.extension-data-absent-reason, a notation the mapping guidelines do not define, is written in the two-row form segment-msh-to-messageheader uses for MSH-24, system.extension.url with the canonical of the R4 data-absent-reason extension and system.extension.valueCode unknown, under the guide's condition, so a value with no XTN.3 and no XTN.4 keeps a system as R4 ContactPoint cpt-2 requires (FerroBRIDGE #1763, upstream FerroBRIDGE #1765). Every other row is the guide's.",
   "group": [
     {
       "element": [
@@ -160,7 +160,7 @@
                     },
                     {
                       "url": "mappedVia",
-                      "valueUrl": "ConceptMap/table-hl70202-to-contact-point-system"
+                      "valueUrl": "ConceptMap/table-hl70202-equipment-to-contact-point-system"
                     }
                   ],
                   "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"

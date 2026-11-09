@@ -41,7 +41,7 @@ pub(super) static MAP: Declared = Declared {
             target: Some("system"),
             target_type: Some("code"),
             assignment: None,
-            mapped_via: Some("ConceptMap/table-hl70202-to-contact-point-system"),
+            mapped_via: Some("ConceptMap/table-hl70202-equipment-to-contact-point-system"),
             depends_on: &[],
         },
         DeclaredRow {

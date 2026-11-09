@@ -152,13 +152,16 @@ that is FerroBRIDGE's own design, and it works as follows.
   the guide's maps. Its value corrections are the FHIR package under
   `terminology/hl7v2-values/` in the repository, which you load into the
   terminology server beside the guide's package.
-- A correction with the id or the canonical url of a guide map replaces that
-  map whole. Any other correction is added.
+- A structure correction with the id or the canonical url of a guide map
+  replaces that map whole. A value correction never takes a guide map's id,
+  since the terminology server holds one resource per id: a corrected table
+  map is added under an id of its own, and the structure correction that uses
+  it names that id. Any other correction is added.
 - Each correction names FerroBRIDGE in its `title`. Its `description` names
   the guide map it overrides, or the structure it adds, the rows it changes
   and why, and the tracker issue that records the defect. A structure override
   keeps the guide map's id and url, since the guide's rows name it. Every
-  other correction takes a url under
+  added map takes a url under
   `https://ferrobridge.eu/fhir/v2mappings/`, so the terminology server holds
   the guide's table map and FerroBRIDGE's side by side, and the bridge asks
   for FerroBRIDGE's by its url.
@@ -186,7 +189,7 @@ value package holds these maps:
 
 | Map | Kind | What it changes, and why |
 |---|---|---|
-| `table-hl70202-to-contact-point-system` | override | Keeps the guide's system group and adds CP as `phone`; the guide's second group maps CP to the contact-point-use code `mobile`, which the required binding of `ContactPoint.system` does not hold (#1762) |
+| `table-hl70202-equipment-to-contact-point-system` | added | The guide's `table-hl70202-to-contact-point-system` corrected: its system group with CP as `phone`. The guide's second group maps CP to the contact-point-use code `mobile`, which the required binding of `ContactPoint.system` does not hold; the XTN override names this map in place of the guide's (#1762) |
 | `table-hl70202-to-contact-point-use` | added | CP to `mobile`, the use the guide's second group meant, which the XTN override writes into `ContactPoint.use` (#1762) |
 | `table-administrative-gender-to-hl70001`, `table-name-use-to-hl70200`, `table-address-use-to-hl70190`, `table-address-type-to-hl70190`, `table-contact-point-system-to-hl70202` | added | The FHIR-to-v2 direction the PID inverse translates back through, where reading the guide's map in reverse gives several codes (#1716) |
 

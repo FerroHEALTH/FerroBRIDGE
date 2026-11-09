@@ -817,8 +817,8 @@ pub(crate) static VALUES: [DeclaredTable; 7] = [
         )],
     },
     DeclaredTable {
-        id: "table-hl70202-to-contact-point-system",
-        url: "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-to-contact-point-system",
+        id: "table-hl70202-equipment-to-contact-point-system",
+        url: "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-equipment-to-contact-point-system",
         title: Some(
             "FerroBRIDGE supplement: HL7 table 0202 to contact-point-system with CP as phone",
         ),
