@@ -236,9 +236,15 @@ size moved from the list's `total` line, a badge under `conformance/badges/`
 that disagrees with its list, and a README conformance badge that names no
 committed badge file. `scripts/checks/conformance.sh --update` rewrites the
 lists and the badges from one run, and `--update <corpus>` or `--check
-<corpus>` runs and rewrites or checks one corpus alone. The script runs one package per `cargo
-nextest` invocation, for the same memory reason the `test` job uses
-`cargo hack`, and it needs `jq`, which the hosted runner carries.
+<corpus>` runs and rewrites or checks one corpus alone. The script runs
+every corpus package in one `cargo nextest` invocation, so each workspace
+crate compiles once with the features of the whole set. One run per package
+compiled `fhir-types` five times and `ferrobridge-testkit` six (run
+42560647228). The largest unit, `fhir-types` with every release and every
+resource, is the one `ferrobridge-testkit` already compiles in the `test`
+job, and the `test` job still runs these tests one package at a time with
+each package's own features. The script needs `jq`, which the hosted runner
+carries.
 
 The README shows each badge through
 `https://img.shields.io/endpoint?url=<raw URL of the badge JSON on main>`, the
