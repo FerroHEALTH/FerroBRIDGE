@@ -127,7 +127,8 @@ toml_val() {
 }
 
 # The version requirement of dependency NAME in the root Cargo.toml, in either
-# the `name = "x.y.z"` or the `name = { version = "x.y.z" }` form.
+# the `name = "x.y.z"` or the `name = { version = "x.y.z" }` form, with the
+# `=` of an exact requirement dropped.
 manifest_req() {
   local crate_name="$1"
   awk -v name="$crate_name" '
@@ -138,7 +139,9 @@ manifest_req() {
         s = substr($0, RSTART, RLENGTH)
       } else { next }
       match(s, /"[^"]+"/)
-      print substr(s, RSTART + 1, RLENGTH - 2); exit
+      v = substr(s, RSTART + 1, RLENGTH - 2)
+      sub(/^=/, "", v)
+      print v; exit
     }
   ' Cargo.toml
 }
