@@ -146,7 +146,7 @@ backon = "1.6.0"
 # token client, the onward client and the introspector.
 # The server adds `axum` for its guard;
 # ferrobridge-term's `smart` feature takes the token client alone.
-ferrohealth-smart = { version = "0.13.0", default-features = false, features = ["fetch"] }
+ferrohealth-smart = { version = "0.14.0", default-features = false, features = ["fetch"] }
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
 # `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
 # query masked. Pinned exactly, as a product pins every shared crate.
@@ -154,7 +154,7 @@ ferrohealth-secret = "=0.2.0"
 # The family's configuration loader (FerroSYS): the file, the `FERROBRIDGE__`
 # environment and its aliases, `--set`, strict with the closest known key, the
 # provenance of every key and the `config check` rendering.
-ferrohealth-config = "=0.2.10"
+ferrohealth-config = "=0.3.0"
 # The family's health document, indicator registry and process lifecycle
 # (FerroSYS). The default build is the document alone, which the operator
 # console reads; the server takes `registry`.
@@ -164,13 +164,13 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body.
-ferrohealth-server = { version = "=0.5.1", default-features = false }
+ferrohealth-server = { version = "=0.7.1", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
 # the request log and the panic line.
-ferrohealth-telemetry = { version = "=0.2.5", default-features = false }
+ferrohealth-telemetry = { version = "=0.3.0", default-features = false }
 # The family's installation report to FerroPULSE (FerroSYS): envelope v2, the
 # latency window the request log fills and the start and daily reporter.
-ferrohealth-usage-report = { version = "=0.2.1", default-features = false }
+ferrohealth-usage-report = { version = "=0.3.0", default-features = false }
 # The family's audit crates (FerroAUDIT): `ehds-logging` builds the EHDS access
 # record of Regulation (EU) 2025/327 Annex II 3.2 and its BALP `AuditEvent`
 # (`balp`), and `ihe-atna` spools it and sends it over the ITI-20 ATX: FHIR
@@ -250,7 +250,7 @@ zip = { version = "=9.1.3", default-features = false, features = ["deflate-flate
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script
 # modules with the router that serves them, shared by every FerroHEALTH
 # console. Pinned exactly, so the console moves to a new version deliberately.
-ferrohealth-ui = "=0.6.8"
+ferrohealth-ui = "=0.6.9"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -263,7 +263,7 @@ base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # with its idle and absolute lifetimes, the refresh, and the four routes with
 # the session watch FerroUI's pages ask. Pinned exactly, as a product pins
 # every shared crate; the console adds `axum`.
-ferrohealth-session = { version = "=0.7.0", default-features = false }
+ferrohealth-session = { version = "=0.8.0", default-features = false }
 # Test-only.
 wiremock = "0.6.5"
 # The operator console's browser journeys (#602): a WebDriver client in Rust
