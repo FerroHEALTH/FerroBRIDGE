@@ -39,8 +39,8 @@ const TERMINOLOGY_PORT: u16 = 8080;
 const TERMINOLOGY_STARTUP: Duration = Duration::from_secs(300);
 
 /// The synthetic terminology fixtures, absolute at compile time, and where
-/// they are mounted in the container.
-const TERMINOLOGY_FIXTURES: [(&str, &str); 1] = [(
+/// they are mounted in the container, for [`terminology`].
+pub const TERMINOLOGY_FIXTURES: [(&str, &str); 1] = [(
     concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/terminology"),
     "/data/codesystems",
 )];
@@ -344,24 +344,6 @@ impl Terminology {
     }
 }
 
-/// Starts the reference terminology server over the synthetic terminology
-/// fixtures and waits for its readiness endpoint.
-///
-/// The image reads each directory `terminology.code_systems` names as FHIR
-/// resources, so `fixtures/terminology` is bind-mounted read-only and the
-/// synthetic `CodeSystem`, `ValueSet` and `ConceptMap` are served through the
-/// ordinary operations. The server enforces no authentication of its own, so
-/// the returned base URL needs no credentials.
-///
-/// # Errors
-///
-/// Returns [`HarnessError::Container`] when Docker refuses the container,
-/// [`HarnessError::Probe`] when the readiness probe cannot be sent, and
-/// [`HarnessError::NotReady`] when the server does not answer it in time.
-pub async fn terminology() -> Result<Terminology, HarnessError> {
-    start_terminology(&TERMINOLOGY_FIXTURES).await
-}
-
 /// Starts the reference terminology server loaded as the HL7 v2 face needs it.
 ///
 /// It holds HL7 Terminology, the v2-to-FHIR guide `hl7.fhir.uv.v2mappings`
@@ -403,7 +385,7 @@ pub async fn v2_terminology() -> Result<Terminology, HarnessError> {
     let values = unpacked.join("package").display().to_string();
     let mut directories: Vec<(&str, &str)> = V2_PACKAGES.to_vec();
     directories.push((values.as_str(), VALUES_MOUNT));
-    let mut server = start_terminology(&directories).await?;
+    let mut server = terminology(&directories).await?;
     server.packed = Some(packed);
     Ok(server)
 }
@@ -428,8 +410,21 @@ async fn run_pack_step(
 }
 
 /// Starts the reference terminology server over the host directories
-/// `directories`, each mounted read-only at its container path.
-async fn start_terminology(directories: &[(&str, &str)]) -> Result<Terminology, HarnessError> {
+/// `directories`, each mounted read-only at its container path, and waits for
+/// its readiness endpoint.
+///
+/// The image reads each directory `terminology.code_systems` names as FHIR
+/// resources: [`TERMINOLOGY_FIXTURES`] serves the synthetic `CodeSystem`,
+/// `ValueSet` and `ConceptMap` through the ordinary operations. The server
+/// enforces no authentication of its own, so the returned base URL needs no
+/// credentials.
+///
+/// # Errors
+///
+/// Returns [`HarnessError::Container`] when Docker refuses the container,
+/// [`HarnessError::Probe`] when the readiness probe cannot be sent, and
+/// [`HarnessError::NotReady`] when the server does not answer it in time.
+pub async fn terminology(directories: &[(&str, &str)]) -> Result<Terminology, HarnessError> {
     let container = terminology_request(directories)
         .start()
         .await
