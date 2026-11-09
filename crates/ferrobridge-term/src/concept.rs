@@ -174,27 +174,129 @@ impl Equivalence {
 /// specifically excluded, so implementers have to check the
 /// `match.equivalence` for each match"
 /// (`OperationDefinition-ConceptMap-translate`, R4), which is why every match
-/// is returned and [`Equivalence::accepted`] decides.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// is returned and [`Match::accepted`] decides. R5 and R6 state
+/// `match.relationship` in place of the equivalence
+/// (<https://hl7.org/fhir/R5/conceptmap-operation-translate.html>).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Match {
-    /// `match.equivalence`, when the server sent one.
+    /// `match.equivalence`, which STU3 to R4B state.
     pub equivalence: Option<Equivalence>,
+    /// `match.relationship`, which R5 and R6 state.
+    pub relationship: Option<Relationship>,
     /// `match.concept`, the concept that was mapped to.
     pub concept: Option<Concept>,
-    /// `match.source`, the concept map that produced this match.
+    /// `match.source`, the concept map that produced this match (STU3 to
+    /// R4B).
     pub source: Option<String>,
+    /// `match.originMap`, the concept map that produced this match (R5 and
+    /// R6, and the terminology ecosystem's addition to R4 and R4B).
+    pub origin_map: Option<String>,
+    /// `match.noMap`, set when the map states that the code maps to nothing.
+    pub no_map: Option<bool>,
+    /// `match.sourceConcept`, the source the match was made from.
+    pub source_concept: Option<Concept>,
+    /// `match.sourceComment`.
+    pub source_comment: Option<String>,
+    /// `match.targetComment`.
+    pub target_comment: Option<String>,
+    /// `match.product`, the other values the mapping produces.
+    pub products: Vec<MatchValue>,
+    /// `match.dependsOn`, the other values the mapping depends on (R5 and
+    /// R6).
+    pub depends_on: Vec<MatchValue>,
+    /// `match.property`, the properties of the mapping (R5 and R6).
+    pub properties: Vec<MatchValue>,
 }
 
 impl Match {
     /// Returns whether this match is a translation.
     ///
-    /// A match with no equivalence is not one: the specification asks the
-    /// caller to check `match.equivalence`, and an absent value states
-    /// nothing.
+    /// A match with neither an equivalence nor a relationship is not one: the
+    /// specification asks the caller to check each match, and an absent value
+    /// states nothing.
     #[must_use]
     pub fn accepted(&self) -> bool {
         self.equivalence.as_ref().is_some_and(Equivalence::accepted)
+            || self
+                .relationship
+                .as_ref()
+                .is_some_and(Relationship::accepted)
     }
+}
+
+/// One `product`, `dependsOn` or `property` part of a match: what it is
+/// about and its value.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MatchValue {
+    /// `element` (STU3 to R4B), `attribute` or `uri` (R5 and R6).
+    pub name: Option<String>,
+    /// `concept` (STU3 to R4B) or `value` (R5 and R6), as the member that
+    /// carried it and its JSON.
+    pub value: Option<PropertyValue>,
+}
+
+/// A `ConceptMapRelationship` code, which R5 and R6 state on a match
+/// (<https://hl7.org/fhir/R5/valueset-concept-map-relationship.html>).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Relationship {
+    /// `related-to`.
+    RelatedTo,
+    /// `equivalent`: the source and target concepts mean the same.
+    Equivalent,
+    /// `source-is-narrower-than-target`.
+    SourceIsNarrowerThanTarget,
+    /// `source-is-broader-than-target`.
+    SourceIsBroaderThanTarget,
+    /// `not-related-to`: the source maps to no target.
+    NotRelatedTo,
+    /// A code outside the value set, kept as the server wrote it.
+    Other(String),
+}
+
+impl Relationship {
+    /// Returns the relationship `code` names.
+    #[must_use]
+    pub fn new(code: &str) -> Self {
+        match code {
+            "related-to" => Self::RelatedTo,
+            "equivalent" => Self::Equivalent,
+            "source-is-narrower-than-target" => Self::SourceIsNarrowerThanTarget,
+            "source-is-broader-than-target" => Self::SourceIsBroaderThanTarget,
+            "not-related-to" => Self::NotRelatedTo,
+            other => Self::Other(other.to_owned()),
+        }
+    }
+
+    /// Returns the code, as the server wrote it.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::RelatedTo => "related-to",
+            Self::Equivalent => "equivalent",
+            Self::SourceIsNarrowerThanTarget => "source-is-narrower-than-target",
+            Self::SourceIsBroaderThanTarget => "source-is-broader-than-target",
+            Self::NotRelatedTo => "not-related-to",
+            Self::Other(code) => code.as_str(),
+        }
+    }
+
+    /// Returns whether a match of this relationship is a translation, which
+    /// only `equivalent` is.
+    #[must_use]
+    pub fn accepted(&self) -> bool {
+        matches!(self, Self::Equivalent)
+    }
+}
+
+/// A concept as a FHIR `CodeableConcept`: its codings and its text
+/// (<https://hl7.org/fhir/R4/datatypes.html#CodeableConcept>).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CodeableConcept {
+    /// `CodeableConcept.coding`, in order.
+    pub coding: Vec<Concept>,
+    /// `CodeableConcept.text`.
+    pub text: Option<String>,
 }
 
 #[cfg(test)]
@@ -242,7 +344,7 @@ mod tests {
         let unstated = Match {
             equivalence: None,
             concept: Some(Concept::default()),
-            source: None,
+            ..Match::default()
         };
         assert!(!unstated.accepted());
     }

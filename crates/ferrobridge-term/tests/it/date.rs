@@ -8,7 +8,7 @@
 
 use crate::support::{RELEASES, client, parameter, release_path, request_body};
 use ferrobridge_term::config::WireVersion;
-use ferrobridge_term::outcome::{Coded, Validation};
+use ferrobridge_term::request::{Coded, Target, Validation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use std::error::Error;
@@ -107,7 +107,9 @@ async fn a_validation_at_a_date_sends_it() -> Result<(), Box<dyn Error>> {
         )
         .await;
         let validation = Validation {
-            value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
+            value_set: Target::Canonical(fixtures::TERM_VALUE_SET_URL.to_owned()),
+            display_language: None,
+            active_only: None,
             value_set_version: None,
             date: Some(DATE.to_owned()),
             coded: Coded::Code {

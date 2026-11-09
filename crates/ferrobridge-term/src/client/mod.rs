@@ -7,9 +7,9 @@
 use crate::config::{Config, Credentials, TokenFailure};
 use crate::error::{Error, UpstreamError};
 use crate::outcome::{
-    BatchOutcome, Coded, ExpandOutcome, Expansion, LookupOutcome, Request, SubsumesOutcome,
-    Subsumption, TranslateOutcome, Translation, ValidateOutcome, Validation,
+    BatchOutcome, ExpandOutcome, LookupOutcome, SubsumesOutcome, TranslateOutcome, ValidateOutcome,
 };
+use crate::request::{Coded, Expansion, Request, Subsumption, Translation, Validation};
 use backon::{ExponentialBuilder, Retryable};
 use http::header::{ACCEPT, CONTENT_TYPE};
 use http::{Method, StatusCode};
@@ -149,9 +149,17 @@ impl Client {
     /// parameter the configured release does not declare: a concept map
     /// `url` or a value set version on an STU3 client. Returns
     /// [`Error::SystemRequired`] when it validates a code with no system on
+    /// an STU3 client. Returns [`Error::UnsupportedOperation`] for an
+    /// operation the release does not define, `CodeSystem/$validate-code` on
     /// an STU3 client.
     pub fn check(&self, request: &Request) -> Result<(), Error> {
         let version = self.config.wire_version;
+        if crate::wire::undefined(version, request) {
+            return Err(Error::UnsupportedOperation {
+                operation: request.operation(),
+                wire_version: version,
+            });
+        }
         if let Some(parameter) = crate::wire::unsupported(version, request) {
             return Err(Error::UnsupportedParameter {
                 operation: request.operation(),
@@ -184,7 +192,7 @@ impl Client {
     pub async fn reachability(&self) -> Result<StatusCode, Error> {
         let url = self.url(METADATA)?;
         let (response, renewal) = self
-            .send(&url, || {
+            .authorized(&url, || {
                 self.http
                     .request(Method::GET, url.clone())
                     .timeout(self.config.timeout)
@@ -205,7 +213,7 @@ impl Client {
     ///
     /// A refused OAuth token is dropped and the request sent once more under a
     /// new one; a second `401` is returned as it stands.
-    async fn send(
+    async fn authorized(
         &self,
         url: &Url,
         build: impl Fn() -> reqwest::RequestBuilder,
@@ -257,13 +265,8 @@ impl Client {
         code: &str,
         version: Option<&str>,
     ) -> Result<LookupOutcome, Error> {
-        self.send_lookup(Request::Lookup {
-            system: system.to_owned(),
-            code: code.to_owned(),
-            version: version.map(str::to_owned),
-            date: None,
-        })
-        .await
+        self.send_lookup(Request::lookup(system, code, version, None))
+            .await
     }
 
     /// Resolves the display of `code` in `system` as the code system stood
@@ -279,13 +282,8 @@ impl Client {
         version: Option<&str>,
         date: &str,
     ) -> Result<LookupOutcome, Error> {
-        self.send_lookup(Request::Lookup {
-            system: system.to_owned(),
-            code: code.to_owned(),
-            version: version.map(str::to_owned),
-            date: Some(date.to_owned()),
-        })
-        .await
+        self.send_lookup(Request::lookup(system, code, version, Some(date)))
+            .await
     }
 
     /// Returns the outcome of the `$lookup` `request`.
@@ -377,7 +375,7 @@ impl Client {
     ///
     /// ```rust,no_run
     /// use ferrobridge_term::client::Client;
-    /// use ferrobridge_term::outcome::Translation;
+    /// use ferrobridge_term::request::Translation;
     ///
     /// # fn main() {
     /// # let terminology: Option<Client> = None;
@@ -425,17 +423,15 @@ impl Client {
         system: &str,
         code: &str,
     ) -> Result<ValidateOutcome, Error> {
-        self.validate(&Validation {
-            value_set_url: value_set_url.to_owned(),
-            value_set_version: None,
-            date: None,
-            coded: Coded::Code {
+        self.validate(&Validation::new(
+            value_set_url,
+            Coded::Code {
                 system: system.to_owned(),
                 code: code.to_owned(),
                 version: None,
                 display: None,
             },
-        })
+        ))
         .await
     }
 
@@ -456,6 +452,20 @@ impl Client {
         let request = Request::ValidateCode(validation.clone());
         let answer = self.operation(&request).await?;
         crate::decode::validate_code(self.config.wire_version, &answer)
+    }
+
+    /// Sends `request`, any of the six operations at the type or the
+    /// instance level, and answers it in the shape of the request.
+    ///
+    /// # Errors
+    /// Returns [`Error::UnsupportedOperation`], [`Error::UnsupportedParameter`]
+    /// or [`Error::SystemRequired`] when the configured release cannot carry
+    /// `request`, and then nothing is sent; [`Error::Refused`] when the server
+    /// refused it; and [`Error`] otherwise when the call did not reach an
+    /// answer or the answer could not be decoded.
+    pub async fn send(&self, request: &Request) -> Result<BatchOutcome, Error> {
+        let answer = self.operation(request).await?;
+        crate::decode::batch_entry(self.config.wire_version, request, &answer)
     }
 
     /// Validates every one of `validations`, answering them by position: one
@@ -557,21 +567,17 @@ impl Client {
             .collect())
     }
 
-    /// Returns the answer to the `POST` form of `request`.
-    ///
-    /// The operations are invoked with a `Parameters` body, the form that
-    /// carries every input whatever its type
-    /// (<https://hl7.org/fhir/R4/operations.html>).
+    /// Returns the answer to `request`, invoked in the configured form.
     async fn operation(&self, request: &Request) -> Result<Answer, Error> {
-        let operation = request.operation();
-        let version = self.config.wire_version;
-        let body = crate::wire::request_body(version, request)
-            .map_err(|source| source.into_error(operation, version))?;
-        let url = self.url(operation)?;
+        let invocation = crate::invocation::Invocation::new(
+            self.config.wire_version,
+            self.config.form,
+            request,
+        )?;
         self.execute(Call {
-            operation,
-            url,
-            body: Some(body),
+            operation: request.operation(),
+            url: invocation.url(&self.config.base_url)?,
+            body: invocation.body().map(str::to_owned),
         })
         .await
     }
@@ -620,7 +626,7 @@ impl Client {
     /// Sends `call` once and reads the whole answer.
     async fn attempt(&self, call: &Call) -> Result<Answer, Error> {
         let (response, renewal) = self
-            .send(&call.url, || match &call.body {
+            .authorized(&call.url, || match &call.body {
                 Some(body) => self
                     .http
                     .request(Method::POST, call.url.clone())

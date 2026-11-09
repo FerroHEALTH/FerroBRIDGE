@@ -8,7 +8,8 @@ use crate::support::{RELEASES, client, parameter, release_path, request_body};
 use ferrobridge_term::concept::Equivalence;
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::{Request, TranslateOutcome, Translation};
+use ferrobridge_term::outcome::TranslateOutcome;
+use ferrobridge_term::request::{Request, Translation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers::{method, path};
@@ -140,7 +141,7 @@ async fn a_false_result_is_a_no_match_outcome() -> Result<(), Box<dyn std::error
         .await;
 
         let outcome = translate(&server, version, fixtures::TERM_UNKNOWN_CODE).await?;
-        let TranslateOutcome::NoMatch { message } = &outcome else {
+        let TranslateOutcome::NoMatch { message, .. } = &outcome else {
             return Err(format!("expected no match, got {outcome:?}").into());
         };
         assert_eq!(Some("no map for this code"), message.as_deref());

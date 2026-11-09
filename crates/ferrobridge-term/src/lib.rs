@@ -12,7 +12,10 @@
 //! [`client::Client::code_system_count`] asks whether the server serves a code
 //! system at all.
 //! [`client::Client::batch`] sends several of them as one `batch` `Bundle` and answers
-//! them by position.
+//! them by position. [`client::Client::send`] sends any [`request::Request`],
+//! `CodeSystem/$validate-code` and the instance-level forms included, and
+//! [`invocation`] writes and reads the same requests for a caller with a
+//! transport of its own.
 //!
 //! A negative answer an operation states in its own `out` parameters is an
 //! outcome ([`outcome`]); an answer the server refused is a typed error
@@ -32,15 +35,17 @@ pub mod concept;
 pub mod config;
 mod decode;
 pub mod error;
+pub mod invocation;
 pub mod outcome;
+pub mod request;
 #[cfg(feature = "smart")]
 pub mod smart;
 mod wire;
 
 /// The HL7 FHIR release this crate targets.
 ///
-/// The release is published at <https://hl7.org/fhir/R4/>. STU3 and R4B are
-/// accepted on the wire as well ([`WireVersion`](config::WireVersion)).
+/// The release is published at <https://hl7.org/fhir/R4/>. STU3, R4B, R5 and
+/// the R6 ballot are accepted on the wire as well ([`WireVersion`](config::WireVersion)).
 pub const FHIR_VERSION: &str = "R4";
 
 /// `CodeSystem/$lookup`, as the operation is invoked
@@ -54,6 +59,10 @@ pub const TRANSLATE: &str = "ConceptMap/$translate";
 /// `ValueSet/$validate-code`
 /// (<https://hl7.org/fhir/R4/valueset-operation-validate-code.html>).
 pub const VALIDATE_CODE: &str = "ValueSet/$validate-code";
+
+/// `CodeSystem/$validate-code`
+/// (<https://hl7.org/fhir/R4/codesystem-operation-validate-code.html>).
+pub const CODE_SYSTEM_VALIDATE_CODE: &str = "CodeSystem/$validate-code";
 
 /// The batch interaction, a `POST` of a `Bundle` to the service base
 /// (<https://hl7.org/fhir/R4/http.html#transaction>).
