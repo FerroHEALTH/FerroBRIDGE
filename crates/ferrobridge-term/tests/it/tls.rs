@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! A terminology server that asks for a client certificate and whose own
-//! certificate chains to a private root, reached through a caller-built HTTP
-//! client (`Client::with_http`).
+//! certificate chains to a private root, reached through a client built from
+//! its endpoint table with the TLS a builder makes (`Client::from_endpoint`).
 //!
 //! Every certificate is synthetic, generated at run time and never
 //! committed. No specification governs the stub: our own design.
 
 use ferrobridge_term::client::Client;
-use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
+use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::outcome::LookupOutcome;
 use ferrobridge_testkit::fixtures;
+use ferrohealth_smart::client::PresentedTls;
+use ferrohealth_smart::config::TlsBuilder;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use rcgen::{
     BasicConstraints, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa, Issuer, KeyPair,
 };
@@ -22,7 +25,6 @@ use rustls::server::WebPkiClientVerifier;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
@@ -151,35 +153,61 @@ async fn stub(
     Ok((address, served))
 }
 
-/// Returns the configuration of a client for the stub at `address`, sent
-/// once with a short budget.
-fn config(address: SocketAddr) -> Result<Config, BoxError> {
-    let base = format!("https://localhost:{}/r4", address.port()).parse()?;
-    Ok(Config::new(base, WireVersion::R4)
-        .with_timeout(Duration::from_secs(5))
-        .with_retry(RetryPolicy {
-            max_attempts: 1,
-            initial_backoff: Duration::from_millis(1),
-            max_backoff: Duration::from_millis(1),
-        }))
+/// The TLS a test builds from the run's material: the private root as the
+/// only trust anchor, and the client identity when `identity` is set.
+struct Pem<'m> {
+    material: &'m Material,
+    identity: bool,
 }
 
-/// Returns an HTTP client that trusts the private root, resolves
-/// `localhost` to the stub, and presents `identity` when one is given.
-fn http(
-    material: &Material,
-    address: SocketAddr,
-    identity: bool,
-) -> Result<reqwest::Client, BoxError> {
-    let mut builder = reqwest::Client::builder()
-        .add_root_certificate(reqwest::Certificate::from_pem(material.root.as_bytes())?)
-        .resolve("localhost", address);
-    if identity {
-        builder = builder.identity(reqwest::Identity::from_pem(
-            material.client_identity.as_bytes(),
-        )?);
+impl TlsBuilder for Pem<'_> {
+    fn build(
+        &self,
+        _key: &str,
+        _section: &ferrohealth_config::tls::TlsClientSection,
+    ) -> Result<PresentedTls, BoxError> {
+        let provider = Arc::new(aws_lc_rs::default_provider());
+        let mut roots = RootCertStore::empty();
+        for certificate in
+            rustls::pki_types::pem::PemObject::pem_slice_iter(self.material.root.as_bytes())
+        {
+            roots.add(certificate?)?;
+        }
+        let builder = rustls::ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()?
+            .with_root_certificates(roots);
+        if !self.identity {
+            return Ok(PresentedTls::new(
+                Arc::new(builder.with_no_client_auth()),
+                None,
+            ));
+        }
+        let identity = self.material.client_identity.as_bytes();
+        let chain = rustls::pki_types::pem::PemObject::pem_slice_iter(identity)
+            .collect::<Result<Vec<CertificateDer<'static>>, _>>()?;
+        let key = <PrivateKeyDer<'static> as rustls::pki_types::pem::PemObject>::from_pem_slice(
+            identity,
+        )?;
+        let leaf = chain.first().cloned();
+        let config = builder.with_client_auth_cert(chain, key)?;
+        Ok(PresentedTls::new(Arc::new(config), leaf))
     }
-    Ok(builder.build()?)
+}
+
+/// Returns a client for the stub at `address` that builds its TLS through
+/// `tls`, sent once with a short budget.
+fn client(address: SocketAddr, tls: &Pem<'_>) -> Result<Client, BoxError> {
+    let table: EndpointSection = serde_json::from_value(serde_json::json!({
+        "url": format!("https://localhost:{}/r4", address.port()),
+        "timeout": "5s",
+        "retry": {"max_attempts": 1, "initial_backoff": "1ms", "max_backoff": "1ms"},
+    }))?;
+    Ok(Client::from_endpoint(
+        &table,
+        "terminology.endpoint",
+        tls,
+        WireVersion::R4,
+    )?)
 }
 
 #[tokio::test]
@@ -187,7 +215,13 @@ async fn a_server_asking_for_a_client_certificate_is_reached_with_the_callers_id
 -> Result<(), BoxError> {
     let material = material()?;
     let (address, served) = stub(&material).await?;
-    let client = Client::with_http(config(address)?, http(&material, address, true)?)?;
+    let client = client(
+        address,
+        &Pem {
+            material: &material,
+            identity: true,
+        },
+    )?;
     let outcome = client
         .lookup(
             fixtures::TERM_SOURCE_SYSTEM,
@@ -207,7 +241,13 @@ async fn a_server_asking_for_a_client_certificate_is_reached_with_the_callers_id
 async fn without_the_client_certificate_the_server_is_not_reached() -> Result<(), BoxError> {
     let material = material()?;
     let (address, served) = stub(&material).await?;
-    let client = Client::with_http(config(address)?, http(&material, address, false)?)?;
+    let client = client(
+        address,
+        &Pem {
+            material: &material,
+            identity: false,
+        },
+    )?;
     let error = client
         .lookup(
             fixtures::TERM_SOURCE_SYSTEM,

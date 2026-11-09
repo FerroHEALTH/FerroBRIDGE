@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 use ehds_logging::map::Declared;
 use ferrohealth_config::units::{ByteSize, Duration};
-use ferrohealth_smart::config::credentials::CredentialsSection;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use serde::{Deserialize, Serialize};
 
 /// The access-record lane.
@@ -22,16 +22,13 @@ use serde::{Deserialize, Serialize};
 pub struct Audit {
     /// Whether the facade and the HL7 v2 face record their accesses.
     pub enabled: bool,
-    /// The FHIR base of the Audit Record Repository, which records are
-    /// created under as `[base]/AuditEvent`.
-    pub base_url: String,
+    /// The Audit Record Repository: its FHIR base as `url`, under which
+    /// records are created as `[base]/AuditEvent`, the timeouts, the retry
+    /// between deliveries, the TLS and the credentials.
+    pub endpoint: EndpointSection,
     /// Whether an `http` base is accepted, for a TLS terminator beside the
     /// bridge that the operator answers for.
     pub cleartext: bool,
-    /// How long one delivery to the repository may take.
-    pub timeout: Duration,
-    /// The longest wait between two delivery attempts.
-    pub retry_max: Duration,
     /// The directory records are stored in until the repository takes them.
     pub spool_dir: Option<PathBuf>,
     /// The most records the spool holds at once.
@@ -45,8 +42,6 @@ pub struct Audit {
     pub source_id: String,
     /// The site the bridge runs at (`AuditEvent.source.site`).
     pub site: Option<String>,
-    /// The credentials the repository expects.
-    pub credentials: CredentialsSection,
     /// The categories the data under each template and archetype belong to.
     pub categories: AuditCategories,
 }
@@ -55,17 +50,20 @@ impl Default for Audit {
     fn default() -> Self {
         Self {
             enabled: false,
-            base_url: String::new(),
+            endpoint: EndpointSection {
+                retry: ferrohealth_smart::config::endpoint::RetrySection {
+                    max_backoff: Duration::from_secs(60),
+                    ..ferrohealth_smart::config::endpoint::RetrySection::default()
+                },
+                ..EndpointSection::default()
+            },
             cleartext: false,
-            timeout: Duration::from_secs(10),
-            retry_max: Duration::from_secs(60),
             spool_dir: None,
             max_records: 10_000,
             max_size: ByteSize::from_mib(64),
             write_timeout: Duration::from_secs(2),
             source_id: String::new(),
             site: None,
-            credentials: CredentialsSection::default(),
             categories: AuditCategories::default(),
         }
     }

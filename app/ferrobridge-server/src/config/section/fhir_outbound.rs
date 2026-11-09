@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use ferrohealth_config::units::Duration;
-use ferrohealth_smart::config::credentials::CredentialsSection;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use serde::{Deserialize, Serialize};
 
 /// The outbound FHIR lane.
@@ -21,17 +21,14 @@ pub struct FhirOutbound {
     pub enabled: bool,
     /// The reader name the lane follows the change feed under.
     pub reader: String,
-    /// The FHIR service base each transaction Bundle is posted to.
-    pub base_url: String,
+    /// The FHIR service each transaction Bundle is posted to: its base as
+    /// `url`, the timeouts, the retry, the TLS and the credentials.
+    pub endpoint: EndpointSection,
     /// Whether an `http` base is accepted, for a TLS terminator beside the
     /// bridge that the operator answers for.
     pub cleartext: bool,
-    /// How long one delivery may take.
-    pub timeout: Duration,
     /// The file the record of what was delivered is kept in.
     pub emitted: Option<PathBuf>,
-    /// The credentials the endpoint expects.
-    pub credentials: CredentialsSection,
 }
 
 impl Default for FhirOutbound {
@@ -39,11 +36,12 @@ impl Default for FhirOutbound {
         Self {
             enabled: false,
             reader: String::new(),
-            base_url: String::new(),
+            endpoint: EndpointSection {
+                timeout: Duration::from_secs(30),
+                ..EndpointSection::default()
+            },
             cleartext: false,
-            timeout: Duration::from_secs(30),
             emitted: None,
-            credentials: CredentialsSection::default(),
         }
     }
 }

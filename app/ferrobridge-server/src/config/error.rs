@@ -427,7 +427,7 @@ pub enum Error {
         key: String,
         /// Why it is refused.
         #[source]
-        source: ihe_atna::atna::feed::FeedAddressError,
+        source: ihe_atna::atna::feed::FeedConfigError,
     },
     /// A category map `ehds-logging` refuses.
     #[error("{key} is no category map")]

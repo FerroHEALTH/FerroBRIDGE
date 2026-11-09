@@ -170,21 +170,29 @@ base path, so the base URL and the wire version are configured together.
 
 ## An absent server
 
-`Client::new` and `Client::with_http` are the only ways to get a client, so a
+`Client::new` and `Client::from_endpoint` are the only ways to get a client, so a
 deployment that configures no terminology server holds `Option<Client>` and
 the absence is visible at every call site. Keep it that way: a `None` is a refusal to translate, not a
 reason to pass a source code through under a target system.
 
 The `Client::translate` documentation carries the worked example.
 
-## Mutual TLS and private trust roots
+## An endpoint table, mutual TLS and private trust roots
 
-`Client::with_http` takes an HTTP client you build, so a server that asks for
-a client certificate, or whose certificate chains to a private root, is
-reached with the `reqwest::Identity` and `reqwest::Certificate` you give that
-client. The configured timeout still bounds each request, and the
-credentials, the retry budget and the typed errors apply as for
-`Client::new`.
+Behind the `smart` feature, `Client::from_endpoint` builds the client from a
+product's `[<lane>.endpoint]` table, `ferrohealth-smart`'s `EndpointSection`
+(`url`, `timeout`, `connect_timeout`, `retry`, `tls`, `credentials`), through
+that crate's `OutboundClient`, the HTTP engine every product of the family
+builds for an outbound integration. The product's `TlsBuilder` (`ServerTls`
+under smart's `server-tls` feature) builds the table's `tls`, so a server
+that asks for a client certificate, or whose certificate chains to a private
+root, is reached with the identity and roots the table names. The table's
+retry is the retry budget, and its credential travels on every request: HTTP
+Basic, or the client credentials token renewed once on a `401`.
+
+```text
+let client = Client::from_endpoint(&section.endpoint, "terminology.endpoint", &ServerTls, WireVersion::R4)?;
+```
 
 ## The client credentials token of ferrohealth-smart
 

@@ -5,24 +5,14 @@
 //!
 //! No specification governs the configuration: our own design.
 
-use std::sync::Arc;
-
-use base64::Engine as _;
 use ehds_logging::map::CategoryMap;
 use ehds_logging::map::Matching;
-use ferrohealth_smart::client::cache::TokenSource;
-use ihe_atna::atna::bearer::Bearer;
-use ihe_atna::atna::feed::Credentials;
-use ihe_atna::atna::feed::CredentialsError;
+use ferrohealth_smart::client::outbound::OutboundClient;
+use ferrohealth_smart::config::ServerTls;
 use ihe_atna::atna::feed::FeedRepository;
 use ihe_atna::atna::spool::Bounds;
-use secrecy::ExposeSecret;
-use secrecy::SecretString;
 
-use super::credentials::Upstream;
-use super::credentials::resolve_credentials;
 use super::error::Error;
-use super::resolve::url_of;
 use super::section::audit::Audit;
 use crate::audit::Settings;
 
@@ -52,42 +42,26 @@ pub(super) fn resolve_audit(
             needs: String::from("auth.enabled"),
         });
     }
-    let base = url_of("audit.base_url", &audit.base_url)?;
-    let http = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|source| Error::Client {
-            upstream: "audit",
-            source: Box::new(source),
-        })?;
-    let timeout = audit.timeout.get();
-    let feed = if audit.cleartext {
-        FeedRepository::cleartext(base, http, timeout)
-    } else {
-        FeedRepository::new(base, http, timeout)
-    }
-    .map_err(|source| Error::AuditBase {
-        key: String::from("audit.base_url"),
-        source,
-    })?;
-    let feed = match resolve_credentials("audit.credentials", &audit.credentials)? {
-        Some(Upstream::Basic { user, password }) => {
-            feed.with_credentials(Arc::new(Basic::new(&user, &password)))
-        }
-        Some(Upstream::OAuth(grant)) => {
-            let source = TokenSource::new(*grant).map_err(|source| Error::Client {
+    let client =
+        OutboundClient::build(&audit.endpoint, "audit.endpoint", &ServerTls).map_err(|source| {
+            Error::Client {
                 upstream: "audit",
                 source: Box::new(source),
-            })?;
-            feed.with_credentials(Arc::new(Bearer::from(source)))
-        }
-        None => feed,
-    };
+            }
+        })?;
+    let feed = if audit.cleartext {
+        FeedRepository::cleartext(client)
+    } else {
+        FeedRepository::new(client)
+    }
+    .map_err(|source| Error::AuditBase {
+        key: String::from("audit.endpoint.url"),
+        source,
+    })?;
     let spool = audit.spool_dir.clone().ok_or(Error::Missing {
         key: String::from("audit.spool_dir"),
     })?;
     for (key, zero) in [
-        ("audit.timeout", audit.timeout.is_zero()),
         ("audit.write_timeout", audit.write_timeout.is_zero()),
         ("audit.max_size", audit.max_size.is_zero()),
     ] {
@@ -126,7 +100,6 @@ pub(super) fn resolve_audit(
             max_bytes: audit.max_size.bytes(),
             write_timeout: audit.write_timeout.get(),
         },
-        retry_max: audit.retry_max.get(),
         source_id: if audit.source_id.is_empty() {
             system_id.to_owned()
         } else {
@@ -135,32 +108,4 @@ pub(super) fn resolve_audit(
         site: audit.site.clone().filter(|site| !site.is_empty()),
         categories,
     })
-}
-
-/// An RFC 7617 Basic credential as the `Authorization` value of every Feed
-/// request.
-struct Basic(SecretString);
-
-impl Basic {
-    /// Returns the credential of `user` with `password`.
-    fn new(user: &str, password: &SecretString) -> Self {
-        let pair = format!("{user}:{}", password.expose_secret());
-        let encoded = base64::engine::general_purpose::STANDARD.encode(pair);
-        Self(SecretString::from(format!("Basic {encoded}")))
-    }
-}
-
-impl std::fmt::Debug for Basic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Basic").finish_non_exhaustive()
-    }
-}
-
-#[async_trait::async_trait]
-impl Credentials for Basic {
-    async fn authorization(&self) -> Result<SecretString, CredentialsError> {
-        Ok(self.0.clone())
-    }
-
-    async fn refused(&self, _refused: &SecretString) {}
 }

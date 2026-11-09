@@ -52,7 +52,8 @@ stored, the answer is withheld with the same `503`. The HL7 v2 face answers
 recognises a message it already committed.
 
 A record waits in the spool until the repository answers `2xx`; the bridge
-retries an unreachable repository with a backoff up to `retry_max`, and a
+retries an unreachable repository in rounds of `[audit.endpoint] retry`
+tries, `max_backoff` apart, and a
 record the repository refuses with a `4xx` is moved to the spool's
 `quarantine` directory for an operator. Records still in the spool at a
 shutdown are delivered by the next start. Size `max_records` and `max_size`

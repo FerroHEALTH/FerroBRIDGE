@@ -182,7 +182,7 @@ A secret and its `_file` sibling are one entry, keyed by the secret
 `password_hash` of each `[[auth.basic.users]]` user), whose value is its
 `state`: `set` (set as a value, in the file or the environment), `file` with
 the `path` it is read from, or `unset`. The file of a private key
-(`private_key_file`, `client_key_file`) is answered as a secret read from
+(`private_key_file`, `tls.client_identity_file`) is answered as a secret read from
 that file. A key the configuration leaves unset and that has no default is
 absent from `entries`.
 

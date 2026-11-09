@@ -64,6 +64,7 @@ url.workspace = true
 
 [dev-dependencies]
 ferrobridge-testkit.workspace = true
+ferrohealth-config.workspace = true
 ferrohealth-smart.workspace = true
 http.workspace = true
 secrecy.workspace = true

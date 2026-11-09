@@ -410,6 +410,17 @@ pub enum Error {
         #[source]
         source: serde_json::Error,
     },
+    /// `ferrohealth-smart`'s outbound client refused the endpoint table, its
+    /// TLS or its credential (feature `smart`).
+    #[cfg(feature = "smart")]
+    #[error("the endpoint table {key} is refused")]
+    Endpoint {
+        /// The table's dotted key.
+        key: &'static str,
+        /// What the outbound client reported.
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 }
 
 impl Error {
@@ -441,6 +452,8 @@ impl Error {
             Self::Refused { .. } => "refused",
             Self::Body { .. } => "body",
             Self::BatchArity { .. } => "batch-arity",
+            #[cfg(feature = "smart")]
+            Self::Endpoint { .. } => "endpoint",
         }
     }
 

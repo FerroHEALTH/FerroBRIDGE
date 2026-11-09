@@ -86,6 +86,10 @@ pub enum Credentials {
     /// client credentials grant (RFC 6749 §4.4), renewed once when the server
     /// answers `401`.
     OAuth(Arc<dyn TokenProvider>),
+    /// An `Authorization` header value sent as it stands, such as the RFC
+    /// 7617 basic credential `ferrohealth-smart`'s outbound client resolves;
+    /// it is marked sensitive, so no log line carries it.
+    Header(http::HeaderValue),
 }
 
 /// Why a [`TokenProvider`] obtained no token.
