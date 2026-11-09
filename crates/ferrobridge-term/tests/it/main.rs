@@ -14,6 +14,7 @@
     reason = "test assertions"
 )]
 
+mod authored;
 mod batch;
 mod date;
 mod end_to_end;

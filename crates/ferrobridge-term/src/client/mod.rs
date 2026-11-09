@@ -305,8 +305,10 @@ impl Client {
     /// another reason, `too-costly` among them, and [`Error`] otherwise when
     /// the call did not reach an answer or the answer could not be decoded.
     /// Returns [`Error::UnsupportedParameter`] when the expansion names a
-    /// value set version on an STU3 client, and [`Error::ParameterRange`]
-    /// when `offset` or `count` exceeds a FHIR `integer`; nothing is sent.
+    /// value set version on an STU3 client, [`Error::AuthoredValueSet`] when
+    /// an authored value set is not a `ValueSet` of the release, and
+    /// [`Error::ParameterRange`] when `offset` or `count` exceeds a FHIR
+    /// `integer`; nothing is sent.
     pub async fn expand(&self, expansion: &Expansion) -> Result<ExpandOutcome, Error> {
         let request = Request::Expand(expansion.clone());
         let answer = self.operation(&request).await?;

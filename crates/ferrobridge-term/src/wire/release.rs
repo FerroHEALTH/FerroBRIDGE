@@ -186,6 +186,13 @@ macro_rules! per_release {
                 let (url, value_set) = match &expansion.value_set {
                     ValueSetSource::Stored(target) => (target.canonical().map(Into::into), None),
                     ValueSetSource::Inline(inline) => (None, Some(inline_value_set(inline))),
+                    ValueSetSource::Authored(authored) => (
+                        None,
+                        Some(
+                            serde_json::from_str::<ValueSet>(authored.json())
+                                .map_err(RequestError::AuthoredValueSet)?,
+                        ),
+                    ),
                 };
                 let mut request = ValueSetExpandRequest {
                     url,
