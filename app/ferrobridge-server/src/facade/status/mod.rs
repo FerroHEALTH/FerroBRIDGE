@@ -531,7 +531,6 @@ mod tests {
         let refused = ferrohealth_smart::client::TokenError::Refused {
             status: StatusCode::BAD_REQUEST,
             error: Some(oauth),
-            body: String::new(),
         };
         let error = CdrError::Renewal {
             source: ferrohealth_smart::client::RenewalError::new(std::sync::Arc::new(refused)),
