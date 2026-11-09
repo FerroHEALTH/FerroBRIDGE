@@ -381,6 +381,8 @@ jobs:
       # The crate bump guard over synthetic histories, on every run, because
       # its own job runs on pull requests only and skips under its label.
       - run: bash scripts/checks/crate-version-guard.sh --self-test
+      # The crates.io upload order over synthetic workspace graphs (#1785).
+      - run: bash scripts/release/publish-crates.sh --self-test
       # The performance gate reads its pins, checks its plan's placeholders,
       # resolves its base and holds its two idle tables equal, offline (#1656).
       - run: bash scripts/perf/gate.sh --self-test
