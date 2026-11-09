@@ -119,6 +119,21 @@ files are its input. It depends on no logging component and on no
 application, so the two harmonised software components stay independent of
 each other (Art 2(2)(n), (o)).
 
+## Requiring the crate
+
+The crate follows Cargo's SemVer rules: a compatible change moves the patch,
+and a breaking change moves the minor while the crate is 0.x. Require it with a
+caret range on its line, so one release serves every crate in your build that
+uses it:
+
+```toml
+[dependencies]
+eehrxf = "0.1"
+```
+
+Name a patch (`"0.1.N"`) when you need the first release that carries what
+you use; the range is the same caret range.
+
 ## Licence
 
 Business Source License 1.1 (`LICENSE`): free for every non-production use and

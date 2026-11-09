@@ -37,6 +37,21 @@ the openEHR types this crate takes and returns.
 openEHR is a registered trademark of the openEHR Foundation. This crate is not
 endorsed by the openEHR Foundation.
 
+## Requiring the crate
+
+The crate follows Cargo's SemVer rules: a compatible change moves the patch,
+and a breaking change moves the minor while the crate is 0.x. Require it with a
+caret range on its line, so one release serves every crate in your build that
+uses it:
+
+```toml
+[dependencies]
+openehr-mapping-core = "0.1"
+```
+
+Name a patch (`"0.1.N"`) when you need the first release that carries what
+you use; the range is the same caret range.
+
 ## Licence
 
 Business Source License 1.1 (`LICENSE`): free for every non-production use and
