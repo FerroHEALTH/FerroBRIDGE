@@ -10,6 +10,21 @@ Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
 specification, and the OMOP Common Data Model through the OMOCL specification.
 
+## Requiring the crate
+
+The crate follows Cargo's SemVer rules: a compatible change moves the patch,
+and a breaking change moves the minor while the crate is 0.x. Require it with a
+caret range on its line, so one release serves every crate in your build that
+uses it:
+
+```toml
+[dependencies]
+ferrobridge-term = "0.1"
+```
+
+Name a patch (`"0.1.N"`) when you need the first release that carries what
+you use; the range is the same caret range.
+
 ## What it does
 
 Five operations on one configured server:
@@ -104,7 +119,7 @@ call in it does not compile. The default is `stu3`, `r4` and `r4b`; a
 consumer that speaks R5 or the R6 ballot turns `r5` or `r6` on:
 
 ```toml
-ferrobridge-term = { version = "=0.1.151", features = ["r5", "r6"] }
+ferrobridge-term = { version = "0.1", features = ["r5", "r6"] }
 ```
 
 The HTTP client is the default `client` feature: `reqwest`, the retry
@@ -114,7 +129,7 @@ request, concept and outcome types and the transport-free writers and readers
 speaks with no HTTP stack:
 
 ```toml
-ferrobridge-term = { version = "=0.1.151", default-features = false, features = ["r4"] }
+ferrobridge-term = { version = "0.1", default-features = false, features = ["r4"] }
 ```
 
 R5 and R6 are off by default because a binary that also enables the
@@ -182,8 +197,8 @@ writes this adapter itself.
 
 ## Status
 
-The crate is on the crate line (`docs/VERSIONS.md`): every change moves it one
-patch, a breaking change included, so pin it exactly.
+The crate is on the crate line (`docs/VERSIONS.md`), which follows Cargo
+SemVer: require it by the caret range under Requiring the crate above.
 
 ## Licence
 
