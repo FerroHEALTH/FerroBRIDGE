@@ -42,3 +42,4 @@ mod support;
 mod term_mapping;
 mod todesursache;
 mod tree;
+mod vitalstatus;

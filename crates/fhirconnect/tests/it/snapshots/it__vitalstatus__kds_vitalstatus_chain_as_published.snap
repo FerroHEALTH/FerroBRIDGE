@@ -1,0 +1,41 @@
+---
+source: crates/fhirconnect/tests/it/vitalstatus.rs
+expression: rows(&diagnostics)
+---
+[
+  "KDS_composition.yml:40 error fc-unpaired-types",
+  "case_identification.v0.yml:16 error fc-unpaired-types",
+  "case_identification.v0.yml:16 error fc-unpaired-types",
+  "report.v1.Observation.yml:101 error fc-unknown-template-node",
+  "report.v1.Observation.yml:103 error fc-unknown-template-node",
+  "report.v1.Observation.yml:108 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:120 error fc-uncarried-tail",
+  "report.v1.Observation.yml:122 error fc-uncarried-tail",
+  "report.v1.Observation.yml:129 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:134 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:138 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:143 error fc-unknown-template-node",
+  "report.v1.Observation.yml:145 error fc-unknown-template-node",
+  "report.v1.Observation.yml:147 error fc-unknown-template-node",
+  "report.v1.Observation.yml:18 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:36 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:42 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:47 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:52 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:63 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:73 error fc-unknown-template-node",
+  "report.v1.Observation.yml:75 error fc-unknown-template-node",
+  "report.v1.Observation.yml:77 error fc-unknown-template-node",
+  "report.v1.Observation.yml:81 warning fc-duplicate-method-name",
+  "report.v1.Observation.yml:89 error fc-unknown-fhir-element",
+  "report.v1.Observation.yml:99 error fc-unknown-template-node",
+  "vital_status.v1.yml:105 warning fc-duplicate-method-name",
+  "vital_status.v1.yml:113 warning fc-duplicate-method-name",
+  "vital_status.v1.yml:121 warning fc-duplicate-method-name",
+  "vital_status.v1.yml:36 error fc-uncarried-tail",
+  "vital_status.v1.yml:38 error fc-uncarried-tail",
+  "vital_status.v1.yml:51 error fc-unknown-template-node",
+  "vital_status.v1.yml:67 error fc-uncarried-tail",
+  "vital_status.v1.yml:69 error fc-uncarried-tail",
+  "vital_status.v1.yml:97 warning fc-duplicate-method-name"
+]
