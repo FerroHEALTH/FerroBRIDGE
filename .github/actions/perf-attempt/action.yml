@@ -9,7 +9,7 @@ description: >-
   decides. A retry may help when the gate ended with exit 2, a run that
   could not be judged, on any CPU model, or with exit 1, a breach, on a CPU
   model the workflow lists as stall-prone; the workflow also retries an
-  attempt whose job did not finish. The calling job checks out
+  attempt whose job ended cancelled because its runner shut down. The calling job checks out
   the repository and installs the Rust toolchain first. No specification
   governs this: our own design.
 inputs:

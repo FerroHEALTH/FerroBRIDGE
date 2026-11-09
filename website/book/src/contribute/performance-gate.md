@@ -85,16 +85,22 @@ tails reach 100 to 300 ms while the p50 holds
 attempt that ends with exit 2 runs again on a fresh runner on any CPU model,
 since a run that cannot be judged says nothing about the code. An attempt
 that ends with exit 1 runs again only on a CPU model the perf workflow lists
-in `STALL_PRONE`. An attempt whose job did not finish, because its runner
-shut down mid-job and left no exit code, runs again on a fresh runner too,
-unless the run itself was cancelled by a newer push or by a person. At most
-two retries run, and the gate passes when the last attempt passed. A breach
-on any other model fails at once. The job summary names each attempt's CPU
-model, its verdict and why a retry ran, and the verdict's summary names an
-attempt that did not finish. The workflow builds two crates at a time
-(`CARGO_BUILD_JOBS=2`), since the two release builds otherwise run the
-seven-gigabyte runner out of memory, and the build step logs the runner's
-free memory and disk each minute.
+in `STALL_PRONE`. An attempt whose job ends cancelled while the run goes on
+lost its runner (a shutdown, or the job's time limit) and left no exit code,
+so it runs again on a fresh runner too, on any CPU model. A run cancelled by
+a newer push or by a person retries nothing, and an attempt job that failed
+fails the gate. At most two retries run, and the gate passes when the last
+attempt passed. A breach on any other model fails at once. The job summary
+names each attempt's CPU model, its verdict and why a retry ran, and the
+verdict's summary names each attempt, a cancelled one with why the next ran.
+
+The workflow builds two crates at a time (`CARGO_BUILD_JOBS=2`), as `ci.yml`
+does, and the build step logs the runner's used memory and free disk each
+minute. The hosted runner has 16 GB. A release build of `fhir-types` with
+every resource of all five FHIR releases peaks above it on its own: on #1737
+the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
+and the runner shut down. The bridge therefore compiles only the releases it
+speaks, through the release features of `ferrobridge-term`.
 
 ## Running it yourself
 
