@@ -17,13 +17,18 @@
 # and idempotent; the registry is read back before success is reported.
 #
 # Each crate is published and verified at the version in its OWN manifest.
-# The members on the crate line (docs/VERSIONS.md) each move one patch per
-# change, and every other member still holds its name at the 0.0.0 placeholder,
-# so the set is deliberately not lockstep.
+# The members on the crate line (docs/VERSIONS.md) follow Cargo SemVer, a patch
+# for a compatible change and the minor for a breaking one while 0.x, and
+# every other member still holds its name at the 0.0.0 placeholder, so the set
+# is deliberately not lockstep. `semver` judges each crate this tree would
+# publish against its newest release on crates.io (scripts/checks/semver.sh);
+# the release plan runs it before anything is created.
 #
 # Usage:
 #   publish-crates.sh publish          # upload each crate in dependency order
 #   publish-crates.sh verify           # read the registry back, with retries
+#   publish-crates.sh pending          # list the crates whose version is not on crates.io
+#   publish-crates.sh semver           # judge the pending crates against crates.io
 #   publish-crates.sh version [CRATE]  # print one crate's manifest version
 #
 # Requires cargo, curl, and jq; `publish` also needs CARGO_REGISTRY_TOKEN.
@@ -121,12 +126,46 @@ do_verify() {
   echo "publish-crates: confirmed on crates.io, all ${#CRATES[@]} crates at their manifest versions"
 }
 
+# The crates whose manifest version crates.io does not list yet: what a
+# publish would upload. A failed read fails the list, so a network error never
+# reads as nothing pending.
+do_pending() {
+  local crate want body
+  for crate in "${CRATES[@]}"; do
+    want="$(manifest_version "$crate")"
+    [[ "$want" != "0.0.0" ]] || continue
+    body="$(curl --proto '=https' --tlsv1.2 -sSL --fail \
+      -H 'User-Agent: ferrobridge-publish-verify (scripts/release/publish-crates.sh)' \
+      "https://crates.io/api/v1/crates/$crate/versions")" || {
+      echo "::error::publish-crates: could not read $crate from crates.io" >&2
+      return 2
+    }
+    if ! jq -e --arg v "$want" 'any(.versions[]?; .num == $v)' <<<"$body" > /dev/null; then
+      echo "$crate"
+    fi
+  done
+}
+
+# Every pending crate's version answers its change against crates.io.
+do_semver() {
+  local pending
+  pending="$(do_pending)"
+  if [[ -z "$pending" ]]; then
+    echo "publish-crates: every crate is on crates.io at its manifest version; nothing to judge"
+    return 0
+  fi
+  # shellcheck disable=SC2086 # one crate name per word by construction
+  bash scripts/checks/semver.sh $pending
+}
+
 case "${1:-}" in
 publish) do_publish ;;
 verify) do_verify ;;
+pending) do_pending ;;
+semver) do_semver ;;
 version) manifest_version "${2:-fhir-types}" ;;
 *)
-  echo "publish-crates: expected 'publish', 'verify', or 'version', got '${1:-<none>}'" >&2
+  echo "publish-crates: expected 'publish', 'verify', 'pending', 'semver' or 'version', got '${1:-<none>}'" >&2
   exit 2
   ;;
 esac

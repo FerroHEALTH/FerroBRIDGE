@@ -13,6 +13,21 @@ openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
 specification, and the OMOP Common Data Model through the OMOCL specification.
 The FerroHEALTH FHIR servers read their search values through this one crate.
 
+## Requiring the crate
+
+The crate follows Cargo's SemVer rules: a compatible change moves the patch,
+and a breaking change moves the minor while the crate is 0.x. Require it with a
+caret range on its line, so one release serves every crate in your build that
+uses it:
+
+```toml
+[dependencies]
+fhir-search = "0.1"
+```
+
+Name a patch (`"0.1.N"`) when you need the first release that carries what
+you use; the range is the same caret range.
+
 ## What it does
 
 A server percent-decodes a parameter's value and reads it in two steps:

@@ -10,6 +10,21 @@ Part of [FerroBRIDGE](https://ferrobridge.eu), a pure-Rust bridge between
 openEHR and two interoperability targets: HL7 FHIR through the FHIRconnect
 specification, and the OMOP Common Data Model through the OMOCL specification.
 
+## Requiring the crate
+
+The crate follows Cargo's SemVer rules: a compatible change moves the patch,
+and a breaking change moves the minor while the crate is 0.x. Require it with a
+caret range on its line, so one release serves every crate in your build that
+uses it:
+
+```toml
+[dependencies]
+ferrobridge-term = "0.1"
+```
+
+Name a patch (`"0.1.N"`) when you need the first release that carries what
+you use; the range is the same caret range.
+
 ## What it does
 
 Five operations on one configured server:
@@ -172,8 +187,8 @@ writes this adapter itself.
 
 ## Status
 
-The crate is on the crate line (`docs/VERSIONS.md`): every change moves it one
-patch, a breaking change included, so pin it exactly.
+The crate is on the crate line (`docs/VERSIONS.md`), which follows Cargo
+SemVer: require it by the caret range under Requiring the crate above.
 
 ## Licence
 
