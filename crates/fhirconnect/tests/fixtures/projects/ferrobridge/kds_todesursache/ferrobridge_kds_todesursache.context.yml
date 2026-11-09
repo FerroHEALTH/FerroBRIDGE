@@ -7,8 +7,8 @@
 # file carries no copyright line to keep.
 # Changed: the metadata name and version are FerroBRIDGE's; the profile, the
 # template and the start are the published file's. CLUSTER.case_identification.v0
-# and the KDS_composition extension are not listed, because a run through the
-# published KDS_composition refuses at its `encounterMapping` link (#1695).
+# names FerroBRIDGE's stand-in, since the published model's Identifier onto the
+# DV_CODED_TEXT KDS_Todesursache constrains is refused at load (#101).
 # FerroBRIDGE's overwrite of the problem qualifier's statusCoded follows the
 # published extensions.
 grammar: FHIRConnect/v1.0.0
@@ -30,8 +30,10 @@ context:
     - EVALUATION.cause_of_death.v1
     - CLUSTER.problem_qualifier.v2
     - COMPOSITION.report.v1.Condition
+    - CLUSTER.case_identification.v0
   extensions:
     - KDS_cause_of_death
     - KDS_problem_qualifier_todesursache
     - ferrobridge_problem_qualifier_terminology_id
+    - KDS_composition
   start: EVALUATION.cause_of_death.v1
