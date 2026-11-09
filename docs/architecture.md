@@ -942,7 +942,11 @@ expression is a load error: the reference CDR's connector let `where()` and
   writes `ehr:/<ehr_id>/compositions/<versioned_object_uid>` into
   `LINK.target`; a refused linking commit names the linked composition it
   left, and a Bundle entry's link to a resource is refused, since a
-  transaction is one `CONTRIBUTION` (#94; our own design). A reference a transaction entry makes to another entry resolves
+  transaction is one `CONTRIBUTION` (#94; our own design). A `link` side
+  may also be the resource an enclosing `reference` entered (`$fhirRoot`
+  inside it): going out of openEHR its target becomes the reference that
+  mapping writes and no copy of the resource is created, and any side that
+  names no resource is refused at load as `fc-link-side` (#1695). A reference a transaction entry makes to another entry resolves
   to that entry by `fullUrl` or `<Type>/<id>` first (#753). A reference the
   request does not carry is resolved as the references chapter recommends, and one whose resource is
   absent (off the allow-list, unknown to the identity map, or answered

@@ -67,6 +67,9 @@ pub enum ResolveCode {
     /// A `reference` writes a choice element whose type its path does not
     /// name.
     ReferenceIntoChoice,
+    /// A `link` whose FHIR side is neither a `Reference`, its `reference`
+    /// string, nor the resource an enclosing `reference` mapping entered.
+    LinkSide,
     /// An openEHR path names a tail below a node that no FLAT part of the
     /// node's class carries.
     UncarriedTail,
@@ -175,6 +178,7 @@ impl ResolveCode {
             Self::UnderivedAlternative => "fc-underived-alternative",
             Self::UnpairedTypes => "fc-unpaired-types",
             Self::ReferenceIntoChoice => "fc-reference-into-choice",
+            Self::LinkSide => "fc-link-side",
             Self::UncarriedTail => "fc-uncarried-tail",
             Self::MalformedOpenehrPath => "fc-malformed-openehr-path",
             Self::UnknownTemplateNode => "fc-unknown-template-node",
@@ -234,6 +238,7 @@ impl ResolveCode {
             Self::UnderivedAlternative,
             Self::UnpairedTypes,
             Self::ReferenceIntoChoice,
+            Self::LinkSide,
             Self::UncarriedTail,
             Self::MalformedOpenehrPath,
             Self::UnknownTemplateNode,
