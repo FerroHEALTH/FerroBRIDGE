@@ -390,10 +390,6 @@ pub struct Hl7v2Settings {
     pub listen: SocketAddr,
     /// The character set a message with an empty MSH-18 is read in.
     pub default_charset: ferrobridge_hl7v2::decode::Charset,
-    /// The directory of the guide's `ConceptMap` files.
-    pub concept_maps: PathBuf,
-    /// The supplement directories, in load order.
-    pub supplements: Vec<PathBuf>,
     /// What an entry no program maps does to the message.
     pub unmapped: crate::facade::ingest::UnmappedEntries,
     /// The EHR policy of the face, when it differs from the facade's.

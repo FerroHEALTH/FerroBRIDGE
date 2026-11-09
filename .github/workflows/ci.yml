@@ -381,6 +381,8 @@ jobs:
       # The crate bump guard over synthetic histories, on every run, because
       # its own job runs on pull requests only and skips under its label.
       - run: bash scripts/checks/crate-version-guard.sh --self-test
+      # The crates.io upload order over synthetic workspace graphs (#1785).
+      - run: bash scripts/release/publish-crates.sh --self-test
       # The performance gate reads its pins, checks its plan's placeholders,
       # resolves its base and holds its two idle tables equal, offline (#1656).
       - run: bash scripts/perf/gate.sh --self-test
@@ -637,17 +639,10 @@ jobs:
           for package in $featured; do
             cargo clippy -p "$package" --all-features --all-targets --locked -- -D warnings
           done
-      # ferrobridge-hl7v2 without its default features, the surface of a
-      # consumer that takes only the listener, the parser and the ack (#1221),
-      # and with each feature alone: `map` and `shipped-maps` translate offline
-      # with no HTTP client, `terminology-server` adds it (#1750).
+      # ferrobridge-hl7v2 without its default `map` feature, the surface of a
+      # consumer that takes only the listener, the parser and the ack (#1221).
       - if: contains(matrix.packages, 'ferrobridge-hl7v2')
-        run: |
-          set -euo pipefail
-          cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
-          for feature in map shipped-maps terminology-server; do
-            cargo clippy -p ferrobridge-hl7v2 --all-targets --no-default-features --features "$feature" --locked -- -D warnings
-          done
+        run: cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
       # fhirconnect without its default `mapping` feature: the FHIR path model
       # alone, the surface ferrobridge-hl7v2's map takes (#1750).
       - if: contains(matrix.packages, 'fhirconnect')
@@ -1101,17 +1096,31 @@ jobs:
       contents: read
     env:
       FERROBRIDGE_JOURNEYS: "1"
+    # A non-functional gate: it runs on the pull request and on every push to
+    # main, and in a merge group it passes without starting a browser (#1790).
     steps:
+      - name: Not run in the merge queue
+        if: github.event_name == 'merge_group'
+        run: |
+          {
+            echo "## Browser journeys"
+            echo
+            echo "Not run in the merge queue: the journeys are a non-functional gate that ran on the pull request and run again on the push to main (#1790)."
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name != 'merge_group'
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
+        if: github.event_name != 'merge_group'
         with:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        if: github.event_name != 'merge_group'
         with:
           tool: cargo-nextest
       - name: Install Chrome and chromedriver
+        if: github.event_name != 'merge_group'
         id: chrome
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
         with:
@@ -1121,6 +1130,7 @@ jobs:
       # stops it with its session, so the journeys run in parallel with no
       # driver shared between them.
       - name: Run the journeys
+        if: github.event_name != 'merge_group'
         env:
           FERROBRIDGE_CHROME: ${{ steps.chrome.outputs.chrome-path }}
           FERROBRIDGE_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
@@ -1131,7 +1141,8 @@ jobs:
   # The performance gate (#1656): ferrohealth-perf's A/B mode, the head
   # judged against its base on the same runner, in perf.yml, which the release
   # lane calls on the release commit too. The base is the merge base with the
-  # pull request's base, the merge group's, or the commit before a push.
+  # pull request's base, or the commit before a push. A non-functional gate:
+  # in a merge group it passes without building or measuring (#1790).
   perf:
     name: perf
     needs: detect
@@ -1140,7 +1151,8 @@ jobs:
       contents: read
     uses: ./.github/workflows/perf.yml
     with:
-      base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+      base: ${{ github.event.pull_request.base.sha || github.event.before }}
+      measure: ${{ github.event_name != 'merge_group' }}
 
   doc:
     name: rustdoc

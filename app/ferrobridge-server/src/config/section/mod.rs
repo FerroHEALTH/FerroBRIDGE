@@ -59,12 +59,6 @@ pub struct Hl7v2 {
     pub listen: String,
     /// The HL7 table 0211 code a message with an empty MSH-18 is read in.
     pub default_charset: String,
-    /// The directory the v2-to-FHIR `ConceptMap` files are read from: the
-    /// `package` directory of `hl7.fhir.uv.v2mappings`.
-    pub concept_maps: Option<PathBuf>,
-    /// Directories of supplement `ConceptMap` files, loaded over the guide in
-    /// order; a map with the url of a loaded one replaces it.
-    pub supplements: Vec<PathBuf>,
     /// What an entry no program maps does to the message: `skip_and_count`
     /// or `refuse`.
     pub unmapped_entries: String,
@@ -114,8 +108,6 @@ impl Default for Hl7v2 {
             enabled: false,
             listen: String::from("127.0.0.1:2575"),
             default_charset: String::from("ASCII"),
-            concept_maps: None,
-            supplements: Vec::new(),
             unmapped_entries: String::from("skip_and_count"),
             ehr_policy: None,
             profiles: Vec::new(),

@@ -372,10 +372,9 @@ pub(crate) struct StartedFace {
     listening: hl7v2::Listening,
 }
 
-/// Loads the HL7 v2 face's `ConceptMaps` and binds its listener.
+/// Binds the HL7 v2 face's listener.
 ///
-/// A corpus that does not load and a port that cannot be bound both refuse
-/// the start, as a facade mapping that does not compile does.
+/// A port that cannot be bound refuses the start.
 async fn start_hl7v2(
     settings: &Settings,
     lane: &config::Hl7v2Settings,
@@ -387,13 +386,9 @@ async fn start_hl7v2(
         .facade()
         .cloned()
         .context("the HL7 v2 face writes through the facade, and the facade is off")?;
-    let corpus = hl7v2::load_corpus(lane).with_context(|| {
-        format!(
-            "loading the v2-to-FHIR ConceptMaps from {}",
-            lane.concept_maps.display()
-        )
-    })?;
-    let maps = corpus.maps().count();
+    let maps = ferrobridge_hl7v2::map::maps::Maps::corrected()
+        .maps()
+        .count();
     let terminology = state.terminology().cloned();
     let socket = TcpListener::bind(lane.listen)
         .await
@@ -409,7 +404,7 @@ async fn start_hl7v2(
     let face = StartedFace {
         socket,
         face: Arc::new(
-            hl7v2::Face::new(facade, corpus, terminology, lane)
+            hl7v2::Face::new(facade, terminology, lane)
                 .with_usage(Arc::clone(state.usage_window()))
                 .with_access_log(state.access_log().cloned(), lane.listen),
         ),

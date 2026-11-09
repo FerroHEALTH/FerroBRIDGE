@@ -5,8 +5,8 @@
 //! run through the guide alone and through the guide with the supplements,
 //! as the face runs it.
 
-use ferrobridge_hl7v2::map::corpus::{Condition, Corpus};
-use ferrobridge_hl7v2::map::translate::Translator;
+use ferrobridge_hl7v2::map::maps::{Condition, Maps};
+
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
 use fhir_types::codec::Value;
 
@@ -15,7 +15,7 @@ use crate::map::{entries, pretty, resources, summary, tables};
 use crate::support;
 
 /// Maps `bytes` through `corpus` with no terminology server.
-async fn run(bytes: &[u8], corpus: &Corpus) -> Mapped {
+async fn run(bytes: &[u8], corpus: &Maps) -> Mapped {
     map(&support::parsed(bytes), corpus, None)
         .await
         .expect("the message maps")
@@ -23,13 +23,13 @@ async fn run(bytes: &[u8], corpus: &Corpus) -> Mapped {
 
 /// Maps a fixture through the shipped supplements with the stubbed tables.
 async fn reviewed(bytes: &[u8]) -> Mapped {
-    translated(bytes, &support::shipped()).await
+    translated(bytes, support::shipped()).await
 }
 
 /// Maps `bytes` through `corpus` with the stubbed tables and the answers of
 /// the report status, order status and specimen type tables the fixtures
 /// here reach, read from those table maps of the guide.
-async fn translated(bytes: &[u8], corpus: &Corpus) -> Mapped {
+async fn translated(bytes: &[u8], corpus: &Maps) -> Mapped {
     let tables = tables()
         .answer(
             "table-hl70123-queries-to-diagnostic-report-status",
@@ -53,13 +53,9 @@ async fn translated(bytes: &[u8], corpus: &Corpus) -> Mapped {
             "Whole blood",
         );
     let (_server, client) = tables.serve().await;
-    map(
-        &support::parsed(bytes),
-        corpus,
-        Some(Translator::Server(&client)),
-    )
-    .await
-    .expect("the message maps")
+    map(&support::parsed(bytes), corpus, Some(&client))
+        .await
+        .expect("the message maps")
 }
 
 /// The ORU^R01 of [`fixtures::oru_r01`] with its report final (OBR-25 `F`),
@@ -116,10 +112,10 @@ fn text(value: &str) -> Value {
 // supplement runs the row, so OBR-4 gives the code beside the guide's display and system.
 #[tokio::test]
 async fn cwe_one_is_the_code_of_the_coding_the_codeableconcept_map_writes() {
-    let guide = translated(&final_result(), &support::corpus()).await;
+    let guide = translated(&final_result(), support::corpus()).await;
     let report = only(guide.bundle(), "DiagnosticReport");
     assert_eq!(first_coding(report, "code").get("code"), None);
-    let shipped = translated(&final_result(), &support::shipped()).await;
+    let shipped = translated(&final_result(), support::shipped()).await;
     for resource_type in ["DiagnosticReport", "Observation"] {
         let coding = first_coding(only(shipped.bundle(), resource_type), "code");
         assert_eq!(coding.get("code"), Some(&text("2345-7")), "{resource_type}");
@@ -177,7 +173,7 @@ fn the_cf_map_reads_the_cf_components_with_an_ungated_code() {
 // the supplement names the Quantity elements, so OBX-6 gives the units.
 #[tokio::test]
 async fn obx_six_gives_the_units_of_the_quantity() {
-    let guide = translated(&fixtures::oru_r01(), &support::corpus()).await;
+    let guide = translated(&fixtures::oru_r01(), support::corpus()).await;
     let shipped = reviewed(&fixtures::oru_r01()).await;
     let quantity = |mapped: &Mapped| -> Vec<Value> {
         resources(mapped.bundle(), "Observation")
@@ -223,7 +219,7 @@ fn application_and_network() -> Vec<u8> {
 // with both valued, the application names the source and the network address gives the endpoint.
 #[tokio::test]
 async fn a_network_address_gives_the_endpoint_beside_the_application_name() {
-    let shipped = run(&application_and_network(), &support::shipped()).await;
+    let shipped = run(&application_and_network(), support::shipped()).await;
     let header = only(shipped.bundle(), "MessageHeader");
     let source = header.get("source").expect("a source");
     assert_eq!(source.get("endpoint"), Some(&text("urn:oid:1.2.3.9")));
@@ -237,7 +233,7 @@ async fn a_network_address_gives_the_endpoint_beside_the_application_name() {
         "{:?}",
         shipped.outcomes()
     );
-    let guide = run(&application_and_network(), &support::corpus()).await;
+    let guide = run(&application_and_network(), support::corpus()).await;
     let source = only(guide.bundle(), "MessageHeader")
         .get("source")
         .expect("a source");
@@ -251,7 +247,7 @@ async fn a_network_address_gives_the_endpoint_beside_the_application_name() {
 async fn a_destination_network_address_gives_one_name() {
     let message =
         fixtures::oru_r01_network_addresses("NORTHNET^1.2.3.9^ISO", "SOUTHNET^1.2.3.10^ISO");
-    let guide = run(&message, &support::corpus()).await;
+    let guide = run(&message, support::corpus()).await;
     assert!(
         guide.outcomes().iter().any(|outcome| matches!(
             outcome,
@@ -260,7 +256,7 @@ async fn a_destination_network_address_gives_one_name() {
         "{:?}",
         guide.outcomes()
     );
-    let shipped = run(&message, &support::shipped()).await;
+    let shipped = run(&message, support::shipped()).await;
     let destination = only(shipped.bundle(), "MessageHeader")
         .get("destination")
         .and_then(Value::as_array)
@@ -282,7 +278,7 @@ async fn a_destination_network_address_gives_one_name() {
 // supplement writes the placer number into basedOn.identifier (R4 Reference.identifier).
 #[tokio::test]
 async fn a_placer_order_number_is_the_identifier_the_report_is_based_on() {
-    let guide = translated(&final_result(), &support::corpus()).await;
+    let guide = translated(&final_result(), support::corpus()).await;
     assert!(
         guide.outcomes().iter().any(|outcome| matches!(
             outcome,
@@ -291,7 +287,7 @@ async fn a_placer_order_number_is_the_identifier_the_report_is_based_on() {
         "{:?}",
         guide.outcomes()
     );
-    let shipped = translated(&final_result(), &support::shipped()).await;
+    let shipped = translated(&final_result(), support::shipped()).await;
     let based_on = only(shipped.bundle(), "DiagnosticReport")
         .get("basedOn")
         .and_then(Value::as_array)
@@ -338,7 +334,7 @@ async fn the_supplemented_message_maps_carry_their_structures() {
         ("BAR^P01^BAR_P01", "message-bar-p01-to-bundle", false),
     ] {
         let message = admission(event, "MSG00047");
-        let refused = map(&support::parsed(&message), &support::corpus(), None).await;
+        let refused = map(&support::parsed(&message), support::corpus(), None).await;
         assert!(
             matches!(
                 refused,
@@ -346,7 +342,7 @@ async fn the_supplemented_message_maps_carry_their_structures() {
             ),
             "{event}: {refused:?}"
         );
-        let shipped = run(&message, &support::shipped()).await;
+        let shipped = run(&message, support::shipped()).await;
         let patient = only(shipped.bundle(), "Patient");
         assert!(patient.get("identifier").is_some(), "{event}: {patient:?}");
         assert!(
@@ -357,7 +353,7 @@ async fn the_supplemented_message_maps_carry_their_structures() {
     }
     let billed = run(
         &admission("BAR^P01^BAR_P01", "MSG00048"),
-        &support::shipped(),
+        support::shipped(),
     )
     .await;
     assert_eq!(resources(billed.bundle(), "Account").len(), 1);
@@ -367,9 +363,9 @@ async fn the_supplemented_message_maps_carry_their_structures() {
 // once per message, where it first ran, and the guide alone counts none.
 #[tokio::test]
 async fn each_supplement_a_run_uses_is_counted_once() {
-    let guide = run(&fixtures::oru_r01(), &support::corpus()).await;
+    let guide = run(&fixtures::oru_r01(), support::corpus()).await;
     assert_eq!(supplemented(&guide), Vec::<(&str, bool)>::new());
-    let shipped = run(&fixtures::oru_r01(), &support::shipped()).await;
+    let shipped = run(&fixtures::oru_r01(), support::shipped()).await;
     let used = supplemented(&shipped);
     let mut unique = used.clone();
     unique.sort_unstable();
@@ -439,8 +435,8 @@ async fn the_guides_mdm_t02_sample_maps_to_the_reviewed_bundle() {
         let (_server, client) = tables.serve().await;
         map(
             &support::parsed(text.trim_end_matches('\r').as_bytes()),
-            &support::shipped(),
-            Some(Translator::Server(&client)),
+            support::shipped(),
+            Some(&client),
         )
         .await
         .expect("the sample maps")
@@ -494,7 +490,7 @@ fn admission_with_location(location: &str) -> Vec<u8> {
 #[tokio::test]
 async fn pl_11_is_the_assigner_of_each_valued_level_s_identifier() {
     let message = admission_with_location("WARD1^101^A^^^^^^^^NORTHHOSP");
-    let guide = run(&message, &support::corpus()).await;
+    let guide = run(&message, support::corpus()).await;
     let refused = guide
         .outcomes()
         .iter()
@@ -513,7 +509,7 @@ async fn pl_11_is_the_assigner_of_each_valued_level_s_identifier() {
         "both guide rows are refused: {:?}",
         guide.outcomes()
     );
-    let shipped = run(&message, &support::shipped()).await;
+    let shipped = run(&message, support::shipped()).await;
     let assigners = location_assigners(shipped.bundle());
     assert_eq!(
         assigners

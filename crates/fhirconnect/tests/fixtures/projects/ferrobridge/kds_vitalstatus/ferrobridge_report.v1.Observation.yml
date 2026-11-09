@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/composition/org.openehr/report.v1.Observation.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published file is report.v1.Condition.yml under an Observation
+# header. Its preprocessor reads `coding.code` of `Observation.status`, a
+# code (line 18), and its methods read `onset`, `recordedDate`, `asserter`
+# and `recorder`, which Observation does not define, and write `null_flavour`
+# below a DV_DATE_TIME and a PARTY_PROXY (#101). The preprocessor here reads
+# `status` itself, and `contextStartTime` reads `issued`, the instant the
+# Observation was made available, in place of the Condition's `recordedDate`.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.report.v1.Observation
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.report.v1
+    revision: 1.2.4
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+preprocessor:
+  fhirCondition:
+    targetRoot: $resource
+    targetAttribute: status
+    operator: not of
+    criterias:
+      - entered-in-error
+      - amended
+      - cancelled
+      - unknown
+
+mappings:
+  - name: contextStartTime
+    with:
+      fhir: $resource.issued
+      openehr: $composition/context/start_time

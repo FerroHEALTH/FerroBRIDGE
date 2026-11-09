@@ -37,7 +37,6 @@ use ferrohealth_usage_report::window::{Counts, Window};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -210,12 +209,6 @@ async fn terminology_stub() -> (MockServer, ferrobridge_term::client::Client) {
     (server, client)
 }
 
-/// The vendored v2-to-FHIR package.
-fn package() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package")
-}
-
 /// The TLS material every case serves and sends with, generated once.
 pub(crate) static PKI: LazyLock<Pki> = LazyLock::new(|| Pki::generate().expect("the TLS material"));
 
@@ -245,8 +238,6 @@ pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
     Hl7v2Settings {
         listen: "127.0.0.1:0".parse().expect("a socket address"),
         default_charset: Charset::Ascii,
-        concept_maps: package(),
-        supplements: Vec::new(),
         unmapped: UnmappedEntries::SkipAndCount,
         ehr_policy: None,
         profiles,
@@ -297,10 +288,9 @@ impl Serving {
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, Box<dyn Error>> {
         let (terminology_server, terminology) = terminology_stub().await;
-        let corpus = ferrobridge_server::hl7v2::load_corpus(&lane)?;
         let usage = Arc::new(ferrobridge_server::usage_report::window());
         let face = Arc::new(
-            Face::new(facade, corpus, Some(terminology), &lane)
+            Face::new(facade, Some(terminology), &lane)
                 .with_usage(Arc::clone(&usage))
                 .with_access_log(log, lane.listen),
         );

@@ -4,11 +4,11 @@
 //! The HL7 v2 face's `ConceptMap` directory `GET /operator/hl7v2/concept-maps`
 //! answers.
 //!
-//! The document names the directory the face read the v2-to-FHIR guide's
-//! maps from and the supplement directories loaded over it, then every map
-//! the face runs: its id, canonical url and title, its kind, what it maps
-//! from and to, where it came from, how many rows it holds and how many
-//! messages it served since the bridge started. It carries no message
+//! The document names every map the face runs, the v2-to-FHIR guide's
+//! generated maps with FerroBRIDGE's corrections over them: its id,
+//! canonical url and title, its kind, what it maps from and to, where it
+//! came from, how many rows it holds and how many messages it served since
+//! the bridge started. It carries no message
 //! content. No specification governs this document: our own design.
 
 use serde::{Deserialize, Serialize};
@@ -17,11 +17,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConceptMaps {
-    /// The directory of the guide's `ConceptMap` files.
-    pub directory: String,
-    /// The supplement directories, in load order, after the supplements the
-    /// bridge ships.
-    pub supplements: Vec<String>,
     /// Since when the face counts the messages each map served: the instant
     /// it started, RFC 3339 UTC.
     pub counted_since: String,
@@ -74,11 +69,11 @@ pub enum Kind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Origin {
-    /// The guide's directory.
+    /// The guide.
     Guide,
-    /// A supplement that adds a map the guide lacks.
+    /// A FerroBRIDGE correction that adds a map the guide lacks.
     Supplement,
-    /// A supplement that replaces a map of the guide.
+    /// A FerroBRIDGE correction that replaces a map of the guide.
     Override,
 }
 
@@ -101,8 +96,6 @@ mod tests {
     #[test]
     fn the_document_round_trips_through_its_json() {
         let document = ConceptMaps {
-            directory: String::from("/etc/ferrobridge/v2mappings"),
-            supplements: vec![String::from("/etc/ferrobridge/local")],
             counted_since: String::from("2026-11-03T09:00:00Z"),
             maps: vec![ConceptMap {
                 id: String::from("segment-pid-to-patient"),

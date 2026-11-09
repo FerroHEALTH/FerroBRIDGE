@@ -167,16 +167,10 @@ fn concept_maps(l: &Locale, directory: &Loaded<ConceptMaps>, href: &str) -> Html
         Ok(Outcome::Refused(refusal)) => return refused_operator(l, refusal),
         Err(fault) => return faulted(l, fault, href),
     };
-    let supplements = if directory.supplements.is_empty() {
-        t(tr(l, Msg::SupplementsNone))
-    } else {
-        t(directory.supplements.join(", "))
-    };
-    let facts = definitions(vec![
-        (tr(l, Msg::FactGuideDirectory), code(&directory.directory)),
-        (tr(l, Msg::RowSupplements), supplements),
-        (tr(l, Msg::FactCountedSince), code(&directory.counted_since)),
-    ]);
+    let facts = definitions(vec![(
+        tr(l, Msg::FactCountedSince),
+        code(&directory.counted_since),
+    )]);
     let count = u64::try_from(directory.maps.len()).unwrap_or(u64::MAX);
     let table = if directory.maps.is_empty() {
         list_empty(tr(l, Msg::ConceptMapsNone), None)

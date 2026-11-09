@@ -23,7 +23,9 @@ generator or its override map and regenerate here. Full discipline:
    only by `scripts/vendor/fhir-packages.sh`, which reads its pins from
    `docs/VERSIONS.md`, and are never hand-edited
    (`.claude/rules/vendored-inputs.md`). The same `emit` also regenerates
-   `crates/hl7v2-types` from the HL7 v2 definitions, which are never committed:
+   `crates/ferrobridge-hl7v2/src/map/generated/` from the v2-to-FHIR guide,
+   its overrides and the value package, and `crates/hl7v2-types` from the HL7
+   v2 definitions, which are never committed:
    fetch and verify them at the pin first with `scripts/vendor/v2ig.sh`.
 
 2. **Regenerate** the per-version modules and the v2 tables:
@@ -37,7 +39,7 @@ generator or its override map and regenerate here. Full discipline:
    is clean afterward:
 
    ```bash
-   git diff --exit-code crates/fhir-types crates/hl7v2-types
+   git diff --exit-code crates/fhir-types crates/hl7v2-types crates/ferrobridge-hl7v2/src/map/generated
    ```
 
    A non-empty diff means the committed generated code was stale; commit the

@@ -29,7 +29,7 @@ use std::collections::BTreeSet;
 use fhir_types::codec::Value;
 
 use crate::map::condition::{self, Operand, Probe};
-use crate::map::corpus::{Corpus, TableGroup};
+use crate::map::maps::{Maps, TableGroup};
 use crate::map::notation::Label;
 use crate::map::run::datum::Datum;
 use crate::map::run::walk::collect;
@@ -331,7 +331,7 @@ struct Recorded {
 /// A run in progress.
 #[derive(Debug)]
 pub(in crate::map) struct Run<'a> {
-    corpus: &'a Corpus,
+    corpus: &'a Maps,
     parsed: &'a Parsed,
     resources: Vec<Resource>,
     requests: Vec<Request>,
@@ -345,7 +345,7 @@ pub(in crate::map) struct Run<'a> {
 
 impl<'a> Run<'a> {
     /// Starts a run with the envelope Bundle as its first resource.
-    pub(in crate::map) fn new(corpus: &'a Corpus, parsed: &'a Parsed) -> Self {
+    pub(in crate::map) fn new(corpus: &'a Maps, parsed: &'a Parsed) -> Self {
         let mut run = Self {
             corpus,
             parsed,
@@ -452,14 +452,13 @@ impl Visit<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use fhir_types::codec::Value;
 
     use super::{Pending, Run};
     use crate::decode::Charset;
     use crate::map::Outcome;
-    use crate::map::corpus::Corpus;
+    use crate::map::generated::model::{Declared, DeclaredRow};
+    use crate::map::maps::{self, Map, Maps};
     use crate::parse::{self, Parsed};
 
     /// A synthetic result whose MSH carries `header` as MSH-3 to MSH-6.
@@ -479,10 +478,9 @@ mod tests {
         parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE)
     }
 
-    pub(super) fn corpus() -> Corpus {
-        let package =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/hl7.fhir.uv.v2mappings/package");
-        Corpus::load(&package).expect("the vendored package loads")
+    /// The guide's maps alone.
+    pub(super) fn corpus() -> Maps {
+        Maps::guide().clone()
     }
 
     /// The `MessageHeader` writes of a run, as dotted paths and ready values.
@@ -525,43 +523,34 @@ mod tests {
 
     /// A data type map with one row per `(component, child, type)` triple, at
     /// the canonical url `url`.
-    pub(super) fn datatype_map(id: &str, url: &str, rows: &[(&str, &str, &str)]) -> Value {
-        let elements: Vec<serde_json::Value> = rows
+    pub(super) fn datatype_map(
+        id: &'static str,
+        url: &'static str,
+        rows: &[(&'static str, &'static str, &'static str)],
+    ) -> Map {
+        let rows: Vec<DeclaredRow> = rows
             .iter()
-            .map(|(component, child, fhir_type)| {
-                serde_json::json!({
-                    "code": component,
-                    "target": [{
-                        "code": child,
-                        "equivalence": "equivalent",
-                        "extension": [{
-                            "url": crate::map::corpus::TYPE_INFO,
-                            "extension": [{ "url": "type", "valueCode": fhir_type }]
-                        }]
-                    }]
-                })
+            .map(|(component, child, fhir_type)| DeclaredRow {
+                source: component,
+                source_type: None,
+                target: Some(child),
+                target_type: Some(fhir_type),
+                assignment: None,
+                mapped_via: None,
+                depends_on: &[],
             })
             .collect();
-        serde_json::from_value(serde_json::json!({
-            "resourceType": "ConceptMap",
-            "id": id,
-            "url": url,
-            "status": "active",
-            "group": [{ "element": elements }]
-        }))
-        .expect("a JSON value")
+        maps::structure(&Declared {
+            id,
+            url,
+            title: None,
+            rows: Box::leak(rows.into_boxed_slice()),
+        })
     }
 
-    /// The vendored package with `maps` loaded over it as a supplement.
-    pub(super) fn supplemented(maps: &[Value]) -> Corpus {
-        let directory = tempfile::tempdir().expect("a temporary directory");
-        for (index, map) in maps.iter().enumerate() {
-            let path = directory.path().join(format!("ConceptMap-{index}.json"));
-            std::fs::write(path, serde_json::to_vec(map).expect("it serializes")).expect("written");
-        }
-        corpus()
-            .supplement(directory.path())
-            .expect("the supplement loads")
+    /// The guide's maps with `added` loaded over them as corrections.
+    pub(super) fn supplemented(added: &[Map]) -> Maps {
+        added.iter().cloned().fold(corpus(), Maps::with)
     }
 
     /// A synthetic message of `segments`, each ended by a carriage return.
@@ -613,10 +602,8 @@ mod tests {
     /// The glucose result `OBX` every specimen case carries.
     pub(super) const GLUCOSE: &str = "OBX|1|NM|2345-7^Glucose^LN||5.5|mmol/L|||||F";
 
-    /// The vendored package with the crate's shipped supplements over it.
-    pub(super) fn shipped() -> Corpus {
-        corpus()
-            .with_shipped_supplements()
-            .expect("the shipped supplements load")
+    /// The guide's maps with FerroBRIDGE's corrections over them.
+    pub(super) fn shipped() -> Maps {
+        Maps::corrected().clone()
     }
 }

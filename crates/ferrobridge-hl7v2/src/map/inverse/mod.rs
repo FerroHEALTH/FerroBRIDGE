@@ -47,12 +47,12 @@ use fhir_types::codec::Value;
 use hl7v2_types::model::Max;
 
 use crate::map::convert;
-use crate::map::corpus::Corpus;
 use crate::map::inverse::grid::Grid;
 use crate::map::inverse::line::{Line, deprecated, lines, order, primitives};
 use crate::map::inverse::walk::Inverse;
-use crate::map::translate::Translator;
+use crate::map::maps::Maps;
 use crate::write::value::{Field, Segment};
+use ferrobridge_term::client::Client;
 
 /// Something the inverse did not write back, typed and counted.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -191,8 +191,8 @@ impl Inverted {
 pub async fn segment(
     resource: &Value,
     definition: &'static hl7v2_types::model::Segment,
-    corpus: &Corpus,
-    translator: Option<Translator<'_>>,
+    corpus: &Maps,
+    translator: Option<&Client>,
 ) -> Result<Inverted, InverseError> {
     let resource_type = resource
         .get("resourceType")

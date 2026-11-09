@@ -30,28 +30,72 @@
 #   publish-crates.sh pending          # list the crates whose version is not on crates.io
 #   publish-crates.sh semver           # judge the pending crates against crates.io
 #   publish-crates.sh version [CRATE]  # print one crate's manifest version
+#   publish-crates.sh order            # print the upload order the workspace graph gives
+#   publish-crates.sh --self-test      # order synthetic graphs, offline
 #
 # Requires cargo, curl, and jq; `publish` also needs CARGO_REGISTRY_TOKEN.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-# Dependency order: a crate is uploaded only after every sibling it depends on
-# is on the index.
-readonly CRATES=(
-  fhir-types
-  hl7v2-types
-  fhir-search
-  openehr-mapping-core
-  ferrobridge-operator-api
-  fhirconnect
-  omocl
-  omop-cdm
-  ferrobridge-term
-  ferrobridge-hl7v2
-  ferrobridge-fhirpath
-  ferrobridge-validator
-  eehrxf
-)
+# Dependency order, derived from the workspace graph: a crate is uploaded only
+# after every member it names with a version is on the index. `cargo publish`
+# resolves a normal, a build and a versioned dev-dependency against the
+# registry (<https://doc.rust-lang.org/cargo/reference/publishing.html>), and
+# strips a path-only dev-dependency, so those three kinds are the edges (#1785).
+
+# The members of `cargo metadata --no-deps` on stdin, as `{name: [members it
+# needs on the index]}`.
+member_graph() {
+  jq -c '
+    [.packages[] | select(.manifest_path | test("/crates/[^/]+/Cargo\\.toml$"))] as $members
+    | ($members | map(.name)) as $names
+    | $members
+    | map({
+        key: .name,
+        value: [.dependencies[]
+          | select(.name as $d | $names | index($d))
+          | select(.kind != "dev" or .req != "*")
+          | .name] | unique
+      })
+    | from_entries'
+}
+
+# The upload order of the graph on stdin: the members whose needs are met, by
+# name, then the next layer. A cycle is refused, naming the members left.
+upload_order() {
+  jq -r '
+    def order:
+      if length == 0 then []
+      else
+        ([to_entries[] | select(.value | length == 0) | .key] | sort) as $ready
+        | if ($ready | length) == 0 then
+            error("a dependency cycle between " + (keys | join(", ")))
+          else
+            $ready + (with_entries(select(.key as $k | $ready | index($k) | not))
+              | map_values(map(select(. as $d | $ready | index($d) | not)))
+              | order)
+          end
+      end;
+    order[]'
+}
+
+# The upload order of this workspace's members.
+crate_order() {
+  cargo metadata --format-version 1 --no-deps --locked | member_graph | upload_order
+}
+
+# The members, in upload order, read once: every subcommand walks them.
+CRATES=()
+load_crates() {
+  local order crate
+  order="$(crate_order)" || {
+    echo "::error::publish-crates: could not order the members" >&2
+    return 1
+  }
+  while IFS= read -r crate; do
+    [[ -n "$crate" ]] && CRATES+=("$crate")
+  done <<<"$order"
+}
 
 # The `[package]` table's own `version` in one member's manifest.
 manifest_version() {
@@ -158,14 +202,69 @@ do_semver() {
   bash scripts/checks/semver.sh $pending
 }
 
+# Orders synthetic `cargo metadata` documents: `pkg name 'deps'` builds one
+# member, each dependency a `name:kind:req` triple.
+self_test() {
+  local failures=0 got
+  pkg() {
+    local name="$1" deps="${2:-}" dep entries="" d k r
+    for dep in $deps; do
+      IFS=: read -r d k r <<<"$dep"
+      entries="$entries{\"name\":\"$d\",\"kind\":$k,\"req\":\"$r\"},"
+    done
+    printf '{"name":"%s","manifest_path":"/w/crates/%s/Cargo.toml","dependencies":[%s]}' \
+      "$name" "$name" "${entries%,}"
+  }
+  graph() {
+    local packages
+    packages="$(printf '%s,' "$@")"
+    printf '{"packages":[%s]}' "${packages%,}"
+  }
+  expect() {
+    local label="$1" want="$2" document="$3"
+    got="$(member_graph <<<"$document" | upload_order 2>&1 | tr '\n' ' ')" || got="refused: $got"
+    if [[ "$got" != "$want" ]]; then
+      echo "publish-crates: self-test: $label: got '$got', wanted '$want'" >&2
+      failures=$((failures + 1))
+    fi
+  }
+  expect "a normal edge orders the dependency first" "a b " \
+    "$(graph "$(pkg b 'a:null:=0.1.0')" "$(pkg a)")"
+  expect "a versioned dev edge orders the dependency first" "a b " \
+    "$(graph "$(pkg b 'a:"dev":=0.1.0')" "$(pkg a)")"
+  expect "a build edge orders the dependency first" "a b " \
+    "$(graph "$(pkg b 'a:"build":=0.1.0')" "$(pkg a)")"
+  expect "a path-only dev edge orders nothing" "a b " \
+    "$(graph "$(pkg a 'b:"dev":*')" "$(pkg b)")"
+  expect "an edge to a crate outside the members orders nothing" "a " \
+    "$(graph "$(pkg a 'serde:null:1')")"
+  expect "a layer is ordered by name" "a c b " \
+    "$(graph "$(pkg c)" "$(pkg b 'a:null:=0.1.0 c:"dev":=0.1.0')" "$(pkg a)")"
+  got="$(member_graph <<<"$(graph "$(pkg a 'b:"dev":=0.1.0')" "$(pkg b 'a:null:=0.1.0')" "$(pkg c)")" | upload_order 2>&1)" && {
+    echo "publish-crates: self-test: a cycle was ordered: $got" >&2
+    failures=$((failures + 1))
+  }
+  if [[ "$got" != *"a dependency cycle between a, b"* ]]; then
+    echo "publish-crates: self-test: a cycle is not named: $got" >&2
+    failures=$((failures + 1))
+  fi
+  if [[ "$failures" -ne 0 ]]; then
+    echo "publish-crates: self-test: $failures case(s) failed" >&2
+    return 1
+  fi
+  echo "publish-crates: self-test passed"
+}
+
 case "${1:-}" in
-publish) do_publish ;;
-verify) do_verify ;;
-pending) do_pending ;;
-semver) do_semver ;;
+publish) load_crates && do_publish ;;
+verify) load_crates && do_verify ;;
+pending) load_crates && do_pending ;;
+semver) load_crates && do_semver ;;
+order) crate_order ;;
 version) manifest_version "${2:-fhir-types}" ;;
+--self-test) self_test ;;
 *)
-  echo "publish-crates: expected 'publish', 'verify', 'pending', 'semver' or 'version', got '${1:-<none>}'" >&2
+  echo "publish-crates: expected 'publish', 'verify', 'pending', 'semver', 'order', 'version' or --self-test, got '${1:-<none>}'" >&2
   exit 2
   ;;
 esac

@@ -9,12 +9,10 @@ mod bundle;
 mod contact_point;
 mod endpoint;
 mod inverse;
-mod offline;
 mod outcome;
 mod package;
 mod single;
 
-use ferrobridge_hl7v2::map::translate::Translator;
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
 use fhir_types::codec::Value;
 
@@ -136,7 +134,7 @@ pub(super) async fn mapped(bytes: &[u8]) -> (Mapped, Vec<(String, String)>) {
     let corpus = support::corpus();
     let tables = tables();
     let (_server, client) = tables.serve().await;
-    let mapped = map(&parsed, &corpus, Some(Translator::Server(&client)))
+    let mapped = map(&parsed, corpus, Some(&client))
         .await
         .expect("the message maps");
     let asked = tables.asked();

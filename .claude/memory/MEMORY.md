@@ -111,3 +111,6 @@
 - [No half solutions](no-half-solutions.md): build what the issue asks the proper way; a breaking change moves the minor version, never shape a design to dodge semver; owner 2026-11-08
 - [EHDS above openEHR](ehds-above-openehr.md): never revert EHDS behaviour to pass a conformance row; record a regulatory deviation; owner 2026-11-09
 - [Terminology via the server](terminology-via-server.md): production code translation always through the terminology server; embedded maps are test-only; owner 2026-11-09
+- [Merge queue runs functional gates only](merge-queue-functional-only.md):
+  perf and the browser journeys pass with a note in merge_group and run on
+  the PR and on main; owner 2026-11-09, #1790

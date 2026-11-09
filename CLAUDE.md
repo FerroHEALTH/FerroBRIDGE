@@ -197,9 +197,11 @@ the testkit tool crate. Beside it:
   `parse` the positional split grouped by the `hl7v2-types` structure tree,
   `ack` the original-mode acknowledgment, `inbound` one message through
   them and `batch` the FHS and BHS batch file with its response batch
-  (#642). `map` runs the v2-to-FHIR guide's ConceptMaps, read from a
-  directory at run time, writing FHIR R4 through `fhirconnect::tree` and translating
-  every table value through `ferrobridge-term`, with every condition, target
+  (#642). `map` runs the v2-to-FHIR guide's structure maps, generated into
+  the crate by `tools/fhir-codegen` with FerroBRIDGE's corrections beside
+  them (#1775), writing FHIR R4 through `fhirconnect::tree` and translating
+  every table value on the terminology server through `ferrobridge-term`,
+  whose value maps ship as the FHIR package `terminology/hl7v2-values/`, with every condition, target
   or value it cannot carry a counted outcome.
 - `crates/ferrobridge-fhirpath`: the FHIRPath evaluator (#436), FHIRPath
   Normative Release 2.0.0 with the FHIR R4 additions over the `fhir-types`
