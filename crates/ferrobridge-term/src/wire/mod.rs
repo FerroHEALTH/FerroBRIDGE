@@ -98,6 +98,9 @@ pub(crate) enum RequestError {
         /// The operation, as `Resource/$code`.
         operation: &'static str,
     },
+    /// The authored value set is not a `ValueSet` the release reads.
+    #[error("the authored value set is not a ValueSet of the release")]
+    AuthoredValueSet(#[source] serde_json::Error),
     /// A numeric input is larger than the FHIR `integer` it is sent as.
     #[error("the {operation} request carries a `{parameter}` larger than a FHIR integer holds")]
     Range {
@@ -118,6 +121,10 @@ impl RequestError {
         match self {
             Self::Json(source) => Error::RequestBody { operation, source },
             Self::Encode(source) => Error::RequestEncode { operation, source },
+            Self::AuthoredValueSet(source) => Error::AuthoredValueSet {
+                wire_version: version,
+                source,
+            },
             Self::UndefinedOperation { operation } => Error::UnsupportedOperation {
                 operation,
                 wire_version: version,

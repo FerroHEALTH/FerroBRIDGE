@@ -54,6 +54,10 @@ pub enum ValueSetSource {
     /// resource, so the request is a `POST`
     /// (<https://hl7.org/fhir/R4/operations.html#request>).
     Inline(InlineValueSet),
+    /// A whole value set the caller authored, sent as the `valueSet` input
+    /// as it stands, so the request is a `POST` as for
+    /// [`ValueSetSource::Inline`].
+    Authored(AuthoredValueSet),
 }
 
 impl ValueSetSource {
@@ -73,6 +77,37 @@ impl ValueSetSource {
 pub struct InlineValueSet {
     /// `compose.include`, in order.
     pub include: Vec<Include>,
+}
+
+/// A whole `ValueSet` resource the caller authored, held as FHIR JSON.
+///
+/// `ValueSet/$expand` takes the value set to expand as its `valueSet` input,
+/// "the value set is provided directly as part of the request"
+/// (<https://hl7.org/fhir/R4/valueset-operation-expand.html>), so every
+/// element the resource carries travels: `compose.include` with its
+/// enumerated `concept` rows, its `valueSet` imports and its filters,
+/// `compose.exclude`, `compose.inactive`, and the elements of a stored
+/// resource the draft is written over. The client reads the JSON into the
+/// configured release's own `ValueSet` when it writes the request, so a
+/// value set that release cannot read is refused before anything is sent.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AuthoredValueSet {
+    json: String,
+}
+
+impl AuthoredValueSet {
+    /// Returns the value set whose FHIR JSON is `json`, read only when a
+    /// request is written.
+    #[must_use]
+    pub fn from_json(json: impl Into<String>) -> Self {
+        Self { json: json.into() }
+    }
+
+    /// Returns the FHIR JSON as the caller gave it.
+    #[must_use]
+    pub fn json(&self) -> &str {
+        &self.json
+    }
 }
 
 /// One `ValueSet.compose.include`: codes of one system, selected by filter.
@@ -203,7 +238,7 @@ impl Request {
             Self::CodeSystemValidateCode(validation) => validation.code_system.instance(),
             Self::Expand(expansion) => match &expansion.value_set {
                 ValueSetSource::Stored(target) => target.instance(),
-                ValueSetSource::Inline(_) => None,
+                ValueSetSource::Inline(_) | ValueSetSource::Authored(_) => None,
             },
             Self::Subsumes(subsumption) => subsumption.code_system.instance(),
         }
