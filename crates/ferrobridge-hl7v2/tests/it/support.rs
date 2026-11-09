@@ -12,7 +12,7 @@ use std::time::Duration;
 use ferrobridge_hl7v2::ack::{self, Code, Stamp};
 use ferrobridge_hl7v2::decode::{self, Charset};
 use ferrobridge_hl7v2::inbound::{self, Received};
-use ferrobridge_hl7v2::map::corpus::Corpus;
+use ferrobridge_hl7v2::map::maps::Maps;
 use ferrobridge_hl7v2::mllp::Malformed;
 use ferrobridge_hl7v2::mllp::listener::{Connection, Handler};
 use ferrobridge_hl7v2::parse::structure::structure_for;
@@ -21,6 +21,8 @@ use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
+
+use crate::tables::PackageTables;
 
 /// The acknowledgment stamp every test answer carries.
 pub(crate) const STAMP: Stamp<'static> = Stamp {
@@ -36,22 +38,34 @@ pub(crate) fn parsed(bytes: &[u8]) -> Parsed {
     parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE)
 }
 
-/// The vendored v2-to-FHIR package.
+/// The vendored v2-to-FHIR package, the generator's input.
 pub(crate) fn package() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/hl7.fhir.uv.v2mappings/package")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package")
 }
 
-/// The corpus, loaded once per test.
-pub(crate) fn corpus() -> Corpus {
-    Corpus::load(&package()).expect("the vendored package loads")
+/// FerroBRIDGE's value package, loaded into the terminology server beside
+/// the guide.
+pub(crate) fn values() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../terminology/hl7v2-values")
 }
 
-/// The corpus with the crate's shipped supplements over it, as the face
-/// runs it.
-pub(crate) fn shipped() -> Corpus {
-    corpus()
-        .with_shipped_supplements()
-        .expect("the shipped supplements load")
+/// The guide's maps alone.
+pub(crate) fn corpus() -> &'static Maps {
+    Maps::guide()
+}
+
+/// The guide's maps with FerroBRIDGE's corrections over them, as the face
+/// runs them.
+pub(crate) fn shipped() -> &'static Maps {
+    Maps::corrected()
+}
+
+/// A terminology stub loaded with the table maps of the guide and of the
+/// value package, and a client of it.
+pub(crate) async fn terminology() -> (MockServer, Client) {
+    let tables = PackageTables::load(&[&package(), &values()]).expect("the table maps load");
+    tables.serve().await.expect("the stub serves")
 }
 
 /// The face the wire tests put behind the listener: it receives each message

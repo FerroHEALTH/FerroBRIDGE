@@ -4,7 +4,7 @@
 name = "ferrobridge-hl7v2"
 description = "The FerroBRIDGE HL7 v2 face: MLLP framing, MSH-18 decoding, positional parsing over the generated v2 tables, the acknowledgment, and the v2-to-FHIR ConceptMap interpreter"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.215"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -16,45 +16,29 @@ readme = "README.md"
 keywords = ["hl7", "hl7v2", "mllp", "fhir", "healthcare"]
 categories = ["parser-implementations", "network-programming", "science"]
 # The crate line is published on crates.io; include is the packaged content.
-# The v2-to-FHIR corpus is read from a directory at run time and never packaged;
-# the crate's own supplements under supplements/ are compiled in and packaged.
-# The patterns are anchored at the root, so the LICENSE and README.md files of
-# the HL7 v2 message sets under vendor/ stay out of the package too.
+# The v2-to-FHIR structure maps are generated into src/map/generated/; the
+# guide package and the value package stay in the repository.
 publish = true
-include = [
-    "/src/**",
-    "/supplements/**",
-    "/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md",
-    "/vendor/hl7.fhir.uv.v2mappings/repository/LICENSE",
-    "/vendor/hl7.fhir.uv.v2mappings/package/ConceptMap-*.json",
-    "/README.md",
-    "/LICENSE",
-]
+include = ["/src/**", "/README.md", "/LICENSE"]
 
 [features]
-# The v2-to-FHIR mapping (`map`), on by default with the terminology server
-# translator. `map` alone translates offline from the corpus, over fhir-types,
-# fhirconnect's FHIR path model and ferrobridge-term's request and outcome
-# types, with no openEHR crate and no HTTP client. A consumer that takes only
-# the listener, the decoder, the parser and the acknowledgment turns every
-# feature off.
-default = ["map", "terminology-server"]
+# The v2-to-FHIR mapping (`map`), on by default: the generated structure maps
+# over fhir-types and fhirconnect's FHIR path model, with every table value
+# translated by `ConceptMap/$translate` through ferrobridge-term's client. A
+# consumer that takes only the listener, the decoder, the parser and the
+# acknowledgment turns it off.
+default = ["map"]
 map = [
     "dep:chumsky",
     "dep:fhirconnect",
     "dep:fhir-types",
     "dep:ferrobridge-term",
+    "ferrobridge-term/client",
     "dep:logos",
     "dep:serde_json",
     "dep:sha2",
     "dep:uuid",
 ]
-# The v2-to-FHIR guide's ConceptMaps compiled in (`Corpus::shipped`), about
-# 3.9 MB of JSON, so a consumer maps with no package on disk.
-shipped-maps = ["map"]
-# `Translator::Server`: table values translated by `ConceptMap/$translate` on
-# a terminology server, through ferrobridge-term's HTTP client.
-terminology-server = ["map", "ferrobridge-term/client"]
 
 [dependencies]
 bytes.workspace = true
@@ -99,7 +83,7 @@ wiremock.workspace = true
 [[test]]
 name = "it"
 path = "tests/it/main.rs"
-required-features = ["terminology-server"]
+required-features = ["map"]
 
 [lints]
 workspace = true

@@ -6,7 +6,7 @@
 
 use ferrobridge_hl7v2::map::inverse::{Outcome, segment};
 use ferrobridge_hl7v2::map::single;
-use ferrobridge_hl7v2::map::translate::Translator;
+
 use ferrobridge_hl7v2::parse::Delimiters;
 use ferrobridge_hl7v2::parse::structure::segment_of;
 use ferrobridge_hl7v2::write::Writer;
@@ -36,6 +36,7 @@ fn json(text: &str) -> Value {
 
 #[tokio::test]
 async fn a_patient_writes_back_as_the_pid_its_fields_came_from() {
+    let (_server, terminology) = support::terminology().await;
     let corpus = support::shipped();
     let patient = json(
         r#"{
@@ -56,14 +57,9 @@ async fn a_patient_writes_back_as_the_pid_its_fields_came_from() {
           "address": [{"use": "home", "line": ["Main Street 1"], "city": "Springfield", "postalCode": "1234 AB", "country": "NL"}]
         }"#,
     );
-    let inverted = segment(
-        &patient,
-        pid_2_5(),
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the Patient writes back");
+    let inverted = segment(&patient, pid_2_5(), corpus, Some(&terminology))
+        .await
+        .expect("the Patient writes back");
     let written = Writer::new(DELIMITERS).segment(inverted.segment());
     assert_eq!(
         written,
@@ -75,6 +71,7 @@ async fn a_patient_writes_back_as_the_pid_its_fields_came_from() {
 
 #[tokio::test]
 async fn the_names_write_back_into_pid_5() {
+    let (_server, terminology) = support::terminology().await;
     let corpus = support::shipped();
     let patient = json(
         r#"{"resourceType": "Patient", "name": [
@@ -82,14 +79,9 @@ async fn the_names_write_back_into_pid_5() {
             {"use": "nickname", "family": "Doe", "given": ["Annie"]}
         ]}"#,
     );
-    let inverted = segment(
-        &patient,
-        pid_2_5(),
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the Patient writes back");
+    let inverted = segment(&patient, pid_2_5(), corpus, Some(&terminology))
+        .await
+        .expect("the Patient writes back");
     assert_eq!(
         Writer::new(DELIMITERS).segment(inverted.segment()),
         "PID|||||Doe^Ann^B^^Dr^^L~Doe^Annie^^^^^N",
@@ -100,18 +92,14 @@ async fn the_names_write_back_into_pid_5() {
 
 #[tokio::test]
 async fn an_element_no_row_writes_back_is_counted() {
+    let (_server, terminology) = support::terminology().await;
     let corpus = support::shipped();
     let patient = json(
         r#"{"resourceType": "Patient", "active": true, "telecom": [{"system": "url", "value": "https://example.org", "use": "temp"}]}"#,
     );
-    let inverted = segment(
-        &patient,
-        pid_2_5(),
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the Patient writes back");
+    let inverted = segment(&patient, pid_2_5(), corpus, Some(&terminology))
+        .await
+        .expect("the Patient writes back");
     let paths: Vec<&str> = inverted
         .outcomes()
         .iter()
@@ -125,16 +113,12 @@ async fn an_element_no_row_writes_back_is_counted() {
 
 #[tokio::test]
 async fn a_code_that_translates_back_to_several_is_ambiguous_never_guessed() {
+    let (_server, terminology) = support::terminology().await;
     let guide = support::corpus();
     let patient = json(r#"{"resourceType": "Patient", "gender": "other"}"#);
-    let inverted = segment(
-        &patient,
-        pid_2_5(),
-        &guide,
-        Some(Translator::Offline(&guide)),
-    )
-    .await
-    .expect("the Patient writes back");
+    let inverted = segment(&patient, pid_2_5(), guide, Some(&terminology))
+        .await
+        .expect("the Patient writes back");
     assert!(
         inverted.outcomes().iter().any(|outcome| matches!(
             outcome,
@@ -145,14 +129,9 @@ async fn a_code_that_translates_back_to_several_is_ambiguous_never_guessed() {
     );
     assert_eq!(Writer::new(DELIMITERS).segment(inverted.segment()), "PID");
     let shipped = support::shipped();
-    let preferred = segment(
-        &patient,
-        pid_2_5(),
-        &shipped,
-        Some(Translator::Offline(&shipped)),
-    )
-    .await
-    .expect("the Patient writes back");
+    let preferred = segment(&patient, pid_2_5(), shipped, Some(&terminology))
+        .await
+        .expect("the Patient writes back");
     assert_eq!(
         Writer::new(DELIMITERS).segment(preferred.segment()),
         "PID||||||||O",
@@ -164,7 +143,7 @@ async fn a_code_that_translates_back_to_several_is_ambiguous_never_guessed() {
 async fn with_no_translator_a_table_value_is_counted() {
     let corpus = support::shipped();
     let patient = json(r#"{"resourceType": "Patient", "gender": "female"}"#);
-    let inverted = segment(&patient, pid_2_5(), &corpus, None)
+    let inverted = segment(&patient, pid_2_5(), corpus, None)
         .await
         .expect("the Patient writes back");
     assert!(
@@ -179,6 +158,7 @@ async fn with_no_translator_a_table_value_is_counted() {
 
 #[tokio::test]
 async fn a_pid_mapped_forward_writes_back_as_itself() {
+    let (_server, terminology) = support::terminology().await;
     let pid = b"PID|1||PAT-1^^^EAST^MR||Doe^Ann^B^^Dr^^L|Roe|19800229|F|||Main Street 1^^Springfield^^1234 AB^NL^H||^PRN^PH^^^^^^^^^+31201234567|^WPN^PH^^^^^^^^^+31207654321";
     let parsed = support::parsed(&fixtures::message(&[
         b"MSH|^~\\&|ADT|EAST|PIX|NORTH|20261025100000||ADT^A01^ADT_A01|M-1|P|2.5",
@@ -187,24 +167,13 @@ async fn a_pid_mapped_forward_writes_back_as_itself() {
         b"PV1|1|O",
     ]));
     let corpus = support::shipped();
-    let forward = single::segment(
-        &parsed,
-        2,
-        "Patient",
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the PID maps");
+    let forward = single::segment(&parsed, 2, "Patient", corpus, Some(&terminology))
+        .await
+        .expect("the PID maps");
     let patient = &forward.resource().expect("a Patient").resource;
-    let inverted = segment(
-        patient,
-        pid_2_5(),
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the Patient writes back");
+    let inverted = segment(patient, pid_2_5(), corpus, Some(&terminology))
+        .await
+        .expect("the Patient writes back");
     let written = Writer::new(DELIMITERS).segment(inverted.segment());
     assert_eq!(
         written,
@@ -245,18 +214,14 @@ fn a_fhir_date_or_time_converts_back_to_its_v2_form() {
 #[tokio::test]
 async fn a_consumer_sets_the_fields_no_row_writes_back() {
     use ferrobridge_hl7v2::write::value::{Component, Field, Repetition};
+    let (_server, terminology) = support::terminology().await;
     let corpus = support::shipped();
     let patient =
         json(r#"{"resourceType": "Patient", "name": [{"family": "Doe"}], "gender": "female"}"#);
-    let mut pid = segment(
-        &patient,
-        pid_2_5(),
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the Patient writes back")
-    .into_segment();
+    let mut pid = segment(&patient, pid_2_5(), corpus, Some(&terminology))
+        .await
+        .expect("the Patient writes back")
+        .into_segment();
     assert_eq!(pid.field(1), Some(&Field::default()));
     assert_eq!(pid.field(9), None);
     pid.set(1, Field::from("1"));
@@ -282,13 +247,14 @@ async fn a_consumer_sets_the_fields_no_row_writes_back() {
 fn the_inverse_and_the_single_map_run_on_a_multi_threaded_runtime() {
     fn spawnable<F: Future + Send>(_: &F) {}
     let corpus = support::shipped();
+    // The futures are only built, never polled, so the client reaches no server.
+    let terminology = ferrobridge_term::client::Client::new(ferrobridge_term::config::Config::new(
+        "http://127.0.0.1:9/r4".parse().expect("a base url"),
+        ferrobridge_term::config::WireVersion::R4,
+    ))
+    .expect("a client");
     let patient = json(r#"{"resourceType": "Patient"}"#);
-    spawnable(&segment(
-        &patient,
-        pid_2_5(),
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    ));
+    spawnable(&segment(&patient, pid_2_5(), corpus, Some(&terminology)));
     let parsed = support::parsed(&fixtures::message(&[
         b"MSH|^~\\&|ADT|EAST|PIX|NORTH|20261025100000||ADT^A01^ADT_A01|M-1|P|2.5",
         b"EVN||20261025100000",
@@ -299,7 +265,7 @@ fn the_inverse_and_the_single_map_run_on_a_multi_threaded_runtime() {
         &parsed,
         2,
         "Patient",
-        &corpus,
-        Some(Translator::Offline(&corpus)),
+        corpus,
+        Some(&terminology),
     ));
 }

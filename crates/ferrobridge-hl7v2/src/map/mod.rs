@@ -3,14 +3,15 @@
 
 //! The interpreter of the HL7 v2-to-FHIR `ConceptMaps`.
 //!
-//! The corpus is the `hl7.fhir.uv.v2mappings` package ([`corpus`]). A parsed
-//! message runs through it in the guide's order: the message map of its
+//! The maps are the `hl7.fhir.uv.v2mappings` package's, generated at build
+//! time with FerroBRIDGE's corrections beside them ([`maps`]). A parsed
+//! message runs through them in the guide's order: the message map of its
 //! structure names, per segment, the resource it maps to; the segment map for
 //! that segment and resource maps each field; a data type map maps the
 //! components of a complex field; and a table map, named by `mappedVia`, is
-//! answered through a [`translate::Translator`]: `ConceptMap/$translate` on a
-//! terminology server loaded with the guide's table maps, or the same table
-//! maps read from the corpus in process. [`single`] maps one segment to one
+//! answered by `ConceptMap/$translate` on a terminology server loaded with the
+//! guide's table maps and FerroBRIDGE's value package, through the
+//! `ferrobridge-term` client. [`single`] maps one segment to one
 //! resource, and [`inverse`] one resource back to one segment.
 //!
 //! The FHIR side is written through `fhirconnect::tree::write` over the
@@ -36,25 +37,22 @@
 pub mod condition;
 mod constraint;
 pub mod convert;
-pub mod corpus;
-#[cfg(feature = "shipped-maps")]
-pub mod guide;
+mod generated;
 pub mod inverse;
+pub mod maps;
 pub mod notation;
 mod run;
 pub mod single;
-pub mod supplement;
-pub mod translate;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use ferrobridge_term::client::Client;
 use fhir_types::codec::{DecodeError, DecodeErrorKind, Value};
 use fhirconnect::tree::error::{ParseError, ResolveError, WriteError};
 
 use crate::map::convert::ConvertError;
-use crate::map::corpus::Corpus;
+use crate::map::maps::Maps;
 use crate::map::notation::NotationError;
-use crate::map::translate::Translator;
 use crate::parse::{Location, Parsed, Unplaced};
 
 /// The row an outcome is about.
@@ -73,7 +71,7 @@ pub struct RowRef {
 pub enum Outcome {
     /// A segment or field the parse did not place.
     Parse(Unplaced),
-    /// A supplement map the run used ([`corpus::Origin::Supplement`]),
+    /// A supplement map the run used ([`maps::Origin::Supplement`]),
     /// counted once per message where it first ran, so a mapped value can be
     /// told from one the guide alone writes.
     Supplemented {
@@ -230,7 +228,7 @@ pub enum Outcome {
         candidates: Vec<String>,
     },
     /// One of the data type maps that each fill one half of a value
-    /// ([`corpus::Map::half_of`]), chosen for a row by its place among the
+    /// ([`maps::Map::half_of`]), chosen for a row by its place among the
     /// rows of its map from the same source into the same element: the
     /// first row takes the half read from the first component.
     DatatypeHalf {
@@ -718,17 +716,16 @@ impl Mapped {
     }
 }
 
-/// Maps `parsed` through `corpus`, translating table values through
-/// `translator`.
+/// Maps `parsed` through `maps`, translating table values through the
+/// terminology server `terminology` reaches.
 ///
-/// With [`Translator::Server`], each translation names its table map by
+/// Each translation names its table map by
 /// canonical `url`, which an R4 or R4B terminology server takes. An STU3
 /// server is not supported: STU3 `ConceptMap/$translate` declares no `url`
 /// (<https://hl7.org/fhir/STU3/conceptmap-operations.html#translate>), and
 /// addressing the map by `source` and `target` instead would let the server
-/// answer from another map. With [`Translator::Offline`], the table maps of
-/// a corpus answer in process. With no translator, a table value is counted
-/// as [`Outcome::NoTerminology`].
+/// answer from another map. With no terminology server, a table value is
+/// counted as [`Outcome::NoTerminology`].
 ///
 /// # Errors
 ///
@@ -741,12 +738,12 @@ impl Mapped {
 /// `MessageHeader`.
 pub async fn map(
     parsed: &Parsed,
-    corpus: &Corpus,
-    translator: Option<Translator<'_>>,
+    maps: &Maps,
+    terminology: Option<&Client>,
 ) -> Result<Mapped, MapError> {
-    let mut run = run::Run::new(corpus, parsed);
+    let mut run = run::Run::new(maps, parsed);
     run.message()?;
-    let translations = run.translate(translator).await?;
+    let translations = run.translate(terminology).await?;
     let applied = run.take_applied();
     let (bundle, outcomes) = run.finish()?;
     Ok(Mapped {

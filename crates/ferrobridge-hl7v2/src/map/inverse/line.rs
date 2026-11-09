@@ -9,8 +9,8 @@ use fhir_types::codec::Value;
 use hl7v2_types::model::Optionality;
 
 use crate::map::condition::{Expr, Operand, Probe};
-use crate::map::corpus::{Assignment, Condition, Map, Row};
 use crate::map::inverse::grid::Grid;
+use crate::map::maps::{Assignment, Condition, Map, Row};
 use crate::map::notation::{Label, Step, Target};
 
 /// When a row runs.

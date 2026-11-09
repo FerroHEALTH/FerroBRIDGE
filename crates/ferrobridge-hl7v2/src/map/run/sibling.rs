@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use fhir_types::codec::Value;
 
-use crate::map::corpus::Map;
+use crate::map::maps::Map;
 use crate::map::notation::{Label, Step, Target};
 use crate::map::run::{Base, Identity, Pending, Run, Write};
 use crate::map::{Outcome, RowRef};
@@ -357,7 +357,7 @@ mod tests {
     use fhir_types::codec::Value;
 
     use crate::map::Outcome;
-    use crate::map::corpus::Corpus;
+    use crate::map::maps::Maps;
     use crate::map::run::tests::{corpus, message, shipped};
     use crate::map::run::{Pending, Run};
     use crate::parse::Parsed;
@@ -375,7 +375,7 @@ mod tests {
 
     /// Walks `parsed` and settles its sibling families, as `finish` does
     /// before it applies the writes.
-    fn settled<'a>(corpus: &'a Corpus, parsed: &'a Parsed) -> Run<'a> {
+    fn settled<'a>(corpus: &'a Maps, parsed: &'a Parsed) -> Run<'a> {
         let mut run = Run::new(corpus, parsed);
         run.message().expect("the walk runs");
         run.siblings();

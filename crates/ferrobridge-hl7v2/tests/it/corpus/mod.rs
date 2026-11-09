@@ -23,7 +23,6 @@
 mod compare;
 mod refusals;
 mod sets;
-mod tables;
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -33,7 +32,7 @@ use bytes::BytesMut;
 use ferrobridge_hl7v2::batch;
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Received};
-use ferrobridge_hl7v2::map::translate::Translator;
+
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
 use ferrobridge_hl7v2::mllp::Codec;
 use ferrobridge_hl7v2::parse;
@@ -48,8 +47,8 @@ use crate::corpus::refusals::Expected;
 use crate::corpus::sets::{
     Message, VENDOR, aira, converter, nist, normalised, reportstream, v2_to_fhir,
 };
-use crate::corpus::tables::GuideTables;
 use crate::support;
+use crate::tables::PackageTables;
 
 /// The reason a case fails when the Bundle the map wrote does not decode.
 const UNDECODABLE: &str = "the Bundle does not decode as R4";
@@ -215,7 +214,7 @@ fn declared(message: &[u8]) -> (Option<String>, Option<String>) {
 /// family and the version the message declares.
 async fn run(
     message: &Message,
-    guide: &ferrobridge_hl7v2::map::corpus::Corpus,
+    guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
     client: &Client,
     expected: Option<&Expected>,
@@ -275,7 +274,7 @@ fn refused(id: &str, normal: &[u8], expected: &Expected) -> Case {
 async fn verdict(
     message: &Message,
     normal: &[u8],
-    guide: &ferrobridge_hl7v2::map::corpus::Corpus,
+    guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
     client: &Client,
 ) -> Case {
@@ -303,7 +302,7 @@ async fn verdict(
 async fn batch_verdict(
     id: &str,
     bytes: &[u8],
-    guide: &ferrobridge_hl7v2::map::corpus::Corpus,
+    guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
     client: &Client,
 ) -> Case {
@@ -341,7 +340,7 @@ async fn one(
     id: &str,
     bytes: &[u8],
     expected: Option<&Path>,
-    guide: &ferrobridge_hl7v2::map::corpus::Corpus,
+    guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
     client: &Client,
 ) -> Case {
@@ -360,7 +359,7 @@ async fn one(
         outcomes.insert(String::from("acknowledgment-not-mapped"), 1);
         return Case::pass(id).with_outcomes(outcomes);
     }
-    let mapped = match map(parsed, guide, Some(Translator::Server(client))).await {
+    let mapped = match map(parsed, guide, Some(client)).await {
         Ok(mapped) => mapped,
         Err(error) => {
             return Case::fail(id, format!("the map refuses it: {}", chain(&error)));
@@ -406,15 +405,15 @@ async fn one(
 /// alone ([`Targets`]), so a class names what the guide lacks whatever the
 /// supplements fill.
 async fn measure(corpus: Corpus, messages: &[Message]) -> Result<(), Box<dyn Error>> {
-    let targets = Targets::of(&support::corpus());
+    let targets = Targets::of(support::corpus());
     let shipped = support::shipped();
-    let tables = GuideTables::load(&support::package())?;
+    let tables = PackageTables::load(&[&support::package(), &support::values()])?;
     let (_server, client) = tables.serve().await?;
     let listed = refusals::expected()?;
     let mut cases = Vec::with_capacity(messages.len());
     for message in messages {
         let expected = listed.get(&message.id);
-        cases.push(run(message, &shipped, &targets, &client, expected).await);
+        cases.push(run(message, shipped, &targets, &client, expected).await);
     }
     let outcome = record(corpus, &cases)?;
     assert!(

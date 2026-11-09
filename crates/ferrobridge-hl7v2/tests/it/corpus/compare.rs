@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use ferrobridge_hl7v2::map::corpus::{Condition, Kind};
+use ferrobridge_hl7v2::map::maps::{Condition, Kind};
 use fhir_types::codec::Value;
 
 use crate::support;
@@ -31,7 +31,7 @@ fn head(target: &str) -> &str {
 }
 
 impl Targets {
-    pub(super) fn of(guide: &ferrobridge_hl7v2::map::corpus::Corpus) -> Self {
+    pub(super) fn of(guide: &ferrobridge_hl7v2::map::maps::Maps) -> Self {
         let mut resources: BTreeMap<String, BTreeMap<String, bool>> = BTreeMap::new();
         let mut elements: BTreeMap<(String, String), bool> = BTreeMap::new();
         for concept_map in guide.maps() {
@@ -192,7 +192,7 @@ pub(super) fn compare(
 #[test]
 fn a_difference_the_guide_maps_is_a_defect_and_one_it_never_maps_a_corpus_gap() {
     let guide = support::corpus();
-    let targets = Targets::of(&guide);
+    let targets = Targets::of(guide);
     assert_eq!(targets.resource("ORU_R01", "Patient"), "defect");
     assert_eq!(targets.resource("ORU_R01", "Immunization"), "corpus-gap");
     assert_eq!(targets.element("Patient", "name"), "defect");
