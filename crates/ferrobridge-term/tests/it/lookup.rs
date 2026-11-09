@@ -30,7 +30,7 @@ async fn mount(server: &MockServer, version: WireVersion, response: ResponseTemp
 #[tokio::test]
 async fn a_found_code_answers_its_display_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -91,7 +91,7 @@ async fn a_found_code_answers_its_display_in_both_releases()
 #[tokio::test]
 async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
 {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -145,7 +145,7 @@ async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dy
 #[tokio::test]
 async fn an_unknown_code_is_a_not_found_outcome_carrying_its_tx_issue()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,

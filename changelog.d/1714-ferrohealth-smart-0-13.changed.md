@@ -1,4 +1,4 @@
-- The bridge and `ferrobridge-term` 0.1.147 take `ferrohealth-smart` 0.13.0,
+- The bridge and `ferrobridge-term` 0.1.148 take `ferrohealth-smart` 0.13.0,
   the operator console `ferrohealth-session` 0.7.0, and the server
   `ihe-atna` and `ehds-logging` 0.8.0, whose FHIR Feed bearer is on the same
   line, so the lock holds one `ferrohealth-smart`. The 0.13 line refuses a

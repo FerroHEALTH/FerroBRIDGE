@@ -48,7 +48,7 @@ async fn translate(
 #[tokio::test]
 async fn an_equivalent_match_is_a_translation_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -131,7 +131,7 @@ async fn a_wider_or_inexact_match_is_returned_and_never_accepted()
 
 #[tokio::test]
 async fn a_false_result_is_a_no_match_outcome() -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -153,7 +153,7 @@ async fn a_false_result_is_a_no_match_outcome() -> Result<(), Box<dyn std::error
 #[tokio::test]
 async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
 {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -259,7 +259,7 @@ async fn sent(
 #[tokio::test]
 async fn a_map_url_alone_sends_no_target_system_and_no_reverse()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let translation =
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
                 .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL);
@@ -284,7 +284,7 @@ async fn a_map_url_alone_sends_no_target_system_and_no_reverse()
 
 #[tokio::test]
 async fn the_system_version_is_sent_when_given() -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let translation =
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
                 .with_version("2026")
@@ -300,7 +300,7 @@ async fn the_system_version_is_sent_when_given() -> Result<(), Box<dyn std::erro
 
 #[tokio::test]
 async fn reverse_is_sent_as_a_boolean_only_when_given() -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         for reverse in [true, false] {
             let translation = Translation::new(
                 fixtures::TERM_TARGET_SYSTEM,
