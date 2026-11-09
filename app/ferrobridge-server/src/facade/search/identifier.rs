@@ -17,6 +17,7 @@
 
 use std::collections::BTreeMap;
 
+use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::ResultSetRow;
 
@@ -173,9 +174,10 @@ pub struct MalformedParty {
 /// Returns the party uids the rows name, in row order, each once.
 ///
 /// Each row's first column is the party's `uid/value`. A versioned uid
-/// (`object_id::creating_system_id::version_tree_id`, RM Common
-/// `OBJECT_VERSION_ID`) names its party by the object id before the first
-/// `::`, so two versions of one party count as one. Every party is kept: a
+/// (`object_id::creating_system_id::version_tree_id`, BASE
+/// `OBJECT_VERSION_ID`) names its party by its `object_id`, kept verbatim, so
+/// two versions of one party count as one; any other uid is the party's
+/// `HIER_OBJECT_ID` whole, its `extension` included. Every party is kept: a
 /// bare identifier value matches "irrespective of the value of the system
 /// property" (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.10), so a value
 /// two patients carry names both.
@@ -190,19 +192,24 @@ pub fn uids(rows: &[ResultSetRow]) -> Result<Vec<String>, MalformedParty> {
         let uid = values
             .first()
             .and_then(serde_json::Value::as_str)
-            .map(object_id)
             .filter(|uid| !uid.is_empty())
+            .map(party_id)
             .ok_or(MalformedParty { row })?;
-        if !found.iter().any(|known| known == uid) {
-            found.push(uid.to_owned());
+        if !found.contains(&uid) {
+            found.push(uid);
         }
     }
     Ok(found)
 }
 
-/// Returns the object id a possibly versioned uid names.
-fn object_id(uid: &str) -> &str {
-    uid.split_once("::").map_or(uid, |(object, _)| object)
+/// Returns the id of the party a possibly versioned uid names.
+fn party_id(uid: &str) -> String {
+    // NOTE: BASE identification package: a `UID_BASED_ID` is a `HIER_OBJECT_ID`
+    // or an `OBJECT_VERSION_ID`, so a uid that is no version id names its party whole.
+    ObjectVersionId::new(uid).map_or_else(
+        |_| uid.to_owned(),
+        |version| version.object_id_str().to_owned(),
+    )
 }
 
 #[cfg(test)]
@@ -314,5 +321,21 @@ mod tests {
             Ok(vec![String::from("p-1"), String::from("p-2")])
         );
         assert!(uids(&[vec![serde_json::json!(7)]]).is_err());
+    }
+
+    #[test]
+    fn a_hier_object_id_with_an_extension_names_its_party_whole() {
+        // BASE identification package: a `HIER_OBJECT_ID` is `root::extension`.
+        assert_eq!(
+            uids(&[
+                vec![serde_json::json!("1.2.840.10003::a")],
+                vec![serde_json::json!("1.2.840.10003::b")],
+                vec![serde_json::json!("1.2.840.10003::a")]
+            ]),
+            Ok(vec![
+                String::from("1.2.840.10003::a"),
+                String::from("1.2.840.10003::b")
+            ])
+        );
     }
 }
