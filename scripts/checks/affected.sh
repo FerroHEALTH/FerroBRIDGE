@@ -186,6 +186,8 @@ classify() {
     .dockerignore | .editorconfig | .gitattributes | .gitignore | .hadolint.yaml | .mcp.json) echo inert ;;
     scripts/checks/comment-style.sh) echo inert ;;
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
+    # Read by crate-version-guard.sh and semver.sh alone.
+    scripts/checks/lib/public-deps.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     # Read by the CI `duplication` job alone, which runs on every change.
     scripts/checks/duplication.sh | scripts/checks/duplication.count | scripts/checks/duplication-baseline.txt) echo inert ;;
