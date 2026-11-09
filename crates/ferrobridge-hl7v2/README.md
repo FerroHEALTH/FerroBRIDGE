@@ -37,7 +37,11 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   components and subcomponents in the message's delimiters, each value
   escaped by HL7 v2.9 chapter 2 §2.7.1 or echoed as read, checked against the
   message structure its MSH declares and encoded in the character set MSH-18
-  names. The acknowledgment and every reply's header are built on it.
+  names. A writer `with_profile` checks against the structure as an
+  integration profile constrains it, the constraints carried as data in
+  `parse::profile` (`IHE_ITI_21`: QRI optional in the ITI-21 response, IHE
+  ITI TF-2 Table 3.21-6). The acknowledgment and every reply's header are
+  built on it.
 - `inbound`: the steps above for one message, settling the `AR` and `AE`
   answers a message owes before it is mapped.
 - `map`: the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, loaded
