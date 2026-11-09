@@ -19,6 +19,9 @@
 # guard names the crates to judge in `judged=` of $GITHUB_OUTPUT when CI sets
 # it. Every crate past 0.0.0 states the caret range consumers require,
 # `<name> = "0.Y"`, in its README, checked over the whole tree on every run.
+# A public dependency (scripts/checks/lib/public-deps.sh) required on another
+# compatibility line breaks the crate, which the judge cannot see, so the guard
+# refuses a patch step for it (#1777).
 #
 #   crate-version-guard.sh <base-ref> [head-ref]
 #   crate-version-guard.sh --self-test
@@ -44,6 +47,8 @@
 # histories in a scratch repository.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# shellcheck disable=SC1091 # shellcheck is not run with -x; the library is checked on its own
+. scripts/checks/lib/public-deps.sh
 
 # Each case builds a one-crate workspace in a scratch repository, forks a
 # branch from it, moves main on, and runs a copy of this script there.
@@ -68,9 +73,10 @@ self_test() {
     fi
   }
 
-  mkdir -p "$tmp/repo/crates/demo/src" "$tmp/repo/scripts/checks" "$tmp/repo/docs"
+  mkdir -p "$tmp/repo/crates/demo/src" "$tmp/repo/scripts/checks" "$tmp/repo/scripts/checks/lib" "$tmp/repo/docs"
   git init -q -b main "$tmp/repo"
   cp "$guard" "$tmp/repo/scripts/checks/"
+  cp "$PWD/scripts/checks/lib/public-deps.sh" "$tmp/repo/scripts/checks/lib/"
   printf '[workspace]\nmembers = ["crates/demo"]\n' > "$tmp/repo/Cargo.toml"
   echo 'pub fn a() {}' > "$tmp/repo/crates/demo/src/lib.rs"
   printf 'demo = "0.1"\n' > "$tmp/repo/crates/demo/README.md"
@@ -183,6 +189,28 @@ self_test() {
   printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde = "2"\ndemo = { path = "crates/demo", version = "=0.1.4" }\n' > "$tmp/repo/Cargo.toml"
   t_git commit -qam 'an exact sibling requirement'
   expect 0 "an exact requirement on a workspace crate" moved HEAD
+
+  # The #1777 cases: a public dependency moved to another compatibility line
+  # breaks the crate, so its step is the minor.
+  with_dependency() {
+    printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nopenehr-rm = "%s"\nserde = "%s"\n' "$2" "$3" > "$tmp/repo/Cargo.toml"
+    set_version "$1"
+    printf '\n[dependencies]\nopenehr-rm.workspace = true\nserde = { workspace = true, optional = true }\n' >> "$tmp/repo/crates/demo/Cargo.toml"
+    printf 'demo = "%s"\n' "$(cut -d. -f1-2 <<<"$1")" > "$tmp/repo/crates/demo/README.md"
+  }
+  t_git checkout -q -b public main
+  with_dependency 0.1.3 0.0.135 1.0.0
+  t_git commit -qam 'a public dependency'
+  t_git branch public-base
+  with_dependency 0.1.4 0.0.136 1.0.0
+  t_git commit -qam 'an incompatible public dependency on a patch'
+  expect 1 "a public dependency on another line with a patch step" public-base HEAD
+  with_dependency 0.2.0 0.0.136 1.0.0
+  t_git commit -qam 'an incompatible public dependency on a minor'
+  expect 0 "a public dependency on another line with a minor step" public-base HEAD
+  with_dependency 0.1.4 0.0.135 2.0.0
+  t_git commit -qam 'a private dependency on another line'
+  expect 0 "a private dependency on another line with a patch step" public-base HEAD
 
   if [[ "$failures" -ne 0 ]]; then
     echo "crate-version-guard: self-test: $failures case(s) failed" >&2
@@ -351,6 +379,16 @@ for manifest in crates/*/Cargo.toml; do
   if [[ -n "$old_ver" ]] && [[ "$old_ver" != "0.0.0" ]]; then
     if ! semver_step "$old_ver" "$new_ver"; then
       echo "::error::$name moves from $old_ver to $new_ver, which is neither a patch step nor the next minor at patch 0; a compatible change bumps the patch and a breaking one the minor (.claude/rules/crates-publishing.md)." >&2
+      fail=1
+      continue
+    fi
+    # A public dependency required on another compatibility line breaks the
+    # crate (#1777), which cargo-semver-checks cannot see.
+    moved="$(moved_lines \
+      "$(manifest_requirements <(git show "$base:Cargo.toml") <(git show "$base:$manifest") | public_lines)" \
+      "$(manifest_requirements <(head_file Cargo.toml) <(head_file "$manifest") | public_lines)")"
+    if [[ -n "$moved" ]] &&[[ "$(version_line "$old_ver")" == "$(version_line "$new_ver")" ]]; then
+      echo "::error::$name moves from $old_ver to $new_ver while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
       fail=1
       continue
     fi
