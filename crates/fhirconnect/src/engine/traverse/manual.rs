@@ -172,8 +172,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 .iter()
                 .map(|segment| segment.attribute.as_str())
                 .collect();
-            // NOTE: no specification governs this: our own design, `merge` writes a manual
-            // value as text, so a tail ending on no string attribute refuses (an empty
+            // NOTE: no specification governs this: our own design, a manual value is
+            // written as text, so a tail ending on no string attribute refuses (an empty
             // tail writes the node's `value`).
             let written: &[&str] = if segments.is_empty() {
                 &["value"]
@@ -201,7 +201,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 elements.last_mut().map(|(_, merged)| merged)
             };
             if let Some(merged) = merged {
-                merge(merged, &segments, text);
+                merge(merged, target.node().rm_type(), written, text).map_err(|source| {
+                    EngineError::TailWrite {
+                        mapping: format!("{}.{}", mapping.name(), entry.name()),
+                        node: String::from(target.node().aql_path().as_str()),
+                        source: Box::new(source),
+                    }
+                })?;
             }
         }
         for (target, mut merged) in elements {

@@ -10,9 +10,12 @@ use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::index::paths::FlatId;
 use openehr_rm::v1_2::model;
+use openehr_rm::v1_2::paths::PathSegment;
+use openehr_rm::v1_2::paths::Predicate;
 use openehr_rm::v1_2::paths::RmPath;
 use openehr_rm::v1_2::paths::item_at_path;
 use openehr_rm::v1_2::paths::items_at_path;
+use openehr_rm::v1_2::paths::write::SetPathError;
 use openehr_rm::v1_2::paths::write::set_at_path;
 use openehr_rm::v1_2::typing::RmType;
 use openehr_sdt::flat::path::Segment;
@@ -510,32 +513,37 @@ pub(super) fn scalar(value: &serde_json::Value) -> Option<String> {
     }
 }
 
-/// Merges one manual path into the object the entry builds.
+/// Writes one manual path's text into the object the entry builds for a node
+/// of `class`, through `openehr_rm::v1_2::paths::set_at_path`, so paths that
+/// share a prefix merge into one data element.
 pub(super) fn merge(
     object: &mut serde_json::Map<String, serde_json::Value>,
+    class: &str,
     segments: &[&str],
     value: &str,
-) {
-    let Some((first, rest)) = segments.split_first() else {
-        object.insert(
-            String::from("value"),
-            serde_json::Value::String(String::from(value)),
-        );
-        return;
+) -> Result<(), SetPathError> {
+    let path = RmPath {
+        absolute: false,
+        segments: segments
+            .iter()
+            .map(|attribute| PathSegment {
+                attribute: String::from(*attribute),
+                predicate: Predicate::default(),
+                descendant: false,
+            })
+            .collect(),
     };
-    if rest.is_empty() {
-        object.insert(
-            String::from(*first),
-            serde_json::Value::String(String::from(value)),
-        );
-        return;
+    let mut whole = serde_json::Value::Object(core::mem::take(object));
+    let written = set_at_path(
+        &mut whole,
+        &RmType::simple(class),
+        &path,
+        serde_json::Value::String(String::from(value)),
+    );
+    if let serde_json::Value::Object(held) = whole {
+        *object = held;
     }
-    let entry = object
-        .entry(String::from(*first))
-        .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
-    if let serde_json::Value::Object(ref mut nested) = *entry {
-        merge(nested, rest, value);
-    }
+    written.map(drop)
 }
 
 #[cfg(test)]
@@ -548,13 +556,17 @@ mod tests {
         // `defining_code/code_string` are merged together in the same data
         // element and do not overwrite".
         let mut object = serde_json::Map::new();
+        let class = "DV_CODED_TEXT";
         merge(
             &mut object,
+            class,
             &["defining_code", "terminology_id", "value"],
             "openehr",
-        );
-        merge(&mut object, &["defining_code", "code_string"], "524");
-        merge(&mut object, &["value"], "Initial");
+        )
+        .expect("the terminology should be written");
+        merge(&mut object, class, &["defining_code", "code_string"], "524")
+            .expect("the code should merge beside the terminology");
+        merge(&mut object, class, &["value"], "Initial").expect("the text should be written");
         assert_eq!(
             serde_json::Value::Object(object),
             serde_json::json!({

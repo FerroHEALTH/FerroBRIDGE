@@ -255,7 +255,7 @@ pub async fn run<S: ConceptSource>(
             index: index.template_id().to_owned(),
         });
     }
-    let walk = Walk::run(program, composition.value());
+    let walk = Walk::run(program, composition.value(), index.navigator());
     let fallback = context_date(composition);
     let answers = ask(&walk, seams, fallback.as_ref()).await?;
     let finisher = Finisher {
