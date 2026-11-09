@@ -4,6 +4,7 @@
 //! The data-type cell of one mapping, run over its input values.
 
 use core::str::FromStr;
+use std::borrow::Cow;
 
 use fhir_types::codec::Value;
 use openehr_mapping_core::composition::RmPosition;
@@ -81,6 +82,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         parent: &Binding,
         inputs: &[Occurrence],
     ) -> Result<Vec<Binding>, EngineError> {
+        let inputs = self.held_inputs(mapping, inputs)?;
+        let inputs = inputs.as_ref();
         let bindings = self.bindings(mapping, parent, inputs)?;
         if !mapping.manual().is_empty() {
             for entry in mapping.manual() {
@@ -113,6 +116,36 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }
         }
         Ok(bindings)
+    }
+
+    /// Returns the inputs of a mapping out of openEHR that hold a value.
+    ///
+    /// A leaf cell out of openEHR whose node holds no value writes nothing
+    /// and has no child to anchor, so it takes no output instance: a later
+    /// mapping onto the same repeating element then writes its first one.
+    /// Every other mapping keeps every input, since its binding anchors its
+    /// children or a `manual` writes without a source value.
+    fn held_inputs<'inputs>(
+        &self,
+        mapping: &Mapping,
+        inputs: &'inputs [Occurrence],
+    ) -> Result<Cow<'inputs, [Occurrence]>, EngineError> {
+        let leaf = self.direction == Direction::OpenehrToFhir
+            && mapping.manual().is_empty()
+            && mapping.followed_by().is_empty()
+            && mapping.data_type() != Some(crate::model::ast::keyword::DataType::None)
+            && !matches!(mapping.derived(), Some(Derived::Anchor | Derived::Event(_)))
+            && converted(mapping).is_some_and(|target| !target.ends_on_list());
+        let Some(target) = mapping.fhir().filter(|_| leaf) else {
+            return Ok(Cow::Borrowed(inputs));
+        };
+        let mut held = Vec::with_capacity(inputs.len());
+        for input in inputs {
+            if self.output_source(mapping, target, input)?.is_some() {
+                held.push(input.clone());
+            }
+        }
+        Ok(Cow::Owned(held))
     }
 
     /// Returns the FHIR value one openEHR value reads as, with what the cell

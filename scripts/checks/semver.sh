@@ -8,7 +8,10 @@
 # while the crate is 0.x (0.1.7 to 0.2.0), the Cargo SemVer rules of
 # https://doc.rust-lang.org/cargo/reference/semver.html. A minor bump with no
 # breaking change is refused too, so a compatible change moves the patch and
-# one caret requirement keeps every consumer on one release. No specification
+# one caret requirement keeps every consumer on one release. A public
+# dependency (scripts/checks/lib/public-deps.sh) moved to another
+# compatibility line breaks the crate where the judge cannot see it, so it
+# needs the minor and answers one (#1777). No specification
 # governs where the judge runs: our own design. crate-version-guard.sh runs it
 # on a pull request and in the merge queue against the target branch, and the
 # release plan runs it against crates.io over the crates the release
@@ -27,6 +30,8 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"
+# shellcheck disable=SC1091 # shellcheck is not run with -x; the library is checked on its own
+. scripts/checks/lib/public-deps.sh
 
 usage() {
   echo "usage: semver.sh [--baseline-rev <rev>] [<crate>...] | --pin" >&2
@@ -66,6 +71,18 @@ package_version() {
   awk -F'"' '/^\[package\]/{p=1; next} /^\[/{p=0} p && /^version[[:space:]]*=/{print $2; exit}'
 }
 
+# The crates.io API document at path $1 under /api/v1/crates/.
+crates_io() {
+  curl --proto '=https' --tlsv1.2 -sSL --fail \
+    -H 'User-Agent: ferrobridge-semver (scripts/checks/semver.sh)' \
+    "https://crates.io/api/v1/crates/$1" 2>/dev/null
+}
+
+# The newest stable release of crate $1 on crates.io; empty when it has none.
+newest_release() {
+  crates_io "$1" | jq -r '.crate.max_stable_version // empty' || true
+}
+
 # The version crate $1 has at the baseline: its manifest at the baseline
 # revision, or its newest stable release on crates.io; empty when it has none.
 baseline_version() {
@@ -73,10 +90,7 @@ baseline_version() {
   if [[ -n "$baseline_rev" ]]; then
     git show "$baseline_rev:crates/$crate/Cargo.toml" 2>/dev/null | package_version || true
   else
-    curl --proto '=https' --tlsv1.2 -sSL --fail \
-      -H 'User-Agent: ferrobridge-semver (scripts/checks/semver.sh)' \
-      "https://crates.io/api/v1/crates/$crate" 2>/dev/null |
-      jq -r '.crate.max_stable_version // empty' || true
+    newest_release "$crate"
   fi
 }
 
@@ -89,6 +103,39 @@ same_line() {
   else
     [[ "${a%%.*}" == "${b%%.*}" ]]
   fi
+}
+
+# The public dependency lines (scripts/checks/lib/public-deps.sh) of crate $1
+# in the tree, at revision $2, and of release $2 on crates.io.
+tree_lines() {
+  manifest_requirements Cargo.toml "crates/$1/Cargo.toml" | public_lines
+}
+revision_lines() {
+  manifest_requirements <(git show "$2:Cargo.toml") <(git show "$2:crates/$1/Cargo.toml") | public_lines
+}
+release_lines() {
+  crates_io "$1/$2/dependencies" |
+    jq -r '.dependencies[] | select(.kind == "normal") | "\(.crate_id) \(.req)"' | public_lines
+}
+
+# The public dependencies of crate $1 that moved to another compatibility line
+# since version $2 at the baseline (#1777). Against a revision, the newest
+# release on crates.io counts too while it shares the line of $2: a move that
+# landed under an unpublished patch still breaks the consumers of that release.
+moved_since() {
+  local crate="$1" previous="$2" current published moved=""
+  current="$(tree_lines "$crate")"
+  if [[ -n "$baseline_rev" ]]; then
+    moved="$(moved_lines "$(revision_lines "$crate" "$baseline_rev")" "$current")"
+    published="$(newest_release "$crate")"
+    if [[ -n "$published" ]] && ! same_line "$published" "$previous"; then published=""; fi
+  else
+    published="$previous"
+  fi
+  if [[ -z "$moved" ]] && [[ -n "$published" ]]; then
+    moved="$(moved_lines "$(release_lines "$crate" "$published")" "$current")"
+  fi
+  echo "$moved"
 }
 
 crates=("$@")
@@ -139,6 +186,18 @@ for crate in "${crates[@]}"; do
   if [[ "$status" -ne 0 ]] || ! grep -q 'Summary' "$log"; then
     echo "::error::semver: cargo-semver-checks could not judge $crate $current against $previous (exit $status); see its output above." >&2
     failed="$failed $crate"
+    continue
+  fi
+  # A public dependency on another line breaks the crate where the judge
+  # cannot see it (#1777): it needs the minor and answers one.
+  moved="$(moved_since "$crate" "$previous")"
+  if [[ -n "$moved" ]]; then
+    if same_line "$previous" "$current"; then
+      echo "::error::semver: $crate moves from $previous to $current while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
+      failed="$failed $crate"
+    else
+      echo "semver: $crate leaves its line for its public dependencies ($moved)"
+    fi
     continue
   fi
   # The version left the line, so the change must break: judged as a patch,
