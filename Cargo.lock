@@ -1550,6 +1550,7 @@ dependencies = [
  "openehr-its",
  "openehr-mapping-core",
  "openehr-rm",
+ "openehr-sdt",
  "proptest",
  "serde",
  "serde_json",
@@ -3995,7 +3996,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.148"
+version = "0.1.149"
 dependencies = [
  "ferrobridge-testkit",
  "insta",
