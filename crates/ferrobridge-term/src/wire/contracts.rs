@@ -33,6 +33,7 @@ macro_rules! validated {
 
 /// Returns the details of a `$validate-code` answer of R4 to R6, whose
 /// `ValueSet` and `CodeSystem` forms declare the same `out` parameters.
+#[cfg(any(feature = "r4", feature = "r4b", feature = "r5", feature = "r6"))]
 macro_rules! modern_details {
     ($answer:expr) => {
         crate::outcome::ValidationDetails {
@@ -66,6 +67,7 @@ macro_rules! modern_details {
 }
 
 /// Returns the `issues` outcome of a `$validate-code` answer of R4 to R6.
+#[cfg(any(feature = "r4", feature = "r4b", feature = "r5", feature = "r6"))]
 macro_rules! modern_issues {
     ($answer:expr) => {
         $answer
@@ -81,6 +83,7 @@ macro_rules! modern_issues {
 /// Returns a `$translate` match of STU3 to R4B with its `equivalence`,
 /// `concept`, `source` and `product` parts, which those releases declare
 /// alike.
+#[cfg(any(feature = "stu3", feature = "r4", feature = "r4b"))]
 macro_rules! equivalence_match {
     ($found:expr) => {
         $found
@@ -115,6 +118,7 @@ macro_rules! equivalence_match {
 
 /// Returns `$base` with the match parts R4 to R6 declare alike: `originMap`,
 /// `noMap`, `sourceConcept` and the two comments.
+#[cfg(any(feature = "r4", feature = "r4b", feature = "r5", feature = "r6"))]
 macro_rules! match_notes {
     ($found:expr, $base:expr) => {
         crate::concept::Match {
@@ -137,6 +141,7 @@ macro_rules! match_notes {
 /// Returns the `$translate` request of STU3 to R4B: `code`, `system`,
 /// `version`, `targetsystem` and `reverse`, which those releases declare
 /// alike.
+#[cfg(any(feature = "stu3", feature = "r4", feature = "r4b"))]
 macro_rules! code_translate_request {
     ($translation:expr) => {
         ConceptMapTranslateRequest {
@@ -154,6 +159,7 @@ macro_rules! code_translate_request {
 /// `conceptMapVersion`, `sourceCode` and `targetSystem`, with the system and
 /// its version under the names `$system` and `$version` the release gives
 /// them.
+#[cfg(any(feature = "r5", feature = "r6"))]
 macro_rules! source_translate_request {
     ($translation:expr, $system:ident, $version:ident) => {
         ConceptMapTranslateRequest {
@@ -173,6 +179,7 @@ macro_rules! source_translate_request {
 /// carries outside `$translate` is declared under the same name and type,
 /// with the terminology ecosystem's additions
 /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+#[cfg(any(feature = "r4", feature = "r4b", feature = "r5", feature = "r6"))]
 macro_rules! modern_contracts {
     ($release:ident) => {
         use fhir_types::$release::operations::code_system_validate_code::CodeSystemValidateCodeRequest;
@@ -269,6 +276,7 @@ macro_rules! modern_contracts {
 
 /// The `$validate-code` `displayLanguage` and the `compose.include.filter.value`
 /// of R4 to R5, which declare the first `0..1` and the second a `string`.
+#[cfg(any(feature = "r4", feature = "r4b", feature = "r5"))]
 macro_rules! single_language_contracts {
     ($release:ident) => {
         /// Returns `displayLanguage`, declared `0..1`.
@@ -288,6 +296,7 @@ macro_rules! single_language_contracts {
 /// The request writers and readers of R4 and R4B, after
 /// `OperationDefinition-ConceptMap-translate` of `hl7.fhir.r4.core` 4.0.1 and
 /// `hl7.fhir.r4b.core` 4.3.0.
+#[cfg(any(feature = "r4", feature = "r4b"))]
 macro_rules! r4_contracts {
     ($release:ident) => {
         modern_contracts!($release);
@@ -331,6 +340,7 @@ macro_rules! r4_contracts {
 /// The `$translate` reader of R5 and R6, whose matches state a
 /// `relationship` and carry `product`, `dependsOn` and `property` parts
 /// (<https://hl7.org/fhir/R5/conceptmap-operation-translate.html>).
+#[cfg(any(feature = "r5", feature = "r6"))]
 macro_rules! relationship_match {
     ($release:ident) => {
         /// Returns one match, with its `relationship`.
@@ -394,6 +404,7 @@ macro_rules! relationship_match {
 /// The request writers of R5, after `OperationDefinition-ConceptMap-translate`
 /// of `hl7.fhir.r5.core` 5.0.0, which renamed the code `sourceCode` and the
 /// target system `targetSystem`.
+#[cfg(feature = "r5")]
 macro_rules! r5_contracts {
     ($release:ident) => {
         modern_contracts!($release);
@@ -413,6 +424,7 @@ macro_rules! r5_contracts {
 /// `OperationDefinition-ConceptMap-translate` of `hl7.fhir.r6.core`
 /// 6.0.0-ballot5, which also renamed `system` and `version` to
 /// `sourceSystem` and `sourceVersion`.
+#[cfg(feature = "r6")]
 macro_rules! r6_contracts {
     ($release:ident) => {
         modern_contracts!($release);
@@ -440,6 +452,7 @@ macro_rules! r6_contracts {
     };
 }
 
+#[cfg(feature = "stu3")]
 macro_rules! stu3_contracts {
     ($release:ident) => {
         /// Returns whether STU3 defines no such operation: it has no
