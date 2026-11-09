@@ -174,4 +174,31 @@ impl Segment {
     pub fn id(&self) -> &str {
         &self.id
     }
+
+    /// Returns the fields in position order, the first at index 0.
+    #[must_use]
+    pub fn fields(&self) -> &[Field] {
+        &self.fields
+    }
+
+    /// Returns the field at `position`, from 1 as the parser counts it,
+    /// `None` past the last field.
+    #[must_use]
+    pub fn field(&self, position: usize) -> Option<&Field> {
+        self.fields.get(position.checked_sub(1)?)
+    }
+
+    /// Sets the field at `position`, from 1, padding with empty fields up
+    /// to it; position 0 names no field and changes nothing.
+    pub fn set(&mut self, position: usize, field: Field) {
+        let Some(index) = position.checked_sub(1) else {
+            return;
+        };
+        if self.fields.len() <= index {
+            self.fields.resize_with(index, Field::default);
+            self.fields.push(field);
+        } else if let Some(slot) = self.fields.get_mut(index) {
+            *slot = field;
+        }
+    }
 }

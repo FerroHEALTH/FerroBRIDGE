@@ -1,0 +1,31 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "table-hl70202-to-contact-point-use",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-to-contact-point-use",
+  "name": "FerroBRIDGEHl70202ToContactPointUse",
+  "title": "FerroBRIDGE supplement: HL7 table 0202 to contact-point-use",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds the contact-point-use group of ConceptMap/table-hl70202-to-contact-point-system of hl7.fhir.uv.v2mappings 1.0.0 as a map of its own: CP (Cellular or Mobile Phone) to mobile. The override of datatype-xtn-to-contactpoint writes ContactPoint.use from XTN.3 through it when XTN.2 is not valued. FerroBRIDGE #1762, upstream defect FerroBRIDGE #1764.",
+  "sourceUri": "http://terminology.hl7.org/ValueSet/v2-0202",
+  "group": [
+    {
+      "source": "http://terminology.hl7.org/CodeSystem/v2-0202",
+      "target": "http://hl7.org/fhir/contact-point-use",
+      "element": [
+        {
+          "code": "CP",
+          "display": "Cellular or Mobile Phone",
+          "target": [
+            {
+              "code": "mobile",
+              "display": "Mobile",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

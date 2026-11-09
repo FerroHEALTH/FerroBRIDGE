@@ -39,7 +39,7 @@ macro_rules! shipped {
 
 /// Every shipped supplement, as its file name and its text, in file name
 /// order.
-pub const SHIPPED: [(&str, &str); 43] = [
+pub const SHIPPED: [(&str, &str); 46] = [
     shipped!("ConceptMap-datatype-ce-to-codeableconcept.json"),
     shipped!("ConceptMap-datatype-cf-to-codeableconcept.json"),
     shipped!("ConceptMap-datatype-cwe-to-codeableconcept.json"),
@@ -49,6 +49,7 @@ pub const SHIPPED: [(&str, &str); 43] = [
     shipped!("ConceptMap-datatype-pl-to-location.json"),
     shipped!("ConceptMap-datatype-xad-to-address.json"),
     shipped!("ConceptMap-datatype-xpn-to-string.json"),
+    shipped!("ConceptMap-datatype-xtn-to-contactpoint.json"),
     shipped!("ConceptMap-message-adt-a03-to-bundle.json"),
     shipped!("ConceptMap-message-adt-a05-to-bundle.json"),
     shipped!("ConceptMap-message-adt-a06-to-bundle.json"),
@@ -82,6 +83,8 @@ pub const SHIPPED: [(&str, &str); 43] = [
     shipped!("ConceptMap-table-address-use-to-hl70190.json"),
     shipped!("ConceptMap-table-administrative-gender-to-hl70001.json"),
     shipped!("ConceptMap-table-contact-point-system-to-hl70202.json"),
+    shipped!("ConceptMap-table-hl70202-to-contact-point-system.json"),
+    shipped!("ConceptMap-table-hl70202-to-contact-point-use.json"),
     shipped!("ConceptMap-table-name-use-to-hl70200.json"),
 ];
 
