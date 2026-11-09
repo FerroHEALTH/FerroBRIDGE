@@ -25,9 +25,13 @@ commit before a push), and on a release the previous release.
 
 ## What runs
 
-The `perf` workflow builds the release binary of the head and of the base,
-the base from `git archive` of its commit with its own toolchain pin, and
-installs `ferrohealth-perf` at its pin in `docs/VERSIONS.md`. Then
+The `perf` workflow builds the release binary of the base and then of the
+head, both in one tree under `target/perf-build` with its own toolchain pin
+and one target directory. The tree starts as `git archive` of the base's
+commit; after the base is built, only the files the head changes are
+rewritten, so cargo rebuilds for the head only the crates the change reaches
+and the generated crates the two arms share build once. It installs
+`ferrohealth-perf` at its pin in `docs/VERSIONS.md`. Then
 `scripts/perf/gate.sh run`:
 
 1. starts two FerroEHR CDRs, each with its own PostgreSQL, one RabbitMQ and
