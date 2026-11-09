@@ -8,7 +8,8 @@ description: >-
   retry on a fresh runner may help, and the perf workflow's verdict job
   decides. A retry may help when the gate ended with exit 2, a run that
   could not be judged, on any CPU model, or with exit 1, a breach, on a CPU
-  model the workflow lists as stall-prone. The calling job checks out
+  model the workflow lists as stall-prone; the workflow also retries an
+  attempt whose job ended cancelled because its runner shut down. The calling job checks out
   the repository and installs the Rust toolchain first. No specification
   governs this: our own design.
 inputs:
@@ -47,17 +48,53 @@ runs:
       shell: bash
       env:
         BASE: ${{ inputs.base }}
-      run: bash scripts/perf/gate.sh build "$BASE"
+        BUILD_SWAP: /perf-build.swap
+      # A release build of fhir-types with every resource of all five FHIR
+      # releases, which main compiled from #1717 until #1737, peaks above the
+      # runner's 16 GB on its own (#1737), so a swap file backs the build and
+      # is turned off again before anything is measured; the binaries are the
+      # same. The memory, swap and disk are logged each minute, so a runner
+      # that shuts down mid-build leaves the last reading in its log.
+      run: |
+        set -euo pipefail
+        swap="$BUILD_SWAP"
+        sudo fallocate -l 20G "$swap"
+        sudo chmod 600 "$swap"
+        sudo mkswap "$swap" > /dev/null
+        sudo swapon "$swap"
+        sample() {
+          while true; do
+            free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB, ", $3, $2 }
+              NR == 3 { printf "swap used %s of %s MB, ", $3, $2 }'
+            df -m . | awk 'NR == 2 { printf "disk free %s MB\n", $4 }'
+            sleep 60
+          done
+        }
+        sample &
+        sampler=$!
+        trap 'kill "$sampler" 2> /dev/null || true; sudo swapoff "$swap" || true; sudo rm -f "$swap"' EXIT
+        bash scripts/perf/gate.sh build "$BASE"
     - name: Gate the performance
       id: gate
       shell: bash
       env:
         ATTEMPT: ${{ inputs.attempt }}
         STALL_PRONE: ${{ inputs.stall-prone }}
+        BUILD_SWAP: /perf-build.swap
+      # The idle phase and the load phases run with the swap the runner booted
+      # with: the build's swap file must be off and gone, or the run cannot be
+      # judged (exit 2).
       run: |
         set -uo pipefail
+        echo "perf-gate: swap before measuring: $(tail -n +2 /proc/swaps | awk '{ printf "%s (%s kB used) ", $1, $4 }')"
+        free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB before measuring\n", $3, $2 }'
         code=0
-        bash scripts/perf/gate.sh run || code=$?
+        if grep -qF "$BUILD_SWAP" /proc/swaps || [ -e "$BUILD_SWAP" ]; then
+          echo "::error title=Performance gate::the build's swap file is still on before the gate measures"
+          code=2
+        else
+          bash scripts/perf/gate.sh run || code=$?
+        fi
         latest="$(find target/perf -name latest.json -not -path '*busy-loop*' -print -quit 2>/dev/null || true)"
         model=""
         if [ -n "$latest" ]; then

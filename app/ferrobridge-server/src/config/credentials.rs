@@ -9,8 +9,8 @@ use std::path::Path;
 use ferrohealth_secret::file::read_secret;
 use ferrohealth_secret::secret::Secret;
 use ferrohealth_smart::client::ClientCredentials;
-use ferrohealth_smart::config::CredentialsSection;
-use ferrohealth_smart::config::Outbound;
+use ferrohealth_smart::config::credentials::CredentialsSection;
+use ferrohealth_smart::config::credentials::Outbound;
 use secrecy::SecretString;
 
 use super::error::Error;

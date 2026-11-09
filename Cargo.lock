@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.1.186"
+version = "0.1.187"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1561,9 +1561,9 @@ dependencies = [
 
 [[package]]
 name = "ehds-logging"
-version = "0.4.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70cd1eefa36dd8f2d001702176dcf70192e5c832cdbe5afa87d17aa5c8b1e850"
+checksum = "513046a1ee51912c306cde485189079fa7fb4954e3ae51e5ced0c6d5e8c8ee1a"
 dependencies = [
  "async-trait",
  "ihe-atna",
@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.204"
+version = "0.1.207"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.1.146"
+version = "0.1.148"
 dependencies = [
  "async-trait",
  "backon",
@@ -1937,7 +1937,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.1.152"
+version = "0.1.154"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -2023,9 +2023,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.3.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2aaad26775b4be3f6bb86add085d220fb687167a102cc302b06b2305977d9e7d"
+checksum = "2a400b7ae519a6515e43a832d8c822b1b0f7b45f87615f09e3d411a5be8bc75f"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -2047,9 +2047,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.9.2"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d2ab4ccee6eb7d4b81d6c31de9ba099cd2b0b165a9c98a983e832886b3f3eee"
+checksum = "dfe7a2900512b6ffdc66ce45bb9b545262d3ac7e997ebc35155378d9fe8cc805"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -2060,6 +2060,7 @@ dependencies = [
  "jiff",
  "jsonwebtoken",
  "reqwest",
+ "rustls",
  "secrecy",
  "serde",
  "serde_json",
@@ -3078,9 +3079,9 @@ dependencies = [
 
 [[package]]
 name = "ihe-atna"
-version = "0.4.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5b92cbd44c5afbfd60f084fb8350a85a20f5a13f055af7e9da1f9145a17681"
+checksum = "5e768c54d08bcc20b07581de76ce07ef7b969e36e7159bdaedb35f05e5536a86"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -5898,7 +5899,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

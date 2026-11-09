@@ -25,6 +25,7 @@ mod arity;
 pub mod grouping;
 pub mod lex;
 mod place;
+pub mod profile;
 mod required;
 pub mod structure;
 
@@ -674,6 +675,8 @@ fn base_name(id: &'static str) -> &'static str {
 
 /// One open group instance while the segments are placed.
 struct Frame {
+    profile: &'static profile::Profile,
+    version: &'static str,
     nodes: &'static [Node],
     group: Option<&'static Group>,
     occurrence: usize,
