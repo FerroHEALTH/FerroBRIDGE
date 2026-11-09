@@ -185,17 +185,26 @@ impl Map {
     /// of the guide names its data type map.
     #[must_use]
     pub fn alternative_to(&self, other: &Self) -> bool {
-        self.rows.iter().any(|mine| {
-            other.rows.iter().any(|theirs| {
-                mine.source == theirs.source
-                    && mine.condition == Condition::Always
-                    && theirs.condition == Condition::Always
-                    && match (reach(mine), reach(theirs)) {
-                        (Some(Reach::Whole), Some(_)) | (Some(_), Some(Reach::Whole)) => true,
-                        (Some(Reach::Child(a)), Some(Reach::Child(b))) => a == b,
-                        _ => false,
-                    }
-            })
+        self.unconditional_pair(other, |mine, theirs| {
+            mine.source == theirs.source
+                && match (reach(mine), reach(theirs)) {
+                    (Some(Reach::Whole), Some(_)) | (Some(_), Some(Reach::Whole)) => true,
+                    (Some(Reach::Child(a)), Some(Reach::Child(b))) => a == b,
+                    _ => false,
+                }
+        })
+    }
+
+    /// Returns whether some row of this map and some row of `other`, both
+    /// with no condition, satisfy `pair`.
+    fn unconditional_pair(&self, other: &Self, pair: impl Fn(&Row, &Row) -> bool) -> bool {
+        let unconditional = |row: &&Row| row.condition == Condition::Always;
+        self.rows.iter().filter(unconditional).any(|mine| {
+            other
+                .rows
+                .iter()
+                .filter(unconditional)
+                .any(|them| pair(mine, them))
         })
     }
 }
@@ -220,16 +229,10 @@ impl Map {
         if !mine.is_disjoint(&theirs) {
             return false;
         }
-        self.rows.iter().any(|row| {
-            other.rows.iter().any(|them| {
-                row.condition == Condition::Always
-                    && them.condition == Condition::Always
-                    && match (reach(row), reach(them)) {
-                        (Some(Reach::Whole), Some(Reach::Whole)) => true,
-                        (Some(Reach::Child(a)), Some(Reach::Child(b))) => a == b,
-                        _ => false,
-                    }
-            })
+        self.unconditional_pair(other, |row, them| match (reach(row), reach(them)) {
+            (Some(Reach::Whole), Some(Reach::Whole)) => true,
+            (Some(Reach::Child(a)), Some(Reach::Child(b))) => a == b,
+            _ => false,
         })
     }
 
@@ -447,24 +450,14 @@ impl Maps {
 /// Reads one generated structure map into rows.
 pub(crate) fn structure(declared: &Declared) -> Map {
     Map {
-        id: String::from(declared.id),
-        url: String::from(declared.url),
-        title: declared.title.map(String::from),
-        kind: Kind::of(declared.id),
         rows: declared.rows.iter().map(row).collect(),
-        groups: Vec::new(),
-        origin: Origin::Guide,
+        ..guide(declared.id, declared.url, declared.title)
     }
 }
 
 /// Reads one generated table map header.
 fn table(declared: &DeclaredTable) -> Map {
     Map {
-        id: String::from(declared.id),
-        url: String::from(declared.url),
-        title: declared.title.map(String::from),
-        kind: Kind::of(declared.id),
-        rows: Vec::new(),
         groups: declared
             .groups
             .iter()
@@ -473,6 +466,19 @@ fn table(declared: &DeclaredTable) -> Map {
                 target: String::from(target.unwrap_or_default()),
             })
             .collect(),
+        ..guide(declared.id, declared.url, declared.title)
+    }
+}
+
+/// A map of the guide with its id, url and title, and no rows or groups.
+fn guide(id: &str, url: &str, title: Option<&str>) -> Map {
+    Map {
+        id: String::from(id),
+        url: String::from(url),
+        title: title.map(String::from),
+        kind: Kind::of(id),
+        rows: Vec::new(),
+        groups: Vec::new(),
         origin: Origin::Guide,
     }
 }
