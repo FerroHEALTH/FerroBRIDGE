@@ -639,6 +639,10 @@ jobs:
       # consumer that takes only the listener, the parser and the ack (#1221).
       - if: contains(matrix.packages, 'ferrobridge-hl7v2')
         run: cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
+      # fhirconnect without its default `mapping` feature: the FHIR path model
+      # alone, the surface ferrobridge-hl7v2's map takes (#1750).
+      - if: contains(matrix.packages, 'fhirconnect')
+        run: cargo clippy -p fhirconnect --all-targets --no-default-features --locked -- -D warnings
       # eehrxf has no default feature: one feature per Art 14(1) category and
       # one per serialisation, linted with none, alone and in every pair (the
       # step above lints them all together), so an import only some
