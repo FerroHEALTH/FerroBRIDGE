@@ -63,6 +63,15 @@ repository_for() {
   esac
 }
 
+# The directory a package is vendored under: the v2-to-FHIR ConceptMaps live
+# in the crate that embeds them, every other package beside the generator.
+vendor_dir_for() {
+  case "$1" in
+    hl7.fhir.uv.v2mappings) printf '%s\n' "crates/ferrobridge-hl7v2/vendor" ;;
+    *) printf '%s\n' "$vendor_dir" ;;
+  esac
+}
+
 repository_paths_for() {
   case "$1" in
     hl7.fhir.uv.v2mappings) printf '%s\n' LICENSE input/pagecontent/mapping_guidelines.md ;;
@@ -136,7 +145,7 @@ vendor_one() {
   case "$ver" in
     *[!A-Za-z0-9.-]*) die "pin for $pkg is not a plain version: '$ver'" ;;
   esac
-  dest="$vendor_dir/$pkg"
+  dest="$(vendor_dir_for "$pkg")/$pkg"
 
   echo "== $pkg $ver"
   local meta_url

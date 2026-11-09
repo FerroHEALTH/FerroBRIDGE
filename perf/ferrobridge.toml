@@ -38,7 +38,7 @@ enabled = false
 [hl7v2]
 enabled = true
 listen = "127.0.0.1:12575"
-concept_maps = "tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
+concept_maps = "crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package"
 senders = [{ namespace_id = "PERFLAB", certificate_subject = "perflab.example.org" }]
 # The profile of the face's Observation context in
 # app/ferrobridge-server/tests/it/hl7v2_fixtures, so an OBX reaches it.

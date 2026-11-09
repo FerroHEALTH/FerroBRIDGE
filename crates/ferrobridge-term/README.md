@@ -119,7 +119,17 @@ call in it does not compile. The default is `stu3`, `r4` and `r4b`; a
 consumer that speaks R5 or the R6 ballot turns `r5` or `r6` on:
 
 ```toml
-ferrobridge-term = { version = "=0.1.147", features = ["r5", "r6"] }
+ferrobridge-term = { version = "0.1", features = ["r5", "r6"] }
+```
+
+The HTTP client is the default `client` feature: `reqwest`, the retry
+budget, the credentials and the token provider. Without it the crate keeps the
+request, concept and outcome types and the transport-free writers and readers
+(`invocation`), which an offline translator such as `ferrobridge-hl7v2`'s
+speaks with no HTTP stack:
+
+```toml
+ferrobridge-term = { version = "0.1", default-features = false, features = ["r4"] }
 ```
 
 R5 and R6 are off by default because a binary that also enables the

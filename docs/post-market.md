@@ -19,11 +19,11 @@ changelog and its release lane (`release.md`).
 
 | Who | What |
 |---|---|
-| Cadasto B.V., the manufacturer | Receives reports at `info@cadasto.com`, decides whether a vulnerability is actively exploited, and signs every report to an authority (the FerroHEALTH procedure). |
-| The maintainer | Reads FerroBRIDGE's private vulnerability reports, the reports Cadasto B.V. forwards from `info@cadasto.com`, and the tracker; drafts the advisory, prepares the fixing release, and publishes the advisory with it. |
+| Cadasto B.V., the manufacturer | Receives reports at `security@cadasto.com`, decides whether a vulnerability is actively exploited, and signs every report to an authority (the FerroHEALTH procedure). |
+| The maintainer | Reads FerroBRIDGE's private vulnerability reports, the reports Cadasto B.V. forwards from `security@cadasto.com`, and the tracker; drafts the advisory, prepares the fixing release, and publishes the advisory with it. |
 
 FerroBRIDGE's channels are GitHub private vulnerability reporting on this
-repository and `info@cadasto.com` with the subject "FerroBRIDGE
+repository and `security@cadasto.com` with the subject "FerroBRIDGE
 vulnerability" ([`SECURITY.md`](../SECURITY.md)). An emailed report gets a
 draft security advisory on this repository on receipt, exactly as a private
 GitHub report does.

@@ -20,7 +20,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-package="$root/tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
+package="$root/crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package"
 
 shape='gsub("\"[^\"]*\""; "L")
   | gsub("[A-Za-z][A-Za-z0-9]{1,3}[-.][0-9]+(\\.[0-9]+)*"; "X")

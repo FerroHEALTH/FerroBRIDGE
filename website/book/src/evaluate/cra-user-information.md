@@ -57,7 +57,7 @@ manufacturer's policy on coordinated vulnerability disclosure can be found;"
 
 - **Report a vulnerability** through
   [GitHub private vulnerability reporting](https://github.com/FerroHEALTH/FerroBRIDGE/security/advisories/new),
-  or by email to [info@cadasto.com](mailto:info@cadasto.com) with
+  or by email to [security@cadasto.com](mailto:security@cadasto.com) with
   "FerroBRIDGE vulnerability" in the subject, as
   [`SECURITY.md`](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/SECURITY.md#reporting-a-vulnerability)
   says. Both routes reach the same people and the same procedure. Do not open
