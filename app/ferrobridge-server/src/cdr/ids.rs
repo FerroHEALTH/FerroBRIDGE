@@ -9,9 +9,10 @@
 //! container of a version) and the handles openEHR has no type of their own
 //! for.
 
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_base::v1_3::base_types::identification::template_id::TemplateId;
+use openehr_its::rest::etag::EntityTag;
+use std::borrow::Cow;
 use std::fmt;
 
 /// A character that would change the shape of a request path or query.
@@ -70,12 +71,13 @@ fn opaque(kind: &'static str, text: &str) -> Result<String, IdError> {
 /// indicator and double quotes around the identifier; neither belongs to the
 /// identifier itself.
 #[must_use]
-pub fn entity_tag(value: &str) -> &str {
-    let value = value.strip_prefix("W/").unwrap_or(value);
-    value
-        .strip_prefix('"')
-        .and_then(|inner| inner.strip_suffix('"'))
-        .unwrap_or(value)
+pub fn entity_tag(value: &str) -> Cow<'_, str> {
+    // NOTE: RFC 9110 §8.8.3 quotes every entity tag; a value that is no entity
+    // tag is read as the bare identifier a lenient peer sent.
+    match value.parse::<EntityTag>() {
+        Ok(tag) => Cow::Owned(tag.tag().to_owned()),
+        Err(_) => Cow::Borrowed(value),
+    }
 }
 
 /// An EHR identifier, taken from `EHR.ehr_id.value`.
@@ -124,37 +126,11 @@ impl fmt::Display for EhrId {
 /// `OBJECT_VERSION_ID`.
 pub fn version_from_etag(value: &str) -> Result<ObjectVersionId, IdError> {
     let tag = entity_tag(value);
-    ObjectVersionId::new(tag).map_err(|source| IdError::Openehr {
+    ObjectVersionId::new(tag.as_ref()).map_err(|source| IdError::Openehr {
         kind: "OBJECT_VERSION_ID",
-        found: tag.to_owned(),
+        found: tag.into_owned(),
         source,
     })
-}
-
-/// Returns the version container `version` belongs to, its `object_id` part
-/// verbatim.
-///
-/// RM Common §`OBJECT_VERSION_ID` gives the three-part form
-/// `object_id::creating_system_id::version_tree_id`, of which the leading
-/// `object_id` names the version container and is stable across updates. The
-/// part is taken as written, since the typed `Uid` accessor lower-cases a UUID
-/// and the CDR addresses the container by the spelling it issued.
-///
-/// # Panics
-/// Never: `ObjectVersionId::new` refuses a value whose `object_id` part is
-/// not a legal `uid`, which is all `HierObjectId::new` checks.
-#[must_use]
-#[expect(
-    clippy::expect_used,
-    reason = "ObjectVersionId::new checked the object_id part against the uid production HierObjectId::new checks"
-)]
-pub fn versioned_object_uid(version: &ObjectVersionId) -> HierObjectId {
-    let object_id = version
-        .value()
-        .split_once("::")
-        .map_or(version.value(), |(head, _)| head);
-    HierObjectId::new(object_id)
-        .expect("the object_id of a constructed OBJECT_VERSION_ID should be a legal uid")
 }
 
 /// Returns the template identifier `text` names.
@@ -326,9 +302,7 @@ impl fmt::Display for RequestId {
 mod tests {
     #![expect(clippy::panic_in_result_fn, reason = "test assertions")]
 
-    use super::{
-        EhrId, IdError, RequestId, entity_tag, template_id, version_from_etag, versioned_object_uid,
-    };
+    use super::{EhrId, IdError, RequestId, entity_tag, template_id, version_from_etag};
     use openehr_base::v1_3::base_types::identification::lexical;
 
     /// A synthetic version container.
@@ -366,7 +340,7 @@ mod tests {
     fn a_version_id_splits_into_its_three_parts() -> Result<(), IdError> {
         let text = format!("{CONTAINER}::openEHRSys.example.com::2");
         let id = version_from_etag(&text)?;
-        assert_eq!(CONTAINER, versioned_object_uid(&id).value());
+        assert_eq!(CONTAINER, id.versioned_object_id().value());
         assert_eq!("openEHRSys.example.com", id.creating_system_id_str());
         assert_eq!("2", id.version_tree_id().value());
         assert_eq!(text, id.value());
@@ -377,7 +351,7 @@ mod tests {
     fn the_version_container_keeps_the_spelling_the_cdr_issued() -> Result<(), IdError> {
         let upper = "8849182C-82AD-4088-A07F-48EAD4180515";
         let id = version_from_etag(&format!("{upper}::ferroehr::1"))?;
-        assert_eq!(upper, versioned_object_uid(&id).value());
+        assert_eq!(upper, id.versioned_object_id().value());
         Ok(())
     }
 

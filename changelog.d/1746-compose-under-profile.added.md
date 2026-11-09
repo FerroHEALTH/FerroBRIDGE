@@ -1,4 +1,4 @@
-- `ferrobridge-hl7v2` 0.1.207 composes a v2 message against its structure
+- `ferrobridge-hl7v2` 0.1.208 composes a v2 message against its structure
   as an integration profile constrains it: `Writer::with_profile` takes a
   `parse::profile::Profile`, whose constraints set the minimum cardinality
   of named structure nodes, and the crate ships `IHE_ITI_21`, which makes

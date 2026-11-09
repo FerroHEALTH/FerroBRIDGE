@@ -159,7 +159,6 @@ mod tests {
         OnwardRefusal::Exchange(OnwardError::Token(TokenError::Refused {
             status,
             error: Some(oauth(error)),
-            body: String::new(),
         }))
     }
 

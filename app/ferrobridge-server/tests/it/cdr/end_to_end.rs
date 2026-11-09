@@ -12,9 +12,7 @@
 use super::support;
 use ferrobridge_server::cdr::commit::CommitContext;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::cdr::ids::{
-    EhrId, SubjectId, SubjectNamespace, template_id, versioned_object_uid,
-};
+use ferrobridge_server::cdr::ids::{EhrId, SubjectId, SubjectNamespace, template_id};
 use ferrobridge_server::cdr::template::{TemplateOutcome, TemplateSource};
 use ferrobridge_server::cdr::{CdrClient, Prefer, Returned};
 use ferrobridge_testkit::containers;
@@ -286,7 +284,7 @@ async fn update(
     let answered = client
         .update_composition(
             ehr_id,
-            &versioned_object_uid(preceding),
+            &preceding.versioned_object_id(),
             preceding,
             &composition()?,
             &commit_context(MODIFICATION, template_id),
@@ -320,7 +318,7 @@ async fn refuse_a_stale_if_match(
     let answered = client
         .update_composition(
             ehr_id,
-            &versioned_object_uid(stale),
+            &stale.versioned_object_id(),
             stale,
             &composition()?,
             &commit_context(MODIFICATION, template_id),
@@ -404,7 +402,7 @@ async fn delete_and_read_the_deleted_outcome(
     let answered = client
         .composition(
             ehr_id,
-            &UidBasedId::HierObjectId(versioned_object_uid(latest)),
+            &UidBasedId::HierObjectId(latest.versioned_object_id()),
             None,
         )
         .await?;
