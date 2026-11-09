@@ -213,7 +213,7 @@ async fn terminology_stub() -> (MockServer, ferrobridge_term::client::Client) {
 /// The vendored v2-to-FHIR package.
 fn package() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package")
+        .join("../../crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package")
 }
 
 /// The TLS material every case serves and sends with, generated once.

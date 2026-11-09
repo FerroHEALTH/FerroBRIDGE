@@ -8,10 +8,13 @@
 //! form: our own design. FHIR leaves authentication to the deployment
 //! (<https://hl7.org/fhir/R4/security.html>), so the credentials are optional.
 
+#[cfg(feature = "client")]
 use secrecy::SecretString;
 use std::fmt;
 use std::sync::Arc;
+#[cfg(feature = "client")]
 use std::time::Duration;
+#[cfg(feature = "client")]
 use url::Url;
 
 /// The FHIR release a server answers in.
@@ -68,6 +71,7 @@ impl WireVersion {
 ///
 /// Every secret is a [`SecretString`], so neither a `Debug` rendering nor a
 /// log line can carry it.
+#[cfg(feature = "client")]
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Credentials {
@@ -117,6 +121,7 @@ impl std::error::Error for TokenFailure {
 /// `401`, it hands the refused token back through
 /// [`TokenProvider::invalidate`], asks once more, and re-sends the request
 /// once, since a `401` means the server applied nothing (RFC 9110 §15.5.2).
+#[cfg(feature = "client")]
 #[async_trait::async_trait]
 pub trait TokenProvider: fmt::Debug + Send + Sync {
     /// Returns the token to send.
@@ -135,6 +140,7 @@ pub trait TokenProvider: fmt::Debug + Send + Sync {
 ///
 /// The delay grows exponentially from `initial_backoff` and is capped at
 /// `max_backoff`; `max_attempts` counts the first try, so `1` disables retry.
+#[cfg(feature = "client")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RetryPolicy {
     /// How many times the request is sent at most, the first try included.
@@ -145,6 +151,7 @@ pub struct RetryPolicy {
     pub max_backoff: Duration,
 }
 
+#[cfg(feature = "client")]
 impl Default for RetryPolicy {
     fn default() -> Self {
         Self {
@@ -178,6 +185,7 @@ pub enum Form {
 /// (<https://hl7.org/fhir/R4/http.html#root>). A server that serves several
 /// releases side by side puts the release in that path, so the base URL and
 /// `wire_version` are set together and must agree.
+#[cfg(feature = "client")]
 #[derive(Debug, Clone)]
 pub struct Config {
     /// The FHIR service base URL.
@@ -194,6 +202,7 @@ pub struct Config {
     pub form: Form,
 }
 
+#[cfg(feature = "client")]
 impl Config {
     /// Returns a configuration for the server whose base URL is `base_url`.
     ///
@@ -243,14 +252,14 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::WireVersion;
-    #[cfg(feature = "r4")]
+    #[cfg(all(feature = "r4", feature = "client"))]
     use super::{Config, Credentials, RetryPolicy};
-    #[cfg(feature = "r4")]
+    #[cfg(all(feature = "r4", feature = "client"))]
     use secrecy::SecretString;
-    #[cfg(feature = "r4")]
+    #[cfg(all(feature = "r4", feature = "client"))]
     use std::time::Duration;
 
-    #[cfg(feature = "r4")]
+    #[cfg(all(feature = "r4", feature = "client"))]
     fn config() -> Config {
         Config::new(
             "http://tx.invalid/r4".parse().expect("a valid URL"),
@@ -258,7 +267,7 @@ mod tests {
         )
     }
 
-    #[cfg(feature = "r4")]
+    #[cfg(all(feature = "r4", feature = "client"))]
     #[test]
     fn a_basic_password_is_not_in_the_debug_rendering() {
         let config = config().with_credentials(Credentials::Basic {
@@ -270,7 +279,7 @@ mod tests {
         assert!(rendered.contains("bridge"));
     }
 
-    #[cfg(feature = "r4")]
+    #[cfg(all(feature = "r4", feature = "client"))]
     #[test]
     fn the_defaults_are_three_attempts_and_thirty_seconds() {
         let config = config();

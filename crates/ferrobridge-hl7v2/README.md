@@ -60,7 +60,9 @@ you use; the range is the same caret range.
 - `inbound`: the steps above for one message, settling the `AR` and `AE`
   answers a message owes before it is mapped.
 - `map`: the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, loaded
-  from a directory at run time (the corpus is never packaged). The message
+  from a directory at run time, or, with the `shipped-maps` feature, from the
+  guide's 263 maps the crate embeds (`Corpus::shipped`, about 3.9 MB; the
+  package is CC0-1.0). The message
   map names a resource per segment, the segment map maps the fields, a data
   type map maps the components, and a table map is answered by
   `ConceptMap/$translate` on a terminology server or, offline, by the same
@@ -75,6 +77,24 @@ you use; the range is the same caret range.
   packaged with the crate under `supplements/`, which override a guide map
   or add one it lacks; `Corpus::with_shipped_supplements` loads them over the
   guide, and the run counts each one it uses as `supplemented`.
+
+## Features
+
+- `map` (default): the v2-to-FHIR interpreter, translating table values
+  offline from the corpus. It needs `fhir-types`, `fhirconnect` without its
+  `mapping` feature and `ferrobridge-term` without its `client` feature, so it
+  links no openEHR crate, no HTTP client and no `jsonschema`.
+- `terminology-server` (default): `Translator::Server`, table values
+  translated by `ConceptMap/$translate` through `ferrobridge-term`'s client.
+- `shipped-maps`: the guide's ConceptMaps compiled in (`Corpus::shipped`).
+
+With every feature off the crate is the listener, the decoder, the parser,
+the writer and the acknowledgment. A consumer that maps offline with no
+package on disk takes:
+
+```toml
+ferrobridge-hl7v2 = { version = "0.1.212", default-features = false, features = ["shipped-maps"] }
+```
 
 ## Example
 

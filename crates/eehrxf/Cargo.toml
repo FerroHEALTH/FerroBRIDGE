@@ -5,7 +5,7 @@ name = "eehrxf"
 description = "The European interoperability software component of an EHR system under Regulation (EU) 2025/327: the format-neutral dataset model of the priority categories read from the Xt-EHR EHDS logical models, and the European electronic health record exchange format in FHIR R4, mapped from openEHR by FHIRconnect"
 # On the crate line, the fhir-types line, since it moved here from FerroFED at
 # 0.0.40 (docs/VERSIONS.md).
-version = "0.1.192"
+version = "0.1.193"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -78,7 +78,7 @@ ferrobridge-term = { workspace = true, optional = true, features = ["r4"] }
 ferrobridge-validator = { workspace = true, optional = true }
 # The status a terminology server answered with, carried by every refusal.
 http = { workspace = true, optional = true }
-fhirconnect = { workspace = true, optional = true }
+fhirconnect = { workspace = true, optional = true, features = ["mapping"] }
 flate2.workspace = true
 # The `local` terminology id, and the archetype id a local code is read in.
 openehr-base = { workspace = true, optional = true }

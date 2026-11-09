@@ -29,6 +29,7 @@ use crate::map::corpus::{Corpus, TableGroup};
 #[derive(Debug, Clone, Copy)]
 pub enum Translator<'a> {
     /// `ConceptMap/$translate` on a terminology server.
+    #[cfg(feature = "terminology-server")]
     Server(&'a ferrobridge_term::client::Client),
     /// The table maps of a corpus, read in process.
     Offline(&'a Corpus),
@@ -42,8 +43,17 @@ impl Translator<'_> {
     /// Returns the client's [`Error`] when the terminology server refuses
     /// the translation or cannot be reached; the offline translator never
     /// fails, and answers a map the corpus does not hold with no match.
+    #[cfg_attr(
+        not(feature = "terminology-server"),
+        expect(
+            clippy::unused_async,
+            clippy::unused_async_trait_impl,
+            reason = "only the server translator awaits; the offline one answers at once"
+        )
+    )]
     pub async fn translate(&self, translation: &Translation) -> Result<TranslateOutcome, Error> {
         match self {
+            #[cfg(feature = "terminology-server")]
             Self::Server(client) => client.translate(translation).await,
             Self::Offline(corpus) => Ok(offline(corpus, translation)),
         }
