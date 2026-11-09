@@ -133,7 +133,7 @@ async fn a_validation_at_a_date_sends_it() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn a_validation_without_a_date_sends_none() -> Result<(), Box<dyn Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
