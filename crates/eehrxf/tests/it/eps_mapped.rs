@@ -801,11 +801,11 @@ fn a_run_with_no_section_in_the_slot_gives_none() -> Result<(), Box<dyn Error>> 
 }
 
 // NOTE: no specification governs this: our own design; a spawned thread gets the 2 MiB
-// default stack (std::thread "Stack size"), so the engine must compile and map within it.
+// default stack (std::thread "Stack size"); the template build, compile and run fit in it.
 #[test]
 fn the_project_compiles_and_maps_on_a_default_stack_thread() -> Result<(), Box<dyn Error>> {
-    let source = template()?;
-    let spawned = std::thread::Builder::new().spawn(move || -> Result<usize, String> {
+    let spawned = std::thread::Builder::new().spawn(|| -> Result<usize, String> {
+        let source = template().map_err(|error| error.to_string())?;
         let project = EPS.with_context(ROOT).map_err(|error| error.to_string())?;
         let mapping =
             Mapping::compile_project(&source, &project).map_err(|error| error.to_string())?;
