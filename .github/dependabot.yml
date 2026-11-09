@@ -15,6 +15,13 @@
 # file in CI (#34). The cargo entry exempts the FerroHEALTH family's own
 # crates, which are first-party code.
 #
+# SCHEDULE AND GROUPS: every ecosystem runs weekly at one shared time, Monday
+# 05:00 Europe/Amsterdam, and one group per ecosystem takes all its version
+# updates, so each ecosystem opens at most one pull request a week (owner
+# decision of 2026-11-09). The cargo entry keeps the family group beside it.
+# Groups apply to version updates only, so a security update still opens its
+# own pull request.
+#
 # SECURITY updates are exempt by design: Dependabot applies no cooldown to
 # advisory-driven bumps, so an advisory still arrives immediately. That is what
 # makes a cooldown safe rather than a delay on getting fixes.
@@ -27,19 +34,18 @@ updates:
       - "dependencies"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Amsterdam"
     # `semver-major-days` is not accepted for this ecosystem, so `default-days`
     # covers every bump. A week costs nothing here: the schedule is weekly
     # anyway and a security bump ignores the cooldown.
     cooldown:
       default-days: 7
     groups:
-      # ONE weekly PR for every minor and patch action bump (one codeql-action
-      # release alone opens three PRs, one per sub-action). MAJORS stay
-      # individual: a breaking action major is a real review, and burying one
-      # in a batch is how it gets rubber-stamped.
-      actions-minor-patch:
+      # ONE weekly PR for every action bump, majors included.
+      github-actions:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
     commit-message:
       prefix: "ci"
 
@@ -53,10 +59,11 @@ updates:
     labels:
       - "dependencies"
       - "no-changelog"
-    # Daily, so a release of a FerroHEALTH family crate reaches a PR the day
-    # after it is published; every other crate still waits out its cooldown.
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Amsterdam"
     # Longer for a major than for an action: a compromised crate executes in
     # the build and ships in the binary, which is the higher-consequence case.
     cooldown:
@@ -78,12 +85,10 @@ updates:
       # so a family crate never lands in the group below.
       ferrohealth-family:
         patterns: ["ferrohealth-*", "openehr-*", "ihe-*", "ehds-*"]
-      # ONE PR for every other minor and patch bump; lockstep families (serde,
-      # axum and tower) bump together inside it by construction. MAJORS stay
-      # individual: a semver major in shipped code is a real review.
-      cargo-minor-patch:
+      # ONE PR for every other bump, majors included; lockstep families
+      # (serde, axum and tower) bump together inside it by construction.
+      cargo:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
     commit-message:
       prefix: "deps"
 
@@ -104,9 +109,16 @@ updates:
       - "no-changelog"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Amsterdam"
     # The base image is pinned by index digest, so a bump is a change of
     # digest. `semver-major-days` is not accepted for this ecosystem either.
     cooldown:
       default-days: 7
+    groups:
+      # ONE weekly PR for both recipes, which share one base.
+      docker:
+        patterns: ["*"]
     commit-message:
       prefix: "build"

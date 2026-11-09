@@ -3,12 +3,14 @@
 
 # Machine review (SonarQube Cloud): advisory, never authority
 
-Every pull request and every push to `main` is analyzed by SonarQube Cloud
-(`.github/workflows/sonar.yml`; scope in `sonar-project.properties`; project
+Every push to `main` is analyzed by SonarQube Cloud, and so is `main` each
+Monday and on demand (`.github/workflows/sonar.yml`; scope in `sonar-project.properties`; project
 `FerroHEALTH_FerroBRIDGE`, organization `ferrohealth`, the built-in "Sonar
 way" quality gate). It exists as a second opinion beside the local gates and
 CodeQL, and it also reads the trees the Rust gates never see: shell, workflow
-YAML, and JSON.
+YAML, and JSON. Neither it nor CodeQL runs on a pull request (owner decision
+of 2026-11-09): both are advisory, so a pull-request run cost runner time and
+gated nothing.
 
 The lane runs the multi-language sweep and the Rust analysis, and imports the
 lcov report the coverage step writes one workspace member at a time
@@ -47,7 +49,8 @@ never weaken a test because a finding suggested it.
   wrong, never to make a number go down.
 
 CodeQL (`.github/workflows/codeql.yml`) runs separately as the security
-scanner and is advisory here too, until a precision case is made to gate on it.
+scanner, on the same triggers (a push to `main`, the Monday schedule and
+`workflow_dispatch`), and is advisory here too, until a precision case is made to gate on it.
 
 ## Official documentation (durable citations)
 

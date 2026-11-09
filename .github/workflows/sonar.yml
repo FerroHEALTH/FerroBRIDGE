@@ -6,14 +6,11 @@
 # local gates, and they gate no merge (.claude/rules/ai-code-review.md). The
 # quality gate is the built-in "Sonar way" default.
 #
-# The multi-language sweep over shell, YAML, JSON and the other config surfaces
-# the Rust gates never see runs on every scan. The instrumented coverage run
-# covers the packages the change reaches (scripts/checks/affected.sh, the
-# selection ci.yml's detect job makes): every package on a push to main, the
-# reached ones on a pull request, and none when a pull request reaches no
-# package, which then analyzes without a coverage report. A pull-request
-# analysis applies only the new-code conditions of the quality gate, so the
-# lines a change adds are the lines whose coverage it reads (docs/ci-cd.md).
+# It runs on a push to main, on the weekly schedule and on demand, never on a
+# pull request (owner decision of 2026-11-09). The multi-language sweep over
+# shell, YAML, JSON and the other config surfaces the Rust gates never see
+# runs on every scan, and the instrumented coverage run covers every package
+# (docs/ci-cd.md).
 #
 # Scan SCOPE lives in sonar-project.properties; do not restate it here.
 # SONAR_HOST_URL is not needed for SonarQube Cloud (SonarSource/
@@ -23,32 +20,25 @@ name: SonarQube Cloud
 on:
   push:
     branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: "41 5 * * 1" # Mondays 05:41 UTC (off-the-hour to dodge load spikes)
+  workflow_dispatch:
 
-# A newer push to a pull request cancels its running analysis. On main a
-# running analysis finishes, and a queued one gives way to the newer merge,
+# A running analysis finishes, and a queued one gives way to the newer merge,
 # so main is analyzed at its latest commit.
 concurrency:
   group: sonar-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   scan:
     name: analyze
-    # Pull-request analysis authenticates with SONAR_TOKEN, which a fork pull
-    # request cannot read, and neither can a DEPENDABOT one: a dependabot-actor
-    # run reads Dependabot secrets rather than Actions secrets, so the scan
-    # would die on "Not authorized". A dependency bump has nothing to decorate
-    # anyway, and the post-merge push to main analyzes the merged result.
-    if: github.event_name == 'push' || (github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
-      pull-requests: read # PR decoration reads the pull-request metadata
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,27 +46,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # A pull request runs on GitHub's merge commit, whose first parent is the
-      # base it merges into, so HEAD^1..HEAD is the change; anything else
-      # instruments the whole workspace. The two generated crates are dropped:
+      # Every package is instrumented. The two generated crates are dropped:
       # sonar-project.properties excludes their sources, so their own tests
       # add no coverage Sonar reads. The corpus flags are the ones
       # scripts/checks/fast.sh fetches for the same packages. The runner's own
       # stable cargo reads the manifests, as in ci.yml's detect job.
-      - name: The packages this change reaches
+      - name: The workspace packages
         id: affected
         if: ${{ hashFiles('Cargo.toml') != '' }}
         env:
-          EVENT: ${{ github.event_name }}
           RUSTUP_TOOLCHAIN: stable
         run: |
           set -euo pipefail
-          parents="$(git rev-list --parents -n 1 HEAD | wc -w)"
-          if [ "$EVENT" = pull_request ] && [ "$parents" -eq 3 ]; then
-            out="$(bash scripts/checks/affected.sh --base HEAD^1 --head HEAD)"
-          else
-            out="$(bash scripts/checks/affected.sh --all)"
-          fi
+          out="$(bash scripts/checks/affected.sh --all)"
           reached="$(sed -n 's/^packages=//p' <<<"$out")"
           packages=""
           for p in $reached; do

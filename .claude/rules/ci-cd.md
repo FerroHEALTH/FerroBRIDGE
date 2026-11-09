@@ -32,12 +32,13 @@ Fourteen workflows:
   the repository's security posture, published to the OpenSSF API and to code
   scanning.
 - `.github/workflows/codeql.yml`: CodeQL over the `actions` language, because
-  the workflows in this directory are code that holds tokens, and over Rust,
-  which on a pull request runs only when the change touches Rust and leaves
-  out the generated trees (`docs/ci-cd.md`).
+  the workflows in this directory are code that holds tokens, and over the
+  whole Rust tree. It runs on a push to `main`, on the Monday schedule and on
+  demand, never on a pull request (owner decision of 2026-11-09,
+  `docs/ci-cd.md`).
 - `.github/workflows/sonar.yml`: SonarQube Cloud, the multi-language sweep
-  over shell, YAML, and JSON. Advisory, gating no merge
-  (`ai-code-review.md`). The instrumented coverage run and the
+  over shell, YAML, and JSON, with the coverage of every package. Advisory,
+  gating no merge (`ai-code-review.md`), and on the same triggers as CodeQL. The instrumented coverage run and the
   `sonar.projectVersion` derivation sit behind a `hashFiles('Cargo.toml')`
   step gate and start reporting when the workspace lands.
 - `.github/workflows/docs.yml`: the documentation site. It builds the mdBook on

@@ -362,6 +362,12 @@ mechanism here.
 | the commit-pinned corpora, the version-pinned FHIR packages and the Chrome for Testing release of `docs/VERSIONS.md` | `pin-freshness.yml`, weekly |
 | the container image tags in `compose.yaml` and the harness constants | `scripts/checks/versions.sh` against `docs/VERSIONS.md` |
 
+Each Dependabot ecosystem runs weekly at one shared time, Monday 05:00
+Europe/Amsterdam, and puts all its version updates into one group, so it opens
+at most one pull request a week; the `cargo` entry keeps its FerroHEALTH
+family group beside that one (owner decision of 2026-11-09). Security updates
+stay outside the groups and arrive when the advisory does.
+
 All three Dependabot ecosystems resolve something today. The `cargo` and
 `docker` entries were inert until their manifests landed, and inert meant
 failing: each weekly job ended `dependency_file_not_found`, which is the noise
@@ -445,7 +451,7 @@ to apply; this table is the reasoning behind each.
 | `MaintainedID` | clears with time. It scores 0 only because the repository is under 90 days old |
 | `CIIBestPracticesID` | registered on 2026-09-13 as bestpractices.dev project 14612; the check reads the registration and clears on the next run |
 | `FuzzingID` | `cargo fuzz` targets over the YAML mapping loader and the openEHR mapping-path parser run weekly from `fuzz.yml` (#155); Scorecard detects OSS-Fuzz and ClusterFuzzLite registrations, so the check scores only once the project registers there, a second step worth taking when the targets prove useful |
-| `SASTID` | already satisfied. CodeQL runs on every push to `main` and on the weekly schedule, and on a pull request whenever the change touches Rust (its actions analysis on every pull request); the score lagged because its Rust job was gated off until the workspace landed |
+| `SASTID` | CodeQL runs on every push to `main` and on the weekly schedule, and no longer on a pull request (owner decision of 2026-11-09). Scorecard's SAST check counts the merged pull requests whose commits a SAST tool checked, so this check can score lower |
 | `SecurityPolicyID` | fixed in #47, which gave `SECURITY.md` the link the check looks for |
 
 ## Configuration this workflow reads
@@ -483,24 +489,16 @@ specification governs this: our own design.
 
 `sonar.yml` (SonarQube Cloud) and `codeql.yml` (CodeQL) gate no merge
 (`.claude/rules/ai-code-review.md`), so neither is a `conclusion` input. Both
-narrow their work on a pull request and keep the full run on `main`, for the
-same reason the Rust lanes do: a pull-request analysis that is cancelled at
-its limit reports nothing, and both held runners the gating lanes need.
+run on a push to `main`, on a Monday schedule and on `workflow_dispatch`, and
+neither runs on a pull request (owner decision of 2026-11-09): a pull-request
+run gated nothing and held runners the gating lanes need.
 
-**SonarQube Cloud.** The `analyze` job runs `affected.sh` the way `detect`
-does: `--base HEAD^1 --head HEAD` on a pull request, `--all` on a push to
-`main`. It instruments the reached packages one at a time with
-`cargo llvm-cov nextest`, leaving out `fhir-types` and `hl7v2-types`, whose
-sources the scan excludes, and fetches only the build-time corpora those
-packages read (the same rule `fast.sh` applies). A pull request that reaches
-no package skips the toolchain, the corpora and the coverage step, and the
-scan runs without `lcov.info`, which the scanner reports as a warning. The
-coverage of a pull request is therefore partial. That is acceptable for an
-advisory analyzer: a pull-request analysis applies only the quality gate's
-conditions on new code, and every file the change touches belongs to a
-reached package, so its new lines carry coverage. SonarQube Cloud's
-documentation describes no import of the target branch's coverage for
-unchanged files, and none is attempted.
+**SonarQube Cloud.** The `analyze` job runs `affected.sh --all` and
+instruments every package one at a time with `cargo llvm-cov nextest`,
+leaving out `fhir-types` and `hl7v2-types`, whose sources the scan excludes,
+and fetches the build-time corpora those packages read (the same rule
+`fast.sh` applies). The lcov report it writes is the coverage the scan
+imports for `main`.
 
 `sonar-project.properties` excludes every generated tree, the same rule it
 already applied to `crates/omop-cdm/src/generated`. Before that, the
@@ -510,16 +508,10 @@ It also excludes every `.sql` file: they are PostgreSQL, and the analyzer
 reads `.sql` as Oracle PL/SQL. `sonar.coverage.exclusions` keeps the test
 code, `fuzz/` and the shell, CSS and JavaScript trees out of the coverage
 denominator; they stay analyzed for findings (#1572).
-A newer push to a pull request cancels its running analysis.
 
-**CodeQL.** The Rust analysis runs on a pull request only when the change
-touches a `.rs` file, a `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` or
-`codeql.yml`, and then over the hand-written tree: a `paths-ignore` list
-leaves out the three generated trees, which held the job at 24 to 32
-minutes. A push to `main` and the Monday schedule analyze the whole tree,
-generated code included. The actions analysis is unchanged.
-
-The measured durations before and after are on #703. No specification
+**CodeQL.** The actions analysis and the Rust analysis both read the whole
+tree, generated code included, on each push to `main` that touches a
+workflow or the Rust sources and on the Monday schedule. No specification
 governs this: our own design.
 
 ## The release lane beside this one
@@ -677,10 +669,6 @@ instead, which keeps the ruleset stable as the pipeline grows.
   <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository>
   and
   <https://github.com/licensee/licensee/blob/main/docs/what-we-look-at.md>
-- SonarQube Cloud pull request analysis:
-  <https://docs.sonarsource.com/sonarqube-cloud/improving/pull-request-analysis/>
-- CodeQL configuration, `paths-ignore`:
-  <https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning>
 - Scorecard checks:
   <https://github.com/ossf/scorecard/blob/main/docs/checks.md>
 - Required status checks and rulesets:
