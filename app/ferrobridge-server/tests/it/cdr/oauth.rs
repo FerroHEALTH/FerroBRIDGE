@@ -399,8 +399,12 @@ async fn a_failing_token_endpoint_keeps_its_status() -> Result<(), Box<dyn Error
         .await
         .expect_err("a 503 is no token");
     assert!(
-        matches!(token_error(&error), TokenError::Refused { status, error: None, body } if *status == StatusCode::SERVICE_UNAVAILABLE && body == "restarting"),
+        matches!(token_error(&error), TokenError::Refused { status, error: None } if *status == StatusCode::SERVICE_UNAVAILABLE),
         "{error:?}"
+    );
+    assert!(
+        !format!("{error:?}").contains("restarting"),
+        "the refusal keeps nothing of the body: {error:?}"
     );
     assert_eq!(Some(StatusCode::SERVICE_UNAVAILABLE), error.status());
     Ok(())
