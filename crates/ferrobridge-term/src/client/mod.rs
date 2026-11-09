@@ -703,6 +703,7 @@ impl Client {
 }
 
 #[cfg(test)]
+#[cfg(feature = "r4")]
 mod tests {
     use super::Client;
     use crate::config::{Config, WireVersion};
