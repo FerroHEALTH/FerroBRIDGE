@@ -322,10 +322,14 @@ const PDQ_QUERY: &str = "MSH|^~\\&|CONSUMER|EAST|PDQ|NORTH|20261025100000||QBP^Q
 
 /// The ITI-21 RSP^K22 with one PID and no QRI.
 fn rsp_k22() -> (Header, Vec<Segment>) {
-    let query = lex(PDQ_QUERY, Charset::Ascii)
-        .expect("the query lexes")
-        .message;
-    let header = Header::from_text(PDQ_QUERY).expect("a header");
+    rsp_k22_to(PDQ_QUERY)
+}
+
+/// The ITI-21 RSP^K22 answering `query`, its QPD echoed, with one PID and no
+/// QRI.
+fn rsp_k22_to(text: &str) -> (Header, Vec<Segment>) {
+    let query = lex(text, Charset::Ascii).expect("the query lexes").message;
+    let header = Header::from_text(text).expect("a header");
     let writer = header.writer();
     let qak = Segment::new(
         "QAK",
@@ -483,5 +487,91 @@ fn an_err_segment_carries_its_location_as_erl_components() {
     assert_eq!(
         writer.segment(&Segment::from(&error)),
         "ERR||QPD^1^4^2|204^Unknown key identifier^HL70357|E||||a \\F\\ b"
+    );
+}
+
+/// Lexes and groups `text` by the structure it declares, under `profile`.
+fn parse_text(
+    text: &str,
+    profile: &'static ferrobridge_hl7v2::parse::profile::Profile,
+) -> ferrobridge_hl7v2::parse::Parsed {
+    let lexed = lex(text, Charset::Ascii).expect("the message lexes");
+    let structure = structure_declared(&lexed.message).expect("a declared structure");
+    ferrobridge_hl7v2::parse::grouping::group(lexed, structure, profile)
+}
+
+/// A synthetic demographics query with two parameters, family name and sex,
+/// in the shape of the example of IHE ITI TF-2 §3.21.4.1.2.3.
+const PDQ_TWO_PARAMETERS: &str = "MSH|^~\\&|CONSUMER|EAST|PDQ|NORTH|20261025100000||QBP^Q22^QBP_Q21|Q-3|P|2.5\r\
+                                  QPD|IHE PDQ Query|TAG-3|@PID.5.1.1^SMITH~@PID.8^F\r\
+                                  RCP|I\r";
+
+// NOTE: IHE ITI TF-2 §3.21.4.1.2.3: QPD-3 "consists of one or more repetitions", one per
+// parameter, where the v2.5 QPD gives QPD-3 one; the RSP^K22 echoes the QPD (Table 3.21-6).
+#[test]
+fn an_iti_21_query_and_response_with_two_parameters_conform_under_the_ihe_constraint() {
+    let query = parse_text(PDQ_TWO_PARAMETERS, &IHE_ITI_21);
+    assert!(
+        !query
+            .unplaced()
+            .iter()
+            .any(|unplaced| matches!(unplaced, Unplaced::ExtraRepetition { .. })),
+        "{:?}",
+        query.unplaced()
+    );
+    let (header, segments) = rsp_k22_to(PDQ_TWO_PARAMETERS);
+    let composed = header
+        .writer()
+        .with_profile(&IHE_ITI_21)
+        .compose(&segments, structure_declared, Charset::Ascii)
+        .expect("the response echoes both parameters under ITI-21");
+    assert_eq!(
+        composed.text(),
+        "MSH|^~\\&|PDQ|NORTH|CONSUMER|EAST|20261025100001+0000||RSP^K22^RSP_K21|ANSWER-1|P|2.5\r\
+         MSA|AA|Q-3\r\
+         QAK|TAG-3|OK\r\
+         QPD|IHE PDQ Query|TAG-3|@PID.5.1.1^SMITH~@PID.8^F\r\
+         PID|1||E-1^^^EAST&2.999.1.1&ISO||Family^Given\r"
+    );
+}
+
+#[test]
+fn a_second_qpd_3_repetition_is_extra_in_the_base_rsp_k21() {
+    let (header, segments) = rsp_k22_to(PDQ_TWO_PARAMETERS);
+    let refused = header
+        .writer()
+        .compose(&segments, structure_declared, Charset::Ascii);
+    let Err(ComposeError::Nonconforming { unplaced, .. }) = refused else {
+        panic!("the base QPD-3 holds one repetition: {refused:?}");
+    };
+    assert!(
+        unplaced
+            .iter()
+            .any(|unplaced| matches!(unplaced, Unplaced::ExtraRepetition { field: "QPD.3", .. })),
+        "{unplaced:?}"
+    );
+}
+
+// NOTE: IHE ITI TF-2 §3.21.4.1.2.3 lets QPD-3 repeat and no other QPD field; QPD-2, the query
+// tag the QAK echoes, keeps its one repetition under ITI-21.
+#[test]
+fn a_second_query_tag_stays_extra_under_the_ihe_constraint() {
+    let query = "MSH|^~\\&|CONSUMER|EAST|PDQ|NORTH|20261025100000||QBP^Q22^QBP_Q21|Q-4|P|2.5\r\
+                 QPD|IHE PDQ Query|TAG-4~TAG-5|@PID.8^F\r\
+                 RCP|I\r";
+    let (header, segments) = rsp_k22_to(query);
+    let refused = header.writer().with_profile(&IHE_ITI_21).compose(
+        &segments,
+        structure_declared,
+        Charset::Ascii,
+    );
+    let Err(ComposeError::Nonconforming { unplaced, .. }) = refused else {
+        panic!("QPD-2 holds one repetition under ITI-21: {refused:?}");
+    };
+    assert!(
+        unplaced
+            .iter()
+            .any(|unplaced| matches!(unplaced, Unplaced::ExtraRepetition { field: "QPD.2", .. })),
+        "{unplaced:?}"
     );
 }

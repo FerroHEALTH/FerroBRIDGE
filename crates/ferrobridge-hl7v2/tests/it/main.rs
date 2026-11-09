@@ -17,6 +17,7 @@
 mod condition;
 mod corpus;
 mod decode;
+mod e2e;
 mod fixtures;
 mod grouping;
 mod map;

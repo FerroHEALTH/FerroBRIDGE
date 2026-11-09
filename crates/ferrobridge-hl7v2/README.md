@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.3"
+ferrobridge-hl7v2 = "0.4"
 ```
 
-Name a patch (`"0.3.N"`) when you need the first release that carries what
+Name a patch (`"0.4.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -55,7 +55,8 @@ you use; the range is the same caret range.
   names. A writer `with_profile` checks against the structure as an
   integration profile constrains it, the constraints carried as data in
   `parse::profile` (`IHE_ITI_21`: QRI optional in the ITI-21 response, IHE
-  ITI TF-2 Table 3.21-6). The acknowledgment and every reply's header are
+  ITI TF-2 Table 3.21-6, and QPD-3 repeating in the query and its echo,
+  §3.21.4.1.2.3). The acknowledgment and every reply's header are
   built on it.
 - `inbound`: the steps above for one message, settling the `AR` and `AE`
   answers a message owes before it is mapped.
@@ -68,7 +69,8 @@ you use; the range is the same caret range.
   a data type map maps the components, and every table value is translated by
   `ConceptMap/$translate` on a terminology server through `ferrobridge-term`'s
   client: load the guide's package and FerroBRIDGE's value package
-  (`terminology/hl7v2-values/` in the repository) into it. `map::single` maps
+  (packed from `terminology/hl7v2-values/` in the repository by
+  `scripts/terminology/pack-hl7v2-values.sh`) into it. `map::single` maps
   one segment to one resource, a PID to a `Patient`. `map::inverse` writes a
   resource back as a segment through the same maps, a `Patient` as a PID,
   with every element it does not write back counted. The FHIR side is written
@@ -86,7 +88,7 @@ With `map` off the crate is the listener, the decoder, the parser, the writer
 and the acknowledgment:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.3", default-features = false }
+ferrobridge-hl7v2 = { version = "0.4", default-features = false }
 ```
 
 ## Example
