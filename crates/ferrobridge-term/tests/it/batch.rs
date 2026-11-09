@@ -94,7 +94,7 @@ fn answers() -> ResponseTemplate {
 #[tokio::test]
 async fn the_entries_map_back_by_position_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, answers()).await;
 
@@ -302,7 +302,7 @@ async fn a_bundle_that_is_not_a_batch_response_is_a_decode_error()
 #[tokio::test]
 async fn an_expansion_and_a_subsumption_map_back_by_position_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,

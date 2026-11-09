@@ -49,7 +49,9 @@ logos = { workspace = true, optional = true }
 fhirconnect = { workspace = true, optional = true }
 # The R4 model the ConceptMaps decode into and the output is checked against.
 fhir-types = { workspace = true, features = ["r4", "resources"], optional = true }
-ferrobridge-term = { workspace = true, optional = true }
+# R4, the release the guide's ConceptMaps are written in; the binary that
+# configures the client adds any other release it speaks.
+ferrobridge-term = { workspace = true, optional = true, features = ["r4"] }
 hl7v2-types.workspace = true
 # MLLP over TLS with client certificates (`mllp::tls`).
 rustls.workspace = true
@@ -65,6 +67,8 @@ tracing.workspace = true
 uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
+# The suites also drive an STU3 terminology server.
+ferrobridge-term = { workspace = true, features = ["stu3", "r4"] }
 ferrobridge-testkit.workspace = true
 insta.workspace = true
 tempfile.workspace = true
