@@ -9,8 +9,6 @@
   "experimental": true,
   "publisher": "FerroBRIDGE test fixtures",
   "description": "The synthetic map the FerroBRIDGE tests translate through.",
-  "sourceUri": "http://example.org/fhir/CodeSystem/ferrobridge-source",
-  "targetUri": "http://example.org/fhir/CodeSystem/ferrobridge-target",
   "group": [
     {
       "source": "http://example.org/fhir/CodeSystem/ferrobridge-source",

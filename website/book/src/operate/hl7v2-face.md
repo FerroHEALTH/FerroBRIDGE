@@ -174,18 +174,31 @@ Load three directories into the terminology server, each the `package`
 directory of a FHIR package: HL7 Terminology (`hl7.terminology`, which holds
 the v2 tables' code systems and the value sets the guide's table maps name
 as their source), `hl7.fhir.uv.v2mappings` 1.0.0 (both from the FHIR package
-registry), and `terminology/hl7v2-values/` of the FerroBRIDGE release you
-run. None of their ConceptMaps share an id or a canonical url. FerroTERM
-refuses a translation through a map whose source value set it does not hold,
-so HL7 Terminology is not optional. For FerroTERM, name all three in
-`terminology.code_systems`:
+registry), and FerroBRIDGE's value package, which you pack from
+`terminology/hl7v2-values/` of the FerroBRIDGE release you run. None of their
+ConceptMaps share an id or a canonical url. FerroTERM refuses a translation
+through a map whose source value set it does not hold, so HL7 Terminology is
+not optional.
+
+The value package's manifest is kept in the source tree as
+`fhir-package.json`, since a file named `package.json` is read as an npm
+manifest. Pack it, which writes `package/package.json` beside the maps and
+the FHIR package tarball:
+
+```sh
+scripts/terminology/pack-hl7v2-values.sh /tmp/hl7v2-values
+# /tmp/hl7v2-values/package/ and /tmp/hl7v2-values/eu.ferrobridge.hl7v2.values-0.2.0.tgz
+```
+
+Copy `package/` (or unpack the tarball) to the server. For FerroTERM, name
+all three in `terminology.code_systems`:
 
 ```toml
 [terminology]
 code_systems = [
   "/srv/hl7.terminology/package",
   "/srv/hl7.fhir.uv.v2mappings/package",
-  "/srv/ferrobridge-hl7v2-values",
+  "/srv/ferrobridge-hl7v2-values/package",
 ]
 ```
 

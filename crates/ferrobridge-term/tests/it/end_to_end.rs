@@ -23,7 +23,7 @@ async fn the_client_resolves_translates_and_validates_against_a_real_server()
     if !containers::e2e_enabled() {
         return Ok(());
     }
-    let server = containers::terminology().await?;
+    let server = containers::terminology(&containers::TERMINOLOGY_FIXTURES).await?;
     for &version in crate::support::RELEASES {
         let base = server.base_url(&release_path(version));
         let client = Client::new(Config::new(base.parse()?, version))?;

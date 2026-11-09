@@ -66,7 +66,7 @@ usage() {
 
 # The members whose tests start containers behind FERROBRIDGE_E2E (the e2e
 # job runs the affected ones).
-readonly E2E_PACKAGES="omop-cdm ferrobridge-server ferrobridge-term ferrobridge-testkit"
+readonly E2E_PACKAGES="omop-cdm ferrobridge-server ferrobridge-term ferrobridge-testkit ferrobridge-hl7v2"
 
 # The shard counts, and each member's measured cost in tenths of a minute on
 # the hosted runner (CI run 38877869687, 2026-10-16: build plus run, one

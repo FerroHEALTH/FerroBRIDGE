@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The XTN of a PID as R4 `ContactPoint`s through the shipped supplements: a
+//! The XTN of a PID as R4 `ContactPoint`s through FerroBRIDGE's corrections: a
 //! cell phone as a `phone` in `mobile` use (#1762) and a number with no
 //! equipment type as a system with the data-absent-reason (#1763), each
-//! `Patient` validated against the R4 core definitions. The table maps are
-//! answered by a stubbed terminology server loaded with the guide's maps and
-//! the crate's supplements.
+//! `Patient` validated against the R4 core definitions. The table values are
+//! answered by the stubbed terminology server loaded with the guide's table
+//! maps and the value package.
 
 use std::path::Path;
 

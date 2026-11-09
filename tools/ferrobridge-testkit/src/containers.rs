@@ -34,11 +34,46 @@ const CDR_PORT: u16 = 8080;
 /// container.
 const TERMINOLOGY_PORT: u16 = 8080;
 
-/// Where the synthetic terminology fixtures are mounted in the container.
-const TERMINOLOGY_RESOURCES: &str = "/data/codesystems";
+/// How long the terminology server may take to load its packages and listen;
+/// HL7 Terminology alone holds thousands of code systems.
+const TERMINOLOGY_STARTUP: Duration = Duration::from_secs(300);
 
-/// The fixture directory the mount reads, absolute at compile time.
-const TERMINOLOGY_FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/terminology");
+/// The synthetic terminology fixtures, absolute at compile time, and where
+/// they are mounted in the container, for [`terminology`].
+pub const TERMINOLOGY_FIXTURES: [(&str, &str); 1] = [(
+    concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/terminology"),
+    "/data/codesystems",
+)];
+
+/// The vendored packages a terminology server for the HL7 v2 face loads: HL7
+/// Terminology, which holds the v2 tables and the value sets the guide's
+/// table maps name as their source, and the v2-to-FHIR guide, each a
+/// `package` directory with its `package.json`.
+const V2_PACKAGES: [(&str, &str); 2] = [
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../fhir-codegen/vendor/hl7.terminology/package"
+        ),
+        "/data/hl7.terminology",
+    ),
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
+        ),
+        "/data/hl7.fhir.uv.v2mappings",
+    ),
+];
+
+/// The script that packs FerroBRIDGE's value package into a FHIR package.
+const VALUES_PACKER: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../scripts/terminology/pack-hl7v2-values.sh"
+);
+
+/// Where the unpacked value package is mounted in the container.
+const VALUES_MOUNT: &str = "/data/hl7v2-values";
 
 /// The login role, its password and its database in the PostgreSQL container.
 const POSTGRES_ROLE: &str = "ferrobridge";
@@ -153,8 +188,8 @@ pub const CDR_POSTGRES: PinnedImage = PinnedImage {
 /// `/r5`, `/r6`), which is why [`Terminology::base_url`] takes the release.
 pub const TERMINOLOGY: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroterm",
-    tag: "0.1.6",
-    digest: "sha256:7ec4c9622e88e3028faf7c74a2384fb02e57dc3163c282b21274121a26aa3d5b",
+    tag: "0.4.2",
+    digest: "sha256:1853486ae6f85a66424561cbf90f9905027c38d506bdeb24a9e1a831b4b97424",
 };
 
 /// A container could not be started, or did not become usable.
@@ -186,6 +221,25 @@ pub enum HarnessError {
         url: String,
         /// How long the probe waited.
         budget: Duration,
+    },
+    /// A step of packing the value package could not run.
+    #[error("could not {step}")]
+    Pack {
+        /// The step.
+        step: &'static str,
+        /// What the system reported.
+        #[source]
+        source: std::io::Error,
+    },
+    /// A step of packing the value package failed.
+    #[error("could not {step}: {status}: {stderr}")]
+    PackRefused {
+        /// The step.
+        step: &'static str,
+        /// How it exited.
+        status: std::process::ExitStatus,
+        /// What it printed on stderr.
+        stderr: String,
     },
 }
 
@@ -262,6 +316,9 @@ pub struct Terminology {
     container: ContainerAsync<GenericImage>,
     /// The origin the server is reachable at, with no path.
     origin: String,
+    /// The scratch directory the value package was packed and unpacked in, held
+    /// while the container mounts it.
+    packed: Option<tempfile::TempDir>,
 }
 
 impl Terminology {
@@ -287,29 +344,94 @@ impl Terminology {
     }
 }
 
-/// Starts the reference terminology server over the synthetic terminology
-/// fixtures and waits for its readiness endpoint.
+/// Starts the reference terminology server loaded as the HL7 v2 face needs it.
 ///
-/// The image reads `FERROTERM_CODESYSTEMS` as a directory of FHIR resources,
-/// so `fixtures/terminology` is bind-mounted read-only and the synthetic
-/// `CodeSystem`, `ValueSet` and `ConceptMap` are served through the ordinary
-/// operations. The server enforces no authentication of its own, so the
-/// returned base URL needs no credentials.
+/// It holds HL7 Terminology, the v2-to-FHIR guide `hl7.fhir.uv.v2mappings`
+/// and FerroBRIDGE's value package in its packed form: the tarball
+/// `scripts/terminology/pack-hl7v2-values.sh` writes, unpacked, as an
+/// operator loads it. It is returned once its readiness endpoint answers.
+///
+/// # Errors
+///
+/// Returns [`HarnessError::Pack`] or [`HarnessError::PackRefused`] when the
+/// value package cannot be packed or unpacked, and the errors of
+/// [`terminology`].
+pub async fn v2_terminology() -> Result<Terminology, HarnessError> {
+    let packed = tempfile::tempdir().map_err(|source| HarnessError::Pack {
+        step: "make a scratch directory",
+        source,
+    })?;
+    let tarball = run_pack_step(
+        "pack the value package",
+        tokio::process::Command::new("bash")
+            .arg(VALUES_PACKER)
+            .arg(packed.path().join("packed")),
+    )
+    .await?;
+    let unpacked = packed.path().join("unpacked");
+    std::fs::create_dir_all(&unpacked).map_err(|source| HarnessError::Pack {
+        step: "make the directory the tarball is unpacked into",
+        source,
+    })?;
+    run_pack_step(
+        "unpack the value package",
+        tokio::process::Command::new("tar")
+            .arg("-xzf")
+            .arg(tarball.trim())
+            .arg("-C")
+            .arg(&unpacked),
+    )
+    .await?;
+    let values = unpacked.join("package").display().to_string();
+    let mut directories: Vec<(&str, &str)> = V2_PACKAGES.to_vec();
+    directories.push((values.as_str(), VALUES_MOUNT));
+    let mut server = terminology(&directories).await?;
+    server.packed = Some(packed);
+    Ok(server)
+}
+
+/// Runs one step of packing the value package and returns what it printed.
+async fn run_pack_step(
+    step: &'static str,
+    command: &mut tokio::process::Command,
+) -> Result<String, HarnessError> {
+    let output = command
+        .output()
+        .await
+        .map_err(|source| HarnessError::Pack { step, source })?;
+    if !output.status.success() {
+        return Err(HarnessError::PackRefused {
+            step,
+            status: output.status,
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Starts the reference terminology server over the host directories
+/// `directories`, each mounted read-only at its container path, and waits for
+/// its readiness endpoint.
+///
+/// The image reads each directory `terminology.code_systems` names as FHIR
+/// resources: [`TERMINOLOGY_FIXTURES`] serves the synthetic `CodeSystem`,
+/// `ValueSet` and `ConceptMap` through the ordinary operations. The server
+/// enforces no authentication of its own, so the returned base URL needs no
+/// credentials.
 ///
 /// # Errors
 ///
 /// Returns [`HarnessError::Container`] when Docker refuses the container,
 /// [`HarnessError::Probe`] when the readiness probe cannot be sent, and
 /// [`HarnessError::NotReady`] when the server does not answer it in time.
-pub async fn terminology() -> Result<Terminology, HarnessError> {
-    let container =
-        terminology_request()
-            .start()
-            .await
-            .map_err(|source| HarnessError::Container {
-                image: TERMINOLOGY.repository,
-                source,
-            })?;
+pub async fn terminology(directories: &[(&str, &str)]) -> Result<Terminology, HarnessError> {
+    let container = terminology_request(directories)
+        .start()
+        .await
+        .map_err(|source| HarnessError::Container {
+            image: TERMINOLOGY.repository,
+            source,
+        })?;
     let host = container
         .get_host()
         .await
@@ -326,7 +448,11 @@ pub async fn terminology() -> Result<Terminology, HarnessError> {
         })?;
     let origin = format!("http://{host}:{port}");
     await_readiness(&format!("{origin}/health")).await?;
-    Ok(Terminology { container, origin })
+    Ok(Terminology {
+        container,
+        origin,
+        packed: None,
+    })
 }
 
 /// Starts a PostgreSQL and returns it with the URL of its login role.
@@ -507,21 +633,30 @@ pub async fn cdr() -> Result<Cdr, HarnessError> {
 }
 
 /// Returns the request that starts the reference terminology server over
-/// the synthetic fixtures.
+/// the host directories `directories`, each mounted read-only at its
+/// container path and named in `terminology.code_systems`.
 ///
-/// The usage report is switched off for the reason [`cdr_request`] gives. The
-/// pinned release sends none and ignores the key, which holds the next pin.
-fn terminology_request() -> ContainerRequest<GenericImage> {
-    let fixtures = Mount::bind_mount(TERMINOLOGY_FIXTURES, TERMINOLOGY_RESOURCES)
-        .with_access_mode(AccessMode::ReadOnly);
-    TERMINOLOGY
+/// The usage report is switched off for the reason [`cdr_request`] gives.
+fn terminology_request(directories: &[(&str, &str)]) -> ContainerRequest<GenericImage> {
+    let listed: Vec<String> = directories
+        .iter()
+        .map(|(_, mounted)| format!("\"{mounted}\""))
+        .collect();
+    let mut request = TERMINOLOGY
         .image()
         .with_wait_for(WaitFor::message_on_stdout("listening"))
         .with_exposed_port(TERMINOLOGY_PORT.tcp())
-        .with_mount(fixtures)
-        .with_env_var("FERROTERM_CODESYSTEMS", TERMINOLOGY_RESOURCES)
-        .with_env_var("FERROTERM_UI", "off")
+        .with_env_var(
+            "FERROTERM__TERMINOLOGY__CODE_SYSTEMS",
+            format!("[{}]", listed.join(",")),
+        )
         .with_env_var("FERROTERM__USAGE_REPORT__ENABLED", "false")
+        .with_startup_timeout(TERMINOLOGY_STARTUP);
+    for (host, mounted) in directories {
+        request = request
+            .with_mount(Mount::bind_mount(*host, *mounted).with_access_mode(AccessMode::ReadOnly));
+    }
+    request
 }
 
 /// Returns the request that starts the reference CDR against `dsn` on
@@ -646,7 +781,8 @@ pub async fn rabbitmq() -> Result<RabbitMq, HarnessError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, cdr_request, terminology_request,
+        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, TERMINOLOGY_FIXTURES, cdr_request,
+        terminology_request,
     };
 
     #[test]
@@ -687,7 +823,7 @@ mod tests {
 
     #[test]
     fn the_terminology_server_starts_with_its_usage_report_off() {
-        let request = terminology_request();
+        let request = terminology_request(&TERMINOLOGY_FIXTURES);
         let usage_report = request
             .env_vars()
             .find(|(name, _)| name == "FERROTERM__USAGE_REPORT__ENABLED")
