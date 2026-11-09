@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::map::corpus::{Map, Row};
+use crate::map::maps::{Map, Row};
 use crate::map::run::datum::Datum;
 use crate::map::run::{Base, Mark, Pending, Recorded, Run, Scope};
 use crate::map::{MapError, Outcome, RowRef};
@@ -257,7 +257,6 @@ fn unlabelled(code: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use fhir_types::codec::Value;
 
     use crate::map::Outcome;
     use crate::map::run::Run;
@@ -406,34 +405,20 @@ mod tests {
     // for the item", so a row naming a data type map runs that map alone.
     #[test]
     fn a_row_naming_its_data_type_map_runs_that_map() {
-        let segment: Value = serde_json::from_value(serde_json::json!({
-            "resourceType": "ConceptMap",
-            "id": "segment-orc-to-diagnosticreport",
-            "url": "http://example.org/fhir/ConceptMap/segment-orc-to-diagnosticreport",
-            "status": "active",
-            "group": [{ "element": [{
-                "code": "ORC-2",
-                "extension": [{
-                    "url": crate::map::corpus::TYPE_INFO,
-                    "extension": [{ "url": "type", "valueCode": "EI" }]
-                }],
-                "target": [{
-                    "code": "identifier[1]",
-                    "equivalence": "equivalent",
-                    "extension": [{
-                        "url": crate::map::corpus::TYPE_INFO,
-                        "extension": [
-                            { "url": "type", "valueCode": "Identifier" },
-                            {
-                                "url": "mappedVia",
-                                "valueUrl": "ConceptMap/datatype-ei-extension-to-identifier"
-                            }
-                        ]
-                    }]
-                }]
-            }]}]
-        }))
-        .expect("a JSON value");
+        let segment = crate::map::maps::structure(&crate::map::generated::model::Declared {
+            id: "segment-orc-to-diagnosticreport",
+            url: "http://example.org/fhir/ConceptMap/segment-orc-to-diagnosticreport",
+            title: None,
+            rows: &[crate::map::generated::model::DeclaredRow {
+                source: "ORC-2",
+                source_type: Some("EI"),
+                target: Some("identifier[1]"),
+                target_type: Some("Identifier"),
+                assignment: None,
+                mapped_via: Some("ConceptMap/datatype-ei-extension-to-identifier"),
+                depends_on: &[],
+            }],
+        });
         let corpus = supplemented(&[segment]);
         let parsed = order("ORC|RE|PLC-1^ORDERDESK");
         let mut run = Run::new(&corpus, &parsed);

@@ -1,7 +1,8 @@
 # fhir-codegen
 
-The generator: vendored FHIR packages in, `crates/fhir-types` out, and the
-fetched HL7 v2 definitions in, `crates/hl7v2-types` out. Hand-written
+The generator: vendored FHIR packages in, `crates/fhir-types` out, the
+fetched HL7 v2 definitions in, `crates/hl7v2-types` out, and the v2-to-FHIR
+guide in, the structure maps of `ferrobridge-hl7v2` out. Hand-written
 tooling; the vendored `StructureDefinition` and `OperationDefinition`
 resources are the authority for what it emits (`.claude/rules/codegen.md`).
 
@@ -73,6 +74,17 @@ resources are the authority for what it emits (`.claude/rules/codegen.md`).
   `CE` bound to table 0051, `TS` is `DTM`), derived from the code since the
   export carries no base column. Its defects are tolerated only where
   `legacy::lower::LegacyDefect::tolerated_in` lists them.
+- The `v2maps` root set (`src/v2maps/`, #1775) reads the v2-to-FHIR guide
+  `vendor/hl7.fhir.uv.v2mappings/`, FerroBRIDGE's structure corrections under
+  `overrides/hl7.fhir.uv.v2mappings/` and its value package under the
+  repository's `terminology/hl7v2-values/`, and emits
+  `crates/ferrobridge-hl7v2/src/map/generated/`: every row of every message,
+  segment and data type map as a static (`v2maps::read` keeps the
+  conditions, assignments and targets as written, so the crate parses them
+  in one place), and of every table map only its id, url and groups, since
+  a terminology server answers its values. `v2maps::emit` refuses a
+  correction that breaks the rules its module documentation states. `emit`
+  and `emit --check` cover it with the two crates.
 - A primitive whose JSON form is a string carries its lexical form into the
   output: `lower` reads the `regex` extension of `<primitive>.value` from the
   version's own package and compiles it there, so an uncompilable form fails

@@ -9,7 +9,7 @@ use clap::Parser;
 fn main() -> anyhow::Result<()> {
     let cli = fhir_codegen::Cli::parse();
     match fhir_codegen::run(&cli)? {
-        fhir_codegen::Report::Emit(report, hl7v2) => {
+        fhir_codegen::Report::Emit(report, hl7v2, maps) => {
             for (module, types) in &report.types {
                 println!("fhir-codegen: {module}: {types} types");
             }
@@ -30,6 +30,14 @@ fn main() -> anyhow::Result<()> {
                 hl7v2.legacy_shared,
                 hl7v2.legacy_inherited,
                 hl7v2.files.len()
+            );
+            println!(
+                "fhir-codegen: ferrobridge-hl7v2: {} guide structure maps, {} guide table maps, {} overrides, {} value maps, {} files",
+                maps.guide_maps,
+                maps.guide_tables,
+                maps.overrides,
+                maps.values,
+                maps.files.len()
             );
         }
         fhir_codegen::Report::Terminology(report) => {

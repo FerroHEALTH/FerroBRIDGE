@@ -5,7 +5,7 @@
 //! the table maps answered offline.
 
 use ferrobridge_hl7v2::map::single::{SegmentError, segment};
-use ferrobridge_hl7v2::map::translate::Translator;
+
 use ferrobridge_hl7v2::map::{MapError, Outcome};
 use fhir_types::codec::{Json as _, Path, Value};
 use fhir_types::r4::patient::Patient;
@@ -27,17 +27,12 @@ const PID: usize = 2;
 
 #[tokio::test]
 async fn a_pid_maps_to_one_patient_through_the_guide_s_maps() {
+    let (_server, terminology) = support::terminology().await;
     let parsed = support::parsed(&feed());
     let corpus = support::shipped();
-    let mapped = segment(
-        &parsed,
-        PID,
-        "Patient",
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the PID maps");
+    let mapped = segment(&parsed, PID, "Patient", corpus, Some(&terminology))
+        .await
+        .expect("the PID maps");
     let built = mapped.resource().expect("a Patient");
     assert_eq!(built.resource_type, "Patient");
     let Value::Object(object) = &built.resource else {
@@ -125,17 +120,12 @@ async fn a_pid_maps_to_one_patient_through_the_guide_s_maps() {
 
 #[tokio::test]
 async fn the_guide_alone_leaves_the_mother_s_maiden_name_unwritten() {
+    let (_server, terminology) = support::terminology().await;
     let parsed = support::parsed(&feed());
     let corpus = support::corpus();
-    let mapped = segment(
-        &parsed,
-        PID,
-        "Patient",
-        &corpus,
-        Some(Translator::Offline(&corpus)),
-    )
-    .await
-    .expect("the PID maps");
+    let mapped = segment(&parsed, PID, "Patient", corpus, Some(&terminology))
+        .await
+        .expect("the PID maps");
     assert!(
         mapped.outcomes().iter().any(|outcome| matches!(
             outcome,
@@ -155,7 +145,7 @@ fn serde_json_value(text: &str) -> Value {
 async fn with_no_translator_a_table_value_is_counted_never_passed_through() {
     let parsed = support::parsed(&feed());
     let corpus = support::corpus();
-    let mapped = segment(&parsed, PID, "Patient", &corpus, None)
+    let mapped = segment(&parsed, PID, "Patient", corpus, None)
         .await
         .expect("the PID maps");
     assert!(
@@ -176,7 +166,7 @@ async fn with_no_translator_a_table_value_is_counted_never_passed_through() {
 async fn a_segment_with_no_map_to_the_resource_is_refused() {
     let parsed = support::parsed(&feed());
     let corpus = support::corpus();
-    let refused = segment(&parsed, PID, "Observation", &corpus, None).await;
+    let refused = segment(&parsed, PID, "Observation", corpus, None).await;
     assert!(
         matches!(&refused, Err(SegmentError::NoSegmentMap { segment, .. }) if segment == "PID"),
         "{refused:?}"
@@ -187,7 +177,7 @@ async fn a_segment_with_no_map_to_the_resource_is_refused() {
 async fn an_index_with_no_placed_segment_is_refused() {
     let parsed = support::parsed(&feed());
     let corpus = support::corpus();
-    let refused = segment(&parsed, 9, "Patient", &corpus, None).await;
+    let refused = segment(&parsed, 9, "Patient", corpus, None).await;
     assert!(
         matches!(refused, Err(SegmentError::Unplaced { index: 9 })),
         "{refused:?}"
@@ -203,14 +193,7 @@ async fn a_refused_translation_fails_the_segment_with_the_upstream_status() {
     let config =
         ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::R4);
     let client = ferrobridge_term::client::Client::new(config).expect("a client");
-    let refused = segment(
-        &parsed,
-        PID,
-        "Patient",
-        &corpus,
-        Some(Translator::Server(&client)),
-    )
-    .await;
+    let refused = segment(&parsed, PID, "Patient", corpus, Some(&client)).await;
     assert!(
         matches!(
             refused,

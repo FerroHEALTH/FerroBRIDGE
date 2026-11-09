@@ -75,8 +75,6 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
     let text = with_face(concat!(
         "listen = \"0.0.0.0:2576\"\n",
         "default_charset = \"8859/1\"\n",
-        "concept_maps = \"/srv/v2mappings/package\"\n",
-        "supplements = [\"/srv/v2mappings/local\"]\n",
         "unmapped_entries = \"refuse\"\n",
         "ehr_policy = \"create_on_first_write\"\n",
         "idle_timeout = \"0s\"\n",
@@ -92,14 +90,6 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
     assert_eq!(
         ferrobridge_hl7v2::decode::Charset::Iso8859(1),
         face.default_charset
-    );
-    assert_eq!(
-        std::path::Path::new("/srv/v2mappings/package"),
-        face.concept_maps
-    );
-    assert_eq!(
-        vec![std::path::PathBuf::from("/srv/v2mappings/local")],
-        face.supplements
     );
     assert_eq!(
         ferrobridge_server::facade::ingest::UnmappedEntries::Refuse,
@@ -136,7 +126,7 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
 #[test]
 fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn std::error::Error>>
 {
-    let text = with_face("concept_maps = \"/srv/v2mappings/package\"\n");
+    let text = with_face("");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let face = settings.hl7v2.ok_or("the face is on")?;
     assert_eq!("127.0.0.1:2575", face.listen.to_string());
@@ -159,7 +149,7 @@ fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn 
 
 #[test]
 fn an_hl7v2_key_is_set_through_its_environment_name() -> Result<(), Box<dyn std::error::Error>> {
-    let text = with_face("concept_maps = \"/srv/v2mappings/package\"\n");
+    let text = with_face("");
     let settings = Config::from_sources(
         Some(&text),
         &env("FERROBRIDGE__HL7V2__LISTEN", "0.0.0.0:2577"),
@@ -172,7 +162,7 @@ fn an_hl7v2_key_is_set_through_its_environment_name() -> Result<(), Box<dyn std:
 
 #[test]
 fn an_hl7v2_face_without_the_facade_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
-    match &refusal("[hl7v2]\nenabled = true\nconcept_maps = \"/srv/p\"\n")? {
+    match &refusal("[hl7v2]\nenabled = true\n")? {
         Error::Needs { key, needs } => {
             assert_eq!("hl7v2.enabled", key);
             assert_eq!("facade.enabled", needs);
@@ -183,19 +173,21 @@ fn an_hl7v2_face_without_the_facade_refuses_to_boot() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn an_hl7v2_face_without_its_concept_maps_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
-{
-    match &refusal(&with_face(""))? {
-        Error::Missing { key } => assert_eq!("hl7v2.concept_maps", key),
-        other => return Err(format!("expected a missing key, got {other:?}").into()),
+fn a_concept_map_directory_or_a_supplement_directory_is_an_unknown_key() {
+    // The v2-to-FHIR maps are generated into the bridge, so no directory is read.
+    for line in [
+        "concept_maps = \"/srv/v2mappings/package\"\n",
+        "supplements = [\"/srv/v2mappings/local\"]\n",
+    ] {
+        let error = Config::from_sources(Some(&with_face(line)), &BTreeMap::new())
+            .expect_err("the key is refused");
+        assert!(matches!(error, Error::Parse { .. }), "{line}: {error:?}");
     }
-    Ok(())
 }
 
 #[test]
 fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn std::error::Error>>
 {
-    let maps = "concept_maps = \"/srv/p\"\n";
     let cases = [
         ("listen = \"nowhere\"\n", "hl7v2.listen"),
         ("default_charset = \"EBCDIC\"\n", "hl7v2.default_charset"),
@@ -234,7 +226,7 @@ fn every_bad_hl7v2_value_refuses_to_boot_naming_its_key() -> Result<(), Box<dyn 
         ),
     ];
     for (line, expected) in cases {
-        let error = refusal(&with_face(&format!("{maps}{line}")))?;
+        let error = refusal(&with_face(line))?;
         let key = match &error {
             Error::Listen { key, .. }
             | Error::Charset { key, .. }
@@ -265,10 +257,9 @@ fn an_unknown_hl7v2_key_refuses_to_boot() {
 
 #[test]
 fn a_device_sender_resolves_with_its_identifier_issuer() -> Result<(), Box<dyn std::error::Error>> {
-    let text = with_face(concat!(
-        "concept_maps = \"/srv/v2mappings/package\"\n",
+    let text = with_face(
         "senders = [{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }, { namespace_id = \"ANALYSER\", origin = \"device\", device_identifier_issuer = \"urn:example:devices\", certificate_subject = \"analyser.example.org\" }]\n",
-    ));
+    );
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let face = settings.hl7v2.ok_or("the face is on")?;
     assert_eq!(2, face.senders.len(), "a device is a sender too");
@@ -284,11 +275,7 @@ fn a_device_sender_resolves_with_its_identifier_issuer() -> Result<(), Box<dyn s
 
 #[test]
 fn an_hl7v2_face_without_senders_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
-    let text = format!(
-        "{}{}",
-        bare_face("concept_maps = \"/srv/v2mappings/package\"\n"),
-        tls_table()
-    );
+    let text = format!("{}{}", bare_face(""), tls_table());
     match &refusal(&text)? {
         Error::Needs { key, needs } => {
             assert_eq!("hl7v2.enabled", key);
@@ -302,10 +289,7 @@ fn an_hl7v2_face_without_senders_refuses_to_boot() -> Result<(), Box<dyn std::er
 #[test]
 fn a_sender_without_its_certificate_subject_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
-    let text = with_face(concat!(
-        "concept_maps = \"/srv/v2mappings/package\"\n",
-        "senders = [{ namespace_id = \"NORTHLAB\" }]\n",
-    ));
+    let text = with_face("senders = [{ namespace_id = \"NORTHLAB\" }]\n");
     match &refusal(&text)? {
         Error::CertificateSubject { key } => assert_eq!("hl7v2.senders", key),
         other => return Err(format!("expected a subject refusal, got {other:?}").into()),
@@ -316,10 +300,7 @@ fn a_sender_without_its_certificate_subject_refuses_to_boot()
 #[test]
 fn an_hl7v2_face_without_tls_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     // The MLLP face serves TLS with client certificates and nothing else.
-    let text = format!(
-        "{}{SENDER}",
-        bare_face("concept_maps = \"/srv/v2mappings/package\"\n")
-    );
+    let text = format!("{}{SENDER}", bare_face(""));
     match &refusal(&text)? {
         Error::Needs { key, needs } => {
             assert_eq!("hl7v2.enabled", key);
@@ -335,7 +316,7 @@ fn tls_material_that_makes_no_listener_refuses_to_boot() -> Result<(), Box<dyn s
     let empty = tempfile::NamedTempFile::new()?;
     let text = format!(
         "{}{SENDER}{}",
-        bare_face("concept_maps = \"/srv/v2mappings/package\"\n"),
+        bare_face(""),
         tls_table().replace(
             &TLS.path().join("authorities.pem").display().to_string(),
             &empty.path().display().to_string()

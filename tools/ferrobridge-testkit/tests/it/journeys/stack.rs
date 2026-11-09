@@ -423,31 +423,8 @@ fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
         templates.join("diagnose.opt"),
         ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
     )?;
-    let v2mappings = tree.path().join("v2mappings");
-    std::fs::create_dir_all(&v2mappings)?;
-    for id in CONCEPT_MAPS {
-        let name = format!("ConceptMap-{id}.json");
-        std::fs::copy(Path::new(V2_PACKAGE).join(&name), v2mappings.join(name))?;
-    }
     Ok(tree)
 }
-
-/// The vendored v2-to-FHIR package the HL7 v2 face's maps are copied from.
-const V2_PACKAGE: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package"
-);
-
-/// The guide's maps of an `ORU^R01` the HL7 v2 face loads: a few, so its
-/// `ConceptMaps` page fits one screenshot.
-const CONCEPT_MAPS: [&str; 6] = [
-    "message-oru-r01-to-bundle",
-    "segment-msh-to-messageheader",
-    "segment-pid-to-patient",
-    "segment-obx-to-observation",
-    "datatype-cwe-to-codeableconcept",
-    "table-hl70001-to-administrative-gender",
-];
 
 /// Writes the MLLP listener's TLS material under `tree` and returns the
 /// `[hl7v2.tls]` table naming it; no key is committed, each is generated here.
@@ -478,12 +455,11 @@ async fn bridge(
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, identity, console, v2mappings] = [
+    let [mappings, templates, identity, console] = [
         tree.join("mappings"),
         tree.join("templates"),
         tree.join("identity.redb"),
         tree.join("console"),
-        tree.join("v2mappings"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
@@ -508,7 +484,7 @@ async fn bridge(
          [[auth.issuer]]\nissuer = \"{issuer}\"\nkind = \"persons\"\naudience = [\"{bridge}/fhir\"]\n\
          first_party_clients = [\"ferrobridge-console\"]\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
-         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\nconcept_maps = {v2mappings}\n\
+         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n\
          senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}]\n{mllp_tls}\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),

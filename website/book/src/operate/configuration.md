@@ -1062,8 +1062,6 @@ it answers.
 | `enabled` | `false` | Whether the MLLP listener runs |
 | `listen` | `127.0.0.1:2575` | The socket address the listener binds |
 | `default_charset` | `ASCII` | The HL7 table 0211 code a message with an empty MSH-18 is read in |
-| `concept_maps` | none, required | The `package` directory of `hl7.fhir.uv.v2mappings`, loaded at boot |
-| `supplements` | `[]` | ConceptMap directories loaded over the guide, in order |
 | `unmapped_entries` | `skip_and_count` | `skip_and_count` or `refuse`, for an entry no program maps |
 | `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
 | `profiles` | `[]` | `{ resource_type, profile }` pairs: the profile a resource of that R4 type claims when the guide wrote none |

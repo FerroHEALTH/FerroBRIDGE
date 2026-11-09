@@ -7,7 +7,7 @@
 use std::collections::BTreeSet;
 
 use crate::map::condition::{self, Operand, Unevaluable};
-use crate::map::corpus::{Condition, Corpus, Map, Row};
+use crate::map::maps::{Condition, Map, Maps, Row};
 use crate::map::run::datum::Datum;
 use crate::map::run::{Base, Run, Scope};
 use crate::map::{MapError, Outcome, RowRef};
@@ -241,7 +241,7 @@ pub(super) fn split_source(source: &str, separator: char) -> (&str, Vec<usize>) 
 /// none for gives the base type the generated tables link it to
 /// ([`version_specific`]): `CM_MSG` gives `MSG` and `CE_0051` gives `CE`.
 fn definition_type(
-    corpus: &Corpus,
+    corpus: &Maps,
     definition: &'static hl7v2_types::model::Segment,
     position: usize,
 ) -> Option<String> {
@@ -260,7 +260,7 @@ fn definition_type(
 /// that base, as the generated tables link them, when the guide has no data
 /// type map from the code as written.
 fn version_specific(
-    corpus: &Corpus,
+    corpus: &Maps,
     definition: &'static hl7v2_types::model::Segment,
     position: usize,
 ) -> Option<(

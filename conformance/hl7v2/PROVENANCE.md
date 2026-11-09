@@ -21,7 +21,8 @@ The list is written by
 `crates/ferrobridge-hl7v2/tests/it/corpus.rs`, under
 `scripts/checks/conformance.sh --update`. A case passes when its message is
 framed, decoded, parsed with no refusal, mapped through the v2-to-FHIR guide
-with the crate's shipped supplements over it,
+with FerroBRIDGE's corrections over it and the table values answered from
+the guide's and the value package's table maps,
 and the Bundle decodes as R4; an acknowledgment passes when it parses. A
 message `crates/ferrobridge-hl7v2/tests/it/corpus/expected-refusals.txt`
 names passes when the face refuses it as listed, with the HL7 v2 chapter 2

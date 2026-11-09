@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 On 2026-09-25 the owner started FerroHEALTH/FerroEHR#3485: a `rest` feature
 exposing the ITS-REST DTOs without axum, and a `rest-client` feature emitted
 by `emit-rest` from the same OpenAPI as the server traits.

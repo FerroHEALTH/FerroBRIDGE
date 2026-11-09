@@ -132,15 +132,13 @@ value.
 The [HL7 v2 face](hl7v2-face.md)'s ConceptMap directory, as one JSON
 document. A bridge whose face is off answers `404`.
 
-- `directory`: the `concept_maps` directory the guide's maps were read
-  from, and `supplements`, the `supplements` directories in load order;
 - `counted_since`: the instant the face started, RFC 3339 UTC, since when
   the `messages` counts run;
 - `maps`: every map the face runs, by id, each with its `id`, canonical
   `url` and `title`, its `kind` (`message`, `segment`, `datatype`, `table`
   or `other`, from the first word of the id), its `origin` (`guide`,
-  `supplement` for a supplement that adds a map, or `override` for one that
-  replaces a map of the guide), its `ends`, what it maps from and to (each
+  `supplement` for a FerroBRIDGE correction that adds a map, or `override`
+  for one that replaces a map of the guide), its `ends`, what it maps from and to (each
   group's source and target code system for a table map, else the
   `source` and `target` the id names before and after `-to-`), the `rows`
   the face reads from it, and the `messages` whose mapping applied it.

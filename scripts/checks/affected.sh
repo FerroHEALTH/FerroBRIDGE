@@ -614,9 +614,6 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   # NOTE: ferrobridge-hl7v2's tests validate a mapped Patient against the R4 core package there (#1762).
   check "the codegen vendor tree reaches its readers" "tools/fhir-codegen/vendor/x.json" false \
     "+ferrobridge-fhirpath +ferrobridge-validator +fhir-codegen +ferrobridge-hl7v2 -fhir-types"
-  check "the v2-to-FHIR guide reaches the crate that embeds it and its readers" \
-    "crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package/x.json" false \
-    "+ferrobridge-hl7v2 +ferrobridge-fhirpath +ferrobridge-server +ferrobridge-testkit -fhir-codegen"
   check "hl7v2-types reaches its dependants and its generator" "crates/hl7v2-types/src/lib.rs" false \
     "+ferrobridge-hl7v2 +hl7v2-types +ferrobridge-server +fhir-codegen -fhir-types"
   check "fhir-types reaches its dependants, its dev-dependants and its generator" \
@@ -669,7 +666,8 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the sqlx script reaches omop-cdm" "scripts/checks/sqlx-offline.sh" false \
     "+omop-cdm +omocl +ferrobridge-server"
   local every_corpus_package
-  every_corpus_package="$(for p in $(conformance_packages); do printf '+%s ' "$p"; done)-fhir-codegen"
+  # NOTE: fhir-codegen writes ferrobridge-hl7v2's src/map/generated/ (#1775), so that conformance package reaches it.
+  every_corpus_package="$(for p in $(conformance_packages); do printf '+%s ' "$p"; done)+fhir-codegen"
   check "the conformance script reaches every conformance package" "scripts/checks/conformance.sh" false \
     "$every_corpus_package"
   check "the README badge block reaches every conformance package" "README.md" false "$every_corpus_package"

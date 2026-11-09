@@ -78,7 +78,7 @@ pub const FACADE: [Row; 9] = [
 ];
 
 /// The HL7 v2 face.
-pub const HL7V2: [Row; 11] = [
+pub const HL7V2: [Row; 9] = [
     row(
         Msg::RowHl7v2,
         Msg::RowHl7v2Desc,
@@ -93,16 +93,6 @@ pub const HL7V2: [Row; 11] = [
         Msg::RowCharset,
         Msg::RowCharsetDesc,
         &[("hl7v2.default_charset", Shape::Word)],
-    ),
-    row(
-        Msg::RowConceptMaps,
-        Msg::RowConceptMapsDesc,
-        &[("hl7v2.concept_maps", Shape::Code)],
-    ),
-    row(
-        Msg::RowSupplements,
-        Msg::RowSupplementsDesc,
-        &[("hl7v2.supplements", Shape::List)],
     ),
     row(
         Msg::RowEhrs,

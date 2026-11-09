@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use fhir_types::codec::Value;
 
 use crate::map::convert;
-use crate::map::corpus::{Assignment, Kind, Map, MappedVia, Row};
+use crate::map::maps::{Assignment, Kind, Map, MappedVia, Row};
 use crate::map::notation::{Step, Target};
 use crate::map::run::datum::Datum;
 use crate::map::run::write::resolve_path;

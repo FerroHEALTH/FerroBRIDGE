@@ -403,9 +403,6 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
             key: String::from("hl7v2.default_charset"),
             value: hl7v2.default_charset.clone(),
         })?;
-    let concept_maps = hl7v2.concept_maps.clone().ok_or_else(|| Error::Missing {
-        key: String::from("hl7v2.concept_maps"),
-    })?;
     let unmapped = match hl7v2.unmapped_entries.as_str() {
         "skip_and_count" => crate::facade::ingest::UnmappedEntries::SkipAndCount,
         "refuse" => crate::facade::ingest::UnmappedEntries::Refuse,
@@ -451,8 +448,6 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
     Ok(Hl7v2Settings {
         listen,
         default_charset,
-        concept_maps,
-        supplements: hl7v2.supplements.clone(),
         unmapped,
         ehr_policy,
         profiles,

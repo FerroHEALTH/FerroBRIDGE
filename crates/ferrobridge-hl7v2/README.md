@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.1"
+ferrobridge-hl7v2 = "0.2"
 ```
 
-Name a patch (`"0.1.N"`) when you need the first release that carries what
+Name a patch (`"0.2.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -59,41 +59,34 @@ you use; the range is the same caret range.
   built on it.
 - `inbound`: the steps above for one message, settling the `AR` and `AE`
   answers a message owes before it is mapped.
-- `map`: the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, loaded
-  from a directory at run time, or, with the `shipped-maps` feature, from the
-  guide's 263 maps the crate embeds (`Corpus::shipped`, about 3.9 MB; the
-  package is CC0-1.0). The message
-  map names a resource per segment, the segment map maps the fields, a data
-  type map maps the components, and a table map is answered by
-  `ConceptMap/$translate` on a terminology server or, offline, by the same
-  table maps read from the corpus (`map::translate`). `map::single` maps one
-  segment to one resource, a PID to a `Patient`. `map::inverse` writes a resource
-  back as a segment through the same maps, a `Patient` as a PID, with every
-  element it does not write back counted. The FHIR side is written
+- `map`: the interpreter of the `hl7.fhir.uv.v2mappings` 1.0.0 ConceptMaps.
+  The message, segment and data type maps are generated into the crate at
+  build time from the pinned guide (`map::maps::Maps::guide`), with
+  FerroBRIDGE's corrections in the guide's shape beside them
+  (`Maps::corrected`, each one the run uses counted as `supplemented`). The
+  message map names a resource per segment, the segment map maps the fields,
+  a data type map maps the components, and every table value is translated by
+  `ConceptMap/$translate` on a terminology server through `ferrobridge-term`'s
+  client: load the guide's package and FerroBRIDGE's value package
+  (`terminology/hl7v2-values/` in the repository) into it. `map::single` maps
+  one segment to one resource, a PID to a `Patient`. `map::inverse` writes a
+  resource back as a segment through the same maps, a `Patient` as a PID,
+  with every element it does not write back counted. The FHIR side is written
   through `fhirconnect::tree` over the `fhir-types` R4 element table, and the
   output is an R4 message `Bundle`. Every condition, target or value the run
   cannot carry is a typed, counted outcome.
-- `map::supplement`: FerroBRIDGE's own ConceptMaps in the guide's shape,
-  packaged with the crate under `supplements/`, which override a guide map
-  or add one it lacks; `Corpus::with_shipped_supplements` loads them over the
-  guide, and the run counts each one it uses as `supplemented`.
 
 ## Features
 
-- `map` (default): the v2-to-FHIR interpreter, translating table values
-  offline from the corpus. It needs `fhir-types`, `fhirconnect` without its
-  `mapping` feature and `ferrobridge-term` without its `client` feature, so it
-  links no openEHR crate, no HTTP client and no `jsonschema`.
-- `terminology-server` (default): `Translator::Server`, table values
-  translated by `ConceptMap/$translate` through `ferrobridge-term`'s client.
-- `shipped-maps`: the guide's ConceptMaps compiled in (`Corpus::shipped`).
+- `map` (default): the v2-to-FHIR interpreter. It needs `fhir-types`,
+  `fhirconnect` without its `mapping` feature and `ferrobridge-term` with its
+  `client` feature, so it links no openEHR crate and no `jsonschema`.
 
-With every feature off the crate is the listener, the decoder, the parser,
-the writer and the acknowledgment. A consumer that maps offline with no
-package on disk takes:
+With `map` off the crate is the listener, the decoder, the parser, the writer
+and the acknowledgment:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.1.212", default-features = false, features = ["shipped-maps"] }
+ferrobridge-hl7v2 = { version = "0.2", default-features = false }
 ```
 
 ## Example

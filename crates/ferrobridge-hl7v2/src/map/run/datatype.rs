@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::map::condition::{self, Operand};
-use crate::map::corpus::{Condition, Map, Row};
+use crate::map::maps::{Condition, Map, Row};
 use crate::map::notation::Target;
 use crate::map::run::datum::Datum;
 use crate::map::run::segment::row_ref;
