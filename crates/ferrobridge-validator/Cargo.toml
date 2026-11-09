@@ -4,7 +4,7 @@
 name = "ferrobridge-validator"
 description = "A FHIR R4 and STU3 profile validator over packages read offline, the generated fhir-types model and its element table"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.153"
+version = "0.1.155"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -21,8 +21,9 @@ include = ["src/**", "README.md", "LICENSE"]
 
 [dependencies]
 # A binding the package set cannot decide goes to a terminology server as
-# ValueSet/$validate-code.
-ferrobridge-term.workspace = true
+# ValueSet/$validate-code, in the two releases the validator holds a resource
+# to.
+ferrobridge-term = { workspace = true, features = ["stu3", "r4"] }
 # A slice discriminator's path is parsed as FHIRPath and held to the simple
 # subset R4 allows (fhirpath.html section 2.9.2).
 ferrobridge-fhirpath.workspace = true

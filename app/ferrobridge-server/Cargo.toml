@@ -28,7 +28,9 @@ async-trait.workspace = true
 base64.workspace = true
 axum.workspace = true
 clap.workspace = true
-ferrobridge-term = { workspace = true, features = ["smart"] }
+# The three releases `[terminology] wire_version` accepts; R5 and R6 stay out,
+# so the build never compiles their resources (#1737).
+ferrobridge-term = { workspace = true, features = ["smart", "stu3", "r4", "r4b"] }
 # The HL7 v2 face: the MLLP listener, the parse, the acknowledgment and the
 # v2-to-FHIR ConceptMap interpreter.
 ferrobridge-hl7v2.workspace = true

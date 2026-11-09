@@ -159,20 +159,30 @@ mod contracts;
 #[macro_use]
 mod release;
 
+#[cfg(feature = "stu3")]
 per_release!(stu3, stu3, stu3_contracts);
+#[cfg(feature = "r4")]
 per_release!(r4, r4, r4_contracts);
+#[cfg(feature = "r4b")]
 per_release!(r4b, r4b, r4_contracts);
+#[cfg(feature = "r5")]
 per_release!(r5, r5, r5_contracts);
+#[cfg(feature = "r6")]
 per_release!(r6, r6, r6_contracts);
 
 /// Calls the function `$function` of the module of `$version`.
 macro_rules! dispatch {
     ($version:expr, $function:ident($($argument:expr),*)) => {
         match $version {
+            #[cfg(feature = "stu3")]
             WireVersion::Stu3 => stu3::$function($($argument),*),
+            #[cfg(feature = "r4")]
             WireVersion::R4 => r4::$function($($argument),*),
+            #[cfg(feature = "r4b")]
             WireVersion::R4B => r4b::$function($($argument),*),
+            #[cfg(feature = "r5")]
             WireVersion::R5 => r5::$function($($argument),*),
+            #[cfg(feature = "r6")]
             WireVersion::R6 => r6::$function($($argument),*),
         }
     };
@@ -301,15 +311,28 @@ pub(crate) fn validate_code(
 
 /// Returns the `CodeSystem/$validate-code` answer `body` carries, `None` in
 /// STU3, which defines no such operation.
+#[cfg_attr(
+    not(feature = "stu3"),
+    expect(clippy::unnecessary_wraps, reason = "only STU3 answers None")
+)]
+#[cfg_attr(
+    not(any(feature = "r4", feature = "r4b", feature = "r5", feature = "r6")),
+    expect(unused_variables, reason = "STU3 alone reads no body")
+)]
 pub(crate) fn code_system_validate_code(
     version: WireVersion,
     body: &str,
 ) -> Option<Result<ValidateOutcome, BodyError>> {
     match version {
+        #[cfg(feature = "stu3")]
         WireVersion::Stu3 => None,
+        #[cfg(feature = "r4")]
         WireVersion::R4 => Some(r4::code_system_validate_code(body)),
+        #[cfg(feature = "r4b")]
         WireVersion::R4B => Some(r4b::code_system_validate_code(body)),
+        #[cfg(feature = "r5")]
         WireVersion::R5 => Some(r5::code_system_validate_code(body)),
+        #[cfg(feature = "r6")]
         WireVersion::R6 => Some(r6::code_system_validate_code(body)),
     }
 }
@@ -330,8 +353,9 @@ pub(crate) fn search_total(version: WireVersion, body: &str) -> Result<u32, Body
 }
 
 #[cfg(test)]
+#[cfg(feature = "r4")]
 mod tests {
-    use super::{batch_body, request_body, status_of};
+    use super::{batch_body, status_of};
     use crate::config::WireVersion;
     use crate::request::Request;
     use http::StatusCode;
@@ -354,9 +378,11 @@ mod tests {
         assert_eq!(None, status_of("not a status"));
     }
 
+    #[cfg(feature = "r4b")]
     #[test]
     #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
     fn both_releases_write_the_same_lookup_parameters() -> Result<(), super::RequestError> {
+        use super::request_body;
         let r4 = request_body(WireVersion::R4, &lookup())?;
         let r4b = request_body(WireVersion::R4B, &lookup())?;
         assert_eq!(r4, r4b);

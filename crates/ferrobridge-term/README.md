@@ -98,7 +98,18 @@ a true answer too, every `details.coding` and `expression` of each issue, the
 
 `WireVersion` selects STU3, R4, R4B, R5 or the R6 ballot (6.0.0-ballot5), and
 the release decides which generated model writes the request and reads the
-answer. R4 to R6 declare the same `in` and `out` parameters outside
+answer. Each release is a feature of this crate, `stu3`, `r4`, `r4b`, `r5` and
+`r6`, and a release whose feature is off has no `WireVersion` variant, so a
+call in it does not compile. The default is `stu3`, `r4` and `r4b`; a
+consumer that speaks R5 or the R6 ballot turns `r5` or `r6` on:
+
+```toml
+ferrobridge-term = { version = "=0.1.147", features = ["r5", "r6"] }
+```
+
+R5 and R6 are off by default because a binary that also enables the
+`fhir-types` `resources` feature would compile every resource of those
+releases, which a 16 GB hosted runner cannot build in release. R4 to R6 declare the same `in` and `out` parameters outside
 `$translate`. `$translate` is spelled three ways: R4 and R4B take `code`,
 `system`, `version` and `targetsystem` and answer `match.equivalence`; R5 takes
 `sourceCode` and `targetSystem` and answers `match.relationship`; R6 also

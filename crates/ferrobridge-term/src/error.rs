@@ -472,6 +472,7 @@ impl Error {
 }
 
 #[cfg(test)]
+#[cfg(feature = "r4")]
 mod tests {
     use super::{Error, TX_ISSUE_TYPE, TxIssue, UpstreamError};
     use crate::config::WireVersion;
@@ -512,6 +513,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "r4b")]
     #[test]
     fn an_r4b_outcome_decodes_the_same_way() {
         let upstream = UpstreamError::new(

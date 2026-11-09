@@ -47,7 +47,7 @@ async fn validate(
 #[tokio::test]
 async fn a_member_is_valid_and_carries_its_display_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -69,7 +69,7 @@ async fn a_member_is_valid_and_carries_its_display_in_both_releases()
 #[tokio::test]
 async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -107,7 +107,7 @@ async fn a_non_member_is_invalid_and_surfaces_its_issues_outcome()
 #[tokio::test]
 async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
 {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -148,7 +148,7 @@ async fn an_unknown_value_set_is_a_typed_error_and_never_an_invalid_code()
 -> Result<(), Box<dyn std::error::Error>> {
     // The testkit stubs write one `OperationOutcome` shape for R4 and R4B,
     // so each release is refused from the same body.
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -183,7 +183,7 @@ async fn an_unknown_value_set_is_a_typed_error_and_never_an_invalid_code()
 #[tokio::test]
 async fn a_server_failure_is_a_typed_error_carrying_the_upstream_status_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,

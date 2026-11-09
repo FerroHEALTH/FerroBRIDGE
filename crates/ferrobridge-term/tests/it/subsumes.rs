@@ -60,7 +60,7 @@ async fn each_of_the_four_outcomes_is_read_in_every_release()
 #[tokio::test]
 async fn the_request_carries_the_declared_parameter_names() -> Result<(), Box<dyn std::error::Error>>
 {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, terminology::subsumes("subsumes")).await;
         client(&server, version)?
@@ -119,7 +119,7 @@ async fn an_outcome_outside_the_value_set_is_a_decode_error()
 #[tokio::test]
 async fn an_undeterminable_relationship_is_a_refusal_carrying_its_tx_issue()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
