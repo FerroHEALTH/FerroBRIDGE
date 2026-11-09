@@ -241,3 +241,39 @@ fn a_fhir_date_or_time_converts_back_to_its_v2_form() {
         Err(ConvertError::Form { .. })
     ));
 }
+
+#[tokio::test]
+async fn a_consumer_sets_the_fields_no_row_writes_back() {
+    use ferrobridge_hl7v2::write::value::{Component, Field, Repetition};
+    let corpus = support::shipped();
+    let patient =
+        json(r#"{"resourceType": "Patient", "name": [{"family": "Doe"}], "gender": "female"}"#);
+    let mut pid = segment(
+        &patient,
+        pid_2_5(),
+        &corpus,
+        Some(Translator::Offline(&corpus)),
+    )
+    .await
+    .expect("the Patient writes back")
+    .into_segment();
+    assert_eq!(pid.field(1), Some(&Field::default()));
+    assert_eq!(pid.field(9), None);
+    pid.set(1, Field::from("1"));
+    pid.set(
+        3,
+        Field::from(Repetition::from_iter([
+            Component::from("PAT-1"),
+            Component::default(),
+            Component::default(),
+            Component::from_iter(["EAST", "2.999.1.1", "ISO"]),
+        ])),
+    );
+    pid.set(0, Field::from("ignored"));
+    pid.set(10, Field::from("R"));
+    assert_eq!(pid.fields().len(), 10);
+    assert_eq!(
+        Writer::new(DELIMITERS).segment(&pid),
+        "PID|1||PAT-1^^^EAST&2.999.1.1&ISO||Doe|||F||R"
+    );
+}
