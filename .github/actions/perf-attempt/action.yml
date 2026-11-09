@@ -48,6 +48,7 @@ runs:
       shell: bash
       env:
         BASE: ${{ inputs.base }}
+        BUILD_SWAP: /perf-build.swap
       # A release build of fhir-types with every resource of all five FHIR
       # releases, which main compiled from #1717 until #1737, peaks above the
       # runner's 16 GB on its own (#1737), so a swap file backs the build and
@@ -56,7 +57,7 @@ runs:
       # that shuts down mid-build leaves the last reading in its log.
       run: |
         set -euo pipefail
-        swap=/perf-build.swap
+        swap="$BUILD_SWAP"
         sudo fallocate -l 20G "$swap"
         sudo chmod 600 "$swap"
         sudo mkswap "$swap" > /dev/null
@@ -79,10 +80,21 @@ runs:
       env:
         ATTEMPT: ${{ inputs.attempt }}
         STALL_PRONE: ${{ inputs.stall-prone }}
+        BUILD_SWAP: /perf-build.swap
+      # The idle phase and the load phases run with the swap the runner booted
+      # with: the build's swap file must be off and gone, or the run cannot be
+      # judged (exit 2).
       run: |
         set -uo pipefail
+        echo "perf-gate: swap before measuring: $(tail -n +2 /proc/swaps | awk '{ printf "%s (%s kB used) ", $1, $4 }')"
+        free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB before measuring\n", $3, $2 }'
         code=0
-        bash scripts/perf/gate.sh run || code=$?
+        if grep -qF "$BUILD_SWAP" /proc/swaps || [ -e "$BUILD_SWAP" ]; then
+          echo "::error title=Performance gate::the build's swap file is still on before the gate measures"
+          code=2
+        else
+          bash scripts/perf/gate.sh run || code=$?
+        fi
         latest="$(find target/perf -name latest.json -not -path '*busy-loop*' -print -quit 2>/dev/null || true)"
         model=""
         if [ -n "$latest" ]; then

@@ -102,8 +102,13 @@ the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
 and the runner shut down. The bridge therefore compiles only the releases it
 speaks, through the release features of `ferrobridge-term`. A base from
 before that change still compiles all five, so the build step backs both
-builds with a 20 GB swap file and turns it off before the gate measures
-anything; swap changes how fast the build runs, never the binary it makes.
+builds with a 20 GB swap file, turns it off and removes it, and logs the
+swap and memory before the gate measures anything. The gate refuses to
+measure while that file is still on (exit 2), so the idle and load phases
+run on the runner as it was before the build. Swap changes how fast the
+build runs, never the binary it makes. The step goes once a perf run on
+`main` shows both builds well under 16 GB without it
+([#1743](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1743)).
 
 ## Running it yourself
 
