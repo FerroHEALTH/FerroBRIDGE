@@ -178,10 +178,10 @@ fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
             "algorithms = [\"ES384\", \"PS256\"]\n",
             "token_types = [\"JWT\"]\n",
             "first_party_clients = [\"ferrobridge-console\"]\n",
-            "clock_skew_seconds = 5\n",
-            "jwks_refresh_interval_seconds = 1\n",
-            "jwks_max_age_seconds = 120\n",
-            "timeout_ms = 2000\n",
+            "clock_skew = \"5s\"\n",
+            "jwks_refresh_interval = \"1s\"\n",
+            "jwks_max_age = \"2min\"\n",
+            "timeout = \"2s\"\n",
         ),
     );
     let auth = settings(&text)?.ok_or("auth is on")?;
@@ -215,9 +215,9 @@ fn several_issuers_read_each_with_its_own_keys() -> Result<(), Box<dyn std::erro
     let auth = settings(concat!(
         "[auth]\nenabled = true\n\n",
         "[[auth.issuer]]\nissuer = \"https://one.example.org\"\nkind = \"persons\"\n",
-        "audience = [\"https://bridge.example.org/fhir\"]\nclock_skew_seconds = 30\n\n",
+        "audience = [\"https://bridge.example.org/fhir\"]\nclock_skew = \"30s\"\n\n",
         "[[auth.issuer]]\nissuer = \"https://two.example.org\"\nkind = \"machines\"\n",
-        "audience = [\"https://bridge.example.org/fhir\"]\nclock_skew_seconds = 10\n",
+        "audience = [\"https://bridge.example.org/fhir\"]\nclock_skew = \"10s\"\n",
     ))?
     .ok_or("auth is on")?;
     assert_eq!(2, auth.issuers.len());
@@ -271,25 +271,17 @@ fn an_issuer_without_its_kind_is_refused_naming_the_key() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn the_flat_issuer_form_is_refused_naming_the_issuer_table()
--> Result<(), Box<dyn std::error::Error>> {
+fn the_flat_issuer_form_is_refused_at_load() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(concat!(
         "[auth]\nenabled = true\nissuer = \"https://as.example.org/realms/ferro\"\n",
         "audience = [\"https://bridge.example.org/fhir\"]\n",
     ))?;
-    assert!(
-        matches!(
-            rule(&error),
-            Some(ConfigError::Removed { key, replacement })
-                if key.starts_with("auth.issuer =") && replacement.contains("[[auth.issuer]]")
-        ),
-        "{error:?}"
-    );
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     Ok(())
 }
 
 #[test]
-fn a_section_level_issuer_setting_is_refused_naming_the_issuer_table()
+fn a_section_level_issuer_setting_is_refused_as_an_unknown_key()
 -> Result<(), Box<dyn std::error::Error>> {
     for (line, removed) in [
         (
@@ -297,46 +289,28 @@ fn a_section_level_issuer_setting_is_refused_naming_the_issuer_table()
             "auth.audience",
         ),
         ("algorithms = [\"ES256\"]\n", "auth.algorithms"),
-        ("clock_skew_seconds = 30\n", "auth.clock_skew_seconds"),
+        ("clock_skew = \"30s\"\n", "auth.clock_skew"),
         ("jwks_file = \"/run/jwks.json\"\n", "auth.jwks_file"),
-        ("timeout_ms = 2000\n", "auth.timeout_ms"),
+        ("timeout = \"2s\"\n", "auth.timeout"),
         ("mode = \"introspection\"\n", "auth.mode"),
         ("role_claims = []\n", "auth.role_claims"),
     ] {
         let error = refusal(&auth(line, ""))?;
         assert!(
-            matches!(
-                rule(&error),
-                Some(ConfigError::Removed { key, .. }) if *key == removed
-            ),
-            "{line}: {error:?}"
+            matches!(error, Error::Parse { .. }) && chain(&error).contains(removed),
+            "{line}: {}",
+            chain(&error)
         );
     }
     Ok(())
 }
 
 #[test]
-fn the_token_profile_key_is_refused_naming_the_profile() -> Result<(), Box<dyn std::error::Error>> {
+fn the_token_profile_key_is_refused_as_an_unknown_key() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&auth("token_profile = \"jwt\"\n", ""))?;
-    assert!(
-        matches!(
-            rule(&error),
-            Some(ConfigError::Removed { key: "auth.token_profile", replacement })
-                if replacement.contains("profile")
-        ),
-        "{error:?}"
-    );
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     let error = refusal(&auth("", "token_profile = \"jwt\"\n"))?;
-    assert!(
-        matches!(
-            rule(&error),
-            Some(ConfigError::Removed {
-                key: "auth.issuer.token_profile",
-                ..
-            })
-        ),
-        "{error:?}"
-    );
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     Ok(())
 }
 
@@ -369,22 +343,14 @@ fn a_profile_preset_reads_with_a_key_set_over_it() -> Result<(), Box<dyn std::er
 }
 
 #[test]
-fn a_scopeless_subject_written_as_a_string_is_refused_naming_the_table_form()
+fn a_scopeless_subject_written_as_a_string_is_refused_at_load()
 -> Result<(), Box<dyn std::error::Error>> {
     for entry in ["svc-ferrofed", "https://one.example.org#svc-ferrofed"] {
         let error = refusal(&two_issuers(
             &format!("scopeless_subjects = [\"{entry}\"]\n"),
             "",
         ))?;
-        assert!(
-            matches!(
-                rule(&error),
-                Some(ConfigError::Removed { key, replacement })
-                    if key.starts_with("auth.scopeless_subjects")
-                        && replacement.contains("{ issuer, sub }")
-            ),
-            "{entry}: {error:?}"
-        );
+        assert!(matches!(error, Error::Parse { .. }), "{entry}: {error:?}");
     }
     Ok(())
 }
@@ -542,8 +508,7 @@ fn the_environment_turns_auth_on_over_the_files_issuer() -> Result<(), Box<dyn s
 }
 
 #[test]
-fn the_flat_issuer_variable_is_refused_naming_the_issuer_table()
--> Result<(), Box<dyn std::error::Error>> {
+fn the_flat_issuer_variable_is_refused_at_load() -> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([(
         String::from("FERROBRIDGE__AUTH__ISSUER"),
         String::from("https://as.example.org"),
@@ -555,13 +520,7 @@ fn the_flat_issuer_variable_is_refused_naming_the_issuer_table()
             .err()
             .ok_or("the flat issuer should be refused")?,
     };
-    assert!(
-        matches!(
-            rule(&error),
-            Some(ConfigError::Removed { replacement, .. }) if replacement.contains("[[auth.issuer]]")
-        ),
-        "{error:?}"
-    );
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     Ok(())
 }
 
@@ -656,7 +615,7 @@ fn an_unknown_profile_key_is_refused() -> Result<(), Box<dyn std::error::Error>>
 
 #[test]
 fn a_clock_skew_over_five_minutes_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refusal(&format!("{MINIMAL}clock_skew_seconds = 301\n"))?;
+    let error = refusal(&format!("{MINIMAL}clock_skew = \"301s\"\n"))?;
     assert!(
         matches!(issuer_rule(&error), Some(ResourceError::ClockSkew { .. })),
         "{error:?}"
@@ -750,7 +709,7 @@ fn a_basic_only_section_is_refused_because_the_facade_names_an_issuer()
 fn introspection_mode_resolves_the_introspection_check_in_place_of_the_issuers()
 -> Result<(), Box<dyn std::error::Error>> {
     let settings = settings(
-        "[auth]\n\n[[auth.issuer]]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://bridge.example.org/fhir\"]\nmode = \"introspection\"\n\n[auth.issuer.introspection]\ncache_max_age_seconds = 30\n\n[auth.issuer.introspection.client]\nclient_id = \"ferrobridge-rs\"\nclient_secret = \"synthetic-secret\"\n",
+        "[auth]\n\n[[auth.issuer]]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://bridge.example.org/fhir\"]\nmode = \"introspection\"\n\n[auth.issuer.introspection]\ncache_max_age = \"30s\"\n\n[auth.issuer.introspection.client]\nclient_id = \"ferrobridge-rs\"\nclient_secret = \"synthetic-secret\"\n",
     )?
     .ok_or("auth is on")?;
     assert!(settings.issuers.is_empty(), "no key set is read");

@@ -49,10 +49,12 @@ pub(super) fn resolve_credentials(
             section: section.to_owned(),
         });
     }
-    let outbound = credentials.resolve().map_err(|source| Error::Credentials {
-        section: section.to_owned(),
-        source: Box::new(source),
-    })?;
+    let outbound = credentials
+        .resolve_with_tls(&ferrohealth_smart::config::ServerTls)
+        .map_err(|source| Error::Credentials {
+            section: section.to_owned(),
+            source: Box::new(source),
+        })?;
     Ok(outbound.map(|outbound| match outbound {
         Outbound::Basic(credential) => Upstream::Basic {
             user: credential.username().to_owned(),

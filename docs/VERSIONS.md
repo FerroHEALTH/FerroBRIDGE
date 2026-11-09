@@ -499,7 +499,7 @@ version (`cargo install --locked`), as every FerroHEALTH product does.
 | `hadolint` | 2.15.1 | `.github/workflows/ci.yml` |
 | `sqlx-cli` | 0.9.0 | `.github/workflows/ci.yml` (the `sqlx-offline` job) |
 | `cargo-semver-checks` | 0.51.0 | read by `scripts/checks/semver.sh --pin` for the `crate-version-guard` job of `.github/workflows/ci.yml` and the `plan` job of `.github/workflows/release.yml` |
-| `ferrohealth-perf` | 0.7.0 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
+| `ferrohealth-perf` | 0.8.0 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
 
 The clone detector of `scripts/checks/duplication.sh` (#1359) also runs on a
 developer machine, so its pins live here and the guard reads them from this

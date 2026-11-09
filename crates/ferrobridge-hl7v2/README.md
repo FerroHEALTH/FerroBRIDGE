@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.2"
+ferrobridge-hl7v2 = "0.3"
 ```
 
-Name a patch (`"0.2.N"`) when you need the first release that carries what
+Name a patch (`"0.3.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -86,7 +86,7 @@ With `map` off the crate is the listener, the decoder, the parser, the writer
 and the acknowledgment:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.2", default-features = false }
+ferrobridge-hl7v2 = { version = "0.3", default-features = false }
 ```
 
 ## Example

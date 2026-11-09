@@ -278,8 +278,9 @@ SMART tokens on writes, takes the same arrangement under
 | `scope` | none | | The `scope` parameter, space-delimited scope tokens (RFC 6749 §3.3); empty sends none |
 | `audience` | none | | An `audience` parameter, for an authorization server that reads one; no specification defines it for this grant |
 | `resource` | none | | The `resource` parameter, an absolute URI with no fragment (RFC 8707 §2) |
-| `refresh_margin_ms` | `30000` | | How long before the token expires a new one is fetched |
-| `timeout_ms` | `10000` | | How long one call to the authorization server may take |
+| `refresh_margin` | `"30s"` | | How long before the token expires a new one is fetched |
+| `timeout` | `"10s"` | | How long one call to the authorization server may take |
+| `tls.trust_roots_file`, `tls.client_identity_file`, `tls.min_version` | none, none, `"1.3"` | | The TLS to the authorization server: trust roots beside the platform's, the client certificate chain and key in one PEM for mutual TLS (or `tls.client_identity` inline), and the oldest TLS version spoken |
 
 Set exactly one of `token_endpoint` and `issuer`; both, or neither, is a boot
 error. With an `issuer`, the bridge reads the RFC 8414 metadata at
@@ -289,7 +290,7 @@ by `/.well-known/openid-configuration`. The document's `issuer` must equal
 the configured value exactly, or no token is requested (RFC 8414 §3.3).
 
 The bridge fetches the token on the first call to that upstream, not at boot,
-and every call to it shares it. It fetches a new one `refresh_margin_ms` before `expires_in`
+and every call to it shares it. It fetches a new one `refresh_margin` before `expires_in`
 runs out; the margin is capped at half the token's lifetime, so a short-lived
 token is still reused. A token without `expires_in` is reused until the
 upstream refuses it. Calls that find no usable token at the same time share
@@ -360,7 +361,7 @@ The issuer's `profile` picks the grant:
 | `indicators` | none | The `resource` or `audience` values the exchange names the CDR by |
 | `scope` | none | The `scope` the request names; the on-behalf-of grant requires it |
 | `correlation_claim` | none | The claim a chained `federation` route carries from the caller's token to the onward one |
-| `keys` | none | The profile keys over the preset; `max_onward_lifetime`, in seconds, is required |
+| `keys` | none | The profile keys over the preset; `max_onward_lifetime`, a duration such as `"1h"`, is required |
 | `cache` | `true` | `false` holds no onward token, so every CDR call exchanges one at the issuer, with a warning logged at start; a setting for a performance measurement, never for production |
 | `actor_assertion` | `false` | `true` names the bridge's client as the actor of every exchange it sends without an actor token, with an assertion signed by the `oauth` table's key (RFC 8693 §2.1); a lane with no assertion key, or under the JWT bearer grant, is refused at start |
 
@@ -375,7 +376,7 @@ grant with no `user/` or `system/` one, and carry the caller's `patient`
 launch context unchanged. Unless
 `cache = false`, the bridge caches the token under the caller's token and the
 target until
-`refresh_margin_ms` before the earlier of its own and the caller's token's
+`refresh_margin` before the earlier of its own and the caller's token's
 expiry, and checks it again on every use. The caller's token appears in no
 log, span or metric.
 
@@ -905,7 +906,7 @@ sends and what each refusal looks like.
 | `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient`; each is one SMART App Launch 2.2.0 (Conformance, Capabilities) defines, or a full URI. `sso-openid-connect` also writes the issuer's `issuer`, which the document omits otherwise (Conformance, Metadata) |
 | `scopes_supported` | `[]` | The scopes the discovery document lists as `scopes_supported`; list only scopes the bridge honours, because "the server SHALL support all scopes listed here" (SMART App Launch 2.2.0, Conformance, Metadata). Empty omits the member |
 | `product_scope` | `__ferrobridge.operator` | The operator scope: it guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
-| `ca_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and for an issuer with `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start |
+| `tls.trust_roots_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and for an issuer with `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start. `tls.client_identity_file` and `tls.min_version` (`"1.3"` unless lowered to `"1.2"`) complete the table |
 
 Each trusted authorization server is one `[[auth.issuer]]` table, and every
 setting of an issuer lives on its table:
@@ -918,11 +919,11 @@ setting of an issuer lives on its table:
 | `first_party_clients` | `[]` | The deployment's own clients: a person's token of a `persons` issuer is admitted only through one of these or a declared delegate, so list the clients your clinicians and operators sign in with, the operator console's included |
 | `audience` | none, required | The audiences, a list, of which every token's `aud` must contain one, normally the facade's `base_url` (RFC 9068 §4) |
 | `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use; a symmetric `HS*` algorithm is refused and `none` is no algorithm |
-| `clock_skew_seconds` | `60` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
-| `jwks_max_age_seconds` | `600` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
-| `jwks_refresh_interval_seconds` | `60` | The shortest time between two reads of the key set that a token naming an unknown `kid`, or a failed read, triggers |
+| `clock_skew` | `"1min"` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
+| `jwks_max_age` | `"10min"` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
+| `jwks_refresh_interval` | `"1min"` | The shortest time between two reads of the key set that a token naming an unknown `kid`, or a failed read, triggers |
 | `jwks_file` | none | A JWK Set file handed over out of band, read in place of the issuer's `jwks_uri`; the issuer's metadata is then not read |
-| `timeout_ms` | `10000` | How long one call to the authorization server may take |
+| `timeout` | `"10s"` | How long one call to the authorization server may take |
 | `role_claims` | `["roles", "groups", "entitlements"]` | The claims this issuer's roles are read from, each a dotted path into the token's JSON (the default is the three RFC 9068 §2.2.3.1 names). A path with an empty step or with whitespace refuses the start. The bridge grants nothing by role: no route it guards asks for one, so the roles a token carries change no answer |
 | `mode` | `jwt` | `jwt` checks JWT access tokens against the issuer's key set; `introspection` asks the issuer's introspection endpoint |
 
@@ -967,8 +968,8 @@ SMART `user/` scopes and the operator scope the person is granted, which the
 facade checks as it checks a token's. A user listing a `system/` scope
 refuses the start, naming the user and the scope. A user's `roles` list is
 accepted and, as with `role_claims`, grants nothing on the bridge. `[auth.basic]
-cache_ttl_seconds` (default `300`) is how long a password that verified is
-remembered, so a repeat request skips the Argon2id derivation; `0`
+cache_ttl` (default `"5min"`) is how long a password that verified is
+remembered, so a repeat request skips the Argon2id derivation; `"0s"`
 remembers none.
 
 ```toml
@@ -991,10 +992,10 @@ on a `404` at the issuer followed by `/.well-known/openid-configuration`, and
 the key set its `jwks_uri` names. Metadata naming another issuer, metadata
 without a `jwks_uri`, a first issuer without a `token_endpoint`, and a key
 set that cannot be read each refuse the start. A key set older than
-`jwks_max_age_seconds` is read again before a token is checked against it. A
+`jwks_max_age` is read again before a token is checked against it. A
 token whose `kid` the key set does not hold makes the server read the key set
 once more, which is how a key rotation arrives, and never more often than
-`jwks_refresh_interval_seconds`.
+`jwks_refresh_interval`.
 
 An authorization server whose access tokens are opaque, so the bridge cannot
 check them against a key set, is checked by OAuth 2.0 Token Introspection
@@ -1005,7 +1006,7 @@ the answer is `active: true` with `scope`, `client_id` and `exp` (SMART App
 Launch 2.2.0, Token Introspection), checks an `iss` and an `aud` the answer
 carries against `issuer` and `audience`, and reads the scopes and the
 `patient` launch context as it reads a JWT's. An answer is held until its
-`exp` and never longer than `cache_max_age_seconds`, so a revoked token
+`exp` and never longer than `cache_max_age`, so a revoked token
 passes for at most that long. An inactive token is refused with `401`; an
 endpoint that fails answers `503`. An introspected issuer takes no
 `jwks_file`, and sits beside issuers checked by their key sets.
@@ -1013,9 +1014,9 @@ endpoint that fails answers `503`. An introspected issuer takes no
 | Key | Default | Meaning |
 |---|---|---|
 | `introspection.endpoint` | the metadata's | The introspection endpoint, an `https` URL, when the issuer's metadata names none or another |
-| `introspection.cache_max_age_seconds` | `60` | The longest an active answer is used before the endpoint is asked again; `0` asks on every request |
+| `introspection.cache_max_age` | `"1min"` | The longest an active answer is used before the endpoint is asked again; `"0s"` asks on every request |
 | `introspection.cache_capacity` | `10000` | The most answers held at once |
-| `introspection.client` | none | The bridge's client authentication at the endpoint: the keys of [`[cdr.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth) (`client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`, the TLS files); `issuer` defaults to the table's |
+| `introspection.client` | none | The bridge's client authentication at the endpoint: the keys of [`[cdr.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth) (`client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`, `tls`); `issuer` defaults to the table's |
 | `introspection.bearer` | none | Instead of `client`: a client credentials grant, in the same keys, whose token the bridge sends as `Authorization: Bearer`, the form SMART App Launch 2.2.0 has an EHR accept |
 
 ```toml
@@ -1027,22 +1028,16 @@ first_party_clients = ["clinic-portal"]
 mode = "introspection"
 
 [auth.issuer.introspection]
-cache_max_age_seconds = 30
+cache_max_age = "30s"
 
 [auth.issuer.introspection.client]
 client_id = "ferrobridge-rs"
 client_secret_file = "/run/secrets/introspection-secret"
 ```
 
-The shapes earlier releases took fail `config check` naming their
-replacement: the flat `[auth] issuer = "…"`, an issuer setting at section
-level (`audience`, `algorithms`, `clock_skew_seconds`, the `jwks_*` keys,
-`timeout_ms`, `mode`, `introspection`, `role_claims`), `token_profile`, and a
-`scopeless_subjects` entry written as a string.
-
 The `[[auth.issuer]]` tables live in the configuration file: an environment
-variable sets one key, and `FERROBRIDGE__AUTH__ISSUER` set to a URL is the
-removed flat form. The section's own keys read from the environment, such as
+variable sets one key, and `FERROBRIDGE__AUTH__ISSUER` set to a URL is refused,
+since `issuer` is a list of tables. The section's own keys read from the environment, such as
 `FERROBRIDGE__AUTH__ENABLED` and `FERROBRIDGE__AUTH__PRODUCT_SCOPE`.
 Apart from the Basic users' hashes and the introspection credential the
 section holds no secret: the resource server checks signatures with the

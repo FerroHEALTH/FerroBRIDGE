@@ -79,8 +79,8 @@ fn a_grant_reads_every_key_and_its_secret_file() -> Result<(), Box<dyn std::erro
                 "scope = \"openehr system/*.crs\"\n",
                 "audience = \"ferroehr\"\n",
                 "resource = \"https://cdr.example.org/v1\"\n",
-                "refresh_margin_ms = 60000\n",
-                "timeout_ms = 4000\n",
+                "refresh_margin = \"1min\"\n",
+                "timeout = \"4s\"\n",
             ),
             file.path()
         ),
@@ -149,8 +149,8 @@ fn a_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn std::err
             file.path().display().to_string(),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__OAUTH__REFRESH_MARGIN_MS"),
-            String::from("10000"),
+            String::from("FERROBRIDGE__CDR__CREDENTIALS__OAUTH__REFRESH_MARGIN"),
+            String::from("10s"),
         ),
     ]);
     let settings = Config::from_sources(None, &environment)?.resolve(Process::Server)?;
@@ -202,7 +202,7 @@ fn a_mutual_tls_client_needs_its_certificate() -> Result<(), Box<dyn std::error:
         matches!(
             rule(&error, "cdr.credentials"),
             Some(ConfigError::Missing {
-                key: "credentials.oauth.client_certificate_file"
+                key: "the client certificate of the TLS configuration built from credentials.oauth.tls"
             })
         ),
         "{error:?}"
@@ -456,7 +456,7 @@ fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn
                 "scope = \"system/CodeSystem.rs\"\n",
                 "audience = \"ferroterm\"\n",
                 "resource = \"https://tx.example.org/r4\"\n",
-                "refresh_margin_ms = 60000\n",
+                "refresh_margin = \"1min\"\n",
             ),
             file.path()
         ),

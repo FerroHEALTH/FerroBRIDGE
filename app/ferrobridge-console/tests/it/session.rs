@@ -38,7 +38,7 @@ async fn signed_in() -> Result<(Provider, axum::Router, String), Box<dyn Error>>
         &provider,
         NO_BRIDGE,
         "",
-        &format!("idle_timeout_s = {IDLE}\nabsolute_timeout_s = 3600"),
+        &format!("idle_timeout = \"{IDLE}s\"\nabsolute_timeout = \"1h\""),
     ))
     .await?;
     let cookie = sign_in(&service, &provider, TokenAnswer::bearer(OPERATOR_TOKEN)).await?;

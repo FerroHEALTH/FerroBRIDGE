@@ -33,7 +33,7 @@ const ONWARD: &str = concat!(
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",
     "[cdr.credentials.onward.keys]\n",
-    "max_onward_lifetime = 300\n",
+    "max_onward_lifetime = \"5min\"\n",
 );
 
 /// A `[[cdr.onward]]` table of the deployment's `patients` issuer, a realm
@@ -46,7 +46,7 @@ const PATIENTS: &str = concat!(
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",
     "[cdr.onward.keys]\n",
-    "max_onward_lifetime = 300\n",
+    "max_onward_lifetime = \"5min\"\n",
 );
 
 /// A `[[cdr.onward]]` table of another party's `federation` issuer, which
@@ -57,7 +57,7 @@ const FEDERATION: &str = concat!(
     "kind = \"federation\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "[cdr.onward.keys]\n",
-    "max_onward_lifetime = 300\n",
+    "max_onward_lifetime = \"5min\"\n",
     "[cdr.onward.federation]\n",
     "contact_point = false\n",
     "mapping = \"iua\"\n",

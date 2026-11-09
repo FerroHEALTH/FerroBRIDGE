@@ -29,9 +29,11 @@ use crate::smart::SmartSettings;
 /// holding a `system/` scope, naming the user and the scope: a Basic
 /// credential is a person's.
 pub(super) fn resolve_auth(auth: &AuthSection) -> Result<Option<SmartSettings>, Error> {
-    let resolved = auth.resolve().map_err(|source| Error::Auth {
-        source: Box::new(source),
-    })?;
+    let resolved = auth
+        .resolve_with_tls(&ferrohealth_smart::config::ServerTls)
+        .map_err(|source| Error::Auth {
+            source: Box::new(source),
+        })?;
     if !resolved.enabled {
         return Ok(None);
     }

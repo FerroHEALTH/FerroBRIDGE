@@ -528,7 +528,7 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
     let mut issuers = Vec::new();
     if let (Some(lane), Some(kind)) = (
         cdr.credentials
-            .onward()
+            .onward_with_tls(&ferrohealth_smart::config::ServerTls)
             .map_err(|source| refused("cdr.credentials", source))?,
         cdr.credentials
             .onward
@@ -547,7 +547,7 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
             )
         })?;
         let lane = oauth
-            .resolve()
+            .resolve_with_tls(&ferrohealth_smart::config::ServerTls)
             .and_then(|credentials| section.resolve(credentials))
             .map_err(|source| refused("cdr.onward", source))?;
         let kind = section.kind.ok_or_else(|| {
