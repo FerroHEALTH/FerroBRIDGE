@@ -32,7 +32,14 @@ pub mod r5;
 #[cfg(feature = "r6")]
 pub mod r6;
 pub mod schema;
-#[cfg(feature = "resources")]
+#[cfg(any(
+    feature = "resources",
+    feature = "r4-resources",
+    feature = "r4b-resources",
+    feature = "r5-resources",
+    feature = "r6-resources",
+    feature = "stu3-resources"
+))]
 pub mod search;
 #[cfg(feature = "stu3")]
 pub mod stu3;

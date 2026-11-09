@@ -91,7 +91,7 @@ pub fn definition_cfg(model: &VersionModule) -> String {
     model
         .types
         .get(ELEMENT_DEFINITION)
-        .map(|ty| ty.scope.cfg())
+        .map(|ty| ty.scope.cfg(&model.name))
         .unwrap_or_default()
 }
 
@@ -166,7 +166,7 @@ pub fn render_definition(model: &VersionModule) -> Result<String, fmt::Error> {
     writeln!(out, "}}")?;
     if let Some(structure) = model.types.get(STRUCTURE_DEFINITION) {
         writeln!(out)?;
-        out.push_str(&structure.scope.cfg());
+        out.push_str(&structure.scope.cfg(&model.name));
         render_structure(&mut out, &reader)?;
     }
     terminology::render_terminology(&mut out, &reader)?;

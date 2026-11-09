@@ -611,8 +611,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+omop-cdm-codegen -omop-cdm"
   check "omop-cdm reaches its dependants and its generator" "crates/omop-cdm/src/lib.rs" false \
     "+omocl +omop-cdm +ferrobridge-server +omop-cdm-codegen -fhir-codegen"
+  # NOTE: ferrobridge-hl7v2's tests validate a mapped Patient against the R4 core package there (#1762).
   check "the codegen vendor tree reaches its readers" "tools/fhir-codegen/vendor/x.json" false \
-    "+ferrobridge-fhirpath +ferrobridge-validator +fhir-codegen -fhir-types -ferrobridge-hl7v2"
+    "+ferrobridge-fhirpath +ferrobridge-validator +fhir-codegen +ferrobridge-hl7v2 -fhir-types"
   check "the v2-to-FHIR guide reaches the crate that embeds it and its readers" \
     "crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package/x.json" false \
     "+ferrobridge-hl7v2 +ferrobridge-fhirpath +ferrobridge-server +ferrobridge-testkit -fhir-codegen"

@@ -225,7 +225,7 @@ impl super::super::definition::ElementDefinitionRead
     }
 }
 
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4b-resources"))]
 impl super::super::definition::StructureDefinitionRead
     for super::structure_definition::StructureDefinition
 {

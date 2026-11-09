@@ -13,7 +13,10 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   the first declared root set (Bundle, CapabilityStatement, CodeSystem,
   ConceptMap, OperationOutcome, Parameters, TerminologyCapabilities, ValueSet,
   and the terminology OperationDefinitions); `resources` widens it to every
-  concrete `kind: resource` StructureDefinition of the package. Each carries
+  concrete `kind: resource` StructureDefinition of the package, in every
+  enabled version, and `<version>-resources` widens one version alone (a
+  resource-scope item carries `any(feature = "resources", feature =
+  "<version>-resources")`). Each carries
   the complete closure of every type its roots reference, per version, and each
   emitted item carries the `cfg` of the narrowest feature that selects it.
   Never trim inside a closure.
