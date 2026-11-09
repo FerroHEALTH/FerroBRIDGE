@@ -48,21 +48,30 @@ runs:
       shell: bash
       env:
         BASE: ${{ inputs.base }}
-      # The free memory and disk are logged each minute while both arms
-      # build, so a runner that shuts down mid-build leaves the last reading
-      # in its log.
+      # A release build of fhir-types with every resource of all five FHIR
+      # releases, which main compiled from #1717 until #1737, peaks above the
+      # runner's 16 GB on its own (#1737), so a swap file backs the build and
+      # is turned off again before anything is measured; the binaries are the
+      # same. The memory, swap and disk are logged each minute, so a runner
+      # that shuts down mid-build leaves the last reading in its log.
       run: |
         set -euo pipefail
+        swap=/perf-build.swap
+        sudo fallocate -l 20G "$swap"
+        sudo chmod 600 "$swap"
+        sudo mkswap "$swap" > /dev/null
+        sudo swapon "$swap"
         sample() {
           while true; do
-            free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB, ", $3, $2 }'
+            free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB, ", $3, $2 }
+              NR == 3 { printf "swap used %s of %s MB, ", $3, $2 }'
             df -m . | awk 'NR == 2 { printf "disk free %s MB\n", $4 }'
             sleep 60
           done
         }
         sample &
         sampler=$!
-        trap 'kill "$sampler" 2> /dev/null || true' EXIT
+        trap 'kill "$sampler" 2> /dev/null || true; sudo swapoff "$swap" || true; sudo rm -f "$swap"' EXIT
         bash scripts/perf/gate.sh build "$BASE"
     - name: Gate the performance
       id: gate

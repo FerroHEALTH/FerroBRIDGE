@@ -100,7 +100,10 @@ minute. The hosted runner has 16 GB. A release build of `fhir-types` with
 every resource of all five FHIR releases peaks above it on its own: on #1737
 the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
 and the runner shut down. The bridge therefore compiles only the releases it
-speaks, through the release features of `ferrobridge-term`.
+speaks, through the release features of `ferrobridge-term`. A base from
+before that change still compiles all five, so the build step backs both
+builds with a 20 GB swap file and turns it off before the gate measures
+anything; swap changes how fast the build runs, never the binary it makes.
 
 ## Running it yourself
 
