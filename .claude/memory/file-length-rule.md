@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 On 2026-09-26 the owner ruled that hand-written files had grown out of hand
 (the v2 interpreter's `run.rs` at 4600 lines, the FHIRconnect traverser at
 3834): a hand-written Rust file is at most 1000 lines, and one over 750 is

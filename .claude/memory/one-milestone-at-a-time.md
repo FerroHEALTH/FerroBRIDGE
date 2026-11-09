@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 All workers work the current release milestone until it is empty and cut;
 only then does work on the next milestone start (owner, 2026-10-19: "you need
 to go per milestone right? so we can cut the release and then do all our

@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 A worker owns every open PR it opened, not only its latest one. Before it starts new work, and while it waits, it lists its open PRs and drives each one to merge:
 - arm auto-merge if it is off;
 - fix a failing check;

@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Sign and push a release tag, and approve the `crates-io` environment's pending deployment, yourself once the release PR has merged and its merge commit is preflighted. Do not hand the owner a command to run.
 
 **Why:** the owner ruled on 2026-11-03: "you can approve crates.io and also tag releases fully autonomously, without me asking anything". Waiting on the owner stalled releases.
