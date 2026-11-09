@@ -138,16 +138,11 @@ fn the_lane_needs_authenticated_callers() -> Result<(), Box<dyn std::error::Erro
 
 #[test]
 fn a_lane_without_a_repository_or_a_spool_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    for (text, missing) in [(
-        lane("endpoint.url = \"https://arr.example.org/fhir/\"\n"),
-        "audit.spool_dir",
-    )] {
-        let error = refusal(&text)?;
-        assert!(
-            matches!(&error, Error::Missing { key } if key == missing),
-            "{missing}: {error:?}"
-        );
-    }
+    let error = refusal(&lane("endpoint.url = \"https://arr.example.org/fhir/\"\n"))?;
+    assert!(
+        matches!(&error, Error::Missing { key } if key == "audit.spool_dir"),
+        "audit.spool_dir: {error:?}"
+    );
     let error = refusal(&lane("spool_dir = \"/var/spool/a\"\n"))?;
     assert!(
         refused_endpoint(&error, "url"),
