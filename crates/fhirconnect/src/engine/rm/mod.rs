@@ -39,6 +39,7 @@ use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
 use openehr_rm::v1_2::data_types::uri::dv_uri::DvUri;
+use openehr_rm::v1_2::typing::base_name;
 use openehr_sdt::flat::attribute_keys::attribute_key;
 use openehr_sdt::flat::path::Segment;
 use serde_json::Value;
@@ -48,7 +49,7 @@ pub mod interval;
 pub mod null_flavour;
 
 use crate::engine::rm::null_flavour::NULL_FLAVOUR;
-use crate::resolve::derive;
+use crate::resolve::derive::type_argument;
 
 /// The suffix a whole canonical value travels under in a FLAT key.
 ///
@@ -188,7 +189,7 @@ impl RmValue {
             rm_type: String::from(rm_type),
             source,
         };
-        match derive::base_class(rm_type) {
+        match base_name(rm_type) {
             "DV_TEXT" | "DV_CODED_TEXT" => from_canonical_value::<DvText>(value)
                 .map(|text| match text {
                     DvText::DvCodedText(coded) => Self::CodedText(Box::new(coded)),
@@ -208,7 +209,8 @@ impl RmValue {
                 .map(|date| Self::DateTime(Box::new(date)))
                 .map_err(refuse),
             "DV_INTERVAL"
-                if rm_type == QUANTITY_INTERVAL || bound_class(value) == Some("DV_QUANTITY") =>
+                if type_argument(rm_type).is_some_and(|bound| bound.name() == DV_QUANTITY)
+                    || bound_class(value) == Some(DV_QUANTITY) =>
             {
                 from_canonical_value(value)
                     .map(|interval| Self::QuantityInterval(Box::new(interval)))
@@ -310,8 +312,8 @@ impl RmValue {
     }
 }
 
-/// The Web Template type name of a quantity interval node.
-const QUANTITY_INTERVAL: &str = "DV_INTERVAL<DV_QUANTITY>";
+/// The bound class of a quantity interval node, `DV_INTERVAL<DV_QUANTITY>`.
+const DV_QUANTITY: &str = "DV_QUANTITY";
 
 /// Returns the class a `DV_INTERVAL`'s bounds carry, read from the `_type` of
 /// whichever bound the document holds.

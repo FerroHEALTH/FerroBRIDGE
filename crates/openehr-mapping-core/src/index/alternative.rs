@@ -13,6 +13,8 @@
 //! the value conforms to wins, and the first in template order on a tie.
 
 use openehr_rm::v1_2::model;
+use openehr_rm::v1_2::typing::RmType;
+use openehr_rm::v1_2::typing::base_name;
 use serde_json::Value;
 
 use crate::index::ResolvedNode;
@@ -41,6 +43,7 @@ pub(super) fn chosen<'node>(
     let mut best: Option<(&'node ResolvedNode, usize)> = None;
     for &node in alternatives {
         let (base, declared) = split_generic(node.rm_type());
+        let declared = declared.as_ref().map(RmType::name);
         let admits = model::is_a(named, base)
             && match (declared, parameter) {
                 (Some(declared), Some(parameter)) => model::is_a(parameter, declared),
@@ -57,24 +60,36 @@ pub(super) fn chosen<'node>(
     Ok(best.map(|(node, _)| node))
 }
 
-/// Splits a class name into its base and its one generic parameter.
-fn split_generic(rm_type: &str) -> (&str, Option<&str>) {
-    match rm_type.split_once('<') {
-        Some((base, rest)) => (base, rest.strip_suffix('>')),
-        None => (rm_type, None),
-    }
+/// Splits a class name into its base and its one generic parameter, read by
+/// `openehr_rm::v1_2::typing`; a name it does not read has no parameter.
+fn split_generic(rm_type: &str) -> (&str, Option<RmType>) {
+    let parameter = rm_type
+        .parse::<RmType>()
+        .ok()
+        .and_then(|parsed| parsed.params().first().cloned());
+    (base_name(rm_type), parameter)
 }
 
 #[cfg(test)]
 mod tests {
+    use openehr_rm::v1_2::typing::RmType;
+
     use super::split_generic;
+
+    fn named(rm_type: &str) -> (&str, Option<String>) {
+        let (base, parameter) = split_generic(rm_type);
+        (
+            base,
+            parameter.as_ref().map(RmType::name).map(str::to_owned),
+        )
+    }
 
     #[test]
     fn a_generic_class_splits_into_its_base_and_parameter() {
         assert_eq!(
-            split_generic("DV_INTERVAL<DV_QUANTITY>"),
-            ("DV_INTERVAL", Some("DV_QUANTITY"))
+            named("DV_INTERVAL<DV_QUANTITY>"),
+            ("DV_INTERVAL", Some(String::from("DV_QUANTITY")))
         );
-        assert_eq!(split_generic("DV_TEXT"), ("DV_TEXT", None));
+        assert_eq!(named("DV_TEXT"), ("DV_TEXT", None));
     }
 }

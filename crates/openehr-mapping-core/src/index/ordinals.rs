@@ -53,4 +53,3 @@ impl OrdinalOption {
         &self.terminology
     }
 }
-
