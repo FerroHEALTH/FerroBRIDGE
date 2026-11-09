@@ -1,6 +1,6 @@
 - The bridge and `ferrobridge-term` 0.1.147 take `ferrohealth-smart` 0.12.0,
   the operator console `ferrohealth-session` 0.6.0, and the server
-  `ihe-atna` and `ehds-logging` 0.7.0, whose FHIR Feed bearer is on the same
+  `ihe-atna` and `ehds-logging` 0.7.1, whose FHIR Feed bearer is on the same
   line, so the lock holds one `ferrohealth-smart`. `[cdr.credentials.onward]`
   and each `[[cdr.onward]]` table take `cache`: `false` holds no onward
   token, so every CDR call exchanges one at the issuer, with a warning at

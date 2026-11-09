@@ -175,8 +175,8 @@ ferrohealth-usage-report = { version = "=0.2.1", default-features = false }
 # Feed (`balp`) with a client credentials bearer (`smart`, on the 0.12 line of
 # ferrohealth-smart). Pinned exactly, as a product pins every shared crate;
 # only the server links them.
-ehds-logging = { version = "=0.7.0", default-features = false }
-ihe-atna = { version = "=0.7.0", default-features = false }
+ehds-logging = { version = "=0.7.1", default-features = false }
+ihe-atna = { version = "=0.7.1", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
