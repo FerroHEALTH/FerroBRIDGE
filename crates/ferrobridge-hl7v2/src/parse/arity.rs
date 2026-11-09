@@ -22,8 +22,9 @@
 //! 2.8.2; with no component source for those fields, only their repetitions
 //! are checked.
 
-use hl7v2_types::model::{DataType, DataTypeRef, Field, Max, SegmentRef};
+use hl7v2_types::model::{DataType, DataTypeRef, Max, SegmentRef};
 
+use crate::parse::profile::Profile;
 use crate::parse::{Component, Location, Parsed, Unplaced};
 
 /// The MSH fields the lexer reads as one value each: the field separator
@@ -31,8 +32,15 @@ use crate::parse::{Component, Location, Parsed, Unplaced};
 const MSH_DELIMITER_FIELDS: [u16; 2] = [1, 2];
 
 /// Counts every valued repetition, component and subcomponent of the
-/// segment at `index` beyond what the definition its node places expects.
-pub(super) fn check_arity(parsed: &mut Parsed, index: usize, node: &'static SegmentRef) {
+/// segment at `index` beyond what the definition its node places expects, a
+/// field's repetition read through `profile`.
+pub(super) fn check_arity(
+    parsed: &mut Parsed,
+    index: usize,
+    node: &'static SegmentRef,
+    profile: &Profile,
+) {
+    let (version, structure) = (parsed.structure.version, parsed.structure.id);
     let location = parsed.location(index);
     let Some(segment) = parsed.message.segments.get(index) else {
         return;
@@ -51,7 +59,7 @@ pub(super) fn check_arity(parsed: &mut Parsed, index: usize, node: &'static Segm
             let number = offset.saturating_add(1);
             let mut place = at.clone();
             place.repetition = Some(number);
-            if !fits(number, field) {
+            if !fits(number, profile.max(version, structure, field)) {
                 if repetition.is_valued() {
                     found.push(Unplaced::ExtraRepetition {
                         location: place,
@@ -69,9 +77,9 @@ pub(super) fn check_arity(parsed: &mut Parsed, index: usize, node: &'static Segm
     parsed.unplaced.extend(found);
 }
 
-/// Whether repetition `number`, from 1, is within the field's cardinality.
-fn fits(number: usize, field: &Field) -> bool {
-    match field.cardinality.max {
+/// Whether repetition `number`, from 1, is within the maximum `max`.
+fn fits(number: usize, max: Max) -> bool {
+    match max {
         Max::Unbounded => true,
         Max::Bounded(max) => usize::try_from(max).map_or(true, |max| number <= max),
     }
