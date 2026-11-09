@@ -34,6 +34,7 @@ pub mod search;
 pub mod snapshot;
 pub mod terminology;
 pub mod v2;
+pub mod v2maps;
 
 use std::path::{Path, PathBuf};
 
@@ -78,6 +79,15 @@ pub enum Command {
         /// The generated HL7 v2 crate directory.
         #[arg(long, value_name = "DIR", default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/hl7v2-types"))]
         hl7v2_out: PathBuf,
+        /// The crate the v2-to-FHIR structure maps are generated into.
+        #[arg(long, value_name = "DIR", default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/ferrobridge-hl7v2"))]
+        maps_out: PathBuf,
+        /// FerroBRIDGE's structure overrides of the v2-to-FHIR guide.
+        #[arg(long, value_name = "DIR", default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/overrides/hl7.fhir.uv.v2mappings"))]
+        overrides: PathBuf,
+        /// FerroBRIDGE's value package for the terminology server.
+        #[arg(long, value_name = "DIR", default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/../../terminology/hl7v2-values"))]
+        values: PathBuf,
     },
     /// Regenerates the FHIR core terminology bundles a terminology server embeds.
     Terminology {
@@ -105,6 +115,9 @@ pub enum Error {
     /// The v2 emit pipeline failed.
     #[error(transparent)]
     V2(#[from] v2::emit::EmitError),
+    /// The v2-to-FHIR maps pipeline failed.
+    #[error(transparent)]
+    V2Maps(#[from] v2maps::emit::EmitError),
     /// The terminology bundles failed.
     #[error(transparent)]
     Terminology(#[from] terminology::BundleError),
@@ -113,8 +126,13 @@ pub enum Error {
 /// What one run of the generator produced.
 #[derive(Debug)]
 pub enum Report {
-    /// The two generated crates, `fhir-types` first.
-    Emit(emit::EmitReport, v2::emit::EmitReport),
+    /// The two generated crates, `fhir-types` first, and the maps generated
+    /// into `ferrobridge-hl7v2`.
+    Emit(
+        emit::EmitReport,
+        Box<v2::emit::EmitReport>,
+        Box<v2maps::emit::EmitReport>,
+    ),
     /// The FHIR core terminology bundles.
     Terminology(terminology::BundleReport),
 }
@@ -145,6 +163,9 @@ pub fn run(cli: &Cli) -> Result<Report, Error> {
             vendor,
             out,
             hl7v2_out,
+            maps_out,
+            overrides,
+            values,
         } => {
             let fhir = emit::emit(&emit::EmitOptions {
                 versions: version_inputs(vendor),
@@ -158,7 +179,14 @@ pub fn run(cli: &Cli) -> Result<Report, Error> {
                 crate_dir: hl7v2_out.clone(),
                 check: *check,
             })?;
-            Ok(Report::Emit(fhir, hl7v2))
+            let maps = v2maps::emit::emit(&v2maps::emit::EmitOptions {
+                guide: vendor.join("hl7.fhir.uv.v2mappings"),
+                overrides: overrides.clone(),
+                values: values.clone(),
+                crate_dir: maps_out.clone(),
+                check: *check,
+            })?;
+            Ok(Report::Emit(fhir, Box::new(hl7v2), Box::new(maps)))
         }
         Command::Terminology { check, vendor, out } => Ok(Report::Terminology(
             terminology::bundle(&terminology::BundleOptions {

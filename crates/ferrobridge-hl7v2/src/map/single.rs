@@ -15,10 +15,10 @@
 
 use fhir_types::codec::Value;
 
-use crate::map::corpus::Corpus;
-use crate::map::translate::Translator;
+use crate::map::maps::Maps;
 use crate::map::{MapError, Outcome, run};
 use crate::parse::Parsed;
+use ferrobridge_term::client::Client;
 
 /// A refusal to map one segment.
 #[derive(Debug, thiserror::Error)]
@@ -113,8 +113,8 @@ pub async fn segment(
     parsed: &Parsed,
     index: usize,
     resource_type: &str,
-    corpus: &Corpus,
-    translator: Option<Translator<'_>>,
+    corpus: &Maps,
+    translator: Option<&Client>,
 ) -> Result<Segmented, SegmentError> {
     let mut run = run::Run::new(corpus, parsed);
     let root = run.single(index, resource_type)?;

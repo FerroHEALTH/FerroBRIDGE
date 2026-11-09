@@ -37,8 +37,7 @@ use std::time::{Duration, Instant};
 use ferrobridge_hl7v2::ack::{self, Code, Header};
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Inbound, Received};
-use ferrobridge_hl7v2::map::corpus::{Corpus, CorpusError};
-use ferrobridge_hl7v2::map::translate::Translator;
+use ferrobridge_hl7v2::map::maps::Maps;
 use ferrobridge_hl7v2::mllp::listener::{self, Connection, Handler, Timeouts};
 use ferrobridge_hl7v2::mllp::{Codec, Malformed};
 use ferrobridge_hl7v2::parse::Message;
@@ -56,28 +55,11 @@ use crate::hl7v2::answer::{Settled, Tally};
 use crate::hl7v2::stamped::Stamped;
 use ferrohealth_usage_report::window::Window;
 
-/// Loads the guide's `ConceptMaps`, the supplements `ferrobridge-hl7v2`
-/// ships, and every supplement directory of the settings over them, in order.
-///
-/// # Errors
-///
-/// Returns the [`CorpusError`] of the first directory or file that does not
-/// load.
-pub fn load_corpus(settings: &Hl7v2Settings) -> Result<Corpus, CorpusError> {
-    let mut corpus = Corpus::load(&settings.concept_maps)?.with_shipped_supplements()?;
-    for supplement in &settings.supplements {
-        corpus = corpus.supplement(supplement)?;
-    }
-    Ok(corpus)
-}
-
 /// The face: what one frame's answer is built from.
 #[derive(Debug)]
 pub struct Face {
     /// The facade whose ingest service the messages enter.
     facade: Arc<Facade>,
-    /// The v2-to-FHIR `ConceptMaps`.
-    corpus: Corpus,
     /// The directory of the maps, with the messages each one served.
     directory: Arc<directory::Directory>,
     /// The terminology server the table maps are translated on.
@@ -166,12 +148,12 @@ pub fn admitted(senders: &[Sender], message: &Message) -> bool {
 }
 
 impl Face {
-    /// Returns the face over `facade`, `corpus` and `terminology` that
-    /// `settings` describes.
+    /// Returns the face over `facade` and `terminology` that `settings`
+    /// describes, running the v2-to-FHIR maps with FerroBRIDGE's corrections
+    /// ([`Maps::corrected`]).
     #[must_use]
     pub fn new(
         facade: Arc<Facade>,
-        corpus: Corpus,
         terminology: Option<ferrobridge_term::client::Client>,
         settings: &Hl7v2Settings,
     ) -> Self {
@@ -180,13 +162,11 @@ impl Face {
             ingest.ehr_policy = policy;
         }
         let directory = Arc::new(directory::Directory::new(
-            &corpus,
-            settings,
+            Maps::corrected(),
             jiff::Timestamp::now(),
         ));
         Self {
             facade,
-            corpus,
             directory,
             terminology,
             settings: ingest,
@@ -392,8 +372,8 @@ impl Face {
         };
         let mapped = match ferrobridge_hl7v2::map::map(
             inbound.parsed(),
-            &self.corpus,
-            self.terminology.as_ref().map(Translator::Server),
+            Maps::corrected(),
+            self.terminology.as_ref(),
         )
         .await
         {

@@ -8,11 +8,10 @@ paths: ["scripts/vendor/*.sh", "**/vendor/**", "docs/specs/**"]
 # Vendored inputs
 
 External material enters this repository one way only: a committed fetch
-script, vendored verbatim, stamped with provenance. Nine trees exist: the six
-HL7 FHIR packages under `tools/fhir-codegen/vendor/` (#72, #453) and the
-v2-to-FHIR guide's package under
-`crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/` (#252, embedded in
-that crate behind its `shipped-maps` feature), all fetched by
+script, vendored verbatim, stamped with provenance. Nine trees exist: the seven
+HL7 FHIR packages under `tools/fhir-codegen/vendor/` (#72, #453), the
+v2-to-FHIR guide's among them (#252, whose structure maps the generator
+emits into `ferrobridge-hl7v2`, #1775), all fetched by
 `scripts/vendor/fhir-packages.sh`, the
 specification corpora under `docs/specs/`, one directory per corpus, fetched by
 `scripts/vendor/*.sh` from the pins in `docs/VERSIONS.md` (#71; a corpus with

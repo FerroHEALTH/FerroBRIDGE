@@ -12,18 +12,18 @@ use fhir_types::codec::Value;
 
 use crate::map::condition::{self, Operand};
 use crate::map::convert;
-use crate::map::corpus::{Corpus, Kind, Map, MappedVia};
 use crate::map::inverse::grid::Grid;
 use crate::map::inverse::line::{
     Gate, Leaf, Line, Slot, choose, deprecated, dot, lines, order, segment_probe, text,
 };
 use crate::map::inverse::{InverseError, Outcome};
-use crate::map::translate::Translator;
+use crate::map::maps::{Kind, Map, MappedVia, Maps};
+use ferrobridge_term::client::Client;
 
 /// The state of one inverse.
 pub(super) struct Inverse<'c> {
-    pub(super) corpus: &'c Corpus,
-    pub(super) translator: Option<Translator<'c>>,
+    pub(super) corpus: &'c Maps,
+    pub(super) translator: Option<&'c Client>,
     pub(super) outcomes: Vec<Outcome>,
     pub(super) translations: usize,
     /// The path of every FHIR value written back or matched.

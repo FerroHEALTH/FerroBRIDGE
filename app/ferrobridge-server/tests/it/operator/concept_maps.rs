@@ -14,14 +14,10 @@ use http::StatusCode;
 
 use super::{Case, OPERATOR, bytes};
 
-/// The directory of the vendored guide, as the face loads it, counting from
-/// a fixed instant.
+/// The directory of the maps the face runs, counting from a fixed instant.
 fn directory() -> Result<Directory, Box<dyn Error>> {
-    let lane = crate::hl7v2::face_settings(false);
-    let corpus = ferrobridge_server::hl7v2::load_corpus(&lane)?;
     Ok(Directory::new(
-        &corpus,
-        &lane,
+        ferrobridge_hl7v2::map::maps::Maps::corrected(),
         "2026-11-03T09:00:00Z".parse()?,
     ))
 }
@@ -52,11 +48,6 @@ async fn the_directory_lists_every_map_with_what_it_maps_and_where_it_came_from(
 -> Result<(), Box<dyn Error>> {
     let case = Case::listing(Arc::new(directory()?)).await?;
     let document = document(&case).await?;
-    assert!(
-        document
-            .directory
-            .ends_with("hl7.fhir.uv.v2mappings/package")
-    );
     assert_eq!("2026-11-03T09:00:00Z", document.counted_since);
     let segment = document
         .maps

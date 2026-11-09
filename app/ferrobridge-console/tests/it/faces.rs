@@ -277,8 +277,6 @@ async fn the_hl7v2_face_lists_its_concept_maps_and_the_messages_each_served()
         "/operator/hl7v2/concept-maps",
         200,
         &json!({
-            "directory": "/etc/ferrobridge/v2mappings",
-            "supplements": [],
             "counted_since": "2026-11-03T09:00:00Z",
             "maps": [
                 {
@@ -309,7 +307,7 @@ async fn the_hl7v2_face_lists_its_concept_maps_and_the_messages_each_served()
     let (response, page) = send(&service, get_with("/hl7v2/concept-maps", &cookie)?).await?;
     assert_eq!(StatusCode::OK, response.status());
     for words in [
-        "/etc/ferrobridge/v2mappings",
+        "2026-11-03T09:00:00Z",
         "Segment PID to Patient Map",
         "segment-pid-to-patient",
         "patient",
@@ -317,7 +315,6 @@ async fn the_hl7v2_face_lists_its_concept_maps_and_the_messages_each_served()
         "Replaces the guide",
         "table-hl70001-to-administrative-gender",
         "http://hl7.org/fhir/administrative-gender",
-        "None beyond the bridge",
     ] {
         assert!(page.contains(words), "{words}: {page}");
     }

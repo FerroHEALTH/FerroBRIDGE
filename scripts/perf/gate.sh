@@ -18,6 +18,14 @@
 #       first the base from `git archive` of that commit, then the same tree
 #       brought to the checkout by rewriting only the files that differ, so
 #       cargo rebuilds for the head only the crates the change reaches.
+#   scripts/perf/gate.sh pack FILE
+#       Writes FILE, a tar of both built arms, the base's commit and the
+#       ferrohealth-perf on PATH, so a later job on another runner measures
+#       the same binaries without building them again.
+#   scripts/perf/gate.sh unpack FILE
+#       Restores what `pack` wrote into the checkout, puts ferrohealth-perf
+#       under target/perf-tools, and extracts the base's tree from its commit
+#       with `git archive`, which needs that commit in the checkout's history.
 #   scripts/perf/gate.sh run
 #       Starts both CDRs, their databases, RabbitMQ and FerroTERM over the
 #       v2-to-FHIR guide's table ConceptMaps on loopback, loads the
@@ -51,6 +59,7 @@ readonly CONFIG=perf/ferrobridge.toml
 readonly WORK=target/perf-run
 readonly BASE_TREE=target/perf-base
 readonly BUILD_TREE=target/perf-build
+readonly TOOLS=target/perf-tools
 readonly NETWORK=ferrobridge-perf
 readonly BROKER_NAME=ferrobridge-perf-broker
 readonly TERMINOLOGY_NAME=ferrobridge-perf-terminology
@@ -62,7 +71,13 @@ readonly TEMPLATES=(tools/ferrobridge-testkit/fixtures/opt/diagnoses.opt tools/f
 # The facade's mapping set and the HL7 v2 face's Observation context, under
 # each arm's own tree.
 readonly MAPPINGS=(app/ferrobridge-server/tests/it/repeated app/ferrobridge-server/tests/it/hl7v2_fixtures)
-readonly CONCEPT_MAPS=crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package
+# The v2-to-FHIR guide and FerroBRIDGE's value package, whose table
+# ConceptMaps the terminology server answers the HL7 v2 face from.
+readonly GUIDE_MAPS=tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package
+readonly VALUE_MAPS=terminology/hl7v2-values
+# Where a tree from before the maps were generated keeps the guide, which its
+# binary still reads through [hl7v2] concept_maps.
+readonly DIRECTORY_MAPS=crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package
 readonly CONDITION=tools/ferrobridge-testkit/fixtures/fhir/r4/condition.json
 readonly PROFILE=http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis
 readonly SUBJECTS=http://example.org/fhir/sid/ferrobridge-subject
@@ -184,15 +199,51 @@ build() {
   rev="$(base_rev "${1:-}")" || die "the base of ${1:-the previous release} cannot be resolved"
   echo "perf-gate: the base is $rev"
   rm -rf "$BASE_TREE" "$BUILD_TREE"
-  mkdir -p "$BASE_TREE/src" "$BUILD_TREE"
-  git archive "$rev" | tar -x -C "$BASE_TREE/src"
+  mkdir -p "$BUILD_TREE"
+  base_source "$rev"
   git archive "$rev" | tar -x -C "$BUILD_TREE"
-  printf '%s\n' "$rev" > "$BASE_TREE/rev"
   # From inside the build tree, so its own toolchain pin builds each arm.
   (cd "$BUILD_TREE" && cargo build --release --locked -p ferrobridge-server --bin ferrobridge --target-dir "$root/target")
   cp target/release/ferrobridge "$BASE_TREE/ferrobridge"
   to_checkout "$rev" "$BUILD_TREE"
   (cd "$BUILD_TREE" && cargo build --release --locked -p ferrobridge-server --bin ferrobridge --target-dir "$root/target")
+}
+
+# base_source REV: the base's tree of REV under target/perf-base/src, and
+# REV in target/perf-base/rev.
+base_source() {
+  local rev="$1"
+  rm -rf "$BASE_TREE/src"
+  mkdir -p "$BASE_TREE/src"
+  git -C "$root" archive "$rev" | tar -x -C "$root/$BASE_TREE/src"
+  printf '%s\n' "$rev" > "$root/$BASE_TREE/rev"
+}
+
+# pack FILE: both arms, the base's commit and ferrohealth-perf, in one tar
+# that keeps their modes.
+pack() {
+  [[ $# -eq 1 ]] || die "usage: gate.sh pack FILE"
+  local file="$1" tool
+  cd "$root"
+  [[ -x target/release/ferrobridge && -x "$BASE_TREE/ferrobridge" && -s "$BASE_TREE/rev" ]] ||
+    die "both arms are not built: run gate.sh build first"
+  tool="$(command -v ferrohealth-perf)" || die "ferrohealth-perf is not on PATH"
+  mkdir -p "$TOOLS"
+  [[ "$tool" -ef "$TOOLS/ferrohealth-perf" ]] || cp "$tool" "$TOOLS/ferrohealth-perf"
+  tar -cf "$file" target/release/ferrobridge "$BASE_TREE/ferrobridge" "$BASE_TREE/rev" "$TOOLS/ferrohealth-perf"
+}
+
+# unpack FILE: what pack wrote, back in the checkout, and the base's tree
+# extracted again from its commit.
+unpack() {
+  [[ $# -eq 1 ]] || die "usage: gate.sh unpack FILE"
+  local file rev
+  file="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  cd "$root"
+  tar -xf "$file"
+  rev="$(< "$BASE_TREE/rev")"
+  git cat-file -e "$rev^{commit}" 2> /dev/null || die "the base $rev is not in this checkout's history"
+  base_source "$rev"
 }
 
 head_pid=""
@@ -274,6 +325,9 @@ serve() {
   done
   (
     cd "$tree"
+    if [[ -d "$tree/$DIRECTORY_MAPS" ]]; then
+      export FERROBRIDGE__HL7V2__CONCEPT_MAPS="$tree/$DIRECTORY_MAPS"
+    fi
     FERROBRIDGE__USAGE_REPORT__ENABLED=false \
       FERROBRIDGE__SERVER__LISTEN="127.0.0.1:$(port "$arm" facade)" \
       FERROBRIDGE__CDR__BASE_URL="$(cdr_origin "$arm")/ferroehr/rest/openehr/v1" \
@@ -281,7 +335,6 @@ serve() {
       FERROBRIDGE__FACADE__BASE_URL="$(facade "$arm")/fhir" \
       FERROBRIDGE__FACADE__IDENTITY_STORE="$dir/identity.redb" \
       FERROBRIDGE__HL7V2__LISTEN="127.0.0.1:$(port "$arm" mllp)" \
-      FERROBRIDGE__HL7V2__CONCEPT_MAPS="$tree/$CONCEPT_MAPS" \
       FERROBRIDGE__HL7V2__TLS__CERTIFICATE_FILE="$root/$WORK/tls/mllp-chain.pem" \
       FERROBRIDGE__HL7V2__TLS__KEY_FILE="$root/$WORK/tls/mllp-key.pem" \
       FERROBRIDGE__HL7V2__TLS__CLIENT_CA_FILE="$root/$WORK/tls/ca.pem" \
@@ -295,12 +348,13 @@ serve() {
   echo "$!"
 }
 
-# terminology IMAGE: starts FerroTERM over the guide's table ConceptMaps,
-# which the HL7 v2 face translates every table value through.
+# terminology IMAGE: starts FerroTERM over the table ConceptMaps of the guide
+# and of the value package, which the HL7 v2 face translates every table
+# value through.
 terminology() {
   local maps="$WORK/terminology"
   mkdir -p "$maps"
-  cp "$root/$CONCEPT_MAPS"/ConceptMap-table-*.json "$maps/"
+  cp "$root/$GUIDE_MAPS"/ConceptMap-table-*.json "$root/$VALUE_MAPS"/ConceptMap-table-*.json "$maps/"
   chmod 0755 "$maps"
   chmod 0644 "$maps"/*.json
   "$engine" run --quiet --detach --name "$TERMINOLOGY_NAME" --publish 127.0.0.1:18100:8080 \
@@ -464,7 +518,9 @@ self_test() {
     check "$file exists" 1 "$([[ -f "$root/$file" ]] && echo 1 || echo 0)"
   done
   check "the guide's table ConceptMaps are vendored" 1 \
-    "$(compgen -G "$root/$CONCEPT_MAPS/ConceptMap-table-*.json" > /dev/null && echo 1 || echo 0)"
+    "$(compgen -G "$root/$GUIDE_MAPS/ConceptMap-table-*.json" > /dev/null && echo 1 || echo 0)"
+  check "the value package holds table ConceptMaps" 1 \
+    "$(compgen -G "$root/$VALUE_MAPS/ConceptMap-table-*.json" > /dev/null && echo 1 || echo 0)"
   for file in "${MAPPINGS[@]}"; do
     check "$file holds mapping files" 1 "$(compgen -G "$root/$file/*.yml" > /dev/null && echo 1 || echo 0)"
   done
@@ -520,6 +576,23 @@ self_test() {
   check "an unchanged file keeps its time" 200001010000 "$(date -r "$tree/kept" +%Y%m%d%H%M 2> /dev/null || stat -c %y "$tree/kept")"
   check "a file the checkout removed is removed" 0 "$([[ -e "$tree/gone" ]] && echo 1 || echo 0)"
   check "an untracked file is copied" n "$(cat "$tree/new/file")"
+  mkdir -p "$repo/target/release" "$repo/$BASE_TREE" "$work/bin"
+  printf '#!/bin/sh\necho head\n' > "$repo/target/release/ferrobridge"
+  printf '#!/bin/sh\necho base\n' > "$repo/$BASE_TREE/ferrobridge"
+  printf '#!/bin/sh\necho perf\n' > "$work/bin/ferrohealth-perf"
+  chmod 0755 "$repo/target/release/ferrobridge" "$repo/$BASE_TREE/ferrobridge" "$work/bin/ferrohealth-perf"
+  printf '%s\n' "$from" > "$repo/$BASE_TREE/rev"
+  check "both arms are packed" 0 "$( (PATH="$work/bin:$PATH" pack "$work/arms.tar") > /dev/null 2>&1; echo $?)"
+  rm -rf "$repo/target"
+  check "the packed arms unpack" 0 "$( (unpack "$work/arms.tar") > /dev/null 2>&1; echo $?)"
+  check "the head unpacks runnable" head "$("$repo/target/release/ferrobridge")"
+  check "the base unpacks runnable" base "$("$repo/$BASE_TREE/ferrobridge")"
+  check "ferrohealth-perf unpacks runnable" perf "$("$repo/$TOOLS/ferrohealth-perf")"
+  check "the base's tree is extracted from its commit" b "$(cat "$repo/$BASE_TREE/src/changed" 2> /dev/null)"
+  check "the base's tree holds what its commit removed later" c "$(cat "$repo/$BASE_TREE/src/gone" 2> /dev/null)"
+  printf '%s\n' 0123456789012345678901234567890123456789 > "$repo/$BASE_TREE/rev"
+  (cd "$repo" && tar -cf "$work/stranger.tar" target/release/ferrobridge "$BASE_TREE/ferrobridge" "$BASE_TREE/rev" "$TOOLS/ferrohealth-perf")
+  check "a base outside the history is refused" 2 "$( (unpack "$work/stranger.tar") > /dev/null 2>&1; echo $?)"
   root="$saved_root"
   [[ "$failed" -eq 0 ]] || exit 1
   echo "perf-gate: self-test OK ($n checks)."
@@ -534,6 +607,14 @@ case "${1:-}" in
     shift
     run "$@"
     ;;
+  pack)
+    shift
+    pack "$@"
+    ;;
+  unpack)
+    shift
+    unpack "$@"
+    ;;
   --self-test) self_test ;;
-  *) die "usage: gate.sh build [BASE] | run | --self-test" ;;
+  *) die "usage: gate.sh build [BASE] | pack FILE | unpack FILE | run | --self-test" ;;
 esac

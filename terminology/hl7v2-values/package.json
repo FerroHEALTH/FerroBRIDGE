@@ -1,0 +1,15 @@
+{
+  "name": "eu.ferrobridge.hl7v2.values",
+  "version": "0.2.0",
+  "type": "Conformance",
+  "license": "BUSL-1.1",
+  "canonical": "https://ferrobridge.eu/fhir/v2mappings",
+  "title": "FerroBRIDGE HL7 v2 value maps",
+  "description": "The table ConceptMaps FerroBRIDGE adds to or corrects in hl7.fhir.uv.v2mappings 1.0.0. Load it into the terminology server beside that package; ferrobridge-hl7v2 translates every v2 table value through ConceptMap/$translate.",
+  "fhirVersions": ["4.0.1"],
+  "dependencies": {
+    "hl7.fhir.r4.core": "4.0.1",
+    "hl7.fhir.uv.v2mappings": "1.0.0"
+  },
+  "author": "Cadasto B.V. (FerroBRIDGE)"
+}

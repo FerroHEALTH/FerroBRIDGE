@@ -33,8 +33,11 @@ and one target directory. The tree starts as `git archive` of the base's
 commit; after the base is built, only the files the head changes are
 rewritten, so cargo rebuilds for the head only the crates the change reaches
 and the generated crates the two arms share build once. It installs
-`ferrohealth-perf` at its pin in `docs/VERSIONS.md`. Then
-`scripts/perf/gate.sh run`:
+`ferrohealth-perf` at its pin in `docs/VERSIONS.md` and packs both binaries,
+the base's commit and the tool into the artifact `perf-arms`. Each attempt
+job downloads it on its own runner, extracts the base's tree again from its
+commit, and runs `scripts/perf/gate.sh run`, so a retry measures the same
+binaries and builds nothing:
 
 1. starts two FerroEHR CDRs, each with its own PostgreSQL, one RabbitMQ and
    one FerroTERM over the v2-to-FHIR guide's table ConceptMaps on loopback,
@@ -96,23 +99,32 @@ lost its runner (a shutdown, or the job's time limit) and left no exit code,
 so it runs again on a fresh runner too, on any CPU model. A run cancelled by
 a newer push or by a person retries nothing, and an attempt job that failed
 fails the gate. At most two retries run, and the gate passes when the last
-attempt passed. A breach on any other model fails at once. The job summary
+attempt passed. A breach on any other model fails at once.
+
+A stall-prone runner is almost never judgeable: from 7 to 9 November 2026,
+24 of 29 attempts on an AMD EPYC 9V74 could not be judged, against 2 of 42 on
+every other model. Their stalls struck pair 1 as often as pair 4, in either
+half of a window, and in both arms of a pair at once, so the host stalled,
+and neither warm-up nor the order of the pairs explains them
+([#1778](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1778)). An attempt
+that lands on a model `STALL_PRONE` lists therefore measures nothing and ends
+with exit 2 at once, unless it is the last attempt, which measures wherever
+it lands. The job summary
 names each attempt's CPU model, its verdict and why a retry ran, and the
 verdict's summary names each attempt, a cancelled one with why the next ran.
 
-The workflow builds four crates at a time (`CARGO_BUILD_JOBS=4`), one per
+The build job builds four crates at a time (`CARGO_BUILD_JOBS=4`), one per
 core, and the build step logs the runner's used memory, swap and free disk
 each minute. The hosted runner has 16 GB. A release build of `fhir-types` with
 every resource of all five FHIR releases peaks above it on its own: on #1737
 the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
 and the runner shut down. The bridge therefore compiles only the releases it
 speaks, through the release features of `ferrobridge-term`. A base from
-before that change still compiles all five, so the build step backs both
-builds with a 20 GB swap file, turns it off and removes it, and logs the
-swap and memory before the gate measures anything. The gate refuses to
-measure while that file is still on (exit 2), so the idle and load phases
-run on the runner as it was before the build. Swap changes how fast the
-build runs, never the binary it makes. The step goes once a perf run on
+before that change still compiles all five, so the build job backs both
+builds with a 20 GB swap file. Nothing is measured on that runner: each
+attempt runs on a fresh one with the swap it booted with, and logs the swap
+and memory before the gate measures anything. Swap changes how fast the
+build runs, never the binary it makes. The swap file goes once a perf run on
 `main` shows both builds well under 16 GB without it
 ([#1743](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1743)).
 
