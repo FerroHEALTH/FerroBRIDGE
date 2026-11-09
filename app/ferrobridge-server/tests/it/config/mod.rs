@@ -41,16 +41,16 @@ filter = "debug"
 logged_query_parameters = ["_count"]
 
 [cdr]
-base_url = "http://cdr.invalid/v1"
-timeout = "5s"
+endpoint.url = "http://cdr.invalid/v1"
+endpoint.timeout = "5s"
 
-[cdr.retry]
+[cdr.endpoint.retry]
 max_attempts = 5
 initial_backoff = "10ms"
 max_backoff = "20ms"
 
 [terminology]
-base_url = "http://tx.invalid/r4"
+endpoint.url = "http://tx.invalid/r4"
 wire_version = "r4b"
 
 [cdm]

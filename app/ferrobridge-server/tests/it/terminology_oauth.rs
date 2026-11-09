@@ -4,7 +4,7 @@
 //! The terminology credential the bridge obtains with the OAuth 2.0 client
 //! credentials grant, through the token cache the CDR lane uses: the token
 //! fetch, the cache across calls, and the one renewal after a terminology
-//! `401`, from `[terminology.credentials.oauth]` to the wire.
+//! `401`, from `[terminology.endpoint.credentials.oauth]` to the wire.
 
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
@@ -25,7 +25,7 @@ const TOKEN_PATH: &str = "/oauth/token";
 /// The `$lookup` route under the configured base.
 const LOOKUP_PATH: &str = "/r4/CodeSystem/$lookup";
 
-/// Returns the terminology client a `[terminology.credentials.oauth]`
+/// Returns the terminology client a `[terminology.endpoint.credentials.oauth]`
 /// section against `authorization` resolves to, for the server `terminology`.
 fn client(
     terminology: &MockServer,
@@ -33,9 +33,9 @@ fn client(
 ) -> Result<Client, Box<dyn std::error::Error>> {
     let text = format!(
         concat!(
-            "[terminology]\nbase_url = \"{}/r4\"\n\n",
-            "[terminology.retry]\nmax_attempts = 1\n\n",
-            "[terminology.credentials.oauth]\n",
+            "[terminology]\nendpoint.url = \"{}/r4\"\n\n",
+            "[terminology.endpoint.retry]\nmax_attempts = 1\n\n",
+            "[terminology.endpoint.credentials.oauth]\n",
             "token_endpoint = \"{}{}\"\n",
             "client_id = \"ferrobridge\"\n",
             "client_secret = \"synthetic-secret\"\n",
@@ -46,8 +46,7 @@ fn client(
         TOKEN_PATH,
     );
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
-    let config = settings.terminology.ok_or("the terminology lane is on")?;
-    Ok(Client::new(config)?)
+    Ok(settings.terminology.ok_or("the terminology lane is on")?)
 }
 
 /// Returns an access token response for `token` living five minutes.

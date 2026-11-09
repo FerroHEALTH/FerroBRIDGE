@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use super::refusal;
 
 /// A CDR section the feed can read.
-const CDR: &str = "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n";
+const CDR: &str = "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n";
 
 #[test]
 fn the_change_feed_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {

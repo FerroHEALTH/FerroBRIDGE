@@ -42,12 +42,12 @@ they are.
 
 ```text
 FERROBRIDGE__SERVER__LISTEN            -> [server] listen
-FERROBRIDGE__CDR__BASE_URL             -> [cdr] base_url
-FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS  -> [cdr.retry] max_attempts
+FERROBRIDGE__CDR__ENDPOINT__URL             -> [cdr] base_url
+FERROBRIDGE__CDR__ENDPOINT__RETRY__MAX_ATTEMPTS  -> [cdr.endpoint.retry] max_attempts
 ```
 
 A value takes the type of the key it sets. A string key takes the text as it
-is, whatever its characters: `FERROBRIDGE__CDR__CREDENTIALS__USER=12345` sets
+is, whatever its characters: `FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__USER=12345` sets
 the user name `12345`, and `true` or `1.5` stay text too. Quotes are part of
 the value, so do not add any. A number, boolean or array key reads the text as
 TOML syntax: `5` is the number 5, `true` is a boolean and `["a","b"]` is an
@@ -196,11 +196,13 @@ server says so once at start-up, naming the section and never a value.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
-| `base_url` | none, required | | The openEHR REST API root, usually ending in `/v1` |
-| `timeout` | `"30s"` | | How long one call may take, connection included |
+| `endpoint.url` | none, required | | The openEHR REST API root, usually ending in `/v1` |
+| `endpoint.timeout` | `"30s"` | | How long one call may take, connection included |
+| `endpoint.connect_timeout` | unset | | How long opening the connection may take; unset, only `timeout` bounds it |
+| `endpoint.tls` | the platform's roots | | `trust_roots_file`, `client_identity_file` or `client_identity` (secret), and `min_version` (`"1.3"`): the TLS of the CDR's connection, for a CDR behind a private root or one that asks for a client certificate |
 | `demographic` | `false` | | Whether the bridge reaches the CDR's ITS-REST 1.1.0 Demographic API, which the release marks `x-status: DEVELOPMENT` |
 
-### `[cdr.retry]` and `[terminology.retry]`
+### `[cdr.endpoint.retry]` and `[terminology.endpoint.retry]`
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -213,7 +215,7 @@ For the CDR, the bridge calls through the generated ITS-REST client of the
 `GET`, `PUT` or `DELETE` is sent again, after a failure to connect, a
 timeout, or a `5xx` other than `501`; a `POST` is sent once. A `401`, a `403`
 and a status the operation does not document are never retried.
-`[cdr] timeout` is the per-request timeout of the client's HTTP engine.
+`[cdr.endpoint] timeout` is the per-request timeout of the client's HTTP engine.
 
 `[cdr] demographic` turns on the client of the ITS-REST 1.1.0 Demographic API,
 DEVELOPMENT: the reads, creates, updates and deletes of `PERSON`,
@@ -225,12 +227,12 @@ removed; the bridge drops the member before it reads the party and counts the
 entries it dropped. Each entry restates a relationship the demographic
 repository already holds (RM Demographic IM Release 1.1.0 §2.2.1).
 
-### `[cdr.credentials]` and `[terminology.credentials]`
+### `[cdr.endpoint.credentials]` and `[terminology.endpoint.credentials]`
 
 The bridge authenticates to an upstream in one of two modes: RFC 7617 basic
 authentication with `user` and `password`, or a token it obtains itself with
 the OAuth 2.0 client credentials grant
-([`[cdr.credentials.oauth]` and `[terminology.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth)). It takes no static
+([`[cdr.endpoint.credentials.oauth]` and `[terminology.endpoint.credentials.oauth]`](#cdrendpointcredentialsoauth-and-terminologyendpointcredentialsoauth)). It takes no static
 bearer token: a `bearer_token` key is an unknown key and refuses the start.
 An inline value beside its `_file` sibling is a boot error too.
 
@@ -247,7 +249,7 @@ inline only.
 The user and the password become the `Authorization` header of every call,
 `Basic` over `user:password`.
 
-### `[cdr.credentials.oauth]` and `[terminology.credentials.oauth]`
+### `[cdr.endpoint.credentials.oauth]` and `[terminology.endpoint.credentials.oauth]`
 
 The bridge can obtain its token for the CDR, and for the terminology server,
 itself with the OAuth 2.0 client credentials grant (RFC 6749 §4.4) and renew
@@ -263,7 +265,7 @@ the bridge obtains and renews its own for the CDR's. Set `audience` or
 `resource` to whichever parameter that authorization server reads to select
 the CDR. A terminology server that checks tokens, such as one that validates
 SMART tokens on writes, takes the same arrangement under
-`[terminology.credentials.oauth]`.
+`[terminology.endpoint.credentials.oauth]`.
 
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
@@ -310,7 +312,7 @@ response with another `token_type` is refused. Point `token_endpoint` and
 secret travels in the token request.
 
 ```toml
-[cdr.credentials.oauth]
+[cdr.endpoint.credentials.oauth]
 issuer = "https://auth.example.org/realms/clinic"
 client_id = "ferrobridge"
 client_secret_file = "/run/secrets/cdr_client_secret"
@@ -318,22 +320,22 @@ scope = "openehr"
 ```
 
 As environment variables, the same section reads
-`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__ISSUER`,
-`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_ID` and
-`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE`. The terminology
-section reads the same names under `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__`.
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__ISSUER`,
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_ID` and
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE`. The terminology
+section reads the same names under `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__`.
 
-### `[cdr.credentials.onward]`
+### `[cdr.endpoint.credentials.onward]`
 
 With this table, each FHIR facade request reaches the CDR under the person
 who made it. The bridge exchanges the caller's access token for a token of
 the CDR's issuer that names the same person, and sends that token on every
 CDR call of the request. The bridge authenticates the exchange with its own
-client of `[cdr.credentials.oauth]`, which the table requires and which must ask
+client of `[cdr.endpoint.credentials.oauth]`, which the table requires and which must ask
 for the CDR alone, by `resource` (RFC 8707 §2) or by `scope` (such as
 `api://<cdr>/.default` under Entra ID), because a machine's request reaches the
 CDR under that token; one naming neither refuses the start. Only the CDR
-lane takes the table: an `onward` table under `[terminology.credentials]` or
+lane takes the table: an `onward` table under `[terminology.endpoint.credentials]` or
 another lane refuses the start, and so does one on a server whose `[auth]` is
 off, because no caller then holds a token to exchange.
 
@@ -384,7 +386,7 @@ Who reaches the CDR how:
 
 | Caller | Reaches the CDR |
 |---|---|
-| A machine (a client credentials token) | Under the bridge's own token of `[cdr.credentials.oauth]`, never exchanged; its composition names the machine's client in `originating_system_audit.system_id` |
+| A machine (a client credentials token) | Under the bridge's own token of `[cdr.endpoint.credentials.oauth]`, never exchanged; its composition names the machine's client in `originating_system_audit.system_id` |
 | A person, a delegated or representing person, under `kind = "persons"` | Under the exchanged token |
 | A professional of another party, under `kind = "federation"` | Under the exchanged token |
 | A patient, under `kind = "patients"` | Under the exchanged token |
@@ -400,13 +402,13 @@ the bridge's own client (`401`), or issues a token the checks above refuse,
 is a `502`.
 
 ```toml
-[cdr.credentials.oauth]
+[cdr.endpoint.credentials.oauth]
 token_endpoint = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"
 client_id = "<bridge application id>"
 client_auth = "private_key_jwt"
 private_key_file = "/run/secrets/bridge_key.pem"
 
-[cdr.credentials.onward]
+[cdr.endpoint.credentials.onward]
 issuer = "https://login.microsoftonline.com/<tenant>/v2.0"
 kind = "persons"
 profile = "entra"
@@ -414,28 +416,28 @@ token_endpoint = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"
 audiences = ["<cdr application id>"]
 scope = "api://<cdr application id>/.default"
 
-[cdr.credentials.onward.keys]
+[cdr.endpoint.credentials.onward.keys]
 max_onward_lifetime = 3600
 ```
 
 As environment variables, the table reads
-`FERROBRIDGE__CDR__CREDENTIALS__ONWARD__ISSUER`,
-`FERROBRIDGE__CDR__CREDENTIALS__ONWARD__KIND`,
-`FERROBRIDGE__CDR__CREDENTIALS__ONWARD__PROFILE` and the other keys the same
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__ONWARD__ISSUER`,
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__ONWARD__KIND`,
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__ONWARD__PROFILE` and the other keys the same
 way.
 
 ### `[[cdr.onward]]`
 
 Each `[[cdr.onward]]` table adds one more onward issuer beside
-`[cdr.credentials.onward]`, with the same keys. The bridge then carries
+`[cdr.endpoint.credentials.onward]`, with the same keys. The bridge then carries
 each caller through the issuer whose `kind` carries it: a person to the
 `persons` issuer, a professional of another party to the `federation`
 issuer, and a patient to the `patients` issuer. Every table authenticates
-with the client of `[cdr.credentials.oauth]`, which it requires. Two issuers
-of one kind refuse the start, across `[cdr.credentials.onward]` and the
+with the client of `[cdr.endpoint.credentials.oauth]`, which it requires. Two issuers
+of one kind refuse the start, across `[cdr.endpoint.credentials.onward]` and the
 array, and so does the array on a server whose `[auth]` is off. Either form
 may stand alone: a deployment that carries only patients declares one
-`[[cdr.onward]]` table and no `[cdr.credentials.onward]`.
+`[[cdr.onward]]` table and no `[cdr.endpoint.credentials.onward]`.
 
 Patients usually sign in at an issuer of their own, a separate Keycloak
 realm or Entra ID tenant, whose tokens the facade admits through an
@@ -443,13 +445,13 @@ realm or Entra ID tenant, whose tokens the facade admits through an
 realm or tenant. Under the default `rfc9068` profile:
 
 ```toml
-[cdr.credentials.onward]
+[cdr.endpoint.credentials.onward]
 issuer = "https://id.example.org/realms/staff"
 kind = "persons"
 audiences = ["cdr"]
 indicators = ["cdr"]
 
-[cdr.credentials.onward.keys]
+[cdr.endpoint.credentials.onward.keys]
 max_onward_lifetime = 300
 
 [[cdr.onward]]
@@ -474,9 +476,11 @@ with no display keeps its code as the value.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `base_url` | none, required | The FHIR service base URL |
+| `endpoint.url` | none, required | The FHIR service base URL |
 | `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
-| `timeout` | `"30s"` | How long one call may take, connection included |
+| `endpoint.timeout` | `"30s"` | How long one call may take, connection included |
+| `endpoint.connect_timeout` | unset | How long opening the connection may take |
+| `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`), for a server behind a private root or one that asks for a client certificate |
 | `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT` or `DV_TEXT`, `false` refuses the resource. A failed call refuses either way |
 
 As an environment variable, `display_fallback` reads
@@ -664,7 +668,7 @@ templates = "/etc/ferrobridge/templates"
 ```toml
 # The operations compile against the templates the CDR serves.
 [cdr]
-base_url = "https://cdr.example.org/openehr/v1"
+endpoint.url = "https://cdr.example.org/openehr/v1"
 
 [mappings]
 directory = "/etc/ferrobridge/mappings"
@@ -1016,7 +1020,7 @@ endpoint that fails answers `503`. An introspected issuer takes no
 | `introspection.endpoint` | the metadata's | The introspection endpoint, an `https` URL, when the issuer's metadata names none or another |
 | `introspection.cache_max_age` | `"1min"` | The longest an active answer is used before the endpoint is asked again; `"0s"` asks on every request |
 | `introspection.cache_capacity` | `10000` | The most answers held at once |
-| `introspection.client` | none | The bridge's client authentication at the endpoint: the keys of [`[cdr.credentials.oauth]`](#cdrcredentialsoauth-and-terminologycredentialsoauth) (`client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`, `tls`); `issuer` defaults to the table's |
+| `introspection.client` | none | The bridge's client authentication at the endpoint: the keys of [`[cdr.endpoint.credentials.oauth]`](#cdrendpointcredentialsoauth-and-terminologyendpointcredentialsoauth) (`client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`, `tls`); `issuer` defaults to the table's |
 | `introspection.bearer` | none | Instead of `client`: a client credentials grant, in the same keys, whose token the bridge sends as `Authorization: Bearer`, the form SMART App Launch 2.2.0 has an EHR accept |
 
 ```toml
@@ -1149,7 +1153,7 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `endpoint.connect_timeout` | unset | How long opening the connection may take; unset, only `timeout` bounds it |
 | `endpoint.retry` | 3 attempts, `"200ms"` doubling to `"5s"` | `max_attempts`, `initial_backoff` and `max_backoff`: a delivery that got no answer or a `5xx` is tried again |
 | `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`), for an endpoint behind a private root or one that asks for a client certificate |
-| `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.endpoint.credentials.oauth]`, the same table `[cdr.credentials]` takes |
+| `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
 
 The `endpoint` table is the family's outbound endpoint table, sent through
 `ferrohealth-smart`'s outbound client, which follows no redirect and renews a
@@ -1204,7 +1208,7 @@ FerroBRIDGE's own design.
 | `endpoint.connect_timeout` | unset | How long opening the connection may take |
 | `endpoint.retry` | 3 tries, `"200ms"` doubling to `"1min"` | The tries of one delivery, and `max_backoff` the wait between two rounds of tries |
 | `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`) |
-| `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.credentials]` takes |
+| `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
 | `spool_dir` | none, required | The directory records wait in until the repository takes them; created when absent, and refused when its group or other users can reach it |
 | `max_records` | `10000` | The most records the spool holds at once |
 | `max_size` | `"64MiB"` | The most bytes the spool holds at once |
@@ -1274,10 +1278,10 @@ it carries.
 
 | Variable | File sibling |
 |---|---|
-| `FERROBRIDGE__CDR__CREDENTIALS__PASSWORD` | `FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE` |
-| `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
-| `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE` |
-| `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
+| `FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
+| `FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
+| `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
+| `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 | `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
 | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
@@ -1328,14 +1332,14 @@ listen = "0.0.0.0:8080"
 format = "json"
 
 [cdr]
-base_url = "https://cdr.example.org/ehrbase/rest/openehr/v1"
+endpoint.url = "https://cdr.example.org/ehrbase/rest/openehr/v1"
 
-[cdr.credentials]
+[cdr.endpoint.credentials]
 user = "ferrobridge"
 password_file = "/run/secrets/cdr-password"
 
 [terminology]
-base_url = "https://tx.example.org/r4"
+endpoint.url = "https://tx.example.org/r4"
 wire_version = "r4"
 
 [mappings]

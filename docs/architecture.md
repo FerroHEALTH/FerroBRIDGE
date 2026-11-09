@@ -2561,7 +2561,7 @@ draft upstream change.
     links them. An architecture test fails when `eehrxf`, `fhirconnect` or
     `openehr-mapping-core` reaches either crate, the shape FerroFED's
     decision A58 holds.
-  - **The onward exchange.** Under `[cdr.credentials.onward]` each facade
+  - **The onward exchange.** Under `[cdr.endpoint.credentials.onward]` each facade
     request reaches the CDR under its caller, so the CDR's own record names
     the clinician too. The bridge exchanges the caller's token through
     `ferrohealth-smart`'s onward client: RFC 8693 §2.1 token exchange

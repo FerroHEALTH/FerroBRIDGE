@@ -333,7 +333,7 @@ serve() {
     fi
     FERROBRIDGE__USAGE_REPORT__ENABLED=false \
       FERROBRIDGE__SERVER__LISTEN="127.0.0.1:$(port "$arm" facade)" \
-      FERROBRIDGE__CDR__BASE_URL="$(cdr_origin "$arm")/ferroehr/rest/openehr/v1" \
+      FERROBRIDGE__CDR__ENDPOINT__URL="$(cdr_origin "$arm")/ferroehr/rest/openehr/v1" \
       FERROBRIDGE__MAPPINGS__DIRECTORY="$dir/mappings" \
       FERROBRIDGE__FACADE__BASE_URL="$(facade "$arm")/fhir" \
       FERROBRIDGE__FACADE__IDENTITY_STORE="$dir/identity.redb" \
@@ -344,7 +344,7 @@ serve() {
       FERROBRIDGE__CHANGE_FEED__URL="$(cdr_origin "$arm")/ferroehr/rest/extensions/v1" \
       FERROBRIDGE__CHANGE_FEED__DEAD_LETTERS="$dir/dead-letters.redb" \
       FERROBRIDGE__EVENTS__EXCHANGE="ferrobridge.perf.$arm" \
-      FERROBRIDGE__TERMINOLOGY__BASE_URL="$TERMINOLOGY/r4" \
+      FERROBRIDGE__TERMINOLOGY__ENDPOINT__URL="$TERMINOLOGY/r4" \
       FERROBRIDGE__TERMINOLOGY__WIRE_VERSION=r4 \
       exec "$binary" --config "$config" serve > "$dir/server.log" 2>&1
   ) &

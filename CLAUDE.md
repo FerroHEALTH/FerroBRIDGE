@@ -77,10 +77,10 @@ the testkit tool crate. Beside it:
   `check`, the checker the operator API shares, #595).
   `src/cdr/` reaches the CDR through the generated ITS-REST 1.1.0 client of
   `openehr-its` (`rest-client`, #285, #293): the handle built from `[cdr]`
-  with its `SecretString` credentials or, under `[cdr.credentials.oauth]`, the
+  with its `SecretString` credentials or, under `[cdr.endpoint.credentials.oauth]`, the
   OAuth 2.0 client-credentials token renewed once on a CDR `401` (#421),
   the per-request exchange of a facade caller's token under
-  `[cdr.credentials.onward]` (`cdr::onward`, #1582), the
+  `[cdr.endpoint.credentials.onward]` (`cdr::onward`, #1582), the
   commit headers filled into the
   generated parameters, the `X-Request-Id` echo, the error body each outcome
   carries read into a refusal's diagnostics, the typed ids an `ETag` names,

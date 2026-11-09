@@ -108,10 +108,13 @@ async fn a_connection_draws_its_credentials_by_reference() -> Result<(), Box<dyn
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, cdr) = send(&service, get_with("/connections/cdr/settings", &cookie)?).await?;
     let cdr = drawn(&cdr);
-    assert!(cdr.contains("cdr.credentials.oauth.client_secret"), "{cdr}");
+    assert!(
+        cdr.contains("cdr.endpoint.credentials.oauth.client_secret"),
+        "{cdr}"
+    );
     assert!(cdr.contains("/run/secrets/cdr.secret"), "{cdr}");
     assert!(
-        !cdr.contains("cdr.credentials.password"),
+        !cdr.contains("cdr.endpoint.credentials.password"),
         "a CDR on the client credentials grant shows no Basic rows: {cdr}"
     );
     let (_response, term) = send(
@@ -120,7 +123,10 @@ async fn a_connection_draws_its_credentials_by_reference() -> Result<(), Box<dyn
     )
     .await?;
     let term = drawn(&term);
-    assert!(term.contains("terminology.credentials.password"), "{term}");
+    assert!(
+        term.contains("terminology.endpoint.credentials.password"),
+        "{term}"
+    );
     assert!(term.contains("fui-secret-now"), "{term}");
     let (_response, cdm) = send(&service, get_with("/connections/cdm/settings", &cookie)?).await?;
     let cdm = drawn(&cdm);

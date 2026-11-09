@@ -103,14 +103,7 @@ impl AppState {
             cdr = Some(client);
         }
         let mut terminology = None;
-        if let Some(config) = settings.terminology.as_ref() {
-            let client =
-                ferrobridge_term::client::Client::new(config.clone()).map_err(|source| {
-                    crate::config::error::Error::Client {
-                        upstream: "terminology",
-                        source: Box::new(source),
-                    }
-                })?;
+        if let Some(client) = settings.terminology.clone() {
             indicators.push(Arc::new(indicators::Terminology::new(client.clone())));
             terminology = Some(client);
         }

@@ -166,31 +166,31 @@ error while an absent one is a lane the server never starts. Set the ones you
 use:
 
 ```sh
-FERROBRIDGE__CDR__BASE_URL=https://cdr.example.org/openehr/v1
-FERROBRIDGE__CDR__CREDENTIALS__USER=ferrobridge
-FERROBRIDGE__CDR__CREDENTIALS__PASSWORD_FILE=/run/secrets/cdr_password
-FERROBRIDGE__TERMINOLOGY__BASE_URL=https://tx.example.org/r4
+FERROBRIDGE__CDR__ENDPOINT__URL=https://cdr.example.org/openehr/v1
+FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__USER=ferrobridge
+FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__PASSWORD_FILE=/run/secrets/cdr_password
+FERROBRIDGE__TERMINOLOGY__ENDPOINT__URL=https://tx.example.org/r4
 FERROBRIDGE__TERMINOLOGY__WIRE_VERSION=r4
-FERROBRIDGE__TERMINOLOGY__CREDENTIALS__USER=ferrobridge
-FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE=/run/secrets/terminology_password
+FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__USER=ferrobridge
+FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__PASSWORD_FILE=/run/secrets/terminology_password
 FERROBRIDGE__CDM__URL_FILE=/run/secrets/cdm_url
 ```
 
 The CDR takes basic authentication, as above, or a token the bridge obtains
 with the OAuth 2.0 client credentials grant: leave the two basic variables
-unset and set the `FERROBRIDGE__CDR__CREDENTIALS__OAUTH__` variables
-([`[cdr.credentials.oauth]`](configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)), with the
+unset and set the `FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__` variables
+([`[cdr.endpoint.credentials.oauth]`](configuration.md#cdrendpointcredentialsoauth-and-terminologyendpointcredentialsoauth)), with the
 client secret in a compose secret of your own.
 
 The terminology server takes the same two modes under its own names:
-`FERROBRIDGE__TERMINOLOGY__CREDENTIALS__USER` and
-`FERROBRIDGE__TERMINOLOGY__CREDENTIALS__PASSWORD_FILE`, read from the
+`FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__USER` and
+`FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__PASSWORD_FILE`, read from the
 `terminology_password` secret as above, or
-`FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__ISSUER` (or `__TOKEN_ENDPOINT`),
+`FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__ISSUER` (or `__TOKEN_ENDPOINT`),
 `__CLIENT_ID`, `__CLIENT_SECRET_FILE` and `__AUDIENCE`
-([`[terminology.credentials.oauth]`](configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)).
+([`[terminology.endpoint.credentials.oauth]`](configuration.md#cdrendpointcredentialsoauth-and-terminologyendpointcredentialsoauth)).
 The CDR takes the same five OAuth variables under
-`FERROBRIDGE__CDR__CREDENTIALS__OAUTH__`. Leave every credential variable of a
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__`. Leave every credential variable of a
 server that checks no credentials unset.
 
 Inbound authentication is on by default

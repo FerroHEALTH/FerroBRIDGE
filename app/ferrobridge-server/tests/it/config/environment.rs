@@ -30,7 +30,7 @@ fn an_environment_override_reaches_a_nested_section_and_keeps_its_type()
 -> Result<(), Box<dyn std::error::Error>> {
     let settings = Config::from_sources(
         Some(FULL),
-        &env("FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS", "9"),
+        &env("FERROBRIDGE__CDR__ENDPOINT__RETRY__MAX_ATTEMPTS", "9"),
     )?
     .resolve(Process::Server)?;
     let cdr = settings.cdr.as_ref().ok_or("the CDR lane is on")?;
@@ -43,15 +43,15 @@ fn an_environment_override_turns_a_lane_on_with_no_file_at_all()
 -> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
-            String::from("FERROBRIDGE__CDR__BASE_URL"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__URL"),
             String::from("http://cdr.invalid/v1"),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__USER"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__USER"),
             String::from("bridge"),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__PASSWORD"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__PASSWORD"),
             String::from("synthetic-password"),
         ),
     ]);
@@ -137,15 +137,15 @@ fn a_log_format_outside_the_three_exits_seventy_eight() {
 fn cdr_user(user: &str) -> Result<String, Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
-            String::from("FERROBRIDGE__CDR__BASE_URL"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__URL"),
             String::from("http://cdr.invalid/v1"),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__USER"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__USER"),
             user.to_owned(),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__PASSWORD"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__PASSWORD"),
             String::from("12345"),
         ),
     ]);
@@ -227,7 +227,7 @@ fn a_digit_string_and_a_number_in_one_environment_each_take_their_key_type()
 fn a_numeric_key_given_text_that_is_no_number_is_refused_naming_the_key() {
     let error = Config::from_sources(
         Some(FULL),
-        &env("FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS", "many"),
+        &env("FERROBRIDGE__CDR__ENDPOINT__RETRY__MAX_ATTEMPTS", "many"),
     )
     .expect_err("max_attempts is a number");
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
@@ -242,7 +242,7 @@ fn a_numeric_key_given_text_that_is_no_number_is_refused_naming_the_key() {
 fn a_numeric_key_given_a_number_out_of_its_range_is_refused() {
     let error = Config::from_sources(
         Some(FULL),
-        &env("FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS", "-1"),
+        &env("FERROBRIDGE__CDR__ENDPOINT__RETRY__MAX_ATTEMPTS", "-1"),
     )
     .expect_err("max_attempts is unsigned");
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");

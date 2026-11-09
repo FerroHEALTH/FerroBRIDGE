@@ -15,7 +15,7 @@ use super::refusal;
 /// directory the load runs over.
 const BASE: &str = r#"
 [cdr]
-base_url = "http://cdr.invalid/v1"
+endpoint.url = "http://cdr.invalid/v1"
 
 [change_feed]
 enabled = true

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `[cdr.credentials.oauth]` and `[terminology.credentials.oauth]`
+//! The `[cdr.endpoint.credentials.oauth]` and `[terminology.endpoint.credentials.oauth]`
 //! sections: the client credentials grant the bridge obtains its token for
 //! each upstream with, and every refusal of it.
 
@@ -20,7 +20,7 @@ use std::time::Duration;
 /// holds `credentials` and whose OAuth section holds `oauth`.
 fn text(credentials: &str, oauth: &str) -> String {
     format!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\n{credentials}\n[cdr.credentials.oauth]\n{oauth}"
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials]\n{credentials}\n[cdr.endpoint.credentials.oauth]\n{oauth}"
     )
 }
 
@@ -133,23 +133,23 @@ fn a_grant_is_reachable_through_the_environment() -> Result<(), Box<dyn std::err
     writeln!(file, "synthetic-secret")?;
     let environment = BTreeMap::from([
         (
-            String::from("FERROBRIDGE__CDR__BASE_URL"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__URL"),
             String::from("http://cdr.invalid/v1"),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__OAUTH__TOKEN_ENDPOINT"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__TOKEN_ENDPOINT"),
             String::from("https://as.example.org/token"),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_ID"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_ID"),
             String::from("ferrobridge"),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE"),
             file.path().display().to_string(),
         ),
         (
-            String::from("FERROBRIDGE__CDR__CREDENTIALS__OAUTH__REFRESH_MARGIN"),
+            String::from("FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__OAUTH__REFRESH_MARGIN"),
             String::from("10s"),
         ),
     ]);
@@ -200,7 +200,7 @@ fn a_mutual_tls_client_needs_its_certificate() -> Result<(), Box<dyn std::error:
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Missing {
                 key: "the client certificate of the TLS configuration built from credentials.oauth.tls"
             })
@@ -219,7 +219,7 @@ fn a_private_key_jwt_client_needs_its_key_file() -> Result<(), Box<dyn std::erro
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Missing {
                 key: "credentials.oauth.private_key_file"
             })
@@ -232,7 +232,7 @@ fn a_private_key_jwt_client_needs_its_key_file() -> Result<(), Box<dyn std::erro
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::SecretFile { .. })
         ),
         "{error:?}"
@@ -248,7 +248,7 @@ fn a_grant_without_a_secret_refuses_to_boot() -> Result<(), Box<dyn std::error::
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Secret {
                 key: "credentials.oauth.client_secret"
             })
@@ -265,7 +265,7 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn std
         "token_endpoint = \"https://as.example.org/token\"\nclient_id = \"c\"\nclient_secret_file = \"/nonexistent/secret\"\n",
     ))?;
     assert!(
-        matches!(rule(&error, "cdr.credentials"), Some(ConfigError::SecretFile { path, .. }) if path == std::path::Path::new("/nonexistent/secret")),
+        matches!(rule(&error, "cdr.endpoint.credentials"), Some(ConfigError::SecretFile { path, .. }) if path == std::path::Path::new("/nonexistent/secret")),
         "{error:?}"
     );
     Ok(())
@@ -279,7 +279,7 @@ fn a_secret_and_its_file_together_refuse_to_boot() -> Result<(), Box<dyn std::er
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Secret {
                 key: "credentials.oauth.client_secret"
             })
@@ -297,7 +297,7 @@ fn a_grant_without_a_client_id_refuses_to_boot() -> Result<(), Box<dyn std::erro
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Missing {
                 key: "credentials.oauth.client_id"
             })
@@ -312,7 +312,7 @@ fn a_grant_with_no_endpoint_refuses_to_boot() -> Result<(), Box<dyn std::error::
     let error = refusal(&text("", "client_id = \"c\"\nclient_secret = \"s\"\n"))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Missing {
                 key: "credentials.oauth.issuer or credentials.oauth.token_endpoint"
             })
@@ -331,7 +331,7 @@ fn a_grant_with_an_issuer_and_a_token_endpoint_refuses_to_boot()
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Exclusive {
                 left: "credentials.oauth.issuer",
                 right: "credentials.oauth.token_endpoint"
@@ -357,7 +357,7 @@ fn an_issuer_that_is_not_https_or_carries_a_query_refuses_to_boot()
         ))?;
         assert!(
             matches!(
-                rule(&error, "cdr.credentials"),
+                rule(&error, "cdr.endpoint.credentials"),
                 Some(ConfigError::OauthIssuer { .. })
             ),
             "{issuer}: {error:?}"
@@ -378,7 +378,7 @@ fn a_scope_that_is_not_scope_tokens_refuses_to_boot() -> Result<(), Box<dyn std:
         ))?;
         assert!(
             matches!(
-                rule(&error, "cdr.credentials"),
+                rule(&error, "cdr.endpoint.credentials"),
                 Some(ConfigError::Scope { .. })
             ),
             "{scope:?}: {error:?}"
@@ -403,7 +403,7 @@ fn a_resource_with_a_fragment_refuses_to_boot() -> Result<(), Box<dyn std::error
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Fragment {
                 key: "credentials.oauth.resource"
             })
@@ -421,7 +421,7 @@ fn a_grant_beside_a_static_scheme_refuses_to_boot() -> Result<(), Box<dyn std::e
     ))?;
     assert!(
         matches!(
-            rule(&error, "cdr.credentials"),
+            rule(&error, "cdr.endpoint.credentials"),
             Some(ConfigError::Exclusive {
                 left: "credentials.user",
                 right: "credentials.oauth"
@@ -436,7 +436,7 @@ fn a_grant_beside_a_static_scheme_refuses_to_boot() -> Result<(), Box<dyn std::e
 /// section holds `credentials` and whose OAuth section holds `oauth`.
 fn terminology_text(credentials: &str, oauth: &str) -> String {
     format!(
-        "[terminology]\nbase_url = \"http://tx.invalid/r4\"\n\n[terminology.credentials]\n{credentials}\n[terminology.credentials.oauth]\n{oauth}"
+        "[terminology]\nendpoint.url = \"http://tx.invalid/r4\"\n\n[terminology.endpoint.credentials]\n{credentials}\n[terminology.endpoint.credentials.oauth]\n{oauth}"
     )
 }
 
@@ -465,11 +465,11 @@ fn the_terminology_lane_obtains_its_token_with_the_grant() -> Result<(), Box<dyn
     let terminology = settings.terminology.ok_or("the terminology lane is on")?;
     assert!(
         matches!(
-            terminology.credentials,
+            terminology.config().credentials,
             Some(ferrobridge_term::config::Credentials::OAuth(_))
         ),
         "{:?}",
-        terminology.credentials
+        terminology.config().credentials
     );
     assert!(
         !format!("{terminology:?}").contains("synthetic-tx-secret"),
@@ -483,26 +483,26 @@ fn the_terminology_grant_is_reachable_through_the_environment()
 -> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
-            String::from("FERROBRIDGE__TERMINOLOGY__BASE_URL"),
+            String::from("FERROBRIDGE__TERMINOLOGY__ENDPOINT__URL"),
             String::from("http://tx.invalid/r4"),
         ),
         (
-            String::from("FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__ISSUER"),
+            String::from("FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__ISSUER"),
             String::from("https://as.example.org/realms/ferro"),
         ),
         (
-            String::from("FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_ID"),
+            String::from("FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_ID"),
             String::from("ferrobridge"),
         ),
         (
-            String::from("FERROBRIDGE__TERMINOLOGY__CREDENTIALS__OAUTH__CLIENT_SECRET"),
+            String::from("FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET"),
             String::from("synthetic-tx-secret"),
         ),
     ]);
     let settings = Config::from_sources(None, &environment)?.resolve(Process::Server)?;
     let terminology = settings.terminology.ok_or("the terminology lane is on")?;
     assert!(matches!(
-        terminology.credentials,
+        terminology.config().credentials,
         Some(ferrobridge_term::config::Credentials::OAuth(_))
     ));
     Ok(())
@@ -516,7 +516,7 @@ fn a_terminology_grant_beside_a_user_refuses_to_boot() -> Result<(), Box<dyn std
     ))?;
     assert!(
         matches!(
-            rule(&error, "terminology.credentials"),
+            rule(&error, "terminology.endpoint.credentials"),
             Some(ConfigError::Exclusive {
                 left: "credentials.user",
                 right: "credentials.oauth"
@@ -536,7 +536,7 @@ fn a_terminology_grant_refusal_names_the_terminology_key() -> Result<(), Box<dyn
     ))?;
     assert!(
         matches!(
-            rule(&error, "terminology.credentials"),
+            rule(&error, "terminology.endpoint.credentials"),
             Some(ConfigError::Secret {
                 key: "credentials.oauth.client_secret"
             })

@@ -23,10 +23,10 @@ use ferrohealth_config::provenance::Provenance;
 /// dotted key; a key under an array of tables names the array.
 const SECRETS: [&str; 10] = [
     "cdm.url",
-    "cdr.credentials.password",
-    "cdr.credentials.oauth.client_secret",
-    "terminology.credentials.password",
-    "terminology.credentials.oauth.client_secret",
+    "cdr.endpoint.credentials.password",
+    "cdr.endpoint.credentials.oauth.client_secret",
+    "terminology.endpoint.credentials.password",
+    "terminology.endpoint.credentials.oauth.client_secret",
     "fhir_outbound.endpoint.credentials.password",
     "fhir_outbound.endpoint.credentials.oauth.client_secret",
     "audit.endpoint.credentials.password",
@@ -36,11 +36,13 @@ const SECRETS: [&str; 10] = [
 
 /// The keys that name the file of a private key, drawn as a secret read
 /// from that file.
-const KEY_FILES: [&str; 8] = [
-    "cdr.credentials.oauth.private_key_file",
-    "cdr.credentials.oauth.tls.client_identity_file",
-    "terminology.credentials.oauth.private_key_file",
-    "terminology.credentials.oauth.tls.client_identity_file",
+const KEY_FILES: [&str; 10] = [
+    "cdr.endpoint.credentials.oauth.private_key_file",
+    "cdr.endpoint.credentials.oauth.tls.client_identity_file",
+    "terminology.endpoint.credentials.oauth.private_key_file",
+    "terminology.endpoint.credentials.oauth.tls.client_identity_file",
+    "cdr.endpoint.tls.client_identity_file",
+    "terminology.endpoint.tls.client_identity_file",
     "fhir_outbound.endpoint.credentials.oauth.private_key_file",
     "fhir_outbound.endpoint.tls.client_identity_file",
     "audit.endpoint.credentials.oauth.private_key_file",
@@ -226,7 +228,7 @@ mod tests {
     #[test]
     fn a_secret_key_names_the_child_of_its_own_table_alone() {
         assert_eq!(child_name("cdm", "cdm.url"), Some("url"));
-        assert_eq!(child_name("cdr", "cdr.credentials.password"), None);
+        assert_eq!(child_name("cdr", "cdr.endpoint.credentials.password"), None);
         assert_eq!(child_name("", "cdm.url"), None);
     }
 }

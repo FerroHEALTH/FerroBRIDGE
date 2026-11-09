@@ -13,7 +13,7 @@ use ferrobridge_server::config::error::Error;
 use super::refusal;
 
 /// A CDR, a change feed and a facade the lane can follow and map through.
-const FEED: &str = "[auth]\nenabled = false\n\n[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
+const FEED: &str = "[auth]\nenabled = false\n\n[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
 
 /// The keys every complete lane names.
 const COMPLETE: &str = "reader = \"fhir-outbound\"\nendpoint.url = \"https://fhir.example.org/r4\"\nemitted = \"/var/lib/ferrobridge/emitted.redb\"\n";
@@ -99,7 +99,7 @@ fn the_lane_needs_the_change_feed_and_the_facade() -> Result<(), Box<dyn std::er
         ),
         (
             format!(
-                "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n[fhir_outbound]\nenabled = true\n{COMPLETE}"
+                "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n[fhir_outbound]\nenabled = true\n{COMPLETE}"
             ),
             "facade.enabled",
         ),

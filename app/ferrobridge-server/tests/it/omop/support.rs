@@ -428,7 +428,7 @@ pub(super) fn configuration(
     mappings: &Path,
 ) -> Result<std::path::PathBuf, Box<dyn Error>> {
     let text = format!(
-        "[cdr]\nbase_url = \"{cdr}/\"\n\n\
+        "[cdr]\nendpoint.url = \"{cdr}/\"\n\n\
          [cdm]\nurl = \"{cdm}\"\n\n\
          [etl]\naql = \"{COMPOSITIONS}\"\ntype_concept_id = {TYPE_CONCEPT}\n\
          observation_period_type_concept_id = {PERIOD_TYPE_CONCEPT}\n\n\

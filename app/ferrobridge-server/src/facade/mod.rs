@@ -390,7 +390,7 @@ impl Facade {
     ///
     /// The inbound `X-Request-Id` travels onto every outbound call, so one
     /// correlation identifier covers the request and the CDR calls it makes.
-    /// Under `[cdr.credentials.onward]` the calls carry the token the caller
+    /// Under `[cdr.endpoint.credentials.onward]` the calls carry the token the caller
     /// behind `access` was exchanged for ([`CdrClient::for_caller`]).
     ///
     /// # Errors

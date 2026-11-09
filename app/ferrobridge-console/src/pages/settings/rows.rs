@@ -179,20 +179,20 @@ const CDR: [Row; 4] = [
     row(
         Msg::RowBaseUrl,
         Msg::RowCdrBaseUrlDesc,
-        &[("cdr.base_url", Shape::Code)],
+        &[("cdr.endpoint.url", Shape::Code)],
     ),
     row(
         Msg::RowTimeout,
         Msg::RowTimeoutDesc,
-        &[("cdr.timeout", Shape::Millis)],
+        &[("cdr.endpoint.timeout", Shape::Millis)],
     ),
     row(
         Msg::RowRetry,
         Msg::RowRetryDesc,
         &[
-            ("cdr.retry.max_attempts", Shape::Number),
-            ("cdr.retry.initial_backoff", Shape::Millis),
-            ("cdr.retry.max_backoff", Shape::Millis),
+            ("cdr.endpoint.retry.max_attempts", Shape::Number),
+            ("cdr.endpoint.retry.initial_backoff", Shape::Millis),
+            ("cdr.endpoint.retry.max_backoff", Shape::Millis),
         ],
     ),
     row(
@@ -207,17 +207,20 @@ const CDR_OAUTH: [Row; 3] = [
     row(
         Msg::RowTokenEndpoint,
         Msg::RowTokenEndpointDesc,
-        &[("cdr.credentials.oauth.token_endpoint", Shape::Code)],
+        &[("cdr.endpoint.credentials.oauth.token_endpoint", Shape::Code)],
     ),
     row(
         Msg::RowClientId,
         Msg::RowClientIdDesc,
-        &[("cdr.credentials.oauth.client_id", Shape::Code)],
+        &[("cdr.endpoint.credentials.oauth.client_id", Shape::Code)],
     ),
     row(
         Msg::RowClientSecret,
         Msg::RowClientSecretDesc,
-        &[("cdr.credentials.oauth.client_secret", Shape::Secret)],
+        &[(
+            "cdr.endpoint.credentials.oauth.client_secret",
+            Shape::Secret,
+        )],
     ),
 ];
 
@@ -226,12 +229,12 @@ const CDR_BASIC: [Row; 2] = [
     row(
         Msg::RowUser,
         Msg::RowUserDesc,
-        &[("cdr.credentials.user", Shape::Code)],
+        &[("cdr.endpoint.credentials.user", Shape::Code)],
     ),
     row(
         Msg::RowPassword,
         Msg::RowPasswordDesc,
-        &[("cdr.credentials.password", Shape::Secret)],
+        &[("cdr.endpoint.credentials.password", Shape::Secret)],
     ),
 ];
 
@@ -240,7 +243,7 @@ const TERMINOLOGY: [Row; 5] = [
     row(
         Msg::RowBaseUrl,
         Msg::RowTerminologyBaseUrlDesc,
-        &[("terminology.base_url", Shape::Code)],
+        &[("terminology.endpoint.url", Shape::Code)],
     ),
     row(
         Msg::RowFhirVersion,
@@ -250,15 +253,15 @@ const TERMINOLOGY: [Row; 5] = [
     row(
         Msg::RowTimeout,
         Msg::RowTimeoutDesc,
-        &[("terminology.timeout", Shape::Millis)],
+        &[("terminology.endpoint.timeout", Shape::Millis)],
     ),
     row(
         Msg::RowRetry,
         Msg::RowRetryDesc,
         &[
-            ("terminology.retry.max_attempts", Shape::Number),
-            ("terminology.retry.initial_backoff", Shape::Millis),
-            ("terminology.retry.max_backoff", Shape::Millis),
+            ("terminology.endpoint.retry.max_attempts", Shape::Number),
+            ("terminology.endpoint.retry.initial_backoff", Shape::Millis),
+            ("terminology.endpoint.retry.max_backoff", Shape::Millis),
         ],
     ),
     row(
@@ -273,17 +276,26 @@ const TERMINOLOGY_OAUTH: [Row; 3] = [
     row(
         Msg::RowTokenEndpoint,
         Msg::RowTokenEndpointDesc,
-        &[("terminology.credentials.oauth.token_endpoint", Shape::Code)],
+        &[(
+            "terminology.endpoint.credentials.oauth.token_endpoint",
+            Shape::Code,
+        )],
     ),
     row(
         Msg::RowClientId,
         Msg::RowClientIdDesc,
-        &[("terminology.credentials.oauth.client_id", Shape::Code)],
+        &[(
+            "terminology.endpoint.credentials.oauth.client_id",
+            Shape::Code,
+        )],
     ),
     row(
         Msg::RowClientSecret,
         Msg::RowClientSecretDesc,
-        &[("terminology.credentials.oauth.client_secret", Shape::Secret)],
+        &[(
+            "terminology.endpoint.credentials.oauth.client_secret",
+            Shape::Secret,
+        )],
     ),
 ];
 
@@ -292,12 +304,12 @@ const TERMINOLOGY_BASIC: [Row; 2] = [
     row(
         Msg::RowUser,
         Msg::RowUserDesc,
-        &[("terminology.credentials.user", Shape::Code)],
+        &[("terminology.endpoint.credentials.user", Shape::Code)],
     ),
     row(
         Msg::RowPassword,
         Msg::RowPasswordDesc,
-        &[("terminology.credentials.password", Shape::Secret)],
+        &[("terminology.endpoint.credentials.password", Shape::Secret)],
     ),
 ];
 
@@ -423,12 +435,12 @@ pub enum Credentials {
 #[must_use]
 pub fn credentials(configuration: &Configuration, name: &str) -> Credentials {
     if configuration
-        .entry(&format!("{name}.credentials.oauth.client_id"))
+        .entry(&format!("{name}.endpoint.credentials.oauth.client_id"))
         .is_some()
     {
         Credentials::Oauth
     } else if configuration
-        .entry(&format!("{name}.credentials.user"))
+        .entry(&format!("{name}.endpoint.credentials.user"))
         .is_some_and(|entry| {
             !matches!(&entry.value, ferrobridge_operator_api::configuration::Value::String(user) if user.is_empty())
         })

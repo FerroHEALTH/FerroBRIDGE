@@ -17,4 +17,5 @@ mod pins;
 mod query;
 mod support;
 mod template;
+mod tls;
 mod transport;

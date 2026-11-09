@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use ferrohealth_smart::config::credentials::CredentialsSection;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use ferrohealth_smart::config::onward::OnwardSection;
 
 use ferrohealth_secret::secret::Secret;
@@ -212,29 +212,25 @@ impl Default for Operations {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Cdr {
-    /// The openEHR REST API root, the path `/ehr` and `/query` live under.
-    pub base_url: String,
-    /// How long one call may take, connection included.
-    pub timeout: Duration,
-    /// The retry budget for idempotent calls.
-    pub retry: Retry,
-    /// The credentials the CDR expects.
-    pub credentials: CredentialsSection,
+    /// The CDR: the openEHR REST API root as `url`, the path `/ehr` and
+    /// `/query` live under, the timeouts, the retry budget of idempotent
+    /// calls, the TLS and the credentials.
+    pub endpoint: EndpointSection,
     /// Whether the bridge reaches the ITS-REST 1.1.0 Demographic API of the
     /// CDR, a module the release marks `x-status: DEVELOPMENT`.
     pub demographic: bool,
-    /// The onward issuers beside `credentials.onward`, one per kind, each
-    /// authenticated with `credentials.oauth`.
+    /// The onward issuers beside `endpoint.credentials.onward`, one per kind,
+    /// each authenticated with `endpoint.credentials.oauth`.
     pub onward: Vec<OnwardSection>,
 }
 
 impl Default for Cdr {
     fn default() -> Self {
         Self {
-            base_url: String::new(),
-            timeout: Duration::from_secs(30),
-            retry: Retry::default(),
-            credentials: CredentialsSection::default(),
+            endpoint: EndpointSection {
+                timeout: Duration::from_secs(30),
+                ..EndpointSection::default()
+            },
             demographic: false,
             onward: Vec::new(),
         }
@@ -245,16 +241,11 @@ impl Default for Cdr {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Terminology {
-    /// The FHIR service base URL.
-    pub base_url: String,
+    /// The terminology server: its FHIR service base as `url`, the timeouts,
+    /// the retry budget, the TLS and the credentials.
+    pub endpoint: EndpointSection,
     /// The release the server answers in: `stu3`, `r4` or `r4b`.
     pub wire_version: String,
-    /// How long one call may take, connection included.
-    pub timeout: Duration,
-    /// The retry budget.
-    pub retry: Retry,
-    /// The credentials the server expects.
-    pub credentials: CredentialsSection,
     /// Whether a code the server does not know takes `coding.code` as its
     /// display going into openEHR, rather than refusing the unit.
     pub display_fallback: bool,
@@ -263,11 +254,11 @@ pub struct Terminology {
 impl Default for Terminology {
     fn default() -> Self {
         Self {
-            base_url: String::new(),
+            endpoint: EndpointSection {
+                timeout: Duration::from_secs(30),
+                ..EndpointSection::default()
+            },
             wire_version: String::from("r4"),
-            timeout: Duration::from_secs(30),
-            retry: Retry::default(),
-            credentials: CredentialsSection::default(),
             display_fallback: false,
         }
     }
@@ -391,26 +382,4 @@ pub struct EtlVisits {
     pub visit_concept_id: Option<i32>,
     /// The `visit_type_concept_id` every visit carries.
     pub visit_type_concept_id: Option<i32>,
-}
-
-/// How often, and how far apart, a call is retried.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Retry {
-    /// How many times a call is sent at most, the first try included.
-    pub max_attempts: u32,
-    /// The delay before the second attempt.
-    pub initial_backoff: Duration,
-    /// The ceiling every later delay is clamped to.
-    pub max_backoff: Duration,
-}
-
-impl Default for Retry {
-    fn default() -> Self {
-        Self {
-            max_attempts: 3,
-            initial_backoff: Duration::from_millis(200),
-            max_backoff: Duration::from_secs(5),
-        }
-    }
 }

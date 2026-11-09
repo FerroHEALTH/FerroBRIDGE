@@ -34,7 +34,7 @@ fn settings(
 ) -> Result<Settings, Box<dyn Error>> {
     let text = format!(
         "[usage_report]\nenabled = false\n\n\
-         [cdr]\nbase_url = \"{uri}/v1\"\n\n\
+         [cdr]\nendpoint.url = \"{uri}/v1\"\n\n\
          [change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\npoll_interval = \"10ms\"\nbackoff = \"10ms\"\nmax_backoff = \"20ms\"\ndead_letters = \"{dead_letters}\"\n\n\
          [events]\nenabled = true\nreader = \"ferrobridge-test\"\nurl = \"amqp://guest:guest@127.0.0.1:{broker_port}/%2f\"\nexchange = \"ferrobridge.test.events\"\nconfirm_timeout = \"500ms\"\n",
         uri = cdr.uri(),

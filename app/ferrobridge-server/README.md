@@ -31,8 +31,8 @@ product version.
 An optional TOML file, then environment variables over it. The file is what
 `--config` names, or what `FERROBRIDGE_CONFIG` names; without either, the
 defaults stand. An override is `FERROBRIDGE__<SECTION>__<KEY>`, two
-underscores per level, so `FERROBRIDGE__CDR__RETRY__MAX_ATTEMPTS` sets
-`[cdr.retry] max_attempts`.
+underscores per level, so `FERROBRIDGE__CDR__ENDPOINT__RETRY__MAX_ATTEMPTS` sets
+`[cdr.endpoint.retry] max_attempts`.
 
 Every struct refuses an unknown key, and a bad value is refused with the key
 named. Every credential is reachable through a `<key>_file` sibling read once

@@ -39,11 +39,11 @@ fn file_text(password_file: &std::path::Path) -> String {
             "audience = [\"https://bridge.example.org/fhir\"]\n\n",
             "[[auth.basic.users]]\nuser = \"operator\"\n",
             "password_hash = \"$argon2id$v=19$m=19456,t=2,p=1$c3ludGhldGljLXNhbHQtMTY$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n\n",
-            "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-            "[cdr.credentials.oauth]\ntoken_endpoint = \"https://as.example.org/token\"\n",
+            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n",
+            "[cdr.endpoint.credentials.oauth]\ntoken_endpoint = \"https://as.example.org/token\"\n",
             "client_id = \"ferrobridge\"\nclient_secret = \"SYNTHETIC-CDR-CLIENT-SECRET\"\n\n",
-            "[terminology]\nbase_url = \"http://term.invalid/fhir\"\n\n",
-            "[terminology.credentials]\nuser = \"bridge\"\npassword_file = {}\n\n",
+            "[terminology]\nendpoint.url = \"http://term.invalid/fhir\"\n\n",
+            "[terminology.endpoint.credentials]\nuser = \"bridge\"\npassword_file = {}\n\n",
             "[cdm]\nurl = \"postgres://bridge:SYNTHETIC-CDM-PASSWORD@db.invalid/cdm?sslmode=disable\"\n\n",
             "[operator]\nenabled = true\n",
         ),
@@ -123,7 +123,10 @@ fn a_secret_is_its_state_and_its_file_never_its_value() -> Result<(), Box<dyn Er
     let (configuration, password) = running()?;
     assert_eq!(
         (&Value::Secret(SecretState::Set), Source::File),
-        entry(&configuration, "cdr.credentials.oauth.client_secret")?
+        entry(
+            &configuration,
+            "cdr.endpoint.credentials.oauth.client_secret"
+        )?
     );
     assert_eq!(
         (
@@ -132,17 +135,17 @@ fn a_secret_is_its_state_and_its_file_never_its_value() -> Result<(), Box<dyn Er
             }),
             Source::File
         ),
-        entry(&configuration, "terminology.credentials.password")?
+        entry(&configuration, "terminology.endpoint.credentials.password")?
     );
     assert!(
         configuration
-            .entry("terminology.credentials.password_file")
+            .entry("terminology.endpoint.credentials.password_file")
             .is_none(),
         "a secret and its file are one entry"
     );
     assert_eq!(
         (&Value::Secret(SecretState::Unset), Source::Default),
-        entry(&configuration, "cdr.credentials.password")?
+        entry(&configuration, "cdr.endpoint.credentials.password")?
     );
     assert_eq!(
         (&Value::Secret(SecretState::Set), Source::File),
