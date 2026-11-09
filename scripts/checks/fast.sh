@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: BUSL-1.1
 # The default local gate: rustfmt, clippy, nextest and the doctests on the
 # packages your change reaches, and the full-emit tests of fhir-codegen when
-# the change reaches it. The reached set is the one the CI `detect` job
+# the change reaches it, and the fuzz crate's own lock on every run. The
+# reached set is the one the CI `detect` job
 # computes (scripts/checks/affected.sh), measured from the merge base with
 # origin/main to the working tree, untracked files included. CI stays the
 # full gate: a push to main runs every lane over every package.
@@ -65,6 +66,17 @@ else
 fi
 
 get() { local key="$1"; printf '%s\n' "$out" | sed -n "s/^$key=//p"; }
+
+# The fuzz crate keeps a lock of its own outside the workspace, which the CI
+# cargo-deny job reads with --locked, so a moved path dependency such as
+# openehr-mapping-core leaves it stale (#1726). Resolving it is cheap, so it
+# runs whatever the change reaches.
+echo "+ cargo metadata --manifest-path fuzz/Cargo.toml --locked"
+if [[ "$dry" = false ]] &&
+  ! cargo metadata --manifest-path fuzz/Cargo.toml --locked --format-version 1 > /dev/null; then
+  die "fuzz/Cargo.lock is out of date with the workspace; refresh it with: cargo update --manifest-path fuzz/Cargo.toml --workspace"
+fi
+
 packages="$(get packages)"
 if [[ -z "$packages" ]]; then
   echo "fast: the change reaches no package; nothing to run"
