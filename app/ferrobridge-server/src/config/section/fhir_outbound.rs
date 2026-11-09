@@ -9,6 +9,7 @@
 
 use std::path::PathBuf;
 
+use ferrohealth_config::units::Duration;
 use ferrohealth_smart::config::credentials::CredentialsSection;
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +27,7 @@ pub struct FhirOutbound {
     /// bridge that the operator answers for.
     pub cleartext: bool,
     /// How long one delivery may take.
-    pub timeout_ms: u64,
+    pub timeout: Duration,
     /// The file the record of what was delivered is kept in.
     pub emitted: Option<PathBuf>,
     /// The credentials the endpoint expects.
@@ -40,7 +41,7 @@ impl Default for FhirOutbound {
             reader: String::new(),
             base_url: String::new(),
             cleartext: false,
-            timeout_ms: 30_000,
+            timeout: Duration::from_secs(30),
             emitted: None,
             credentials: CredentialsSection::default(),
         }

@@ -55,7 +55,7 @@ clap.workspace = true
 # subcommands.
 ferrohealth-config.workspace = true
 ferrohealth-secret.workspace = true
-ferrohealth-server = { workspace = true, features = ["console"] }
+ferrohealth-server = { workspace = true, features = ["console", "otlp"] }
 ferrohealth-telemetry.workspace = true
 # The R4 CapabilityStatement the bridge client reads from `/fhir/metadata`
 # and the console reduces to the operator contract's `Capability`, and the

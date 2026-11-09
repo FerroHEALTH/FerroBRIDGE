@@ -69,22 +69,22 @@ The section is the FerroHEALTH family's (`ferrohealth-server`).
 |---|---|---|
 | `listen` | `127.0.0.1:8080` | The socket address to bind |
 | `base_path` | empty | The path every route is served under: empty, or starting with `/` and not ending with one |
-| `request_timeout_ms` | `30000` | How long one request may take before the server answers `408` (`504` under `/fhir`) |
-| `header_read_timeout_ms` | `30000` | How long a client may take to send a request head, counted from accept or from the first byte of each later head on a kept-alive connection; a client that has not sent one by then, one that sent nothing included, is disconnected |
-| `idle_timeout_ms` | `120000` | How long a kept-alive HTTP/1.1 connection may wait for its next request before the server closes it with a clean end of stream |
-| `body_limit_bytes` | `1048576` | The largest request body read before the server answers `413` |
-| `drain_delay_ms` | `0` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
-| `shutdown_timeout_ms` | `10000` | How long the requests in flight may take once the listener closed |
+| `request_timeout` | `"30s"` | How long one request may take before the server answers `408` (`504` under `/fhir`) |
+| `header_read_timeout` | `"30s"` | How long a client may take to send a request head, counted from accept or from the first byte of each later head on a kept-alive connection; a client that has not sent one by then, one that sent nothing included, is disconnected |
+| `idle_timeout` | `"2min"` | How long a kept-alive HTTP/1.1 connection may wait for its next request before the server closes it with a clean end of stream |
+| `body_limit` | `"1MiB"` | The largest request body read before the server answers `413` |
+| `drain_delay` | `"0s"` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
+| `shutdown_timeout` | `"10s"` | How long the requests in flight may take once the listener closed |
 | `max_concurrent_requests` | unset | How many requests the server serves at once; past it a request is answered `503` with `Retry-After`, and the health routes are never refused |
-| `retry_after_s` | `1` | The seconds a refused request is told to wait |
+| `retry_after` | `"1s"` | The seconds a refused request is told to wait |
 | `trusted_proxies` | `[]` | The reverse proxies, each an address or a CIDR block, whose forwarded client address is believed |
 | `forwarded_header` | `forwarded` | The header a trusted proxy names the client in: `forwarded` or `x-forwarded-for` |
 | `compression` | `true` | Whether a response is compressed with gzip or Brotli when the client accepts one |
-| `compression_min_bytes` | `1024` | The smallest response body that is compressed |
+| `compression_min_size` | `"1KiB"` | The smallest response body that is compressed |
 
 `[server.tls]` serves the listener over TLS: `certificate_file` and
 `key_file` (PEM), `client_auth` (`none`, `optional` or `required`) with
-`client_ca_file`, `reload_interval_s` (unset, only `SIGHUP` reads the files
+`client_ca_file`, `reload_interval` (unset, only `SIGHUP` reads the files
 again), `healthcheck_identity_file` for `ferrobridge healthcheck` against a
 listener that asks a client certificate, and `min_version` (`"1.3"` unless
 lowered to `"1.2"`). Without it the listener speaks plain HTTP behind a proxy
@@ -100,13 +100,28 @@ caller's rate; bound the server with `max_concurrent_requests`.
 | `logged_query_parameters` | `[]` | The query parameter names whose values may reach the request log, each value cut at 64 characters |
 | `environment` | unset | The deployment environment, such as `production` |
 
-The section is the FerroHEALTH family's (`ferrohealth-telemetry`). This build
-exports no traces and no metrics, so a `[telemetry.otlp]` table refuses the
-start.
+The section is the FerroHEALTH family's (`ferrohealth-telemetry`).
 
 Nothing else about a request is logged. Add a name to
 `logged_query_parameters` only for a parameter you know carries no identifying
 content.
+
+`[telemetry.otlp]` exports the traces and the metrics to an OpenTelemetry
+collector over OTLP/gRPC:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `endpoint` | none | The collector's OTLP/gRPC endpoint; `https://` speaks TLS, and the value is masked in `config check` |
+| `traces` | `true` | Whether the spans are exported |
+| `metrics` | `true` | Whether the metrics are pushed |
+| `sample_ratio` | `1.0` | The share of the traces that are sampled |
+| `tls.trust_roots_file` | unset | A PEM bundle of trust roots beside the platform's |
+| `tls.client_identity_file` | unset | The client certificate chain and its key in one PEM, for mutual TLS (or `tls.client_identity` inline) |
+| `tls.min_version` | `"1.3"` | The oldest TLS version spoken; `"1.2"` lowers it |
+
+The bridge reads `tls` with the family's outbound TLS reader and dials an
+`https://` collector through the platform verifier with those roots beside
+it. TLS material beside an endpoint that is not `https://` refuses the start.
 
 ### The console
 
@@ -182,7 +197,7 @@ server says so once at start-up, naming the section and never a value.
 | Key | Default | Secret | Meaning |
 |---|---|---|---|
 | `base_url` | none, required | | The openEHR REST API root, usually ending in `/v1` |
-| `timeout_ms` | `30000` | | How long one call may take, connection included |
+| `timeout` | `"30s"` | | How long one call may take, connection included |
 | `demographic` | `false` | | Whether the bridge reaches the CDR's ITS-REST 1.1.0 Demographic API, which the release marks `x-status: DEVELOPMENT` |
 
 ### `[cdr.retry]` and `[terminology.retry]`
@@ -190,15 +205,15 @@ server says so once at start-up, naming the section and never a value.
 | Key | Default | Meaning |
 |---|---|---|
 | `max_attempts` | `3` | How many times a call is sent at most, the first try included; `1` disables retry |
-| `initial_backoff_ms` | `200` | The delay before the second attempt |
-| `max_backoff_ms` | `5000` | The ceiling every later delay is clamped to |
+| `initial_backoff` | `"200ms"` | The delay before the second attempt |
+| `max_backoff` | `"5s"` | The ceiling every later delay is clamped to |
 
 For the CDR, the bridge calls through the generated ITS-REST client of the
 `openehr-its` crate, and the three keys are that client's retry budget. Only a
 `GET`, `PUT` or `DELETE` is sent again, after a failure to connect, a
 timeout, or a `5xx` other than `501`; a `POST` is sent once. A `401`, a `403`
 and a status the operation does not document are never retried.
-`[cdr] timeout_ms` is the per-request timeout of the client's HTTP engine.
+`[cdr] timeout` is the per-request timeout of the client's HTTP engine.
 
 `[cdr] demographic` turns on the client of the ITS-REST 1.1.0 Demographic API,
 DEVELOPMENT: the reads, creates, updates and deletes of `PERSON`,
@@ -460,7 +475,7 @@ with no display keeps its code as the value.
 |---|---|---|
 | `base_url` | none, required | The FHIR service base URL |
 | `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
-| `timeout_ms` | `30000` | How long one call may take, connection included |
+| `timeout` | `"30s"` | How long one call may take, connection included |
 | `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT` or `DV_TEXT`, `false` refuses the resource. A failed call refuses either way |
 
 As an environment variable, `display_fallback` reads
@@ -758,7 +773,7 @@ FerroBRIDGE's own design.
 |---|---|---|
 | `fetch_bases` | `[]` | The FHIR service bases an absolute reference may be fetched from, each an `http` or `https` URL with no query or fragment |
 | `max_depth` | `2` | How many levels of references are followed: the request's own, then those of each resolved resource; `0` resolves none |
-| `timeout_ms` | `10000` | How long one fetch from a listed base may take, connection included |
+| `timeout` | `"10s"` | How long one fetch from a listed base may take, connection included |
 
 Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
 `fetch_bases` takes a TOML array:
@@ -1052,9 +1067,9 @@ it answers.
 | `unmapped_entries` | `skip_and_count` | `skip_and_count` or `refuse`, for an entry no program maps |
 | `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
 | `profiles` | `[]` | `{ resource_type, profile }` pairs: the profile a resource of that R4 type claims when the guide wrote none |
-| `idle_timeout_ms` | `300000` | How long a connection may sit between messages; `0` keeps it open |
-| `frame_timeout_ms` | `30000` | How long one frame may take to arrive whole; `0` waits |
-| `frame_limit_bytes` | `1048576` | The largest message one frame may carry |
+| `idle_timeout` | `"5min"` | How long a connection may sit between messages; `"0s"` keeps it open |
+| `frame_timeout` | `"30s"` | How long one frame may take to arrive whole; `"0s"` waits |
+| `frame_limit` | `"1MiB"` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes by kind at debug level |
 | `senders` | none, required | The MSH-4 sending facilities accepted, at least one: `{ namespace_id }` or `{ universal_id, universal_id_type }`, each with its `certificate_subject` and an optional `origin = "device"` with its `device_identifier_issuer` |
 | `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none, required | The PEM chain and key the MLLP listener serves over TLS, and the authorities a sender's client certificate must chain to |
@@ -1083,12 +1098,12 @@ specification governs the change feed: it is FerroBRIDGE's own design.
 | `dead_letters` | none, required | The `redb` file the consumers park a poisoned event in and count its poisoned passes in; keep it beside `watermarks` |
 | `max_attempts` | `5` | How many passes an event may fail with a poisoned failure before it is parked, 1 to 1000 |
 | `page_size` | `100` | How many events one read asks for, 1 to 1000 |
-| `poll_interval_ms` | `1000` | How long a consumer waits after a read that found no full page |
-| `backoff_ms` | `1000` | How long a consumer waits after its first failed read, doubled per failure |
-| `max_backoff_ms` | `60000` | The longest wait after a failed read, at least `backoff_ms` |
+| `poll_interval` | `"1s"` | How long a consumer waits after a read that found no full page |
+| `backoff` | `"1s"` | How long a consumer waits after its first failed read, doubled per failure |
+| `max_backoff` | `"1min"` | The longest wait after a failed read, at least `backoff` |
 
 A missing `dead_letters`, an unknown `source`, a `start` that names no
-instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `0`,
+instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `"0s"`,
 and a `url` that is no http or https base without a query or a fragment are
 each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
@@ -1109,12 +1124,12 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `url` | none, required | Secret. The AMQP 0.9.1 broker URL, `amqp://` or `amqps://` |
 | `tls` | `false` | Whether an `amqp://` URL is upgraded to `amqps://` |
 | `exchange` | none, required | The durable topic exchange the events are published to |
-| `confirm_timeout_ms` | `30000` | How long one publish waits for the broker's confirm |
+| `confirm_timeout` | `"30s"` | How long one publish waits for the broker's confirm |
 | `queues` | `[]` | `{ name, binding }` pairs: the durable queues declared and bound to the exchange with each topic binding key |
 
 A missing `reader`, `url` or `exchange`, a reader name outside its alphabet,
 a URL that is not `amqp://` or `amqps://` (the refusal never repeats the URL,
-which may carry a password), a `confirm_timeout_ms` of `0`, and a queue named
+which may carry a password), a `confirm_timeout` of `"0s"`, and a queue named
 twice or with no binding are each a boot error naming the key. Over
 `[change_feed] source = "ferroehr"`, a CDR that answers `404` for the reader
 refuses the start.
@@ -1136,13 +1151,13 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `reader` | none, required | The reader name the lane follows the change feed under, another than `[events] reader` and `[omop_incremental] reader`: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
 | `base_url` | none, required | The FHIR service base each Bundle is posted to, `https` without a query or a fragment, never the facade's own `base_url` |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `timeout_ms` | `30000` | How long one delivery may take |
+| `timeout` | `"30s"` | How long one delivery may take |
 | `emitted` | none, required | The `redb` file the record of what was delivered for each composition is kept in, identifiers only |
 | `credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.credentials.oauth]`, the same table `[cdr.credentials]` takes |
 
 A missing `reader`, `base_url` or `emitted`, a reader name outside its
 alphabet or another consumer's, an `http` base without `cleartext`, the
-facade's own base, a `timeout_ms` of `0`, and the lane without the change
+facade's own base, a `timeout` of `"0s"`, and the lane without the change
 feed or the facade are each a boot error naming the key. A record file that
 cannot be opened refuses the start.
 
@@ -1185,12 +1200,12 @@ FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the facade and the HL7 v2 face record their accesses |
 | `base_url` | none, required | The repository's FHIR base; each record is created as `[base]/AuditEvent` |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `timeout_ms` | `10000` | How long one delivery to the repository may take |
-| `retry_max_ms` | `60000` | The longest wait between two delivery attempts |
+| `timeout` | `"10s"` | How long one delivery to the repository may take |
+| `retry_max` | `"1min"` | The longest wait between two delivery attempts |
 | `spool_dir` | none, required | The directory records wait in until the repository takes them; created when absent, and refused when its group or other users can reach it |
 | `max_records` | `10000` | The most records the spool holds at once |
-| `max_bytes` | `67108864` | The most bytes the spool holds at once |
-| `write_timeout_ms` | `2000` | The longest storing one record may take |
+| `max_size` | `"64MiB"` | The most bytes the spool holds at once |
+| `write_timeout` | `"2s"` | The longest storing one record may take |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
 | `credentials` | none | `user` with `password` or `password_file`, or `[audit.credentials.oauth]`, the same table `[cdr.credentials]` takes |
@@ -1281,7 +1296,7 @@ are refused:
 - an unknown key or an unknown section;
 - a value of the wrong type, or one that is not a socket address, a URL, a
   release name or a `tracing` filter;
-- `[server.caller_rate]`, and `[telemetry.otlp]` in this build;
+- `[server.caller_rate]`;
 - a user beside the OAuth section of the same credentials section, an OAuth
   section with both an `issuer` and a `token_endpoint` or neither, an
   `issuer` that is not an `https` URL free of a query and a fragment, a

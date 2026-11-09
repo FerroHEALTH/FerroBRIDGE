@@ -54,9 +54,11 @@ pub enum Shape {
     Code,
     /// A switch, as a state badge.
     Switch,
-    /// A duration in milliseconds, in seconds where it is whole seconds.
+    /// A duration, written as the family `Duration` (`"30s"`) or a number
+    /// of milliseconds, drawn in seconds where it is whole seconds.
     Millis,
-    /// A size in bytes, in the largest whole binary unit.
+    /// A size, written as the family `ByteSize` (`"1MiB"`) or a number of
+    /// bytes, drawn in the largest whole binary unit.
     Bytes,
     /// A number.
     Number,
@@ -142,6 +144,18 @@ fn value(l: &Locale, held: &Value, shape: Shape) -> Html {
         (Value::Boolean(on), _) => switch(l, *on),
         (Value::Integer(millis), Shape::Millis) => t(duration(l, *millis)),
         (Value::Integer(bytes), Shape::Bytes) => t(size(l, *bytes)),
+        // NOTE: no specification governs this: our own design; a value the bridge
+        // wrote that reads as no span or size is drawn as the text it holds.
+        (Value::String(text), Shape::Millis) => text
+            .parse::<ferrohealth_config::units::Duration>()
+            .ok()
+            .and_then(|span| i64::try_from(span.as_millis()).ok())
+            .map_or_else(|| code(text), |millis| t(duration(l, millis))),
+        (Value::String(text), Shape::Bytes) => text
+            .parse::<ferrohealth_config::units::ByteSize>()
+            .ok()
+            .and_then(|amount| i64::try_from(amount.bytes()).ok())
+            .map_or_else(|| code(text), |bytes| t(size(l, bytes))),
         (Value::String(text), Shape::Word | Shape::Code) if text.is_empty() => unset(l),
         (Value::String(text), Shape::Code) => code(text),
         (Value::String(text), Shape::Query) => h(format!(

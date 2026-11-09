@@ -58,7 +58,7 @@ ferrohealth-smart = { workspace = true, features = ["axum"] }
 ferrohealth-config.workspace = true
 ferrohealth-health = { workspace = true, features = ["registry"] }
 ferrohealth-secret.workspace = true
-ferrohealth-server.workspace = true
+ferrohealth-server = { workspace = true, features = ["otlp"] }
 ferrohealth-telemetry = { workspace = true, features = ["axum"] }
 ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
 # The facade's access record (EHDS Annex II 3.2) and its BALP `AuditEvent`,

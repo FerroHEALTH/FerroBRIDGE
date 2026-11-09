@@ -28,7 +28,7 @@ const COMPLETE: &str = "reader = \"ferrobridge\"\nurl = \"amqp://bridge:syntheti
 fn the_events_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_sources(None, &BTreeMap::new())?;
     assert!(!config.events.enabled);
-    assert_eq!(30_000, config.events.confirm_timeout_ms);
+    assert_eq!(30_000, config.events.confirm_timeout.as_millis());
     assert!(config.resolve(Process::Server)?.events.is_none());
     Ok(())
 }
@@ -37,7 +37,7 @@ fn the_events_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>>
 fn an_enabled_lane_resolves_every_key_and_feeds_the_change_feed()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = lane(&format!(
-        "{COMPLETE}confirm_timeout_ms = 5000\nqueues = [{{ name = \"analytics\", binding = \"COMPOSITION.*.*\" }}, {{ name = \"all\", binding = \"#\" }}]\n"
+        "{COMPLETE}confirm_timeout = \"5s\"\nqueues = [{{ name = \"analytics\", binding = \"COMPOSITION.*.*\" }}, {{ name = \"all\", binding = \"#\" }}]\n"
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let events = settings.events.ok_or("the lane is on")?;

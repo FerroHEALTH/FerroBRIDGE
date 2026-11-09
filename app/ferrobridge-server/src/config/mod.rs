@@ -585,8 +585,8 @@ mod tests {
         let config = Config::from_sources(None, &BTreeMap::new()).expect("the defaults parse");
         assert_eq!(format!("{:?}", Config::default()), format!("{config:?}"));
         assert_eq!("127.0.0.1:8080", config.server.listen.to_string());
-        assert_eq!(1024 * 1024, config.server.body_limit_bytes);
-        assert_eq!(10_000, config.server.shutdown_timeout_ms);
+        assert_eq!(1024 * 1024, config.server.body_limit.bytes());
+        assert_eq!(10_000, config.server.shutdown_timeout.as_millis());
         assert_eq!(
             config.telemetry.logged_query_parameters,
             Vec::<String>::new()

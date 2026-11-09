@@ -97,7 +97,7 @@ version, and an RFC 3339 instant offers what was committed from then on.
 The AQL source has limits a consumer has to accept:
 
 - **Polling latency.** A change is seen on the next poll, up to
-  `poll_interval_ms` after its commit.
+  `poll_interval` after its commit.
 - **No commit order across EHRs.** Events come in order of
   `time_committed`. Commits whose instants tie, or a CDR whose nodes' clocks
   differ, give an order that is not the commit order, and a version that

@@ -30,11 +30,11 @@ fn lane(keys: &str) -> String {
 fn the_audit_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_sources(None, &BTreeMap::new())?;
     assert!(!config.audit.enabled);
-    assert_eq!(10_000, config.audit.timeout_ms);
-    assert_eq!(60_000, config.audit.retry_max_ms);
+    assert_eq!(10_000, config.audit.timeout.as_millis());
+    assert_eq!(60_000, config.audit.retry_max.as_millis());
     assert_eq!(10_000, config.audit.max_records);
-    assert_eq!(64 << 20, config.audit.max_bytes);
-    assert_eq!(2_000, config.audit.write_timeout_ms);
+    assert_eq!(64 << 20, config.audit.max_size.bytes());
+    assert_eq!(2_000, config.audit.write_timeout.as_millis());
     assert!(
         Config::from_sources(Some(FACADE), &BTreeMap::new())?
             .resolve(Process::Server)?
@@ -47,7 +47,7 @@ fn the_audit_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> 
 #[test]
 fn an_enabled_lane_resolves_every_key() -> Result<(), Box<dyn std::error::Error>> {
     let text = lane(&format!(
-        "{COMPLETE}retry_max_ms = 5000\nmax_records = 50\nmax_bytes = 4096\nwrite_timeout_ms = 300\nsource_id = \"bridge-1\"\nsite = \"ward-4\"\n\n[audit.categories.templates]\n\"Synthetic Summary.v1\" = [\"Patient-Summaries\"]\n\"Synthetic Admin.v1\" = \"none\"\n\n[audit.categories.archetypes]\n\"openEHR-EHR-COMPOSITION.report.v1\" = [\"Laboratory-Reports\"]\n"
+        "{COMPLETE}retry_max = \"5s\"\nmax_records = 50\nmax_size = \"4KiB\"\nwrite_timeout = \"300ms\"\nsource_id = \"bridge-1\"\nsite = \"ward-4\"\n\n[audit.categories.templates]\n\"Synthetic Summary.v1\" = [\"Patient-Summaries\"]\n\"Synthetic Admin.v1\" = \"none\"\n\n[audit.categories.archetypes]\n\"openEHR-EHR-COMPOSITION.report.v1\" = [\"Laboratory-Reports\"]\n"
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let audit = settings.audit.ok_or("the lane is on")?;
@@ -190,8 +190,13 @@ fn a_category_map_naming_no_category_is_refused() -> Result<(), Box<dyn std::err
 
 #[test]
 fn a_zero_bound_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    for key in ["timeout_ms", "write_timeout_ms", "max_bytes", "max_records"] {
-        let error = refusal(&lane(&format!("{COMPLETE}{key} = 0\n")))?;
+    for (key, zero) in [
+        ("timeout", "\"0s\""),
+        ("write_timeout", "\"0s\""),
+        ("max_size", "\"0B\""),
+        ("max_records", "0"),
+    ] {
+        let error = refusal(&lane(&format!("{COMPLETE}{key} = {zero}\n")))?;
         assert!(
             matches!(&error, Error::Bound { key: bound, .. } if *bound == format!("audit.{key}")),
             "{key}: {error:?}"

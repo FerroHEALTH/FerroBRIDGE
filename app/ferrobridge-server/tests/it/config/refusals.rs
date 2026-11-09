@@ -110,7 +110,7 @@ fn a_bad_listen_address_a_bad_url_and_a_bad_release_each_name_their_key()
 #[test]
 fn a_section_that_is_present_and_names_no_url_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
-    let error = Config::from_sources(Some("[cdr]\ntimeout_ms = 1000\n"), &BTreeMap::new())?
+    let error = Config::from_sources(Some("[cdr]\ntimeout = \"1s\"\n"), &BTreeMap::new())?
         .resolve(Process::Server)
         .expect_err("a CDR lane with no base URL cannot start");
     match &error {

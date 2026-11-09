@@ -278,7 +278,7 @@ Verify the new release
 ([verifying a release](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/SECURITY.md#verifying-a-release)),
 then replace the binary or deploy the new image by digest and restart. On
 `SIGTERM` the server drains its requests for up to
-`[server] shutdown_timeout_ms` before it exits. Run one process per identity
+`[server] shutdown_timeout` before it exits. Run one process per identity
 store, so on Kubernetes use the `Recreate` strategy
 ([the identity store](../operate/container.md#the-identity-store)).
 

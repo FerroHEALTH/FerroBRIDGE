@@ -66,7 +66,7 @@ listen = "0.0.0.0:3000"
 
 [bridge]
 base_url = "https://bridge.example.org/"
-timeout_ms = 30000
+timeout = "30s"
 
 [session]
 store = "memory"

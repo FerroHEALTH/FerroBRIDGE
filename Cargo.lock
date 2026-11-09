@@ -1959,9 +1959,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-config"
-version = "0.2.10"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b43a5b1b1feb60993918bccfc6146c9e8555ee8c0191808404a75a761f8bcc4f"
+checksum = "52ce40e3df59b02d2c702b4f236f8ff3a345c459b100a9ca245606120e5578da"
 dependencies = [
  "ferrohealth-secret",
  "percent-encoding",
@@ -1995,12 +1995,13 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.5.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86bd2ac04c00ff5697e78615cc674222f393707d4c63839a292c920d2c3b63a8"
+checksum = "0ea00be22cf2f9b8f9dffa236ec20fdde1c2135135a5487fa17c09cc85a03aa1"
 dependencies = [
  "axum",
  "clap",
+ "ferrohealth-config",
  "ferrohealth-health",
  "ferrohealth-secret",
  "ferrohealth-telemetry",
@@ -2010,6 +2011,7 @@ dependencies = [
  "ipnet",
  "pin-project-lite",
  "rustls",
+ "rustls-platform-verifier",
  "secrecy",
  "serde",
  "serde_json",
@@ -2076,19 +2078,26 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-telemetry"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edfb01663a1a976dfa637065df3f82f1a68d5bc0e3de4225979f729dea92a8f1"
+checksum = "5ca2f8ecb29315a7a5b73cbc3a732fc24718f7ad8830ab80dddb60d8944bbf0e"
 dependencies = [
  "axum",
+ "ferrohealth-config",
  "ferrohealth-secret",
  "http",
+ "hyper-util",
  "opentelemetry",
+ "opentelemetry-otlp",
  "opentelemetry_sdk",
  "pin-project-lite",
+ "rustls",
  "secrecy",
  "serde",
  "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "tonic",
  "tower",
  "tracing",
  "tracing-opentelemetry",
@@ -2113,9 +2122,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-usage-report"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0fcadf75b67e4d4782862c29f92ad56da989efdbfcd558108f54fd94c9e4606"
+checksum = "a36a108a2b4ccf63a5274fbecabc82c5e26d83765297286201b710078ceed7d7"
 dependencies = [
  "ferrohealth-telemetry",
  "http",
@@ -4096,6 +4105,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry-otlp"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0756af24841e367128ef31c831999937b8b5c5197d47914590d8f4e2e88c2e1a"
+dependencies = [
+ "http",
+ "opentelemetry",
+ "opentelemetry-proto",
+ "opentelemetry_sdk",
+ "prost",
+ "thiserror",
+ "tokio",
+ "tonic",
+ "tonic-types",
+]
+
+[[package]]
+name = "opentelemetry-proto"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d576f5dddc3299341bcd85a04be17b2564844c0c9563214f02d85f2524d1afae"
+dependencies = [
+ "opentelemetry",
+ "opentelemetry_sdk",
+ "prost",
+ "tonic",
+ "tonic-prost",
+]
+
+[[package]]
 name = "opentelemetry_sdk"
 version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5018,9 +5057,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-platform-verifier"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26d1e2536ce4f35f4846aa13bff16bd0ff40157cdb14cc056c7b14ba41233ba0"
+checksum = "1167586491e2b18b8bfbb293e8180ec17c201c4f076d7cb3070ca964e7598f98"
 dependencies = [
  "core-foundation 0.10.1",
  "core-foundation-sys",
@@ -5039,9 +5078,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-platform-verifier-android"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
+checksum = "eec689c0bc40ff2458a5977b6619cb718087084a18e02a131c599b62d05e1a5f"
 
 [[package]]
 name = "rustls-webpki"
@@ -5891,7 +5930,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -6244,6 +6283,17 @@ checksum = "50849f68853be452acf590cde0b146665b8d507b3b8af17261df47e02c209ea0"
 dependencies = [
  "bytes",
  "prost",
+ "tonic",
+]
+
+[[package]]
+name = "tonic-types"
+version = "0.14.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73ab1b02061f83d519bba3caa167f88f261ef05720ab8ebc954ade70de3348e8"
+dependencies = [
+ "prost",
+ "prost-types",
  "tonic",
 ]
 

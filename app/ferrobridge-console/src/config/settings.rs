@@ -117,8 +117,7 @@ impl Config {
             source,
         })?;
         let base = base_url("bridge.base_url", &self.bridge.base_url)?;
-        let timeout =
-            positive("bridge.timeout_ms", self.bridge.timeout_ms).map(Duration::from_millis)?;
+        let timeout = positive("bridge.timeout", self.bridge.timeout)?;
         let oidc = self.oidc.as_ref().map(resolve_oidc).transpose()?;
         let session = match &oidc {
             Some(oidc) => self.session.check(&oidc.checked)?,
@@ -178,13 +177,13 @@ fn resolve_oidc(oidc: &OidcSection) -> Result<OidcSettings, Error> {
 }
 
 /// Returns `value`, refusing zero.
-fn positive(key: &str, value: u64) -> Result<u64, Error> {
-    if value == 0 {
+fn positive(key: &str, value: ferrohealth_config::units::Duration) -> Result<Duration, Error> {
+    if value.is_zero() {
         Err(Error::Zero {
             key: key.to_owned(),
         })
     } else {
-        Ok(value)
+        Ok(value.get())
     }
 }
 

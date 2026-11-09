@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use ehds_logging::map::Declared;
+use ferrohealth_config::units::{ByteSize, Duration};
 use ferrohealth_smart::config::credentials::CredentialsSection;
 use serde::{Deserialize, Serialize};
 
@@ -28,17 +29,17 @@ pub struct Audit {
     /// bridge that the operator answers for.
     pub cleartext: bool,
     /// How long one delivery to the repository may take.
-    pub timeout_ms: u64,
+    pub timeout: Duration,
     /// The longest wait between two delivery attempts.
-    pub retry_max_ms: u64,
+    pub retry_max: Duration,
     /// The directory records are stored in until the repository takes them.
     pub spool_dir: Option<PathBuf>,
     /// The most records the spool holds at once.
     pub max_records: usize,
     /// The most bytes the spool holds at once.
-    pub max_bytes: u64,
+    pub max_size: ByteSize,
     /// The longest storing one record may take.
-    pub write_timeout_ms: u64,
+    pub write_timeout: Duration,
     /// How the bridge names itself as the recording system
     /// (`AuditEvent.source.observer`); empty takes `[facade] system_id`.
     pub source_id: String,
@@ -56,12 +57,12 @@ impl Default for Audit {
             enabled: false,
             base_url: String::new(),
             cleartext: false,
-            timeout_ms: 10_000,
-            retry_max_ms: 60_000,
+            timeout: Duration::from_secs(10),
+            retry_max: Duration::from_secs(60),
             spool_dir: None,
             max_records: 10_000,
-            max_bytes: 64 << 20,
-            write_timeout_ms: 2_000,
+            max_size: ByteSize::from_mib(64),
+            write_timeout: Duration::from_secs(2),
             source_id: String::new(),
             site: None,
             credentials: CredentialsSection::default(),

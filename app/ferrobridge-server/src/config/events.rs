@@ -6,7 +6,6 @@
 //! No specification governs the lane: our own design.
 
 use std::collections::BTreeSet;
-use std::time::Duration;
 
 use secrecy::ExposeSecret;
 use secrecy::SecretString;
@@ -50,9 +49,9 @@ pub(super) fn resolve_events(events: &Events, change_feed: bool) -> Result<Setti
             key: String::from("events.exchange"),
         });
     }
-    if events.confirm_timeout_ms == 0 {
+    if events.confirm_timeout.is_zero() {
         return Err(Error::Bound {
-            key: String::from("events.confirm_timeout_ms"),
+            key: String::from("events.confirm_timeout"),
             value: 0,
             reason: "a publish waits at least one millisecond for its confirm",
         });
@@ -86,7 +85,7 @@ pub(super) fn resolve_events(events: &Events, change_feed: bool) -> Result<Setti
         url,
         exchange: events.exchange.clone(),
         queues,
-        confirm_timeout: Duration::from_millis(events.confirm_timeout_ms),
+        confirm_timeout: events.confirm_timeout.get(),
     })
 }
 

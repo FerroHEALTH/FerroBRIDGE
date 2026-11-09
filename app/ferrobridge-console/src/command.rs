@@ -8,7 +8,7 @@ use std::process::ExitCode;
 
 use ferrohealth_server::cli::{Common, ConfigCommand};
 use ferrohealth_server::run::{EXIT_CONFIG, Run, chain};
-use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
+use ferrohealth_telemetry::telemetry::{Console, Service};
 
 use crate::cli::Cli;
 use crate::config::Config;
@@ -151,15 +151,26 @@ async fn healthcheck(settings: &Settings) -> ExitCode {
 )]
 async fn serve(settings: Settings) -> ExitCode {
     let service = Service::new("ferrobridge-console", env!("CARGO_PKG_VERSION"));
-    let installed = Telemetry::new(&settings.telemetry, service).and_then(|telemetry| {
-        telemetry
-            .install(&settings.telemetry, &Console::detect())
-            .map(|_filter| telemetry)
-    });
-    let telemetry = match installed {
+    let telemetry = match ferrohealth_server::telemetry::build(&settings.telemetry, service) {
         Ok(telemetry) => telemetry,
         Err(error) => {
-            eprintln!("ferrobridge-console: cannot start the log: {error}");
+            eprintln!(
+                "ferrobridge-console: cannot start the log: {}",
+                chain(&error)
+            );
+            return ExitCode::FAILURE;
+        }
+    };
+    let telemetry = match telemetry
+        .install(&settings.telemetry, &Console::detect())
+        .map(|_filter| telemetry)
+    {
+        Ok(telemetry) => telemetry,
+        Err(error) => {
+            eprintln!(
+                "ferrobridge-console: cannot start the log: {}",
+                chain(&error)
+            );
             return ExitCode::FAILURE;
         }
     };

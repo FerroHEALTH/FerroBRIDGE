@@ -413,7 +413,7 @@ async fn start_hl7v2(
                 .with_usage(Arc::clone(state.usage_window()))
                 .with_access_log(state.access_log().cloned(), lane.listen),
         ),
-        listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout()),
+        listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout.get()),
         listening: listening.clone(),
     };
     Ok((face, listening))

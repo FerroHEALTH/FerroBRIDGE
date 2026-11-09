@@ -54,8 +54,8 @@ fn file_text(password_file: &std::path::Path) -> String {
 /// The environment of the case: one override over the file.
 fn environment() -> BTreeMap<String, String> {
     BTreeMap::from([(
-        String::from("FERROBRIDGE__SERVER__REQUEST_TIMEOUT_MS"),
-        String::from("5000"),
+        String::from("FERROBRIDGE__SERVER__REQUEST_TIMEOUT"),
+        String::from("5s"),
     )])
 }
 
@@ -95,12 +95,12 @@ fn each_key_carries_its_value_and_whether_the_file_the_environment_or_the_defaul
         entry(&configuration, "server.listen")?
     );
     assert_eq!(
-        (&Value::Integer(5000), Source::Environment),
-        entry(&configuration, "server.request_timeout_ms")?
+        (&Value::String(String::from("5s")), Source::Environment),
+        entry(&configuration, "server.request_timeout")?
     );
     assert_eq!(
-        (&Value::Integer(10_000), Source::Default),
-        entry(&configuration, "server.shutdown_timeout_ms")?
+        (&Value::String(String::from("10s")), Source::Default),
+        entry(&configuration, "server.shutdown_timeout")?
     );
     assert_eq!(
         (&Value::Boolean(true), Source::File),

@@ -39,7 +39,7 @@ fn settings(
 /// Returns a configuration with a CDR at `cdr` and the fixture mapping set.
 fn cdr_text(cdr: &MockServer) -> String {
     format!(
-        "[cdr]\nbase_url = \"{}/\"\ntimeout_ms = 2000\n\n[cdr.retry]\nmax_attempts = 1\n\n[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n",
+        "[cdr]\nbase_url = \"{}/\"\ntimeout = \"2s\"\n\n[cdr.retry]\nmax_attempts = 1\n\n[auth]\nenabled = false\n\n[mappings]\ndirectory = \"{FIXTURES}\"\n",
         cdr.uri()
     )
 }

@@ -308,7 +308,7 @@ async fn a_panicking_fhir_handler_answers_a_500_operation_outcome_naming_the_req
 async fn a_request_past_the_timeout_yields_four_hundred_and_eight()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut settings = support::settings();
-    settings.request_timeout_ms = 20;
+    settings.request_timeout = ferrohealth_config::units::Duration::from_millis(20);
     let router = with_middleware(
         Router::new().route(
             "/slow",
@@ -330,7 +330,7 @@ async fn a_request_past_the_timeout_yields_four_hundred_and_eight()
 async fn a_body_over_the_ceiling_yields_four_hundred_and_thirteen()
 -> Result<(), Box<dyn std::error::Error>> {
     let settings = support::settings();
-    let oversized = "x".repeat(settings.body_limit_bytes + 1);
+    let oversized = "x".repeat(settings.body_limit_bytes() + 1);
     let request = Request::post("/health/liveness")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))?;
@@ -365,7 +365,7 @@ async fn edge_outcome(
 /// timeout and whose `/fhir/echo` route reads its body.
 fn edge_app() -> Router {
     let mut settings = support::settings();
-    settings.request_timeout_ms = 20;
+    settings.request_timeout = ferrohealth_config::units::Duration::from_millis(20);
     let slow = || async {
         tokio::time::sleep(Duration::from_secs(5)).await;
         StatusCode::OK
@@ -422,7 +422,7 @@ async fn a_request_past_the_timeout_off_the_fhir_surface_answers_a_408_problem()
 #[tokio::test]
 async fn a_fhir_body_declared_over_the_ceiling_answers_a_413_operation_outcome()
 -> Result<(), Box<dyn std::error::Error>> {
-    let oversized = "x".repeat(support::settings().body_limit_bytes + 1);
+    let oversized = "x".repeat(support::settings().body_limit_bytes() + 1);
     let request = Request::post("/fhir/echo")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))?;
@@ -444,7 +444,7 @@ async fn a_fhir_body_declared_over_the_ceiling_answers_a_413_operation_outcome()
 #[tokio::test]
 async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
 -> Result<(), Box<dyn std::error::Error>> {
-    let oversized = "x".repeat(support::settings().body_limit_bytes + 1);
+    let oversized = "x".repeat(support::settings().body_limit_bytes() + 1);
     let chunks = futures_util::stream::iter([Ok::<_, std::io::Error>(oversized)]);
     let request = Request::post("/fhir/echo").body(Body::from_stream(chunks))?;
 
@@ -459,7 +459,7 @@ async fn a_streamed_fhir_body_over_the_ceiling_answers_a_413_operation_outcome()
 #[tokio::test]
 async fn a_body_over_the_ceiling_off_the_fhir_surface_answers_a_413_problem()
 -> Result<(), Box<dyn std::error::Error>> {
-    let oversized = "x".repeat(support::settings().body_limit_bytes + 1);
+    let oversized = "x".repeat(support::settings().body_limit_bytes() + 1);
     let request = Request::post("/health/liveness")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))?;
@@ -621,7 +621,7 @@ fn a_caught_panic_leaves_its_request_line() {
 #[test]
 fn a_timeout_leaves_its_request_line() {
     let mut settings = support::settings();
-    settings.request_timeout_ms = 20;
+    settings.request_timeout = ferrohealth_config::units::Duration::from_millis(20);
     let router = with_middleware(
         Router::new().route(
             "/slow",
@@ -651,7 +651,7 @@ fn a_timeout_leaves_its_request_line() {
 #[test]
 fn a_refused_oversized_body_leaves_its_request_line() {
     let settings = support::settings();
-    let oversized = "x".repeat(settings.body_limit_bytes + 1);
+    let oversized = "x".repeat(settings.body_limit_bytes() + 1);
     let request = Request::post("/health/liveness")
         .header(header::CONTENT_LENGTH, oversized.len())
         .body(Body::from(oversized))

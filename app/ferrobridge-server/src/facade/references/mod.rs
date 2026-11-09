@@ -64,10 +64,6 @@ use crate::facade::references::literal::type_of;
 /// none.
 pub const DEFAULT_MAX_DEPTH: u32 = 2;
 
-/// How long one fetch from an allow-listed base may take, in milliseconds,
-/// when the configuration names none.
-pub const DEFAULT_TIMEOUT_MS: u64 = 10_000;
-
 /// The media type a fetch asks for (<https://hl7.org/fhir/R4/http.html#mime-type>).
 const FHIR_JSON: &str = "application/fhir+json";
 

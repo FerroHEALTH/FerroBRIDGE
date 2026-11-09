@@ -28,7 +28,7 @@ fn lane(keys: &str) -> String {
 fn the_outbound_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_sources(None, &BTreeMap::new())?;
     assert!(!config.fhir_outbound.enabled);
-    assert_eq!(30_000, config.fhir_outbound.timeout_ms);
+    assert_eq!(30_000, config.fhir_outbound.timeout.as_millis());
     assert!(config.resolve(Process::Server)?.fhir_outbound.is_none());
     Ok(())
 }
@@ -36,7 +36,7 @@ fn the_outbound_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error
 #[test]
 fn an_enabled_lane_resolves_every_key_and_follows_the_change_feed()
 -> Result<(), Box<dyn std::error::Error>> {
-    let text = lane(&format!("{COMPLETE}timeout_ms = 5000\n"));
+    let text = lane(&format!("{COMPLETE}timeout = \"5s\"\n"));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let outbound = settings.fhir_outbound.ok_or("the lane is on")?;
     assert!(
@@ -190,9 +190,9 @@ fn the_facade_itself_is_refused_as_the_endpoint() -> Result<(), Box<dyn std::err
 
 #[test]
 fn a_zero_timeout_and_an_unknown_key_are_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refusal(&lane(&format!("{COMPLETE}timeout_ms = 0\n")))?;
+    let error = refusal(&lane(&format!("{COMPLETE}timeout = \"0s\"\n")))?;
     assert!(
-        matches!(&error, Error::Bound { key, .. } if key == "fhir_outbound.timeout_ms"),
+        matches!(&error, Error::Bound { key, .. } if key == "fhir_outbound.timeout"),
         "{error:?}"
     );
     assert!(

@@ -123,14 +123,14 @@ pub const HL7V2: [Row; 11] = [
         Msg::RowTimeouts,
         Msg::RowTimeoutsDesc,
         &[
-            ("hl7v2.idle_timeout_ms", Shape::Millis),
-            ("hl7v2.frame_timeout_ms", Shape::Millis),
+            ("hl7v2.idle_timeout", Shape::Millis),
+            ("hl7v2.frame_timeout", Shape::Millis),
         ],
     ),
     row(
         Msg::RowLargestFrame,
         Msg::RowLargestFrameDesc,
-        &[("hl7v2.frame_limit_bytes", Shape::Bytes)],
+        &[("hl7v2.frame_limit", Shape::Bytes)],
     ),
     row(
         Msg::RowSenders,
@@ -194,15 +194,15 @@ const CDR: [Row; 4] = [
     row(
         Msg::RowTimeout,
         Msg::RowTimeoutDesc,
-        &[("cdr.timeout_ms", Shape::Millis)],
+        &[("cdr.timeout", Shape::Millis)],
     ),
     row(
         Msg::RowRetry,
         Msg::RowRetryDesc,
         &[
             ("cdr.retry.max_attempts", Shape::Number),
-            ("cdr.retry.initial_backoff_ms", Shape::Millis),
-            ("cdr.retry.max_backoff_ms", Shape::Millis),
+            ("cdr.retry.initial_backoff", Shape::Millis),
+            ("cdr.retry.max_backoff", Shape::Millis),
         ],
     ),
     row(
@@ -260,15 +260,15 @@ const TERMINOLOGY: [Row; 5] = [
     row(
         Msg::RowTimeout,
         Msg::RowTimeoutDesc,
-        &[("terminology.timeout_ms", Shape::Millis)],
+        &[("terminology.timeout", Shape::Millis)],
     ),
     row(
         Msg::RowRetry,
         Msg::RowRetryDesc,
         &[
             ("terminology.retry.max_attempts", Shape::Number),
-            ("terminology.retry.initial_backoff_ms", Shape::Millis),
-            ("terminology.retry.max_backoff_ms", Shape::Millis),
+            ("terminology.retry.initial_backoff", Shape::Millis),
+            ("terminology.retry.max_backoff", Shape::Millis),
         ],
     ),
     row(
@@ -387,8 +387,8 @@ pub const CORE: [Row; 7] = [
         Msg::RowRequestLimits,
         Msg::RowRequestLimitsDesc,
         &[
-            ("server.request_timeout_ms", Shape::Millis),
-            ("server.body_limit_bytes", Shape::Bytes),
+            ("server.request_timeout", Shape::Millis),
+            ("server.body_limit", Shape::Bytes),
         ],
     ),
     row(

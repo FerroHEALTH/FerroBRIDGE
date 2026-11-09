@@ -22,7 +22,7 @@ const PROBE_PATH: &str = "/v1/definition/template/adl1.4";
 
 /// Returns the serving state of a deployment whose CDR is `base`.
 async fn router(base: &str) -> Result<Arc<AppState>, Box<dyn Error>> {
-    let text = format!("[cdr]\nbase_url = \"{base}/v1\"\ntimeout_ms = 2000\n");
+    let text = format!("[cdr]\nbase_url = \"{base}/v1\"\ntimeout = \"2s\"\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     Ok(serving(AppState::build(&settings).await?))
 }
@@ -164,7 +164,7 @@ async fn a_cdr_token_that_cannot_be_obtained_makes_readiness_five_hundred_and_th
     let base = server.uri();
     let text = format!(
         concat!(
-            "[cdr]\nbase_url = \"{base}/v1\"\ntimeout_ms = 2000\n\n",
+            "[cdr]\nbase_url = \"{base}/v1\"\ntimeout = \"2s\"\n\n",
             "[cdr.credentials.oauth]\ntoken_endpoint = \"{base}/oauth/token\"\n",
             "client_id = \"ferrobridge\"\nclient_secret = \"synthetic-secret\"\n",
         ),

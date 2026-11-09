@@ -229,7 +229,7 @@ fn reference_policy(facade: &Facade) -> Result<crate::facade::references::Policy
     crate::facade::references::Policy::new(
         bases,
         facade.references.max_depth,
-        Duration::from_millis(facade.references.timeout_ms),
+        facade.references.timeout.get(),
     )
     .map_err(|source| Error::Client {
         upstream: "reference fetch",
@@ -377,9 +377,9 @@ fn ehr_policy_of(key: &str, value: &str) -> Result<crate::facade::ehr::Policy, E
     }
 }
 
-/// Returns the timeout `milliseconds` states, `None` for `0`.
-fn timeout_of(milliseconds: u64) -> Option<Duration> {
-    (milliseconds > 0).then(|| Duration::from_millis(milliseconds))
+/// Returns the timeout `span` states, `None` for `"0s"`.
+fn timeout_of(span: ferrohealth_config::units::Duration) -> Option<Duration> {
+    (!span.is_zero()).then(|| span.get())
 }
 
 /// Returns the HL7 v2 face `hl7v2` describes, refused when the facade it
@@ -440,9 +440,12 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
             });
         }
     }
-    if hl7v2.frame_limit_bytes == 0 {
+    // NOTE: no specification governs this: our own design; a limit past the address
+    // space bounds nothing more than the address space does, so it saturates.
+    let frame_limit = usize::try_from(hl7v2.frame_limit.bytes()).unwrap_or(usize::MAX);
+    if frame_limit == 0 {
         return Err(Error::FrameLimit {
-            key: String::from("hl7v2.frame_limit_bytes"),
+            key: String::from("hl7v2.frame_limit"),
         });
     }
     Ok(Hl7v2Settings {
@@ -454,10 +457,10 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
         ehr_policy,
         profiles,
         timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts {
-            idle: timeout_of(hl7v2.idle_timeout_ms),
-            frame: timeout_of(hl7v2.frame_timeout_ms),
+            idle: timeout_of(hl7v2.idle_timeout),
+            frame: timeout_of(hl7v2.frame_timeout),
         },
-        frame_limit: hl7v2.frame_limit_bytes,
+        frame_limit,
         log_outcomes: hl7v2.log_outcomes,
         senders: hl7v2
             .senders
@@ -474,14 +477,14 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
 pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Error> {
     let base_url = url_of("cdr.base_url", &cdr.base_url)?;
     let mut config = crate::cdr::config::CdrConfig::new(base_url)
-        .with_timeout(Duration::from_millis(cdr.timeout_ms))
+        .with_timeout(cdr.timeout.get())
         .with_demographic(cdr.demographic)
         .with_retry(openehr_its::rest::client::RetryPolicy {
             // NOTE: no specification governs this: our own design; a u32 fits a
             // usize on every target the server builds for, so the clamp never bites.
             max_attempts: usize::try_from(cdr.retry.max_attempts).unwrap_or(usize::MAX),
-            initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
-            max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
+            initial_backoff: cdr.retry.initial_backoff.get(),
+            max_backoff: cdr.retry.max_backoff.get(),
         });
     let own = ferrohealth_smart::config::credentials::CredentialsSection {
         onward: None,
@@ -594,11 +597,11 @@ pub(super) fn resolve_terminology(
         }
     };
     let mut config = ferrobridge_term::config::Config::new(base_url, wire_version)
-        .with_timeout(Duration::from_millis(terminology.timeout_ms))
+        .with_timeout(terminology.timeout.get())
         .with_retry(ferrobridge_term::config::RetryPolicy {
             max_attempts: terminology.retry.max_attempts,
-            initial_backoff: Duration::from_millis(terminology.retry.initial_backoff_ms),
-            max_backoff: Duration::from_millis(terminology.retry.max_backoff_ms),
+            initial_backoff: terminology.retry.initial_backoff.get(),
+            max_backoff: terminology.retry.max_backoff.get(),
         });
     match resolve_credentials("terminology.credentials", &terminology.credentials)? {
         Some(Upstream::Basic { user, password }) => {

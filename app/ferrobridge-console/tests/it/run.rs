@@ -35,7 +35,7 @@ fn config_check_accepts_a_valid_configuration() {
 fn config_check_refuses_an_invalid_configuration_with_ex_config() {
     let dir = tempfile::tempdir().expect("a temporary directory");
     let config = dir.path().join("console.toml");
-    std::fs::write(&config, "[bridge]\ntimeout_ms = 0\n").expect("the configuration file");
+    std::fs::write(&config, "[bridge]\ntimeout = \"0s\"\n").expect("the configuration file");
     assert_eq!(
         ExitCode::from(EXIT_CONFIG.get()),
         run(args(&config, &["config", "check"]))

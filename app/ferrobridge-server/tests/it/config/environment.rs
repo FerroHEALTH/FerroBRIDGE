@@ -188,7 +188,7 @@ fn a_digit_string_and_a_number_in_one_environment_each_take_their_key_type()
 -> Result<(), Box<dyn std::error::Error>> {
     let environment = BTreeMap::from([
         (
-            String::from("FERROBRIDGE__SERVER__BODY_LIMIT_BYTES"),
+            String::from("FERROBRIDGE__AUDIT__MAX_RECORDS"),
             String::from("2048"),
         ),
         (
@@ -209,7 +209,7 @@ fn a_digit_string_and_a_number_in_one_environment_each_take_their_key_type()
         ),
     ]);
     let config = Config::from_sources(Some(FULL), &environment)?;
-    assert_eq!(2048, config.server.body_limit_bytes);
+    assert_eq!(2048, config.audit.max_records);
     assert!(config.facade.enabled);
     assert_eq!("2048", config.facade.system_id);
     assert_eq!(

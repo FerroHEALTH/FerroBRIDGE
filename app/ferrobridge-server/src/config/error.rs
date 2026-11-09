@@ -438,6 +438,16 @@ pub enum Error {
         #[source]
         source: ehds_logging::map::MapErrors,
     },
+    /// A span of time outside the range its key admits.
+    #[error("{key} is {value}; {reason}")]
+    Span {
+        /// The key that holds it.
+        key: String,
+        /// The span it holds.
+        value: ferrohealth_config::units::Duration,
+        /// Why it is refused.
+        reason: &'static str,
+    },
 }
 
 /// The operations lane has a mapping directory and nowhere to take its
