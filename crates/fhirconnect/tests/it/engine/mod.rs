@@ -9,6 +9,7 @@
 //! compiled against the synthetic diagnosis template of the testkit and
 //! evaluated over the synthetic FHIR `Condition` of the testkit.
 
+mod absent;
 mod audit;
 mod chain;
 mod composer;
