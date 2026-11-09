@@ -33,20 +33,25 @@ use crate::outcome::{
     ExpandOutcome, LookupOutcome, SubsumesOutcome, TranslateOutcome, ValidateOutcome,
 };
 use crate::request::Request;
+#[cfg(feature = "client")]
 use http::StatusCode;
 
 /// The `HTTPVerb` code a batch entry carries for the `POST` form of an
 /// operation (<https://hl7.org/fhir/R4/valueset-http-verb.html>).
+#[cfg(feature = "client")]
 const POST: &str = "POST";
 
 /// The `BundleType` code of a request bundle whose entries are independent
 /// (<https://hl7.org/fhir/R4/valueset-bundle-type.html>).
+#[cfg(feature = "client")]
 const BATCH: &str = "batch";
 
 /// The `BundleType` code the server answers a `batch` with.
+#[cfg(feature = "client")]
 const BATCH_RESPONSE: &str = "batch-response";
 
 /// The `BundleType` code the server answers a search with.
+#[cfg(feature = "client")]
 const SEARCHSET: &str = "searchset";
 
 /// The extension marking an expansion that does not list every code the
@@ -60,6 +65,7 @@ const UNCLOSED_REASON: &str = "http://hl7.org/fhir/StructureDefinition/valueset-
 
 /// One entry of a `batch-response` `Bundle`, in request order.
 #[derive(Debug)]
+#[cfg(feature = "client")]
 pub(crate) struct BatchEntry {
     /// The status `entry.response.status` names.
     pub(crate) status: StatusCode,
@@ -191,6 +197,7 @@ macro_rules! dispatch {
 /// Returns the relative URL of `request`, the form a batch entry carries
 /// (<https://hl7.org/fhir/R4/http.html#transaction>), each segment
 /// percent-encoded so an id stays one segment.
+#[cfg(feature = "client")]
 fn path_of(request: &Request) -> String {
     request
         .segments()
@@ -219,6 +226,7 @@ fn integer(value: Option<u32>, parameter: &'static str) -> Result<Option<i32>, R
 /// `Bundle.entry.response.status` is "the status code returned by processing
 /// this entry", written as the status line's code and optional reason phrase
 /// (<https://hl7.org/fhir/R4/bundle-definitions.html#Bundle.entry.response.status>).
+#[cfg(feature = "client")]
 fn status_of(line: &str) -> Option<StatusCode> {
     let code = line.split_whitespace().next()?;
     StatusCode::from_bytes(code.as_bytes()).ok()
@@ -244,16 +252,19 @@ pub(crate) fn outcome(version: WireVersion, body: &str) -> Result<Outcome, BodyE
 }
 
 /// Returns whether `version` defines no operation for `request`.
+#[cfg(feature = "client")]
 pub(crate) const fn undefined(version: WireVersion, request: &Request) -> bool {
     dispatch!(version, undefined_operation(request))
 }
 
 /// Returns the parameter of `request` that `version` cannot carry.
+#[cfg(feature = "client")]
 pub(crate) const fn unsupported(version: WireVersion, request: &Request) -> Option<&'static str> {
     dispatch!(version, unsupported_parameter(request))
 }
 
 /// Returns whether `request` names no system where `version` requires one.
+#[cfg(feature = "client")]
 pub(crate) const fn requires_system(version: WireVersion, request: &Request) -> bool {
     dispatch!(version, requires_system(request))
 }
@@ -276,6 +287,7 @@ pub(crate) fn request_query(
 }
 
 /// Returns the FHIR JSON `batch` Bundle that carries `requests`.
+#[cfg(feature = "client")]
 pub(crate) fn batch_body(
     version: WireVersion,
     requests: &[Request],
@@ -284,6 +296,7 @@ pub(crate) fn batch_body(
 }
 
 /// Returns the entries of the `batch-response` `body` carries.
+#[cfg(feature = "client")]
 pub(crate) fn batch_entries(
     version: WireVersion,
     body: &str,
@@ -348,12 +361,13 @@ pub(crate) fn subsumes(version: WireVersion, body: &str) -> Result<SubsumesOutco
 }
 
 /// Returns the `Bundle.total` of the `searchset` `body` carries.
+#[cfg(feature = "client")]
 pub(crate) fn search_total(version: WireVersion, body: &str) -> Result<u32, BodyError> {
     dispatch!(version, search_total(body))
 }
 
 #[cfg(test)]
-#[cfg(feature = "r4")]
+#[cfg(all(feature = "r4", feature = "client"))]
 mod tests {
     use super::{batch_body, status_of};
     use crate::config::WireVersion;

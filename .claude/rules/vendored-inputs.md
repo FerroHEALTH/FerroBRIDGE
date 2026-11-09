@@ -8,14 +8,18 @@ paths: ["scripts/vendor/*.sh", "**/vendor/**", "docs/specs/**"]
 # Vendored inputs
 
 External material enters this repository one way only: a committed fetch
-script, vendored verbatim, stamped with provenance. Nine trees exist: the seven
-HL7 FHIR packages under `tools/fhir-codegen/vendor/` (#72, #252, #453), the
+script, vendored verbatim, stamped with provenance. Nine trees exist: the six
+HL7 FHIR packages under `tools/fhir-codegen/vendor/` (#72, #453) and the
+v2-to-FHIR guide's package under
+`crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/` (#252, embedded in
+that crate behind its `shipped-maps` feature), all fetched by
+`scripts/vendor/fhir-packages.sh`, the
 specification corpora under `docs/specs/`, one directory per corpus, fetched by
 `scripts/vendor/*.sh` from the pins in `docs/VERSIONS.md` (#71; a corpus with
 no commit to pin, such as the registry tarballs and FHIR R4 pages the `eehrxf`
 tests read, is pinned file by file by URL and sha256 through
 `scripts/vendor/lib/pinned.sh`, #1314), the three HL7
-v2 message sets under `crates/ferrobridge-hl7v2/vendor/` (#292, with the NIST
+v2 message sets beside it under `crates/ferrobridge-hl7v2/vendor/` (#292, with the NIST
 and AIRA sets fetched at build time beside them), the UCUM essence under
 `crates/ferrobridge-fhirpath/vendor/ucum/`, embedded whole in that crate with its
 licence, which forbids modified or derived copies (#459), FerroPULSE's report

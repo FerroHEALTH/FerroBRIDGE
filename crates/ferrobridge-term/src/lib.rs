@@ -39,6 +39,7 @@
 )))]
 compile_error!("ferrobridge-term needs at least one release feature: stu3, r4, r4b, r5 or r6");
 
+#[cfg(feature = "client")]
 pub mod client;
 pub mod concept;
 pub mod config;

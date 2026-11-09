@@ -32,6 +32,8 @@ use fhir_types::r4::concept_map::{
 use fhir_types::r4::extension::{Extension, ExtensionValue};
 
 use crate::map::condition::{self, AssignmentError, ConditionError, Expr, Part};
+#[cfg(feature = "shipped-maps")]
+use crate::map::guide;
 use crate::map::notation::{self, NotationError, Target};
 use crate::map::supplement;
 
@@ -387,6 +389,25 @@ impl Corpus {
     pub fn load(directory: &Path) -> Result<Self, CorpusError> {
         let mut corpus = Self::default();
         corpus.add_directory(directory, false)?;
+        Ok(corpus)
+    }
+
+    /// Loads every `ConceptMap` of the v2-to-FHIR guide this crate embeds
+    /// ([`guide::GUIDE`]), in file name order, as [`Corpus::load`] reads the
+    /// package directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CorpusError`] when an embedded file is no R4 `ConceptMap`
+    /// with an id and a url, which the crate's tests rule out.
+    #[cfg(feature = "shipped-maps")]
+    pub fn shipped() -> Result<Self, CorpusError> {
+        let mut corpus = Self::default();
+        for (name, text) in guide::GUIDE {
+            let path = Path::new(guide::DIRECTORY).join(name);
+            let map = decode_map(&path, text.as_bytes())?;
+            corpus.insert(map, false);
+        }
         Ok(corpus)
     }
 

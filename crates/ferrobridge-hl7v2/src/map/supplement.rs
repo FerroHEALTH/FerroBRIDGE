@@ -98,8 +98,7 @@ mod tests {
     use crate::map::corpus::{Corpus, Origin};
 
     fn package() -> std::path::PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("vendor/hl7.fhir.uv.v2mappings/package")
     }
 
     fn decoded(text: &str) -> ConceptMap {
