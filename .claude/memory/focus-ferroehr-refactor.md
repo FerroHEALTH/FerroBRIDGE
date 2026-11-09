@@ -18,3 +18,5 @@ From 2026-11-01 every worker slot goes to the FerroEHR refactor: the service-lay
 **Update 2026-11-02:** the owner lifted the pause for FerroBRIDGE when deciding that broker delivery moves from FerroEHR to FerroBRIDGE: "move it but also work on the BRIDGE then because the pause is lifted". FerroBRIDGE issues are worked again, starting with the change-feed adapter #117 and its AMQP consumer #1367 over FerroEHR's cursor feed (FerroEHR #4786). FerroTERM, FerroFED and FerroPIX still wait; ask before starting there.
 
 **Update 2026-11-02, later:** the owner lifted the pause for every product: "why do we only have 1 worker running? we have more products right? ... there is no time to wait and go slow". Keep all five worker slots busy across FerroEHR, FerroBRIDGE, FerroTERM, FerroFED and FerroPIX, each worker working its product's open milestone under that repo's own rules. No need to ask before starting a product.
+
+**Update 2026-11-03:** the slot count is ten, not five ([[worker-cap-ten]]).

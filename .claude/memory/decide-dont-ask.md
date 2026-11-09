@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Decide and act. Do not put a choice to the owner, and do not hand the owner a command to run when the orchestrator can run it itself. That covers which option to take, whether an issue is obsolete, reopening or closing an issue, moving a milestone, and design rulings.
 
 **Why:** on 2026-11-03 the owner said "why are you asking me stupid things, you are in control, so you decide and just do things", after being asked about audit-format options and handed a command to reopen an issue.
