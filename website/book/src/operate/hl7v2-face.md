@@ -170,15 +170,20 @@ that is FerroBRIDGE's own design, and it works as follows.
 
 ### Loading the value maps
 
-Load two directories into the terminology server: the `package` directory of
-`hl7.fhir.uv.v2mappings` 1.0.0 (from the FHIR package registry) and
-`terminology/hl7v2-values/` of the FerroBRIDGE release you run. Both carry a
-`package.json` declaring FHIR 4.0.1, and none of their ConceptMaps share a
-canonical url. For FerroTERM, name both in `terminology.code_systems`:
+Load three directories into the terminology server, each the `package`
+directory of a FHIR package: HL7 Terminology (`hl7.terminology`, which holds
+the v2 tables' code systems and the value sets the guide's table maps name
+as their source), `hl7.fhir.uv.v2mappings` 1.0.0 (both from the FHIR package
+registry), and `terminology/hl7v2-values/` of the FerroBRIDGE release you
+run. None of their ConceptMaps share an id or a canonical url. FerroTERM
+refuses a translation through a map whose source value set it does not hold,
+so HL7 Terminology is not optional. For FerroTERM, name all three in
+`terminology.code_systems`:
 
 ```toml
 [terminology]
 code_systems = [
+  "/srv/hl7.terminology/package",
   "/srv/hl7.fhir.uv.v2mappings/package",
   "/srv/ferrobridge-hl7v2-values",
 ]
