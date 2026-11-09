@@ -16,7 +16,7 @@ use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::commit::CommitContext;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::cdr::ids::{EhrId, template_id, versioned_object_uid};
+use ferrobridge_server::cdr::ids::{EhrId, template_id};
 use ferrobridge_server::cdr::query::PageSize;
 use ferrobridge_testkit::containers::{self, Cdr};
 use ferrobridge_testkit::fixtures::{
@@ -276,7 +276,7 @@ impl Harness {
             .client
             .update_composition(
                 &self.ehr,
-                &versioned_object_uid(preceding),
+                &preceding.versioned_object_id(),
                 preceding,
                 &self.composition(laboratory)?,
                 &Self::commit_context()?,

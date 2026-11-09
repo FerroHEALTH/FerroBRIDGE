@@ -31,6 +31,7 @@ use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_term::codes::NullFlavour as Flavour;
 
 use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
@@ -48,40 +49,41 @@ pub const OPENEHR: &str = "openehr";
 /// (<https://hl7.org/fhir/R4/extension-data-absent-reason.html>).
 pub const EXTENSION: &str = "http://hl7.org/fhir/StructureDefinition/data-absent-reason";
 
-/// The null flavours of the openEHR terminology, with their rubrics and the
-/// FHIR code each reads back as when no `null_reason` names one.
+/// Returns the FHIR code the null flavour `flavour` reads back as when no
+/// `null_reason` names one.
 ///
-/// The codes and rubrics are the openEHR terminology's group `null_flavours`;
-/// the FHIR codes are `NULL_FLAVOUR.adoc`'s rows marked "Default for
+/// The codes are `NULL_FLAVOUR.adoc`'s rows marked "Default for
 /// openEHR->FHIR", with the two rows read as the module docs say.
-pub const FLAVOURS: &[(&str, &str, &str)] = &[
-    ("253", "unknown", "unknown"),
-    ("271", "no information", "unknown"),
-    ("272", "masked", "masked"),
-    ("273", "not applicable", "not-applicable"),
-];
+#[must_use]
+pub const fn fhir_default(flavour: Flavour) -> &'static str {
+    match flavour {
+        Flavour::Unknown | Flavour::NoInformation => "unknown",
+        Flavour::Masked => "masked",
+        Flavour::NotApplicable => "not-applicable",
+    }
+}
 
 /// The R4 `data-absent-reason` codes with the null flavour each is written
 /// as, in the order of `NULL_FLAVOUR.adoc`'s table.
 ///
 /// The codes are the whole R4 value set
 /// (<https://hl7.org/fhir/R4/valueset-data-absent-reason.html>).
-pub const BRIDGE: &[(&str, &str)] = &[
-    ("unknown", "253"),
-    ("asked-unknown", "253"),
-    ("temp-unknown", "253"),
-    ("not-asked", "253"),
-    ("asked-declined", "253"),
-    ("masked", "272"),
-    ("not-applicable", "273"),
-    ("unsupported", "253"),
-    ("as-text", "253"),
-    ("error", "253"),
-    ("not-a-number", "253"),
-    ("negative-infinity", "253"),
-    ("positive-infinity", "253"),
-    ("not-performed", "253"),
-    ("not-permitted", "253"),
+pub const BRIDGE: &[(&str, Flavour)] = &[
+    ("unknown", Flavour::Unknown),
+    ("asked-unknown", Flavour::Unknown),
+    ("temp-unknown", Flavour::Unknown),
+    ("not-asked", Flavour::Unknown),
+    ("asked-declined", Flavour::Unknown),
+    ("masked", Flavour::Masked),
+    ("not-applicable", Flavour::NotApplicable),
+    ("unsupported", Flavour::Unknown),
+    ("as-text", Flavour::Unknown),
+    ("error", Flavour::Unknown),
+    ("not-a-number", Flavour::Unknown),
+    ("negative-infinity", Flavour::Unknown),
+    ("positive-infinity", Flavour::Unknown),
+    ("not-performed", Flavour::Unknown),
+    ("not-permitted", Flavour::Unknown),
 ];
 
 /// An `ELEMENT`'s null flavour with the reason beside it.
@@ -105,9 +107,9 @@ impl Lens<NullFlavour, fhir_types::r4::primitives::String> for NullFlavourLens {
     fn get(&self, source: &NullFlavour) -> Result<fhir_types::r4::primitives::String, LensError> {
         let code = &source.flavour.defining_code;
         let default = (code.terminology_id.value == OPENEHR)
-            .then(|| flavour(&code.code_string))
+            .then(|| Flavour::from_code(&code.code_string))
             .flatten()
-            .map(|&(_, _, fhir)| fhir)
+            .map(fhir_default)
             .ok_or_else(|| LensError::Shape {
                 cell: CELL,
                 attribute: "ELEMENT.null_flavour",
@@ -129,7 +131,7 @@ impl Lens<NullFlavour, fhir_types::r4::primitives::String> for NullFlavourLens {
             attribute: "ELEMENT.null_flavour",
             direction: Direction::FhirToOpenehr,
         })?;
-        let flavour_code = bridged(code).ok_or_else(|| LensError::Shape {
+        let flavour = bridged(code).ok_or_else(|| LensError::Shape {
             cell: CELL,
             attribute: "ELEMENT.null_flavour",
             found: String::from(code),
@@ -141,18 +143,9 @@ impl Lens<NullFlavour, fhir_types::r4::primitives::String> for NullFlavourLens {
         {
             return Ok(held.clone());
         }
-        let Some(&(_, rubric, default)) = flavour(flavour_code) else {
-            return Err(LensError::Shape {
-                cell: CELL,
-                attribute: "ELEMENT.null_flavour",
-                found: String::from(flavour_code),
-                reason: "the bridge names a null flavour the openEHR terminology lacks",
-                direction: Direction::FhirToOpenehr,
-            });
-        };
         Ok(NullFlavour {
-            flavour: coded(flavour_code, rubric),
-            reason: (code != default).then(|| reason(code)),
+            flavour: coded(flavour),
+            reason: (code != fhir_default(flavour)).then(|| reason(code)),
         })
     }
 
@@ -169,14 +162,9 @@ pub fn uncarried_reason(source: &NullFlavour) -> Option<&str> {
     reason_text(source.reason.as_ref()).filter(|&text| bridged(text).is_none())
 }
 
-/// Returns the row of the null flavour `code`.
-fn flavour(code: &str) -> Option<&'static (&'static str, &'static str, &'static str)> {
-    FLAVOURS.iter().find(|&&(flavour, _, _)| flavour == code)
-}
-
 /// Returns the null flavour a FHIR code is written as, `None` outside the
 /// value set.
-fn bridged(code: &str) -> Option<&'static str> {
+fn bridged(code: &str) -> Option<Flavour> {
     BRIDGE
         .iter()
         .find(|&&(fhir, _)| fhir == code)
@@ -199,10 +187,10 @@ fn text(code: &str) -> fhir_types::r4::primitives::String {
     }
 }
 
-/// Returns the null flavour `code` with its rubric.
-fn coded(code: &str, rubric: &str) -> DvCodedText {
+/// Returns the null flavour `flavour` with its rubric.
+fn coded(flavour: Flavour) -> DvCodedText {
     DvCodedText {
-        value: String::from(rubric),
+        value: String::from(flavour.rubric()),
         hyperlink: None,
         formatting: None,
         mappings: None,
@@ -212,7 +200,7 @@ fn coded(code: &str, rubric: &str) -> DvCodedText {
             terminology_id: TerminologyId {
                 value: String::from(OPENEHR),
             },
-            code_string: String::from(code),
+            code_string: String::from(flavour.code()),
             preferred_term: None,
         },
     }
@@ -233,7 +221,7 @@ fn reason(code: &str) -> DvText {
 #[cfg(test)]
 mod tests {
     use super::BRIDGE;
-    use super::FLAVOURS;
+    use super::Flavour;
     use super::NullFlavour;
     use super::NullFlavourLens;
     use super::coded;
@@ -247,14 +235,20 @@ mod tests {
     use proptest::strategy::Just;
     use proptest::strategy::Strategy;
 
-    /// Returns the null flavour `code` with no reason.
+    /// Returns the null flavour `code` with no reason; a code outside the
+    /// group keeps its code with no rubric.
     fn flavour(code: &str) -> NullFlavour {
-        let rubric = FLAVOURS
-            .iter()
-            .find(|&&(flavour, _, _)| flavour == code)
-            .map_or("", |&(_, rubric, _)| rubric);
+        let flavour = Flavour::from_code(code).map_or_else(
+            || {
+                let mut outside = coded(Flavour::Unknown);
+                outside.value = String::new();
+                outside.defining_code.code_string = String::from(code);
+                outside
+            },
+            coded,
+        );
         NullFlavour {
-            flavour: coded(code, rubric),
+            flavour,
             reason: None,
         }
     }
@@ -262,7 +256,7 @@ mod tests {
     /// Generates a null flavour of the group, with no reason, a reason that
     /// names a FHIR code, or a free-text reason.
     fn held() -> impl Strategy<Value = NullFlavour> {
-        let codes: Vec<&str> = FLAVOURS.iter().map(|&(code, _, _)| code).collect();
+        let codes: Vec<&str> = Flavour::ALL.iter().map(|flavour| flavour.code()).collect();
         let fhir: Vec<&str> = BRIDGE.iter().map(|&(code, _)| code).collect();
         let reasons = prop_oneof![
             Just(None),
@@ -295,7 +289,8 @@ mod tests {
     #[test]
     fn every_bridge_entry_writes_its_flavour() {
         // NULL_FLAVOUR.adoc §Data absent, one row per R4 code.
-        for &(code, flavour_code) in BRIDGE {
+        for &(code, flavour) in BRIDGE {
+            let flavour_code = flavour.code();
             let written = NullFlavourLens
                 .put(&text(code), None)
                 .expect("every row writes a flavour");

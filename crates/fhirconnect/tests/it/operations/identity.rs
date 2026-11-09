@@ -162,7 +162,7 @@ fn a_seam_id_outside_the_id_grammar_is_refused() -> Result<(), Box<dyn Error>> {
 #[test]
 fn without_a_seam_the_id_still_derives_from_the_composition() -> Result<(), Box<dyn Error>> {
     let answer = tofhir(&Seams::default())??;
-    let expected = deterministic_id(versioned_object_uid(COMPOSITION_UID), ENTRY_PATH);
+    let expected = deterministic_id(&versioned_object_uid(COMPOSITION_UID), ENTRY_PATH);
     assert_eq!(condition_id(&answer).as_deref(), Some(expected.as_str()));
     Ok(())
 }
