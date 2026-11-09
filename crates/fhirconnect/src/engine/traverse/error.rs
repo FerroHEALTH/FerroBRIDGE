@@ -273,6 +273,18 @@ pub enum EngineError {
         #[source]
         source: EhrUriError,
     },
+    /// Two `link` mappings name the one resource a `reference` mapping
+    /// creates as standing in two compositions, and the reference to it holds
+    /// one.
+    #[error("{mapping} links the resource it sits in to {second}, already linked to {first}")]
+    LinkedTwice {
+        /// The mapping being run.
+        mapping: String,
+        /// The `ehr:` URI the resource was linked to first.
+        first: String,
+        /// The `ehr:` URI the second link names.
+        second: String,
+    },
     /// A reference-model family the node carries does not decode.
     #[error("{mapping} could not read the family its node carries")]
     Family {

@@ -12,7 +12,7 @@
 
 use crate::config::{Form, WireVersion};
 use crate::error::Error;
-use crate::outcome::BatchOutcome;
+use crate::outcome::{BatchOutcome, ExpandOutcome};
 use crate::request::Request;
 use http::{Method, StatusCode};
 use url::Url;
@@ -40,9 +40,10 @@ impl Invocation {
     ///
     /// Returns [`Error::UnsupportedOperation`],
     /// [`Error::UnsupportedParameter`] or [`Error::SystemRequired`] when the
-    /// release cannot carry the request, and [`Error::ParameterRange`],
-    /// [`Error::RequestBody`] or [`Error::RequestEncode`] when an input
-    /// cannot be written.
+    /// release cannot carry the request, [`Error::AuthoredValueSet`] when an
+    /// authored value set is not a `ValueSet` of the release, and
+    /// [`Error::ParameterRange`], [`Error::RequestBody`] or
+    /// [`Error::RequestEncode`] when an input cannot be written.
     pub fn new(version: WireVersion, form: Form, request: &Request) -> Result<Self, Error> {
         let operation = request.operation();
         let fail = |source: crate::wire::RequestError| source.into_error(operation, version);
@@ -138,6 +139,34 @@ pub fn answer(
         body: body.to_owned(),
     };
     crate::decode::batch_entry(version, request, &answer)
+}
+
+/// Returns what a `ValueSet/$expand` sent in `version` to `url` answered
+/// with `status` and `body`, for a caller that wrote the request itself.
+///
+/// The answer is read as [`answer`] reads the answer to a
+/// [`Request::Expand`]: the expanded `ValueSet`, a value set the server does
+/// not know as [`ExpandOutcome::NotFound`], and every other refusal as an
+/// error carrying the upstream status and body. An expansion's reading does
+/// not depend on the request, so none is taken.
+///
+/// # Errors
+///
+/// Returns [`Error::Body`] for a `2xx` body that is not a `ValueSet` of the
+/// release, and [`Error::Refused`], [`Error::Unauthorized`] or
+/// [`Error::ServerFailure`] for a refusal.
+pub fn expand_answer(
+    version: WireVersion,
+    url: &Url,
+    status: StatusCode,
+    body: &str,
+) -> Result<ExpandOutcome, Error> {
+    let answer = crate::client::Answer {
+        url: url.clone(),
+        status,
+        body: body.to_owned(),
+    };
+    crate::decode::expand(version, &answer)
 }
 
 /// Returns `segment` percent-encoded as one path segment: every byte outside

@@ -13,20 +13,20 @@
 //! holds, so a local code is read in the context of the archetype the item
 //! sits in.
 //!
-//! [`TermDefinitions`] keeps every term definition of an OPT 1.4 template,
-//! read with `openehr-its`'s `opt14` model: the definitions of each
-//! `C_ARCHETYPE_ROOT`, in the template's own language, and the
-//! language-keyed definitions of its flattened ontologies.
+//! [`TermDefinitions`] keeps every term definition of an OPT 1.4 template:
+//! the definitions of each `C_ARCHETYPE_ROOT` in the template's own language,
+//! read from the Web Template node the `openehr-sdt` builder makes for the
+//! root, and the language-keyed definitions of its flattened ontologies, read
+//! with `openehr-its`'s `opt14` model.
 
 use std::collections::BTreeMap;
 
 use openehr_base::v1_3::base_types::identification::archetype_id::ArchetypeId;
-use openehr_its::opt14::types::CArchetypeRoot;
-use openehr_its::opt14::types::CAttribute;
-use openehr_its::opt14::types::CObject;
 use openehr_its::opt14::types::Codedefinitionset;
 use openehr_its::opt14::types::OperationalTemplate;
 use openehr_its::xml::runtime::XmlError;
+use openehr_sdt::flat::error::FlatError;
+use openehr_sdt::flat::webtemplate::builder::build_web_template;
 
 /// The `items` key of an `ARCHETYPE_TERM` that holds the term's text.
 const TEXT: &str = "text";
@@ -60,6 +60,9 @@ pub enum TermDefinitionsError {
     /// The text is not an OPT 1.4 operational template.
     #[error("the operational template is not an OPT 1.4 template")]
     Template(#[source] XmlError),
+    /// The operational template builds no Web Template.
+    #[error("the operational template builds no Web Template")]
+    Build(#[source] FlatError),
 }
 
 impl TermDefinitions {
@@ -68,21 +71,39 @@ impl TermDefinitions {
     /// # Errors
     ///
     /// [`TermDefinitionsError::Template`] when `xml` is not an OPT 1.4
-    /// operational template.
+    /// operational template, and the errors of
+    /// [`TermDefinitions::from_template`].
     pub fn from_opt14(xml: &str) -> Result<Self, TermDefinitionsError> {
-        openehr_its::opt14::from_xml(xml)
-            .map(|template| Self::from_template(&template))
-            .map_err(TermDefinitionsError::Template)
+        let template = openehr_its::opt14::from_xml(xml).map_err(TermDefinitionsError::Template)?;
+        Self::from_template(&template)
     }
 
     /// Returns the term definitions of `template`.
-    #[must_use]
-    pub fn from_template(template: &OperationalTemplate) -> Self {
+    ///
+    /// A term an archetype root defines with no text is left out.
+    ///
+    /// # Errors
+    ///
+    /// [`TermDefinitionsError::Build`] when `template` builds no Web
+    /// Template.
+    pub fn from_template(template: &OperationalTemplate) -> Result<Self, TermDefinitionsError> {
         let mut definitions = Self {
             language: template.language.code_string.clone(),
             terms: BTreeMap::new(),
         };
-        definitions.root(&template.definition);
+        let built = build_web_template(template).map_err(TermDefinitionsError::Build)?;
+        let language = definitions.language.clone();
+        let mut stack = vec![&built.tree];
+        while let Some(node) = stack.pop() {
+            if let Some(archetype) = node.node_id.as_deref() {
+                for (code, term) in &node.facts.archetype_terms {
+                    if !term.text.is_empty() {
+                        definitions.insert(&language, archetype, code, &term.text);
+                    }
+                }
+            }
+            stack.extend(node.children.iter().chain(&node.alternatives));
+        }
         for ontology in template
             .ontology
             .iter()
@@ -95,7 +116,7 @@ impl TermDefinitions {
                 definitions.set(&ontology.archetype_id, set);
             }
         }
-        definitions
+        Ok(definitions)
     }
 
     /// Returns the template's own language, the language of the term
@@ -122,37 +143,6 @@ impl TermDefinitions {
             Term::OtherLanguage
         } else {
             Term::Undefined
-        }
-    }
-
-    /// Keeps the term definitions of `root` and of every archetype root
-    /// below it.
-    fn root(&mut self, root: &CArchetypeRoot) {
-        let archetype = root.archetype_id.value.as_str();
-        let language = self.language.clone();
-        for term in &root.term_definitions {
-            if let Some(text) = term.items.get(TEXT) {
-                self.insert(&language, archetype, &term.code, text);
-            }
-        }
-        self.attributes(&root.attributes);
-    }
-
-    /// Walks `attributes` for the archetype roots they hold.
-    fn attributes(&mut self, attributes: &[CAttribute]) {
-        for attribute in attributes {
-            let children = match attribute {
-                CAttribute::CMultipleAttribute(multiple) => &multiple.children,
-                CAttribute::CSingleAttribute(single) => &single.children,
-            };
-            for child in children {
-                match child {
-                    CObject::CArchetypeRoot(root) => self.root(root),
-                    CObject::CComplexObject(complex) => self.attributes(&complex.attributes),
-                    CObject::TComplexObject(complex) => self.attributes(&complex.attributes),
-                    _ => {}
-                }
-            }
         }
     }
 

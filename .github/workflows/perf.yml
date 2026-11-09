@@ -44,10 +44,11 @@ on:
 permissions: {}
 
 env:
-  # A called workflow does not inherit the caller's env, so the cap ci.yml
-  # sets is repeated here: the hosted runner has four cores and 16 GB, and a
-  # release build never compiles a generated giant beside three other crates.
-  CARGO_BUILD_JOBS: "2"
+  # A called workflow does not inherit ci.yml's two-job cap, and the two
+  # release builds take all four cores: with the release features of #1737
+  # the base peaked at 10.4 GB two jobs wide, and a job count changes neither
+  # binary (#1758).
+  CARGO_BUILD_JOBS: "4"
   FERROHEALTH_PERF_VERSION: 0.5.2
   FERROBRIDGE__USAGE_REPORT__ENABLED: "false"
   # The CPU models whose runners stall every route for 100 to 300 ms for a

@@ -1,0 +1,55 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "table-contact-point-system-to-hl70202",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-contact-point-system-to-hl70202",
+  "name": "FerroBRIDGEContactPointSystemToHl70202",
+  "title": "FerroBRIDGE supplement: contact-point-system to HL7 table 0202",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds the FHIR-to-v2 direction of ConceptMap/table-hl70202-to-contact-point-system of hl7.fhir.uv.v2mappings 1.0.0, which maps v2 to FHIR only. Reversed, that map gives email two sources (Internet and X.400) and other four (MD, SAT, TDD and TTY); this map names Internet (Internet Address) for email, the address form of today's mail, and leaves other with none, since no one of the four is the other's meaning. Used by the PID inverse of FerroBRIDGE #1716.",
+  "group": [
+    {
+      "source": "http://hl7.org/fhir/contact-point-system",
+      "target": "http://terminology.hl7.org/CodeSystem/v2-0202",
+      "element": [
+        {
+          "code": "phone",
+          "target": [
+            {
+              "code": "PH",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "fax",
+          "target": [
+            {
+              "code": "FX",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "email",
+          "target": [
+            {
+              "code": "Internet",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "pager",
+          "target": [
+            {
+              "code": "BP",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

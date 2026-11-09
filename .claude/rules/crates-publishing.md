@@ -75,6 +75,18 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   checks it names the line the manifest is on. A PR that breaks a public API
   says so in its body and its CHANGELOG entry, naming what a consumer
   changes.
+- **A crate of this line requires a sibling of this workspace exactly**
+  (#1736): `ferrobridge-validator` requires `ferrobridge-term = "=0.1.147"`,
+  in the root `[workspace.dependencies]` and wherever else a sibling is
+  named with a version. The siblings are built, tested and released
+  together from one commit, so a published crate names the one sibling
+  release it was verified with, and a consumer's lockfile cannot pair it
+  with a later sibling this workspace never built it against. A sibling's
+  bump then moves every member that requires it in the same PR, which the
+  bump rule above already demands, since the root entry is packaged
+  content. `crate-version-guard` fails a range between workspace crates on
+  every run. The caret ranges of the rule above are for consumers outside
+  this workspace.
 - **A crate of this line takes a caret requirement on another family shared
   crate** (owner decision 2026-10-26): `ferrobridge-term` requires
   `ferrohealth-smart = "0.8.3"`, never `=0.8.3`, because the FerroAUTH,

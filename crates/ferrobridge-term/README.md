@@ -82,8 +82,11 @@ no FHIR of its own.
 instance-level forms (`ValueSet/[id]/$validate-code`,
 `CodeSystem/[id]/$validate-code`, `CodeSystem/[id]/$subsumes`), named with
 `request::Target::Instance`. `$expand` also takes an inline value set
-(`request::ValueSetSource::Inline`), sent as the `valueSet` resource, and the
-inputs `activeOnly`, `excludeNested` and `displayLanguage`.
+(`request::ValueSetSource::Inline`), sent as the `valueSet` resource, a whole
+`ValueSet` you authored (`request::ValueSetSource::Authored`, its FHIR JSON
+read into the release's own `ValueSet` and sent as it stands, concepts,
+imports, excludes and all), and the inputs `activeOnly`, `excludeNested` and
+`displayLanguage`.
 
 `Config::with_form(Form::Get)` invokes each operation as a `GET` with its
 inputs in the query, which the operations framework allows when no input is
@@ -92,7 +95,8 @@ goes as a `POST`.
 
 `invocation::Invocation::new` writes a request (method, path segments, query,
 body) without sending it, and `invocation::answer` reads a status and a body
-exactly as the client does. A caller that sends through a transport of its
+exactly as the client does; `invocation::expand_answer` reads an `$expand`
+answer without the request, for a caller that wrote the request itself. A caller that sends through a transport of its
 own, such as a server forwarding a signed-in user's token, uses the two and
 writes no terminology client of its own.
 

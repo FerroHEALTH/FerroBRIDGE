@@ -10,15 +10,14 @@ use openehr_rm::v1_2::paths::EhrUri;
 
 use crate::engine::demographics::MARKER;
 use crate::engine::family;
-use crate::engine::fhir::FhirKind;
 use crate::engine::linked::Linked;
 use crate::engine::linked::LinkedCompositions;
 use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
 use crate::engine::outcome::Warning;
-use crate::engine::seam::ReferenceError;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::binding::ResourceType;
+use crate::resolve::program::mapping::LinkSide;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
@@ -38,12 +37,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ///
     /// The openEHR side names the `links` of a `LOCATABLE`, and each link is
     /// written as one `_link:i` family on the node (Simplified Formats, the
-    /// `LINK` table). The FHIR side is the reference the link targets: an
-    /// `ehr:` URI is written as it stands, and a reference to a resource is
-    /// the linked composition of `concept-mappings.adoc` §Linked mappings,
-    /// whose URI the [`LinkedCompositions`] seam answers. A run with no such
-    /// seam, or a side that is no reference, produces one composition and
-    /// refuses.
+    /// `LINK` table). The FHIR side reaches the resource whose composition
+    /// the link targets (`concept-mappings.adoc` §Linked mappings, see
+    /// [`LinkSide`]): an `ehr:` URI is written as it stands, and a resource is
+    /// the linked composition whose URI the [`LinkedCompositions`] seam
+    /// answers. A run with no such seam produces one composition and refuses.
     pub(super) fn link(
         &mut self,
         mapping: &Mapping,
@@ -53,14 +51,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
         link_type: &str,
     ) -> Result<Vec<Binding>, EngineError> {
         let (target, openehr) = Self::family_sides(mapping, "links")?;
-        if !matches!(
-            FhirKind::at(target.resolved().location()),
-            Some(FhirKind::Reference | FhirKind::String)
-        ) {
+        let Some(side) = LinkSide::of(target, self.frames.len()) else {
             return Err(EngineError::LinkedComposition {
                 mapping: String::from(mapping.name()),
             });
-        }
+        };
         match self.direction {
             Direction::FhirToOpenehr => {
                 let mut bindings = Vec::with_capacity(inputs.len());
@@ -69,58 +64,31 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         input.clone(),
                         mapping.fhir().map_or(parent.level, FhirTarget::level),
                     );
-                    let Some(literal) = self.reference_at(mapping, input)? else {
-                        let location = self.locate(mapping, input);
-                        self.warnings.push(Warning::new(
-                            Loss::Skipped {
-                                mapping: String::from(mapping.name()),
-                                reason: SkipReason::EmptyReference,
-                            },
-                            location,
-                        ));
-                        bindings.push(binding);
-                        continue;
-                    };
-                    let literal = match literal.parse::<EhrUri>() {
-                        Ok(_) => literal,
-                        Err(source) => {
-                            let Some(linked) = self.seams.linked() else {
-                                return Err(EngineError::LinkTarget {
-                                    mapping: String::from(mapping.name()),
-                                    target: literal,
-                                    source,
-                                });
-                            };
-                            match self.linked_target(mapping, linked, &literal)? {
-                                Ok(uri) => uri,
-                                Err(reason) => {
-                                    let location = self.locate(mapping, input);
-                                    self.warnings.push(Warning::new(
-                                        Loss::Skipped {
-                                            mapping: String::from(mapping.name()),
-                                            reason,
-                                        },
-                                        location,
-                                    ));
-                                    bindings.push(binding);
-                                    continue;
-                                }
-                            }
+                    match self.link_target(mapping, side, input)? {
+                        Ok(literal) => {
+                            let positions = self.bound_positions(openehr, &binding);
+                            let index = self.next_family(openehr, &positions, "_link");
+                            self.families.extend(family::link(
+                                openehr.node(),
+                                &positions,
+                                index,
+                                &family::LinkParts {
+                                    meaning,
+                                    link_type,
+                                    target: &literal,
+                                },
+                            ));
                         }
-                    };
-                    {
-                        let positions = self.bound_positions(openehr, &binding);
-                        let index = self.next_family(openehr, &positions, "_link");
-                        self.families.extend(family::link(
-                            openehr.node(),
-                            &positions,
-                            index,
-                            &family::LinkParts {
-                                meaning,
-                                link_type,
-                                target: &literal,
-                            },
-                        ));
+                        Err(reason) => {
+                            let location = self.locate(mapping, input);
+                            self.warnings.push(Warning::new(
+                                Loss::Skipped {
+                                    mapping: String::from(mapping.name()),
+                                    reason,
+                                },
+                                location,
+                            ));
+                        }
                     }
                     bindings.push(binding);
                 }
@@ -131,31 +99,63 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     self.family_bindings(mapping, openehr, parent, |node| {
                         family::link_targets(node, meaning, link_type)
                     })?;
-                for (binding, literal) in bindings.iter().zip(targets.iter()) {
-                    self.write_reference(mapping, binding, literal, None)?;
+                for (binding, literal) in bindings.iter().zip(targets) {
+                    if side == LinkSide::Resource {
+                        self.link_resource(mapping, literal)?;
+                    } else {
+                        self.write_reference(mapping, binding, &literal, None)?;
+                    }
                 }
                 Ok(bindings)
             }
         }
     }
 
-    /// Returns the `ehr:` URI of the composition the resource `literal` names
-    /// was committed as, or why the link is skipped.
+    /// Returns the `ehr:` URI one input of a `link` targets going into
+    /// openEHR, or why the link is skipped.
     ///
-    /// The resource is read through the reference seam, as a `reference`
-    /// mapping reads one, and a reference that resolves to nothing is the
-    /// same declared skip (`engine/references.adoc`). A resource no context
-    /// maps is skipped too (`concept-mappings.adoc` §Linked mappings).
-    fn linked_target(
+    /// A `Reference` side names the resource by its literal, which is read
+    /// through the reference seam; a resource side is the document the
+    /// innermost `reference` mapping entered, under the literal it was entered
+    /// by, so it is read once.
+    fn link_target(
         &self,
         mapping: &Mapping,
-        linked: &dyn LinkedCompositions,
-        literal: &str,
+        side: LinkSide,
+        input: &Occurrence,
     ) -> Result<Result<String, SkipReason>, EngineError> {
-        let refuse = |source: ReferenceError| EngineError::Reference {
-            mapping: String::from(mapping.name()),
-            source: Box::new(source),
+        let literal = if side == LinkSide::Resource {
+            // NOTE: LinkSide::of admits a resource side only at the depth of the innermost
+            // reference, so `references` holds the literal that reference was entered by.
+            self.references.last().cloned()
+        } else {
+            self.reference_at(mapping, input)?
         };
+        let Some(literal) = literal else {
+            return Ok(Err(SkipReason::EmptyReference));
+        };
+        let Err(source) = literal.parse::<EhrUri>() else {
+            return Ok(Ok(literal));
+        };
+        let Some(linked) = self.seams.linked() else {
+            return Err(EngineError::LinkTarget {
+                mapping: String::from(mapping.name()),
+                target: literal,
+                source,
+            });
+        };
+        if side == LinkSide::Resource {
+            return Self::linked_composition(mapping, linked, &literal, &self.fhir);
+        }
+        let Some(resource) = self.fetch_linked(mapping, &literal)? else {
+            return Ok(Err(SkipReason::UnresolvedReference { reference: literal }));
+        };
+        Self::linked_composition(mapping, linked, &literal, &resource)
+    }
+
+    /// Reads the resource the literal `literal` names through the reference
+    /// seam, as a `reference` mapping reads one (`engine/references.adoc`).
+    fn fetch_linked(&self, mapping: &Mapping, literal: &str) -> Result<Option<Value>, EngineError> {
         // NOTE: R4 references.html §2.3.0.1: a relative literal is `<type>/<id>`, so the
         // segment before the id names the type; any other literal names none here.
         let kind = literal
@@ -163,24 +163,57 @@ impl<T: Table + ?Sized> Run<'_, T> {
             .nth(1)
             .filter(|kind| kind.chars().next().is_some_and(|c| c.is_ascii_uppercase()))
             .unwrap_or("Resource");
-        let Some(resource) = self
-            .seams
+        self.seams
             .references()
             .fetch(literal, &ResourceType::new(kind))
-            .map_err(refuse)?
-        else {
-            return Ok(Err(SkipReason::UnresolvedReference {
+            .map_err(|source| EngineError::Reference {
+                mapping: String::from(mapping.name()),
+                source: Box::new(source),
+            })
+    }
+
+    /// Returns the `ehr:` URI of the composition `resource`, which the literal
+    /// `literal` names, was committed as, or why the link is skipped.
+    ///
+    /// A resource no context maps is skipped (`concept-mappings.adoc`
+    /// §Linked mappings).
+    fn linked_composition(
+        mapping: &Mapping,
+        linked: &dyn LinkedCompositions,
+        literal: &str,
+        resource: &Value,
+    ) -> Result<Result<String, SkipReason>, EngineError> {
+        let answer =
+            linked
+                .composition(literal, resource)
+                .map_err(|source| EngineError::Reference {
+                    mapping: String::from(mapping.name()),
+                    source: Box::new(source),
+                })?;
+        Ok(match answer {
+            Linked::At(uri) => Ok(uri.to_string()),
+            Linked::Unmapped => Err(SkipReason::UnmappedLink {
                 reference: String::from(literal),
-            }));
-        };
-        Ok(
-            match linked.composition(literal, &resource).map_err(refuse)? {
-                Linked::At(uri) => Ok(uri.to_string()),
-                Linked::Unmapped => Err(SkipReason::UnmappedLink {
-                    reference: String::from(literal),
-                }),
-            },
-        )
+            }),
+        })
+    }
+
+    /// Records that the resource the innermost `reference` mapping creates
+    /// stands in the linked composition at `target`.
+    ///
+    /// Going out of openEHR a reference-side link writes its target as the
+    /// reference, so a resource-side link makes its target the reference the
+    /// enclosing mapping writes, which holds one.
+    fn link_resource(&mut self, mapping: &Mapping, target: String) -> Result<(), EngineError> {
+        if let Some(ref first) = self.linked_to {
+            return Err(EngineError::LinkedTwice {
+                mapping: String::from(mapping.name()),
+                first: first.clone(),
+                second: target,
+            });
+        }
+        self.linked_to = Some(target);
+        Ok(())
     }
 
     /// Runs a `participationsFunction` mapping.

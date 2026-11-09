@@ -166,7 +166,7 @@ fn slot_parts(model: &MappingName, mappings: Vec<Mapping>) -> MappingParts {
 
 /// A reference source over a map, keyed by the literal reference.
 #[derive(Debug, Default)]
-struct MapReferences(BTreeMap<String, Value>);
+pub(crate) struct MapReferences(pub(crate) BTreeMap<String, Value>);
 
 impl ReferenceSource for MapReferences {
     fn fetch(

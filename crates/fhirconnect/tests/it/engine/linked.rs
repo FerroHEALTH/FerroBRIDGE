@@ -20,12 +20,14 @@ use fhirconnect::engine::outcome::SkipReason;
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::engine::traverse::error::EngineError;
+use fhirconnect::engine::traverse::to_fhir;
 use fhirconnect::engine::traverse::to_openehr;
 use openehr_mapping_core::composition::CanonicalComposition;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::index::paths::AqlPath;
 use openehr_rm::v1_2::paths::EhrUri;
 
+use crate::engine::MapIdentities;
 use crate::engine::MapReferences;
 use crate::engine::defaults;
 use crate::engine::reference::condition_with;
@@ -227,5 +229,174 @@ fn a_linked_composition_the_caller_cannot_commit_refuses_the_run() -> Result<(),
     )?;
     let error = ran.expect_err("the failed commit refuses");
     assert!(matches!(error, EngineError::Reference { .. }), "{error:?}");
+    Ok(())
+}
+
+/// Returns the synthetic Encounter the resource-side link enters, typed so
+/// the mapping inside the reference writes from it.
+fn typed_encounter() -> Value {
+    Value::from_serde_json(serde_json::json!({
+        "resourceType": "Encounter",
+        "id": "synthetic-encounter-1",
+        "status": "finished",
+        "class": {"system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "AMB"},
+        "type": [{"text": "Synthetic encounter type"}]
+    }))
+}
+
+/// Maps the Condition whose `encounter` reference enters the Encounter and
+/// links the entry through `$fhirRoot`, with `seams` as the run's seams.
+fn run_resource_side(seams: &Seams<'_>) -> Result<(Ran, WebTemplateIndex), Box<dyn Error>> {
+    let program = compiled("ferrobridge_link_resource")?;
+    let index = template()?;
+    let ran = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_with(serde_json::json!({"encounter": {"reference": ENCOUNTER}}))?,
+        seams,
+        &defaults(),
+        &CallContext::new(),
+    );
+    Ok((ran, index))
+}
+
+/// Returns the references source holding the typed Encounter.
+fn holding_typed_encounter() -> MapReferences {
+    let mut held = BTreeMap::new();
+    held.insert(String::from(ENCOUNTER), typed_encounter());
+    MapReferences(held)
+}
+
+/// Maps `composition` back out through the resource-side link program, with
+/// an identity sink that names a created Encounter.
+fn back_out(composition: &CanonicalComposition) -> Result<Outcome<Value>, Box<dyn Error>> {
+    let program = compiled("ferrobridge_link_resource")?;
+    let mut ids = BTreeMap::new();
+    ids.insert(
+        String::from("Encounter"),
+        String::from("created-encounter-1"),
+    );
+    let identities = MapIdentities {
+        ids,
+        seen: Mutex::default(),
+    };
+    Ok(to_fhir(
+        &program,
+        &SCHEMAS,
+        &template()?,
+        composition,
+        &Seams::default().with_identities(&identities),
+        &CallContext::new(),
+    )?)
+}
+
+/// Returns the literal the outbound Condition's `encounter` holds.
+fn encounter_reference(outbound: &Outcome<Value>) -> Option<&str> {
+    outbound
+        .value()
+        .get("encounter")
+        .and_then(|encounter| encounter.get("reference"))
+        .and_then(Value::as_str)
+}
+
+#[test]
+fn a_link_whose_side_is_the_entered_resource_targets_its_composition() -> Result<(), Box<dyn Error>>
+{
+    // concept-mappings.adoc §Linked mappings: "the engine checks the `meta.url`
+    // contained in the FHIR resource", here the Encounter the reference
+    // entered, which is handed over as it was read, under its literal.
+    let references = holding_typed_encounter();
+    let linker = Answering::new(Ok(Linked::At(COMMITTED.parse::<EhrUri>()?)));
+    let (ran, index) = run_resource_side(
+        &Seams::default()
+            .with_references(&references)
+            .with_linked(&linker),
+    )?;
+    let inbound = ran?;
+    assert_eq!(link_targets(&index, inbound.value())?, [COMMITTED]);
+    assert_eq!(
+        *linker.asked.lock().unwrap_or_else(PoisonError::into_inner),
+        [(String::from(ENCOUNTER), Some(String::from("Encounter")))],
+        "the caller was handed the entered Encounter"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_link_whose_side_is_the_entered_resource_reads_back_as_its_reference()
+-> Result<(), Box<dyn Error>> {
+    // The linked composition is the Encounter's record, so going out the
+    // reference names it, as a Reference-side link writes its target, and
+    // no second Encounter is created from this composition.
+    let references = holding_typed_encounter();
+    let linker = Answering::new(Ok(Linked::At(COMMITTED.parse::<EhrUri>()?)));
+    let (ran, _) = run_resource_side(
+        &Seams::default()
+            .with_references(&references)
+            .with_linked(&linker),
+    )?;
+    let outbound = back_out(ran?.value())?;
+    assert_eq!(encounter_reference(&outbound), Some(COMMITTED));
+    assert!(outbound.created().is_empty(), "{:?}", outbound.created());
+    assert!(
+        outbound.warnings().iter().any(|warning| matches!(
+            *warning.loss(),
+            Loss::Skipped {
+                reason: SkipReason::LinkedResource { ref target },
+                ..
+            } if target == COMMITTED
+        )),
+        "{:?}",
+        outbound.warnings()
+    );
+    Ok(())
+}
+
+#[test]
+fn an_entered_resource_with_no_link_is_created_going_out() -> Result<(), Box<dyn Error>> {
+    // Reference.adoc: "initialize a new resource in FHIR ... and reference
+    // it"; with no linked composition the Encounter is created as before.
+    let references = holding_typed_encounter();
+    let linker = Answering::new(Ok(Linked::Unmapped));
+    let (ran, index) = run_resource_side(
+        &Seams::default()
+            .with_references(&references)
+            .with_linked(&linker),
+    )?;
+    let inbound = ran?;
+    assert_eq!(link_targets(&index, inbound.value())?, Vec::<String>::new());
+    let outbound = back_out(inbound.value())?;
+    assert_eq!(
+        encounter_reference(&outbound),
+        Some("Encounter/created-encounter-1")
+    );
+    let created = outbound
+        .created()
+        .first()
+        .ok_or("the run created the Encounter")?;
+    assert_eq!(
+        created
+            .get("type")
+            .and_then(|types| types.as_array()?.first())
+            .and_then(|kind| kind.get("text"))
+            .and_then(Value::as_str),
+        Some("Synthetic encounter type")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_resource_side_link_with_no_seam_refuses() -> Result<(), Box<dyn Error>> {
+    // RM 1.1.0 data_types.html §DV_EHR_URI: the target "has the scheme name
+    // 'ehr'", and one run produces one composition, so with no caller to
+    // commit the Encounter's own the run refuses.
+    let references = holding_typed_encounter();
+    let (ran, _) = run_resource_side(&Seams::default().with_references(&references))?;
+    let error = ran.expect_err("no seam commits the linked composition");
+    assert!(
+        matches!(error, EngineError::LinkTarget { ref target, .. } if target == ENCOUNTER),
+        "{error}"
+    );
     Ok(())
 }

@@ -8,6 +8,7 @@ use core::fmt;
 
 use openehr_mapping_core::header::metadata::MappingName;
 
+use crate::engine::fhir::FhirKind;
 use crate::model::ast::keyword::DataType;
 use crate::model::ast::keyword::Direction;
 
@@ -22,6 +23,44 @@ use crate::resolve::program::port::Port;
 use crate::resolve::program::port::render_ports;
 use crate::resolve::program::target::FhirTarget;
 use crate::resolve::program::target::OpenehrTarget;
+
+/// What the FHIR side of a `link` names.
+///
+/// "The engine checks the `meta.url` contained in the FHIR resource"
+/// (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked
+/// mappings): the side reaches that resource through a `Reference`, its
+/// `reference` string, or as the resource an enclosing `reference` mapping
+/// entered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkSide {
+    /// A `Reference` element.
+    Reference,
+    /// The `reference` string of a `Reference`.
+    String,
+    /// The resource the innermost enclosing `reference` mapping entered.
+    Resource,
+}
+
+impl LinkSide {
+    /// Returns what `target` names, for a mapping `depth` references deep;
+    /// `None` for a side no `link` can carry.
+    ///
+    /// A resource is a side only as the root of the document the innermost
+    /// reference entered: the program's own resource is the composition
+    /// being written, and one a `^` run climbed into is not the resource the
+    /// link sits in.
+    #[must_use]
+    pub fn of(target: &FhirTarget, depth: usize) -> Option<Self> {
+        match FhirKind::at(target.resolved().location()) {
+            Some(FhirKind::Reference) => Some(Self::Reference),
+            Some(FhirKind::String) => Some(Self::String),
+            _ if target.resolved().moves().is_empty() && depth > 0 && target.level() == depth => {
+                Some(Self::Resource)
+            }
+            _ => None,
+        }
+    }
+}
 
 /// What a compiled mapping does beyond mapping its two paths against each
 /// other.

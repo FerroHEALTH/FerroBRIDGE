@@ -7,6 +7,8 @@
 # the same change, because a published version is immutable. A root
 # `[workspace.dependencies]` entry a member consumes is packaged content too:
 # `cargo package` renders the concrete requirement.
+# Every requirement on a workspace crate names its version exactly (`=X.Y.Z`),
+# checked over the whole tree on every run (#1736).
 #
 # Versions are per crate here, not lockstep, and follow Cargo SemVer (#1745): a
 # compatible change moves the patch, a breaking one the minor while the crate is
@@ -169,6 +171,18 @@ self_test() {
   printf 'demo = "1"\n' > "$tmp/repo/crates/demo/README.md"
   t_git commit -qam 'out of 0.x'
   expect 1 "a step out of 0.x" stepped HEAD
+  # The #1736 case: a sibling requirement between workspace crates is exact,
+  # since the siblings are released together from one commit.
+  t_git branch moved
+  printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde = "2"\ndemo = { path = "crates/demo", version = "0.1.4" }\n' > "$tmp/repo/Cargo.toml"
+  t_git commit -qam 'a caret sibling requirement'
+  expect 1 "a caret requirement on a workspace crate" moved HEAD
+  printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde = "2"\ndemo = { path = "crates/demo", version = "~0.1.4" }\n' > "$tmp/repo/Cargo.toml"
+  t_git commit -qam 'a tilde sibling requirement'
+  expect 1 "a tilde requirement on a workspace crate" moved HEAD
+  printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde = "2"\ndemo = { path = "crates/demo", version = "=0.1.4" }\n' > "$tmp/repo/Cargo.toml"
+  t_git commit -qam 'an exact sibling requirement'
+  expect 0 "an exact requirement on a workspace crate" moved HEAD
 
   if [[ "$failures" -ne 0 ]]; then
     echo "crate-version-guard: self-test: $failures case(s) failed" >&2
@@ -208,6 +222,19 @@ for manifest in crates/*/Cargo.toml; do
   fi
 done
 [[ "$unstated" -eq 0 ]] || exit 1
+
+# Every requirement on a workspace crate that names a version names it
+# exactly (`=X.Y.Z`), in the root manifest and in any member's: the siblings
+# are released together, so a published crate names the sibling release it was
+# built with and never resolves one this workspace did not build it against
+# (#1736).
+inexact=0
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  echo "::error::${line%%:*}: ${line#*:} requires a workspace crate by a range; a sibling requirement is exact (version = \"=X.Y.Z\") (.claude/rules/crates-publishing.md)." >&2
+  inexact=1
+done < <(grep -HnE '\{[^}]*path = "[^"]*crates/[^"]*"[^}]*version = "[^="]' Cargo.toml crates/*/Cargo.toml 2>/dev/null || true)
+[[ "$inexact" -eq 0 ]] || exit 1
 
 base_ref="${1:?usage: crate-version-guard.sh <base-ref> [head-ref|WORKTREE] | --self-test}"
 head="${2:-HEAD}"
@@ -333,7 +360,7 @@ for manifest in crates/*/Cargo.toml; do
   # An internal requirement only exists for a crate other members depend on;
   # when it does, it must name the same version.
   req="$(grep -E "^${name} = \{ path = \"${crate}\", version = \"" Cargo.toml |
-    sed -E 's/.*version = "([^"]+)".*/\1/' || true)"
+    sed -E 's/.*version = "=?([^"]+)".*/\1/' || true)"
   if [[ -n "$req" ]] && [[ "$req" != "$new_ver" ]]; then
     echo "::error::root Cargo.toml requires $name $req, its manifest is at $new_ver." >&2
     fail=1

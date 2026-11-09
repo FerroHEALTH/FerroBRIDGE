@@ -19,6 +19,9 @@
 use fhir_types::schema::Kind;
 use fhir_types::schema::ValueKind;
 use openehr_rm::v1_2::model;
+use openehr_rm::v1_2::typing::RmType;
+use openehr_rm::v1_2::typing::attribute_type;
+use openehr_rm::v1_2::typing::base_name;
 
 use crate::model::ast::keyword::DataType;
 use crate::model::ast::keyword::Direction;
@@ -83,24 +86,15 @@ pub const TEXT: &str = "string";
 /// and no data value is one.
 pub const STRUCTURAL: &str = "PATHABLE";
 
-/// Returns the class a Web Template type name names, without the generic
-/// parameter a `DV_INTERVAL<T>` node carries (`DV_INTERVAL<DV_DATE_TIME>`).
-///
-/// `DV_INTERVAL<T>` is generic in its bound class
-/// (<https://specifications.openehr.org/releases/RM/Release-1.1.0/data_types.html#_dv_interval_class>),
-/// and the cells and the pairs are keyed by the class.
-#[must_use]
-pub fn base_class(rm_type: &str) -> &str {
-    rm_type.split_once('<').map_or(rm_type, |(class, _)| class)
-}
-
 /// Returns the generic parameter a Web Template type name carries
-/// (`DV_QUANTITY` of `DV_INTERVAL<DV_QUANTITY>`), `None` for a plain class.
+/// (`DV_QUANTITY` of `DV_INTERVAL<DV_QUANTITY>`), `None` for a plain class
+/// and for a name `openehr_rm::v1_2::typing::RmType` does not read.
 #[must_use]
-pub fn type_argument(rm_type: &str) -> Option<&str> {
+pub fn type_argument(rm_type: &str) -> Option<RmType> {
     rm_type
-        .split_once('<')
-        .and_then(|(_, argument)| argument.strip_suffix('>'))
+        .parse::<RmType>()
+        .ok()
+        .and_then(|parsed| parsed.params().first().cloned())
 }
 
 /// Returns the class an attribute of a node of `rm_type` holds: the node's
@@ -114,24 +108,19 @@ pub fn type_argument(rm_type: &str) -> Option<&str> {
 /// attribute declared as the parameter's bound with no type arguments of its
 /// own is read as typed by the parameter, and the argument replaces it only
 /// when it conforms to that bound.
+///
+/// The substitution is `openehr_rm::v1_2::typing::attribute_type`; an
+/// attribute the node's class does not declare itself (one of a descendant),
+/// and an argument the class does not take, keep the declared type.
 #[must_use]
 pub fn attribute_class(rm_type: &str, attribute: &model::RmAttribute) -> &'static str {
     let declared = attribute.declared_type;
-    let Some(argument) = type_argument(rm_type) else {
+    let Ok(instantiated) = rm_type.parse::<RmType>() else {
         return declared;
     };
-    let parameterised = attribute.type_params.is_empty()
-        && model::class(base_class(rm_type)).is_some_and(|class| {
-            class
-                .generic_params
-                .iter()
-                .any(|parameter| parameter.conforms_to == Some(declared))
-        });
-    if !parameterised {
-        return declared;
-    }
-    model::class(argument)
-        .filter(|class| model::is_a(class.name, declared))
+    attribute_type(&instantiated, attribute.name)
+        .ok()
+        .and_then(|typed| model::class(typed.item.name()))
         .map_or(declared, |class| class.name)
 }
 
@@ -171,7 +160,7 @@ pub fn pairs(class: &str) -> &'static [&'static str] {
         .or_else(|| {
             type_argument(class)
                 .is_none()
-                .then(|| row(base_class(class)))
+                .then(|| row(base_name(class)))
                 .flatten()
         })
         .unwrap_or(&[])
@@ -278,6 +267,7 @@ mod tests {
     use super::type_argument;
     use crate::model::ast::keyword::Direction;
     use openehr_rm::v1_2::model;
+    use openehr_rm::v1_2::typing::RmType;
 
     #[test]
     fn a_date_time_element_against_a_date_time_node_converts_as_a_date_time() {
@@ -395,7 +385,9 @@ mod tests {
     #[test]
     fn a_generic_node_names_its_parameter() {
         assert_eq!(
-            type_argument("DV_INTERVAL<DV_QUANTITY>"),
+            type_argument("DV_INTERVAL<DV_QUANTITY>")
+                .as_ref()
+                .map(RmType::name),
             Some("DV_QUANTITY")
         );
         assert_eq!(type_argument("DV_QUANTITY"), None);

@@ -14,6 +14,14 @@
     reason = "test assertions"
 )]
 
+#[cfg(all(
+    feature = "stu3",
+    feature = "r4",
+    feature = "r4b",
+    feature = "r5",
+    feature = "r6"
+))]
+mod authored;
 #[cfg(feature = "r4")]
 mod batch;
 #[cfg(all(feature = "stu3", feature = "r4", feature = "r4b"))]
