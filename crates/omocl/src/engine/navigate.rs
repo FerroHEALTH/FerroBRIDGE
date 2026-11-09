@@ -9,45 +9,75 @@
 //! BASE Release 1.2.0 §Paths and Locators, positional predicates). That path
 //! is what a record key names, and what a parent step walks back up.
 
-use openehr_rm::v1_2::paths::PathSegment;
-use openehr_rm::v1_2::paths::Predicate;
-use openehr_rm::v1_2::paths::select_children;
+use openehr_sdt::flat::navigate::Navigator;
 use serde_json::Value;
 
 use crate::resolve::program::Hop;
 
 /// One step of an instance path.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Step {
+struct Step {
     attribute: String,
     node_id: Option<String>,
     position: usize,
 }
 
-/// One node of a composition, with the path that reaches it.
+/// One node of a composition, with the path that reaches it, as the
+/// template-aware navigation of `openehr-sdt` found it.
 #[derive(Debug, Clone)]
 pub(crate) struct Instance<'a> {
-    value: &'a Value,
-    steps: Vec<Step>,
+    found: openehr_sdt::flat::navigate::Instance<'a>,
 }
 
 impl<'a> Instance<'a> {
     /// Returns the composition root.
     pub(crate) const fn root(composition: &'a Value) -> Self {
         Self {
-            value: composition,
-            steps: Vec::new(),
+            found: openehr_sdt::flat::navigate::Instance::root(composition),
         }
     }
 
     /// Returns the node.
-    pub(crate) const fn value(&self) -> &'a Value {
-        self.value
+    pub(crate) fn value(&self) -> &'a Value {
+        self.found.value()
     }
 
-    /// Returns the instance path, every segment with its position.
+    /// Returns the instance path, every segment with the 1-based position of
+    /// its node among the siblings that carry the same archetype node id.
     pub(crate) fn path(&self) -> String {
-        render(&self.steps)
+        let mut steps = Vec::with_capacity(self.found.steps().len());
+        let mut parent = self
+            .found
+            .ancestor(self.found.steps().len())
+            .map(|root| root.value());
+        for step in self.found.steps() {
+            let node_id = step
+                .value()
+                .get("archetype_node_id")
+                .and_then(Value::as_str);
+            let siblings: &[Value] = parent
+                .and_then(|held| held.get(&step.segment().attribute))
+                .and_then(Value::as_array)
+                .map_or(&[], Vec::as_slice);
+            let position = step.index().map_or(1, |index| {
+                siblings
+                    .iter()
+                    .take(index)
+                    .filter(|sibling| {
+                        node_id.is_none()
+                            || sibling.get("archetype_node_id").and_then(Value::as_str) == node_id
+                    })
+                    .count()
+                    .saturating_add(1)
+            });
+            steps.push(Step {
+                attribute: step.segment().attribute.clone(),
+                node_id: node_id.map(str::to_owned),
+                position,
+            });
+            parent = Some(step.value());
+        }
+        render(&steps)
     }
 }
 
@@ -56,85 +86,18 @@ impl<'a> Instance<'a> {
 /// A parent step walks back along `from`'s own path, so `../` always names
 /// the ancestor the instance was reached through.
 pub(crate) fn follow<'a>(
-    composition: &'a Value,
+    navigator: &Navigator,
     from: &Instance<'a>,
     hop: &Hop,
 ) -> Vec<Instance<'a>> {
-    let start = if hop.up() == 0 {
-        from.clone()
-    } else {
-        let Some(kept) = from.steps.len().checked_sub(hop.up()) else {
-            return Vec::new();
-        };
-        let mut steps = from.steps.clone();
-        steps.truncate(kept);
-        let Some(ancestor) = revisit(composition, &steps) else {
-            return Vec::new();
-        };
-        ancestor
+    let Some(start) = from.found.ancestor(hop.up()) else {
+        return Vec::new();
     };
-    let mut current = vec![start];
-    for segment in hop.down() {
-        let mut next = Vec::new();
-        for instance in &current {
-            next.append(&mut children(instance, segment));
-        }
-        current = next;
-    }
-    current
-}
-
-/// Returns every child of `instance` one written segment selects.
-fn children<'a>(instance: &Instance<'a>, segment: &PathSegment) -> Vec<Instance<'a>> {
-    select_children(instance.value, segment)
+    navigator
+        .descend(&start, hop.down())
         .into_iter()
-        .map(|child| {
-            let node_id = child
-                .get("archetype_node_id")
-                .and_then(Value::as_str)
-                .map(str::to_owned);
-            let identity = identity(&segment.attribute, node_id.as_deref());
-            let position = select_children(instance.value, &identity)
-                .iter()
-                .position(|sibling| core::ptr::eq(*sibling, child))
-                .map_or(1, |index| index.saturating_add(1));
-            let mut steps = instance.steps.clone();
-            steps.push(Step {
-                attribute: segment.attribute.clone(),
-                node_id,
-                position,
-            });
-            Instance {
-                value: child,
-                steps,
-            }
-        })
+        .map(|found| Instance { found })
         .collect()
-}
-
-/// Walks the composition along an instance path.
-fn revisit<'a>(composition: &'a Value, steps: &[Step]) -> Option<Instance<'a>> {
-    let mut current = composition;
-    for step in steps {
-        let identity = identity(&step.attribute, step.node_id.as_deref());
-        current = *select_children(current, &identity).get(step.position.checked_sub(1)?)?;
-    }
-    Some(Instance {
-        value: current,
-        steps: steps.to_vec(),
-    })
-}
-
-/// Returns the segment that selects the siblings of one archetype node id.
-fn identity(attribute: &str, node_id: Option<&str>) -> PathSegment {
-    PathSegment {
-        attribute: attribute.to_owned(),
-        predicate: Predicate {
-            archetype_node_id: node_id.map(str::to_owned),
-            ..Predicate::default()
-        },
-        descendant: false,
-    }
 }
 
 /// Renders an instance path.

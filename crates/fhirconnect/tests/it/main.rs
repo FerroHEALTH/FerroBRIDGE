@@ -31,6 +31,7 @@ mod model;
 mod operations;
 mod person;
 mod pins;
+mod prozedur;
 mod published;
 mod readiness;
 mod repeated_start;

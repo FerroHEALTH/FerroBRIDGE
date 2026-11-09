@@ -8,6 +8,7 @@ use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
 use openehr_sdt::flat::build::BuildOptions;
 use openehr_sdt::flat::build::build_composition_with;
+use openehr_sdt::flat::navigate::Instance;
 use openehr_sdt::flat::path::FlatKey;
 use openehr_sdt::flat::path::MAX_INSTANCE_INDEX;
 use openehr_sdt::flat::path::Segment;
@@ -36,8 +37,7 @@ impl WebTemplateIndex {
     /// (Simplified Formats, §Context); this crate reads no clock.
     ///
     /// Every `ARCHETYPED.rm_version` names the RM release the composition
-    /// conforms to: Release 1.1.0, unless it holds an element the development
-    /// line changed (a `GENERIC_ENTRY` whose `data` is no `ITEM_TREE`).
+    /// conforms to: the oldest release whose model decodes it.
     ///
     /// # Errors
     ///
@@ -45,7 +45,8 @@ impl WebTemplateIndex {
     /// template, [`PathError::OccurrenceCount`] when its occurrences do not
     /// match the repeating nodes above it, [`PathError::CompositionBuild`]
     /// when the builder refuses the values, and
-    /// [`PathError::InvalidComposition`] when the result does not validate.
+    /// [`PathError::InvalidComposition`] when the result does not validate or
+    /// no RM release decodes it.
     pub fn build_composition(
         &self,
         values: &[NodeValue],
@@ -82,15 +83,25 @@ impl WebTemplateIndex {
                 source: Box::new(source),
             }
         })?;
-        let built = crate::release::build(|release| {
-            let options = BuildOptions::default().with_rm_version(release.spec_version());
-            build_composition_with(&document, self.web_template(), now, &options).map_err(
-                |source| PathError::CompositionBuild {
-                    template_id: self.template_id().to_owned(),
-                    source: Box::new(source),
-                },
-            )
-        })?;
+        let built = crate::release::build(
+            |release| {
+                let options = BuildOptions::default().with_rm_version(release.spec_version());
+                build_composition_with(&document, self.web_template(), now, &options).map_err(
+                    |source| PathError::CompositionBuild {
+                        template_id: self.template_id().to_owned(),
+                        source: Box::new(source),
+                    },
+                )
+            },
+            |refusal| PathError::InvalidComposition {
+                template_id: self.template_id().to_owned(),
+                messages: refusal
+                    .rejections()
+                    .iter()
+                    .map(|(generation, error)| format!("{generation}: {error}"))
+                    .collect(),
+            },
+        )?;
         let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
         if !messages.is_empty() {
             return Err(PathError::InvalidComposition {
@@ -227,7 +238,7 @@ impl WebTemplateIndex {
             });
         }
         let path = self.instance_path(node, occurrences)?;
-        Ok(Self::walk(composition.document(), &path.segments))
+        Ok(self.walk(composition.document(), &path.segments))
     }
 
     /// Reads the `ELEMENT` a value node sits in out of a composition.
@@ -269,7 +280,7 @@ impl WebTemplateIndex {
                 });
             }
         };
-        Ok(Self::walk(composition.document(), element))
+        Ok(self.walk(composition.document(), element))
     }
 
     /// Returns the path that names one instance of `node` in a composition,
@@ -301,60 +312,49 @@ impl WebTemplateIndex {
             });
         }
         let path = self.instance_path(node, occurrences)?;
-        let mut current = composition.document();
-        let mut named = RmPath {
-            absolute: path.absolute,
-            segments: Vec::with_capacity(path.segments.len()),
+        let found = self.navigator().instances(composition.document(), &path);
+        let Some(instance) = found.first() else {
+            return Ok(None);
         };
-        for segment in &path.segments {
-            let mut identity = segment.clone();
-            identity.predicate.position = None;
-            let candidates = select_children(current, &identity);
-            let nth = segment
-                .predicate
-                .position
-                .map_or(0, |position| position.saturating_sub(1));
-            let Some(&chosen) = candidates.get(nth) else {
-                return Ok(None);
-            };
-            if nth > 0 {
-                let place = current
-                    .get(&segment.attribute)
-                    .and_then(Value::as_array)
-                    .and_then(|items| items.iter().position(|item| core::ptr::eq(item, chosen)))
-                    .and_then(|index| index.checked_add(1));
-                identity.predicate = openehr_rm::v1_2::paths::Predicate {
-                    position: place,
-                    ..openehr_rm::v1_2::paths::Predicate::default()
-                };
-            }
-            named.segments.push(identity);
-            current = chosen;
-        }
-        Ok(Some(named))
+        let segments = path
+            .segments
+            .iter()
+            .zip(instance.steps())
+            .map(|(segment, step)| {
+                if segment
+                    .predicate
+                    .position
+                    .is_some_and(|position| position > 1)
+                {
+                    PathSegment {
+                        attribute: segment.attribute.clone(),
+                        predicate: openehr_rm::v1_2::paths::Predicate {
+                            position: step.index().and_then(|index| index.checked_add(1)),
+                            ..openehr_rm::v1_2::paths::Predicate::default()
+                        },
+                        descendant: false,
+                    }
+                } else {
+                    step.segment().clone()
+                }
+            })
+            .collect();
+        Ok(Some(RmPath {
+            absolute: path.absolute,
+            segments,
+        }))
     }
 
-    /// Walks the instance path `segments` down a canonical document.
+    /// Walks the instance path `segments` down a canonical document to the
+    /// first instance it reaches, in document order.
     ///
     /// NOTE: no specification governs this: our own design, an absent optional
     /// node is a legitimate absence and never a defect, so it reads as `None`.
-    fn walk(document: &Value, segments: &[PathSegment]) -> Option<Value> {
-        let mut current = document;
-        for segment in segments {
-            // An RM positional predicate counts every element of the container
-            // (BASE Release 1.2.0 §Paths and Locators, positional parameters),
-            // and an instance counts the node's own occurrences only, so the
-            // position picks among the elements the node's identity selects.
-            let mut identity = segment.clone();
-            identity.predicate.position = None;
-            let candidates = select_children(current, &identity);
-            let index = segment
-                .predicate
-                .position
-                .map_or(0, |position| position.saturating_sub(1));
-            current = *candidates.get(index)?;
-        }
-        Some(current.clone())
+    fn walk(&self, document: &Value, segments: &[PathSegment]) -> Option<Value> {
+        self.navigator()
+            .descend(&Instance::root(document), segments)
+            .first()
+            .map(|instance| instance.value().clone())
     }
 
     /// Returns the FLAT key one value is written under.
@@ -471,38 +471,4 @@ fn position_segment(path: &RmPath) -> Option<usize> {
         .iter()
         .rposition(|segment| segment.predicate.archetype_node_id.is_some())
         .or_else(|| path.segments.len().checked_sub(1))
-}
-
-/// The children of `node` a path segment selects.
-///
-/// A root point records its archetype id in `archetype_node_id` (openEHR RM
-/// common, the `LOCATABLE` class), and an ADL 2 template records the full
-/// release (`openEHR-EHR-INSTRUCTION.medication_order.v3.0.0`) where the
-/// `aqlPath` names the interface form, so an archetype id that selects no
-/// child exactly selects the children it names in its interface form.
-fn select_children<'a>(node: &'a Value, segment: &PathSegment) -> Vec<&'a Value> {
-    let exact = openehr_rm::v1_2::paths::select_children(node, segment);
-    let Some(wanted) = segment.predicate.archetype_node_id.as_deref() else {
-        return exact;
-    };
-    if !exact.is_empty() {
-        return exact;
-    }
-    let children = match node.get(&segment.attribute) {
-        Some(Value::Array(items)) => items.iter().collect(),
-        Some(single) => vec![single],
-        None => Vec::new(),
-    };
-    children
-        .into_iter()
-        .filter(|child| {
-            child
-                .get("archetype_node_id")
-                .and_then(Value::as_str)
-                .is_some_and(|carried| crate::index::matching::node_id_matches(wanted, carried))
-                && segment.predicate.name_value.as_deref().is_none_or(|name| {
-                    child.pointer("/name/value").and_then(Value::as_str) == Some(name)
-                })
-        })
-        .collect()
 }

@@ -28,8 +28,11 @@ use std::path::PathBuf;
 use fhir_types::r4::search_parameters::SEARCH_PARAMETERS;
 use fhir_types::search::SearchParameter;
 use openehr_mapping_core::index::WebTemplateIndex;
+use openehr_query::ast::IdentifiedPath;
+use openehr_query::ast::ObjectPath;
 use serde::Deserialize;
 
+use crate::facade::search::aql::below;
 use crate::facade::search::declaration::file::ParameterFile;
 
 /// One search declaration file, as written.
@@ -116,14 +119,15 @@ pub enum Coded {
 }
 
 /// One checked parameter: where it is read and what it compares.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     /// The FHIR type.
     kind: ParameterType,
     /// The node the path is read under, `None` for the composition.
     node: Option<Node>,
-    /// The path, relative to the node or to the composition.
-    path: String,
+    /// The path, relative to the node or to the composition, parsed when
+    /// the declaration loaded.
+    path: ObjectPath,
     /// The coded value's type, for a `token`.
     coded: Option<Coded>,
     /// The FHIR system URI to openEHR terminology id table of a `token`.
@@ -162,29 +166,30 @@ impl Parameter {
     /// Returns the compared path relative to `alias`: the one path of a
     /// `string` or a `date`, the code path of a `token`.
     #[must_use]
-    pub fn value_path(&self, alias: &str) -> String {
+    pub fn value_path(&self, alias: &str) -> IdentifiedPath {
         match self.coded {
-            Some(Coded::Text) => format!("{alias}/{}/defining_code/code_string", self.path),
-            Some(Coded::Phrase) => format!("{alias}/{}/code_string", self.path),
-            None => format!("{alias}/{}", self.path),
+            Some(Coded::Text) => below(alias, &self.path, &["defining_code", "code_string"]),
+            Some(Coded::Phrase) => below(alias, &self.path, &["code_string"]),
+            None => below(alias, &self.path, &[]),
         }
     }
 
     /// Returns the system path of a `token` relative to `alias`.
     #[must_use]
-    pub fn system_path(&self, alias: &str) -> Option<String> {
+    pub fn system_path(&self, alias: &str) -> Option<IdentifiedPath> {
         match self.coded? {
-            Coded::Text => Some(format!(
-                "{alias}/{}/defining_code/terminology_id/value",
-                self.path
+            Coded::Text => Some(below(
+                alias,
+                &self.path,
+                &["defining_code", "terminology_id", "value"],
             )),
-            Coded::Phrase => Some(format!("{alias}/{}/terminology_id/value", self.path)),
+            Coded::Phrase => Some(below(alias, &self.path, &["terminology_id", "value"])),
         }
     }
 
     /// Returns every path this parameter compares, relative to `alias`.
     #[must_use]
-    pub fn paths(&self, alias: &str) -> Vec<String> {
+    pub fn paths(&self, alias: &str) -> Vec<IdentifiedPath> {
         std::iter::once(self.value_path(alias))
             .chain(self.system_path(alias))
             .collect()

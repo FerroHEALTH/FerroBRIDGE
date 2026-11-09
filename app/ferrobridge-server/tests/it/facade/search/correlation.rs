@@ -19,6 +19,7 @@ use wiremock::matchers;
 use super::super::VERSION_ONE;
 use super::AQL;
 use super::OTHER_CONTAINER;
+use super::assert_canonical;
 use super::bound;
 use super::counts;
 use super::diagnosis;
@@ -49,10 +50,11 @@ async fn code_and_system_are_compared_on_the_one_node_the_from_binds() -> Result
     );
     assert!(
         text.contains(
-            "((n0/data[at0001]/items[at0002]/value/defining_code/terminology_id/value = $p0 AND n0/data[at0001]/items[at0002]/value/defining_code/code_string = $p1))"
+            "WHERE c/archetype_details/template_id/value = $template AND (n0/data[at0001]/items[at0002]/value/defining_code/terminology_id/value = $p0 AND n0/data[at0001]/items[at0002]/value/defining_code/code_string = $p1)"
         ),
         "the code and the system are not one node's: {text}"
     );
+    assert_canonical(text)?;
     assert!(
         !text.contains("c/content["),
         "a path still crosses the repeated node: {text}"

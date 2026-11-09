@@ -33,6 +33,8 @@ openehr-base.workspace = true
 # The canonical JSON reader every RM value a node holds is decoded with
 # (`openehr_its::json`).
 openehr-its.workspace = true
+# The template-aware instance navigation the walk follows a hop with.
+openehr-sdt.workspace = true
 # The exact decimal a DV_QUANTITY magnitude and a `multiplication` product are
 # carried in.
 rust_decimal.workspace = true

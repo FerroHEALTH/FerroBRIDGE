@@ -249,11 +249,16 @@ if [[ -z "$only" || "$only" = validator-agreement ]] && ! scripts/vendor/profile
   echo "conformance: the profile packages could not be fetched" >&2
   exit 2
 fi
-# Runs the conformance tests of package $1 that filter $2 selects.
+# Runs the conformance tests that filter $1 selects in the packages after it.
 measure() {
-  local test_package="$1" test_filter="$2"
-  if ! cargo nextest run --locked -p "$test_package" --no-tests=fail --no-fail-fast -E "$test_filter"; then
-    echo "conformance: a $test_package corpus test failed; a case its list records no longer passes"
+  local test_filter="$1" package
+  shift
+  local args=()
+  for package in "$@"; do
+    args+=(-p "$package")
+  done
+  if ! cargo nextest run --locked "${args[@]}" --no-tests=fail --no-fail-fast -E "$test_filter"; then
+    echo "conformance: a corpus test of $* failed; a case its list records no longer passes"
     failed=1
   fi
 }
@@ -263,14 +268,15 @@ measure_corpus() {
   local corpus_name="$1"
   local package test
   read -r package test < <(test_of "$corpus_name")
-  measure "$package" "test(/(^|::)${test}\$/)"
+  measure "test(/(^|::)${test}\$/)" "$package"
 }
 
-# One package per invocation, as the CI test lane runs them.
-for package in "${PACKAGES[@]}"; do
-  [[ -z "$only" ]] || break
-  measure "$package" 'test(/conformance_/)'
-done
+# Every package in one invocation, so each workspace crate compiles once with
+# the features of the whole set. The CI test lane runs the same tests one
+# package at a time, with each package's own features.
+if [[ -z "$only" ]]; then
+  measure 'test(/conformance_/)' "${PACKAGES[@]}"
+fi
 selected=("${CORPORA[@]}")
 if [[ -n "$only" ]]; then
   selected=("$only")

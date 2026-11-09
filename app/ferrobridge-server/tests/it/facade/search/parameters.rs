@@ -14,6 +14,7 @@ use super::super::VERSION_ONE;
 use super::super::call;
 use super::super::create_one;
 use super::super::first_issue;
+use super::assert_canonical;
 use super::bound;
 use super::get;
 use super::link;
@@ -81,7 +82,11 @@ async fn comma_values_are_alternatives_and_repeats_are_all_required() -> Result<
     // two entries, and the alternatives of one occurrence share its node.
     let query = query_of("code=a,b&code=c").await?;
     let text = query["q"].as_str().unwrap_or_default();
-    assert!(text.contains(") OR ("), "{text}");
+    assert!(
+        text.contains(&format!("({CODE} = $p0 OR {CODE} = $p1) AND ")),
+        "{text}"
+    );
+    assert_canonical(text)?;
     assert_eq!(2, text.matches(&format!("{CODE} = $")).count(), "{text}");
     assert_eq!(
         1,
