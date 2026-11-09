@@ -406,3 +406,81 @@ const SHARED_CHILD: &str = "mappings:\n  - name: \"problem\"\n    with:\n      f
                             - name: \"code\"\n          with:\n            fhir: \"code\"\n            openehr: \
                             \"data[at0001]/items[at0002]\"\n        - name: \"code\"\n          with:\n            \
                             fhir: \"note.text\"\n            openehr: \"data[at0001]/items[at0069]\"\n";
+
+/// The model body of a `link` whose FHIR side is `side`, at the top level of
+/// the start model or, with `inside`, inside a `reference` to an `Encounter`.
+fn link_body(side: &str, inside: bool) -> String {
+    let pad = if inside {
+        " ".repeat(10)
+    } else {
+        " ".repeat(4)
+    };
+    let link = format!(
+        "{pad}with:\n{pad}  fhir: \"{side}\"\n{pad}  openehr: \"$archetype/links\"\n{pad}link:\n\
+         {pad}  meaning: \"the encounter\"\n{pad}  type: \"encounter\"\n"
+    );
+    if inside {
+        format!(
+            "mappings:\n  - name: \"encounter\"\n    with:\n      fhir: \"$resource.encounter\"\n      \
+             openehr: \"$reference\"\n    reference:\n      resourceType: \"Encounter\"\n      \
+             mappings:\n        - name: \"encounterLink\"\n{link}"
+        )
+    } else {
+        format!("mappings:\n  - name: \"encounterLink\"\n{link}")
+    }
+}
+
+/// Compiles the start model with `body` and returns its refusal codes.
+fn link_codes(body: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let files = [
+        ("model.yml", start_model(body)),
+        (
+            "context.yml",
+            context("synthetic.context", &start_context(&[])),
+        ),
+    ];
+    let set = set_of(&borrow(&files))?;
+    Ok(match program_of(&set, "synthetic.context") {
+        Ok(_) => Vec::new(),
+        Err(diagnostics) => codes(&diagnostics),
+    })
+}
+
+/// "The engine checks the `meta.url` contained in the FHIR resource"
+/// (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked
+/// mappings), so a `link` side names the resource: a `Reference`, its
+/// `reference` string, or the resource an enclosing `reference` entered.
+#[test]
+fn a_link_side_naming_the_resource_compiles() -> Result<(), Box<dyn Error>> {
+    for (side, inside) in [
+        ("$resource.encounter", false),
+        ("$resource.encounter.reference", false),
+        ("$fhirRoot", true),
+    ] {
+        assert_eq!(
+            link_codes(&link_body(side, inside))?,
+            Vec::<String>::new(),
+            "{side}"
+        );
+    }
+    Ok(())
+}
+
+/// A side that names no resource, the program's own resource (the
+/// composition being written) or an element of the entered resource is
+/// refused when the program compiles, never on the run that first meets it.
+#[test]
+fn a_link_side_naming_no_linked_resource_is_refused_at_load() -> Result<(), Box<dyn Error>> {
+    for (side, inside) in [
+        ("$resource.code", false),
+        ("$resource", false),
+        ("$fhirRoot.class", true),
+    ] {
+        let found = link_codes(&link_body(side, inside))?;
+        assert!(
+            found.iter().any(|code| code == "fc-link-side"),
+            "{side}: {found:?}"
+        );
+    }
+    Ok(())
+}

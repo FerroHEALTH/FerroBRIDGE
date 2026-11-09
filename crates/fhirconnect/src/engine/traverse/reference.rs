@@ -271,11 +271,26 @@ impl<T: Table + ?Sized> Run<'_, T> {
         mappings: &[Mapping],
         binding: &Binding,
     ) -> Result<(), EngineError> {
+        let outer = self.linked_to.take();
         let level = self.enter_frame(empty_resource(resource.as_str()), binding.fhir.clone());
         let inner = binding.keeping_openehr(Occurrence::default(), level);
         let ran = self.mappings(mappings, &inner);
         let mut created = self.leave_frame();
+        let linked = core::mem::replace(&mut self.linked_to, outer);
         ran?;
+        if let Some(target) = linked {
+            let location = self.locate(mapping, &binding.fhir);
+            self.warnings.push(Warning::new(
+                Loss::Skipped {
+                    mapping: String::from(mapping.name()),
+                    reason: SkipReason::LinkedResource {
+                        target: target.clone(),
+                    },
+                },
+                location,
+            ));
+            return self.write_reference(mapping, binding, &target, None);
+        }
         // NOTE: no specification governs this: our own design, a resource its
         // mappings wrote nothing into carries no content, so no resource and no
         // reference to it is created.

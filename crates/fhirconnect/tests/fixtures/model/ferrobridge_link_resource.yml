@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping whose encounter reference enters the
+# Encounter, maps its type onto the problem-diagnosis comment and links the
+# entry to the Encounter's own composition through `$fhirRoot`, the shape the
+# published KDS_composition.yml extensions write
+# (types-of-mappings/concept-type/concept-mappings.adoc, Linked mappings).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_link_resource
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemName"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+      type: "CODEABLECONCEPT"
+
+  - name: "encounter"
+    with:
+      fhir: "$resource.encounter"
+      openehr: "$reference"
+    reference:
+      resourceType: "Encounter"
+      mappings:
+        - name: "encounterType"
+          with:
+            fhir: "$fhirRoot.type"
+            openehr: "$archetype/data[at0001]/items[at0069]"
+            type: "CODEABLECONCEPT"
+        - name: "encounterLink"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$archetype/links"
+          link:
+            meaning: "the encounter the diagnosis was made in"
+            type: "encounter"
