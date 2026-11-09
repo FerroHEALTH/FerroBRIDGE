@@ -466,7 +466,7 @@ async fn a_token_that_is_not_a_bearer_token_is_refused() -> Result<(), Box<dyn E
         .await
         .expect_err("the bridge sends bearer tokens");
     assert!(
-        matches!(token_error(&error), TokenError::TokenType { found } if found == "DPoP"),
+        matches!(token_error(&error), TokenError::TokenType { found, expected } if found == "DPoP" && *expected == "Bearer"),
         "{error:?}"
     );
     Ok(())

@@ -83,7 +83,7 @@ ferrobridge-testkit = { path = "tools/ferrobridge-testkit" }
 generated-tree = { path = "tools/generated-tree" }
 # Published from this workspace and consumed by the published
 # ferrobridge-hl7v2, so the requirement carries both a path and a version.
-ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.146" }
+ferrobridge-term = { path = "crates/ferrobridge-term", version = "0.1.147" }
 # Published from this workspace and consumed by the published
 # ferrobridge-validator, so the requirement carries both a path and a version.
 ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "0.1.132" }
@@ -136,7 +136,7 @@ backon = "1.6.0"
 # audit line, and the client credentials token of the CDR and terminology
 # lanes, and the RFC 7662 introspection check of an `[[auth.issuer]]` with `mode =
 # "introspection"`. A caret requirement, as a shared crate takes another (owner
-# decision, 2026-10-26), with 0.10.1 as the floor: it classifies every caller by
+# decision, 2026-10-26), with 0.12.0 as the floor: it classifies every caller by
 # its issuer's `kind`, holds a Basic credential to a person, carries the
 # onward grants (RFC 8693, RFC 7523) the facade reaches the CDR under its
 # caller with, and reads a Keycloak 26.8 impersonation as issued. `fetch`
@@ -144,7 +144,7 @@ backon = "1.6.0"
 # token client, the onward client and the introspector.
 # The server adds `axum` for its guard;
 # ferrobridge-term's `smart` feature takes the token client alone.
-ferrohealth-smart = { version = "0.10.1", default-features = false, features = ["fetch"] }
+ferrohealth-smart = { version = "0.12.0", default-features = false, features = ["fetch"] }
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
 # `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
 # query masked. Pinned exactly, as a product pins every shared crate.
@@ -172,11 +172,11 @@ ferrohealth-usage-report = { version = "=0.2.1", default-features = false }
 # The family's audit crates (FerroAUDIT): `ehds-logging` builds the EHDS access
 # record of Regulation (EU) 2025/327 Annex II 3.2 and its BALP `AuditEvent`
 # (`balp`), and `ihe-atna` spools it and sends it over the ITI-20 ATX: FHIR
-# Feed (`balp`) with a client credentials bearer (`smart`, on the 0.10 line of
+# Feed (`balp`) with a client credentials bearer (`smart`, on the 0.12 line of
 # ferrohealth-smart). Pinned exactly, as a product pins every shared crate;
 # only the server links them.
-ehds-logging = { version = "=0.6.0", default-features = false }
-ihe-atna = { version = "=0.6.0", default-features = false }
+ehds-logging = { version = "=0.7.0", default-features = false }
+ihe-atna = { version = "=0.7.0", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
@@ -261,7 +261,7 @@ base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # with its idle and absolute lifetimes, the refresh, and the four routes with
 # the session watch FerroUI's pages ask. Pinned exactly, as a product pins
 # every shared crate; the console adds `axum`.
-ferrohealth-session = { version = "=0.4.0", default-features = false }
+ferrohealth-session = { version = "=0.6.0", default-features = false }
 # Test-only.
 wiremock = "0.6.5"
 # The operator console's browser journeys (#602): a WebDriver client in Rust

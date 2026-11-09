@@ -347,6 +347,7 @@ The issuer's `profile` picks the grant:
 | `correlation_claim` | none | The claim a chained `federation` route carries from the caller's token to the onward one |
 | `keys` | none | The profile keys over the preset; `max_onward_lifetime`, in seconds, is required |
 | `cache` | `true` | `false` holds no onward token, so every CDR call exchanges one at the issuer, with a warning logged at start; a setting for a performance measurement, never for production |
+| `actor_assertion` | `false` | `true` names the bridge's client as the actor of every exchange it sends without an actor token, with an assertion signed by the `oauth` table's key (RFC 8693 §2.1); a lane with no assertion key, or under the JWT bearer grant, is refused at start |
 
 Each issued token is decoded and refused unless its issuer is the one asked,
 its `aud` lies inside `audiences`, it lives no longer than
