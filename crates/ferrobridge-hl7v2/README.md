@@ -68,7 +68,8 @@ you use; the range is the same caret range.
   a data type map maps the components, and every table value is translated by
   `ConceptMap/$translate` on a terminology server through `ferrobridge-term`'s
   client: load the guide's package and FerroBRIDGE's value package
-  (`terminology/hl7v2-values/` in the repository) into it. `map::single` maps
+  (packed from `terminology/hl7v2-values/` in the repository by
+  `scripts/terminology/pack-hl7v2-values.sh`) into it. `map::single` maps
   one segment to one resource, a PID to a `Patient`. `map::inverse` writes a
   resource back as a segment through the same maps, a `Patient` as a PID,
   with every element it does not write back counted. The FHIR side is written

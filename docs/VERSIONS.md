@@ -204,7 +204,8 @@ The terminology server needs no database. It reads the synthetic `CodeSystem`,
 named in `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, and serves each FHIR release
 under its own path prefix (`/r4`, `/r4b`). For the HL7 v2 face it reads HL7
 Terminology, the v2-to-FHIR guide and FerroBRIDGE's value package
-`terminology/hl7v2-values/` the same way (`containers::v2_terminology`).
+`terminology/hl7v2-values/`, packed by `scripts/terminology/pack-hl7v2-values.sh` and
+unpacked, the same way (`containers::v2_terminology`).
 
 ## FHIR packages (the `fhir-types` generator input)
 

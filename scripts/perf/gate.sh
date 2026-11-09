@@ -352,13 +352,18 @@ serve() {
 }
 
 # terminology IMAGE: starts FerroTERM over HL7 Terminology, the guide and the
-# value package, whose table ConceptMaps the HL7 v2 face translates every
-# table value through.
+# value package, packed and unpacked as an operator loads it, whose table
+# ConceptMaps the HL7 v2 face translates every table value through.
 terminology() {
+  local packed="$root/$WORK/hl7v2-values" tarball
+  rm -rf "$packed"
+  mkdir -p "$packed/unpacked"
+  tarball="$(bash "$root/scripts/terminology/pack-hl7v2-values.sh" "$packed/packed")"
+  tar -xzf "$tarball" -C "$packed/unpacked"
   "$engine" run --quiet --detach --name "$TERMINOLOGY_NAME" --publish 127.0.0.1:18100:8080 \
     --volume "$root/$THO:/data/hl7.terminology:ro" \
     --volume "$root/$GUIDE_MAPS:/data/hl7.fhir.uv.v2mappings:ro" \
-    --volume "$root/$VALUE_MAPS:/data/hl7v2-values:ro" \
+    --volume "$packed/unpacked/package:/data/hl7v2-values:ro" \
     --env 'FERROTERM__TERMINOLOGY__CODE_SYSTEMS=["/data/hl7.terminology","/data/hl7.fhir.uv.v2mappings","/data/hl7v2-values"]' \
     --env FERROTERM__USAGE_REPORT__ENABLED=false "$1" > /dev/null
 }

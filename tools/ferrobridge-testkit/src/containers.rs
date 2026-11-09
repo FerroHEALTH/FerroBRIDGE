@@ -45,11 +45,11 @@ const TERMINOLOGY_FIXTURES: [(&str, &str); 1] = [(
     "/data/codesystems",
 )];
 
-/// The packages a terminology server for the HL7 v2 face loads: HL7
+/// The vendored packages a terminology server for the HL7 v2 face loads: HL7
 /// Terminology, which holds the v2 tables and the value sets the guide's
-/// table maps name as their source, the v2-to-FHIR guide, and FerroBRIDGE's
-/// value package, each a `package` directory with its `package.json`.
-const V2_TERMINOLOGY: [(&str, &str); 3] = [
+/// table maps name as their source, and the v2-to-FHIR guide, each a
+/// `package` directory with its `package.json`.
+const V2_PACKAGES: [(&str, &str); 2] = [
     (
         concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -64,14 +64,16 @@ const V2_TERMINOLOGY: [(&str, &str); 3] = [
         ),
         "/data/hl7.fhir.uv.v2mappings",
     ),
-    (
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../terminology/hl7v2-values"
-        ),
-        "/data/hl7v2-values",
-    ),
 ];
+
+/// The script that packs FerroBRIDGE's value package into a FHIR package.
+const VALUES_PACKER: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../scripts/terminology/pack-hl7v2-values.sh"
+);
+
+/// Where the unpacked value package is mounted in the container.
+const VALUES_MOUNT: &str = "/data/hl7v2-values";
 
 /// The login role, its password and its database in the PostgreSQL container.
 const POSTGRES_ROLE: &str = "ferrobridge";
@@ -220,6 +222,25 @@ pub enum HarnessError {
         /// How long the probe waited.
         budget: Duration,
     },
+    /// A step of packing the value package could not run.
+    #[error("could not {step}")]
+    Pack {
+        /// The step.
+        step: &'static str,
+        /// What the system reported.
+        #[source]
+        source: std::io::Error,
+    },
+    /// A step of packing the value package failed.
+    #[error("could not {step}: {status}: {stderr}")]
+    PackRefused {
+        /// The step.
+        step: &'static str,
+        /// How it exited.
+        status: std::process::ExitStatus,
+        /// What it printed on stderr.
+        stderr: String,
+    },
 }
 
 /// A started PostgreSQL, torn down when it is dropped.
@@ -295,6 +316,9 @@ pub struct Terminology {
     container: ContainerAsync<GenericImage>,
     /// The origin the server is reachable at, with no path.
     origin: String,
+    /// The scratch directory the value package was packed and unpacked in, held
+    /// while the container mounts it.
+    packed: Option<tempfile::TempDir>,
 }
 
 impl Terminology {
@@ -341,14 +365,66 @@ pub async fn terminology() -> Result<Terminology, HarnessError> {
 /// Starts the reference terminology server loaded as the HL7 v2 face needs it.
 ///
 /// It holds HL7 Terminology, the v2-to-FHIR guide `hl7.fhir.uv.v2mappings`
-/// and FerroBRIDGE's value package `terminology/hl7v2-values/`, and is
-/// returned once its readiness endpoint answers.
+/// and FerroBRIDGE's value package in its packed form: the tarball
+/// `scripts/terminology/pack-hl7v2-values.sh` writes, unpacked, as an
+/// operator loads it. It is returned once its readiness endpoint answers.
 ///
 /// # Errors
 ///
-/// Returns the errors of [`terminology`].
+/// Returns [`HarnessError::Pack`] or [`HarnessError::PackRefused`] when the
+/// value package cannot be packed or unpacked, and the errors of
+/// [`terminology`].
 pub async fn v2_terminology() -> Result<Terminology, HarnessError> {
-    start_terminology(&V2_TERMINOLOGY).await
+    let packed = tempfile::tempdir().map_err(|source| HarnessError::Pack {
+        step: "make a scratch directory",
+        source,
+    })?;
+    let tarball = run_pack_step(
+        "pack the value package",
+        tokio::process::Command::new("bash")
+            .arg(VALUES_PACKER)
+            .arg(packed.path().join("packed")),
+    )
+    .await?;
+    let unpacked = packed.path().join("unpacked");
+    std::fs::create_dir_all(&unpacked).map_err(|source| HarnessError::Pack {
+        step: "make the directory the tarball is unpacked into",
+        source,
+    })?;
+    run_pack_step(
+        "unpack the value package",
+        tokio::process::Command::new("tar")
+            .arg("-xzf")
+            .arg(tarball.trim())
+            .arg("-C")
+            .arg(&unpacked),
+    )
+    .await?;
+    let values = unpacked.join("package").display().to_string();
+    let mut directories: Vec<(&str, &str)> = V2_PACKAGES.to_vec();
+    directories.push((values.as_str(), VALUES_MOUNT));
+    let mut server = start_terminology(&directories).await?;
+    server.packed = Some(packed);
+    Ok(server)
+}
+
+/// Runs one step of packing the value package and returns what it printed.
+async fn run_pack_step(
+    step: &'static str,
+    command: &mut tokio::process::Command,
+) -> Result<String, HarnessError> {
+    let output = command
+        .output()
+        .await
+        .map_err(|source| HarnessError::Pack { step, source })?;
+    if !output.status.success() {
+        return Err(HarnessError::PackRefused {
+            step,
+            status: output.status,
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// Starts the reference terminology server over the host directories
@@ -377,7 +453,11 @@ async fn start_terminology(directories: &[(&str, &str)]) -> Result<Terminology, 
         })?;
     let origin = format!("http://{host}:{port}");
     await_readiness(&format!("{origin}/health")).await?;
-    Ok(Terminology { container, origin })
+    Ok(Terminology {
+        container,
+        origin,
+        packed: None,
+    })
 }
 
 /// Starts a PostgreSQL and returns it with the URL of its login role.

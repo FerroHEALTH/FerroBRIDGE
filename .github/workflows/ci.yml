@@ -452,6 +452,25 @@ jobs:
           bash scripts/checks/usage-report-off.sh --self-test
           bash scripts/checks/usage-report-off.sh
 
+  # No tracked package.json outside the vendored trees names a FHIR package:
+  # the dependency graph reads it as npm, where those names are not ours
+  # (#1797). The value package's packer is self-tested beside it.
+  fhir-manifests:
+    name: fhir-manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          set -euo pipefail
+          bash scripts/checks/fhir-manifests.sh --self-test
+          bash scripts/checks/fhir-manifests.sh
+          bash scripts/terminology/pack-hl7v2-values.sh --self-test
+
   # Every TODO(#N) and every issue a pending subcommand names must still be
   # open on the tracker (#614). The job token reads the issues and nothing
   # else.
@@ -1603,6 +1622,7 @@ jobs:
       - profile-packages
       - favicon-sync
       - usage-report-off
+      - fhir-manifests
       - todo-issues
       - tracker-helpers
       - detect

@@ -32,7 +32,7 @@ sqlx.workspace = true
 tempfile.workspace = true
 testcontainers.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["time", "net"] }
+tokio = { workspace = true, features = ["time", "net", "process"] }
 tokio-rustls.workspace = true
 # The redirect an approved authorization request is answered with.
 url.workspace = true
