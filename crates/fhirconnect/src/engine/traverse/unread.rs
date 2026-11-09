@@ -10,6 +10,7 @@
 //! [`Loss::Unread`], so the resource never drops content with no trace. No
 //! specification governs the declaration: our own design.
 
+use openehr_rm::v1_2::typing::base_name;
 use std::collections::BTreeSet;
 
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -162,7 +163,7 @@ fn element_of<'index>(
         let node_id = node
             .node_id()
             .filter(|id| id.starts_with("at") || id.starts_with("id"))?;
-        if model::is_a(derive::base_class(node.rm_type()), derive::STRUCTURAL) {
+        if model::is_a(base_name(node.rm_type()), derive::STRUCTURAL) {
             return None;
         }
         return Some((node, node_id, None));
