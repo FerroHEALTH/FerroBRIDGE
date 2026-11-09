@@ -67,6 +67,20 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   line against the target branch, refusing a break on a patch and a minor
   bump with no break. A new variant goes at the end of an enum, since the
   judge counts a moved discriminant as a break.
+- **A public dependency moved to an incompatible version is a breaking
+  change** (coordinator ruling, 2026-11-09, #1777): The Cargo Book, "SemVer
+  Compatibility", counts changing the major version of a public dependency
+  as a major change, and for a 0.x dependency the incompatible step is the
+  left-most non-zero component (`openehr-rm` 0.0.135 to 0.0.136, `fhirconnect`
+  0.1 to 0.2). `cargo-semver-checks` cannot see it, so the crate bumps its
+  minor. A public dependency is any normal dependency of the `openehr-*`,
+  `fhir-types`, `hl7v2-types` and `ferrohealth-*` families or a sibling of
+  this workspace (`scripts/checks/lib/public-deps.sh`), optional ones
+  included. `crate-version-guard` refuses a patch step for a member whose
+  public dependency moved line in the diff, and `semver.sh` refuses it
+  against the target branch or crates.io and accepts the minor step it
+  answers. A sibling's minor step therefore moves every published member
+  that requires it to its next minor too.
 - **A consumer outside this workspace requires a crate of the line by a caret
   range** (`fhirconnect = "0.1"`, or `"0.1.240"` for a floor), so one
   compatible release serves every crate in its build that uses it, and two

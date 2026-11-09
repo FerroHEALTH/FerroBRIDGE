@@ -33,6 +33,8 @@ use openehr_mapping_core::loader::load_str;
 
 use crate::support::OwnedChain;
 
+mod verbatim;
+
 /// The vendored mapping library, relative to this crate's manifest.
 const CORPUS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -543,7 +545,8 @@ fn entered_contexts(program: &Program) -> Vec<&str> {
 ///
 /// A program reaches its context, every context it enters through
 /// `slotContext`, a model mapping it compiled and every extension it
-/// applied to one. The programs are the diagnosis chain against the
+/// applied to one, less the files a stand-in replaces a method of
+/// (`replaced_files`). The programs are the diagnosis chain against the
 /// synthetic template, the KDS diagnosis, person and laboratory request
 /// project contexts against the published `KDS_Diagnose`, `KDS_Person` and
 /// `KDS_Laborauftrag` templates, the library's own model mappings against
@@ -573,7 +576,9 @@ fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
             .map(owned),
     );
     chains.extend(crate::published::published_chains()?);
+    let fixtures = verbatim::fixture_models()?;
     for (files, program) in chains {
+        let replaced = verbatim::replaced_files(&files, &program, &fixtures);
         let mut names: Vec<&str> = vec![program.context().as_str()];
         names.extend(entered_contexts(&program));
         for model in program.models() {
@@ -583,7 +588,9 @@ fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
         for file in &files {
             let source = fs::read_to_string(PathBuf::from(CORPUS).join(file))?;
             let document = load_str(file.as_str(), &source)?;
-            if names.contains(&document.header().name().value().as_str()) {
+            if names.contains(&document.header().name().value().as_str())
+                && !replaced.contains(file)
+            {
                 reached.insert(file.clone());
             }
         }
@@ -618,6 +625,7 @@ fn set_refusals() -> Result<BTreeMap<String, String>, Box<dyn Error>> {
 /// is in the pinned rejection set, validates against the strict schemas,
 /// loads into the corpus set with no refusal naming it, and is reached by a
 /// program compiled against a template that carries its archetype
+/// and runs verbatim, with no stand-in replacing one of its methods
 /// (`docs/specs/fhirconnect/modules/ROOT/pages/schema/schema.adoc`,
 /// `docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/context-mappings.adoc`).
 #[test]
