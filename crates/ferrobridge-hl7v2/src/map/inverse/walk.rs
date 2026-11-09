@@ -229,7 +229,7 @@ impl<'c> Inverse<'c> {
         path: &'a str,
         inner: &'a [usize],
         grid: &'a mut Grid,
-    ) -> Pin<Box<dyn Future<Output = Result<(), InverseError>> + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<(), InverseError>> + Send + 'a>> {
         Box::pin(async move {
             let source_type = line.source_type.clone().unwrap_or_default();
             if let Some(map) = self.datatype_map(line, &source_type) {

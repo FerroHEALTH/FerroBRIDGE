@@ -277,3 +277,29 @@ async fn a_consumer_sets_the_fields_no_row_writes_back() {
         "PID|1||PAT-1^^^EAST&2.999.1.1&ISO||Doe|||F||R"
     );
 }
+
+#[test]
+fn the_inverse_and_the_single_map_run_on_a_multi_threaded_runtime() {
+    fn spawnable<F: Future + Send>(_: &F) {}
+    let corpus = support::shipped();
+    let patient = json(r#"{"resourceType": "Patient"}"#);
+    spawnable(&segment(
+        &patient,
+        pid_2_5(),
+        &corpus,
+        Some(Translator::Offline(&corpus)),
+    ));
+    let parsed = support::parsed(&fixtures::message(&[
+        b"MSH|^~\\&|ADT|EAST|PIX|NORTH|20261025100000||ADT^A01^ADT_A01|M-1|P|2.5",
+        b"EVN||20261025100000",
+        b"PID|1||PAT-1",
+        b"PV1|1|O",
+    ]));
+    spawnable(&single::segment(
+        &parsed,
+        2,
+        "Patient",
+        &corpus,
+        Some(Translator::Offline(&corpus)),
+    ));
+}
