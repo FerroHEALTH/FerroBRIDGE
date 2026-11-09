@@ -68,7 +68,7 @@ jobs:
   plan:
     name: plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 60
     permissions:
       contents: read
       issues: read # the milestone titled as the tag
@@ -124,13 +124,28 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
+      # The crate SemVer check of the list builds each crate the release
+      # publishes and its newest release on crates.io, so the plan job installs
+      # the toolchain and the pinned cargo-semver-checks. No cache: nothing a
+      # pull request saved feeds a release.
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache: "false"
+      - id: semver-pin
+        name: Read the cargo-semver-checks pin
+        run: echo "version=$(bash scripts/checks/semver.sh --pin)" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-semver-checks@${{ steps.semver-pin.outputs.version }}
+
       # Every release fact, as ONE list: the milestone titled as the tag, the
       # product version in every file that declares it, the changelog's
       # structure and Security rules for this section, no fragment left under
       # changelog.d/ unassembled, the previous release
       # taken by version from `git ls-remote`, and the changelog section as
       # the release notes with the support period and the link to the book's
-      # CRA Annex II user information page appended. The list is
+      # CRA Annex II user information page appended, and each crate the
+      # release publishes judged by cargo-semver-checks against crates.io. The list is
       # scripts/release/plan.sh; scripts/release/preflight.sh runs the same
       # list before the tag is pushed, so the two cannot drift. It names every
       # refused check, and writes release-notes.md for github-release. A

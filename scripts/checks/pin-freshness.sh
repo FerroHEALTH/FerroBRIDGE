@@ -42,6 +42,7 @@ zizmor	zizmorcore/zizmor
 actionlint	rhysd/actionlint
 shellcheck	koalaman/shellcheck
 hadolint	hadolint/hadolint
+cargo-semver-checks	obi1kenobi/cargo-semver-checks
 trivy	aquasecurity/trivy
 mdBook	rust-lang/mdBook
 mdbook-toc	badboy/mdbook-toc

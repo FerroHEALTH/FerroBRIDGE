@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "jsonschema",
  "openehr-am",
