@@ -66,6 +66,9 @@ readonly MAPPINGS=(app/ferrobridge-server/tests/it/repeated app/ferrobridge-serv
 # ConceptMaps the terminology server answers the HL7 v2 face from.
 readonly GUIDE_MAPS=tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package
 readonly VALUE_MAPS=terminology/hl7v2-values
+# HL7 Terminology, which holds the value sets the guide's table maps name as
+# their source.
+readonly THO=tools/fhir-codegen/vendor/hl7.terminology/package
 # Where a tree from before the maps were generated keeps the guide, which its
 # binary still reads through [hl7v2] concept_maps.
 readonly DIRECTORY_MAPS=crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package
@@ -303,18 +306,16 @@ serve() {
   echo "$!"
 }
 
-# terminology IMAGE: starts FerroTERM over the table ConceptMaps of the guide
-# and of the value package, which the HL7 v2 face translates every table
-# value through.
+# terminology IMAGE: starts FerroTERM over HL7 Terminology, the guide and the
+# value package, whose table ConceptMaps the HL7 v2 face translates every
+# table value through.
 terminology() {
-  local maps="$WORK/terminology"
-  mkdir -p "$maps"
-  cp "$root/$GUIDE_MAPS"/ConceptMap-table-*.json "$root/$VALUE_MAPS"/ConceptMap-table-*.json "$maps/"
-  chmod 0755 "$maps"
-  chmod 0644 "$maps"/*.json
   "$engine" run --quiet --detach --name "$TERMINOLOGY_NAME" --publish 127.0.0.1:18100:8080 \
-    --volume "$root/$maps:/data/codesystems:ro" --env FERROTERM_CODESYSTEMS=/data/codesystems \
-    --env FERROTERM_UI=off --env FERROTERM__USAGE_REPORT__ENABLED=false "$1" > /dev/null
+    --volume "$root/$THO:/data/hl7.terminology:ro" \
+    --volume "$root/$GUIDE_MAPS:/data/hl7.fhir.uv.v2mappings:ro" \
+    --volume "$root/$VALUE_MAPS:/data/hl7v2-values:ro" \
+    --env 'FERROTERM__TERMINOLOGY__CODE_SYSTEMS=["/data/hl7.terminology","/data/hl7.fhir.uv.v2mappings","/data/hl7v2-values"]' \
+    --env FERROTERM__USAGE_REPORT__ENABLED=false "$1" > /dev/null
 }
 
 start() {
@@ -343,7 +344,7 @@ start() {
     wait_for "the $arm CDR" 120 curl --fail --silent "$(cdr_origin "$arm")/health/readiness"
   done
   wait_for "RabbitMQ" 120 broker_up
-  wait_for "FerroTERM" 120 curl --fail --silent "$TERMINOLOGY/health"
+  wait_for "FerroTERM" 300 curl --fail --silent "$TERMINOLOGY/health"
   templates head "$root"
   templates base "$root/$BASE_TREE/src"
 

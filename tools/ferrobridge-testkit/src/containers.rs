@@ -34,11 +34,44 @@ const CDR_PORT: u16 = 8080;
 /// container.
 const TERMINOLOGY_PORT: u16 = 8080;
 
-/// Where the synthetic terminology fixtures are mounted in the container.
-const TERMINOLOGY_RESOURCES: &str = "/data/codesystems";
+/// How long the terminology server may take to load its packages and listen;
+/// HL7 Terminology alone holds thousands of code systems.
+const TERMINOLOGY_STARTUP: Duration = Duration::from_secs(300);
 
-/// The fixture directory the mount reads, absolute at compile time.
-const TERMINOLOGY_FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/terminology");
+/// The synthetic terminology fixtures, absolute at compile time, and where
+/// they are mounted in the container.
+const TERMINOLOGY_FIXTURES: [(&str, &str); 1] = [(
+    concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/terminology"),
+    "/data/codesystems",
+)];
+
+/// The packages a terminology server for the HL7 v2 face loads: HL7
+/// Terminology, which holds the v2 tables and the value sets the guide's
+/// table maps name as their source, the v2-to-FHIR guide, and FerroBRIDGE's
+/// value package, each a `package` directory with its `package.json`.
+const V2_TERMINOLOGY: [(&str, &str); 3] = [
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../fhir-codegen/vendor/hl7.terminology/package"
+        ),
+        "/data/hl7.terminology",
+    ),
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
+        ),
+        "/data/hl7.fhir.uv.v2mappings",
+    ),
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../terminology/hl7v2-values"
+        ),
+        "/data/hl7v2-values",
+    ),
+];
 
 /// The login role, its password and its database in the PostgreSQL container.
 const POSTGRES_ROLE: &str = "ferrobridge";
@@ -153,8 +186,8 @@ pub const CDR_POSTGRES: PinnedImage = PinnedImage {
 /// `/r5`, `/r6`), which is why [`Terminology::base_url`] takes the release.
 pub const TERMINOLOGY: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroterm",
-    tag: "0.1.6",
-    digest: "sha256:7ec4c9622e88e3028faf7c74a2384fb02e57dc3163c282b21274121a26aa3d5b",
+    tag: "0.4.2",
+    digest: "sha256:1853486ae6f85a66424561cbf90f9905027c38d506bdeb24a9e1a831b4b97424",
 };
 
 /// A container could not be started, or did not become usable.
@@ -290,11 +323,11 @@ impl Terminology {
 /// Starts the reference terminology server over the synthetic terminology
 /// fixtures and waits for its readiness endpoint.
 ///
-/// The image reads `FERROTERM_CODESYSTEMS` as a directory of FHIR resources,
-/// so `fixtures/terminology` is bind-mounted read-only and the synthetic
-/// `CodeSystem`, `ValueSet` and `ConceptMap` are served through the ordinary
-/// operations. The server enforces no authentication of its own, so the
-/// returned base URL needs no credentials.
+/// The image reads each directory `terminology.code_systems` names as FHIR
+/// resources, so `fixtures/terminology` is bind-mounted read-only and the
+/// synthetic `CodeSystem`, `ValueSet` and `ConceptMap` are served through the
+/// ordinary operations. The server enforces no authentication of its own, so
+/// the returned base URL needs no credentials.
 ///
 /// # Errors
 ///
@@ -302,14 +335,32 @@ impl Terminology {
 /// [`HarnessError::Probe`] when the readiness probe cannot be sent, and
 /// [`HarnessError::NotReady`] when the server does not answer it in time.
 pub async fn terminology() -> Result<Terminology, HarnessError> {
-    let container =
-        terminology_request()
-            .start()
-            .await
-            .map_err(|source| HarnessError::Container {
-                image: TERMINOLOGY.repository,
-                source,
-            })?;
+    start_terminology(&TERMINOLOGY_FIXTURES).await
+}
+
+/// Starts the reference terminology server loaded as the HL7 v2 face needs it.
+///
+/// It holds HL7 Terminology, the v2-to-FHIR guide `hl7.fhir.uv.v2mappings`
+/// and FerroBRIDGE's value package `terminology/hl7v2-values/`, and is
+/// returned once its readiness endpoint answers.
+///
+/// # Errors
+///
+/// Returns the errors of [`terminology`].
+pub async fn v2_terminology() -> Result<Terminology, HarnessError> {
+    start_terminology(&V2_TERMINOLOGY).await
+}
+
+/// Starts the reference terminology server over the host directories
+/// `directories`, each mounted read-only at its container path.
+async fn start_terminology(directories: &[(&str, &str)]) -> Result<Terminology, HarnessError> {
+    let container = terminology_request(directories)
+        .start()
+        .await
+        .map_err(|source| HarnessError::Container {
+            image: TERMINOLOGY.repository,
+            source,
+        })?;
     let host = container
         .get_host()
         .await
@@ -507,21 +558,30 @@ pub async fn cdr() -> Result<Cdr, HarnessError> {
 }
 
 /// Returns the request that starts the reference terminology server over
-/// the synthetic fixtures.
+/// the host directories `directories`, each mounted read-only at its
+/// container path and named in `terminology.code_systems`.
 ///
-/// The usage report is switched off for the reason [`cdr_request`] gives. The
-/// pinned release sends none and ignores the key, which holds the next pin.
-fn terminology_request() -> ContainerRequest<GenericImage> {
-    let fixtures = Mount::bind_mount(TERMINOLOGY_FIXTURES, TERMINOLOGY_RESOURCES)
-        .with_access_mode(AccessMode::ReadOnly);
-    TERMINOLOGY
+/// The usage report is switched off for the reason [`cdr_request`] gives.
+fn terminology_request(directories: &[(&str, &str)]) -> ContainerRequest<GenericImage> {
+    let listed: Vec<String> = directories
+        .iter()
+        .map(|(_, mounted)| format!("\"{mounted}\""))
+        .collect();
+    let mut request = TERMINOLOGY
         .image()
         .with_wait_for(WaitFor::message_on_stdout("listening"))
         .with_exposed_port(TERMINOLOGY_PORT.tcp())
-        .with_mount(fixtures)
-        .with_env_var("FERROTERM_CODESYSTEMS", TERMINOLOGY_RESOURCES)
-        .with_env_var("FERROTERM_UI", "off")
+        .with_env_var(
+            "FERROTERM__TERMINOLOGY__CODE_SYSTEMS",
+            format!("[{}]", listed.join(",")),
+        )
         .with_env_var("FERROTERM__USAGE_REPORT__ENABLED", "false")
+        .with_startup_timeout(TERMINOLOGY_STARTUP);
+    for (host, mounted) in directories {
+        request = request
+            .with_mount(Mount::bind_mount(*host, *mounted).with_access_mode(AccessMode::ReadOnly));
+    }
+    request
 }
 
 /// Returns the request that starts the reference CDR against `dsn` on
@@ -646,7 +706,8 @@ pub async fn rabbitmq() -> Result<RabbitMq, HarnessError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, cdr_request, terminology_request,
+        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, TERMINOLOGY_FIXTURES, cdr_request,
+        terminology_request,
     };
 
     #[test]
@@ -687,7 +748,7 @@ mod tests {
 
     #[test]
     fn the_terminology_server_starts_with_its_usage_report_off() {
-        let request = terminology_request();
+        let request = terminology_request(&TERMINOLOGY_FIXTURES);
         let usage_report = request
             .env_vars()
             .find(|(name, _)| name == "FERROTERM__USAGE_REPORT__ENABLED")
