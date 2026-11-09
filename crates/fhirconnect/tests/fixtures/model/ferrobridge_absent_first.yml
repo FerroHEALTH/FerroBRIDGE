@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping with two methods onto the repeating
+# Condition.note: the first reads the context end time, a family of the
+# context node the composition leaves empty, and the second the problem name,
+# which `problemName` also carries as Condition.code.text.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_absent_first
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemName"
+    with:
+      fhir: "$resource.code.text"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+  - name: "endNote"
+    with:
+      fhir: "$resource.note.time"
+      openehr: "$composition/context/end_time"
+  - name: "nameNote"
+    with:
+      fhir: "$resource.note.text"
+      openehr: "$archetype/data[at0001]/items[at0002]"
