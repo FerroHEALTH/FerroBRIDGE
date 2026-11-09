@@ -4,7 +4,7 @@
 name = "ferrobridge-term"
 description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate, $validate-code, $expand and $subsumes"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.152"
+version = "0.1.153"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -22,14 +22,25 @@ include = ["src/**", "README.md", "LICENSE"]
 [features]
 # The client credentials token of ferrohealth-smart as the client's
 # TokenProvider (`smart`), so a product writes no adapter of its own.
-smart = ["dep:ferrohealth-smart"]
+smart = ["client", "dep:ferrohealth-smart"]
 # One feature per FHIR release the client speaks, each compiling that
 # release's fhir-types module and its writers and readers; a release left off
 # has no `WireVersion` variant. The default is the three releases the
 # workspace's consumers configure. R5 and R6 stay off by default because a
 # dependant that enables the crate-wide fhir-types `resources` feature then
 # compiles every resource of those releases as well (#1737).
-default = ["stu3", "r4", "r4b"]
+default = ["client", "stu3", "r4", "r4b"]
+# The HTTP client (`client`), on by default: reqwest, the retry budget, the
+# credentials and the token provider. Without it the crate is the request,
+# concept and outcome types and the transport-free writers and readers, which
+# an offline translator such as ferrobridge-hl7v2's speaks.
+client = [
+    "dep:async-trait",
+    "dep:backon",
+    "dep:reqwest",
+    "dep:secrecy",
+    "dep:tracing",
+]
 stu3 = ["fhir-types/stu3"]
 r4 = ["fhir-types/r4"]
 r4b = ["fhir-types/r4b"]
@@ -37,18 +48,18 @@ r5 = ["fhir-types/r5"]
 r6 = ["fhir-types/r6"]
 
 [dependencies]
-async-trait.workspace = true
+async-trait = { workspace = true, optional = true }
 ferrohealth-smart = { workspace = true, optional = true }
-backon.workspace = true
+backon = { workspace = true, optional = true }
 # The terminology root set that carries Parameters, OperationOutcome, Bundle
 # and the operation contracts; each release feature above adds its module.
 fhir-types = { workspace = true, features = ["terminology"] }
 http.workspace = true
-reqwest.workspace = true
-secrecy.workspace = true
+reqwest = { workspace = true, optional = true }
+secrecy = { workspace = true, optional = true }
 serde_json.workspace = true
 thiserror.workspace = true
-tracing.workspace = true
+tracing = { workspace = true, optional = true }
 url.workspace = true
 
 [dev-dependencies]
@@ -63,6 +74,12 @@ wiremock.workspace = true
 rcgen.workspace = true
 rustls.workspace = true
 tokio-rustls.workspace = true
+
+# The integration tests drive the HTTP client against a stub server.
+[[test]]
+name = "it"
+path = "tests/it/main.rs"
+required-features = ["client"]
 
 [lints]
 workspace = true

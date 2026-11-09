@@ -4,7 +4,7 @@
 name = "fhirconnect"
 description = "The FHIRconnect mapping language for Rust: the mapping file model and its validation, context resolution into an immutable program, and the bidirectional interpreter between openEHR compositions and FHIR resources"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.246"
+version = "0.1.247"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -19,37 +19,58 @@ categories = ["parser-implementations", "science"]
 publish = true
 include = ["src/**", "schemas/**", "README.md", "LICENSE"]
 
+[features]
+# The FHIRconnect language (`model`, `resolve`, `engine`, `operations`), on by
+# default. A consumer that needs only the FHIR path model (`tree`), such as
+# ferrobridge-hl7v2's v2-to-FHIR map, turns it off and drops the openEHR
+# crates, jsonschema and the rest of the mapping stack.
+default = ["mapping"]
+mapping = [
+    "dep:jsonschema",
+    "dep:openehr-mapping-core",
+    "dep:openehr-base",
+    "dep:openehr-rm",
+    "dep:openehr-its",
+    "dep:openehr-sdt",
+    "dep:openehr-term",
+    "dep:serde_json",
+    "dep:base64",
+    "dep:serde",
+    "dep:rust_decimal",
+    "dep:sha2",
+]
+
 [dependencies]
-jsonschema.workspace = true
-openehr-mapping-core.workspace = true
+jsonschema = { workspace = true, optional = true }
+openehr-mapping-core = { workspace = true, optional = true }
 # The BASE identification types the RM data types carry, for the one field a
 # lens builds by hand (`CODE_PHRASE.terminology_id`).
-openehr-base.workspace = true
+openehr-base = { workspace = true, optional = true }
 # The openEHR RM path model the mapping foundation resolves a path into
 # (docs/architecture.md section 3); the foundation returns its types, so this
 # crate names the same crate rather than re-exporting them.
-openehr-rm.workspace = true
+openehr-rm = { workspace = true, optional = true }
 # The canonical JSON entry points of ITS-JSON, the one codec every RM value
 # crosses (`openehr_its::json`).
-openehr-its.workspace = true
+openehr-its = { workspace = true, optional = true }
 # The FLAT key model the composition seam takes its segments and suffixes in
 # (`openehr_sdt::flat::path`).
-openehr-sdt.workspace = true
+openehr-sdt = { workspace = true, optional = true }
 # The openEHR terminology bundle a coded text in the `openehr` terminology
 # takes its rubric from (`openehr_term::bundle`).
-openehr-term.workspace = true
-serde_json.workspace = true
+openehr-term = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 # The base64 of FHIR `base64Binary`: a `DV_PARSABLE` value travels as an
 # `Attachment.data`, and a `DV_MULTIMEDIA` size is read from its data.
-base64.workspace = true
+base64 = { workspace = true, optional = true }
 # The bounds the `mappingCode` library decodes and encodes an `openehr-rm`
 # value under (`engine::library`).
-serde.workspace = true
+serde = { workspace = true, optional = true }
 # Exact decimal arithmetic for the rate a ratio function divides and
 # multiplies, so no amount passes through a binary float (`engine::library`).
-rust_decimal.workspace = true
+rust_decimal = { workspace = true, optional = true }
 # The digest the default identity sink derives a created resource's id from.
-sha2.workspace = true
+sha2 = { workspace = true, optional = true }
 # The generated FHIR model: the lexical `Value` tree the path model walks and
 # the element table that guides it (docs/architecture.md section 4.1).
 fhir-types = { workspace = true, features = ["r4-resources"] }
@@ -65,9 +86,18 @@ openehr-adl.workspace = true
 # (AOM2 `parent_archetype_id`), which the suites read to carry the lineage.
 openehr-am.workspace = true
 proptest.workspace = true
+# The path model's own tests read their fixtures as JSON with or without the
+# `mapping` feature.
+serde_json.workspace = true
 tempfile.workspace = true
 # The EHDS readiness matrix test reads docs/ehds/readiness.toml.
 toml.workspace = true
+
+# The integration tests drive the FHIRconnect language.
+[[test]]
+name = "it"
+path = "tests/it/main.rs"
+required-features = ["mapping"]
 
 [lints]
 workspace = true

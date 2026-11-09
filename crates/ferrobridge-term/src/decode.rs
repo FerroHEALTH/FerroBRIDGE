@@ -10,7 +10,6 @@
 //! "this code is not known" is the one decision no FHIR clause fixes, and
 //! [`is_not_found`] states it.
 
-use crate::client::Answer;
 use crate::config::WireVersion;
 use crate::error::{Error, UpstreamError};
 use crate::outcome::{
@@ -18,6 +17,7 @@ use crate::outcome::{
 };
 use crate::request::Request;
 use http::StatusCode;
+use url::Url;
 
 /// The `tx-issue-type` codes that say the server does not know the concept.
 ///
@@ -27,6 +27,16 @@ use http::StatusCode;
 /// classification the terminology ecosystem defines
 /// (<https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-tx-issue-type.html>)
 /// and falls back to a bare `404`.
+/// What the server answered, read whole.
+pub(crate) struct Answer {
+    /// The URL that was called.
+    pub(crate) url: Url,
+    /// The status the server answered with.
+    pub(crate) status: StatusCode,
+    /// The response body, as received.
+    pub(crate) body: String,
+}
+
 const NOT_FOUND_TX_ISSUES: [&str; 2] = ["not-found", "invalid-code"];
 
 /// Returns the `CodeSystem/$lookup` outcome `answer` carries.
@@ -125,6 +135,7 @@ pub(crate) fn subsumes(version: WireVersion, answer: &Answer) -> Result<Subsumes
 
 /// Returns the `Bundle.total` of the `CodeSystem` count search `answer`
 /// carries.
+#[cfg(feature = "client")]
 pub(crate) fn search_total(version: WireVersion, answer: &Answer) -> Result<u32, Error> {
     if answer.status == StatusCode::OK {
         return crate::wire::search_total(version, &answer.body)

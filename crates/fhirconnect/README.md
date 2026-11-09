@@ -16,6 +16,14 @@ as incompatible with the next, so a different one gives you a second copy of
 the openEHR types this crate takes and returns.
 The design is recorded in the repository's architecture document.
 
+## Features
+
+`mapping`, on by default, is the language: the `model`, `resolve`, `engine`
+and `operations` modules and their openEHR dependencies. With
+`default-features = false` the crate is the `tree` module alone, the FHIR
+path model over `fhir-types`, which a FHIR writer can take with no openEHR
+crate.
+
 ## Requiring the crate
 
 The crate follows Cargo's SemVer rules: a compatible change moves the patch,

@@ -38,8 +38,7 @@ pub(crate) fn parsed(bytes: &[u8]) -> Parsed {
 
 /// The vendored v2-to-FHIR package.
 pub(crate) fn package() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/hl7.fhir.uv.v2mappings/package")
 }
 
 /// The corpus, loaded once per test.

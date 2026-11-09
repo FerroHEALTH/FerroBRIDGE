@@ -59,8 +59,8 @@ crates on crates.io. Report privately, through either route:
   ("Report a vulnerability" on the repository's **Security** tab), which
   needs a GitHub account and opens a private advisory visible only to you and
   the maintainer; or
-- email to [info@cadasto.com](mailto:info@cadasto.com), the single point of
-  contact of Cadasto B.V., the manufacturer (CRA Art 13(17)), with
+- email to [security@cadasto.com](mailto:security@cadasto.com), the security
+  address of Cadasto B.V., the manufacturer (CRA Art 13(17)), with
   "FerroBRIDGE vulnerability" in the subject. No account is needed. The
   address has no published encryption key, so send the details you are
   comfortable sending by email and say that more is available; we will agree

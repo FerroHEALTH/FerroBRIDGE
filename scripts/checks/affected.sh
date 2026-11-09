@@ -610,7 +610,10 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "omop-cdm reaches its dependants and its generator" "crates/omop-cdm/src/lib.rs" false \
     "+omocl +omop-cdm +ferrobridge-server +omop-cdm-codegen -fhir-codegen"
   check "the codegen vendor tree reaches its readers" "tools/fhir-codegen/vendor/x.json" false \
-    "+ferrobridge-fhirpath +ferrobridge-hl7v2 +ferrobridge-validator +ferrobridge-server +fhir-codegen -fhir-types"
+    "+ferrobridge-fhirpath +ferrobridge-validator +fhir-codegen -fhir-types -ferrobridge-hl7v2"
+  check "the v2-to-FHIR guide reaches the crate that embeds it and its readers" \
+    "crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package/x.json" false \
+    "+ferrobridge-hl7v2 +ferrobridge-fhirpath +ferrobridge-server +ferrobridge-testkit -fhir-codegen"
   check "hl7v2-types reaches its dependants and its generator" "crates/hl7v2-types/src/lib.rs" false \
     "+ferrobridge-hl7v2 +hl7v2-types +ferrobridge-server +fhir-codegen -fhir-types"
   check "fhir-types reaches its dependants, its dev-dependants and its generator" \
