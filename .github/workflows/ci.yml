@@ -227,7 +227,7 @@ jobs:
           for lane in CDR TERMINOLOGY; do
             for key in USER PASSWORD_FILE OAUTH__ISSUER OAUTH__TOKEN_ENDPOINT \
               OAUTH__CLIENT_ID OAUTH__CLIENT_SECRET_FILE OAUTH__AUDIENCE; do
-              names+=("FERROBRIDGE__${lane}__CREDENTIALS__${key}")
+              names+=("FERROBRIDGE__${lane}__ENDPOINT__CREDENTIALS__${key}")
             done
           done
           for name in "${names[@]}"; do export "${name}=set-${name}"; done
