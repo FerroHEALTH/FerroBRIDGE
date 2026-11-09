@@ -138,14 +138,22 @@ fn a_resolved_leaf_carries_its_rm_type_and_occurrence_bounds() {
 #[test]
 fn an_archetype_id_predicate_matches_the_interface_form() {
     let index = fixture_index();
-    let path = MappingPath::from_str(
-        "/content[org.example::openEHR-EHR-EVALUATION.ferrobridge_note.v1.2.3]",
-    )
-    .expect("a well-formed mapping path");
+    let path = MappingPath::from_str("/content[openEHR-EHR-EVALUATION.ferrobridge_note.v1.2.3]")
+        .expect("a well-formed mapping path");
     let node = index
         .resolve(&path, &root_anchor())
         .expect("the archetype root resolves");
     assert_eq!(node.rm_type(), "EVALUATION");
+    // BASE master07-referencing.adoc §Referencing: "a namespace is never a
+    // wildcard", so a namespaced reference names no root of the legacy id.
+    let namespaced = MappingPath::from_str(
+        "/content[org.example::openEHR-EHR-EVALUATION.ferrobridge_note.v1.2.3]",
+    )
+    .expect("a well-formed mapping path");
+    assert!(
+        index.resolve(&namespaced, &root_anchor()).is_err(),
+        "the template's root carries no namespace"
+    );
 }
 
 #[test]

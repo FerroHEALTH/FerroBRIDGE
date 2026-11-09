@@ -21,6 +21,7 @@
 //! base32 characters, which fit the R4 id grammar `[A-Za-z0-9\-\.]{1,64}`
 //! (<https://hl7.org/fhir/R4/datatypes.html#id>).
 
+use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use sha2::Digest;
 
 use crate::engine::seam::identity::IdentityRequest;
@@ -37,11 +38,16 @@ pub const DIGEST_CHARACTERS: usize = 52;
 /// Locators).
 pub const ROOT_PATH: &str = "/";
 
-/// Returns the `object_id` of an `OBJECT_VERSION_ID`, its leading segment
-/// before the first `::`, or the whole text when it carries none.
+/// Returns the `object_id` of the composition uid `uid` when it is an
+/// `OBJECT_VERSION_ID`, verbatim, or the whole text when it is not.
 #[must_use]
-pub fn versioned_object_uid(uid: &str) -> &str {
-    uid.split("::").next().unwrap_or(uid)
+pub fn versioned_object_uid(uid: &str) -> String {
+    // NOTE: RM Common `LOCATABLE.uid` is a UID_BASED_ID, so a uid that is no
+    // OBJECT_VERSION_ID is a HIER_OBJECT_ID naming the object itself.
+    ObjectVersionId::new(uid).map_or_else(
+        |_| uid.to_owned(),
+        |version| version.object_id_str().to_owned(),
+    )
 }
 
 /// Returns the deterministic id of the resource mapped from the instance at

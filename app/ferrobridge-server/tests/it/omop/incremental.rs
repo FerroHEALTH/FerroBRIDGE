@@ -16,7 +16,7 @@ use std::error::Error;
 
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::cdr::ids::{EhrId, versioned_object_uid};
+use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::change_feed::follow::Consumer;
 use ferrobridge_server::change_feed::{ChangedVersion, Domain, Event, Position, Seq};
 use ferrobridge_server::config::Process;
@@ -51,7 +51,7 @@ fn event(
         ehr_id: Some(ehr.clone()),
         committed_at: None,
         versions: vec![ChangedVersion {
-            vo_id: Some(versioned_object_uid(version).value().parse()?),
+            vo_id: Some(version.versioned_object_id().value().parse()?),
             kind: String::from("COMPOSITION"),
             sys_version: None,
             version_tree_id: None,

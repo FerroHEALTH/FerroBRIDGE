@@ -19,6 +19,7 @@ use omop_cdm::graph::{
 };
 use omop_cdm::value::{CdmDate, CdmDatetime};
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
+use openehr_base::v1_3::foundation_types::time::iso8601_date_time::Iso8601DateTime;
 use std::collections::BTreeMap;
 
 /// The mapping name the report files visit refusals under.
@@ -36,19 +37,32 @@ struct Moment {
     datetime: Option<CdmDatetime>,
 }
 
-/// Returns `text` without a trailing `Z` or `±hh:mm` offset on its time.
+/// Returns the wall clock `text` names, in the extended form and without
+/// its `Z` or `±hh:mm` offset, and `text` itself when it names no full date.
 ///
-/// The cut is lexical so the fraction of a second keeps the digits the source
-/// wrote: `openehr_base::v1_3::foundation_types::time::iso8601_date_time`
-/// yields the fraction as an `f64`, which cannot carry them.
-fn without_offset(text: &str) -> &str {
-    let Some((date, time)) = text.split_once('T') else {
-        return text;
+/// The fraction of a second keeps the digits the source wrote
+/// (`Iso8601_date_time.fraction_digits`).
+fn without_offset(text: &str) -> String {
+    let value = Iso8601DateTime {
+        value: text.to_owned(),
     };
-    let cut = time
-        .find(['Z', '+', '-'])
-        .map_or(text.len(), |at| date.len() + 1 + at);
-    text.get(..cut).unwrap_or(text)
+    let (Some(year), Some(month), Some(day)) = (value.year(), value.month(), value.day()) else {
+        return text.to_owned();
+    };
+    let date = format!("{year:04}-{month:02}-{day:02}");
+    let Some(hour) = value.hour() else {
+        return date;
+    };
+    let clock = match (value.minute(), value.second()) {
+        (Some(minute), Some(second)) => format!(":{minute:02}:{second:02}"),
+        (Some(minute), None) => format!(":{minute:02}"),
+        (None, _) => String::new(),
+    };
+    let fraction = value
+        .fraction_digits()
+        .map(|digits| format!(".{digits}"))
+        .unwrap_or_default();
+    format!("{date}T{hour:02}{clock}{fraction}")
 }
 
 /// Reads `text` as a moment, or `None` when it carries no full date.
@@ -58,12 +72,12 @@ fn moment(text: &str) -> Option<Moment> {
     // NOTE: no specification governs this: our own design; a value that is no
     // CDM datetime after its date is refused whole rather than cut to its date.
     let datetime = if local.len() > 10 {
-        Some(CdmDatetime::new(local).ok()?)
+        Some(CdmDatetime::new(&local).ok()?)
     } else {
         None
     };
     Some(Moment {
-        local: local.to_owned(),
+        local,
         date,
         datetime,
     })
@@ -169,6 +183,16 @@ mod tests {
         );
         assert_eq!("2026-06-14", without_offset("2026-06-14"));
         assert!(moment("2026-06").is_none(), "a partial date is no CDM date");
+    }
+
+    #[test]
+    fn a_basic_form_value_reads_as_its_extended_wall_clock() {
+        // BASE foundation_types Iso8601_date_time: the basic form names the
+        // same moment, and the fraction keeps the digits written.
+        assert_eq!(
+            "2026-06-14T10:00:00.50",
+            without_offset("20260614T100000.50+0200")
+        );
     }
 
     #[test]
