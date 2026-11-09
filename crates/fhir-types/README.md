@@ -13,6 +13,21 @@ with a runtime descriptor of the declared parameter set. The `resources`
 feature widens the same tree to every concrete resource each package defines,
 with the complete closure of the datatypes those resources reference.
 
+## Requiring the crate
+
+The crate follows Cargo's SemVer rules: a compatible change moves the patch,
+and a breaking change moves the minor while the crate is 0.x. Require it with a
+caret range on its line, so one release serves every crate in your build that
+uses it:
+
+```toml
+[dependencies]
+fhir-types = "0.1"
+```
+
+Name a patch (`"0.1.N"`) when you need the first release that carries what
+you use; the range is the same caret range.
+
 ## Features
 
 One tree holds every type the generator emits, and the features select inside

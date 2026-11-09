@@ -387,10 +387,11 @@ No build reads anything here.
 The library crates are published to crates.io on one crate version line,
 distinct from the product version (owner decision 2026-09-05). The line is
 `fhir-types`' own: the sibling published 0.1.97 on 2026-09-12, the first
-release from here was 0.1.98, and the line moves one patch with every change
-to the crate's packaged content (`.claude/rules/crates-publishing.md`). A
-change that breaks a public API is a patch too, so a consumer pins a crate of
-the line exactly (owner decision 2026-10-17, #510).
+release from here was 0.1.98, and every change to a crate's packaged content
+moves its version by Cargo SemVer: the patch for a compatible change, the
+minor for a breaking one while 0.x, judged by `cargo-semver-checks`
+(`.claude/rules/crates-publishing.md`, #1745, superseding the patch-only rule
+of #510). A consumer requires a crate of the line by a caret range.
 `openehr-mapping-core` and `fhirconnect` joined the line at 0.1.108 with their
 first publish (#397), and `ferrobridge-term`, `ferrobridge-fhirpath` and
 `ferrobridge-validator` joined it at 0.1.126 (#432), `hl7v2-types` and
@@ -401,7 +402,7 @@ at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.128 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.1.129 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 
@@ -497,6 +498,7 @@ version (`cargo install --locked`), as every FerroHEALTH product does.
 | `shellcheck` | 0.11.0 | `.github/workflows/ci.yml` |
 | `hadolint` | 2.15.1 | `.github/workflows/ci.yml` |
 | `sqlx-cli` | 0.9.0 | `.github/workflows/ci.yml` (the `sqlx-offline` job) |
+| `cargo-semver-checks` | 0.51.0 | read by `scripts/checks/semver.sh --pin` for the `crate-version-guard` job of `.github/workflows/ci.yml` and the `plan` job of `.github/workflows/release.yml` |
 | `ferrohealth-perf` | 0.5.2 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
 
 The clone detector of `scripts/checks/duplication.sh` (#1359) also runs on a
