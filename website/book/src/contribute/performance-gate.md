@@ -98,9 +98,9 @@ attempt passed. A breach on any other model fails at once. The job summary
 names each attempt's CPU model, its verdict and why a retry ran, and the
 verdict's summary names each attempt, a cancelled one with why the next ran.
 
-The workflow builds two crates at a time (`CARGO_BUILD_JOBS=2`), as `ci.yml`
-does, and the build step logs the runner's used memory and free disk each
-minute. The hosted runner has 16 GB. A release build of `fhir-types` with
+The workflow builds four crates at a time (`CARGO_BUILD_JOBS=4`), one per
+core, and the build step logs the runner's used memory, swap and free disk
+each minute. The hosted runner has 16 GB. A release build of `fhir-types` with
 every resource of all five FHIR releases peaks above it on its own: on #1737
 the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
 and the runner shut down. The bridge therefore compiles only the releases it
