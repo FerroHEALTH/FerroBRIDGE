@@ -942,9 +942,10 @@ jobs:
   # packages (per version, and R4 through the facade) against the committed
   # pass lists under conformance/. A case a list records that no
   # longer passes fails the job, and so does an unrecorded new pass or a badge
-  # that disagrees with its list. The script runs one package per nextest
-  # invocation, as the test lane does through cargo hack, so the generated
-  # giants never compile side by side, and fetches the build-time HL7 v2 sets,
+  # that disagrees with its list. The script runs every corpus package in one
+  # nextest invocation, so each workspace crate compiles once; the test lane
+  # runs the same tests one package at a time with each package's own
+  # features. It fetches the build-time HL7 v2 sets,
   # FHIR examples packages and profile packages this job restores from the
   # cache keys of the test and profile-packages lanes.
   conformance:
