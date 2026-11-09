@@ -63,9 +63,7 @@ pub fn render_lib(models: &[VersionModule]) -> Result<String, fmt::Error> {
     writeln!(out, "pub mod definition;")?;
     writeln!(out, "pub mod operation;")?;
     writeln!(out, "pub mod schema;")?;
-    out.push_str(
-        &RootScope::Resources.cfg_any(models.iter().map(|model| model.name.as_str())),
-    );
+    out.push_str(&RootScope::Resources.cfg_any(models.iter().map(|model| model.name.as_str())));
     writeln!(out, "pub mod search;")?;
     writeln!(out, "pub mod xml;")?;
     for model in models {

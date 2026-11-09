@@ -1,4 +1,3 @@
-model/admin_entry/org.highmed/person_data.v0.yml
 model/admin_entry/org.highmed/versicherungsinformationen.v0.yml
 model/cluster/org.highmed/diagnoseTyp.yml
 model/cluster/org.highmed/entry_category.v0.yml
@@ -6,18 +5,14 @@ model/cluster/org.highmed/identifier_fhir.v0.yml
 model/cluster/org.openehr/death_details.v1.yml
 model/cluster/org.openehr/organisation.v1.yml
 model/cluster/org.openehr/person_birth_data_iso.v0.yml
-model/cluster/org.openehr/problem_qualifier.v2.yml
-model/cluster/org.openehr/structured_name.v1.yml
 model/composition/org.openehr/health_summary.v1.Composition.yml
 model/composition/org.openehr/medication_list.v1.MedicationStatement.yml
 model/evaluation/org.openehr/absence.v2.yml
 model/evaluation/org.openehr/exclusion_global.v1.yml
 model/evaluation/org.openehr/gender.v1.yml
-model/evaluation/org.openehr/problem_diagnosis.v1.yml
 projects/org.highmed/KDS/person/KDS_Composition.yml
 projects/org.highmed/KDS/person/KDS_gender.yml
 projects/org.highmed/KDS/procedure/KDS_anatomical_location.yml
-projects/org.highmed/KDS/procedure/KDS_procedure.v1.yml
 projects/org.highmed/KDS/todesursache/KDS_cause_of_death.yml
 projects/org.highmed/KDS/todesursache/KDS_problem_qualifier.yml
 projects/org.openehr/IPS/medication/IPS_medication.context.yml
