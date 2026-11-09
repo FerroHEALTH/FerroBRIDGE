@@ -123,7 +123,7 @@ pub fn group(lexed: Lexed, structure: &'static Structure, profile: &'static Prof
     let placed = placed_segments(&parsed.items);
     for (index, node) in placed {
         check_fields(&mut parsed, index, node);
-        check_arity(&mut parsed, index, node);
+        check_arity(&mut parsed, index, node, profile);
     }
     parsed
 }
