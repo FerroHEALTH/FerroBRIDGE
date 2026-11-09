@@ -132,7 +132,7 @@ pub fn answer(
     status: StatusCode,
     body: &str,
 ) -> Result<BatchOutcome, Error> {
-    let answer = crate::client::Answer {
+    let answer = crate::decode::Answer {
         url: url.clone(),
         status,
         body: body.to_owned(),
@@ -142,6 +142,7 @@ pub fn answer(
 
 /// Returns `segment` percent-encoded as one path segment: every byte outside
 /// the `pchar` set of RFC 3986 §3.3 is written `%XX`.
+#[cfg(feature = "client")]
 pub(crate) fn path_segment(segment: &str) -> String {
     let mut written = String::with_capacity(segment.len());
     for byte in segment.bytes() {
@@ -160,6 +161,7 @@ pub(crate) fn path_segment(segment: &str) -> String {
 }
 
 #[cfg(test)]
+#[cfg(feature = "client")]
 mod tests {
     use super::path_segment;
 

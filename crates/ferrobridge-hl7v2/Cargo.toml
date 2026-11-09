@@ -32,10 +32,13 @@ include = [
 ]
 
 [features]
-# The v2-to-FHIR mapping (`map`), on by default. A consumer that takes only the
-# listener, the decoder, the parser and the acknowledgment turns it off and
-# drops fhirconnect, ferrobridge-term, fhir-types and the openEHR crates.
-default = ["map"]
+# The v2-to-FHIR mapping (`map`), on by default with the terminology server
+# translator. `map` alone translates offline from the corpus, over fhir-types,
+# fhirconnect's FHIR path model and ferrobridge-term's request and outcome
+# types, with no openEHR crate and no HTTP client. A consumer that takes only
+# the listener, the decoder, the parser and the acknowledgment turns every
+# feature off.
+default = ["map", "terminology-server"]
 map = [
     "dep:chumsky",
     "dep:fhirconnect",
@@ -49,6 +52,9 @@ map = [
 # The v2-to-FHIR guide's ConceptMaps compiled in (`Corpus::shipped`), about
 # 3.9 MB of JSON, so a consumer maps with no package on disk.
 shipped-maps = ["map"]
+# `Translator::Server`: table values translated by `ConceptMap/$translate` on
+# a terminology server, through ferrobridge-term's HTTP client.
+terminology-server = ["map", "ferrobridge-term/client"]
 
 [dependencies]
 bytes.workspace = true
@@ -79,13 +85,19 @@ uuid = { workspace = true, optional = true }
 
 [dev-dependencies]
 # The suites also drive an STU3 terminology server.
-ferrobridge-term = { workspace = true, features = ["stu3", "r4"] }
+ferrobridge-term = { workspace = true, features = ["client", "stu3", "r4"] }
 ferrobridge-testkit.workspace = true
 insta.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "net", "io-util", "test-util"] }
 url.workspace = true
 wiremock.workspace = true
+
+# The integration tests run the map against a stub terminology server.
+[[test]]
+name = "it"
+path = "tests/it/main.rs"
+required-features = ["terminology-server"]
 
 [lints]
 workspace = true

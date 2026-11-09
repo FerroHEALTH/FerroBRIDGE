@@ -5,6 +5,7 @@
 //! time.
 
 use crate::config::{Config, Credentials, TokenFailure};
+use crate::decode::Answer;
 use crate::error::{Error, UpstreamError};
 use crate::outcome::{
     BatchOutcome, ExpandOutcome, LookupOutcome, SubsumesOutcome, TranslateOutcome, ValidateOutcome,
@@ -37,16 +38,6 @@ struct Call {
     url: Url,
     /// The FHIR JSON request body of a `POST`; a `GET` carries none.
     body: Option<String>,
-}
-
-/// What the server answered, read whole.
-pub(crate) struct Answer {
-    /// The URL that was called.
-    pub(crate) url: Url,
-    /// The status the server answered with.
-    pub(crate) status: StatusCode,
-    /// The response body, as received.
-    pub(crate) body: String,
 }
 
 /// A client for one FHIR terminology server.

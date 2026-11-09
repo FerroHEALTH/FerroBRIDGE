@@ -646,11 +646,13 @@ jobs:
       - if: contains(matrix.packages, 'fhirconnect')
         run: cargo clippy -p fhirconnect --all-targets --no-default-features --locked -- -D warnings
       # ferrobridge-term with each FHIR release alone (#1737), so a writer, a
-      # reader or a test that needs another release names it in a cfg.
+      # reader or a test that needs another release names it in a cfg, each
+      # with and without its HTTP client (#1750).
       - if: contains(matrix.packages, 'ferrobridge-term')
         run: |
           set -euo pipefail
           for release in stu3 r4 r4b r5 r6; do
+            cargo clippy -p ferrobridge-term --all-targets --no-default-features --features "client,$release" --locked -- -D warnings
             cargo clippy -p ferrobridge-term --all-targets --no-default-features --features "$release" --locked -- -D warnings
           done
       # eehrxf has no default feature: one feature per Art 14(1) category and

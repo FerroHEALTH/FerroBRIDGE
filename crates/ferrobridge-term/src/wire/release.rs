@@ -30,7 +30,9 @@ macro_rules! per_release {
     ($module:ident, $release:ident, $contracts:ident) => {
         /// The bodies of one FHIR release, over its own generated model.
         pub(crate) mod $module {
-            use super::{BatchEntry, RequestError, BATCH, BATCH_RESPONSE, POST};
+            use super::RequestError;
+            #[cfg(feature = "client")]
+            use super::{BatchEntry, BATCH, BATCH_RESPONSE, POST};
             use crate::concept::{Concept, Designation, Property, PropertyValue};
             use crate::error::{BodyError, Issue, Outcome, TxIssue};
             use crate::outcome::{
@@ -40,6 +42,7 @@ macro_rules! per_release {
             use crate::request::{
                 Coded, Expansion, InlineValueSet, Request, Subsumption, Validation, ValueSetSource,
             };
+            #[cfg(feature = "client")]
             use fhir_types::$release::bundle::{Bundle, BundleEntry, BundleEntryRequest};
             use fhir_types::$release::codeable_concept::CodeableConcept;
             use fhir_types::$release::coding::Coding;
@@ -57,6 +60,7 @@ macro_rules! per_release {
             use fhir_types::$release::parameters::{
                 Parameters, ParametersParameter, ParametersParameterValue,
             };
+            #[cfg(feature = "client")]
             use fhir_types::$release::resource::Resource;
             use fhir_types::$release::value_set::{
                 ValueSet, ValueSetCompose, ValueSetComposeInclude, ValueSetComposeIncludeFilter,
@@ -251,17 +255,20 @@ macro_rules! per_release {
             }
 
             /// Returns whether this release defines no such operation.
+            #[cfg(feature = "client")]
             pub(crate) const fn undefined_operation(request: &Request) -> bool {
                 undefined(request)
             }
 
             /// Returns the parameter of `request` this release cannot carry.
+            #[cfg(feature = "client")]
             pub(crate) const fn unsupported_parameter(request: &Request) -> Option<&'static str> {
                 unsupported(request)
             }
 
             /// Returns whether `request` names no system where this release
             /// requires one.
+            #[cfg(feature = "client")]
             pub(crate) const fn requires_system(request: &Request) -> bool {
                 system_required(request)
             }
@@ -309,6 +316,7 @@ macro_rules! per_release {
             ///
             /// A request this release cannot carry refuses the whole batch,
             /// so nothing is sent.
+            #[cfg(feature = "client")]
             pub(crate) fn batch_body(requests: &[Request]) -> Result<String, RequestError> {
                 let entry = requests
                     .iter()
@@ -333,6 +341,7 @@ macro_rules! per_release {
             }
 
             /// Returns the entries of the `batch-response` `body` carries.
+            #[cfg(feature = "client")]
             pub(crate) fn batch_entries(body: &str) -> Result<Vec<BatchEntry>, BodyError> {
                 let bundle = serde_json::from_str::<Bundle>(body)?;
                 let kind = bundle.r#type.value.clone().unwrap_or_default();
@@ -343,6 +352,7 @@ macro_rules! per_release {
             }
 
             /// Returns one `batch-response` entry as its status and body.
+            #[cfg(feature = "client")]
             fn entry(entry: BundleEntry) -> Result<BatchEntry, BodyError> {
                 let status = entry
                     .response
@@ -572,6 +582,7 @@ macro_rules! per_release {
             }
 
             /// Returns the `Bundle.total` of the `searchset` `body` carries.
+            #[cfg(feature = "client")]
             pub(crate) fn search_total(body: &str) -> Result<u32, BodyError> {
                 let bundle = serde_json::from_str::<Bundle>(body)?;
                 let kind = bundle.r#type.value.clone().unwrap_or_default();

@@ -23,7 +23,7 @@ include = ["src/**", "README.md", "LICENSE"]
 # A binding the package set cannot decide goes to a terminology server as
 # ValueSet/$validate-code, in the two releases the validator holds a resource
 # to.
-ferrobridge-term = { workspace = true, features = ["stu3", "r4"] }
+ferrobridge-term = { workspace = true, features = ["client", "stu3", "r4"] }
 # A slice discriminator's path is parsed as FHIRPath and held to the simple
 # subset R4 allows (fhirpath.html section 2.9.2).
 ferrobridge-fhirpath.workspace = true

@@ -8,6 +8,7 @@
 //! is the other half, and every one of these carries the upstream status and
 //! body rather than an empty value.
 
+#[cfg(feature = "client")]
 use crate::config::TokenFailure;
 use crate::config::WireVersion;
 use http::StatusCode;
@@ -212,6 +213,7 @@ pub enum Error {
         base: Url,
     },
     /// The HTTP client could not be built from the configuration.
+    #[cfg(feature = "client")]
     #[error("the HTTP client could not be built")]
     ClientBuild {
         /// What the HTTP stack reported.
@@ -306,6 +308,7 @@ pub enum Error {
         source: std::num::TryFromIntError,
     },
     /// The request never reached the server.
+    #[cfg(feature = "client")]
     #[error("the request to {url} could not be sent")]
     Transport {
         /// The URL that was called.
@@ -315,6 +318,7 @@ pub enum Error {
         source: reqwest::Error,
     },
     /// The server did not answer inside the configured timeout.
+    #[cfg(feature = "client")]
     #[error("the request to {url} timed out")]
     Timeout {
         /// The URL that was called.
@@ -342,6 +346,7 @@ pub enum Error {
         upstream: Box<UpstreamError>,
     },
     /// The token provider obtained no token, so nothing was sent.
+    #[cfg(feature = "client")]
     #[error("no token could be obtained for the request to {url}")]
     Token {
         /// The URL the request was for.
@@ -352,6 +357,7 @@ pub enum Error {
     },
     /// The server refused the token (`401`) and no new one could be
     /// obtained, so the request was not sent again.
+    #[cfg(feature = "client")]
     #[error("the terminology server refused the token for {url} and no new one could be obtained")]
     Renewal {
         /// The URL that was called.
@@ -400,6 +406,7 @@ impl Error {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::BaseUrl { .. } => "base-url",
+            #[cfg(feature = "client")]
             Self::ClientBuild { .. } => "client-build",
             Self::RequestBody { .. } => "request-body",
             Self::RequestEncode { .. } => "request-encode",
@@ -407,11 +414,15 @@ impl Error {
             Self::UnsupportedOperation { .. } => "unsupported-operation",
             Self::SystemRequired { .. } => "system-required",
             Self::ParameterRange { .. } => "parameter-range",
+            #[cfg(feature = "client")]
             Self::Transport { .. } => "transport",
+            #[cfg(feature = "client")]
             Self::Timeout { .. } => "timeout",
             Self::ServerFailure { .. } => "server-failure",
             Self::Unauthorized { .. } => "unauthorized",
+            #[cfg(feature = "client")]
             Self::Token { .. } => "token",
+            #[cfg(feature = "client")]
             Self::Renewal { .. } => "token-renewal",
             Self::Refused { .. } => "refused",
             Self::Body { .. } => "body",
@@ -427,8 +438,9 @@ impl Error {
         match self {
             Self::ServerFailure { upstream, .. }
             | Self::Unauthorized { upstream, .. }
-            | Self::Renewal { upstream, .. }
             | Self::Refused { upstream, .. } => Some(upstream.status()),
+            #[cfg(feature = "client")]
+            Self::Renewal { upstream, .. } => Some(upstream.status()),
             _ => None,
         }
     }
@@ -450,10 +462,12 @@ impl Error {
     /// The `CodeSystem` search is a `GET`, a safe method (RFC 9110 §9.2.1).
     #[must_use]
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            Self::Transport { .. } | Self::Timeout { .. } | Self::ServerFailure { .. }
-        )
+        match self {
+            Self::ServerFailure { .. } => true,
+            #[cfg(feature = "client")]
+            Self::Transport { .. } | Self::Timeout { .. } => true,
+            _ => false,
+        }
     }
 }
 
