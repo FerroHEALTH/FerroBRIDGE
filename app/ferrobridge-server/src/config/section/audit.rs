@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use ehds_logging::map::Declared;
-use ferrohealth_smart::config::CredentialsSection;
+use ferrohealth_smart::config::credentials::CredentialsSection;
 use serde::{Deserialize, Serialize};
 
 /// The access-record lane.

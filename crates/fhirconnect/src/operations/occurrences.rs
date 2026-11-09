@@ -114,7 +114,7 @@ pub(super) fn occurrences<T: Table + ?Sized>(
     let mut mapped = Vec::new();
     let mut inapplicable = 0_usize;
     for one in &named {
-        let sink = anchored(container, one.path());
+        let sink = anchored(container.as_deref(), one.path());
         let run = match sink {
             Some(ref sink) => occurrence::to_fhir_at(
                 program,

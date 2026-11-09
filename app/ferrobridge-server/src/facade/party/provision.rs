@@ -17,7 +17,6 @@ use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 
 use crate::cdr::CdrClient;
-use crate::cdr::ids::versioned_object_uid;
 use crate::facade::Facade;
 use crate::facade::ehr;
 use crate::facade::ehr::Policy;
@@ -46,7 +45,7 @@ pub(crate) async fn provision(
     if resource_type != PATIENT || facade.settings().ehr_policy != Policy::CreateOnFirstWrite {
         return Ok(());
     }
-    let id = versioned_object_uid(version);
+    let id = version.versioned_object_id();
     let stored = Issue::warning(IssueType::Informational).diagnosing(format!(
         "the Patient was stored as {PATIENT}/{} and has no EHR",
         id.value()

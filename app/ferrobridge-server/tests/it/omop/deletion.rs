@@ -14,7 +14,7 @@
 
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::cdr::ids::{EhrId, versioned_object_uid};
+use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::etl::report::RunReport;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures::LABORATORY_REPORT_OPT;
@@ -86,7 +86,7 @@ async fn a_composition_deleted_in_the_cdr_loses_its_rows_on_the_next_run()
         .get(LABORATORIES.get(1).ok_or("lab-2")?.ehr)
         .ok_or("an EHR")?;
     delete(&client, doomed_ehr, doomed).await?;
-    let doomed_object = versioned_object_uid(doomed).value().to_owned();
+    let doomed_object = doomed.versioned_object_id().value().to_owned();
 
     let second = etl_run(&config).await?;
     assert_eq!(2, second.compositions.committed, "{second}");
