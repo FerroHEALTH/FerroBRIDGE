@@ -149,6 +149,16 @@ impl CdrOnward {
             .map(|lane| &lane.target)
     }
 
+    /// Returns whether the issuer of `kind` holds the tokens it obtains,
+    /// when the lane has that issuer: `false` under `cache = false`.
+    #[must_use]
+    pub fn caches(&self, kind: IssuerKind) -> Option<bool> {
+        self.lanes
+            .iter()
+            .find(|lane| lane.kind == kind)
+            .map(|lane| lane.client.caches())
+    }
+
     /// Returns how a caller of `kind` reaches the CDR under this lane, with
     /// the issuer that carries it when it is exchanged.
     fn route_of(&self, kind: &CallerKind) -> (Route, Option<&Lane>) {

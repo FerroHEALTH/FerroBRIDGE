@@ -484,9 +484,7 @@ async fn the_entries_of_one_message_bind_by_content_whatever_the_version_order()
         .map(|entry| {
             (
                 entry.full_url.clone(),
-                ferrobridge_server::cdr::ids::versioned_object_uid(&entry.version)
-                    .value()
-                    .to_owned(),
+                entry.version.versioned_object_id().value().to_owned(),
             )
         })
         .collect();
@@ -549,9 +547,7 @@ async fn the_entries_of_one_message_bind_on_retry_from_the_contribution_read_bac
         .map(|entry| {
             (
                 entry.full_url.clone(),
-                ferrobridge_server::cdr::ids::versioned_object_uid(&entry.version)
-                    .value()
-                    .to_owned(),
+                entry.version.versioned_object_id().value().to_owned(),
             )
         })
         .collect();

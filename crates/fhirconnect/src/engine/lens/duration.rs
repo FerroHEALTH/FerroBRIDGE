@@ -28,6 +28,8 @@ use fhir_types::r4::duration::Duration;
 use fhir_types::r4::primitives::Code;
 use fhir_types::r4::primitives::Decimal;
 use fhir_types::r4::primitives::Uri;
+use openehr_base::v1_3::foundation_types::time::iso8601_duration::Iso8601Duration;
+use openehr_base::v1_3::foundation_types::time::iso8601_duration_impl::DurationDesignator as Designator;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_duration::DvDuration;
 
 use crate::engine::lens::Fallback;
@@ -42,73 +44,33 @@ use crate::model::ast::keyword::Direction;
 /// The name the `Duration` cell carries in a diagnostic.
 pub const CELL: &str = "DV_DURATION against Duration";
 
-/// One ISO 8601 duration component.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Component {
-    /// `nY`.
-    Years,
-    /// `nM` before the `T`.
-    Months,
-    /// `nW`.
-    Weeks,
-    /// `nD`.
-    Days,
-    /// `nH`.
-    Hours,
-    /// `nM` after the `T`.
-    Minutes,
-    /// `nS`.
-    Seconds,
-}
-
-impl Component {
-    /// Returns the designator letter the component is written with.
-    #[must_use]
-    pub const fn designator(self) -> char {
-        match self {
-            Self::Years => 'Y',
-            Self::Months | Self::Minutes => 'M',
-            Self::Weeks => 'W',
-            Self::Days => 'D',
-            Self::Hours => 'H',
-            Self::Seconds => 'S',
-        }
-    }
-
-    /// Returns whether the component is written after the `T`.
-    #[must_use]
-    pub const fn is_time(self) -> bool {
-        matches!(self, Self::Hours | Self::Minutes | Self::Seconds)
-    }
-
-    /// Returns the next smaller component and how many of it make one of
-    /// this, `None` for the smallest of its group.
-    const fn smaller(self) -> Option<(Self, u128)> {
-        match self {
-            Self::Years => Some((Self::Months, 12)),
-            Self::Weeks => Some((Self::Days, 7)),
-            Self::Days => Some((Self::Hours, 24)),
-            Self::Hours => Some((Self::Minutes, 60)),
-            Self::Minutes => Some((Self::Seconds, 60)),
-            Self::Months | Self::Seconds => None,
-        }
+/// Returns the next smaller designator and how many of it make one of
+/// `designator`, `None` for the smallest of its group.
+const fn smaller(designator: Designator) -> Option<(Designator, u128)> {
+    match designator {
+        Designator::Years => Some((Designator::Months, 12)),
+        Designator::Weeks => Some((Designator::Days, 7)),
+        Designator::Days => Some((Designator::Hours, 24)),
+        Designator::Hours => Some((Designator::Minutes, 60)),
+        Designator::Minutes => Some((Designator::Seconds, 60)),
+        Designator::Months | Designator::Seconds => None,
     }
 }
 
 /// The bridge of `DV_DURATION.adoc`, one row per UCUM code.
 ///
-/// Each row of `CommonUCUMCodesForDuration` names the component the code is
-/// written as and the power of ten its value is divided by on the way (`ms`
+/// Each row of `CommonUCUMCodesForDuration` names the designator the code is
+/// written with and the power of ten its value is divided by on the way (`ms`
 /// is a fraction of a second).
-pub const BRIDGE: [(&str, Component, u32); 8] = [
-    ("ms", Component::Seconds, 3),
-    ("s", Component::Seconds, 0),
-    ("min", Component::Minutes, 0),
-    ("h", Component::Hours, 0),
-    ("d", Component::Days, 0),
-    ("wk", Component::Weeks, 0),
-    ("mo", Component::Months, 0),
-    ("a", Component::Years, 0),
+pub const BRIDGE: [(&str, Designator, u32); 8] = [
+    ("ms", Designator::Seconds, 3),
+    ("s", Designator::Seconds, 0),
+    ("min", Designator::Minutes, 0),
+    ("h", Designator::Hours, 0),
+    ("d", Designator::Days, 0),
+    ("wk", Designator::Weeks, 0),
+    ("mo", Designator::Months, 0),
+    ("a", Designator::Years, 0),
 ];
 
 /// `DV_DURATION` against `Duration`.
@@ -181,6 +143,15 @@ impl Lens<DvDuration, Duration> for DurationLens {
             reason: "an ISO 8601 duration component is a non-negative decimal",
             direction: Direction::FhirToOpenehr,
         })?;
+        if component != Designator::Seconds && amount.contains('.') {
+            return Err(LensError::Shape {
+                cell: CELL,
+                attribute: "Duration.value",
+                found: String::from(text),
+                reason: "only the seconds of an openEHR duration carry a fraction",
+                direction: Direction::FhirToOpenehr,
+            });
+        }
         let written = iso(&amount, component);
         // NOTE: no specification governs this: our own design, a held duration
         // that reads as the same value and code keeps the components it was
@@ -215,18 +186,24 @@ impl Lens<DvDuration, Duration> for DurationLens {
 /// when no single code of [`BRIDGE`] states it.
 #[must_use]
 pub fn reading(duration: &str) -> Option<(String, &'static str)> {
-    let parts = components(duration)?;
-    let (&(smallest, ref fraction), larger) = parts.split_last()?;
-    let mut whole: u128 = 0;
-    let mut unit = parts.first()?.0;
-    for &(component, ref amount) in larger {
-        whole = descend(whole, unit, component)?.checked_add(amount.parse().ok()?)?;
-        unit = component;
+    let duration = Iso8601Duration {
+        value: String::from(duration),
+    };
+    if duration.is_negative()? {
+        return None;
     }
-    whole = descend(whole, unit, smallest)?;
-    let (integer, decimals) = match fraction.split_once('.') {
+    let parts = duration.parts()?;
+    let (smallest, larger) = parts.split_last()?;
+    let mut whole: u128 = 0;
+    let mut unit = parts.first()?.designator;
+    for part in larger {
+        whole = descend(whole, unit, part.designator)?.checked_add(part.text.parse().ok()?)?;
+        unit = part.designator;
+    }
+    whole = descend(whole, unit, smallest.designator)?;
+    let (integer, decimals) = match smallest.text.split_once(['.', ',']) {
         Some((integer, decimals)) => (integer, Some(decimals)),
-        None => (fraction.as_str(), None),
+        None => (smallest.text, None),
     };
     let total = whole.checked_add(integer.parse::<u128>().ok()?)?;
     let mut value = total.to_string();
@@ -236,71 +213,22 @@ pub fn reading(duration: &str) -> Option<(String, &'static str)> {
     }
     let code = BRIDGE
         .iter()
-        .find(|&&(_, component, shift)| component == smallest && shift == 0)
+        .find(|&&(_, designator, shift)| designator == smallest.designator && shift == 0)
         .map(|&(code, _, _)| code)?;
     Some((value, code))
 }
 
 /// Returns `amount` of `from` counted in `to`, `None` when `to` is not
 /// reached from `from` by the factors UCUM fixes or the count overflows.
-fn descend(amount: u128, from: Component, to: Component) -> Option<u128> {
+fn descend(amount: u128, from: Designator, to: Designator) -> Option<u128> {
     let mut unit = from;
     let mut count = amount;
     while unit != to {
-        let (next, factor) = unit.smaller()?;
+        let (next, factor) = smaller(unit)?;
         count = count.checked_mul(factor)?;
         unit = next;
     }
     Some(count)
-}
-
-/// Returns the components of an ISO 8601 duration in order, `None` for text
-/// that is no duration of the `P[nY][nM][nW][nD][T[nH][nM][nS]]` form the
-/// page names.
-fn components(duration: &str) -> Option<Vec<(Component, String)>> {
-    let body = duration.strip_prefix('P')?;
-    let (date, time) = match body.split_once('T') {
-        Some((date, time)) if !time.is_empty() => (date, Some(time)),
-        Some(_) => return None,
-        None => (body, None),
-    };
-    let mut parts = Vec::new();
-    let date_order = [
-        Component::Years,
-        Component::Months,
-        Component::Weeks,
-        Component::Days,
-    ];
-    let time_order = [Component::Hours, Component::Minutes, Component::Seconds];
-    read_group(date, &date_order, &mut parts)?;
-    if let Some(time) = time {
-        read_group(time, &time_order, &mut parts)?;
-    }
-    let fractional = parts
-        .iter()
-        .rev()
-        .skip(1)
-        .any(|(_, amount)| amount.contains('.'));
-    (!parts.is_empty() && !fractional).then_some(parts)
-}
-
-/// Reads the components of one side of the `T`, in the order `order` admits.
-fn read_group(text: &str, order: &[Component], parts: &mut Vec<(Component, String)>) -> Option<()> {
-    let mut rest = text;
-    let mut allowed = order.iter();
-    while !rest.is_empty() {
-        let end = rest.find(|character: char| !(character.is_ascii_digit() || character == '.'))?;
-        let (amount, tail) = rest.split_at(end);
-        let mut letters = tail.chars();
-        let designator = letters.next()?;
-        let component = allowed.find(|component| component.designator() == designator)?;
-        if !is_amount(amount) {
-            return None;
-        }
-        parts.push((*component, String::from(amount)));
-        rest = letters.as_str();
-    }
-    Some(())
 }
 
 /// Returns whether `text` is a non-negative decimal with no exponent.
@@ -340,10 +268,10 @@ fn shifted(text: &str, shift: u32) -> Option<String> {
     Some(format!("{head}.{decimals}"))
 }
 
-/// Writes `amount` of `component` as an ISO 8601 duration.
-fn iso(amount: &str, component: Component) -> String {
-    let time = if component.is_time() { "T" } else { "" };
-    format!("P{time}{amount}{}", component.designator())
+/// Writes `amount` of `designator` as an ISO 8601 duration.
+fn iso(amount: &str, designator: Designator) -> String {
+    let time = if designator.is_time() { "T" } else { "" };
+    format!("P{time}{amount}{}", designator.letter())
 }
 
 #[cfg(test)]
@@ -448,6 +376,21 @@ mod tests {
             assert_eq!(reading(iso), None, "{iso}");
             assert!(DurationLens.get(&duration(iso)).is_err(), "{iso}");
         }
+    }
+
+    #[test]
+    fn a_fraction_below_the_seconds_is_refused_going_in() {
+        // BASE master06 §Durations: only the seconds of a duration carry a
+        // fraction, so `P1.5D` is no openEHR duration.
+        let error = DurationLens
+            .put(&fhir("1.5", "d"), None)
+            .expect_err("a day count carries no fraction");
+        assert!(
+            matches!(error, LensError::Shape { attribute, .. } if attribute == "Duration.value"),
+            "{error}"
+        );
+        assert_eq!(reading("P1.5D"), None);
+        assert_eq!(reading("PT1,5S"), Some((String::from("1.5"), "s")));
     }
 
     #[test]

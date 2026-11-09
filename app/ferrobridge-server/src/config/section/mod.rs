@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use ferrohealth_smart::config::CredentialsSection;
+use ferrohealth_smart::config::credentials::CredentialsSection;
 use ferrohealth_smart::config::onward::OnwardSection;
 
 use ferrohealth_secret::secret::Secret;
