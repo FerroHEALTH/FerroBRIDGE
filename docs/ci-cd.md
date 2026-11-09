@@ -136,17 +136,16 @@ them; the repository's ten-gigabyte cache quota was full before this.
 of the root manifest: `fhir-codegen` optimised, and `fhir-types` and
 `hl7v2-types`, which its test binary links but no full-emit test runs, at
 opt-level 0. Building them optimised at `CARGO_BUILD_JOBS=1` took 35 of the
-lane's 47 minutes on 2026-10-16. The lane runs in three shards selected by
-nextest filtersets: the two longest tests (four and three full emits of
-`hl7v2-types`) each alone, and every other test in the third, whose filter
-is the complement of the first two, so a test runs in exactly one shard.
-Across 17 runs on 2026-11-07 the third shard's test step took 6.6 to 11.9
-minutes, about 6.7 of them the build and 3.5 the tests, led by the `v2`
-sync check (161 seconds); the shard's 45-minute timeout is room for a slow
-runner, and a run that reaches it is a stalled runner to look into. The
-banner test reads the committed `crates/fhir-types` tree, which the sync
-check holds equal to the emitter's output, so the shard runs one
-all-versions emit fewer.
+lane's 47 minutes on 2026-10-16. One job builds the test binary once and
+runs every test. Three shards each built the same binary for 6 to 7 minutes
+(run 42560647228). Each full emit runs one `rustfmt` at a time, so the two
+longest tests (four and three full emits of `hl7v2-types`, about 466 seconds
+each) run side by side with the rest on the four cores. A priority in
+`.config/nextest.toml` starts them before every other test. The job's
+45-minute timeout is room for a slow runner, and a run that reaches it is a
+stalled runner to look into. The banner test reads the committed
+`crates/fhir-types` tree, which the sync check holds equal to the emitter's
+output, so the job runs one all-versions emit fewer.
 
 **The local gate.** Each checkout, a worktree included, builds into its own
 `target/`. A `CARGO_TARGET_DIR` shared with another checkout at a different
@@ -236,9 +235,15 @@ size moved from the list's `total` line, a badge under `conformance/badges/`
 that disagrees with its list, and a README conformance badge that names no
 committed badge file. `scripts/checks/conformance.sh --update` rewrites the
 lists and the badges from one run, and `--update <corpus>` or `--check
-<corpus>` runs and rewrites or checks one corpus alone. The script runs one package per `cargo
-nextest` invocation, for the same memory reason the `test` job uses
-`cargo hack`, and it needs `jq`, which the hosted runner carries.
+<corpus>` runs and rewrites or checks one corpus alone. The script runs
+every corpus package in one `cargo nextest` invocation, so each workspace
+crate compiles once with the features of the whole set. One run per package
+compiled `fhir-types` five times and `ferrobridge-testkit` six (run
+42560647228). The largest unit, `fhir-types` with every release and every
+resource, is the one `ferrobridge-testkit` already compiles in the `test`
+job, and the `test` job still runs these tests one package at a time with
+each package's own features. The script needs `jq`, which the hosted runner
+carries.
 
 The README shows each badge through
 `https://img.shields.io/endpoint?url=<raw URL of the badge JSON on main>`, the
@@ -465,8 +470,8 @@ through `cargo hack clippy`, the way the `msrv` job compiles: a workspace-wide
 (`fhir-types` with its five versions, `openehr-am` behind the client) side by
 side, the hosted runner's seven gigabytes run out, and the runner kills the
 job with exit 143 and no diagnostic; per package the two never meet. The
-`clippy-fhir-types` matrix lints `fhir-types` per version with `resources`,
-which is what a consumer builds; the all-features union (five versions, every
+`clippy-fhir-types` matrix lints `fhir-types` per version with its
+`<version>-resources` feature, which is what a consumer builds; the all-features union (five versions, every
 resource, one crate) is no consumer's surface and is not linted in CI. A
 package with a feature its default set leaves off (`scripts/checks/featured.sh`
 names them: `eehrxf` and `ferrobridge-term` today) is also linted and tested

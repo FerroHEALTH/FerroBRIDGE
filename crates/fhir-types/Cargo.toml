@@ -3,7 +3,7 @@
 [package]
 name = "fhir-types"
 description = "Generated per-version FHIR types and terminology operation contracts"
-version = "0.1.129"
+version = "0.1.130"
 edition.workspace = true
 rust-version.workspace = true
 # The one first-party crate under Apache-2.0 (docs/architecture.md section 4.1).
@@ -36,8 +36,17 @@ r6 = []
 # operation contracts.
 terminology = []
 # Every concrete resource each package defines, with the complete closure of
-# the datatypes and primitives those resources reference.
+# the datatypes and primitives those resources reference, in every version
+# module the features enable.
 resources = ["terminology"]
+# The same resource set in one version module alone, so a dependant that needs
+# every resource of one release and the terminology set of others compiles no
+# resource of those others.
+stu3-resources = ["stu3", "terminology"]
+r4-resources = ["r4", "terminology"]
+r4b-resources = ["r4b", "terminology"]
+r5-resources = ["r5", "terminology"]
+r6-resources = ["r6", "terminology"]
 
 [lib]
 # Generated doc text is not a curated example set (.claude/rules/testing.md).

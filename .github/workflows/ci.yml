@@ -663,7 +663,7 @@ jobs:
         run: cargo hack clippy -p eehrxf --feature-powerset --depth 2 --all-targets --locked -- -D warnings
 
   clippy-fhir-types:
-    name: clippy-fhir-types (${{ matrix.version }}, resources)
+    name: clippy-fhir-types (${{ matrix.version }}-resources)
     needs: detect
     if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
     runs-on: ubuntu-latest
@@ -683,10 +683,11 @@ jobs:
           components: clippy
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       # One version with every resource is what a consumer builds; each is one
-      # crate compile and fits the runner.
+      # crate compile and fits the runner. `<version>-resources` and
+      # `<version>,resources` select the same items.
       - env:
           VERSION: ${{ matrix.version }}
-        run: cargo clippy --locked -p fhir-types --all-targets --no-default-features --features "$VERSION,resources" -- -D warnings
+        run: cargo clippy --locked -p fhir-types --all-targets --no-default-features --features "$VERSION-resources" -- -D warnings
 
   # The reached packages in shards, as the clippy lane runs them.
   test:
@@ -935,9 +936,10 @@ jobs:
   # packages (per version, and R4 through the facade) against the committed
   # pass lists under conformance/. A case a list records that no
   # longer passes fails the job, and so does an unrecorded new pass or a badge
-  # that disagrees with its list. The script runs one package per nextest
-  # invocation, as the test lane does through cargo hack, so the generated
-  # giants never compile side by side, and fetches the build-time HL7 v2 sets,
+  # that disagrees with its list. The script runs every corpus package in one
+  # nextest invocation, so each workspace crate compiles once; the test lane
+  # runs the same tests one package at a time with each package's own
+  # features. It fetches the build-time HL7 v2 sets,
   # FHIR examples packages and profile packages this job restores from the
   # cache keys of the test and profile-packages lanes.
   conformance:
@@ -1313,34 +1315,23 @@ jobs:
   # The `emit` profile (root Cargo.toml) optimises the emitter and leaves the
   # two generated crates the test binary links unoptimised: optimising them
   # was 35 of this lane's 47 minutes, and at opt-level 0 they fit the runner
-  # two crates at a time, as in the test lane. The two longest tests (four
-  # and three full emits of hl7v2-types) each take a shard of their own, and
-  # the third shard runs every other test: its filter is the complement of
-  # the first two, so a test belongs to exactly one shard, and a renamed one
-  # falls into the third while its old shard fails on `--no-tests=fail`.
+  # two crates at a time, as in the test lane. One job builds the test binary
+  # once and runs every test: each full emit runs one rustfmt at a time, so
+  # the two longest tests (four and three full emits of hl7v2-types) run side
+  # by side with the rest on the four cores, started first by their priority
+  # in .config/nextest.toml.
   codegen-emit-tests:
-    name: codegen-emit-tests (${{ matrix.shard }})
+    name: codegen-emit-tests
     needs: detect
     if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - shard: v2-check
-            filter: test(=v2::emit::check_reports_edited_missing_and_stale_files)
-          - shard: v2-twice
-            filter: test(=v2::emit::emitting_twice_is_byte_identical_and_check_passes)
-          - shard: rest
-            filter: not (test(=v2::emit::check_reports_edited_missing_and_stale_files) | test(=v2::emit::emitting_twice_is_byte_identical_and_check_passes))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # One build serves every shard, so the shards share one cache.
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt
@@ -1375,10 +1366,9 @@ jobs:
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: cargo-nextest
-      - run: cargo nextest run --locked --cargo-profile emit -p fhir-codegen --no-tests=fail -E "$FILTER"
+      - run: cargo nextest run --locked --cargo-profile emit -p fhir-codegen --no-tests=fail
         env:
           FERROBRIDGE_CODEGEN_EMIT: "1"
-          FILTER: ${{ matrix.filter }}
 
   # The same gate for the OMOP side: regenerate crates/omop-cdm from the
   # vendored OHDSI CommonDataModel definitions and fail on any difference.

@@ -1,0 +1,7 @@
+---
+source: crates/fhirconnect/tests/it/prozedur.rs
+expression: rows(&diagnostics)
+---
+[
+  "procedure.v1.yml:85 error fc-condition-target-root-mismatch"
+]

@@ -27,6 +27,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use openehr_rm::v1_2::paths::RmPath;
+use openehr_sdt::flat::navigate::Navigator;
 use openehr_sdt::flat::webtemplate::model::WebTemplate;
 use openehr_sdt::flat::webtemplate::model::WebTemplateNode;
 
@@ -209,6 +210,8 @@ pub struct WebTemplateIndex {
     ordinals: BTreeMap<AqlPath, Vec<OrdinalOption>>,
     /// The archetypes the template root specialises, the nearest first.
     root_lineage: Vec<String>,
+    /// The instance navigation of `openehr-sdt` over this template.
+    navigator: Navigator,
 }
 
 impl WebTemplateIndex {
@@ -306,6 +309,7 @@ impl WebTemplateIndex {
                 aql_path: web_template.tree.aql_path.clone(),
                 source: openehr_rm::v1_2::paths::PathError::Empty,
             })?;
+        let navigator = Navigator::new(&web_template);
         Ok(Self {
             web_template,
             generation,
@@ -317,7 +321,15 @@ impl WebTemplateIndex {
             archetype_terms: BTreeMap::new(),
             ordinals: BTreeMap::new(),
             root_lineage: Vec::new(),
+            navigator,
         })
+    }
+
+    /// Returns the instance navigation of `openehr-sdt` over the template,
+    /// which reaches a renamed instance and an OPT2-inlined archetype root.
+    #[must_use]
+    pub const fn navigator(&self) -> &Navigator {
+        &self.navigator
     }
 
     /// Returns the template the index was built from.

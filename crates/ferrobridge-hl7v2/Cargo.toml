@@ -49,7 +49,7 @@ logos = { workspace = true, optional = true }
 # The FHIR writer: the path model over the fhir-types element table.
 fhirconnect = { workspace = true, optional = true }
 # The R4 model the ConceptMaps decode into and the output is checked against.
-fhir-types = { workspace = true, features = ["r4", "resources"], optional = true }
+fhir-types = { workspace = true, features = ["r4-resources"], optional = true }
 # R4, the release the guide's ConceptMaps are written in; the binary that
 # configures the client adds any other release it speaks.
 ferrobridge-term = { workspace = true, optional = true, features = ["r4"] }

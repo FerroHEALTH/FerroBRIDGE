@@ -4,7 +4,7 @@
 name = "ferrobridge-fhirpath"
 description = "A FHIRPath Normative Release 2.0.0 evaluator with the FHIR R4 additions, over the fhir-types element table"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.134"
+version = "0.1.135"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -25,7 +25,7 @@ include = ["src/**", "vendor/ucum/**", "README.md", "LICENSE"]
 base64.workspace = true
 chumsky.workspace = true
 # The STU3 and R4 element tables are the type sources of the two models.
-fhir-types = { workspace = true, features = ["stu3", "r4", "resources"] }
+fhir-types = { workspace = true, features = ["stu3-resources", "r4-resources"] }
 jiff.workspace = true
 logos.workspace = true
 # The XHTML narrative that htmlChecks() reads.

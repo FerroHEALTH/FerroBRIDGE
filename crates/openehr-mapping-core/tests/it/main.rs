@@ -23,5 +23,6 @@ mod party_build;
 mod paths;
 mod pins;
 mod registry;
+mod renamed;
 mod terms;
 mod web_template;

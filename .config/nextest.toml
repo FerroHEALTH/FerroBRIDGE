@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
+# The two longest full-emit tests of codegen-emit-tests start before every
+# other test, so the job's test step lasts about as long as the longer of
+# the two (https://nexte.st/docs/configuration/test-priorities/). Outside
+# that job they return early.
+[[profile.default.overrides]]
+filter = 'package(fhir-codegen) & (test(=v2::emit::check_reports_edited_missing_and_stale_files) | test(=v2::emit::emitting_twice_is_byte_identical_and_check_passes))'
+priority = 100

@@ -1,0 +1,40 @@
+---
+source: crates/fhirconnect/tests/it/prozedur.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "the mapping ISMTransitionOpenEhrToFhir did not run: its unidirectional marker names the other direction",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "the mapping metaURL did not run: its unidirectional marker names the other direction",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [
+    "the mapping actionTimeFromPerformedEnd did not run: its unidirectional marker names the other direction",
+    "the mapping actionPerformed did not run: its unidirectional marker names the other direction",
+    "the mapping ISMTransitionFhirToOpenEhr did not run: its unidirectional marker names the other direction",
+    "the mapping seitenlokalisationFromOpsCode did not run: its unidirectional marker names the other direction",
+    "the mapping context did not run: its unidirectional marker names the other direction"
+  ],
+  "lost": [
+    "subject.reference = \"Patient/synthetic-1\""
+  ],
+  "added": [
+    "bodySite[0].text = \"66754008\"",
+    "category.text = \"387713003\"",
+    "code.text = \"5-470.11\"",
+    "extension[0].valueCoding.display = \"262202000\"",
+    "extension[1].url = \"http://fhir.de/StructureDefinition/ProzedurDokumentationsdatum\"",
+    "extension[1].valueDateTime = \"2026-09-11T10:30:00+02:00\"",
+    "meta.profile[0] = \"https://www.medizininformatik-initiative.de/fhir/core/modul-prozedur/StructureDefinition/Procedure\"",
+    "recorder.display = \"FHIRconnect\"",
+    "statusReason.text = \"completed\""
+  ],
+  "changed": []
+}
