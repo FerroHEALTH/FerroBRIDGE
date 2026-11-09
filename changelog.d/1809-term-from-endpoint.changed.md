@@ -1,4 +1,4 @@
-- `ferrobridge-term` builds on `ferrohealth-smart` 0.16. Behind the `smart`
+- `ferrobridge-term` 0.3.0 builds on `ferrohealth-smart` 0.16. Behind the `smart`
   feature, `Client::from_endpoint` builds a client from a product's
   `[<lane>.endpoint]` table (smart's `EndpointSection`) through smart's
   `OutboundClient`: the table's timeouts, no redirect, the TLS the product's
@@ -9,3 +9,6 @@
   table's `tls` and builds through `from_endpoint`. `Credentials::Header`
   carries an `Authorization` value as it stands, and `Error::Endpoint` is the
   outbound client's refusal of the table.
+- `ferrobridge-validator` 0.3.0, `eehrxf` 0.3.0 and `ferrobridge-hl7v2`
+  0.5.0 take the minor step with `ferrobridge-term` 0.3.0, which each
+  requires exactly.
