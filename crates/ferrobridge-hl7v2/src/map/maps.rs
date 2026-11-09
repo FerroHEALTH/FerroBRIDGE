@@ -188,13 +188,10 @@ impl Map {
         self.rows.iter().any(|mine| {
             other.rows.iter().any(|theirs| {
                 mine.source == theirs.source
-                    && mine.condition == Condition::Always
-                    && theirs.condition == Condition::Always
-                    && match (reach(mine), reach(theirs)) {
-                        (Some(Reach::Whole), Some(_)) | (Some(_), Some(Reach::Whole)) => true,
-                        (Some(Reach::Child(a)), Some(Reach::Child(b))) => a == b,
-                        _ => false,
-                    }
+                    && matches!(
+                        overlap(mine, theirs),
+                        Some(Overlap::Same | Overlap::WholeAndChild)
+                    )
             })
         })
     }
@@ -221,15 +218,10 @@ impl Map {
             return false;
         }
         self.rows.iter().any(|row| {
-            other.rows.iter().any(|them| {
-                row.condition == Condition::Always
-                    && them.condition == Condition::Always
-                    && match (reach(row), reach(them)) {
-                        (Some(Reach::Whole), Some(Reach::Whole)) => true,
-                        (Some(Reach::Child(a)), Some(Reach::Child(b))) => a == b,
-                        _ => false,
-                    }
-            })
+            other
+                .rows
+                .iter()
+                .any(|them| overlap(row, them) == Some(Overlap::Same))
         })
     }
 
@@ -290,6 +282,31 @@ enum Reach<'r> {
     Whole,
     /// The child with this name.
     Child(&'r str),
+}
+
+/// How the targets of two rows with no condition meet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Overlap {
+    /// Both write the same child, or both the target itself (`$value`).
+    Same,
+    /// One writes the target itself and the other a child of it.
+    WholeAndChild,
+    /// They write different children.
+    Apart,
+}
+
+/// Returns how the targets of `mine` and `theirs` meet when neither carries
+/// a condition, `None` when one does or a target does not parse.
+fn overlap(mine: &Row, theirs: &Row) -> Option<Overlap> {
+    if mine.condition != Condition::Always || theirs.condition != Condition::Always {
+        return None;
+    }
+    Some(match (reach(mine)?, reach(theirs)?) {
+        (Reach::Whole, Reach::Whole) => Overlap::Same,
+        (Reach::Whole, Reach::Child(_)) | (Reach::Child(_), Reach::Whole) => Overlap::WholeAndChild,
+        (Reach::Child(a), Reach::Child(b)) if a == b => Overlap::Same,
+        (Reach::Child(_), Reach::Child(_)) => Overlap::Apart,
+    })
 }
 
 /// Returns the part of its target `row` writes, `None` for a target that
@@ -444,27 +461,31 @@ impl Maps {
     }
 }
 
+/// Returns the map named `id`, `url` and `title` with no rows and no groups,
+/// read from the guide.
+fn named(id: &str, url: &str, title: Option<&str>) -> Map {
+    Map {
+        id: String::from(id),
+        url: String::from(url),
+        title: title.map(String::from),
+        kind: Kind::of(id),
+        rows: Vec::new(),
+        groups: Vec::new(),
+        origin: Origin::Guide,
+    }
+}
+
 /// Reads one generated structure map into rows.
 pub(crate) fn structure(declared: &Declared) -> Map {
     Map {
-        id: String::from(declared.id),
-        url: String::from(declared.url),
-        title: declared.title.map(String::from),
-        kind: Kind::of(declared.id),
         rows: declared.rows.iter().map(row).collect(),
-        groups: Vec::new(),
-        origin: Origin::Guide,
+        ..named(declared.id, declared.url, declared.title)
     }
 }
 
 /// Reads one generated table map header.
 fn table(declared: &DeclaredTable) -> Map {
     Map {
-        id: String::from(declared.id),
-        url: String::from(declared.url),
-        title: declared.title.map(String::from),
-        kind: Kind::of(declared.id),
-        rows: Vec::new(),
         groups: declared
             .groups
             .iter()
@@ -473,7 +494,7 @@ fn table(declared: &DeclaredTable) -> Map {
                 target: String::from(target.unwrap_or_default()),
             })
             .collect(),
-        origin: Origin::Guide,
+        ..named(declared.id, declared.url, declared.title)
     }
 }
 
