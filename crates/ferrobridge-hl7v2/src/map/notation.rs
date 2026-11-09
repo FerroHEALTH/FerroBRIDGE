@@ -5,7 +5,7 @@
 //!
 //! A target code is a FHIR element path with two additions the mapping
 //! guidelines define (`mapping_guidelines.md` §\[n\] Notation, vendored under
-//! `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/repository/`): `[n]`
+//! `crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/repository/`): `[n]`
 //! after an element names one instance, so rows with the same `[n]` at the
 //! same place fill the same instance and rows with different ones fill
 //! different instances; and a leading `[n].` in a data type map names the

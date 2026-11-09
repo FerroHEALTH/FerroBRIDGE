@@ -481,7 +481,7 @@ mod tests {
 
     pub(super) fn corpus() -> Corpus {
         let package = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package");
+            .join("../../crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package");
         Corpus::load(&package).expect("the vendored package loads")
     }
 

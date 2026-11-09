@@ -60,7 +60,7 @@ readonly TEMPLATES=(tools/ferrobridge-testkit/fixtures/opt/diagnoses.opt tools/f
 # The facade's mapping set and the HL7 v2 face's Observation context, under
 # each arm's own tree.
 readonly MAPPINGS=(app/ferrobridge-server/tests/it/repeated app/ferrobridge-server/tests/it/hl7v2_fixtures)
-readonly CONCEPT_MAPS=tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package
+readonly CONCEPT_MAPS=crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package
 readonly CONDITION=tools/ferrobridge-testkit/fixtures/fhir/r4/condition.json
 readonly PROFILE=http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis
 readonly SUBJECTS=http://example.org/fhir/sid/ferrobridge-subject

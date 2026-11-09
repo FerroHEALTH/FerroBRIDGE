@@ -44,6 +44,8 @@ verbatim with a `PROVENANCE.md` per tree (`vendored-inputs.md`):
   PostgreSQL DDL.
 - `docs/specs/its-rest/`: the five `STABLE` ITS-REST 1.1.0 OpenAPI documents (Overview, System, EHR, Query and Definition), the `DEVELOPMENT` Demographic document the bridge reaches behind `[cdr] demographic`, and the Simplified Formats and Simplified Data Template sub-specifications (the FLAT families).
 - `tools/fhir-codegen/vendor/`: the HL7 FHIR packages the generator reads.
+- `crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/`: the v2-to-FHIR
+  guide, whose ConceptMaps the HL7 v2 face's crate embeds.
 
 Read the vendored text for a citation and name the file and section; the
 published URLs above are the same content at the pinned version.

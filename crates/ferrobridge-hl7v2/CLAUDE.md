@@ -10,7 +10,7 @@ encoding rules and the acknowledgment; the `HL7/v2ig` definitions the tables
 are generated from), the MLLP Release 1 transport, HL7 table 0211 for the
 character sets, the v2-to-FHIR implementation guide
 (`hl7.fhir.uv.v2mappings` 1.0.0 and its `mapping_guidelines.md`, vendored
-under `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/`), and FHIR R4.
+under `crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/`), and FHIR R4.
 
 ## The interpreter is an adapter over the corpus and the engine's writer
 

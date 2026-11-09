@@ -229,7 +229,7 @@ of every `PROVENANCE.md` below back against its row.
 | `hl7.fhir.r5.core` | 5.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.r5.core/PROVENANCE.md` |
 | `hl7.fhir.r6.core` | 6.0.0-ballot5 | `tools/fhir-codegen/vendor/hl7.fhir.r6.core/PROVENANCE.md` |
 | `hl7.terminology` (THO) | 7.5.0 | `tools/fhir-codegen/vendor/hl7.terminology/PROVENANCE.md` |
-| `hl7.fhir.uv.v2mappings` (the v2-to-FHIR IG) | 1.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md` (FHIR 4.0.1; the package declares CC0-1.0, its source repository `HL7/v2-to-fhir` Apache-2.0) |
+| `hl7.fhir.uv.v2mappings` (the v2-to-FHIR IG) | 1.0.0 | `crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md` (FHIR 4.0.1; the package declares CC0-1.0, its source repository `HL7/v2-to-fhir` Apache-2.0) |
 
 ## FHIR examples packages (the conformance corpora, build time, never committed)
 

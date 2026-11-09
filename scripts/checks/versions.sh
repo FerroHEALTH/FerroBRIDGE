@@ -59,7 +59,7 @@
 #                          every sha256 or tree digest the row records.
 #  10. FHIR packages       every row of the docs/VERSIONS.md FHIR-packages
 #                          table against the Version line of its
-#                          tools/fhir-codegen/vendor/<package>/PROVENANCE.md,
+#                          <dir>/<package>/PROVENANCE.md (the Repeated-in path),
 #                          and a package vendored with its source repository
 #                          records that repository's licence; every row of
 #                          the Profile packages table against the Version,
@@ -823,30 +823,33 @@ else
   note "$NO_MATRIX"
 fi
 
-echo "== FHIR packages (tools/fhir-codegen/vendor/*/PROVENANCE.md <-> docs/VERSIONS.md)"
+echo "== FHIR packages (each row's PROVENANCE.md <-> docs/VERSIONS.md)"
 if [[ -f docs/VERSIONS.md ]]; then
   # The rows of the FHIR-packages table: the package is the backticked name
-  # opening the Item cell, the pin is the whole Pin cell.
+  # opening the Item cell, the pin is the whole Pin cell, and the stamp is
+  # the backticked path opening the Repeated-in cell.
   packages="$(awk -F'|' '
     /^## / { on = ($0 ~ /^## FHIR packages/); next }
-    on && NF >= 4 && $2 ~ /^[[:space:]]*`/ {
-      k = $2; v = $3
+    on && NF >= 5 && $2 ~ /^[[:space:]]*`/ {
+      k = $2; v = $3; r = $4
       sub(/^[[:space:]]*`/, "", k); sub(/`.*/, "", k)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
-      if (k != "Item") print k "|" v
+      sub(/^[^`]*`/, "", r); sub(/`.*/, "", r)
+      if (k != "Item") print k "|" v "|" r
     }
   ' docs/VERSIONS.md)"
   agreed=0
   expected=0
-  while IFS='|' read -r pkg ver; do
+  while IFS='|' read -r pkg ver prov; do
     [[ -n "$pkg" ]] || continue
     expected=$((expected + 1))
-    prov="tools/fhir-codegen/vendor/$pkg/PROVENANCE.md"
-    if [[ ! -f "$prov" ]]; then
+    if [[ "$prov" != */"$pkg"/PROVENANCE.md ]]; then
+      bad "docs/VERSIONS.md names '$prov' as the stamp of $pkg, which is no <dir>/$pkg/PROVENANCE.md"
+    elif [[ ! -f "$prov" ]]; then
       bad "no $prov for the pinned package $pkg (run scripts/vendor/fhir-packages.sh $pkg)"
     elif ! grep -qxF -- "- Version: $ver" "$prov"; then
       bad "$prov does not record version $ver, which docs/VERSIONS.md pins for $pkg"
-    elif [[ -d "tools/fhir-codegen/vendor/$pkg/repository" ]] && ! grep -q '^- Repository licence: ' "$prov"; then
+    elif [[ -d "$(dirname "$prov")/repository" ]] && ! grep -q '^- Repository licence: ' "$prov"; then
       bad "$prov vendors its source repository and records no repository licence"
     else
       agreed=$((agreed + 1))

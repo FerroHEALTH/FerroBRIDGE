@@ -435,7 +435,7 @@ fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
 /// The vendored v2-to-FHIR package the HL7 v2 face's maps are copied from.
 const V2_PACKAGE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package"
+    "/../../crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package"
 );
 
 /// The guide's maps of an `ORU^R01` the HL7 v2 face loads: a few, so its
