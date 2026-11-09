@@ -136,17 +136,16 @@ them; the repository's ten-gigabyte cache quota was full before this.
 of the root manifest: `fhir-codegen` optimised, and `fhir-types` and
 `hl7v2-types`, which its test binary links but no full-emit test runs, at
 opt-level 0. Building them optimised at `CARGO_BUILD_JOBS=1` took 35 of the
-lane's 47 minutes on 2026-10-16. The lane runs in three shards selected by
-nextest filtersets: the two longest tests (four and three full emits of
-`hl7v2-types`) each alone, and every other test in the third, whose filter
-is the complement of the first two, so a test runs in exactly one shard.
-Across 17 runs on 2026-11-07 the third shard's test step took 6.6 to 11.9
-minutes, about 6.7 of them the build and 3.5 the tests, led by the `v2`
-sync check (161 seconds); the shard's 45-minute timeout is room for a slow
-runner, and a run that reaches it is a stalled runner to look into. The
-banner test reads the committed `crates/fhir-types` tree, which the sync
-check holds equal to the emitter's output, so the shard runs one
-all-versions emit fewer.
+lane's 47 minutes on 2026-10-16. One job builds the test binary once and
+runs every test. Three shards each built the same binary for 6 to 7 minutes
+(run 42560647228). Each full emit runs one `rustfmt` at a time, so the two
+longest tests (four and three full emits of `hl7v2-types`, about 466 seconds
+each) run side by side with the rest on the four cores. A priority in
+`.config/nextest.toml` starts them before every other test. The job's
+45-minute timeout is room for a slow runner, and a run that reaches it is a
+stalled runner to look into. The banner test reads the committed
+`crates/fhir-types` tree, which the sync check holds equal to the emitter's
+output, so the job runs one all-versions emit fewer.
 
 **The local gate.** Each checkout, a worktree included, builds into its own
 `target/`. A `CARGO_TARGET_DIR` shared with another checkout at a different

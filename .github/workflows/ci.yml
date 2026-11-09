@@ -1307,34 +1307,23 @@ jobs:
   # The `emit` profile (root Cargo.toml) optimises the emitter and leaves the
   # two generated crates the test binary links unoptimised: optimising them
   # was 35 of this lane's 47 minutes, and at opt-level 0 they fit the runner
-  # two crates at a time, as in the test lane. The two longest tests (four
-  # and three full emits of hl7v2-types) each take a shard of their own, and
-  # the third shard runs every other test: its filter is the complement of
-  # the first two, so a test belongs to exactly one shard, and a renamed one
-  # falls into the third while its old shard fails on `--no-tests=fail`.
+  # two crates at a time, as in the test lane. One job builds the test binary
+  # once and runs every test: each full emit runs one rustfmt at a time, so
+  # the two longest tests (four and three full emits of hl7v2-types) run side
+  # by side with the rest on the four cores, started first by their priority
+  # in .config/nextest.toml.
   codegen-emit-tests:
-    name: codegen-emit-tests (${{ matrix.shard }})
+    name: codegen-emit-tests
     needs: detect
     if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - shard: v2-check
-            filter: test(=v2::emit::check_reports_edited_missing_and_stale_files)
-          - shard: v2-twice
-            filter: test(=v2::emit::emitting_twice_is_byte_identical_and_check_passes)
-          - shard: rest
-            filter: not (test(=v2::emit::check_reports_edited_missing_and_stale_files) | test(=v2::emit::emitting_twice_is_byte_identical_and_check_passes))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # One build serves every shard, so the shards share one cache.
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt
@@ -1369,10 +1358,9 @@ jobs:
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: cargo-nextest
-      - run: cargo nextest run --locked --cargo-profile emit -p fhir-codegen --no-tests=fail -E "$FILTER"
+      - run: cargo nextest run --locked --cargo-profile emit -p fhir-codegen --no-tests=fail
         env:
           FERROBRIDGE_CODEGEN_EMIT: "1"
-          FILTER: ${{ matrix.filter }}
 
   # The same gate for the OMOP side: regenerate crates/omop-cdm from the
   # vendored OHDSI CommonDataModel definitions and fail on any difference.
