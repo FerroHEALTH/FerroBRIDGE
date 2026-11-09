@@ -20,6 +20,11 @@ invocation and the failure shape.
   all. Verify any claimed
   per-release difference against the vendored `OperationDefinition` files
   before encoding it.
+- **Each release is a feature** (`stu3`, `r4`, `r4b`, `r5`, `r6`; the default
+  is the first three). A release whose feature is off has no `WireVersion`
+  variant and no module, every macro and test names the releases it needs in
+  a `cfg`, and CI lints and tests the crate with each release alone and with
+  all of them (#1737).
 - **The transport is optional.** `invocation` writes a request and reads an
   answer with no HTTP, and `Client` sends exactly what it writes, in the
   `POST` form or, configured, the `GET` form where every input is primitive.
