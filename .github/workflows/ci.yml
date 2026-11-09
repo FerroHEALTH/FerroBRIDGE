@@ -384,6 +384,8 @@ jobs:
       # The performance gate reads its pins, checks its plan's placeholders,
       # resolves its base and holds its two idle tables equal, offline (#1656).
       - run: bash scripts/perf/gate.sh --self-test
+      # The gate's verdict over every shape of its three attempts (#1737).
+      - run: bash scripts/perf/verdict.sh --self-test
 
   # The profile validator's package set (#435), fetched at build time and
   # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/
@@ -643,6 +645,14 @@ jobs:
       # alone, the surface ferrobridge-hl7v2's map takes (#1750).
       - if: contains(matrix.packages, 'fhirconnect')
         run: cargo clippy -p fhirconnect --all-targets --no-default-features --locked -- -D warnings
+      # ferrobridge-term with each FHIR release alone (#1737), so a writer, a
+      # reader or a test that needs another release names it in a cfg.
+      - if: contains(matrix.packages, 'ferrobridge-term')
+        run: |
+          set -euo pipefail
+          for release in stu3 r4 r4b r5 r6; do
+            cargo clippy -p ferrobridge-term --all-targets --no-default-features --features "$release" --locked -- -D warnings
+          done
       # eehrxf has no default feature: one feature per Art 14(1) category and
       # one per serialisation, linted with none, alone and in every pair (the
       # step above lints them all together), so an import only some
@@ -820,6 +830,15 @@ jobs:
       - name: Test fhir-search with no default feature
         if: contains(matrix.packages, 'fhir-search')
         run: cargo nextest run -p fhir-search --no-default-features --locked
+      # ferrobridge-term's suites with each FHIR release alone (#1737); the
+      # step above runs them with every release.
+      - name: Test ferrobridge-term with each release alone
+        if: contains(matrix.packages, 'ferrobridge-term')
+        run: |
+          set -euo pipefail
+          for release in stu3 r4 r4b r5 r6; do
+            cargo nextest run -p ferrobridge-term --no-default-features --features "$release" --locked --no-tests=pass
+          done
       - name: Upload the emitted exchange-format documents
         if: contains(matrix.packages, 'eehrxf')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
