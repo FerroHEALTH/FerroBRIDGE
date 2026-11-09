@@ -260,6 +260,10 @@ check_ehds_fresh() {
   bash "$SYSTEM_DOCUMENTS" fresh
 }
 
+# Every crate the release would publish moves its version as Cargo SemVer
+# asks, judged against its newest release on crates.io (#1745).
+check_crate_semver() { bash scripts/release/publish-crates.sh semver; }
+
 # The list: "<function> <title>", in the order the plan job runs them.
 list() {
   cat <<'EOF'
@@ -272,6 +276,7 @@ check_prev_tag The previous release resolves from the pushed tags
 check_notes The changelog section for this tag becomes the release notes, with the support period, the CRA user information link and the EHDS system documents
 check_ehds_documents The EHDS system documents at the pinned revision, with this release's facts, and the notes naming them
 check_ehds_fresh The EHDS system-documents pin names the newest revision of every page, or says why it keeps an older one
+check_crate_semver Each crate the release publishes bumps the minor for a breaking change and the patch otherwise (cargo-semver-checks)
 EOF
 }
 

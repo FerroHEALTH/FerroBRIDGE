@@ -258,7 +258,12 @@ requests and again on the merge group against the queue base, and fails a
 change that alters a crate's packaged content without moving that crate's
 version above the base's, which a published version's immutability makes a
 hard rule (`.claude/rules/crates-publishing.md`); the `no-crate-bump` label is
-its escape.
+its escape. It also refuses a version step Cargo SemVer does not take and a
+README whose stated caret range is not the manifest's line, and then installs
+the toolchain and the pinned `cargo-semver-checks` to judge every crate that
+moved from a published line against the same base (`scripts/checks/semver.sh`):
+a breaking change on a patch bump, or a minor bump with no break, fails it
+(#1745).
 
 `hashFiles()` cannot do this work. It is evaluated before checkout, when the
 workspace is empty, so a `if: hashFiles('Cargo.toml') != ''` gate never sees
