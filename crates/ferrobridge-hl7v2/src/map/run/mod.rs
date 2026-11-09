@@ -476,7 +476,7 @@ mod tests {
         );
         let lexed = parse::lex::lex(&text, Charset::Ascii).expect("it lexes");
         let structure = parse::structure::structure_for(&lexed.message).expect("a structure");
-        parse::grouping::group(lexed, structure)
+        parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE)
     }
 
     pub(super) fn corpus() -> Corpus {
@@ -569,7 +569,7 @@ mod tests {
         let text = format!("{}\r", segments.join("\r"));
         let lexed = parse::lex::lex(&text, Charset::Ascii).expect("it lexes");
         let structure = parse::structure::structure_for(&lexed.message).expect("a structure");
-        parse::grouping::group(lexed, structure)
+        parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE)
     }
 
     /// The values written at `path` in resources of `type_name`.

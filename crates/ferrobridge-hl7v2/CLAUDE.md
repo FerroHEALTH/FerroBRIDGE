@@ -211,7 +211,11 @@ elsewhere. A field read from a message is echoed through `Writer::echo` as
 the message wrote it, and only into the delimiters it was read in, since the
 lexer keeps the formatting sequences of `FT` in a decoded value as written.
 `Writer::compose` checks a composed message with the same lexer and grouping
-a received message takes, so a structure rule lives once, in `parse`.
+a received message takes, so a structure rule lives once, in `parse`. An
+integration profile that sets a member's minimum apart from the base
+(IHE ITI-21's optional QRI) is a `parse::profile::Profile` constant, data
+naming the node by its generated id and version, read by the grouping;
+never a special case in `place` or `compose`.
 
 ## Logs
 
