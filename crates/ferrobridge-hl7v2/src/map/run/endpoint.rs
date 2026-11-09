@@ -7,7 +7,7 @@
 use fhir_types::codec::Value;
 
 use crate::map::convert;
-use crate::map::corpus::Map;
+use crate::map::maps::Map;
 use crate::map::notation::{self, Target};
 use crate::map::run::datum::Datum;
 use crate::map::run::segment::row_ref;

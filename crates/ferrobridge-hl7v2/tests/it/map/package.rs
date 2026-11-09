@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use ferrobridge_hl7v2::map::corpus::{Condition, Kind};
+use ferrobridge_hl7v2::map::maps::{Condition, Kind};
 
 use crate::support::{self};
 

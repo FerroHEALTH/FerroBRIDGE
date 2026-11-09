@@ -10,42 +10,53 @@ encoding rules and the acknowledgment; the `HL7/v2ig` definitions the tables
 are generated from), the MLLP Release 1 transport, HL7 table 0211 for the
 character sets, the v2-to-FHIR implementation guide
 (`hl7.fhir.uv.v2mappings` 1.0.0 and its `mapping_guidelines.md`, vendored
-under `crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/`), and FHIR R4.
+under `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/`), and FHIR R4.
 
-## The interpreter is an adapter over the corpus and the engine's writer
+## The interpreter is an adapter over the generated maps and the engine's writer
 
-The ConceptMaps are data. Nothing here maps a message, segment or table by
-hand: the message map names a resource per segment, the segment map maps the
-fields, a data type map maps the components, a table map goes through
-`map::translate::Translator`, and every FHIR element is written through
+The ConceptMaps are data, split by what they are (owner ruling on #1775).
+The message, segment and data type maps are mapping logic: `fhir-codegen`
+emits every row of them into `src/map/generated/` from the guide vendored
+under `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/`, and
+`map::maps::Maps` parses each row's condition, assignment and target once.
+`src/map/generated/` is `// @generated` and off-limits; change the generator
+or its inputs and regenerate. The table maps are terminology: of them the
+crate holds only the generated header (id, url, each group's systems), and
+every table value goes through `ferrobridge_term::client::Client::translate`
+on a terminology server, the only translator; there is no offline copy of a
+table and no directory or server is read for a structure map. Nothing here
+maps a message, segment or table by hand: the message map names a resource
+per segment, the segment map maps the fields, a data type map maps the
+components, and every FHIR element is written through
 `fhirconnect::tree::write::write` over `fhir_types::r4::schema::SCHEMAS`.
-The translator is a closed choice of two (owner ruling on #1716):
-`ferrobridge_term::client::Client::translate` against a server, and the
-offline reading of the same table maps from the corpus, which answers as
-R4 `ConceptMap/$translate` does, `reverse` included, so the maps stay one
-source. Never add a second FHIR writer, a table evaluated in code, or a
-per-message code path. A gap in the corpus is a counted
-outcome here and a ConceptMap in a supplement, in the guide's own shape.
+Never add a second FHIR writer, a table evaluated in code, or a per-message
+code path. A gap in the maps is a counted outcome here and a correction in
+the generator's inputs, in the guide's own shape.
 
-## Supplements are ConceptMaps, shipped under `supplements/`
+## Corrections are generator inputs
 
-`supplements/` holds FerroBRIDGE's own ConceptMaps (#256), one file per map
-named `ConceptMap-<id>.json`, compiled in through `map::supplement::SHIPPED`
-(the crate's `include` packages the directory; a test fails when the list and
-the directory differ). `Corpus::with_shipped_supplements` loads them over the
-guide, and an operator's `[hl7v2] supplements` directories load after them
-(`Corpus::supplement`). A supplement with the id or url of a loaded map
-replaces it, and `Map::origin` records which it is; the run counts each
-supplement map it uses once per message as `supplemented`. Every file names
-FerroBRIDGE in `title`; its `description` opens with `Overrides
-ConceptMap/<id> of hl7.fhir.uv.v2mappings 1.0.0.` (keeping the guide's id and
-url) or `Adds` (a url under `map::supplement::CANONICAL_BASE`), says what it
-changes and why, and names the tracker issue (`FerroBRIDGE #N`); the test in
-`map::supplement` holds every file to that. A supplement changes rows, never
-the interpreter: a gap a ConceptMap cannot express is an interpreter issue.
-The tests of `map::run` and `tests/it/map/` run the guide alone and pin
-its behaviour; `tests/it/supplement.rs` runs each supplement on the row it
-changes against the guide alone, and the corpus test runs the shipped set.
+FerroBRIDGE's structure corrections (#256) are ConceptMaps under
+`tools/fhir-codegen/overrides/hl7.fhir.uv.v2mappings/`, generated into
+`map::generated::overrides`; its value corrections are the FHIR package under
+`terminology/hl7v2-values/`, which an operator loads into the terminology
+server beside the guide's package, and whose headers are generated into
+`map::generated::table::VALUES`. `Maps::corrected` loads both over the guide;
+`Maps::guide` is the guide alone. A correction with the id or url of a guide
+map replaces it, and `Map::origin` records which it is; the run counts each
+correction it uses once per message as `supplemented`. The generator refuses
+an input that breaks the rules `v2maps::emit` states: the overrides hold
+structure maps only and the value package table maps only, each names
+FerroBRIDGE in `title`, its `description` opens with `Overrides
+ConceptMap/<id> of hl7.fhir.uv.v2mappings 1.0.0.` or `Adds` and names the
+tracker issue (`FerroBRIDGE #N`), a structure override keeps the guide map's
+url, and every other correction takes a url under
+`https://ferrobridge.eu/fhir/v2mappings/ConceptMap/`, so the terminology
+server holds the guide's table map and ours side by side. A correction
+changes rows, never the interpreter: a gap a ConceptMap cannot express is an
+interpreter issue. The tests of `map::run` and `tests/it/map/` run the guide
+alone and pin its behaviour; `tests/it/supplement.rs` runs each correction on
+the row it changes against the guide alone, and the corpus test runs the
+corrected set.
 
 ## Selection by name is a recorded design, flagged in the code
 
@@ -53,9 +64,9 @@ The guide names neither the segment map a message row runs nor the data type
 map a field row runs. The interpreter selects `segment-<seg>-to-<resource>`
 and `datatype-<source>-to-<target>`, else the single qualified map
 `<kind>-<source>-<qualifier>-to-<target>`, and counts `no-segment-map` or
-`no-datatype-map` when there is none or several (`Corpus::find`). Keep that
+`no-datatype-map` when there is none or several (`Maps::find`). Keep that
 rule in one place. A row into a complex element is the one exception: it
-runs every qualified map (`Corpus::qualifying`), named for the element's type
+runs every qualified map (`Maps::qualifying`), named for the element's type
 or else its element path (`messageheader-source`), each into its own
 children (`Run::datatypes`). A child another row of the same source targets
 directly is left to that row (`Run::claimed`), unless that row only reaches
@@ -244,9 +255,10 @@ caller answers it as any malformed frame.
 
 `tests/it/` drives the public surface: decoding per character set, parsing
 against the generated structures, the ACK codes on the wire against a plain
-`TcpStream` sender, and the interpreter over the vendored package with the
-table maps answered by a `wiremock` terminology stub that answers from the
-guide's own table maps. The bundles and outcome lists are reviewed `insta`
+`TcpStream` sender, and the interpreter over the generated maps with the
+table values answered by a `wiremock` terminology stub (`tests/it/tables.rs`,
+`support::terminology`) that answers `$translate`, `reverse` included, from the
+table maps of the guide package and of the value package. The bundles and outcome lists are reviewed `insta`
 snapshots. Every fixture is synthetic (`tests/it/fixtures.rs`); the one
 exception is the guide's own MDM^T02 sample pair under
 `vendor/v2-to-fhir/samples/`, mapped against its Bundle in

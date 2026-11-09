@@ -19,8 +19,8 @@ use crate::map::run::dangling::{Unlinked, unlink};
 use crate::map::run::resource::document_of;
 use crate::map::run::write::repeating;
 use crate::map::run::{Identity, Part, Pending, Resource, Run, Write};
-use crate::map::translate::Translator;
 use crate::map::{MapError, Outcome};
+use ferrobridge_term::client::Client;
 
 impl Run<'_> {
     /// Asks the translator for every recorded translation.
@@ -31,7 +31,7 @@ impl Run<'_> {
     /// translation or cannot be reached.
     pub(in crate::map) async fn translate(
         &mut self,
-        translator: Option<Translator<'_>>,
+        translator: Option<&Client>,
     ) -> Result<usize, MapError> {
         let mut calls = 0usize;
         let mut outcomes = Vec::new();

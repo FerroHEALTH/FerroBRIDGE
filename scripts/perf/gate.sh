@@ -62,7 +62,13 @@ readonly TEMPLATES=(tools/ferrobridge-testkit/fixtures/opt/diagnoses.opt tools/f
 # The facade's mapping set and the HL7 v2 face's Observation context, under
 # each arm's own tree.
 readonly MAPPINGS=(app/ferrobridge-server/tests/it/repeated app/ferrobridge-server/tests/it/hl7v2_fixtures)
-readonly CONCEPT_MAPS=crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package
+# The v2-to-FHIR guide and FerroBRIDGE's value package, whose table
+# ConceptMaps the terminology server answers the HL7 v2 face from.
+readonly GUIDE_MAPS=tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/package
+readonly VALUE_MAPS=terminology/hl7v2-values
+# Where a tree from before the maps were generated keeps the guide, which its
+# binary still reads through [hl7v2] concept_maps.
+readonly DIRECTORY_MAPS=crates/ferrobridge-hl7v2/vendor/hl7.fhir.uv.v2mappings/package
 readonly CONDITION=tools/ferrobridge-testkit/fixtures/fhir/r4/condition.json
 readonly PROFILE=http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis
 readonly SUBJECTS=http://example.org/fhir/sid/ferrobridge-subject
@@ -274,6 +280,9 @@ serve() {
   done
   (
     cd "$tree"
+    if [[ -d "$tree/$DIRECTORY_MAPS" ]]; then
+      export FERROBRIDGE__HL7V2__CONCEPT_MAPS="$tree/$DIRECTORY_MAPS"
+    fi
     FERROBRIDGE__USAGE_REPORT__ENABLED=false \
       FERROBRIDGE__SERVER__LISTEN="127.0.0.1:$(port "$arm" facade)" \
       FERROBRIDGE__CDR__BASE_URL="$(cdr_origin "$arm")/ferroehr/rest/openehr/v1" \
@@ -281,7 +290,6 @@ serve() {
       FERROBRIDGE__FACADE__BASE_URL="$(facade "$arm")/fhir" \
       FERROBRIDGE__FACADE__IDENTITY_STORE="$dir/identity.redb" \
       FERROBRIDGE__HL7V2__LISTEN="127.0.0.1:$(port "$arm" mllp)" \
-      FERROBRIDGE__HL7V2__CONCEPT_MAPS="$tree/$CONCEPT_MAPS" \
       FERROBRIDGE__HL7V2__TLS__CERTIFICATE_FILE="$root/$WORK/tls/mllp-chain.pem" \
       FERROBRIDGE__HL7V2__TLS__KEY_FILE="$root/$WORK/tls/mllp-key.pem" \
       FERROBRIDGE__HL7V2__TLS__CLIENT_CA_FILE="$root/$WORK/tls/ca.pem" \
@@ -295,12 +303,13 @@ serve() {
   echo "$!"
 }
 
-# terminology IMAGE: starts FerroTERM over the guide's table ConceptMaps,
-# which the HL7 v2 face translates every table value through.
+# terminology IMAGE: starts FerroTERM over the table ConceptMaps of the guide
+# and of the value package, which the HL7 v2 face translates every table
+# value through.
 terminology() {
   local maps="$WORK/terminology"
   mkdir -p "$maps"
-  cp "$root/$CONCEPT_MAPS"/ConceptMap-table-*.json "$maps/"
+  cp "$root/$GUIDE_MAPS"/ConceptMap-table-*.json "$root/$VALUE_MAPS"/ConceptMap-table-*.json "$maps/"
   chmod 0755 "$maps"
   chmod 0644 "$maps"/*.json
   "$engine" run --quiet --detach --name "$TERMINOLOGY_NAME" --publish 127.0.0.1:18100:8080 \
@@ -464,7 +473,9 @@ self_test() {
     check "$file exists" 1 "$([[ -f "$root/$file" ]] && echo 1 || echo 0)"
   done
   check "the guide's table ConceptMaps are vendored" 1 \
-    "$(compgen -G "$root/$CONCEPT_MAPS/ConceptMap-table-*.json" > /dev/null && echo 1 || echo 0)"
+    "$(compgen -G "$root/$GUIDE_MAPS/ConceptMap-table-*.json" > /dev/null && echo 1 || echo 0)"
+  check "the value package holds table ConceptMaps" 1 \
+    "$(compgen -G "$root/$VALUE_MAPS/ConceptMap-table-*.json" > /dev/null && echo 1 || echo 0)"
   for file in "${MAPPINGS[@]}"; do
     check "$file holds mapping files" 1 "$(compgen -G "$root/$file/*.yml" > /dev/null && echo 1 || echo 0)"
   done

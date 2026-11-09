@@ -4,7 +4,6 @@
 //! The counted outcomes and the failures of a run.
 
 use ferrobridge_hl7v2::map::map;
-use ferrobridge_hl7v2::map::translate::Translator;
 
 use crate::fixtures;
 use crate::support::{self};
@@ -21,7 +20,7 @@ async fn a_z_segment_is_a_counted_outcome_of_the_mapping() {
 async fn a_table_map_with_no_terminology_server_is_a_counted_outcome() {
     let parsed = support::parsed(&fixtures::oru_r01());
     let corpus = support::corpus();
-    let mapped = map(&parsed, &corpus, None).await.expect("the message maps");
+    let mapped = map(&parsed, corpus, None).await.expect("the message maps");
     assert_eq!(mapped.translations(), 0);
     assert!(
         mapped
@@ -54,7 +53,7 @@ async fn a_refused_translation_fails_the_run_with_the_upstream_status() {
                 max_backoff: std::time::Duration::from_millis(1),
             });
     let client = ferrobridge_term::client::Client::new(config).expect("a client");
-    let refused = map(&parsed, &corpus, Some(Translator::Server(&client))).await;
+    let refused = map(&parsed, corpus, Some(&client)).await;
     assert!(
         matches!(
             refused,
@@ -62,34 +61,6 @@ async fn a_refused_translation_fails_the_run_with_the_upstream_status() {
         ),
         "{refused:?}"
     );
-}
-
-#[tokio::test]
-async fn a_supplement_map_replaces_the_package_map_with_its_url() {
-    let directory = tempfile::tempdir().expect("a scratch directory");
-    let package = support::package().join("ConceptMap-segment-pv1-to-encounter.json");
-    let text = std::fs::read_to_string(&package).expect("the package map reads");
-    let mut map_json: serde_json::Value = serde_json::from_str(&text).expect("JSON");
-    let first = map_json["group"][0]["element"][0].clone();
-    let targets = first["target"].as_array().map_or(0, Vec::len);
-    map_json["group"][0]["element"] = serde_json::json!([first]);
-    std::fs::write(
-        directory
-            .path()
-            .join("ConceptMap-segment-pv1-to-encounter.json"),
-        serde_json::to_vec(&map_json).expect("JSON"),
-    )
-    .expect("the supplement is written");
-    let corpus = support::corpus()
-        .supplement(directory.path())
-        .expect("the supplement loads");
-    assert!(
-        corpus
-            .get("segment-pv1-to-encounter")
-            .is_some_and(|map| map.rows.len() == targets),
-        "the supplement's map took the package map's place"
-    );
-    assert_eq!(corpus.maps().count(), 263);
 }
 
 // NOTE: `mapping_guidelines.md` §General Format/Approach: a condition decides whether the v2
@@ -118,7 +89,7 @@ async fn an_stu3_terminology_client_is_refused_before_any_translation_is_sent() 
     let config =
         ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::Stu3);
     let client = ferrobridge_term::client::Client::new(config).expect("a client");
-    let refused = map(&parsed, &corpus, Some(Translator::Server(&client))).await;
+    let refused = map(&parsed, corpus, Some(&client)).await;
     let Err(ferrobridge_hl7v2::map::MapError::Terminology { source, .. }) = refused else {
         panic!("an STU3 client fails the run: {refused:?}");
     };

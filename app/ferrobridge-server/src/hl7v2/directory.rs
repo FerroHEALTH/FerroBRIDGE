@@ -4,7 +4,7 @@
 //! The face's `ConceptMap` directory as the operator API answers it, with
 //! the messages each map served.
 //!
-//! The listing is read from the corpus once, when the face starts; the
+//! The listing is read from the maps once, when the face starts; the
 //! counts grow by one per map each time a message's mapping applies it
 //! (`ferrobridge_hl7v2::map::Mapped::applied`), whether or not the ingest
 //! then commits the message, and start again from zero with the process.
@@ -13,32 +13,26 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
-use ferrobridge_hl7v2::map::corpus::{Corpus, Kind, Map, Origin};
+use ferrobridge_hl7v2::map::maps::{Kind, Map, Maps, Origin};
 use ferrobridge_operator_api::hl7v2 as document;
-
-use crate::config::Hl7v2Settings;
 
 /// The directory of one running face.
 #[derive(Debug)]
 pub struct Directory {
-    /// The directory and supplements of the settings, with no counts.
+    /// The maps, with no counts.
     listing: document::ConceptMaps,
     /// The messages each map served, by id.
     served: Mutex<BTreeMap<String, u64>>,
 }
 
 impl Directory {
-    /// Returns the directory of `corpus`, loaded as `settings` describes,
-    /// counting from the instant `since`.
+    /// Returns the directory of `maps`, counting from the instant `since`.
     #[must_use]
-    pub fn new(corpus: &Corpus, settings: &Hl7v2Settings, since: jiff::Timestamp) -> Self {
-        let text = |path: &std::path::Path| path.display().to_string();
+    pub fn new(maps: &Maps, since: jiff::Timestamp) -> Self {
         Self {
             listing: document::ConceptMaps {
-                directory: text(&settings.concept_maps),
-                supplements: settings.supplements.iter().map(|path| text(path)).collect(),
                 counted_since: since.to_string(),
-                maps: corpus.maps().map(listed).collect(),
+                maps: maps.maps().map(listed).collect(),
             },
             served: Mutex::new(BTreeMap::new()),
         }

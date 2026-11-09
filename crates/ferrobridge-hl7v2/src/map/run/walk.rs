@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 use hl7v2_types::model::Max;
 
-use crate::map::corpus::{Map, Origin};
+use crate::map::maps::{Map, Origin};
 use crate::map::notation::Target;
 use crate::map::run::segment::row_ref;
 use crate::map::run::{Base, Identity, Run, Scope, Visit, placed};

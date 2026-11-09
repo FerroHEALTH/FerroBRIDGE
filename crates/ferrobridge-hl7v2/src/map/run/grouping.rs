@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::map::Outcome;
-use crate::map::corpus::{Map, Row};
+use crate::map::maps::{Map, Row};
 use crate::map::run::{Run, Visit};
 use crate::parse::Location;
 

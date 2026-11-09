@@ -19,11 +19,12 @@ FerroBRIDGE's own design, and this page states it.
 
 The face is off until `[hl7v2] enabled` is true, and it needs the FHIR facade:
 the programs, the identity map and the ingest service it writes through are the
-facade's. `[hl7v2] enabled` with the facade off is a boot error. So is a
-`concept_maps` directory that does not load and a port that cannot be bound.
-The guide's table maps are translated on the `[terminology]` server, so load
-the guide's table ConceptMaps into it. Without a `[terminology]` section every
-table value is a counted `no-terminology` outcome.
+facade's. `[hl7v2] enabled` with the facade off is a boot error, and so is a
+port that cannot be bound. The guide's message, segment and data type maps are
+built into the bridge. Every table value is translated on the `[terminology]`
+server, so load the guide's package and FerroBRIDGE's value package into it
+([Loading the value maps](#loading-the-value-maps)). Without a `[terminology]`
+section every table value is a counted `no-terminology` outcome.
 
 ```toml
 [facade]
@@ -35,7 +36,6 @@ composition_territory = "GB"
 [hl7v2]
 enabled = true
 listen = "0.0.0.0:2575"
-concept_maps = "/srv/hl7.fhir.uv.v2mappings/package"
 ehr_policy = "create_on_first_write"
 profiles = [
   { resource_type = "Observation", profile = "https://example.org/fhir/StructureDefinition/lab-result" },
@@ -61,8 +61,6 @@ from the file `tls.key_file` names.
 | `enabled` | `false` | Whether the MLLP listener runs |
 | `listen` | `127.0.0.1:2575` | The socket address the listener binds |
 | `default_charset` | `ASCII` | The HL7 table 0211 code a message with an empty MSH-18 is read in: `ASCII`, `UNICODE UTF-8`, `8859/1` to `8859/9` or `8859/15` |
-| `concept_maps` | none, required | The directory of the guide's ConceptMaps: the `package` directory of `hl7.fhir.uv.v2mappings` |
-| `supplements` | `[]` | Directories of your own ConceptMaps, loaded in order after the guide and the supplements the face ships; a map with the id or the url of a loaded one replaces it |
 | `unmapped_entries` | `skip_and_count` | What an entry no program maps does: `skip_and_count` commits the others, `refuse` refuses the message |
 | `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
 | `profiles` | `[]` | A list of `{ resource_type, profile }`: the profile a resource of that type claims in `meta.profile` when the guide's maps wrote none |
@@ -94,10 +92,11 @@ sender cannot send as another. The bridge refuses to start without the
    position and grouped by its message structure. With `senders` set, a
    message whose MSH-4 names none of them is answered `AR` here and is never
    mapped.
-3. The guide's message, segment and data type maps, with the supplements over
-   them, write an R4 message Bundle. Every row the run cannot carry is a
-   counted outcome, and every supplement map the run used is counted once as
-   `supplemented`.
+3. The guide's message, segment and data type maps, with FerroBRIDGE's
+   corrections over them, write an R4 message Bundle, and each table value is
+   translated by `ConceptMap/$translate` on the terminology server. Every row
+   the run cannot carry is a counted outcome, and every correction the run
+   used is counted once as `supplemented`.
 4. Every entry whose resource type is listed under `profiles` and that claims
    no profile gets that profile in `meta.profile`, and every entry with a
    `subject` or `patient` reference and none set references the message's one
@@ -134,31 +133,64 @@ sender cannot send as another. The bridge refuses to start without the
 6. The acknowledgment is sent once the ingest settled, so `AA` means the CDR
    holds the message's compositions.
 
-## Supplements to the guide
+## Corrections to the guide
 
 The guide invites an implementation to add a mapping it needs locally
 (`mapping_guidelines.md`, General Format/Approach). FerroBRIDGE does that with
-supplements: ConceptMaps in the guide's own shape that override a map of the
-guide or add one it lacks. No specification governs how they load or how they
-are marked; that is FerroBRIDGE's own design, and it works as follows.
+ConceptMaps in the guide's own shape that override a map of the guide or add
+one it lacks. No specification governs how they load or how they are marked;
+that is FerroBRIDGE's own design, and it works as follows.
 
-- The face ships its supplements inside `ferrobridge-hl7v2` (the crate's
-  `supplements/` directory, compiled in) and loads them over the guide's
-  package at boot. The `supplements` directories of `[hl7v2]` load after
-  them, so a map of your own can replace one of FerroBRIDGE's.
-- A supplement with the id or the canonical url of a loaded map replaces that
-  map whole. Any other supplement is added.
-- Each shipped supplement names FerroBRIDGE in its `title`. Its `description`
-  names the guide map it overrides, or the structure it adds, the rows it
-  changes and why, and the tracker issue that records the defect. An override
-  keeps the guide map's id and url. An added map takes an id in the guide's
-  naming form and a url under `https://ferrobridge.eu/fhir/v2mappings/`, so it
-  never claims a canonical url of the guide.
-- The run counts each supplement map it uses once per message, as
-  `supplemented` naming the map, so an outcome list shows which values a
-  supplement wrote.
+- The guide's maps split by what they are. A message, segment or data type map
+  says which field goes where, so it is mapping logic: the bridge is built
+  with every one of them, generated from the pinned `hl7.fhir.uv.v2mappings`
+  1.0.0 package, and reads none from a directory or a server. A table map says
+  which code stands for which, so it is terminology: the bridge translates
+  every table value by `ConceptMap/$translate` on the terminology server, and
+  carries no copy of a table.
+- FerroBRIDGE's structure corrections are generated into the bridge beside
+  the guide's maps. Its value corrections are the FHIR package under
+  `terminology/hl7v2-values/` in the repository, which you load into the
+  terminology server beside the guide's package.
+- A correction with the id or the canonical url of a guide map replaces that
+  map whole. Any other correction is added.
+- Each correction names FerroBRIDGE in its `title`. Its `description` names
+  the guide map it overrides, or the structure it adds, the rows it changes
+  and why, and the tracker issue that records the defect. A structure override
+  keeps the guide map's id and url, since the guide's rows name it. Every
+  other correction takes a url under
+  `https://ferrobridge.eu/fhir/v2mappings/`, so the terminology server holds
+  the guide's table map and FerroBRIDGE's side by side, and the bridge asks
+  for FerroBRIDGE's by its url.
+- The run counts each correction it uses once per message, as `supplemented`
+  naming the map, so an outcome list shows which values a correction wrote.
 
-The shipped supplements:
+### Loading the value maps
+
+Load two directories into the terminology server: the `package` directory of
+`hl7.fhir.uv.v2mappings` 1.0.0 (from the FHIR package registry) and
+`terminology/hl7v2-values/` of the FerroBRIDGE release you run. Both carry a
+`package.json` declaring FHIR 4.0.1, and none of their ConceptMaps share a
+canonical url. For FerroTERM, name both in `terminology.code_systems`:
+
+```toml
+[terminology]
+code_systems = [
+  "/srv/hl7.fhir.uv.v2mappings/package",
+  "/srv/ferrobridge-hl7v2-values",
+]
+```
+
+Then point the bridge's `[terminology]` section at the server's R4 base. The
+value package holds these maps:
+
+| Map | Kind | What it changes, and why |
+|---|---|---|
+| `table-hl70202-to-contact-point-system` | override | Keeps the guide's system group and adds CP as `phone`; the guide's second group maps CP to the contact-point-use code `mobile`, which the required binding of `ContactPoint.system` does not hold (#1762) |
+| `table-hl70202-to-contact-point-use` | added | CP to `mobile`, the use the guide's second group meant, which the XTN override writes into `ContactPoint.use` (#1762) |
+| `table-administrative-gender-to-hl70001`, `table-name-use-to-hl70200`, `table-address-use-to-hl70190`, `table-address-type-to-hl70190`, `table-contact-point-system-to-hl70202` | added | The FHIR-to-v2 direction the PID inverse translates back through, where reading the guide's map in reverse gives several codes (#1716) |
+
+The structure corrections built into the bridge:
 
 | Map | Kind | What it changes, and why |
 |---|---|---|
@@ -168,6 +200,7 @@ The shipped supplements:
 | `datatype-cwe-to-quantity` | override | Names the targets `code`, `unit` and `system`, where the guide writes `Quantity.code` and so on, which the element table cannot find under the Quantity the row fills; OBX-6 units are kept (#332) |
 | `datatype-hd-name-to-messageheader-source` | override | Drops the row that writes HD.2, a universal ID, into `MessageHeader.source.software`, which R4 defines as the software's name (#324) |
 | `datatype-hd-name-to-messageheader-destination` | override | Writes HD.1 into `destination.name`, as the endpoint map does, where the guide writes HD.2 and the two maps disagree (#332) |
+| `datatype-xtn-to-contactpoint` | override | Writes XTN.3 into `use` through `table-hl70202-to-contact-point-use` when XTN.2 is empty, so a cell phone is a phone in mobile use, and writes a `system` with no XTN.3 and no XTN.4 as the R4 data-absent-reason extension in the two-row form the MSH-24 rows use, so the ContactPoint keeps `cpt-2` (#1762, #1763) |
 | `datatype-pl-to-location` | override | Links the six Locations of a PL (bed, room, point of care, floor, building, facility) into one `partOf` chain in the order the guide's PL.10 rows give the finest level, where the guide's `partOf` rows disagree with it and the building's names itself; writes the point of care's `mode` and `physicalType` (`wa`, the code the guide repository's MDM^T02 sample gives PL.1) at elements Location has; names the point of care and the building in the PL.10 rows as their second set does; and writes PL.9 into the finest valued level (#342, #332) |
 | `segment-msh-to-messageheader` | override | With both MSH-3 and MSH-24 valued, MSH-3 names the source and MSH-24 gives its endpoint; with one of them empty, the other runs as the guide writes it (#311) |
 | `segment-orc-to-diagnosticreport` | override | Writes ORC-2 into `basedOn.identifier` (R4 `Reference.identifier`), where the guide writes `basedOn(ServiceRequest)` with no map to fill it (#336) |
@@ -180,10 +213,10 @@ The shipped supplements:
 | `message-oul-r22-to-bundle` | added | OUL_R22 (the specimen-oriented observation), from the guide's ORU_R01 rows at the OUL_R22 paths; the OBR row into a Specimen is left out, since SPM carries the specimen (#256) |
 
 The operator console's HL7 v2 page lists every map the face runs on its
-ConceptMaps tab, the guide's and the supplements alike, from
+ConceptMaps tab, the guide's and the corrections alike, from
 [`GET /operator/hl7v2/concept-maps`](operator-api.md#get-operatorhl7v2concept-maps).
 
-What the supplements leave to the guide, and what stays open:
+What the corrections leave to the guide, and what stays open:
 
 - CWE.3 is written into `Coding.system` as the sender sends it (`LN`). The
   guide's comment on that row says a vocabulary table gives the URI, and the
@@ -313,7 +346,7 @@ acknowledged, and the connection closes, within the same
 ## Until a mapping context covers the guide's resources
 
 No published FHIRconnect context in the tree maps the resources the guide and
-its supplements write for the message families (ADT, BAR, ORU, OUL, ORM, OML
+its corrections write for the message families (ADT, BAR, ORU, OUL, ORM, OML
 and ORL, MDM, SIU, VXU):
 the published contexts do not compile in-tree for lack of their templates
 (issue #258). Until one does, a message's Bundle reaches the ingest service and

@@ -185,7 +185,7 @@ console answers with the page it drew.
   listener runs and where, whether an ETL is configured, and each face's
   settings. The ConceptMaps tab lists every map the HL7 v2 face runs, from
   `GET /operator/hl7v2/concept-maps`: its title and id, its kind, what it
-  maps from and to, whether it is the guide's or a supplement's, its rows
+  maps from and to, whether it is the guide's or a FerroBRIDGE correction, its rows
   and the messages it served since the bridge started. The OMOP ETL's Runs
   tab lists the runs the bridge schema keeps, from `GET /operator/etl/runs`,
   each with its job, when it ran and its counts, and links each to its

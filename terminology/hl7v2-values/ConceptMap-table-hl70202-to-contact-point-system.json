@@ -1,0 +1,131 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "table-hl70202-to-contact-point-system",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-hl70202-to-contact-point-system",
+  "name": "FerroBRIDGEHl70202ToContactPointSystem",
+  "title": "FerroBRIDGE supplement: HL7 table 0202 to contact-point-system with CP as phone",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Overrides ConceptMap/table-hl70202-to-contact-point-system of hl7.fhir.uv.v2mappings 1.0.0. The guide's map has a second group that maps CP to the contact-point-use code mobile, and the XTN.3 row of datatype-xtn-to-contactpoint writes ContactPoint.system through this map, so a cell phone was written as system mobile, which the required R4 binding of ContactPoint.system (contact-point-system) does not hold. This supplement keeps the system group, adds CP as phone, and moves the use group to ConceptMap/table-hl70202-to-contact-point-use. Recorded as an upstream defect on FerroBRIDGE #1764; the fix is FerroBRIDGE #1762.",
+  "sourceUri": "http://terminology.hl7.org/ValueSet/v2-0202",
+  "group": [
+    {
+      "source": "http://terminology.hl7.org/CodeSystem/v2-0202",
+      "target": "http://hl7.org/fhir/contact-point-system",
+      "element": [
+        {
+          "code": "PH",
+          "display": "Telephone",
+          "target": [
+            {
+              "code": "phone",
+              "display": "Phone",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "CP",
+          "display": "Cellular or Mobile Phone",
+          "target": [
+            {
+              "code": "phone",
+              "display": "Phone",
+              "equivalence": "equivalent",
+              "comment": "A cell phone number is a number for voice calls (R4 contact-point-system phone); its mobility is ContactPoint.use mobile, written through table-hl70202-to-contact-point-use."
+            }
+          ]
+        },
+        {
+          "code": "FX",
+          "display": "Fax",
+          "target": [
+            {
+              "code": "fax",
+              "display": "Fax",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "MD",
+          "display": "Modem",
+          "target": [
+            {
+              "code": "other",
+              "display": "Other",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "SAT",
+          "display": "Satellite Phone",
+          "target": [
+            {
+              "code": "other",
+              "display": "Other",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "BP",
+          "display": "Beeper",
+          "target": [
+            {
+              "code": "pager",
+              "display": "Pager",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "Internet",
+          "display": "Internet Address",
+          "target": [
+            {
+              "code": "email",
+              "display": "email",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "X.400",
+          "display": "X.400 email address",
+          "target": [
+            {
+              "code": "email",
+              "display": "email",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "TDD",
+          "display": "Telecommunications Device for the Deaf",
+          "target": [
+            {
+              "code": "other",
+              "display": "Other",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "TTY",
+          "display": "Teletypewriter",
+          "target": [
+            {
+              "code": "other",
+              "display": "Other",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -24,6 +24,7 @@ mod parse;
 mod sender;
 mod supplement;
 mod support;
+mod tables;
 mod tls;
 mod wire;
 mod write;
