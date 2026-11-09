@@ -9,6 +9,7 @@ use crate::parse::arity::check_arity;
 use crate::parse::lex::Lexed;
 use crate::parse::place::close;
 use crate::parse::place::{Missing, place};
+use crate::parse::profile::Profile;
 use crate::parse::required::check_fields;
 use crate::parse::{ErrorCode, Frame, Item, Parsed, Refusal, Unplaced, base_name};
 
@@ -31,9 +32,10 @@ fn places(nodes: &'static [Node], id: &str) -> bool {
 /// A required segment or group left empty is a refusal. A required field
 /// left empty in a placed segment is counted as
 /// [`Unplaced::MissingRequiredField`], and refuses only for MSH-9, MSH-10 and
-/// MSH-12.
+/// MSH-12. A member's minimum is the one `profile` sets where it constrains
+/// the member, else the structure's.
 #[must_use]
-pub fn group(lexed: Lexed, structure: &'static Structure) -> Parsed {
+pub fn group(lexed: Lexed, structure: &'static Structure, profile: &'static Profile) -> Parsed {
     let Lexed { message, refusals } = lexed;
     let mut parsed = Parsed {
         message,
@@ -77,7 +79,7 @@ pub fn group(lexed: Lexed, structure: &'static Structure) -> Parsed {
             structure: structure.id,
         });
     }
-    let mut stack = vec![Frame::root(structure.nodes)];
+    let mut stack = vec![Frame::root(structure.nodes, profile, structure.version)];
     let mut missing = Vec::new();
     let routed: Vec<(usize, &str)> = parsed
         .message

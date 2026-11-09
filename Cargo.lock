@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.1.188"
+version = "0.1.189"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1750,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.1.132"
+version = "0.1.133"
 dependencies = [
  "base64 0.23.1",
  "chumsky",
@@ -1769,7 +1769,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.1.206"
+version = "0.1.209"
 dependencies = [
  "bytes",
  "chumsky",
@@ -2180,7 +2180,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.242"
+version = "0.1.243"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -5900,7 +5900,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

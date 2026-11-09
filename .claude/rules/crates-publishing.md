@@ -61,6 +61,17 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   consumer pins a crate of the line exactly (`fhirconnect = "=0.1.120"`), as
   FerroFED does, and moves the pin deliberately. A PR that breaks a public API
   says so in its body and its CHANGELOG entry, naming what a consumer changes.
+- **A crate of this line requires a sibling of this workspace exactly**
+  (#1736): `ferrobridge-validator` requires `ferrobridge-term = "=0.1.147"`,
+  in the root `[workspace.dependencies]` and wherever else a sibling is
+  named with a version. The line moves one patch per change, a breaking one
+  included, and Cargo reads a caret or tilde on `0.1.x` as compatible across
+  patches, so a published crate with a range would resolve a later sibling it
+  was never built with (validator 0.1.151 against term 0.1.146). An exact
+  requirement means a sibling's bump moves every member that requires it in
+  the same PR, which the bump rule above already demands, since the root
+  entry is packaged content. `crate-version-guard` fails a range between
+  workspace crates on every run.
 - **A crate of this line takes a caret requirement on another family shared
   crate** (owner decision 2026-10-26): `ferrobridge-term` requires
   `ferrohealth-smart = "0.8.3"`, never `=0.8.3`, because the FerroAUTH,
