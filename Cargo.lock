@@ -1776,6 +1776,7 @@ dependencies = [
  "encoding_rs",
  "ferrobridge-term",
  "ferrobridge-testkit",
+ "ferrobridge-validator",
  "fhir-types",
  "fhirconnect",
  "hl7v2-types",

@@ -6,6 +6,7 @@
 //! stubbed terminology server.
 
 mod bundle;
+mod contact_point;
 mod endpoint;
 mod inverse;
 mod offline;
