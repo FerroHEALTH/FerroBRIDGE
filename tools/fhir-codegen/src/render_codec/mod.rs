@@ -162,7 +162,7 @@ pub fn render_value_check(
         .collect();
     primitives.sort_by(|a, b| a.path.cmp(&b.path));
     for ty in primitives {
-        out.push_str(&ty.scope.cfg());
+        out.push_str(&ty.scope.cfg(&model.name));
         writeln!(
             out,
             "        {:?} => <{} as {C}::Primitive>::from_json_parts(Some(value), None, &mut path).map(|_| ()),",

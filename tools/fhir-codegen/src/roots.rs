@@ -84,10 +84,34 @@ impl RootScope {
         }
     }
 
-    /// The `cfg` attribute line gating the scope, with a trailing newline.
+    /// The `cfg` attribute line gating the scope in the module of FHIR
+    /// version `version`, with a trailing newline.
+    ///
+    /// A resource-scope item is on under the crate-wide `resources` feature
+    /// or under its own version's `<version>-resources` feature, so a
+    /// dependant that needs every resource of one release compiles no
+    /// resource of the others.
     #[must_use]
-    pub fn cfg(self) -> String {
-        format!("#[cfg(feature = \"{}\")]\n", self.feature())
+    pub fn cfg(self, version: &str) -> String {
+        self.cfg_any([version])
+    }
+
+    /// The `cfg` attribute line of an item that any of the FHIR versions
+    /// `versions` needs in the scope, with a trailing newline.
+    #[must_use]
+    pub fn cfg_any<'a>(self, versions: impl IntoIterator<Item = &'a str>) -> String {
+        match self {
+            Self::Terminology => format!("#[cfg(feature = \"{}\")]\n", self.feature()),
+            Self::Resources => {
+                let mut features = vec![format!("feature = \"{}\"", self.feature())];
+                features.extend(
+                    versions
+                        .into_iter()
+                        .map(|version| format!("feature = \"{version}-{}\"", self.feature())),
+                );
+                format!("#[cfg(any({}))]\n", features.join(", "))
+            }
+        }
     }
 }
 

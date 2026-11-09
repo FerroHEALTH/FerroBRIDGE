@@ -14,50 +14,50 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Resource {
     /// A `Account` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Account(Box<super::account::Account>),
     /// A `ActivityDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ActivityDefinition(Box<super::activity_definition::ActivityDefinition>),
     /// A `ActorDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ActorDefinition(Box<super::actor_definition::ActorDefinition>),
     /// A `AdministrableProductDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     AdministrableProductDefinition(
         Box<super::administrable_product_definition::AdministrableProductDefinition>,
     ),
     /// A `AdverseEvent` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     AdverseEvent(Box<super::adverse_event::AdverseEvent>),
     /// A `AllergyIntolerance` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     AllergyIntolerance(Box<super::allergy_intolerance::AllergyIntolerance>),
     /// A `Appointment` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Appointment(Box<super::appointment::Appointment>),
     /// A `AppointmentResponse` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     AppointmentResponse(Box<super::appointment_response::AppointmentResponse>),
     /// A `ArtifactAssessment` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ArtifactAssessment(Box<super::artifact_assessment::ArtifactAssessment>),
     /// A `AuditEvent` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     AuditEvent(Box<super::audit_event::AuditEvent>),
     /// A `Basic` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Basic(Box<super::basic::Basic>),
     /// A `Binary` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Binary(Box<super::binary::Binary>),
     /// A `BiologicallyDerivedProduct` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     BiologicallyDerivedProduct(
         Box<super::biologically_derived_product::BiologicallyDerivedProduct>,
     ),
     /// A `BodyStructure` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     BodyStructure(Box<super::body_structure::BodyStructure>),
     /// A `Bundle` resource.
     #[cfg(feature = "terminology")]
@@ -66,336 +66,336 @@ pub enum Resource {
     #[cfg(feature = "terminology")]
     CapabilityStatement(Box<super::capability_statement::CapabilityStatement>),
     /// A `CarePlan` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     CarePlan(Box<super::care_plan::CarePlan>),
     /// A `CareTeam` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     CareTeam(Box<super::care_team::CareTeam>),
     /// A `Claim` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Claim(Box<super::claim::Claim>),
     /// A `ClaimResponse` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ClaimResponse(Box<super::claim_response::ClaimResponse>),
     /// A `ClinicalUseDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ClinicalUseDefinition(Box<super::clinical_use_definition::ClinicalUseDefinition>),
     /// A `CodeSystem` resource.
     #[cfg(feature = "terminology")]
     CodeSystem(Box<super::code_system::CodeSystem>),
     /// A `Communication` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Communication(Box<super::communication::Communication>),
     /// A `CommunicationRequest` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     CommunicationRequest(Box<super::communication_request::CommunicationRequest>),
     /// A `CompartmentDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     CompartmentDefinition(Box<super::compartment_definition::CompartmentDefinition>),
     /// A `Composition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Composition(Box<super::composition::Composition>),
     /// A `ConceptMap` resource.
     #[cfg(feature = "terminology")]
     ConceptMap(Box<super::concept_map::ConceptMap>),
     /// A `Condition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Condition(Box<super::condition::Condition>),
     /// A `Consent` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Consent(Box<super::consent::Consent>),
     /// A `Contract` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Contract(Box<super::contract::Contract>),
     /// A `Coverage` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Coverage(Box<super::coverage::Coverage>),
     /// A `CoverageEligibilityRequest` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     CoverageEligibilityRequest(
         Box<super::coverage_eligibility_request::CoverageEligibilityRequest>,
     ),
     /// A `CoverageEligibilityResponse` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     CoverageEligibilityResponse(
         Box<super::coverage_eligibility_response::CoverageEligibilityResponse>,
     ),
     /// A `DetectedIssue` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DetectedIssue(Box<super::detected_issue::DetectedIssue>),
     /// A `Device` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Device(Box<super::device::Device>),
     /// A `DeviceAlert` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DeviceAlert(Box<super::device_alert::DeviceAlert>),
     /// A `DeviceAssociation` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DeviceAssociation(Box<super::device_association::DeviceAssociation>),
     /// A `DeviceDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DeviceDefinition(Box<super::device_definition::DeviceDefinition>),
     /// A `DeviceMetric` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DeviceMetric(Box<super::device_metric::DeviceMetric>),
     /// A `DeviceRequest` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DeviceRequest(Box<super::device_request::DeviceRequest>),
     /// A `DiagnosticReport` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DiagnosticReport(Box<super::diagnostic_report::DiagnosticReport>),
     /// A `DocumentReference` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     DocumentReference(Box<super::document_reference::DocumentReference>),
     /// A `Encounter` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Encounter(Box<super::encounter::Encounter>),
     /// A `Endpoint` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Endpoint(Box<super::endpoint::Endpoint>),
     /// A `EnrollmentRequest` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     EnrollmentRequest(Box<super::enrollment_request::EnrollmentRequest>),
     /// A `EnrollmentResponse` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     EnrollmentResponse(Box<super::enrollment_response::EnrollmentResponse>),
     /// A `EpisodeOfCare` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     EpisodeOfCare(Box<super::episode_of_care::EpisodeOfCare>),
     /// A `EventDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     EventDefinition(Box<super::event_definition::EventDefinition>),
     /// A `Evidence` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Evidence(Box<super::evidence::Evidence>),
     /// A `EvidenceVariable` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     EvidenceVariable(Box<super::evidence_variable::EvidenceVariable>),
     /// A `ExampleScenario` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ExampleScenario(Box<super::example_scenario::ExampleScenario>),
     /// A `ExplanationOfBenefit` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ExplanationOfBenefit(Box<super::explanation_of_benefit::ExplanationOfBenefit>),
     /// A `FamilyMemberHistory` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     FamilyMemberHistory(Box<super::family_member_history::FamilyMemberHistory>),
     /// A `Flag` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Flag(Box<super::flag::Flag>),
     /// A `Goal` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Goal(Box<super::goal::Goal>),
     /// A `Group` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Group(Box<super::group::Group>),
     /// A `GuidanceResponse` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     GuidanceResponse(Box<super::guidance_response::GuidanceResponse>),
     /// A `HealthcareService` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     HealthcareService(Box<super::healthcare_service::HealthcareService>),
     /// A `ImagingSelection` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ImagingSelection(Box<super::imaging_selection::ImagingSelection>),
     /// A `ImagingStudy` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ImagingStudy(Box<super::imaging_study::ImagingStudy>),
     /// A `Immunization` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Immunization(Box<super::immunization::Immunization>),
     /// A `ImplementationGuide` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ImplementationGuide(Box<super::implementation_guide::ImplementationGuide>),
     /// A `Ingredient` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Ingredient(Box<super::ingredient::Ingredient>),
     /// A `InsurancePlan` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     InsurancePlan(Box<super::insurance_plan::InsurancePlan>),
     /// A `InsuranceProduct` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     InsuranceProduct(Box<super::insurance_product::InsuranceProduct>),
     /// A `Invoice` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Invoice(Box<super::invoice::Invoice>),
     /// A `Library` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Library(Box<super::library::Library>),
     /// A `List` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     List(Box<super::list::List>),
     /// A `Location` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Location(Box<super::location::Location>),
     /// A `ManufacturedItemDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ManufacturedItemDefinition(
         Box<super::manufactured_item_definition::ManufacturedItemDefinition>,
     ),
     /// A `Measure` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Measure(Box<super::measure::Measure>),
     /// A `MeasureReport` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MeasureReport(Box<super::measure_report::MeasureReport>),
     /// A `Medication` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Medication(Box<super::medication::Medication>),
     /// A `MedicationAdministration` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MedicationAdministration(Box<super::medication_administration::MedicationAdministration>),
     /// A `MedicationDispense` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MedicationDispense(Box<super::medication_dispense::MedicationDispense>),
     /// A `MedicationRequest` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MedicationRequest(Box<super::medication_request::MedicationRequest>),
     /// A `MedicationStatement` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MedicationStatement(Box<super::medication_statement::MedicationStatement>),
     /// A `MedicinalProductDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MedicinalProductDefinition(
         Box<super::medicinal_product_definition::MedicinalProductDefinition>,
     ),
     /// A `MessageDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MessageDefinition(Box<super::message_definition::MessageDefinition>),
     /// A `MessageHeader` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     MessageHeader(Box<super::message_header::MessageHeader>),
     /// A `NamingSystem` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     NamingSystem(Box<super::naming_system::NamingSystem>),
     /// A `NutritionIntake` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     NutritionIntake(Box<super::nutrition_intake::NutritionIntake>),
     /// A `NutritionOrder` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     NutritionOrder(Box<super::nutrition_order::NutritionOrder>),
     /// A `NutritionProduct` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     NutritionProduct(Box<super::nutrition_product::NutritionProduct>),
     /// A `Observation` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Observation(Box<super::observation::Observation>),
     /// A `ObservationDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ObservationDefinition(Box<super::observation_definition::ObservationDefinition>),
     /// A `OperationDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     OperationDefinition(Box<super::operation_definition::OperationDefinition>),
     /// A `OperationOutcome` resource.
     #[cfg(feature = "terminology")]
     OperationOutcome(Box<super::operation_outcome::OperationOutcome>),
     /// A `Organization` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Organization(Box<super::organization::Organization>),
     /// A `OrganizationAffiliation` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     OrganizationAffiliation(Box<super::organization_affiliation::OrganizationAffiliation>),
     /// A `PackagedProductDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     PackagedProductDefinition(Box<super::packaged_product_definition::PackagedProductDefinition>),
     /// A `Parameters` resource.
     #[cfg(feature = "terminology")]
     Parameters(Box<super::parameters::Parameters>),
     /// A `Patient` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Patient(Box<super::patient::Patient>),
     /// A `PaymentNotice` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     PaymentNotice(Box<super::payment_notice::PaymentNotice>),
     /// A `PaymentReconciliation` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     PaymentReconciliation(Box<super::payment_reconciliation::PaymentReconciliation>),
     /// A `Person` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Person(Box<super::person::Person>),
     /// A `PlanDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     PlanDefinition(Box<super::plan_definition::PlanDefinition>),
     /// A `Practitioner` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Practitioner(Box<super::practitioner::Practitioner>),
     /// A `PractitionerRole` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     PractitionerRole(Box<super::practitioner_role::PractitionerRole>),
     /// A `Procedure` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Procedure(Box<super::procedure::Procedure>),
     /// A `Provenance` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Provenance(Box<super::provenance::Provenance>),
     /// A `Questionnaire` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Questionnaire(Box<super::questionnaire::Questionnaire>),
     /// A `QuestionnaireResponse` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     QuestionnaireResponse(Box<super::questionnaire_response::QuestionnaireResponse>),
     /// A `RegulatedAuthorization` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     RegulatedAuthorization(Box<super::regulated_authorization::RegulatedAuthorization>),
     /// A `RelatedPerson` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     RelatedPerson(Box<super::related_person::RelatedPerson>),
     /// A `RequestOrchestration` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     RequestOrchestration(Box<super::request_orchestration::RequestOrchestration>),
     /// A `Requirements` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Requirements(Box<super::requirements::Requirements>),
     /// A `ResearchStudy` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ResearchStudy(Box<super::research_study::ResearchStudy>),
     /// A `ResearchSubject` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ResearchSubject(Box<super::research_subject::ResearchSubject>),
     /// A `RiskAssessment` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     RiskAssessment(Box<super::risk_assessment::RiskAssessment>),
     /// A `Schedule` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Schedule(Box<super::schedule::Schedule>),
     /// A `SearchParameter` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     SearchParameter(Box<super::search_parameter::SearchParameter>),
     /// A `ServiceRequest` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     ServiceRequest(Box<super::service_request::ServiceRequest>),
     /// A `Slot` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Slot(Box<super::slot::Slot>),
     /// A `Specimen` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Specimen(Box<super::specimen::Specimen>),
     /// A `SpecimenDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     SpecimenDefinition(Box<super::specimen_definition::SpecimenDefinition>),
     /// A `StructureDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     StructureDefinition(Box<super::structure_definition::StructureDefinition>),
     /// A `StructureMap` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     StructureMap(Box<super::structure_map::StructureMap>),
     /// A `Subscription` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Subscription(Box<super::subscription::Subscription>),
     /// A `SubscriptionStatus` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     SubscriptionStatus(Box<super::subscription_status::SubscriptionStatus>),
     /// A `SubscriptionTopic` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     SubscriptionTopic(Box<super::subscription_topic::SubscriptionTopic>),
     /// A `Substance` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Substance(Box<super::substance::Substance>),
     /// A `SubstanceDefinition` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     SubstanceDefinition(Box<super::substance_definition::SubstanceDefinition>),
     /// A `Task` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Task(Box<super::task::Task>),
     /// A `TerminologyCapabilities` resource.
     #[cfg(feature = "terminology")]
@@ -404,7 +404,7 @@ pub enum Resource {
     #[cfg(feature = "terminology")]
     ValueSet(Box<super::value_set::ValueSet>),
     /// A `VisionPrescription` resource.
-    #[cfg(feature = "resources")]
+    #[cfg(any(feature = "resources", feature = "r6-resources"))]
     VisionPrescription(Box<super::vision_prescription::VisionPrescription>),
     /// A resource of any type carried as its JSON body: decoded for a type
     /// outside the enabled root set, written as given for any type.
@@ -414,283 +414,283 @@ pub enum Resource {
 impl super::super::codec::Json for Resource {
     fn to_json(&self) -> Result<super::super::codec::Object, super::super::codec::EncodeError> {
         match self {
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Account(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ActivityDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ActorDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AdministrableProductDefinition(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AdverseEvent(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AllergyIntolerance(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Appointment(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AppointmentResponse(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ArtifactAssessment(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AuditEvent(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Basic(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Binary(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::BiologicallyDerivedProduct(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::BodyStructure(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(feature = "terminology")]
             Self::Bundle(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(feature = "terminology")]
             Self::CapabilityStatement(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CarePlan(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CareTeam(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Claim(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ClaimResponse(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ClinicalUseDefinition(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
             #[cfg(feature = "terminology")]
             Self::CodeSystem(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Communication(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CommunicationRequest(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CompartmentDefinition(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Composition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(feature = "terminology")]
             Self::ConceptMap(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Condition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Consent(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Contract(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Coverage(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CoverageEligibilityRequest(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CoverageEligibilityResponse(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DetectedIssue(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Device(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceAlert(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceAssociation(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceMetric(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceRequest(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DiagnosticReport(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DocumentReference(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Encounter(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Endpoint(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EnrollmentRequest(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EnrollmentResponse(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EpisodeOfCare(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EventDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Evidence(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EvidenceVariable(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ExampleScenario(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ExplanationOfBenefit(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::FamilyMemberHistory(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Flag(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Goal(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Group(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::GuidanceResponse(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::HealthcareService(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ImagingSelection(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ImagingStudy(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Immunization(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ImplementationGuide(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Ingredient(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::InsurancePlan(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::InsuranceProduct(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Invoice(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Library(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::List(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Location(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ManufacturedItemDefinition(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Measure(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MeasureReport(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Medication(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationAdministration(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationDispense(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationRequest(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationStatement(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicinalProductDefinition(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MessageDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MessageHeader(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NamingSystem(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NutritionIntake(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NutritionOrder(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NutritionProduct(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Observation(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ObservationDefinition(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::OperationDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(feature = "terminology")]
             Self::OperationOutcome(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Organization(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::OrganizationAffiliation(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PackagedProductDefinition(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
             #[cfg(feature = "terminology")]
             Self::Parameters(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Patient(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PaymentNotice(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PaymentReconciliation(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Person(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PlanDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Practitioner(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PractitionerRole(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Procedure(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Provenance(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Questionnaire(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::QuestionnaireResponse(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RegulatedAuthorization(inner) => {
                 super::super::codec::Json::to_json(inner.as_ref())
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RelatedPerson(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RequestOrchestration(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Requirements(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ResearchStudy(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ResearchSubject(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RiskAssessment(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Schedule(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SearchParameter(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ServiceRequest(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Slot(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Specimen(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SpecimenDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::StructureDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::StructureMap(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Subscription(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SubscriptionStatus(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SubscriptionTopic(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Substance(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SubstanceDefinition(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Task(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(feature = "terminology")]
             Self::TerminologyCapabilities(inner) => {
@@ -698,7 +698,7 @@ impl super::super::codec::Json for Resource {
             }
             #[cfg(feature = "terminology")]
             Self::ValueSet(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::VisionPrescription(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             Self::Unknown(inner) => match &inner.body {
                 super::super::codec::Value::Object(object) => Ok(object.clone()),
@@ -712,49 +712,49 @@ impl super::super::codec::Json for Resource {
         path: &mut super::super::codec::Path,
     ) -> Result<Self, super::super::codec::DecodeError> {
         match super::super::codec::resource_type(object, path)? {
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Account" => Ok(Self::Account(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ActivityDefinition" => Ok(Self::ActivityDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ActorDefinition" => Ok(Self::ActorDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "AdministrableProductDefinition" => Ok(Self::AdministrableProductDefinition(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "AdverseEvent" => Ok(Self::AdverseEvent(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "AllergyIntolerance" => Ok(Self::AllergyIntolerance(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Appointment" => Ok(Self::Appointment(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "AppointmentResponse" => Ok(Self::AppointmentResponse(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ArtifactAssessment" => Ok(Self::ArtifactAssessment(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "AuditEvent" => Ok(Self::AuditEvent(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Basic" => Ok(Self::Basic(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Binary" => Ok(Self::Binary(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "BiologicallyDerivedProduct" => Ok(Self::BiologicallyDerivedProduct(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "BodyStructure" => Ok(Self::BodyStructure(super::super::codec::boxed(
                 object, path,
             )?)),
@@ -764,235 +764,235 @@ impl super::super::codec::Json for Resource {
             "CapabilityStatement" => Ok(Self::CapabilityStatement(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "CarePlan" => Ok(Self::CarePlan(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "CareTeam" => Ok(Self::CareTeam(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Claim" => Ok(Self::Claim(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ClaimResponse" => Ok(Self::ClaimResponse(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ClinicalUseDefinition" => Ok(Self::ClinicalUseDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
             #[cfg(feature = "terminology")]
             "CodeSystem" => Ok(Self::CodeSystem(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Communication" => Ok(Self::Communication(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "CommunicationRequest" => Ok(Self::CommunicationRequest(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "CompartmentDefinition" => Ok(Self::CompartmentDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Composition" => Ok(Self::Composition(super::super::codec::boxed(object, path)?)),
             #[cfg(feature = "terminology")]
             "ConceptMap" => Ok(Self::ConceptMap(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Condition" => Ok(Self::Condition(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Consent" => Ok(Self::Consent(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Contract" => Ok(Self::Contract(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Coverage" => Ok(Self::Coverage(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "CoverageEligibilityRequest" => Ok(Self::CoverageEligibilityRequest(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "CoverageEligibilityResponse" => Ok(Self::CoverageEligibilityResponse(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DetectedIssue" => Ok(Self::DetectedIssue(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Device" => Ok(Self::Device(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DeviceAlert" => Ok(Self::DeviceAlert(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DeviceAssociation" => Ok(Self::DeviceAssociation(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DeviceDefinition" => Ok(Self::DeviceDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DeviceMetric" => Ok(Self::DeviceMetric(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DeviceRequest" => Ok(Self::DeviceRequest(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DiagnosticReport" => Ok(Self::DiagnosticReport(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "DocumentReference" => Ok(Self::DocumentReference(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Encounter" => Ok(Self::Encounter(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Endpoint" => Ok(Self::Endpoint(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "EnrollmentRequest" => Ok(Self::EnrollmentRequest(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "EnrollmentResponse" => Ok(Self::EnrollmentResponse(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "EpisodeOfCare" => Ok(Self::EpisodeOfCare(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "EventDefinition" => Ok(Self::EventDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Evidence" => Ok(Self::Evidence(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "EvidenceVariable" => Ok(Self::EvidenceVariable(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ExampleScenario" => Ok(Self::ExampleScenario(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ExplanationOfBenefit" => Ok(Self::ExplanationOfBenefit(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "FamilyMemberHistory" => Ok(Self::FamilyMemberHistory(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Flag" => Ok(Self::Flag(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Goal" => Ok(Self::Goal(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Group" => Ok(Self::Group(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "GuidanceResponse" => Ok(Self::GuidanceResponse(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "HealthcareService" => Ok(Self::HealthcareService(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ImagingSelection" => Ok(Self::ImagingSelection(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ImagingStudy" => Ok(Self::ImagingStudy(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Immunization" => Ok(Self::Immunization(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ImplementationGuide" => Ok(Self::ImplementationGuide(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Ingredient" => Ok(Self::Ingredient(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "InsurancePlan" => Ok(Self::InsurancePlan(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "InsuranceProduct" => Ok(Self::InsuranceProduct(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Invoice" => Ok(Self::Invoice(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Library" => Ok(Self::Library(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "List" => Ok(Self::List(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Location" => Ok(Self::Location(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ManufacturedItemDefinition" => Ok(Self::ManufacturedItemDefinition(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Measure" => Ok(Self::Measure(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MeasureReport" => Ok(Self::MeasureReport(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Medication" => Ok(Self::Medication(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MedicationAdministration" => Ok(Self::MedicationAdministration(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MedicationDispense" => Ok(Self::MedicationDispense(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MedicationRequest" => Ok(Self::MedicationRequest(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MedicationStatement" => Ok(Self::MedicationStatement(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MedicinalProductDefinition" => Ok(Self::MedicinalProductDefinition(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MessageDefinition" => Ok(Self::MessageDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "MessageHeader" => Ok(Self::MessageHeader(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "NamingSystem" => Ok(Self::NamingSystem(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "NutritionIntake" => Ok(Self::NutritionIntake(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "NutritionOrder" => Ok(Self::NutritionOrder(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "NutritionProduct" => Ok(Self::NutritionProduct(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Observation" => Ok(Self::Observation(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ObservationDefinition" => Ok(Self::ObservationDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "OperationDefinition" => Ok(Self::OperationDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
@@ -1000,129 +1000,129 @@ impl super::super::codec::Json for Resource {
             "OperationOutcome" => Ok(Self::OperationOutcome(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Organization" => Ok(Self::Organization(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "OrganizationAffiliation" => Ok(Self::OrganizationAffiliation(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "PackagedProductDefinition" => Ok(Self::PackagedProductDefinition(
                 super::super::codec::boxed(object, path)?,
             )),
             #[cfg(feature = "terminology")]
             "Parameters" => Ok(Self::Parameters(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Patient" => Ok(Self::Patient(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "PaymentNotice" => Ok(Self::PaymentNotice(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "PaymentReconciliation" => Ok(Self::PaymentReconciliation(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Person" => Ok(Self::Person(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "PlanDefinition" => Ok(Self::PlanDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Practitioner" => Ok(Self::Practitioner(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "PractitionerRole" => Ok(Self::PractitionerRole(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Procedure" => Ok(Self::Procedure(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Provenance" => Ok(Self::Provenance(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Questionnaire" => Ok(Self::Questionnaire(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "QuestionnaireResponse" => Ok(Self::QuestionnaireResponse(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "RegulatedAuthorization" => Ok(Self::RegulatedAuthorization(
                 super::super::codec::boxed(object, path)?,
             )),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "RelatedPerson" => Ok(Self::RelatedPerson(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "RequestOrchestration" => Ok(Self::RequestOrchestration(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Requirements" => Ok(Self::Requirements(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ResearchStudy" => Ok(Self::ResearchStudy(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ResearchSubject" => Ok(Self::ResearchSubject(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "RiskAssessment" => Ok(Self::RiskAssessment(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Schedule" => Ok(Self::Schedule(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "SearchParameter" => Ok(Self::SearchParameter(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "ServiceRequest" => Ok(Self::ServiceRequest(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Slot" => Ok(Self::Slot(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Specimen" => Ok(Self::Specimen(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "SpecimenDefinition" => Ok(Self::SpecimenDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "StructureDefinition" => Ok(Self::StructureDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "StructureMap" => Ok(Self::StructureMap(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Subscription" => Ok(Self::Subscription(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "SubscriptionStatus" => Ok(Self::SubscriptionStatus(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "SubscriptionTopic" => Ok(Self::SubscriptionTopic(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Substance" => Ok(Self::Substance(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "SubstanceDefinition" => Ok(Self::SubstanceDefinition(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Task" => Ok(Self::Task(super::super::codec::boxed(object, path)?)),
             #[cfg(feature = "terminology")]
             "TerminologyCapabilities" => Ok(Self::TerminologyCapabilities(
@@ -1130,7 +1130,7 @@ impl super::super::codec::Json for Resource {
             )),
             #[cfg(feature = "terminology")]
             "ValueSet" => Ok(Self::ValueSet(super::super::codec::boxed(object, path)?)),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "VisionPrescription" => Ok(Self::VisionPrescription(super::super::codec::boxed(
                 object, path,
             )?)),
@@ -1145,45 +1145,45 @@ impl super::super::codec::Json for Resource {
 impl serde::Serialize for Resource {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Account(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ActivityDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ActorDefinition(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AdministrableProductDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AdverseEvent(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AllergyIntolerance(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Appointment(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AppointmentResponse(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ArtifactAssessment(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::AuditEvent(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Basic(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Binary(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::BiologicallyDerivedProduct(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::BodyStructure(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
             #[cfg(feature = "terminology")]
             Self::Bundle(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
@@ -1191,203 +1191,203 @@ impl serde::Serialize for Resource {
             Self::CapabilityStatement(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CarePlan(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CareTeam(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Claim(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ClaimResponse(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ClinicalUseDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
             #[cfg(feature = "terminology")]
             Self::CodeSystem(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Communication(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CommunicationRequest(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CompartmentDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Composition(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
             #[cfg(feature = "terminology")]
             Self::ConceptMap(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Condition(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Consent(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Contract(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Coverage(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CoverageEligibilityRequest(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::CoverageEligibilityResponse(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DetectedIssue(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Device(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceAlert(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceAssociation(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceMetric(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DeviceRequest(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DiagnosticReport(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::DocumentReference(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Encounter(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Endpoint(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EnrollmentRequest(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EnrollmentResponse(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EpisodeOfCare(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EventDefinition(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Evidence(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::EvidenceVariable(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ExampleScenario(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ExplanationOfBenefit(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::FamilyMemberHistory(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Flag(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Goal(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Group(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::GuidanceResponse(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::HealthcareService(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ImagingSelection(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ImagingStudy(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Immunization(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ImplementationGuide(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Ingredient(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::InsurancePlan(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::InsuranceProduct(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Invoice(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Library(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::List(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Location(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ManufacturedItemDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Measure(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MeasureReport(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Medication(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationAdministration(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationDispense(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationRequest(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicationStatement(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MedicinalProductDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MessageDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::MessageHeader(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NamingSystem(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NutritionIntake(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NutritionOrder(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::NutritionProduct(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Observation(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ObservationDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::OperationDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
@@ -1395,101 +1395,101 @@ impl serde::Serialize for Resource {
             Self::OperationOutcome(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Organization(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::OrganizationAffiliation(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PackagedProductDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
             #[cfg(feature = "terminology")]
             Self::Parameters(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Patient(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PaymentNotice(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PaymentReconciliation(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Person(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PlanDefinition(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Practitioner(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::PractitionerRole(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Procedure(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Provenance(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Questionnaire(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::QuestionnaireResponse(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RegulatedAuthorization(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RelatedPerson(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RequestOrchestration(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Requirements(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ResearchStudy(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ResearchSubject(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::RiskAssessment(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Schedule(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SearchParameter(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::ServiceRequest(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Slot(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Specimen(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SpecimenDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::StructureDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::StructureMap(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Subscription(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SubscriptionStatus(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SubscriptionTopic(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Substance(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::SubstanceDefinition(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Task(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
             #[cfg(feature = "terminology")]
             Self::TerminologyCapabilities(inner) => {
@@ -1497,7 +1497,7 @@ impl serde::Serialize for Resource {
             }
             #[cfg(feature = "terminology")]
             Self::ValueSet(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(feature = "resources")]
+            #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::VisionPrescription(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }

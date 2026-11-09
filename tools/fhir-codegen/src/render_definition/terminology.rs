@@ -61,7 +61,7 @@ fn render_value_set(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let contains = "ValueSet.expansion.contains";
     if let (Some(own), Some(entry)) = (reader.type_at("ValueSet"), reader.type_at(contains)) {
         writeln!(out)?;
-        out.push_str(&own.scope.cfg());
+        out.push_str(&own.scope.cfg(&reader.model.name));
         writeln!(
             out,
             "impl {D}::ValueSetRead for super::{}::{} {{\n    type Contains = super::{}::{};\n",
@@ -80,7 +80,7 @@ fn render_value_set(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
             &reader.struct_opt("ValueSet", "expansion", "self", &expansion_read),
         )?;
         writeln!(out, "}}\n")?;
-        out.push_str(&entry.scope.cfg());
+        out.push_str(&entry.scope.cfg(&reader.model.name));
         writeln!(
             out,
             "impl {D}::ContainsRead for super::{}::{} {{",
@@ -120,7 +120,7 @@ fn render_code_system(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
     let concept = "CodeSystem.concept";
     if let (Some(own), Some(entry)) = (reader.type_at("CodeSystem"), reader.type_at(concept)) {
         writeln!(out)?;
-        out.push_str(&own.scope.cfg());
+        out.push_str(&own.scope.cfg(&reader.model.name));
         writeln!(
             out,
             "impl {D}::CodeSystemRead for super::{}::{} {{\n    type Concept = super::{}::{};\n",
@@ -162,7 +162,7 @@ fn render_code_system(out: &mut String, reader: &Reader<'_>) -> fmt::Result {
             &reader.slice("CodeSystem", "concept", "self"),
         )?;
         writeln!(out, "}}\n")?;
-        out.push_str(&entry.scope.cfg());
+        out.push_str(&entry.scope.cfg(&reader.model.name));
         writeln!(
             out,
             "impl {D}::ConceptRead for super::{}::{} {{",
