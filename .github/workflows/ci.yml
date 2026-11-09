@@ -637,10 +637,17 @@ jobs:
           for package in $featured; do
             cargo clippy -p "$package" --all-features --all-targets --locked -- -D warnings
           done
-      # ferrobridge-hl7v2 without its default `map` feature, the surface of a
-      # consumer that takes only the listener, the parser and the ack (#1221).
+      # ferrobridge-hl7v2 without its default features, the surface of a
+      # consumer that takes only the listener, the parser and the ack (#1221),
+      # and with each feature alone: `map` and `shipped-maps` translate offline
+      # with no HTTP client, `terminology-server` adds it (#1750).
       - if: contains(matrix.packages, 'ferrobridge-hl7v2')
-        run: cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
+        run: |
+          set -euo pipefail
+          cargo clippy -p ferrobridge-hl7v2 --lib --no-default-features --locked -- -D warnings
+          for feature in map shipped-maps terminology-server; do
+            cargo clippy -p ferrobridge-hl7v2 --all-targets --no-default-features --features "$feature" --locked -- -D warnings
+          done
       # fhirconnect without its default `mapping` feature: the FHIR path model
       # alone, the surface ferrobridge-hl7v2's map takes (#1750).
       - if: contains(matrix.packages, 'fhirconnect')

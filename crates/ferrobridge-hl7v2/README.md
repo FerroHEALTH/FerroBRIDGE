@@ -63,6 +63,24 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
   or add one it lacks; `Corpus::with_shipped_supplements` loads them over the
   guide, and the run counts each one it uses as `supplemented`.
 
+## Features
+
+- `map` (default): the v2-to-FHIR interpreter, translating table values
+  offline from the corpus. It needs `fhir-types`, `fhirconnect` without its
+  `mapping` feature and `ferrobridge-term` without its `client` feature, so it
+  links no openEHR crate, no HTTP client and no `jsonschema`.
+- `terminology-server` (default): `Translator::Server`, table values
+  translated by `ConceptMap/$translate` through `ferrobridge-term`'s client.
+- `shipped-maps`: the guide's ConceptMaps compiled in (`Corpus::shipped`).
+
+With every feature off the crate is the listener, the decoder, the parser,
+the writer and the acknowledgment. A consumer that maps offline with no
+package on disk takes:
+
+```toml
+ferrobridge-hl7v2 = { version = "=0.1.211", default-features = false, features = ["shipped-maps"] }
+```
+
 ## Example
 
 Receive one message from an MLLP frame and build its acknowledgment:
