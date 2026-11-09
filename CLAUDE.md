@@ -407,8 +407,8 @@ not the implementer.** Fable plans, coordinates, reviews, and does the taste-
 and intelligence-heavy work itself; it fans implementation out to subagents via
 the `Agent` tool (`model: 'opus'`, which resolves to the newest Opus, currently
 Claude Opus 5: 1M-token context, 128K output; the `.claude/agents/*` defs with
-`model: opus` pick it up automatically) or a `Workflow` (per-agent `model`). The
-main loop does not auto-delegate, so this section is the standing instruction
+`model: opus` pick it up automatically), never a `Workflow`, whose agents
+cannot be messaged (owner 2026-11-01). The main loop does not auto-delegate, so this section is the standing instruction
 that it should.
 
 Why this split: the win is context isolation, parallelism, and sparing the
@@ -427,8 +427,9 @@ parameter accepts.
 | fable-5   | 2    | 9            | 9     |
 | opus-5    | 4    | 8            | 8     |
 
-Only these two models are used: Fable 5 orchestrates (and takes the rare
-top-intelligence delegation), Opus 5 is the worker tier for everything else.
+Only these two models are used: Fable 5 orchestrates, and Opus is the worker
+tier for everything, research and review included (owner 2026-10-30: never
+Fable as a worker).
 Sonnet and Haiku are not used in this project; never pass them to
 `Agent`/`Workflow`, even for a mechanical pass.
 
@@ -444,15 +445,15 @@ ships):
 - **Delegate to Opus 5 subagents:** bulk or parallelizable implementation on a
   clear spec (wiring handlers, DTO impls, client plumbing, test scaffolding),
   file-heavy investigation, and codebase analysis, which would otherwise burn
-  the orchestrator's context. Fan out several concurrently in one message (max
-  5 implementation workers, the owner cap since 2026-10-19). Opus 5's 1M-token window means one
+  the orchestrator's context. Fan out several concurrently in one message (up to
+  10 implementation workers, the owner cap since 2026-11-03). Opus 5's 1M-token window means one
   worker can hold a whole subsystem, so prefer one worker with the full spec up
   front over splitting a coherent task. Prompt-tune for Opus 5: it self-verifies,
   so drop "double-check your work" scaffolding from worker prompts; it also
   delegates onward readily, so tell workers NOT to spawn their own subagents.
-- **Fable 5 subagents:** use when a delegated task still needs top intelligence
-  or taste (a tricky algorithm, an API-shape decision) but you want it off the
-  main context.
+- **No Fable subagents** (owner 2026-10-30): a delegated task that seems to
+  need more intelligence gets a tighter brief and the previous worker's
+  handover, on Opus.
 - **Reviews:** an independent read before committing a subsystem, especially
   spec and wire conformance. Spec questions and requirements extraction go to
   `spec-researcher`; bounded implementation to `implementer`. Both are defined
@@ -470,6 +471,18 @@ and forbids the scratchpad root, so one worker never publishes another's file
 
 ## IMPORTANT hard rules
 
+- **Family rules carried in `.claude/memory/` (index `MEMORY.md`).**
+  FerroBRIDGE is greenfield, so a removed or renamed config key, flag, route
+  or format is deleted with no refusal; in a released product a removal aid
+  lives exactly one release, then is deleted fully; no legacy support is ever
+  kept (owner hard rule 2026-11-09, `no-compat-shims.md`). Build the proper
+  solution even when it breaks an API and moves the minor version (owner
+  2026-11-08, `no-half-solutions.md`). A production value map goes only
+  through the terminology server, never an embedded copy (owner 2026-11-09,
+  `terminology-via-server.md`). Where the EHDS Regulation conflicts with an
+  openEHR or other standard's text, the Regulation wins, and EHDS work is
+  never reverted to pass a conformance row (owner 2026-11-09,
+  `ehds-above-openehr.md`).
 - **The specification text is the oracle.** The conformance authority is the
   HL7 FHIR specification for the version in play, the FHIRconnect
   specification, the OMOP Common Data Model, the OMOCL specification, and the

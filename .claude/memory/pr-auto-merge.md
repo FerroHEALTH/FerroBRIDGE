@@ -29,10 +29,9 @@ enabled", seen on #934, 2026-10-19). `--auto` arms the queue, which
 merges with the strategy `main` sets, and `delete_branch_on_merge` removes
 the remote branch after the merge.
 
-**How to apply:** until `ci.yml` (#16) exists the required `conclusion` check
-never reports, so an armed auto-merge waits. In that window say so in the
-hand-off and let the owner merge through the admin bypass; never use
-`--admin` without asking.
+**How to apply:** an armed auto-merge waits for the required `conclusion`
+check. No session merges through the admin bypass ([[admin-bypass-stays]]);
+never use `--admin`.
 
 **Inside a worktree:** confirm a merge with `gh pr view --json
 state,mergedAt`. After the merge the orchestrator removes the worktree (`git

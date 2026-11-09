@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Research on 2026-09-25 (issue #292): every public HL7 v2 message set is
 hand-written or generated test data; no real de-identified traffic is
 downloadable anywhere. Real traffic needs a partner feed under an agreement.

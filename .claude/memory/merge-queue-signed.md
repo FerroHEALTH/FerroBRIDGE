@@ -27,6 +27,10 @@ run.
 queue sets the method; passing `--squash` is refused). A conflicting branch
 is still fixed by a LOCAL merge or rebase (commits signed by
 `commit.gpgsign`) and pushed, never by `gh pr update-branch --rebase`.
-Dependabot branches get the `@dependabot rebase` comment. Never `--admin`
+Dependabot branches get the `@dependabot rebase` comment. No line of a
+commit message may start with `-` or with a git header word (`tree`,
+`parent`, `author`, `committer`, `gpgsig`). The queue's squash commit then fails its signature
+check, and the queue removes the PR with `branch_protection_failure` after a
+green run (FerroEHR #5233 and #5245, 2026-11-09). Never `--admin`
 without the owner asking. The queue does not prevent overlapping changes;
 [[pr-backlog-discipline]] does.

@@ -39,3 +39,5 @@ Later on 2026-10-28 the owner handed over the merge too: "you merge it for me
 as well do not wait for me". A release PR gets auto-merge armed like any other
 PR once its preflight passes, and the session tags its merge commit as soon as
 it lands. Nothing in a release cut waits on the owner.
+
+**Update 2026-11-02:** the preflight is back for FerroEHR. Two release candidates burnt without it, so the merge commit is preflighted before any FerroEHR tag ([[preflight-merge-commit-before-tag]]), and [[release-tag-and-approve-autonomously]] (2026-11-03) checks the merge commit in every repository before tagging.
