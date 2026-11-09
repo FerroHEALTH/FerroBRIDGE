@@ -227,19 +227,6 @@ pub enum Error {
         #[source]
         source: serde_json::Error,
     },
-    /// The authored value set of a `ValueSet/$expand` request is not a
-    /// `ValueSet` the configured release reads, so nothing was sent.
-    #[error(
-        "the authored value set is not a FHIR {} ValueSet; nothing was sent",
-        .wire_version.as_str()
-    )]
-    AuthoredValueSet {
-        /// The release the request was written in.
-        wire_version: WireVersion,
-        /// What the release's `ValueSet` reader reported.
-        #[source]
-        source: serde_json::Error,
-    },
     /// A request input could not be written for the `GET` form.
     #[error("the {operation} request could not be written as a query")]
     RequestEncode {
@@ -403,6 +390,19 @@ pub enum Error {
         sent: usize,
         /// How many entries came back.
         answered: usize,
+    },
+    /// The authored value set of a `ValueSet/$expand` request is not a
+    /// `ValueSet` the configured release reads, so nothing was sent.
+    #[error(
+        "the authored value set is not a FHIR {} ValueSet; nothing was sent",
+        .wire_version.as_str()
+    )]
+    AuthoredValueSet {
+        /// The release the request was written in.
+        wire_version: WireVersion,
+        /// What the release's `ValueSet` reader reported.
+        #[source]
+        source: serde_json::Error,
     },
 }
 
