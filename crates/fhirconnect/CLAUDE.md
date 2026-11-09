@@ -264,9 +264,14 @@ resource and every defaulted field in the composition's
 reference to a resource is the linked composition, read through the
 reference seam and answered by the `engine::linked::LinkedCompositions`
 seam (`Seams::with_linked`) as the `ehr:` URI of the composition the caller
-committed it as, or `Linked::Unmapped`, a `SkipReason::UnmappedLink`. A run
-with no such seam, or a `link` whose FHIR side is no reference, refuses,
-since one run produces one composition.
+committed it as, or `Linked::Unmapped`, a `SkipReason::UnmappedLink`. A
+side that is the resource an enclosing `reference` mapping entered
+(`$fhirRoot` inside it, `LinkSide::Resource`) hands the seam that resource
+under the literal it was entered by; going out of openEHR its target becomes
+the reference the enclosing mapping writes, with no copy of the resource
+created (`SkipReason::LinkedResource`). A run with no seam refuses a target
+that is no `ehr:` URI, since one run produces one composition, and the
+compiler refuses any other side as `fc-link-side`.
 
 ## A value travels whole, and the attribute model decides a tail
 

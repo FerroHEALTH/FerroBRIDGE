@@ -26,6 +26,7 @@ use std::sync::Arc;
 
 use crate::cdr::error::CdrError;
 use crate::cdr::query::QueryPageError;
+use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 
 use crate::cdr::CdrClient;
@@ -304,20 +305,17 @@ fn read_row(cells: &[serde_json::Value]) -> Result<Row, FeedError> {
     let ehr_id = EhrId::new(text(cells, 0, "ehr_id")?)
         .map_err(|_refused| malformed("a row carries an ehr_id that is no identifier"))?;
     let version_uid = text(cells, 1, "version uid")?.to_owned();
-    let mut parts = version_uid.split("::");
-    let vo_id = parts
-        .next()
-        .and_then(|object| uuid::Uuid::parse_str(object).ok())
-        .ok_or_else(|| malformed("a row carries a version uid that names no UUID"))?;
-    let version_tree_id = parts
-        .nth(1)
-        .ok_or_else(|| malformed("a row carries a version uid that names no version tree id"))?
-        .to_owned();
+    let version = ObjectVersionId::new(version_uid.as_str()).map_err(|_refused| {
+        malformed("a row carries a version uid that is no OBJECT_VERSION_ID")
+    })?;
+    let vo_id = uuid::Uuid::parse_str(&version.object_id().value())
+        .map_err(|_refused| malformed("a row carries a version uid that names no UUID"))?;
+    let version_tree_id = version.version_tree_id();
     let sys_version = version_tree_id
-        .split('.')
-        .next()
-        .and_then(|trunk| trunk.parse::<u64>().ok())
-        .ok_or_else(|| malformed("a row carries a version tree id with no trunk number"))?;
+        .trunk_version()
+        .parse::<u64>()
+        .map_err(|_refused| malformed("a row carries a version tree id with no trunk number"))?;
+    let version_tree_id = version_tree_id.value().to_owned();
     let contribution_id = ContributionUid::new(text(cells, 2, "contribution id")?)
         .map_err(|_refused| malformed("a row carries a contribution id that is no identifier"))?;
     let at_text = text(cells, 3, "time_committed")?.to_owned();

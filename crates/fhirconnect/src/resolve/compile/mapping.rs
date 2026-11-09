@@ -22,6 +22,7 @@ use crate::resolve::program::condition;
 use crate::resolve::program::condition::ConditionParts;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::mapping::Derived;
+use crate::resolve::program::mapping::LinkSide;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::mapping::MappingParts;
 use crate::resolve::program::mapping::Method;
@@ -36,6 +37,7 @@ use crate::resolve::compile::Derivation;
 use crate::resolve::compile::Scope;
 use crate::resolve::compile::Site;
 use crate::resolve::compile::header::archetype_of;
+use crate::resolve::compile::method::declared_methods;
 use crate::resolve::compile::method::slots_composition;
 use crate::resolve::compile::openehr::walks_below;
 
@@ -173,6 +175,47 @@ impl<'a> Compiler<'a> {
         ));
     }
 
+    /// Refuses a `link` whose FHIR side the engine cannot carry.
+    ///
+    /// The engine "checks the `meta.url` contained in the FHIR resource"
+    /// (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked
+    /// mappings), so the side names the resource: as a `Reference` or its
+    /// `reference` string, as the section's example does, or as the resource
+    /// an enclosing `reference` mapping entered (`$fhirRoot` inside it).
+    fn link_side(
+        &mut self,
+        node: &Node<'a>,
+        method_kind: &Method,
+        fhir: Option<&FhirTarget>,
+        scope: &Scope,
+        path: &ModelPath,
+    ) {
+        let (Method::Link { .. }, Some(target)) = (method_kind, fhir) else {
+            return;
+        };
+        // NOTE: a mapping writing two concept methods is refused as such, and which one
+        // it means is undecided, so its sides are not judged as a link's.
+        if declared_methods(node.mapping).len() > 1
+            || LinkSide::of(target, scope.enclosing.len()).is_some()
+        {
+            return;
+        }
+        let file = node.origin;
+        self.diagnostics.push(diagnostic(
+            file.file(),
+            file.header().name().value(),
+            ResolveCode::LinkSide,
+            node.mapping.position,
+            &path.field("with").field("fhir"),
+            format!(
+                "`{}` is neither a `Reference`, its `reference` string, nor the resource an \
+                 enclosing `reference` mapping entered, so it names no resource whose \
+                 composition the `link` targets",
+                target.expression()
+            ),
+        ));
+    }
+
     /// Compiles one mapping method and everything under it.
     fn mapping(&mut self, node: &Node<'a>, scope: &Scope, path: &ModelPath) -> Mapping {
         let file = node.origin;
@@ -222,6 +265,7 @@ impl<'a> Compiler<'a> {
         let method_kind = self.method(node, &inner, path);
         let method_kind = self.ports(node, method_kind, openehr.as_ref(), &inner, path);
         self.reference_into_choice(node, &method_kind, fhir.as_ref(), path);
+        self.link_side(node, &method_kind, fhir.as_ref(), scope, path);
         let followed_by = self.mappings(&node.followed_by, &inner);
         let data_type = with.and_then(|with| with.data_type.as_ref().map(|kind| *kind.value()));
         let plain =

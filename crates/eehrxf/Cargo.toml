@@ -5,7 +5,7 @@ name = "eehrxf"
 description = "The European interoperability software component of an EHR system under Regulation (EU) 2025/327: the format-neutral dataset model of the priority categories read from the Xt-EHR EHDS logical models, and the European electronic health record exchange format in FHIR R4, mapped from openEHR by FHIRconnect"
 # On the crate line, the fhir-types line, since it moved here from FerroFED at
 # 0.0.40 (docs/VERSIONS.md).
-version = "0.1.187"
+version = "0.1.191"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -60,6 +60,7 @@ openehr = [
   "dep:openehr-its",
   "dep:openehr-mapping-core",
   "dep:openehr-rm",
+  "dep:openehr-sdt",
   "dep:url",
 ]
 
@@ -85,6 +86,9 @@ openehr-base = { workspace = true, optional = true }
 openehr-its = { workspace = true, optional = true, features = ["opt14"] }
 openehr-mapping-core = { workspace = true, optional = true }
 openehr-rm = { workspace = true, optional = true }
+# The Web Template builder, which keeps the term definitions of each archetype
+# root on the node it builds.
+openehr-sdt = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 tar.workspace = true

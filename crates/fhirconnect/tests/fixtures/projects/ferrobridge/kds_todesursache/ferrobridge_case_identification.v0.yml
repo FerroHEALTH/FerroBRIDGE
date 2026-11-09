@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/cluster/org.openehr/case_identification.v0.yml, a
+# derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published line 16 maps the slotted Identifier onto items[at0001],
+# which KDS_Todesursache constrains as a mandatory DV_CODED_TEXT, and
+# DV_CODED_TEXT.adoc pairs it with CodeableConcept and Coding only (#101). This
+# file maps the Identifier's type, its one CodeableConcept, so the cluster the
+# published KDS_composition links is complete; the identifier's value is not
+# carried. The header is the published file's.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: CLUSTER.case_identification.v0
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-CLUSTER.case_identification.v0
+    revision: 0.0.1-alpha
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Identifier
+
+mappings:
+  - name: identifierCaseParent
+    with:
+      fhir: $fhirRoot.type
+      openehr: items[at0001]

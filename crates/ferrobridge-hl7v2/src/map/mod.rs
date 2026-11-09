@@ -11,7 +11,7 @@
 //! answered through a [`translate::Translator`]: `ConceptMap/$translate` on a
 //! terminology server loaded with the guide's table maps, or the same table
 //! maps read from the corpus in process. [`single`] maps one segment to one
-//! resource with no message map.
+//! resource, and [`inverse`] one resource back to one segment.
 //!
 //! The FHIR side is written through `fhirconnect::tree::write` over the
 //! `fhir-types` R4 element table, so every element, cardinality and choice
@@ -39,6 +39,7 @@ pub mod convert;
 pub mod corpus;
 #[cfg(feature = "shipped-maps")]
 pub mod guide;
+pub mod inverse;
 pub mod notation;
 mod run;
 pub mod single;

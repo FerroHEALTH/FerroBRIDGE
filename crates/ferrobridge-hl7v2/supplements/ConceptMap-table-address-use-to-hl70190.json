@@ -1,0 +1,64 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "table-address-use-to-hl70190",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-address-use-to-hl70190",
+  "name": "FerroBRIDGEAddressUseToHl70190",
+  "title": "FerroBRIDGE supplement: address-use to HL7 table 0190",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds the FHIR-to-v2 direction of ConceptMap/table-hl70190-to-address-use of hl7.fhir.uv.v2mappings 1.0.0, which maps v2 to FHIR only. Reversed, that map gives work two sources (B and O); this map names B (Firm/Business) for work, the business address, over O (Office), and each other code its one source. Used by the PID inverse of FerroBRIDGE #1716.",
+  "group": [
+    {
+      "source": "http://hl7.org/fhir/address-use",
+      "target": "http://terminology.hl7.org/CodeSystem/v2-0190",
+      "element": [
+        {
+          "code": "home",
+          "target": [
+            {
+              "code": "H",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "work",
+          "target": [
+            {
+              "code": "B",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "temp",
+          "target": [
+            {
+              "code": "C",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "old",
+          "target": [
+            {
+              "code": "BA",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "billing",
+          "target": [
+            {
+              "code": "BI",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

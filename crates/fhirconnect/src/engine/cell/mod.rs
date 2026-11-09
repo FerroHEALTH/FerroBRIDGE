@@ -14,6 +14,7 @@ use openehr_mapping_core::index::ordinals::OrdinalOption;
 use openehr_rm::v1_2::data_types::encapsulated::dv_multimedia::DvMultimedia;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_rm::v1_2::typing::base_name;
 
 use crate::engine::fhir::FhirKind;
 use crate::engine::fhir::FhirValue;
@@ -254,7 +255,7 @@ pub fn put(
     ordinals: &[OrdinalOption],
 ) -> Result<Produced<RmValue>, LensError> {
     let coded = coded_lens(binding);
-    let value = match (derive::base_class(rm_type), view) {
+    let value = match (base_name(rm_type), view) {
         ("DV_TEXT", FhirValue::String(text)) => {
             TextLens.put(text, held_text(existing)).map(RmValue::Text)
         }
@@ -376,7 +377,7 @@ fn fallbacks(
     // NOTE: DV_QUANTITY.adoc §Primitives hardcodes `units` as 1, which is a
     // one-way row only where no held value supplies the units.
     let unheld = held_quantity(existing).is_none();
-    match (derive::base_class(rm_type), view) {
+    match (base_name(rm_type), view) {
         ("DV_QUANTITY", FhirValue::Quantity(quantity)) => QuantityLens.fallbacks(quantity.as_ref()),
         ("DV_DURATION", FhirValue::Duration(duration)) => DurationLens.fallbacks(duration.as_ref()),
         ("DV_INTERVAL", FhirValue::Range(range)) if bounded_by(rm_type, QUANTITY) => {
@@ -430,7 +431,7 @@ const QUANTITY: &str = "DV_QUANTITY";
 /// so a `Period` written into a quantity interval would build the wrong
 /// value; the parameter decides the cell.
 fn bounded_by(rm_type: &str, class: &str) -> bool {
-    derive::type_argument(rm_type).is_none_or(|argument| argument == class)
+    derive::type_argument(rm_type).is_none_or(|argument| argument.name() == class)
 }
 
 /// Returns the coded-text lens for an element with or without a binding.

@@ -33,7 +33,7 @@ pub(crate) fn parsed(bytes: &[u8]) -> Parsed {
     let decoded = decode::decode(bytes, Charset::Ascii).expect("the fixture decodes");
     let lexed = parse::lex::lex(&decoded.text, decoded.charset).expect("the fixture lexes");
     let structure = structure_for(&lexed.message).expect("the fixture names a structure");
-    parse::grouping::group(lexed, structure)
+    parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE)
 }
 
 /// The vendored v2-to-FHIR package.

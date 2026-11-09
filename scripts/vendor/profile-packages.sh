@@ -16,12 +16,14 @@
 # build time and never committed; only each PROVENANCE.md beside them is. A
 # tree already on disk at its pinned count and digest is kept without a
 # download, so a re-run or a cache-restored tree changes nothing. Its count and
-# digest are recorded in a stamp under the ignored target/ with a fingerprint
-# of every file's size and its modification and change times to the
-# nanosecond. A later run that finds the fingerprint unchanged reads the count
-# and digest from the stamp instead of hashing the tree again; any changed
-# file changes the fingerprint and the tree is hashed, and the pin is always
-# compared afresh.
+# digest are recorded in a stamp under the ignored
+# docs/specs/fhir-packages/.verified/, beside the trees so that `cargo clean`
+# keeps it, with a fingerprint of every file's path, size and modification
+# time to the nanosecond. A later run that finds the fingerprint unchanged
+# reads the count and digest from the stamp instead of hashing the tree again;
+# any added, removed, resized or rewritten file changes the fingerprint and the
+# tree is hashed, and the pin is always compared afresh. A default run reads
+# each tree's state once and the closure check that ends it reuses it.
 #
 # A dependency named by a patch range (`1.4.x`) is resolved when --stamp runs,
 # to the highest version the registry publishes in the range, and the
@@ -60,12 +62,15 @@ registry="https://packages.fhir.org"
 vendor_dir="docs/specs/fhir-packages"
 pins="docs/VERSIONS.md"
 ua="ferrobridge-vendor (scripts/vendor/profile-packages.sh)"
-stamp_dir="${PROFILE_PACKAGES_STAMPS:-target/profile-packages-verified}"
+stamp_dir="${PROFILE_PACKAGES_STAMPS:-$vendor_dir/.verified}"
 
 # What stamped_state found: the count and digest, and whether the stamp
 # answered.
 stamped=""
 from_stamp=0
+# The trees a default run already found at their pin, one ref per line, which
+# its closing check does not read again.
+kept=""
 
 # The packages a dependency may name that another tree of this repository
 # already vendors: `<package>#<version>` and the directory holding its
@@ -101,12 +106,14 @@ tree_state() {
   fi
 }
 
-# The size, modification time and change time of every file of the tree $1
-# but PROVENANCE.md, hashed: what tells a tree its stamp still describes.
+# The path, size and modification time of every file of the tree $1 but
+# PROVENANCE.md, hashed: what tells a tree its stamp still describes. The
+# change time is left out: a metadata write such as an extended attribute moves
+# it without touching a byte, and then every tree was hashed again (#1725).
 tree_fingerprint() {
-  local format=(-f '%N %z %Fm %Fc')
+  local format=(-f '%N %z %Fm')
   if stat --version > /dev/null 2>&1; then
-    format=(-c '%n %s %y %z')
+    format=(-c '%n %s %y')
   fi
   (
     cd "$1" || exit 1
@@ -366,10 +373,11 @@ download.
 PROV
 }
 
-# The trees under the vendor directory $1, one `<package>#<version>` per line.
+# The trees under the vendor directory $1, one `<package>#<version>` per line;
+# the hidden stamp directory is none of them.
 vendored_refs() {
   if [[ -d "$1" ]]; then
-    find "$1" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | LC_ALL=C sort
+    find "$1" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -exec basename {} \; | LC_ALL=C sort
   fi
 }
 
@@ -500,7 +508,7 @@ closure_gaps() {
 # The offline check against the pins: every PROVENANCE.md, every fetched tree,
 # no unpinned tree, and the closure.
 check_all() {
-  local rows ref files digest gap failed=0 expected=0 fetched=0 stamps=0 vendored
+  local rows ref files digest gap failed=0 expected=0 fetched=0 stamps=0 reread=0 vendored
   rows="$(pinned_rows "$pins")"
   [[ -n "$rows" ]] || die "$pins has no Profile packages rows"
   while read -r ref files digest; do
@@ -513,6 +521,10 @@ check_all() {
       failed=1
     elif [[ -d "$vendor_dir/$ref/package" ]]; then
       fetched=$((fetched + 1))
+      if grep -qxF -- "$ref" <<< "$kept"; then
+        reread=$((reread + 1))
+        continue
+      fi
       stamped_state "$vendor_dir/$ref" "$stamp_dir/$ref"
       [[ "$from_stamp" -eq 0 ]] || stamps=$((stamps + 1))
       if [[ "$stamped" != "$files $digest" ]]; then
@@ -531,7 +543,7 @@ check_all() {
   done <<< "$vendored"
   closure_gaps "$vendor_dir" "$reused" || failed=1
   [[ "$failed" -eq 0 ]] || die "the profile package set does not match its pins"
-  say "OK: $expected pins with their provenance, $fetched fetched trees at their count and digest ($stamps read from a stamp, unchanged since verified), the closure complete"
+  say "OK: $expected pins with their provenance, $fetched fetched trees at their count and digest ($stamps read from a stamp, unchanged since verified; $reread kept earlier in this run), the closure complete"
 }
 
 # Writes a synthetic package.json for $2#$3 under the vendor directory $1, with
@@ -735,6 +747,12 @@ PINS
   printf 'three\n' > "$work/stamped/package/b.json"
   stamped_state "$work/stamped" "$work/stamps/tree"
   [[ "$from_stamp" -eq 0 ]] || die "self-test: an added file is read from the stamp"
+  # A metadata change that moves only the change time keeps the stamp.
+  chmod 600 "$work/stamped/package/b.json"
+  stamped_state "$work/stamped" "$work/stamps/tree"
+  [[ "$from_stamp" -eq 1 ]] || die "self-test: a mode change alone hashes the tree again"
+  mkdir -p "$work/listed/.verified" "$work/listed/a.pkg#1.0.0"
+  [[ "$(vendored_refs "$work/listed")" = "a.pkg#1.0.0" ]] || die "self-test: the stamp directory is listed as a tree"
 
   # A fetch that fails twice and then answers is retried to success; one that
   # never answers fails after the last attempt with its own status.
@@ -799,6 +817,7 @@ while read -r ref files digest; do
     grep -qE '^[0-9a-f]{64}$' <<< "$digest" || die "the $ref pin names no tree digest"
     stamped_state "$vendor_dir/$ref" "$stamp_dir/$ref"
     if [[ "$stamped" = "$files $digest" ]]; then
+      kept+="$ref"$'\n'
       if [[ "$from_stamp" -eq 1 ]]; then
         echo "   $ref: $files files at digest $digest, kept (verified before, unchanged since)"
       else

@@ -43,18 +43,7 @@ impl<'a> Compiler<'a> {
         let method = node.mapping;
         let file = node.origin;
         let owner = file.header().name().value();
-        let declared = [
-            method.reference.as_ref().map(|_| "reference"),
-            method.slot_archetype.as_ref().map(|_| "slotArchetype"),
-            method.slot_context.as_ref().map(|_| "slotContext"),
-            method.link.as_ref().map(|_| "link"),
-            method.mapping_code.as_ref().map(|_| "mappingCode"),
-            method
-                .participations_function
-                .as_ref()
-                .map(|_| "participationsFunction"),
-        ];
-        let written: Vec<&str> = declared.into_iter().flatten().collect();
+        let written = declared_methods(method);
         if written.len() > 1 {
             self.diagnostics.push(diagnostic(
                 file.file(),
@@ -619,6 +608,24 @@ fn slot_depth(model: &MappingName, scope: &Scope) -> Option<String> {
             depth.saturating_add(1)
         )
     })
+}
+
+/// Returns the concept-method keys a mapping writes, in schema order.
+pub(super) fn declared_methods(method: &Mapping) -> Vec<&'static str> {
+    [
+        method.reference.as_ref().map(|_| "reference"),
+        method.slot_archetype.as_ref().map(|_| "slotArchetype"),
+        method.slot_context.as_ref().map(|_| "slotContext"),
+        method.link.as_ref().map(|_| "link"),
+        method.mapping_code.as_ref().map(|_| "mappingCode"),
+        method
+            .participations_function
+            .as_ref()
+            .map(|_| "participationsFunction"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 /// Whether `mapping` slots a composition model: a `slotArchetype` at

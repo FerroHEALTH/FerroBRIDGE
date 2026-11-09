@@ -526,6 +526,18 @@ pub enum SkipReason {
         /// The reference as the document wrote it.
         reference: String,
     },
+    /// The resource a `reference` mapping would create going out of openEHR
+    /// stands in the linked composition at `target`, so the reference names
+    /// that composition and the run creates no copy of the resource.
+    ///
+    /// A `link` whose FHIR side is the resource it sits in names the
+    /// composition the resource was "saved as"
+    /// (`types-of-mappings/concept-type/concept-mappings.adoc`, §Linked
+    /// mappings), and a reference holds one target.
+    LinkedResource {
+        /// The `ehr:` URI of the linked composition.
+        target: String,
+    },
     /// The concept map the mapping names translates the input code to no
     /// equivalent concept, so the optional output element is not written.
     Untranslated {
@@ -614,6 +626,10 @@ impl fmt::Display for SkipReason {
             Self::UnmappedLink { ref reference } => {
                 write!(f, "no context mapping maps the resource {reference} links")
             }
+            Self::LinkedResource { ref target } => write!(
+                f,
+                "the resource stands in the linked composition {target}, so no copy is created"
+            ),
             Self::Untranslated { ref conceptmap } => {
                 write!(
                     f,

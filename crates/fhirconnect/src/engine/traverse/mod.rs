@@ -661,6 +661,9 @@ struct Run<'a, T: Table + ?Sized> {
     chain: Vec<String>,
     /// The references the current reference chain entered, outermost first.
     references: Vec<String>,
+    /// The `ehr:` URI a resource-side `link` named for the resource the
+    /// innermost `reference` mapping creates going out of openEHR.
+    linked_to: Option<String>,
     /// The documents the current reference chain left, outermost first, so
     /// the frame at index `n` is the document of level `n`.
     frames: Vec<Frame>,
@@ -736,6 +739,7 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             counters: BTreeMap::new(),
             chain: Vec::new(),
             references: Vec::new(),
+            linked_to: None,
             frames: Vec::new(),
             created: Vec::new(),
             consumed: Vec::new(),

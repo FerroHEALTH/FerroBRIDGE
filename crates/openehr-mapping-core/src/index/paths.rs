@@ -4,11 +4,9 @@
 //! The two node identifiers of a Web Template and the relative path between
 //! two nodes.
 
-use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
 
 use crate::index::ResolvedNode;
-use crate::index::matching::parse_aql_path;
 use crate::template::PathError;
 
 /// The `aqlPath` of one node of a Web Template.
@@ -104,28 +102,11 @@ impl core::fmt::Display for RelativePath {
 ///
 /// # Errors
 ///
-/// Returns [`PathError::NotADescendant`] when `child` is not under `parent`,
-/// and [`PathError::MalformedAqlPath`] when either node carries an `aqlPath`
-/// the openEHR path grammar refuses.
+/// Returns [`PathError::NotADescendant`] when `child` is not under `parent`.
 pub fn relative(parent: &ResolvedNode, child: &ResolvedNode) -> Result<RelativePath, PathError> {
-    let parent_path = parse_aql_path(parent.aql_path.as_str())?;
-    let child_path = parse_aql_path(child.aql_path.as_str())?;
-    let Some(tail) = child_path.segments.get(parent_path.segments.len()..) else {
-        return Err(not_a_descendant(parent, child));
-    };
-    let head = child_path
-        .segments
-        .iter()
-        .take(parent_path.segments.len())
-        .cloned()
-        .collect::<Vec<PathSegment>>();
-    if head != parent_path.segments {
-        return Err(not_a_descendant(parent, child));
-    }
-    Ok(RelativePath(RmPath {
-        absolute: false,
-        segments: tail.to_vec(),
-    }))
+    openehr_sdt::flat::navigate::relative(parent.rm_path(), child.rm_path())
+        .map(RelativePath)
+        .ok_or_else(|| not_a_descendant(parent, child))
 }
 
 /// Returns the refusal of a child that is not under the parent.

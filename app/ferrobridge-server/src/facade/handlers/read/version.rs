@@ -183,8 +183,8 @@ pub(crate) async fn version_of_etag(
     value: &str,
 ) -> Result<(ObjectVersionId, Option<Composition>), Refusal> {
     let bare = entity_tag(value);
-    if let Ok(full) = ObjectVersionId::new(bare) {
-        if full.object_id().value() != container.value() {
+    if let Ok(full) = ObjectVersionId::new(bare.as_ref()) {
+        if full.object_id_str() != container.value() {
             return Err(write::refuse(&status::Answer::new(
                 status::PRECONDITION_FAILED,
                 format!(
@@ -198,7 +198,7 @@ pub(crate) async fn version_of_etag(
     // NOTE: a parse failure IS the answer here: a value that is no
     // OBJECT_VERSION_ID is the R4 spelling, which names the version tree id
     // alone (<https://hl7.org/fhir/R4/http.html#concurrency>).
-    let tree = VersionTreeId::new(bare).map_err(|error| {
+    let tree = VersionTreeId::new(bare.as_ref()).map_err(|error| {
         reply::refusal(
             StatusCode::BAD_REQUEST,
             Issue::error(IssueType::Invalid).diagnosing(format!(

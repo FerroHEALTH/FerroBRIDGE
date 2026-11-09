@@ -16,6 +16,9 @@
 //! A value the target cannot hold is refused, never approximated: a time with
 //! no offset is no FHIR `dateTime`.
 //!
+//! [`temporal`] converts a FHIR date or time back to its v2 form, for the
+//! inverse of a map.
+//!
 //! A v2 `HD` written into a FHIR `url` that no row of the guide fills is
 //! converted by [`endpoint`] into a derived `urn:` form.
 
@@ -62,6 +65,63 @@ pub fn primitive(fhir_type: &str, text: &str) -> Result<Value, ConvertError> {
         "integer" | "positiveInt" | "unsignedInt" => integer(fhir_type, text).map(Value::Number),
         "boolean" => Err(ConvertError::Boolean),
         _ => Ok(Value::String(String::from(text))),
+    }
+}
+
+/// Converts a FHIR date or time back to the v2 form of `v2_type`.
+///
+/// A `DTM` or `TS` keeps every part a FHIR `date`, `dateTime`, `instant` or
+/// `time` states, a `DT` its date and a `TM` its time, each with the
+/// punctuation removed and a `Z` offset written `+0000`.
+///
+/// # Errors
+///
+/// Returns [`ConvertError::Form`] when `text` is no FHIR date or time, and
+/// [`ConvertError::Precision`] when a `TM` is asked of a value with no time.
+pub fn temporal(v2_type: &str, text: &str) -> Result<String, ConvertError> {
+    let form = ConvertError::Form {
+        expected: "FHIR date or time",
+    };
+    let (date, rest) = match text.split_once('T') {
+        Some((date, rest)) => (date, Some(rest)),
+        None if text.contains(':') => ("", Some(text)),
+        None => (text, None),
+    };
+    let (time, offset) = match rest {
+        Some(rest) => match rest.find(['+', '-', 'Z']) {
+            Some(at) => (rest.get(..at).unwrap_or_default(), rest.get(at..)),
+            None => (rest, None),
+        },
+        None => ("", None),
+    };
+    let digits = |part: &str, allowed: char| -> Result<String, ConvertError> {
+        if part
+            .chars()
+            .all(|character| character.is_ascii_digit() || character == allowed || character == '.')
+        {
+            Ok(part
+                .chars()
+                .filter(|character| *character != allowed)
+                .collect())
+        } else {
+            Err(form.clone())
+        }
+    };
+    let date = digits(date, '-')?;
+    let time = digits(time, ':')?;
+    let offset = match offset {
+        Some("Z") => String::from("+0000"),
+        Some(offset) => {
+            let (sign, rest) = offset.split_at(offset.len().min(1));
+            format!("{sign}{}", digits(rest, ':')?)
+        }
+        None => String::new(),
+    };
+    match v2_type {
+        "DT" => Ok(date),
+        "TM" if time.is_empty() => Err(ConvertError::Precision { target: "TM" }),
+        "TM" => Ok(format!("{time}{offset}")),
+        _ => Ok(format!("{date}{time}{offset}")),
     }
 }
 

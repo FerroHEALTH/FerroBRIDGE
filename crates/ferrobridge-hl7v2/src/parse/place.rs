@@ -6,12 +6,20 @@
 
 use hl7v2_types::model::{Group, GroupKind, Max, Node};
 
+use crate::parse::profile::Profile;
 use crate::parse::{Frame, Instance, Item, Placed};
 
 impl Frame {
-    /// The frame of the structure's top level.
-    pub(super) fn root(nodes: &'static [Node]) -> Self {
+    /// The frame of the top level of a structure of `version`, its members'
+    /// minimums read through `profile`.
+    pub(super) fn root(
+        nodes: &'static [Node],
+        profile: &'static Profile,
+        version: &'static str,
+    ) -> Self {
         Self {
+            profile,
+            version,
             nodes,
             group: None,
             occurrence: 0,
@@ -21,9 +29,11 @@ impl Frame {
         }
     }
 
-    /// The frame of a new instance of `group`.
-    fn instance(group: &'static Group, occurrence: usize) -> Self {
+    /// The frame of a new instance of `group`, inside this frame.
+    fn instance(&self, group: &'static Group, occurrence: usize) -> Self {
         Self {
+            profile: self.profile,
+            version: self.version,
             nodes: group.children,
             group: Some(group),
             occurrence,
@@ -36,6 +46,8 @@ impl Frame {
     /// A copy of the frame's cursor without its items, for a trial walk.
     fn shadow(&self) -> Self {
         Self {
+            profile: self.profile,
+            version: self.version,
             nodes: self.nodes,
             group: self.group,
             occurrence: self.occurrence,
@@ -57,6 +69,36 @@ impl Frame {
             .is_some_and(|group| group.kind == GroupKind::Choice)
     }
 
+    /// Whether `node` must occur at least once, by the profile's minimum.
+    fn required(&self, node: &Node) -> bool {
+        let min = match node {
+            Node::Segment(reference) => {
+                self.profile
+                    .min(self.version, reference.id, reference.cardinality)
+            }
+            Node::Group(group) => self.profile.min(self.version, group.id, group.cardinality),
+            Node::Placeholder(_) => 0,
+        };
+        min > 0
+    }
+
+    /// The segment ids a new instance of `group` can open with.
+    fn group_first(&self, group: &'static Group) -> Vec<&'static str> {
+        let mut first = Vec::new();
+        for child in group.children {
+            let ids = match child {
+                Node::Segment(reference) => vec![reference.segment.id],
+                Node::Group(inner) => self.group_first(inner),
+                Node::Placeholder(_) => Vec::new(),
+            };
+            first.extend(ids);
+            if self.required(child) && group.kind == GroupKind::Sequence {
+                break;
+            }
+        }
+        first
+    }
+
     /// Records a required node left empty, naming the group that lacks it.
     pub(super) fn check(&self, missing: &mut Vec<Missing>) {
         if self.is_choice() {
@@ -67,10 +109,10 @@ impl Frame {
                 continue;
             }
             let member = match node {
-                Node::Segment(reference) if reference.cardinality.min > 0 => {
+                Node::Segment(reference) if self.required(node) => {
                     format!("segment {}", reference.id)
                 }
-                Node::Group(group) if group.cardinality.min > 0 => format!("group {}", group.id),
+                Node::Group(group) if self.required(node) => format!("group {}", group.id),
                 Node::Segment(_) | Node::Group(_) | Node::Placeholder(_) => continue,
             };
             let detail = match self.group {
@@ -109,15 +151,6 @@ fn fits(count: usize, max: Max) -> bool {
     match max {
         Max::Unbounded => true,
         Max::Bounded(bound) => usize::try_from(bound).map_or(true, |bound| count < bound),
-    }
-}
-
-/// Whether `node` must occur at least once.
-fn required(node: Option<&Node>) -> bool {
-    match node {
-        Some(Node::Segment(reference)) => reference.cardinality.min > 0,
-        Some(Node::Group(group)) => group.cardinality.min > 0,
-        Some(Node::Placeholder(_)) | None => false,
     }
 }
 
@@ -236,7 +269,10 @@ fn clean(
     let passes = !frame.is_choice()
         && (frame.at..position).any(|skipped| {
             frame.counts.get(skipped).copied().unwrap_or_default() == 0
-                && required(frame.nodes.get(skipped))
+                && frame
+                    .nodes
+                    .get(skipped)
+                    .is_some_and(|node| frame.required(node))
         });
     missing.is_empty() && !passes && completes(stack, found, id, index, rest, budget)
 }
@@ -310,7 +346,7 @@ fn candidate(frame: &Frame, id: &str, from: usize) -> Option<usize> {
                 reference.segment.id == id && fits(count, reference.cardinality.max)
             }
             Some(Node::Group(group)) => {
-                fits(count, group.cardinality.max) && starts(&group_first(group), id)
+                fits(count, group.cardinality.max) && starts(&frame.group_first(group), id)
             }
             Some(Node::Placeholder(_)) | None => false,
         }
@@ -338,7 +374,8 @@ fn enter(stack: &mut Vec<Frame>, position: usize, id: &str, index: usize) -> boo
             true
         }
         Some(Node::Group(group)) => {
-            stack.push(Frame::instance(group, occurrence));
+            let opened = frame.instance(group, occurrence);
+            stack.push(opened);
             let Some(inner) = stack
                 .last()
                 .and_then(|frame| candidate(frame, id, frame.at))
@@ -372,21 +409,4 @@ pub(super) fn close(stack: &mut Vec<Frame>, missing: &mut Vec<Missing>) {
 /// Whether `first` holds `id`.
 fn starts(first: &[&'static str], id: &str) -> bool {
     first.contains(&id)
-}
-
-/// The segment ids a new instance of `group` can open with.
-fn group_first(group: &'static Group) -> Vec<&'static str> {
-    let mut first = Vec::new();
-    for child in group.children {
-        let (ids, required) = match child {
-            Node::Segment(reference) => (vec![reference.segment.id], reference.cardinality.min > 0),
-            Node::Group(inner) => (group_first(inner), inner.cardinality.min > 0),
-            Node::Placeholder(_) => (Vec::new(), false),
-        };
-        first.extend(ids);
-        if required && group.kind == GroupKind::Sequence {
-            break;
-        }
-    }
-    first
 }

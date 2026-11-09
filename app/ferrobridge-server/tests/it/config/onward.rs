@@ -108,6 +108,36 @@ fn an_onward_table_resolves_into_the_cdr_lane() -> Result<(), Box<dyn std::error
 }
 
 #[test]
+fn an_onward_table_caches_its_tokens_by_default() -> Result<(), Box<dyn std::error::Error>> {
+    let settings = Config::from_sources(Some(&cdr(&format!("{OAUTH}{ONWARD}"))), &BTreeMap::new())?
+        .resolve(Process::Job)?;
+    let onward = settings
+        .cdr
+        .ok_or("the CDR lane is on")?
+        .onward
+        .ok_or("the onward lane is on")?;
+    assert_eq!(Some(true), onward.caches(IssuerKind::Persons));
+    Ok(())
+}
+
+#[test]
+fn an_onward_table_with_cache_off_holds_no_token() -> Result<(), Box<dyn std::error::Error>> {
+    let table = ONWARD.replace(
+        "[cdr.credentials.onward.keys]\n",
+        "cache = false\n[cdr.credentials.onward.keys]\n",
+    );
+    let settings = Config::from_sources(Some(&cdr(&format!("{OAUTH}{table}"))), &BTreeMap::new())?
+        .resolve(Process::Job)?;
+    let onward = settings
+        .cdr
+        .ok_or("the CDR lane is on")?
+        .onward
+        .ok_or("the onward lane is on")?;
+    assert_eq!(Some(false), onward.caches(IssuerKind::Persons));
+    Ok(())
+}
+
+#[test]
 fn a_cdr_lane_without_an_onward_table_has_no_onward_lane() -> Result<(), Box<dyn std::error::Error>>
 {
     let settings =

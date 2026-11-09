@@ -595,11 +595,11 @@ fn the_mapped_dispense_is_written_for_the_validator() -> Result<(), Box<dyn Erro
 }
 
 // NOTE: no specification governs this: our own design; a spawned thread gets the 2 MiB
-// default stack (std::thread "Stack size"), so the engine must compile and map within it.
+// default stack (std::thread "Stack size"); the template build, compile and run fit in it.
 #[test]
 fn both_contexts_round_trip_on_a_default_stack_thread() -> Result<(), Box<dyn Error>> {
-    let source = template()?;
-    let spawned = std::thread::Builder::new().spawn(move || -> Result<usize, String> {
+    let spawned = std::thread::Builder::new().spawn(|| -> Result<usize, String> {
+        let source = template().map_err(|error| error.to_string())?;
         let mut mapped = 0;
         for (context, resource) in [(REQUEST, request()), (DISPENSE, dispense())] {
             let project = MPD

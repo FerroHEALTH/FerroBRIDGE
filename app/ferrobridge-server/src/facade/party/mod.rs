@@ -44,7 +44,6 @@ use crate::cdr::Answered;
 use crate::cdr::CdrClient;
 use crate::cdr::demographic::Demographic;
 use crate::cdr::error::Upstream;
-use crate::cdr::ids::versioned_object_uid;
 use crate::facade::Facade;
 use crate::facade::handlers::write::refuse;
 use crate::facade::outcome::Issue;
@@ -323,7 +322,7 @@ pub(crate) async fn render(
 pub(crate) fn stamp(resource: &mut Object, version: &ObjectVersionId) {
     resource.insert(
         String::from("id"),
-        Value::String(String::from(versioned_object_uid(version).value())),
+        Value::String(String::from(version.versioned_object_id().value())),
     );
     let mut meta = match resource.remove("meta") {
         Some(Value::Object(meta)) => meta,
@@ -341,7 +340,7 @@ pub(crate) fn location(facade: &Facade, resource_type: &str, version: &ObjectVer
     format!(
         "{}/{resource_type}/{}/_history/{}",
         facade.settings().base_url.trim_end_matches('/'),
-        versioned_object_uid(version).value(),
+        version.versioned_object_id().value(),
         version.version_tree_id().value()
     )
 }

@@ -4,7 +4,7 @@
 name = "fhirconnect"
 description = "The FHIRconnect mapping language for Rust: the mapping file model and its validation, context resolution into an immutable program, and the bidirectional interpreter between openEHR compositions and FHIR resources"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.240"
+version = "0.1.245"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -32,6 +32,7 @@ mapping = [
     "dep:openehr-rm",
     "dep:openehr-its",
     "dep:openehr-sdt",
+    "dep:openehr-term",
     "dep:serde_json",
     "dep:base64",
     "dep:serde",
@@ -55,6 +56,9 @@ openehr-its = { workspace = true, optional = true }
 # The FLAT key model the composition seam takes its segments and suffixes in
 # (`openehr_sdt::flat::path`).
 openehr-sdt = { workspace = true, optional = true }
+# The openEHR terminology bundle a coded text in the `openehr` terminology
+# takes its rubric from (`openehr_term::bundle`).
+openehr-term = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 # The base64 of FHIR `base64Binary`: a `DV_PARSABLE` value travels as an
 # `Attachment.data`, and a `DV_MULTIMEDIA` size is read from its data.

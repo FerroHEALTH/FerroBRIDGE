@@ -10,7 +10,7 @@
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::commit::CommitContext;
-use ferrobridge_server::cdr::ids::{EhrId, template_id, versioned_object_uid};
+use ferrobridge_server::cdr::ids::{EhrId, template_id};
 use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::RunOptions;
 use ferrobridge_server::etl::report::RunReport;
@@ -372,7 +372,7 @@ pub(super) async fn update(
     match client
         .update_composition(
             ehr,
-            &versioned_object_uid(preceding),
+            &preceding.versioned_object_id(),
             preceding,
             &composition(value)?,
             &commit()?,
