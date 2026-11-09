@@ -15,7 +15,6 @@
 
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::cdr::ids::versioned_object_uid;
 use ferrobridge_server::etl::report::{Persons, RunReport};
 use ferrobridge_testkit::containers::{self, Postgres};
 use ferrobridge_testkit::fixtures::LABORATORY_REPORT_OPT;
@@ -296,7 +295,7 @@ async fn the_laboratory_round_trip_writes_the_reviewed_rows_and_a_rerun_changes_
         let ehr = ehrs.get(laboratory.ehr).ok_or("an EHR")?;
         let version = create(&client, ehr, &canonical(&index, laboratory)?).await?;
         names.insert(
-            versioned_object_uid(&version).value().to_owned(),
+            version.versioned_object_id().value().to_owned(),
             laboratory.label.to_owned(),
         );
         versions.push(version);

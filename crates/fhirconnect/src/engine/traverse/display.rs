@@ -35,9 +35,13 @@ use crate::engine::traverse::error::EngineError;
 /// The attribute the code fallback of a coded text fills.
 const VALUE: &str = "DV_TEXT.value";
 
-/// The terminologies no terminology server addresses: the archetype's own
-/// codes and the openEHR terminology.
-const LOCAL: [&str; 2] = ["local", "openehr"];
+/// The terminology of the archetype's own codes, which no terminology server
+/// addresses, so its code stands as the page's alternative (no specification
+/// governs this: our own design).
+const LOCAL: &str = "local";
+
+/// The openEHR terminology, whose rubrics the `openehr-term` bundle carries.
+const OPENEHR: &str = "openehr";
 
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Resolves the display of a coded text, or of a text, whose value the
@@ -61,13 +65,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 let code = coded.defining_code.code_string.clone();
                 let from_code = coding_of(view, &system, &code).is_some_and(undisplayed)
                     && filled_from_code(&produced.fallbacks, &[CODING_CELL, CODEABLE_CONCEPT_CELL]);
-                // NOTE: no specification governs this: our own design, a server addresses
-                // no archetype-local code, so its code stands as the page's alternative.
-                if !from_code || coded.value != code || LOCAL.contains(&system.as_str()) {
+                if !from_code || coded.value != code || system == LOCAL {
                     return Ok(());
                 }
-                let version = (!version.is_empty()).then_some(version.as_str());
-                let display = self.looked_up(mapping, system, code, version)?;
+                let display = if system == OPENEHR {
+                    self.openehr_rubric(&code)
+                } else {
+                    let version = (!version.is_empty()).then_some(version.as_str());
+                    self.looked_up(mapping, system, code, version)?
+                };
                 if let Some(ref display) = display {
                     coded.value.clone_from(display);
                 }
@@ -108,6 +114,17 @@ impl<T: Table + ?Sized> Run<'_, T> {
             produced.fallbacks.retain(|taken| taken.field() != VALUE);
         }
         Ok(())
+    }
+
+    /// Returns the rubric of the openEHR terminology concept `code` in the
+    /// template's default language, from the `openehr-term` bundle (openEHR
+    /// Terminology); `None` leaves the code standing, as the page's
+    /// alternative, for a language or a code the bundle does not carry.
+    fn openehr_rubric(&self, code: &str) -> Option<String> {
+        let language = self.index.web_template().default_language.as_str();
+        openehr_term::bundle::openehr()
+            .concept_rubric(code, language)
+            .map(String::from)
     }
 
     /// Asks the terminology seam for the display of `code` in `system`.

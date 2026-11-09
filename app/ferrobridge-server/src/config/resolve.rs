@@ -483,7 +483,7 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
             initial_backoff: Duration::from_millis(cdr.retry.initial_backoff_ms),
             max_backoff: Duration::from_millis(cdr.retry.max_backoff_ms),
         });
-    let own = ferrohealth_smart::config::CredentialsSection {
+    let own = ferrohealth_smart::config::credentials::CredentialsSection {
         onward: None,
         ..cdr.credentials.clone()
     };

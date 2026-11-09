@@ -164,7 +164,7 @@ pub fn receive(
             );
         }
     };
-    let parsed = parse::grouping::group(lexed, structure);
+    let parsed = parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE);
     if !parsed.refusals().is_empty() {
         let errors: Vec<Error> = parsed.refusals().iter().map(Error::from).collect();
         return answer(Code::Error, &errors);

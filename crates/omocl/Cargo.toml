@@ -30,6 +30,9 @@ openehr-mapping-core.workspace = true
 openehr-rm.workspace = true
 # The ISO 8601 date and time readers a DV_DATE_TIME value is read with.
 openehr-base.workspace = true
+# The canonical JSON reader every RM value a node holds is decoded with
+# (`openehr_its::json`).
+openehr-its.workspace = true
 # The exact decimal a DV_QUANTITY magnitude and a `multiplication` product are
 # carried in.
 rust_decimal.workspace = true

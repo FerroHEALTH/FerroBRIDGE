@@ -27,6 +27,7 @@ use hl7v2_types::model::Structure;
 
 use crate::decode::{self, Charset, DecodeError};
 use crate::parse::lex::{self, LexError};
+use crate::parse::profile::Profile;
 use crate::parse::structure::StructureError;
 use crate::parse::{self, Delimiters, Message, Refusal, Unplaced};
 use crate::write::value::{Component, Field, Repetition, Segment, Value};
@@ -118,14 +119,25 @@ impl Composed {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Writer {
     delimiters: Delimiters,
+    profile: &'static Profile,
 }
 
 impl Writer {
     /// Creates the writer of a message in `delimiters`, which its MSH-1 and
-    /// MSH-2 then declare.
+    /// MSH-2 then declare, checking against the base structure.
     #[must_use]
     pub const fn new(delimiters: Delimiters) -> Self {
-        Self { delimiters }
+        Self {
+            delimiters,
+            profile: &Profile::BASE,
+        }
+    }
+
+    /// Returns this writer checking a composed message against its structure
+    /// as `profile` constrains it ([`Writer::compose`]).
+    #[must_use]
+    pub const fn with_profile(self, profile: &'static Profile) -> Self {
+        Self { profile, ..self }
     }
 
     /// Returns the delimiters.
@@ -229,7 +241,8 @@ impl Writer {
 
     /// Writes `segments` as one message and checks it against the message
     /// structure `select` picks from its MSH, as [`inbound::receive`] picks
-    /// it for a received message.
+    /// it for a received message, with each member's minimum read through
+    /// the writer's profile ([`Writer::with_profile`]).
     ///
     /// The message travels in the character set MSH-18 names, or in
     /// `default` when MSH-18 is empty.
@@ -258,7 +271,7 @@ impl Writer {
             None => default,
         };
         let structure = select(&lexed.message).map_err(ComposeError::Structure)?;
-        let parsed = parse::grouping::group(lexed, structure);
+        let parsed = parse::grouping::group(lexed, structure, self.profile);
         let unplaced: Vec<Unplaced> = parsed
             .unplaced()
             .iter()
