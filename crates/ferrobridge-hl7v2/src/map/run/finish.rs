@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ferrobridge_term::outcome::Translation;
+use ferrobridge_term::request::Translation;
 use fhir_types::codec::{Json, Value};
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::tree::Occurrence;
@@ -19,10 +19,11 @@ use crate::map::run::dangling::{Unlinked, unlink};
 use crate::map::run::resource::document_of;
 use crate::map::run::write::repeating;
 use crate::map::run::{Identity, Part, Pending, Resource, Run, Write};
+use crate::map::translate::Translator;
 use crate::map::{MapError, Outcome};
 
 impl Run<'_> {
-    /// Asks the terminology server for every recorded translation.
+    /// Asks the translator for every recorded translation.
     ///
     /// # Errors
     ///
@@ -30,12 +31,12 @@ impl Run<'_> {
     /// translation or cannot be reached.
     pub(in crate::map) async fn translate(
         &mut self,
-        terminology: Option<&ferrobridge_term::client::Client>,
+        translator: Option<Translator<'_>>,
     ) -> Result<usize, MapError> {
         let mut calls = 0usize;
         let mut outcomes = Vec::new();
         for request in &mut self.requests {
-            let Some(client) = terminology else {
+            let Some(translator) = translator else {
                 outcomes.push(Outcome::NoTerminology {
                     at: request.at.clone(),
                     row: request.row.clone(),
@@ -44,7 +45,7 @@ impl Run<'_> {
             };
             for group in &request.groups {
                 calls = calls.saturating_add(1);
-                let answer = client
+                let answer = translator
                     .translate(
                         &Translation::new(group.source.as_str(), request.code.as_str())
                             .with_concept_map(request.url.as_str())
@@ -72,13 +73,10 @@ impl Run<'_> {
         Ok(calls)
     }
 
-    /// Applies every write and assembles the Bundle.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MapError::NoMessageHeader`] when the Bundle is a `message`
-    /// and no complete `MessageHeader` enters it.
-    pub(in crate::map) fn finish(mut self) -> Result<(Value, Vec<Outcome>), MapError> {
+    /// Applies every write and returns the envelope's document, when it was
+    /// built, and each resource's type, full url and document, in the order
+    /// the run created them, with every dangling reference removed.
+    fn documents(&mut self) -> (Option<Value>, Vec<(String, String, Value)>) {
         self.siblings();
         let mut documents = Vec::new();
         let resources = core::mem::take(&mut self.resources);
@@ -114,12 +112,40 @@ impl Run<'_> {
             entries.push((resource, document));
         }
         self.unlink(&resources, &mut entries);
-        entries.sort_by_key(|(resource, _)| resource.type_name != "MessageHeader");
+        let entries = entries
+            .into_iter()
+            .map(|(resource, document)| {
+                (
+                    resource.type_name.clone(),
+                    resource.full_url.clone(),
+                    document,
+                )
+            })
+            .collect();
+        (envelope, entries)
+    }
+
+    /// Applies every write and returns each resource's type, full url and
+    /// document, in the order the run created them, with the outcomes.
+    pub(in crate::map) fn resources(mut self) -> (Vec<(String, String, Value)>, Vec<Outcome>) {
+        let (_, entries) = self.documents();
+        (entries, self.outcomes)
+    }
+
+    /// Applies every write and assembles the Bundle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MapError::NoMessageHeader`] when the Bundle is a `message`
+    /// and no complete `MessageHeader` enters it.
+    pub(in crate::map) fn finish(mut self) -> Result<(Value, Vec<Outcome>), MapError> {
+        let (envelope, mut entries) = self.documents();
+        entries.sort_by_key(|(type_name, _, _)| type_name != "MessageHeader");
         let mut bundle = envelope.unwrap_or_else(|| document_of("Bundle"));
         let message = bundle.get("type").and_then(Value::as_str) == Some("message");
         let headed = entries
             .first()
-            .is_some_and(|(resource, _)| resource.type_name == "MessageHeader");
+            .is_some_and(|(type_name, _, _)| type_name == "MessageHeader");
         // NOTE: HL7 R4 Bundle invariant bdl-12: a `message` Bundle's first resource is a
         // MessageHeader, so a run that could not complete one refuses the message.
         if message && !headed {
@@ -138,16 +164,6 @@ impl Run<'_> {
                 .map(Box::new);
             return Err(MapError::NoMessageHeader { dropped });
         }
-        let entries = entries
-            .into_iter()
-            .map(|(resource, document)| {
-                (
-                    resource.type_name.clone(),
-                    resource.full_url.clone(),
-                    document,
-                )
-            })
-            .collect();
         enter(&mut bundle, entries, &mut self.outcomes);
         Ok((bundle, self.outcomes))
     }

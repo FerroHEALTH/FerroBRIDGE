@@ -17,21 +17,32 @@ use url::Url;
 /// The FHIR release a server answers in.
 ///
 /// The release decides which generated module writes the request and reads
-/// the `Parameters` and the `OperationOutcome` of a call. R4 and R4B declare
-/// the same `in` and `out` parameters for the five operations this client
-/// sends. STU3 declares fewer, so a request naming a parameter STU3 has no
-/// equivalent for is refused with
+/// the `Parameters` and the `OperationOutcome` of a call. R4 to R6 declare
+/// the same `in` and `out` parameters outside `$translate`, which each
+/// release spells its own way. STU3 declares fewer, so a request naming a
+/// parameter STU3 has no equivalent for is refused with
 /// [`Error::UnsupportedParameter`](crate::error::Error::UnsupportedParameter)
-/// before anything is sent.
+/// before anything is sent. A release is a variant only when its feature of
+/// this crate is on, so a release left out of the build cannot be named.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum WireVersion {
     /// FHIR STU3, release 3.0.2 (<https://hl7.org/fhir/STU3/>).
+    #[cfg(feature = "stu3")]
     Stu3,
     /// FHIR R4 (<https://hl7.org/fhir/R4/>).
+    #[cfg(feature = "r4")]
     R4,
     /// FHIR R4B (<https://hl7.org/fhir/R4B/>).
+    #[cfg(feature = "r4b")]
     R4B,
+    /// FHIR R5 (<https://hl7.org/fhir/R5/>).
+    #[cfg(feature = "r5")]
+    R5,
+    /// The FHIR R6 ballot, 6.0.0-ballot5
+    /// (<https://hl7.org/fhir/6.0.0-ballot5/>).
+    #[cfg(feature = "r6")]
+    R6,
 }
 
 impl WireVersion {
@@ -39,9 +50,16 @@ impl WireVersion {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            #[cfg(feature = "stu3")]
             Self::Stu3 => "STU3",
+            #[cfg(feature = "r4")]
             Self::R4 => "R4",
+            #[cfg(feature = "r4b")]
             Self::R4B => "R4B",
+            #[cfg(feature = "r5")]
+            Self::R5 => "R5",
+            #[cfg(feature = "r6")]
+            Self::R6 => "R6",
         }
     }
 }
@@ -137,6 +155,21 @@ impl Default for RetryPolicy {
     }
 }
 
+/// The form an operation is invoked in
+/// (<https://hl7.org/fhir/R4/operations.html#request>).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Form {
+    /// A `POST` whose body is a `Parameters` resource carrying every input.
+    #[default]
+    Post,
+    /// A `GET` whose query carries every input, which the framework allows
+    /// only when no input is a complex type or a resource; a request with
+    /// such an input (an inline `ValueSet`, a `Coding`, a
+    /// `CodeableConcept`) is sent as a `POST`.
+    Get,
+}
+
 /// Everything one [`Client`](crate::client::Client) needs about one
 /// terminology server.
 ///
@@ -157,6 +190,8 @@ pub struct Config {
     pub retry: RetryPolicy,
     /// The credentials, when the deployment needs them.
     pub credentials: Option<Credentials>,
+    /// The form each operation is invoked in.
+    pub form: Form,
 }
 
 impl Config {
@@ -172,6 +207,7 @@ impl Config {
             timeout: Duration::from_secs(30),
             retry: RetryPolicy::default(),
             credentials: None,
+            form: Form::Post,
         }
     }
 
@@ -189,6 +225,13 @@ impl Config {
         self
     }
 
+    /// Returns this configuration invoking each operation in `form`.
+    #[must_use]
+    pub const fn with_form(mut self, form: Form) -> Self {
+        self.form = form;
+        self
+    }
+
     /// Returns this configuration with `credentials` presented on every call.
     #[must_use]
     pub fn with_credentials(mut self, credentials: Credentials) -> Self {
@@ -199,10 +242,15 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, Credentials, RetryPolicy, WireVersion};
+    use super::WireVersion;
+    #[cfg(feature = "r4")]
+    use super::{Config, Credentials, RetryPolicy};
+    #[cfg(feature = "r4")]
     use secrecy::SecretString;
+    #[cfg(feature = "r4")]
     use std::time::Duration;
 
+    #[cfg(feature = "r4")]
     fn config() -> Config {
         Config::new(
             "http://tx.invalid/r4".parse().expect("a valid URL"),
@@ -210,6 +258,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "r4")]
     #[test]
     fn a_basic_password_is_not_in_the_debug_rendering() {
         let config = config().with_credentials(Credentials::Basic {
@@ -221,6 +270,7 @@ mod tests {
         assert!(rendered.contains("bridge"));
     }
 
+    #[cfg(feature = "r4")]
     #[test]
     fn the_defaults_are_three_attempts_and_thirty_seconds() {
         let config = config();
@@ -231,8 +281,15 @@ mod tests {
 
     #[test]
     fn a_wire_version_names_its_release() {
+        #[cfg(feature = "stu3")]
         assert_eq!("STU3", WireVersion::Stu3.as_str());
+        #[cfg(feature = "r4")]
         assert_eq!("R4", WireVersion::R4.as_str());
+        #[cfg(feature = "r4b")]
         assert_eq!("R4B", WireVersion::R4B.as_str());
+        #[cfg(feature = "r5")]
+        assert_eq!("R5", WireVersion::R5.as_str());
+        #[cfg(feature = "r6")]
+        assert_eq!("R6", WireVersion::R6.as_str());
     }
 }

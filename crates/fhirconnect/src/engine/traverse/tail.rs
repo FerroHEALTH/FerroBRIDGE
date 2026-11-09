@@ -58,6 +58,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// a `DV_DATE_TIME` as `family::end_time` does.
     fn convert_family(
         &mut self,
+        owner: &str,
         mapping: &Mapping,
         target: &FhirTarget,
         openehr: &OpenehrTarget,
@@ -101,7 +102,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
             ));
         }
         let value = self.identified(mapping, view, produced.value, Shape::Identifier)?;
-        let under = rm::family_of(&segments);
+        let under =
+            rm::family_of(owner, &segments).ok_or_else(|| unsupported_tail(mapping, openehr))?;
         match value {
             RmValue::Party(ref party) => {
                 if under
@@ -164,7 +166,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             return self.entry_time(mapping, target, node, view, binding, key);
         }
         if carried == Carried::Family {
-            return self.convert_family(mapping, target, openehr, view, binding);
+            return self.convert_family(class, mapping, target, openehr, view, binding);
         }
         let object = self
             .held_object(&binding.openehr, node.flat_id())

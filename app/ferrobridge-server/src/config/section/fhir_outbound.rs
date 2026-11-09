@@ -9,7 +9,7 @@
 
 use std::path::PathBuf;
 
-use ferrohealth_smart::config::CredentialsSection;
+use ferrohealth_smart::config::credentials::CredentialsSection;
 use serde::{Deserialize, Serialize};
 
 /// The outbound FHIR lane.

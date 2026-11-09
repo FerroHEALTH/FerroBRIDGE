@@ -10,7 +10,8 @@ use crate::support::{RELEASES, client, parameter, release_path, request_body};
 use ferrobridge_term::concept::Concept;
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::{Coded, ValidateOutcome, Validation};
+use ferrobridge_term::outcome::ValidateOutcome;
+use ferrobridge_term::request::{Coded, Target, Validation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use http::StatusCode;
@@ -52,7 +53,9 @@ fn member() -> Concept {
 /// A validation of `coded` against the fixture value set.
 fn validation(coded: Coded) -> Validation {
     Validation {
-        value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
+        value_set: Target::Canonical(fixtures::TERM_VALUE_SET_URL.to_owned()),
+        display_language: None,
+        active_only: None,
         value_set_version: None,
         date: None,
         coded,
@@ -62,7 +65,7 @@ fn validation(coded: Coded) -> Validation {
 #[tokio::test]
 async fn a_coding_goes_as_the_coding_parameter_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount_operation(
             &server,
@@ -96,7 +99,7 @@ async fn a_coding_goes_as_the_coding_parameter_in_both_releases()
 #[tokio::test]
 async fn a_codeable_concept_goes_with_every_coding_and_its_text()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount_operation(
             &server,
@@ -193,7 +196,7 @@ async fn one_validation_goes_as_one_call() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 async fn several_validations_go_as_one_batch_answered_by_position()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount_base(
             &server,
@@ -244,7 +247,7 @@ async fn several_validations_go_as_one_batch_answered_by_position()
 #[tokio::test]
 async fn a_failed_batch_is_a_typed_error_carrying_the_upstream_status()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount_base(
             &server,
@@ -278,7 +281,7 @@ const CONTEXT: &str =
 #[tokio::test]
 async fn a_code_in_context_goes_with_its_context_and_no_system()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount_operation(
             &server,

@@ -9,6 +9,7 @@ use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::model::Container;
 use openehr_rm::v1_2::paths::RmPath;
 use openehr_rm::v1_2::typing::RmType;
+use openehr_rm::v1_2::typing::base_name;
 use openehr_rm::v1_2::typing::path_type;
 
 use super::{ENTRY_TIMES, FAMILIES, PARTY_ROOTS};
@@ -38,8 +39,8 @@ pub enum Carried {
     Family,
     /// A `DV_DATE_TIME` attribute of an entry the Web Template carries no
     /// node for, an `OBSERVATION`'s history origin or an `ACTION`'s time,
-    /// which FLAT writes under the entry's node with the key [`ENTRY_TIMES`]
-    /// names.
+    /// which FLAT writes under the entry's node with the key
+    /// [`super::entry_time_key`] answers.
     EntryTime,
 }
 
@@ -62,10 +63,10 @@ pub enum Carried {
 #[must_use]
 pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> {
     let wanted = tail.join("/");
-    let class = derive::base_class(rm_type);
-    if let Some(&(owner, _, _)) = ENTRY_TIMES
+    let class = base_name(rm_type);
+    if let Some(&(owner, _)) = ENTRY_TIMES
         .iter()
-        .find(|&&(owner, path, _)| path == wanted && model::is_a(class, owner))
+        .find(|&&(owner, path)| path == wanted && model::is_a(class, owner))
     {
         return Some((owner, Carried::EntryTime));
     }

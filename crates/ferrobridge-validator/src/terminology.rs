@@ -47,10 +47,10 @@ use std::future::Future;
 
 use ferrobridge_term::client::Client;
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::Coded;
-use ferrobridge_term::outcome::Request;
 use ferrobridge_term::outcome::ValidateOutcome;
-use ferrobridge_term::outcome::Validation;
+use ferrobridge_term::request::Coded;
+use ferrobridge_term::request::Request;
+use ferrobridge_term::request::Validation;
 
 use crate::issue::Issue;
 use crate::issue::IssueType;

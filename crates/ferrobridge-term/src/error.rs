@@ -46,6 +46,11 @@ pub struct Issue {
     pub details: Option<String>,
     /// `issue.diagnostics`, when the server sent one.
     pub diagnostics: Option<String>,
+    /// Every coding of `issue.details.coding`, in the order the server sent
+    /// them.
+    pub codings: Vec<crate::concept::Concept>,
+    /// `issue.expression`, the paths of the input the issue is about.
+    pub expression: Vec<String>,
     /// The [`TX_ISSUE_TYPE`] coding of `issue.details.coding`, when one is
     /// present.
     pub tx_issue_type: Option<TxIssue>,
@@ -222,6 +227,15 @@ pub enum Error {
         #[source]
         source: serde_json::Error,
     },
+    /// A request input could not be written for the `GET` form.
+    #[error("the {operation} request could not be written as a query")]
+    RequestEncode {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// What the encoder reported.
+        #[source]
+        source: fhir_types::codec::EncodeError,
+    },
     /// The request carries a parameter the configured release's
     /// `OperationDefinition` does not declare and has no equivalent for, so
     /// nothing was sent.
@@ -243,12 +257,27 @@ pub enum Error {
         /// The release the client is configured for.
         wire_version: WireVersion,
     },
+    /// The operation is not defined in the configured release, so nothing
+    /// was sent.
+    ///
+    /// STU3 defines no `CodeSystem/$validate-code`
+    /// (<https://hl7.org/fhir/STU3/codesystem-operations.html>).
+    #[error(
+        "FHIR {} defines no {operation} operation; nothing was sent",
+        .wire_version.as_str()
+    )]
+    UnsupportedOperation {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// The release the client is configured for.
+        wire_version: WireVersion,
+    },
     /// The request carries a code with no system, which the configured
     /// release requires, so nothing was sent.
     ///
     /// STU3 `ValueSet/$validate-code` reads "If a code is provided, a system
     /// must be provided" (`OperationDefinition-ValueSet-validate-code`,
-    /// 3.0.2), so a [`Coded::InContext`](crate::outcome::Coded::InContext)
+    /// 3.0.2), so a [`Coded::InContext`](crate::request::Coded::InContext)
     /// code cannot be asked of an STU3 server; R4 and R4B accept a context
     /// in place of the system.
     #[error(
@@ -362,6 +391,19 @@ pub enum Error {
         /// How many entries came back.
         answered: usize,
     },
+    /// The authored value set of a `ValueSet/$expand` request is not a
+    /// `ValueSet` the configured release reads, so nothing was sent.
+    #[error(
+        "the authored value set is not a FHIR {} ValueSet; nothing was sent",
+        .wire_version.as_str()
+    )]
+    AuthoredValueSet {
+        /// The release the request was written in.
+        wire_version: WireVersion,
+        /// What the release's `ValueSet` reader reported.
+        #[source]
+        source: serde_json::Error,
+    },
 }
 
 impl Error {
@@ -373,7 +415,10 @@ impl Error {
             Self::BaseUrl { .. } => "base-url",
             Self::ClientBuild { .. } => "client-build",
             Self::RequestBody { .. } => "request-body",
+            Self::RequestEncode { .. } => "request-encode",
+            Self::AuthoredValueSet { .. } => "authored-value-set",
             Self::UnsupportedParameter { .. } => "unsupported-parameter",
+            Self::UnsupportedOperation { .. } => "unsupported-operation",
             Self::SystemRequired { .. } => "system-required",
             Self::ParameterRange { .. } => "parameter-range",
             Self::Transport { .. } => "transport",
@@ -427,6 +472,7 @@ impl Error {
 }
 
 #[cfg(test)]
+#[cfg(feature = "r4")]
 mod tests {
     use super::{Error, TX_ISSUE_TYPE, TxIssue, UpstreamError};
     use crate::config::WireVersion;
@@ -467,6 +513,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "r4b")]
     #[test]
     fn an_r4b_outcome_decodes_the_same_way() {
         let upstream = UpstreamError::new(

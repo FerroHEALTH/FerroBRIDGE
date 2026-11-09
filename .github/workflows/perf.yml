@@ -15,9 +15,12 @@
 # An attempt that ends with exit 2 could not be judged and says nothing about
 # the code, so it is retried on a fresh runner on any CPU model. Some runners
 # stall the gate for a whole job (FerroHEALTH/FerroPIX#511), so an attempt
-# that ends with exit 1 on a CPU model STALL_PRONE lists is retried too. At
-# most two retries run. The verdict job passes the gate when the last attempt
-# that ran passed; a breach on any other model fails at once, with no retry.
+# that ends with exit 1 on a CPU model STALL_PRONE lists is retried too, and
+# so is an attempt job that ends cancelled while the run itself was not
+# cancelled (a runner that shut down mid-job ends with no exit code). At most
+# two retries run. The verdict job passes the gate when the last attempt that
+# ran passed; a breach on any other model fails at once, with no retry, and a
+# run cancelled by its concurrency group or by a person retries nothing.
 # No specification governs this: our own design.
 name: Perf
 
@@ -41,6 +44,11 @@ on:
 permissions: {}
 
 env:
+  # A called workflow does not inherit ci.yml's two-job cap, and the two
+  # release builds take all four cores: with the release features of #1737
+  # the base peaked at 10.4 GB two jobs wide, and a job count changes neither
+  # binary (#1758).
+  CARGO_BUILD_JOBS: "4"
   FERROHEALTH_PERF_VERSION: 0.5.2
   FERROBRIDGE__USAGE_REPORT__ENABLED: "false"
   # The CPU models whose runners stall every route for 100 to 300 ms for a
@@ -53,7 +61,9 @@ jobs:
   perf:
     name: perf (attempt 1)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # 90 while a base still compiles all five FHIR releases under swap (about
+    # 28 minutes) before the head and the measurement; #1743 lowers it again.
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -79,9 +89,11 @@ jobs:
   perf-retry:
     name: perf (attempt 2)
     needs: perf
-    if: needs.perf.outputs.retryable == 'true'
+    # A cancelled attempt lost its runner while the run went on; !cancelled()
+    # keeps a run cancelled by its concurrency group or a person from retrying.
+    if: ${{ !cancelled() && (needs.perf.outputs.retryable == 'true' || needs.perf.result == 'cancelled') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -107,9 +119,11 @@ jobs:
   perf-retry-2:
     name: perf (attempt 3)
     needs: perf-retry
-    if: needs.perf-retry.outputs.retryable == 'true'
+    # A cancelled attempt lost its runner while the run went on; !cancelled()
+    # keeps a run cancelled by its concurrency group or a person from retrying.
+    if: ${{ !cancelled() && (needs.perf-retry.outputs.retryable == 'true' || needs.perf-retry.result == 'cancelled') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -132,32 +146,35 @@ jobs:
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
-  # The gate passes when the last attempt that ran passed; an attempt job
-  # that did not finish fails it.
+  # The gate passes when the last attempt that ran passed. An attempt job
+  # that failed fails it, and so does a cancelled attempt no later attempt
+  # followed (scripts/perf/verdict.sh).
   verdict:
     name: perf verdict
     needs: [perf, perf-retry, perf-retry-2]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      # Every step runs on a cancelled run too, so the summary still names it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: always()
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/perf
+      # cancelled() is read only in an `if`, so a step records it.
+      - name: The run was cancelled
+        if: cancelled()
+        run: echo "RUN_CANCELLED=true" >> "$GITHUB_ENV"
       - name: The last attempt passed
+        if: always()
         env:
-          RESULTS: ${{ needs.perf.result }} ${{ needs.perf-retry.result }} ${{ needs.perf-retry-2.result }}
-          CODES: ${{ needs.perf.outputs.code }} ${{ needs.perf-retry.outputs.code }} ${{ needs.perf-retry-2.outputs.code }}
-        run: |
-          set -euo pipefail
-          echo "attempt results: ${RESULTS}; exit codes: ${CODES}"
-          case " ${RESULTS} " in
-            *" failure "* | *" cancelled "*)
-              echo "::error title=Performance gate::an attempt did not finish"
-              exit 1
-              ;;
-          esac
-          last="$(awk '{ print $NF }' <<< "${CODES}")"
-          if [ "$last" != "0" ]; then
-            echo "::error title=Performance gate::the last attempt ended with exit ${last}"
-            exit 1
-          fi
-          echo "the last attempt passed"
+          RESULT_1: ${{ needs.perf.result }}
+          RESULT_2: ${{ needs.perf-retry.result }}
+          RESULT_3: ${{ needs.perf-retry-2.result }}
+          CODE_1: ${{ needs.perf.outputs.code }}
+          CODE_2: ${{ needs.perf-retry.outputs.code }}
+          CODE_3: ${{ needs.perf-retry-2.outputs.code }}
+        run: bash scripts/perf/verdict.sh

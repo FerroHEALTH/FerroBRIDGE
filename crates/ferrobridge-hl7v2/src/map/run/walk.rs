@@ -11,7 +11,8 @@ use hl7v2_types::model::Max;
 use crate::map::corpus::{Map, Origin};
 use crate::map::notation::Target;
 use crate::map::run::segment::row_ref;
-use crate::map::run::{Base, Run, Scope, Visit};
+use crate::map::run::{Base, Identity, Run, Scope, Visit, placed};
+use crate::map::single::SegmentError;
 use crate::map::{MapError, Outcome};
 use crate::parse::{Item, Location};
 
@@ -134,6 +135,67 @@ impl<'a> Run<'a> {
             self.unmapped_fields(&scope, &named);
         }
         Ok(())
+    }
+
+    /// Maps the placed segment at `index` through its segment map into one
+    /// new resource of `resource_type`, with no message map, and returns the
+    /// resource's full url.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SegmentError::Unplaced`] when no placed segment is at
+    /// `index`, [`SegmentError::NoSegmentMap`] when the corpus holds no single
+    /// segment map from the segment to `resource_type`, and
+    /// [`SegmentError::Map`] when a `NOT VALUED ERROR` condition holds.
+    pub(in crate::map) fn single(
+        &mut self,
+        index: usize,
+        resource_type: &str,
+    ) -> Result<String, SegmentError> {
+        let visit = placed(self.parsed)
+            .into_iter()
+            .find(|visit| visit.index == index)
+            .ok_or(SegmentError::Unplaced { index })?;
+        let at = self.parsed.location(index);
+        let map = self
+            .corpus
+            .find("segment", &at.segment, resource_type)
+            .map_err(|candidates| SegmentError::NoSegmentMap {
+                segment: at.segment.clone(),
+                resource: String::from(resource_type),
+                candidates,
+            })?;
+        let resource = self.create(
+            resource_type,
+            Identity::Message {
+                label: None,
+                key: visit.key.clone(),
+            },
+        );
+        let scope = Scope {
+            parsed: self.parsed,
+            index,
+            definition: visit.definition,
+            chain: visit.chain.clone(),
+            at,
+            repetition: None,
+            datatype: None,
+        };
+        if let Some(envelope) = self.resources.first_mut() {
+            envelope.omitted = true;
+        }
+        let base = Base {
+            resource,
+            slots: Vec::new(),
+        };
+        let mut named = BTreeSet::new();
+        self.segment(&scope, map, &base, &mut named)?;
+        self.unmapped_fields(&scope, &named);
+        Ok(self
+            .resources
+            .get(resource)
+            .map(|built| built.full_url.clone())
+            .unwrap_or_default())
     }
 }
 

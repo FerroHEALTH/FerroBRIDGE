@@ -6,6 +6,7 @@
 //! as the face runs it.
 
 use ferrobridge_hl7v2::map::corpus::{Condition, Corpus};
+use ferrobridge_hl7v2::map::translate::Translator;
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
 use fhir_types::codec::Value;
 
@@ -52,9 +53,13 @@ async fn translated(bytes: &[u8], corpus: &Corpus) -> Mapped {
             "Whole blood",
         );
     let (_server, client) = tables.serve().await;
-    map(&support::parsed(bytes), corpus, Some(&client))
-        .await
-        .expect("the message maps")
+    map(
+        &support::parsed(bytes),
+        corpus,
+        Some(Translator::Server(&client)),
+    )
+    .await
+    .expect("the message maps")
 }
 
 /// The ORU^R01 of [`fixtures::oru_r01`] with its report final (OBR-25 `F`),
@@ -435,7 +440,7 @@ async fn the_guides_mdm_t02_sample_maps_to_the_reviewed_bundle() {
         map(
             &support::parsed(text.trim_end_matches('\r').as_bytes()),
             &support::shipped(),
-            Some(&client),
+            Some(Translator::Server(&client)),
         )
         .await
         .expect("the sample maps")

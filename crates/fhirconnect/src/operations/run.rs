@@ -484,7 +484,7 @@ fn identity(
         return Ok(written.clone());
     }
     composition_uid(composition)
-        .map(|uid| identity::deterministic_id(identity::versioned_object_uid(uid), mapped.path))
+        .map(|uid| identity::deterministic_id(&identity::versioned_object_uid(uid), mapped.path))
         .ok_or_else(|| OperationError::Unidentified {
             resource: String::from(resource_type),
         })

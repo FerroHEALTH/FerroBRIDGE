@@ -97,9 +97,9 @@ fn class_of(node: &Value) -> Result<&str, DatumError> {
         })
 }
 
-/// Decodes a node as `T`.
+/// Decodes a node as `T` through the strict ITS-JSON reader of `openehr-its`.
 fn decode<T: serde::de::DeserializeOwned>(node: &Value, rm_type: &str) -> Result<T, DatumError> {
-    serde_json::from_value(node.clone()).map_err(|error| DatumError::Malformed {
+    openehr_its::json::from_canonical_value(node).map_err(|error| DatumError::Malformed {
         rm_type: rm_type.to_owned(),
         reason: error.to_string(),
     })

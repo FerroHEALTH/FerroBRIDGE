@@ -25,9 +25,13 @@ commit before a push), and on a release the previous release.
 
 ## What runs
 
-The `perf` workflow builds the release binary of the head and of the base,
-the base from `git archive` of its commit with its own toolchain pin, and
-installs `ferrohealth-perf` at its pin in `docs/VERSIONS.md`. Then
+The `perf` workflow builds the release binary of the base and then of the
+head, both in one tree under `target/perf-build` with its own toolchain pin
+and one target directory. The tree starts as `git archive` of the base's
+commit; after the base is built, only the files the head changes are
+rewritten, so cargo rebuilds for the head only the crates the change reaches
+and the generated crates the two arms share build once. It installs
+`ferrohealth-perf` at its pin in `docs/VERSIONS.md`. Then
 `scripts/perf/gate.sh run`:
 
 1. starts two FerroEHR CDRs, each with its own PostgreSQL, one RabbitMQ and
@@ -85,9 +89,30 @@ tails reach 100 to 300 ms while the p50 holds
 attempt that ends with exit 2 runs again on a fresh runner on any CPU model,
 since a run that cannot be judged says nothing about the code. An attempt
 that ends with exit 1 runs again only on a CPU model the perf workflow lists
-in `STALL_PRONE`. At most two retries run, and the gate passes when the last
+in `STALL_PRONE`. An attempt whose job ends cancelled while the run goes on
+lost its runner (a shutdown, or the job's time limit) and left no exit code,
+so it runs again on a fresh runner too, on any CPU model. A run cancelled by
+a newer push or by a person retries nothing, and an attempt job that failed
+fails the gate. At most two retries run, and the gate passes when the last
 attempt passed. A breach on any other model fails at once. The job summary
-names each attempt's CPU model, its verdict and why a retry ran.
+names each attempt's CPU model, its verdict and why a retry ran, and the
+verdict's summary names each attempt, a cancelled one with why the next ran.
+
+The workflow builds four crates at a time (`CARGO_BUILD_JOBS=4`), one per
+core, and the build step logs the runner's used memory, swap and free disk
+each minute. The hosted runner has 16 GB. A release build of `fhir-types` with
+every resource of all five FHIR releases peaks above it on its own: on #1737
+the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
+and the runner shut down. The bridge therefore compiles only the releases it
+speaks, through the release features of `ferrobridge-term`. A base from
+before that change still compiles all five, so the build step backs both
+builds with a 20 GB swap file, turns it off and removes it, and logs the
+swap and memory before the gate measures anything. The gate refuses to
+measure while that file is still on (exit 2), so the idle and load phases
+run on the runner as it was before the build. Swap changes how fast the
+build runs, never the binary it makes. The step goes once a perf run on
+`main` shows both builds well under 16 GB without it
+([#1743](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1743)).
 
 ## Running it yourself
 

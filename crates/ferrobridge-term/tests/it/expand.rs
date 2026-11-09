@@ -9,7 +9,8 @@
 use crate::support::{RELEASES, client, parameter, release_path, request_body};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::Error;
-use ferrobridge_term::outcome::{ExpandOutcome, Expanded, Expansion};
+use ferrobridge_term::outcome::{ExpandOutcome, Expanded};
+use ferrobridge_term::request::Expansion;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers::{method, path};
@@ -54,7 +55,7 @@ fn member() -> serde_json::Value {
 #[tokio::test]
 async fn a_nested_expansion_keeps_its_hierarchy_in_both_releases()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         let mut child = member();
         child["version"] = serde_json::Value::from("1.0.0");
@@ -107,7 +108,7 @@ async fn a_nested_expansion_keeps_its_hierarchy_in_both_releases()
 #[tokio::test]
 async fn the_request_carries_every_input_it_sets_under_its_declared_name()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -191,7 +192,7 @@ async fn an_input_left_unset_is_not_sent() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 async fn a_page_answers_its_offset_and_the_total_of_the_whole_expansion()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -245,7 +246,7 @@ async fn a_count_of_zero_answers_the_size_alone() -> Result<(), Box<dyn std::err
 #[tokio::test]
 async fn the_filter_is_sent_and_the_filtered_codes_come_back()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -279,7 +280,7 @@ async fn the_filter_is_sent_and_the_filtered_codes_come_back()
 #[tokio::test]
 async fn included_designations_are_read_from_each_entry() -> Result<(), Box<dyn std::error::Error>>
 {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         let mut entry = member();
         entry["designation"] = serde_json::json!([{
@@ -320,7 +321,7 @@ async fn included_designations_are_read_from_each_entry() -> Result<(), Box<dyn 
 #[tokio::test]
 async fn an_unknown_value_set_is_a_not_found_outcome_carrying_its_tx_issue()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,
@@ -372,7 +373,7 @@ async fn a_bare_404_is_a_not_found_outcome() -> Result<(), Box<dyn std::error::E
 #[tokio::test]
 async fn an_expansion_error_is_a_refusal_carrying_the_outcome()
 -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(
             &server,

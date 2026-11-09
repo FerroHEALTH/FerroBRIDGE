@@ -11,9 +11,8 @@
 use crate::support::release_path;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, WireVersion};
-use ferrobridge_term::outcome::{
-    LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
-};
+use ferrobridge_term::outcome::{LookupOutcome, TranslateOutcome, ValidateOutcome};
+use ferrobridge_term::request::{Request, Translation};
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures;
 use std::error::Error;
@@ -25,7 +24,7 @@ async fn the_client_resolves_translates_and_validates_against_a_real_server()
         return Ok(());
     }
     let server = containers::terminology().await?;
-    for version in crate::support::RELEASES {
+    for &version in crate::support::RELEASES {
         let base = server.base_url(&release_path(version));
         let client = Client::new(Config::new(base.parse()?, version))?;
         resolve_a_display(&client, version).await?;
@@ -206,12 +205,14 @@ async fn answer_a_batch_by_position(
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
         Request::Lookup {
             system: fixtures::TERM_SOURCE_SYSTEM.to_owned(),
             code: fixtures::TERM_UNKNOWN_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
     ];
     let outcomes = client.batch(&requests).await?;

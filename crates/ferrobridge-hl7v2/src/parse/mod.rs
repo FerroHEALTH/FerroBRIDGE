@@ -25,6 +25,7 @@ mod arity;
 pub mod grouping;
 pub mod lex;
 mod place;
+pub mod profile;
 mod required;
 pub mod structure;
 
@@ -66,7 +67,9 @@ impl Delimiters {
         text
     }
 
-    /// Escapes `text` so it travels as one value (chapter 2 §2.7.1).
+    /// Escapes `text` so it travels as one value (HL7 v2.9 chapter 2 §2.7.1):
+    /// each delimiter, the truncation character among them when MSH-2
+    /// declares one, becomes its escape sequence.
     #[must_use]
     pub fn escape(&self, text: &str) -> String {
         let mut out = String::with_capacity(text.len());
@@ -81,6 +84,8 @@ impl Delimiters {
                 Some('R')
             } else if character == self.escape {
                 Some('E')
+            } else if Some(character) == self.truncation {
+                Some('P')
             } else {
                 None
             };
@@ -134,13 +139,21 @@ impl Segment {
     }
 }
 
-/// One field: its repetitions.
+/// One field: its repetitions, and its text as the message wrote it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Field {
+    written: String,
     repetitions: Vec<Repetition>,
 }
 
 impl Field {
+    /// Returns the field as the message wrote it, its delimiters and escape
+    /// sequences included.
+    #[must_use]
+    pub fn written(&self) -> &str {
+        &self.written
+    }
+
     /// Returns the repetitions, in message order.
     #[must_use]
     pub fn repetitions(&self) -> &[Repetition] {
@@ -385,6 +398,12 @@ impl Location {
     /// them, the trailing unknown ones omitted.
     #[must_use]
     pub fn erl(&self, separator: char) -> String {
+        self.components().join(&separator.to_string())
+    }
+
+    /// Returns the ERL components, the trailing unknown ones omitted.
+    #[must_use]
+    pub fn components(&self) -> Vec<String> {
         let mut parts = vec![self.segment.clone(), self.sequence.to_string()];
         for part in [
             self.field,
@@ -397,7 +416,7 @@ impl Location {
                 None => break,
             }
         }
-        parts.join(&separator.to_string())
+        parts
     }
 }
 
@@ -656,6 +675,8 @@ fn base_name(id: &'static str) -> &'static str {
 
 /// One open group instance while the segments are placed.
 struct Frame {
+    profile: &'static profile::Profile,
+    version: &'static str,
     nodes: &'static [Node],
     group: Option<&'static Group>,
     occurrence: usize,

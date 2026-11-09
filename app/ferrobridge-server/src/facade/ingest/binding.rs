@@ -18,7 +18,6 @@ use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::Returned;
 use crate::cdr::ids::EhrId;
-use crate::cdr::ids::versioned_object_uid;
 use crate::facade::commit;
 use crate::facade::engine;
 use crate::facade::identity::FhirResourceId;
@@ -468,7 +467,7 @@ impl Ingest<'_> {
         // of a split is bound as a created resource of its own when the entry is
         // rendered, so the entry's identity is its first occurrence.
         let path = entry.identity_path().to_owned();
-        let key = EntryKey::new(versioned_object_uid(version), path.as_str());
+        let key = EntryKey::new(version.versioned_object_id(), path.as_str());
         let map_key = derive::map_key(&key);
         let recorded = self
             .store
@@ -483,7 +482,7 @@ impl Ingest<'_> {
         };
         let binding = CompositionBinding {
             ehr_id: String::from(ehr_id.as_str()),
-            versioned_object_uid: String::from(versioned_object_uid(version).value()),
+            versioned_object_uid: String::from(version.versioned_object_id().value()),
             template_id: String::from(composition.template_id()),
             resource_type: String::from(resource_type),
             entry_path: path,

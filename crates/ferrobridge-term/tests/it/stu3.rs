@@ -15,10 +15,8 @@ use ferrobridge_term::client::FHIR_JSON;
 use ferrobridge_term::concept::{Concept, Equivalence};
 use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::error::{BodyError, Error};
-use ferrobridge_term::outcome::{
-    BatchOutcome, Coded, LookupOutcome, Request, TranslateOutcome, Translation, ValidateOutcome,
-    Validation,
-};
+use ferrobridge_term::outcome::{BatchOutcome, LookupOutcome, TranslateOutcome, ValidateOutcome};
+use ferrobridge_term::request::{Coded, Request, Target, Translation, Validation};
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::matchers::{method, path};
@@ -64,7 +62,9 @@ fn parameters(parameters: &[serde_json::Value]) -> ResponseTemplate {
 /// Returns the member validation of the fixture value set, with `coded`.
 fn validation(coded: Coded) -> Validation {
     Validation {
-        value_set_url: fixtures::TERM_VALUE_SET_URL.to_owned(),
+        value_set: Target::Canonical(fixtures::TERM_VALUE_SET_URL.to_owned()),
+        display_language: None,
+        active_only: None,
         value_set_version: None,
         date: None,
         coded,
@@ -81,6 +81,7 @@ fn member() -> Concept {
     }
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_lookup_sends_stu3_parameters_and_reads_a_code_property()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -144,6 +145,7 @@ async fn a_lookup_sends_stu3_parameters_and_reads_a_code_property()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn an_stu3_lookup_property_that_is_not_a_code_is_a_body_error()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -179,6 +181,7 @@ async fn an_stu3_lookup_property_that_is_not_a_code_is_a_body_error()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn an_unknown_code_is_not_found_in_stu3() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
@@ -208,6 +211,7 @@ async fn an_unknown_code_is_not_found_in_stu3() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_translation_reads_the_stu3_match_parts() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
@@ -273,6 +277,7 @@ async fn a_translation_reads_the_stu3_match_parts() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn an_stu3_translation_with_no_match_is_no_match() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
@@ -290,12 +295,13 @@ async fn an_stu3_translation_with_no_match_is_no_match() -> Result<(), Box<dyn s
         )
         .await?;
     assert!(
-        matches!(&outcome, TranslateOutcome::NoMatch { message: Some(text) } if text == "no mapping for the code"),
+        matches!(&outcome, TranslateOutcome::NoMatch { message: Some(text), .. } if text == "no mapping for the code"),
         "{outcome:?}"
     );
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_concept_map_url_is_refused_in_stu3_and_nothing_is_sent()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -326,6 +332,7 @@ async fn a_concept_map_url_is_refused_in_stu3_and_nothing_is_sent()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_code_sends_its_system_version_as_the_stu3_version()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -361,6 +368,7 @@ async fn a_code_sends_its_system_version_as_the_stu3_version()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_coding_and_a_codeable_concept_go_as_their_stu3_parameters()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -401,6 +409,7 @@ async fn a_coding_and_a_codeable_concept_go_as_their_stu3_parameters()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_false_stu3_validation_is_invalid_with_its_message()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -419,7 +428,10 @@ async fn a_false_stu3_validation_is_invalid_with_its_message()
             fixtures::TERM_NON_MEMBER_CODE,
         )
         .await?;
-    let ValidateOutcome::Invalid { message, outcome } = &outcome else {
+    let ValidateOutcome::Invalid {
+        message, outcome, ..
+    } = &outcome
+    else {
         return Err(format!("expected an invalid code, got {outcome:?}").into());
     };
     assert_eq!(Some("the code is not in the value set"), message.as_deref());
@@ -427,6 +439,7 @@ async fn a_false_stu3_validation_is_invalid_with_its_message()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn an_stu3_answer_with_an_undeclared_issues_parameter_is_a_body_error()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -456,6 +469,7 @@ async fn an_stu3_answer_with_an_undeclared_issues_parameter_is_a_body_error()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_value_set_version_is_refused_in_stu3_and_nothing_is_sent()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -482,6 +496,7 @@ async fn a_value_set_version_is_refused_in_stu3_and_nothing_is_sent()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn an_stu3_batch_answers_each_entry_by_position() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
@@ -526,6 +541,7 @@ async fn an_stu3_batch_answers_each_entry_by_position() -> Result<(), Box<dyn st
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
         Request::Translate(
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
@@ -570,6 +586,7 @@ async fn an_stu3_batch_answers_each_entry_by_position() -> Result<(), Box<dyn st
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -580,6 +597,7 @@ async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing()
             code: fixtures::TERM_MEMBER_CODE.to_owned(),
             version: None,
             date: None,
+            display_language: None,
         },
         Request::Translate(
             Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
@@ -607,6 +625,7 @@ async fn an_stu3_batch_with_an_unsupported_parameter_sends_nothing()
     Ok(())
 }
 
+#[cfg(feature = "r4")]
 #[tokio::test]
 async fn the_same_requests_are_sent_unchanged_in_r4() -> Result<(), Box<dyn std::error::Error>> {
     let server = MockServer::start().await;
@@ -639,6 +658,7 @@ async fn the_same_requests_are_sent_unchanged_in_r4() -> Result<(), Box<dyn std:
     );
     Ok(())
 }
+#[cfg(all(feature = "stu3", feature = "r4"))]
 #[tokio::test]
 async fn check_names_the_parameter_stu3_lacks_and_passes_the_rest()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -674,6 +694,7 @@ async fn check_names_the_parameter_stu3_lacks_and_passes_the_rest()
     Ok(())
 }
 
+#[cfg(feature = "stu3")]
 #[tokio::test]
 async fn a_code_in_context_is_refused_because_stu3_requires_a_system()
 -> Result<(), Box<dyn std::error::Error>> {

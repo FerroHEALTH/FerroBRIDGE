@@ -11,7 +11,7 @@ use ferrobridge_term::client::Client;
 use ferrobridge_term::config::Config;
 use ferrobridge_term::config::RetryPolicy;
 use ferrobridge_term::config::WireVersion;
-use ferrobridge_term::outcome::Coded;
+use ferrobridge_term::request::Coded;
 use ferrobridge_testkit::stubs::terminology;
 use ferrobridge_validator::issue::MessageId;
 use ferrobridge_validator::report::Reason;

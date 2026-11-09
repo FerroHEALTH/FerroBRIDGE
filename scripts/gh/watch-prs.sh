@@ -10,7 +10,8 @@
 #
 # - BEHIND: updates the branch.
 # - DIRTY only in version lines: merges origin/main (the higher of the two
-#   versions on each version line, a fresh Cargo.lock, the crate bump guard
+#   versions on each version line, a crate version one patch above main's
+#   where main reached the branch's, a fresh Cargo.lock, the crate bump guard
 #   passing), pushes, and keeps watching. A changelog entry is a fragment
 #   under changelog.d/ of its own, so two branches never conflict on one.
 # - Open and not queued: arms auto-merge again, since a push to the branch
@@ -23,26 +24,43 @@
 # scripts/gh/watch-prs.sh --self-test   judges fixture checks and merges
 # fixture version conflicts, with no gh call.
 set -u
-# Resolves, in place, each conflict hunk of file $1 whose two sides differ
-# only in their x.y.z version numbers: the hunk becomes one side with the
-# higher version at each position. Any other hunk keeps its markers. Every
-# capture is copied before the next match, which would overwrite it.
+# Resolves, in place, each conflict hunk of file $1 whose sides differ only in
+# their x.y.z version numbers; any other hunk keeps its markers. A hunk with
+# the common ancestor (diff3) carries it between `|||||||` and `=======`.
+# Each line keeps the higher version at each position, except a workspace
+# crate's own version (a `path =` requirement, or the `[package]` `version =`
+# of crates/*/Cargo.toml): the branch's version when it is higher than main's,
+# else one patch above main's, so the branch's change keeps a bump of its own;
+# a line the branch left at the ancestor's version takes main's. With no
+# ancestor in the hunk, every line keeps the higher version.
 merge_versions() {
   local file="$1"
-  perl -0pi -e '
+  WATCH_PRS_FILE="$file" perl -0pi -e '
+    my $crate_manifest = $ENV{WATCH_PRS_FILE} =~ m{(^|/)crates/[^/]+/Cargo\.toml$};
     sub newer { my @a = split /\./, $_[0]; my @b = split /\./, $_[1];
       for my $i (0 .. 2) { my $c = $a[$i] <=> $b[$i]; return $c if $c } 0 }
-    sub pick { my ($ours, $theirs, $hunk) = @_;
-      my @ov = $ours =~ /(\d+\.\d+\.\d+)/g;
-      my @tv = $theirs =~ /(\d+\.\d+\.\d+)/g;
-      (my $on = $ours) =~ s/\d+\.\d+\.\d+/V/g;
-      (my $tn = $theirs) =~ s/\d+\.\d+\.\d+/V/g;
-      return $hunk if $on ne $tn;
-      my $i = 0;
-      $ours =~ s{\d+\.\d+\.\d+}{ my ($o, $t) = ($ov[$i], $tv[$i]); $i++;
-        newer($o, $t) >= 0 ? $o : $t }ge;
-      $ours }
-    s{<<<<<<< HEAD\n(.*?)=======\n(.*?)>>>>>>> origin/main\n}{pick($1, $2, $&)}gse' "$file"
+    sub above { my @v = split /\./, $_[0]; $v[2]++; join ".", @v }
+    sub shape { (my $s = $_[0]) =~ s/\d+\.\d+\.\d+/V/g; $s }
+    sub pick { my ($ours, $base, $theirs, $hunk) = @_;
+      return $hunk if shape($ours) ne shape($theirs);
+      return $hunk if defined $base && shape($base) ne shape($ours);
+      my @o = split /^/, $ours; my @t = split /^/, $theirs;
+      my @b = defined $base ? split(/^/, $base) : ();
+      my $out = "";
+      for my $l (0 .. $#o) {
+        my $line = $o[$l];
+        my @tv = $t[$l] =~ /(\d+\.\d+\.\d+)/g;
+        my @bv = defined $base ? $b[$l] =~ /(\d+\.\d+\.\d+)/g : ();
+        my $own = defined $base
+          && ($line =~ /\bpath\s*=/ || ($crate_manifest && $line =~ /^version\s*=/));
+        my $i = 0;
+        $line =~ s{\d+\.\d+\.\d+}{ my ($ov, $tv, $bv) = ($&, $tv[$i], $bv[$i]); $i++;
+          !$own ? (newer($ov, $tv) >= 0 ? $ov : $tv)
+          : defined $bv && $ov eq $bv ? $tv
+          : newer($ov, $tv) > 0 ? $ov : above($tv) }ge;
+        $out .= $line }
+      $out }
+    s{<<<<<<< HEAD\n(.*?)(?:\|\|\|\|\|\|\|[^\n]*\n(.*?))?=======\n(.*?)>>>>>>> origin/main\n}{pick($1, $2, $3, $&)}gse' "$file"
 }
 # The checks of the newest run of each workflow, from `gh pr checks --json
 # name,bucket,link,workflow`; a check whose link names no Actions run is kept.
@@ -127,6 +145,50 @@ EOF
     cat "$dir/other.toml" >&2
     failures=$((failures + 1))
   fi
+  # With the ancestor (diff3), a crate requirement main moved to the branch's
+  # version or past it lands one patch above main's.
+  printf '%s\n' '<<<<<<< HEAD' 'x = { path = "x", version = "0.1.158" }' \
+    '||||||| merged common ancestors' 'x = { path = "x", version = "0.1.157" }' \
+    '=======' 'x = { path = "x", version = "0.1.158" }' '>>>>>>> origin/main' >"$dir/reached.toml"
+  merge_versions "$dir/reached.toml"
+  if [[ "$(cat "$dir/reached.toml")" != 'x = { path = "x", version = "0.1.159" }' ]]; then
+    echo "watch-prs: self-test: a crate requirement main reached kept no bump:" >&2
+    cat "$dir/reached.toml" >&2
+    failures=$((failures + 1))
+  fi
+  mkdir -p "$dir/crates/x"
+  printf '%s\n' '<<<<<<< HEAD' 'version = "0.1.158"' '||||||| 1a2b3c4' 'version = "0.1.157"' \
+    '=======' 'version = "0.1.160"' '>>>>>>> origin/main' >"$dir/crates/x/Cargo.toml"
+  merge_versions "$dir/crates/x/Cargo.toml"
+  if [[ "$(cat "$dir/crates/x/Cargo.toml")" != 'version = "0.1.161"' ]]; then
+    echo "watch-prs: self-test: a crate version main passed kept no bump:" >&2
+    cat "$dir/crates/x/Cargo.toml" >&2
+    failures=$((failures + 1))
+  fi
+  # The branch's crate version above main's is kept, a requirement the branch
+  # left at the ancestor's takes main's, and an external pin the higher side.
+  printf '%s\n' '<<<<<<< HEAD' 'x = { path = "x", version = "0.1.162" }' \
+    'y = { path = "y", version = "0.2.4" }' 'z = "1.10.0"' '||||||| merged common ancestors' \
+    'x = { path = "x", version = "0.1.157" }' 'y = { path = "y", version = "0.2.4" }' 'z = "1.8.0"' \
+    '=======' 'x = { path = "x", version = "0.1.160" }' 'y = { path = "y", version = "0.2.6" }' \
+    'z = "1.9.0"' '>>>>>>> origin/main' >"$dir/mixed.toml"
+  merge_versions "$dir/mixed.toml"
+  if [[ "$(cat "$dir/mixed.toml")" != "$(printf '%s\n' 'x = { path = "x", version = "0.1.162" }' \
+    'y = { path = "y", version = "0.2.6" }' 'z = "1.10.0"')" ]]; then
+    echo "watch-prs: self-test: a diff3 hunk with mixed lines was misread:" >&2
+    cat "$dir/mixed.toml" >&2
+    failures=$((failures + 1))
+  fi
+  printf '%s\n' '<<<<<<< HEAD' 'openehr-base = "0.0.135"' '||||||| merged common ancestors' \
+    'openehr-base = "0.0.134"' '=======' 'openehr-base = "0.0.136"' '>>>>>>> origin/main' >"$dir/pin.toml"
+  merge_versions "$dir/pin.toml"
+  if [[ "$(cat "$dir/pin.toml")" != 'openehr-base = "0.0.136"' ]]; then
+    echo "watch-prs: self-test: an external pin did not take the higher side:" >&2
+    cat "$dir/pin.toml" >&2
+    failures=$((failures + 1))
+  fi
+  rm -f "$dir/reached.toml" "$dir/crates/x/Cargo.toml" "$dir/mixed.toml" "$dir/pin.toml"
+  rmdir "$dir/crates/x" "$dir/crates"
   rm -f "$dir/main-higher.toml" "$dir/branch-higher.toml" "$dir/other.toml" "$dir/other.expected"
   rmdir "$dir"
   if [[ "$failures" != 0 ]]; then
@@ -145,8 +207,8 @@ if [[ $# -eq 0 ]]; then
 fi
 repo=$(git rev-parse --show-toplevel) || exit 1
 # A conflict this script resolves on its own: a version line (a crate
-# manifest, the root manifest, the pin tables) keeps the higher version when
-# the two sides differ only in their version numbers. Every manifest must still parse, Cargo.lock is regenerated, and
+# manifest, the root manifest, the pin tables) whose two sides differ only in
+# their version numbers, resolved by merge_versions over the diff3 hunk. Every manifest must still parse, Cargo.lock is regenerated, and
 # the crate bump guard must pass.
 resolve_merge() {
   local p=$1 b tmp
@@ -156,7 +218,7 @@ resolve_merge() {
   git -C "$repo" worktree add -q "$tmp" "origin/$b" 2>/dev/null || return 1
   (
     cd "$tmp" || exit 1
-    git -c merge.conflictStyle=merge merge --no-commit --no-ff origin/main >/dev/null 2>&1
+    git -c merge.conflictStyle=diff3 merge --no-commit --no-ff origin/main >/dev/null 2>&1
     for f in $(git diff --name-only --diff-filter=U); do
       case $f in
         Cargo.lock)

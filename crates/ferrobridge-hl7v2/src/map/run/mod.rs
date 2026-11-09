@@ -330,7 +330,7 @@ struct Recorded {
 
 /// A run in progress.
 #[derive(Debug)]
-pub(super) struct Run<'a> {
+pub(in crate::map) struct Run<'a> {
     corpus: &'a Corpus,
     parsed: &'a Parsed,
     resources: Vec<Resource>,
@@ -345,7 +345,7 @@ pub(super) struct Run<'a> {
 
 impl<'a> Run<'a> {
     /// Starts a run with the envelope Bundle as its first resource.
-    pub(super) fn new(corpus: &'a Corpus, parsed: &'a Parsed) -> Self {
+    pub(in crate::map) fn new(corpus: &'a Corpus, parsed: &'a Parsed) -> Self {
         let mut run = Self {
             corpus,
             parsed,
@@ -378,22 +378,28 @@ impl<'a> Run<'a> {
             .ok_or_else(|| MapError::NoMessageMap {
                 structure: String::from(structure),
             })?;
-        let mut visits = Vec::new();
-        collect(
-            self.parsed.items(),
-            structure,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
-            self.parsed.structure().nodes,
-            &mut visits,
-        );
-        visits.sort_by_key(|visit| visit.index);
-        for visit in visits {
+        for visit in placed(self.parsed) {
             self.visit(map, &visit)?;
         }
         Ok(())
     }
+}
+
+/// Every placed segment of `parsed` with what its walk needs, in message
+/// order.
+fn placed(parsed: &Parsed) -> Vec<Visit<'_>> {
+    let mut visits = Vec::new();
+    collect(
+        parsed.items(),
+        parsed.structure_name(),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        parsed.structure().nodes,
+        &mut visits,
+    );
+    visits.sort_by_key(|visit| visit.index);
+    visits
 }
 
 impl Base {
@@ -470,7 +476,7 @@ mod tests {
         );
         let lexed = parse::lex::lex(&text, Charset::Ascii).expect("it lexes");
         let structure = parse::structure::structure_for(&lexed.message).expect("a structure");
-        parse::grouping::group(lexed, structure)
+        parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE)
     }
 
     pub(super) fn corpus() -> Corpus {
@@ -563,7 +569,7 @@ mod tests {
         let text = format!("{}\r", segments.join("\r"));
         let lexed = parse::lex::lex(&text, Charset::Ascii).expect("it lexes");
         let structure = parse::structure::structure_for(&lexed.message).expect("a structure");
-        parse::grouping::group(lexed, structure)
+        parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE)
     }
 
     /// The values written at `path` in resources of `type_name`.

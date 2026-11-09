@@ -1,0 +1,65 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "datatype-xpn-to-string",
+  "url": "http://hl7.org/fhir/uv/v2mappings/ConceptMap/datatype-xpn-to-string",
+  "name": "FerroBRIDGEXpnToStringValue",
+  "title": "FerroBRIDGE supplement: XPN to string through $value",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Overrides ConceptMap/datatype-xpn-to-string of hl7.fhir.uv.v2mappings 1.0.0. The guide writes XPN.1 to the target $this, which its mapping guidelines (§[n] Notation) do not define, with the narrative assignment \"/concatenate according to XPN.11/\", which no machine evaluates, so the interpreter refuses the row and the string is lost (PID-6, the mother's maiden name, leaves Patient.extension with no value). This supplement writes XPN.1, the family name, into the string itself through $value, which names the element the data type is used at; it assembles no further name parts, since XPN.11 is narrative. Recorded as an upstream defect on FerroBRIDGE #1728.",
+  "group": [
+    {
+      "element": [
+        {
+          "extension": [
+            {
+              "extension": [
+                {
+                  "url": "type",
+                  "valueCode": "FN"
+                },
+                {
+                  "url": "cardinalityMin",
+                  "valueInteger": 0
+                },
+                {
+                  "url": "cardinalityMax",
+                  "valueInteger": 1
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+            }
+          ],
+          "code": "XPN.1",
+          "display": "Family Name",
+          "target": [
+            {
+              "extension": [
+                {
+                  "extension": [
+                    {
+                      "url": "type",
+                      "valueCode": "string"
+                    },
+                    {
+                      "url": "cardinalityMin",
+                      "valueInteger": 1
+                    },
+                    {
+                      "url": "cardinalityMax",
+                      "valueInteger": 1
+                    }
+                  ],
+                  "url": "http://hl7.org/fhir/uv/v2mappings/StructureDefinition/TypeInfo"
+                }
+              ],
+              "code": "$value",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

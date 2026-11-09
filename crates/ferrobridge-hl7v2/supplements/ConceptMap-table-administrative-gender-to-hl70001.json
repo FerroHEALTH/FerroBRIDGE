@@ -1,0 +1,55 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "table-administrative-gender-to-hl70001",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-administrative-gender-to-hl70001",
+  "name": "FerroBRIDGEAdministrativeGenderToHl70001",
+  "title": "FerroBRIDGE supplement: administrative-gender to HL7 table 0001",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds the FHIR-to-v2 direction of ConceptMap/table-hl70001-to-administrative-gender of hl7.fhir.uv.v2mappings 1.0.0, which maps v2 to FHIR only. Reversed, that map gives other three sources (O, A and N), so the inverse would have no single code to write; this map names O (Other) for other, since A (Ambiguous) and N (Not applicable) state why no sex is given, and each other code its one source. Used by the PID inverse of FerroBRIDGE #1716.",
+  "group": [
+    {
+      "source": "http://hl7.org/fhir/administrative-gender",
+      "target": "http://terminology.hl7.org/CodeSystem/v2-0001",
+      "element": [
+        {
+          "code": "female",
+          "target": [
+            {
+              "code": "F",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "male",
+          "target": [
+            {
+              "code": "M",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "other",
+          "target": [
+            {
+              "code": "O",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "unknown",
+          "target": [
+            {
+              "code": "U",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
