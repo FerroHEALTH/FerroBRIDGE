@@ -213,6 +213,21 @@ lexer keeps the formatting sequences of `FT` in a decoded value as written.
 `Writer::compose` checks a composed message with the same lexer and grouping
 a received message takes, so a structure rule lives once, in `parse`.
 
+## The inverse is our own design over the guide's rows
+
+The guide maps v2 to FHIR only. `map::inverse` reads the same segment, data
+type and table maps backwards under the rules its module documentation
+states: a row reads its target and writes its source, a literal assignment
+is a match (required with no condition, preferred with one), an instance
+goes to the first label it fits in row order, a source deprecated (`B` or
+`W` in the version's table or in v2.9.1) yields to a current one writing the
+same element, a conditional row runs where its condition holds over the
+value as built with its own value in place, and a table value translates
+back through a shipped FHIR-to-v2 table map (`table-<fhir>-to-hl7NNNN`)
+when one exists, else through `reverse`. Never add a per-segment or
+per-resource inverse: a gap is a supplement or a rule here, and every FHIR
+element not written back is an `inverse::Outcome`.
+
 ## Logs
 
 Libraries speak `tracing`, and no message content reaches a log: the listener
