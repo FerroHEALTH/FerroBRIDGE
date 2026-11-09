@@ -157,13 +157,31 @@ from the merge base with `origin/main` to the working tree, and runs
 rustfmt, clippy, nextest and the doctests on the reached packages, each as
 one cargo invocation over the whole set with cargo's default job count, the
 full-emit tests when `fhir-codegen` is reached, and the `omop-cdm-codegen`
-drift check when that is. One invocation builds a shared dependency once,
+drift check when that is. On every run it also resolves the fuzz crate's
+own `fuzz/Cargo.lock` with `--locked`, as the `cargo-deny` job does, and
+names `cargo update --manifest-path fuzz/Cargo.toml --workspace` when a
+moved path dependency left it stale. One invocation builds a shared dependency once,
 where a run per package rebuilt it under each package's feature set; the
 cost is that features unify across the set, so a feature one package
 forgets is caught by the CI lanes, which run each package on its own
 through cargo hack. It treats the CI configuration
 and its own pair as inert, since they change no cargo result. CI stays the
 full gate.
+
+When the change reaches `ferrobridge-validator` or `fhirconnect`, `fast.sh`
+runs `scripts/vendor/profile-packages.sh`, which hashes each profile package
+tree (about 970 MB) only when its stamp no longer describes it. The stamp, one
+file per tree under the ignored `docs/specs/fhir-packages/.verified/`, holds
+the count and digest the last hash found and a fingerprint of every file's
+path, size and modification time to the nanosecond. A tree whose fingerprint
+still matches is trusted without a hash: an added, removed, resized or
+rewritten file changes the fingerprint and the tree is hashed again and
+refused on a mismatch with its pin. The change time is left out of the
+fingerprint, since an extended attribute write moves it without changing a
+byte. The stamps sit beside the trees, so `cargo clean` keeps them, and CI,
+which restores the trees from a cache without their stamps, hashes every tree.
+`--check` reads the same stamps and still checks every pin, every tree and the
+closure.
 
 No specification governs any of this: our own design.
 
