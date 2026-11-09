@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.2"
+ferrobridge-hl7v2 = "0.3"
 ```
 
-Name a patch (`"0.2.N"`) when you need the first release that carries what
+Name a patch (`"0.3.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -55,7 +55,8 @@ you use; the range is the same caret range.
   names. A writer `with_profile` checks against the structure as an
   integration profile constrains it, the constraints carried as data in
   `parse::profile` (`IHE_ITI_21`: QRI optional in the ITI-21 response, IHE
-  ITI TF-2 Table 3.21-6). The acknowledgment and every reply's header are
+  ITI TF-2 Table 3.21-6, and QPD-3 repeating in the query and its echo,
+  §3.21.4.1.2.3). The acknowledgment and every reply's header are
   built on it.
 - `inbound`: the steps above for one message, settling the `AR` and `AE`
   answers a message owes before it is mapped.
@@ -87,7 +88,7 @@ With `map` off the crate is the listener, the decoder, the parser, the writer
 and the acknowledgment:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.2", default-features = false }
+ferrobridge-hl7v2 = { version = "0.3", default-features = false }
 ```
 
 ## Example

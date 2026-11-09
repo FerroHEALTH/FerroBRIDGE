@@ -227,9 +227,11 @@ lexer keeps the formatting sequences of `FT` in a decoded value as written.
 `Writer::compose` checks a composed message with the same lexer and grouping
 a received message takes, so a structure rule lives once, in `parse`. An
 integration profile that sets a member's minimum apart from the base
-(IHE ITI-21's optional QRI) is a `parse::profile::Profile` constant, data
-naming the node by its generated id and version, read by the grouping;
-never a special case in `place` or `compose`.
+(IHE ITI-21's optional QRI), or a field's repetition (IHE ITI-21's repeating
+QPD-3), is a `parse::profile::Profile` constant, data naming the node by its
+generated id or the field by its id, with the structure and version, read by
+the grouping and the arity check; never a special case in `place` or
+`compose`.
 
 ## The inverse is our own design over the guide's rows
 
