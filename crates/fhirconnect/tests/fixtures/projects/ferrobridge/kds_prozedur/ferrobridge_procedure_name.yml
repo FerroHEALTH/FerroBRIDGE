@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# Overwrites `name` of ACTION.procedure.v1 after KDS_procedure.v1 appends
+# `bfarm` to it. The appended `codingBfarm` conditions on
+# `$openehrRoot/items[at0001]`, below the procedure name ELEMENT the method
+# names, which the template does not carry, and compares its code string with
+# the OPS system URL (#101). This writes the published `name` alone.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_procedure_name
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: ACTION.procedure.v1
+mappings:
+  - name: name
+    extension: overwrite
+    with:
+      fhir: $resource.code
+      openehr: $archetype/description[at0001]/items[at0002]

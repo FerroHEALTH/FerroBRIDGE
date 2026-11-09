@@ -16,6 +16,8 @@ model/evaluation/org.openehr/gender.v1.yml
 model/evaluation/org.openehr/problem_diagnosis.v1.yml
 projects/org.highmed/KDS/person/KDS_Composition.yml
 projects/org.highmed/KDS/person/KDS_gender.yml
+projects/org.highmed/KDS/procedure/KDS_anatomical_location.yml
+projects/org.highmed/KDS/procedure/KDS_procedure.v1.yml
 projects/org.highmed/KDS/todesursache/KDS_cause_of_death.yml
 projects/org.highmed/KDS/todesursache/KDS_problem_qualifier.yml
 projects/org.openehr/IPS/medication/IPS_medication.context.yml
