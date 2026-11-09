@@ -6,57 +6,59 @@
 //! closure of the datatypes and primitives it references, from `hl7.fhir.r4.core` 4.0.1.
 //!
 //! A type of the terminology root set is behind the `terminology` feature; a
-//! type only the wide resource root set reaches is behind `resources`.
+//! type only the wide resource root set reaches is behind `resources`, which
+//! turns it on in every enabled version, or behind `r4-resources`, which turns
+//! it on in this version alone.
 
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod account;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod activity_definition;
 #[cfg(feature = "terminology")]
 pub mod address;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod adverse_event;
 #[cfg(feature = "terminology")]
 pub mod age;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod allergy_intolerance;
 #[cfg(feature = "terminology")]
 pub mod annotation;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod appointment;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod appointment_response;
 #[cfg(feature = "terminology")]
 pub mod attachment;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod audit_event;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod basic;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod binary;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod biologically_derived_product;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod body_structure;
 #[cfg(feature = "terminology")]
 pub mod bundle;
 #[cfg(feature = "terminology")]
 pub mod capability_statement;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod care_plan;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod care_team;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod catalog_entry;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod charge_item;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod charge_item_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod claim;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod claim_response;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod clinical_impression;
 #[cfg(feature = "terminology")]
 pub mod code_system;
@@ -64,239 +66,239 @@ pub mod code_system;
 pub mod codeable_concept;
 #[cfg(feature = "terminology")]
 pub mod coding;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod communication;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod communication_request;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod compartment_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod composition;
 #[cfg(feature = "terminology")]
 pub mod concept_map;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod condition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod consent;
 #[cfg(feature = "terminology")]
 pub mod contact_detail;
 #[cfg(feature = "terminology")]
 pub mod contact_point;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod contract;
 #[cfg(feature = "terminology")]
 pub mod contributor;
 #[cfg(feature = "terminology")]
 pub mod count;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod coverage;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod coverage_eligibility_request;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod coverage_eligibility_response;
 #[cfg(feature = "terminology")]
 pub mod data_requirement;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod detected_issue;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod device;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod device_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod device_metric;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod device_request;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod device_use_statement;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod diagnostic_report;
 #[cfg(feature = "terminology")]
 pub mod distance;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod document_manifest;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod document_reference;
 #[cfg(feature = "terminology")]
 pub mod dosage;
 #[cfg(feature = "terminology")]
 pub mod duration;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod effect_evidence_synthesis;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod element_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod encounter;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod endpoint;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod enrollment_request;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod enrollment_response;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod episode_of_care;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod event_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod evidence;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod evidence_variable;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod example_scenario;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod explanation_of_benefit;
 #[cfg(feature = "terminology")]
 pub mod expression;
 #[cfg(feature = "terminology")]
 pub mod extension;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod family_member_history;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod flag;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod goal;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod graph_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod group;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod guidance_response;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod healthcare_service;
 #[cfg(feature = "terminology")]
 pub mod human_name;
 #[cfg(feature = "terminology")]
 pub mod identifier;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod imaging_study;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod immunization;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod immunization_evaluation;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod immunization_recommendation;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod implementation_guide;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod insurance_plan;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod invoice;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod library;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod linkage;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod list;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod location;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod marketing_status;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod measure;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod measure_report;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod media;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medication;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medication_administration;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medication_dispense;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medication_knowledge;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medication_request;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medication_statement;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_authorization;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_contraindication;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_indication;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_ingredient;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_interaction;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_manufactured;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_packaged;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_pharmaceutical;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod medicinal_product_undesirable_effect;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod message_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod message_header;
 #[cfg(feature = "terminology")]
 pub mod meta;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod molecular_sequence;
 #[cfg(feature = "terminology")]
 pub mod money;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod naming_system;
 #[cfg(feature = "terminology")]
 pub mod narrative;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod nutrition_order;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod observation;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod observation_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod operation_definition;
 #[cfg(feature = "terminology")]
 pub mod operation_outcome;
 #[cfg(feature = "terminology")]
 pub mod operations;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod organization;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod organization_affiliation;
 #[cfg(feature = "terminology")]
 pub mod parameter_definition;
 #[cfg(feature = "terminology")]
 pub mod parameters;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod patient;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod payment_notice;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod payment_reconciliation;
 #[cfg(feature = "terminology")]
 pub mod period;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod person;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod plan_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod population;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod practitioner;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod practitioner_role;
 #[cfg(feature = "terminology")]
 pub mod primitives;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod procedure;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod prod_characteristic;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod product_shelf_life;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod provenance;
 #[cfg(feature = "terminology")]
 pub mod quantity;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod questionnaire;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod questionnaire_response;
 #[cfg(feature = "terminology")]
 pub mod range;
@@ -306,76 +308,76 @@ pub mod ratio;
 pub mod reference;
 #[cfg(feature = "terminology")]
 pub mod related_artifact;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod related_person;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod request_group;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod research_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod research_element_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod research_study;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod research_subject;
 #[cfg(feature = "terminology")]
 pub mod resource;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod risk_assessment;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod risk_evidence_synthesis;
 #[cfg(feature = "terminology")]
 pub mod sampled_data;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod schedule;
 pub mod schema;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod search_parameter;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod search_parameters;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod service_request;
 #[cfg(feature = "terminology")]
 pub mod signature;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod slot;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod specimen;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod specimen_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod structure_definition;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod structure_map;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod subscription;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance_amount;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance_nucleic_acid;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance_polymer;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance_protein;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance_reference_information;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance_source_material;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod substance_specification;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod supply_delivery;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod supply_request;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod task;
 #[cfg(feature = "terminology")]
 pub mod terminology_capabilities;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod test_report;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod test_script;
 #[cfg(feature = "terminology")]
 pub mod timing;
@@ -385,7 +387,7 @@ pub mod trigger_definition;
 pub mod usage_context;
 #[cfg(feature = "terminology")]
 pub mod value_set;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod verification_result;
-#[cfg(feature = "resources")]
+#[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod vision_prescription;

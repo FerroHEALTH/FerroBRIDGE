@@ -83,10 +83,7 @@ fn a_type_is_behind_terminology_exactly_when_the_terminology_closure_holds_it() 
         let text = fs::read_to_string(crate_dir().join("src").join(module).join("mod.rs"))
             .expect("the version mod.rs reads");
         for name in model.modules().keys() {
-            let line = format!(
-                "#[cfg(feature = \"{}\")]\npub mod {name};",
-                model.module_scope(name).feature()
-            );
+            let line = format!("{}pub mod {name};", model.module_scope(name).cfg(module));
             assert!(text.contains(&line), "{module}: {name} carries its feature");
         }
     }
@@ -141,14 +138,14 @@ fn the_resource_enum_covers_every_concrete_resource() {
             "{module}: a resource outside the enabled root set is still carried"
         );
         for resource in resources {
-            let feature = model
+            let cfg = model
                 .types
                 .get(resource)
                 .expect("every variant is lowered")
                 .scope
-                .feature();
+                .cfg(module);
             assert!(
-                text.contains(&format!("#[cfg(feature = \"{feature}\")]\n    {resource}(")),
+                text.contains(&format!("    {cfg}    {resource}(")),
                 "{module}: the {resource} variant carries its feature"
             );
         }
@@ -517,4 +514,20 @@ fn every_content_reference_targets_a_type_in_a_scope_at_least_as_wide() {
             "{module}: the package carries content references"
         );
     }
+}
+
+#[test]
+fn a_resource_scope_item_is_on_under_resources_or_its_own_release() {
+    assert_eq!(
+        RootScope::Resources.cfg("r4"),
+        "#[cfg(any(feature = \"resources\", feature = \"r4-resources\"))]\n"
+    );
+    assert_eq!(
+        RootScope::Terminology.cfg("r4"),
+        "#[cfg(feature = \"terminology\")]\n"
+    );
+    assert_eq!(
+        RootScope::Resources.cfg_any(["stu3", "r4"]),
+        "#[cfg(any(feature = \"resources\", feature = \"stu3-resources\", feature = \"r4-resources\"))]\n"
+    );
 }

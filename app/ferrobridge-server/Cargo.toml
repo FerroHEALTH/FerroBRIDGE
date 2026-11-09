@@ -36,8 +36,9 @@ ferrobridge-term = { workspace = true, features = ["smart", "stu3", "r4", "r4b"]
 ferrobridge-hl7v2.workspace = true
 # The FHIR R4 search value grammar the facade reads its search values with.
 fhir-search.workspace = true
-# The generated FHIR R4 model the facade authors its wire bodies with.
-fhir-types = { workspace = true, features = ["r4", "resources"] }
+# The generated FHIR R4 model the facade authors its wire bodies with: every R4
+# resource, and no resource of the releases the terminology client adds.
+fhir-types = { workspace = true, features = ["r4-resources"] }
 # The mapping language the facade runs: the loader, the compiler and the
 # bidirectional engine (docs/architecture.md section 4.6).
 fhirconnect.workspace = true

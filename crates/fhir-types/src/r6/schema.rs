@@ -13,7 +13,7 @@ use super::super::schema::{FieldSchema, Kind, PrimitiveSchema, TypeSchema, Value
 /// The version's schema.
 pub static SCHEMAS: Schemas = Schemas {
     types: &[
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Account",
             path: "Account",
@@ -370,7 +370,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AccountBalance",
             path: "Account.balance",
@@ -469,7 +469,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AccountCoverage",
             path: "Account.coverage",
@@ -542,7 +542,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AccountDiagnosis",
             path: "Account.diagnosis",
@@ -667,7 +667,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AccountGuarantor",
             path: "Account.guarantor",
@@ -809,7 +809,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AccountProcedure",
             path: "Account.procedure",
@@ -934,7 +934,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ActivityDefinition",
             path: "ActivityDefinition",
@@ -1723,7 +1723,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ActivityDefinitionDynamicValue",
             path: "ActivityDefinition.dynamicValue",
@@ -1796,7 +1796,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ActivityDefinitionParticipant",
             path: "ActivityDefinition.participant",
@@ -1932,7 +1932,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ActorDefinition",
             path: "ActorDefinition",
@@ -2497,7 +2497,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdministrableProductDefinition",
             path: "AdministrableProductDefinition",
@@ -2769,7 +2769,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdministrableProductDefinitionProperty",
             path: "AdministrableProductDefinition.property",
@@ -2873,7 +2873,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdministrableProductDefinitionRouteOfAdministration",
             path: "AdministrableProductDefinition.routeOfAdministration",
@@ -3013,7 +3013,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdministrableProductDefinitionRouteOfAdministrationTargetSpecies",
             path: "AdministrableProductDefinition.routeOfAdministration.targetSpecies",
@@ -3088,7 +3088,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdministrableProductDefinitionRouteOfAdministrationTargetSpeciesWithdrawalPeriod",
             path: "AdministrableProductDefinition.routeOfAdministration.targetSpecies.withdrawalPeriod",
@@ -3174,7 +3174,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdverseEvent",
             path: "AdverseEvent",
@@ -3647,7 +3647,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdverseEventParticipant",
             path: "AdverseEvent.participant",
@@ -3729,7 +3729,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdverseEventSuspectEntity",
             path: "AdverseEvent.suspectEntity",
@@ -3829,7 +3829,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AdverseEventSuspectEntityCausality",
             path: "AdverseEvent.suspectEntity.causality",
@@ -4019,7 +4019,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AllergyIntolerance",
             path: "AllergyIntolerance",
@@ -4356,7 +4356,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AllergyIntoleranceReaction",
             path: "AllergyIntolerance.reaction",
@@ -4576,7 +4576,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Appointment",
             path: "Appointment",
@@ -5124,7 +5124,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AppointmentParticipant",
             path: "Appointment.participant",
@@ -5246,7 +5246,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AppointmentRecurrenceTemplate",
             path: "Appointment.recurrenceTemplate",
@@ -5423,7 +5423,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AppointmentRecurrenceTemplateMonthlyTemplate",
             path: "Appointment.recurrenceTemplate.monthlyTemplate",
@@ -5522,7 +5522,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AppointmentRecurrenceTemplateWeeklyTemplate",
             path: "Appointment.recurrenceTemplate.weeklyTemplate",
@@ -5595,7 +5595,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AppointmentRecurrenceTemplateYearlyTemplate",
             path: "Appointment.recurrenceTemplate.yearlyTemplate",
@@ -5655,7 +5655,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AppointmentResponse",
             path: "AppointmentResponse",
@@ -5932,7 +5932,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ArtifactAssessment",
             path: "ArtifactAssessment",
@@ -6204,7 +6204,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ArtifactAssessmentContent",
             path: "ArtifactAssessment.content",
@@ -6374,7 +6374,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ArtifactAssessmentRelatesTo",
             path: "ArtifactAssessment.relatesTo",
@@ -6659,7 +6659,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AuditEvent",
             path: "AuditEvent",
@@ -6956,7 +6956,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AuditEventAgent",
             path: "AuditEvent.agent",
@@ -7122,7 +7122,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AuditEventEntity",
             path: "AuditEvent.entity",
@@ -7260,7 +7260,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AuditEventEntityDetail",
             path: "AuditEvent.entity.detail",
@@ -7357,7 +7357,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AuditEventOutcome",
             path: "AuditEvent.outcome",
@@ -7430,7 +7430,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "AuditEventSource",
             path: "AuditEvent.source",
@@ -7844,7 +7844,7 @@ pub static SCHEMAS: Schemas = Schemas {
             base: None,
             fields: &[],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Basic",
             path: "Basic",
@@ -8029,7 +8029,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Binary",
             path: "Binary",
@@ -8128,7 +8128,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "BiologicallyDerivedProduct",
             path: "BiologicallyDerivedProduct",
@@ -8424,7 +8424,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "BiologicallyDerivedProductCollection",
             path: "BiologicallyDerivedProduct.collection",
@@ -8542,7 +8542,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "BiologicallyDerivedProductProperty",
             path: "BiologicallyDerivedProduct.property",
@@ -8635,7 +8635,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "BodyStructure",
             path: "BodyStructure",
@@ -8838,7 +8838,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "BodyStructureIncludedStructure",
             path: "BodyStructure.includedStructure",
@@ -8989,7 +8989,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "BodyStructureIncludedStructureBodyLandmarkOrientation",
             path: "BodyStructure.includedStructure.bodyLandmarkOrientation",
@@ -9090,7 +9090,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "BodyStructureIncludedStructureBodyLandmarkOrientationDistanceFromLandmark",
             path: "BodyStructure.includedStructure.bodyLandmarkOrientation.distanceFromLandmark",
@@ -11723,7 +11723,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CarePlan",
             path: "CarePlan",
@@ -12136,7 +12136,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CarePlanActivity",
             path: "CarePlan.activity",
@@ -12232,7 +12232,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CareTeam",
             path: "CareTeam",
@@ -12490,7 +12490,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CareTeamParticipant",
             path: "CareTeam.participant",
@@ -12623,7 +12623,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Claim",
             path: "Claim",
@@ -13191,7 +13191,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimAccident",
             path: "Claim.accident",
@@ -13280,7 +13280,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimCareTeam",
             path: "Claim.careTeam",
@@ -13383,7 +13383,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimDiagnosis",
             path: "Claim.diagnosis",
@@ -13482,7 +13482,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimEvent",
             path: "Claim.event",
@@ -13558,7 +13558,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimInsurance",
             path: "Claim.insurance",
@@ -13696,7 +13696,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimItem",
             path: "Claim.item",
@@ -14097,7 +14097,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimItemBodySite",
             path: "Claim.item.bodySite",
@@ -14170,7 +14170,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimItemDetail",
             path: "Claim.item.detail",
@@ -14425,7 +14425,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimItemDetailSubDetail",
             path: "Claim.item.detail.subDetail",
@@ -14667,7 +14667,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimPayee",
             path: "Claim.payee",
@@ -14746,7 +14746,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimProcedure",
             path: "Claim.procedure",
@@ -14858,7 +14858,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimRelated",
             path: "Claim.related",
@@ -14944,7 +14944,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponse",
             path: "ClaimResponse",
@@ -15507,7 +15507,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseAddItem",
             path: "ClaimResponse.addItem",
@@ -15912,7 +15912,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseAddItemBodySite",
             path: "ClaimResponse.addItem.bodySite",
@@ -15985,7 +15985,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseAddItemDetail",
             path: "ClaimResponse.addItem.detail",
@@ -16214,7 +16214,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseAddItemDetailSubDetail",
             path: "ClaimResponse.addItem.detail.subDetail",
@@ -16430,7 +16430,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseError",
             path: "ClaimResponse.error",
@@ -16542,7 +16542,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseEvent",
             path: "ClaimResponse.event",
@@ -16618,7 +16618,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseInsurance",
             path: "ClaimResponse.insurance",
@@ -16730,7 +16730,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseItem",
             path: "ClaimResponse.item",
@@ -16868,7 +16868,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseItemAdjudication",
             path: "ClaimResponse.item.adjudication",
@@ -16980,7 +16980,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseItemDetail",
             path: "ClaimResponse.item.detail",
@@ -17105,7 +17105,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseItemDetailSubDetail",
             path: "ClaimResponse.item.detail.subDetail",
@@ -17217,7 +17217,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseItemReviewOutcome",
             path: "ClaimResponse.item.reviewOutcome",
@@ -17316,7 +17316,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponsePayment",
             path: "ClaimResponse.payment",
@@ -17441,7 +17441,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseProcessNote",
             path: "ClaimResponse.processNote",
@@ -17553,7 +17553,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseSupportingInfo",
             path: "ClaimResponse.supportingInfo",
@@ -17813,7 +17813,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimResponseTotal",
             path: "ClaimResponse.total",
@@ -17886,7 +17886,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClaimSupportingInfo",
             path: "Claim.supportingInfo",
@@ -18146,7 +18146,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinition",
             path: "ClinicalUseDefinition",
@@ -18424,7 +18424,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinitionContraindication",
             path: "ClinicalUseDefinition.contraindication",
@@ -18568,7 +18568,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinitionIndication",
             path: "ClinicalUseDefinition.indication",
@@ -18730,7 +18730,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinitionIndicationOtherTherapy",
             path: "ClinicalUseDefinition.indication.otherTherapy",
@@ -18810,7 +18810,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinitionInteraction",
             path: "ClinicalUseDefinition.interaction",
@@ -18937,7 +18937,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinitionInteractionInteractant",
             path: "ClinicalUseDefinition.interaction.interactant",
@@ -19020,7 +19020,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinitionUndesirableEffect",
             path: "ClinicalUseDefinition.undesirableEffect",
@@ -19121,7 +19121,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ClinicalUseDefinitionWarning",
             path: "ClinicalUseDefinition.warning",
@@ -20514,7 +20514,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Communication",
             path: "Communication",
@@ -20920,7 +20920,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CommunicationPayload",
             path: "Communication.payload",
@@ -20985,7 +20985,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CommunicationRequest",
             path: "CommunicationRequest",
@@ -21420,7 +21420,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CommunicationRequestPayload",
             path: "CommunicationRequest.payload",
@@ -21485,7 +21485,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompartmentDefinition",
             path: "CompartmentDefinition",
@@ -21808,7 +21808,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompartmentDefinitionResource",
             path: "CompartmentDefinition.resource",
@@ -21907,7 +21907,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Composition",
             path: "Composition",
@@ -22344,7 +22344,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompositionAttester",
             path: "Composition.attester",
@@ -22437,7 +22437,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompositionClassification",
             path: "Composition.classification",
@@ -22510,7 +22510,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompositionEvent",
             path: "Composition.event",
@@ -22583,7 +22583,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompositionParticipant",
             path: "Composition.participant",
@@ -22691,7 +22691,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompositionRelatesTo",
             path: "Composition.relatesTo",
@@ -22773,7 +22773,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CompositionSection",
             path: "Composition.section",
@@ -24394,7 +24394,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Condition",
             path: "Condition",
@@ -24755,7 +24755,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ConditionStage",
             path: "Condition.stage",
@@ -24844,7 +24844,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Consent",
             path: "Consent",
@@ -25227,7 +25227,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ConsentPolicyBasis",
             path: "Consent.policyBasis",
@@ -25300,7 +25300,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ConsentProvision",
             path: "Consent.provision",
@@ -25490,7 +25490,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ConsentProvisionActor",
             path: "Consent.provision.actor",
@@ -25572,7 +25572,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ConsentProvisionData",
             path: "Consent.provision.data",
@@ -25645,7 +25645,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ConsentVerification",
             path: "Consent.verification",
@@ -25924,7 +25924,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Contract",
             path: "Contract",
@@ -26482,7 +26482,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractContentDefinition",
             path: "Contract.contentDefinition",
@@ -26611,7 +26611,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractFriendly",
             path: "Contract.friendly",
@@ -26678,7 +26678,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractLegal",
             path: "Contract.legal",
@@ -26745,7 +26745,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractRule",
             path: "Contract.rule",
@@ -26808,7 +26808,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractSigner",
             path: "Contract.signer",
@@ -26900,7 +26900,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTerm",
             path: "Contract.term",
@@ -27106,7 +27106,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermAction",
             path: "Contract.term.action",
@@ -27432,7 +27432,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermActionSubject",
             path: "Contract.term.action.subject",
@@ -27513,7 +27513,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermAsset",
             path: "Contract.term.asset",
@@ -27755,7 +27755,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermAssetContext",
             path: "Contract.term.asset.context",
@@ -27841,7 +27841,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermAssetValuedItem",
             path: "Contract.term.asset.valuedItem",
@@ -28085,7 +28085,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermOffer",
             path: "Contract.term.offer",
@@ -28262,7 +28262,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermOfferAnswer",
             path: "Contract.term.offer.answer",
@@ -28348,7 +28348,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermOfferParty",
             path: "Contract.term.offer.party",
@@ -28429,7 +28429,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ContractTermSecurityLabel",
             path: "Contract.term.securityLabel",
@@ -28627,7 +28627,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Coverage",
             path: "Coverage",
@@ -28993,7 +28993,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageClass",
             path: "Coverage.class",
@@ -29092,7 +29092,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageCostToBeneficiary",
             path: "Coverage.costToBeneficiary",
@@ -29233,7 +29233,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageCostToBeneficiaryException",
             path: "Coverage.costToBeneficiary.exception",
@@ -29306,7 +29306,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityRequest",
             path: "CoverageEligibilityRequest",
@@ -29636,7 +29636,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityRequestEvent",
             path: "CoverageEligibilityRequest.event",
@@ -29712,7 +29712,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityRequestInsurance",
             path: "CoverageEligibilityRequest.insurance",
@@ -29798,7 +29798,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityRequestItem",
             path: "CoverageEligibilityRequest.item",
@@ -29981,7 +29981,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityRequestItemDiagnosis",
             path: "CoverageEligibilityRequest.item.diagnosis",
@@ -30041,7 +30041,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityRequestSupportingInfo",
             path: "CoverageEligibilityRequest.supportingInfo",
@@ -30127,7 +30127,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityResponse",
             path: "CoverageEligibilityResponse",
@@ -30469,7 +30469,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityResponseError",
             path: "CoverageEligibilityResponse.error",
@@ -30542,7 +30542,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityResponseEvent",
             path: "CoverageEligibilityResponse.event",
@@ -30618,7 +30618,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityResponseInsurance",
             path: "CoverageEligibilityResponse.insurance",
@@ -30717,7 +30717,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityResponseInsuranceItem",
             path: "CoverageEligibilityResponse.insurance.item",
@@ -30949,7 +30949,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoverageEligibilityResponseInsuranceItemBenefit",
             path: "CoverageEligibilityResponse.insurance.item.benefit",
@@ -31043,7 +31043,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "CoveragePaymentBy",
             path: "Coverage.paymentBy",
@@ -31635,7 +31635,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DetectedIssue",
             path: "DetectedIssue",
@@ -32003,7 +32003,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DetectedIssueEvidence",
             path: "DetectedIssue.evidence",
@@ -32076,7 +32076,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DetectedIssueMitigation",
             path: "DetectedIssue.mitigation",
@@ -32178,7 +32178,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Device",
             path: "Device",
@@ -32615,7 +32615,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceAdditive",
             path: "Device.additive",
@@ -32691,7 +32691,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceAlert",
             path: "DeviceAlert",
@@ -33042,7 +33042,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceAlertDerivedFrom",
             path: "DeviceAlert.derivedFrom",
@@ -33128,7 +33128,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceAlertSignal",
             path: "DeviceAlert.signal",
@@ -33266,7 +33266,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceAssociation",
             path: "DeviceAssociation",
@@ -33537,7 +33537,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceConformsTo",
             path: "Device.conformsTo",
@@ -33623,7 +33623,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinition",
             path: "DeviceDefinition",
@@ -34297,7 +34297,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionAdditive",
             path: "DeviceDefinition.additive",
@@ -34372,7 +34372,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionChargeItem",
             path: "DeviceDefinition.chargeItem",
@@ -34471,7 +34471,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionClassification",
             path: "DeviceDefinition.classification",
@@ -34544,7 +34544,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionConformsTo",
             path: "DeviceDefinition.conformsTo",
@@ -34643,7 +34643,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionCorrectiveAction",
             path: "DeviceDefinition.correctiveAction",
@@ -34729,7 +34729,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionDeviceName",
             path: "DeviceDefinition.deviceName",
@@ -34802,7 +34802,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionDeviceVersion",
             path: "DeviceDefinition.deviceVersion",
@@ -34888,7 +34888,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionGuideline",
             path: "DeviceDefinition.guideline",
@@ -35026,7 +35026,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionHasPart",
             path: "DeviceDefinition.hasPart",
@@ -35102,7 +35102,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionLink",
             path: "DeviceDefinition.link",
@@ -35178,7 +35178,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionMaterial",
             path: "DeviceDefinition.material",
@@ -35264,7 +35264,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionPackaging",
             path: "DeviceDefinition.packaging",
@@ -35389,7 +35389,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionPackagingDistributor",
             path: "DeviceDefinition.packaging.distributor",
@@ -35462,7 +35462,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionProperty",
             path: "DeviceDefinition.property",
@@ -35551,7 +35551,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionRegulatoryIdentifier",
             path: "DeviceDefinition.regulatoryIdentifier",
@@ -35663,7 +35663,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionUdiDeviceIdentifier",
             path: "DeviceDefinition.udiDeviceIdentifier",
@@ -35775,7 +35775,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDefinitionUdiDeviceIdentifierMarketDistribution",
             path: "DeviceDefinition.udiDeviceIdentifier.marketDistribution",
@@ -35848,7 +35848,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceDeviceVersion",
             path: "Device.deviceVersion",
@@ -35947,7 +35947,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceMetric",
             path: "DeviceMetric",
@@ -36202,7 +36202,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceMetricCalibration",
             path: "DeviceMetric.calibration",
@@ -36288,7 +36288,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceName",
             path: "Device.name",
@@ -36374,7 +36374,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceProperty",
             path: "Device.property",
@@ -36463,7 +36463,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceRequest",
             path: "DeviceRequest",
@@ -36942,7 +36942,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceRequestParameter",
             path: "DeviceRequest.parameter",
@@ -37020,7 +37020,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DeviceUdiCarrier",
             path: "Device.udiCarrier",
@@ -37158,7 +37158,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DiagnosticReport",
             path: "DiagnosticReport",
@@ -37667,7 +37667,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DiagnosticReportMedia",
             path: "DiagnosticReport.media",
@@ -37740,7 +37740,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DiagnosticReportSupportingInfo",
             path: "DiagnosticReport.supportingInfo",
@@ -37921,7 +37921,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DocumentReference",
             path: "DocumentReference",
@@ -38371,7 +38371,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DocumentReferenceAttester",
             path: "DocumentReference.attester",
@@ -38464,7 +38464,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DocumentReferenceContent",
             path: "DocumentReference.content",
@@ -38537,7 +38537,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DocumentReferenceContentProfile",
             path: "DocumentReference.content.profile",
@@ -38601,7 +38601,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DocumentReferenceRelated",
             path: "DocumentReference.related",
@@ -38674,7 +38674,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DocumentReferenceRelatesTo",
             path: "DocumentReference.relatesTo",
@@ -39292,7 +39292,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DosageDetails",
             path: "DosageDetails",
@@ -39378,7 +39378,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "DosageDetailsStep",
             path: "DosageDetails.step",
@@ -39855,7 +39855,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinition",
             path: "ElementDefinition",
@@ -40770,7 +40770,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionBase",
             path: "ElementDefinition.base",
@@ -40843,7 +40843,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionBinding",
             path: "ElementDefinition.binding",
@@ -40929,7 +40929,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionBindingAdditional",
             path: "ElementDefinition.binding.additional",
@@ -41054,7 +41054,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionConstraint",
             path: "ElementDefinition.constraint",
@@ -41181,7 +41181,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionExample",
             path: "ElementDefinition.example",
@@ -41359,7 +41359,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionMapping",
             path: "ElementDefinition.mapping",
@@ -41445,7 +41445,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionSlicing",
             path: "ElementDefinition.slicing",
@@ -41531,7 +41531,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionSlicingDiscriminator",
             path: "ElementDefinition.slicing.discriminator",
@@ -41591,7 +41591,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ElementDefinitionType",
             path: "ElementDefinition.type",
@@ -41696,7 +41696,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Encounter",
             path: "Encounter",
@@ -42196,7 +42196,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EncounterAdmission",
             path: "Encounter.admission",
@@ -42327,7 +42327,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EncounterBusinessStatus",
             path: "Encounter.businessStatus",
@@ -42413,7 +42413,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EncounterDiagnosis",
             path: "Encounter.diagnosis",
@@ -42486,7 +42486,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EncounterLocation",
             path: "Encounter.location",
@@ -42585,7 +42585,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EncounterParticipant",
             path: "Encounter.participant",
@@ -42679,7 +42679,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EncounterReason",
             path: "Encounter.reason",
@@ -42757,7 +42757,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Endpoint",
             path: "Endpoint",
@@ -43038,7 +43038,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EndpointPayload",
             path: "Endpoint.payload",
@@ -43137,7 +43137,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EnrollmentRequest",
             path: "EnrollmentRequest",
@@ -43347,7 +43347,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EnrollmentResponse",
             path: "EnrollmentResponse",
@@ -43583,7 +43583,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EpisodeOfCare",
             path: "EpisodeOfCare",
@@ -43870,7 +43870,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EpisodeOfCareDiagnosis",
             path: "EpisodeOfCare.diagnosis",
@@ -43943,7 +43943,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EpisodeOfCareReason",
             path: "EpisodeOfCare.reason",
@@ -44022,7 +44022,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EpisodeOfCareStatusHistory",
             path: "EpisodeOfCare.statusHistory",
@@ -44095,7 +44095,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EventDefinition",
             path: "EventDefinition",
@@ -44616,7 +44616,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Evidence",
             path: "Evidence",
@@ -45160,7 +45160,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceCertainty",
             path: "Evidence.certainty",
@@ -45285,7 +45285,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceClassification",
             path: "Evidence.classification",
@@ -45358,7 +45358,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceRelatesTo",
             path: "Evidence.relatesTo",
@@ -45440,7 +45440,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceStatistic",
             path: "Evidence.statistic",
@@ -45617,7 +45617,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceStatisticAttributeEstimate",
             path: "Evidence.statistic.attributeEstimate",
@@ -45755,7 +45755,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceStatisticModelCharacteristic",
             path: "Evidence.statistic.modelCharacteristic",
@@ -45884,7 +45884,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceStatisticModelCharacteristicVariable",
             path: "Evidence.statistic.modelCharacteristic.variable",
@@ -45999,7 +45999,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceStatisticSampleSize",
             path: "Evidence.statistic.sampleSize",
@@ -46124,7 +46124,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceVariable",
             path: "EvidenceVariable",
@@ -46772,7 +46772,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceVariableCategory",
             path: "EvidenceVariable.category",
@@ -46850,7 +46850,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceVariableConstraint",
             path: "EvidenceVariable.constraint",
@@ -47053,7 +47053,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceVariableDataStorage",
             path: "EvidenceVariable.dataStorage",
@@ -47152,7 +47152,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceVariableDefinition",
             path: "Evidence.variableDefinition",
@@ -47309,7 +47309,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceVariableDefinitionModifier",
             path: "EvidenceVariable.definitionModifier",
@@ -47402,7 +47402,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "EvidenceVariableRelatesTo",
             path: "EvidenceVariable.relatesTo",
@@ -47484,7 +47484,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenario",
             path: "ExampleScenario",
@@ -47859,7 +47859,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioActor",
             path: "ExampleScenario.actor",
@@ -47971,7 +47971,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioInstance",
             path: "ExampleScenario.instance",
@@ -48138,7 +48138,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioInstanceContainedInstance",
             path: "ExampleScenario.instance.containedInstance",
@@ -48211,7 +48211,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioInstanceVersion",
             path: "ExampleScenario.instance.version",
@@ -48310,7 +48310,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioProcess",
             path: "ExampleScenario.process",
@@ -48422,7 +48422,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioProcessStep",
             path: "ExampleScenario.process.step",
@@ -48547,7 +48547,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioProcessStepAlternative",
             path: "ExampleScenario.process.step.alternative",
@@ -48633,7 +48633,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExampleScenarioProcessStepOperation",
             path: "ExampleScenario.process.step.operation",
@@ -48812,7 +48812,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefit",
             path: "ExplanationOfBenefit",
@@ -49583,7 +49583,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitAccident",
             path: "ExplanationOfBenefit.accident",
@@ -49672,7 +49672,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitAddItem",
             path: "ExplanationOfBenefit.addItem",
@@ -50090,7 +50090,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitAddItemBodySite",
             path: "ExplanationOfBenefit.addItem.bodySite",
@@ -50163,7 +50163,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitAddItemDetail",
             path: "ExplanationOfBenefit.addItem.detail",
@@ -50405,7 +50405,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitAddItemDetailSubDetail",
             path: "ExplanationOfBenefit.addItem.detail.subDetail",
@@ -50634,7 +50634,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitBenefitBalance",
             path: "ExplanationOfBenefit.benefitBalance",
@@ -50785,7 +50785,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitBenefitBalanceFinancial",
             path: "ExplanationOfBenefit.benefitBalance.financial",
@@ -50878,7 +50878,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitCareTeam",
             path: "ExplanationOfBenefit.careTeam",
@@ -50981,7 +50981,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitDiagnosis",
             path: "ExplanationOfBenefit.diagnosis",
@@ -51080,7 +51080,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitEvent",
             path: "ExplanationOfBenefit.event",
@@ -51156,7 +51156,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitInsurance",
             path: "ExplanationOfBenefit.insurance",
@@ -51242,7 +51242,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitItem",
             path: "ExplanationOfBenefit.item",
@@ -51682,7 +51682,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitItemAdjudication",
             path: "ExplanationOfBenefit.item.adjudication",
@@ -51794,7 +51794,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitItemBodySite",
             path: "ExplanationOfBenefit.item.bodySite",
@@ -51867,7 +51867,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitItemDetail",
             path: "ExplanationOfBenefit.item.detail",
@@ -52161,7 +52161,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitItemDetailSubDetail",
             path: "ExplanationOfBenefit.item.detail.subDetail",
@@ -52442,7 +52442,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitItemReviewOutcome",
             path: "ExplanationOfBenefit.item.reviewOutcome",
@@ -52541,7 +52541,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitPayee",
             path: "ExplanationOfBenefit.payee",
@@ -52620,7 +52620,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitPayment",
             path: "ExplanationOfBenefit.payment",
@@ -52745,7 +52745,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitProcedure",
             path: "ExplanationOfBenefit.procedure",
@@ -52857,7 +52857,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitProcessNote",
             path: "ExplanationOfBenefit.processNote",
@@ -52969,7 +52969,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitRelated",
             path: "ExplanationOfBenefit.related",
@@ -53058,7 +53058,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitSupportingInfo",
             path: "ExplanationOfBenefit.supportingInfo",
@@ -53318,7 +53318,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ExplanationOfBenefitTotal",
             path: "ExplanationOfBenefit.total",
@@ -53780,7 +53780,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "FamilyMemberHistory",
             path: "FamilyMemberHistory",
@@ -54151,7 +54151,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "FamilyMemberHistoryCondition",
             path: "FamilyMemberHistory.condition",
@@ -54268,7 +54268,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "FamilyMemberHistoryProcedure",
             path: "FamilyMemberHistory.procedure",
@@ -54386,7 +54386,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Flag",
             path: "Flag",
@@ -54641,7 +54641,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Goal",
             path: "Goal",
@@ -55004,7 +55004,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "GoalAcceptance",
             path: "Goal.acceptance",
@@ -55098,7 +55098,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "GoalTarget",
             path: "Goal.target",
@@ -55203,7 +55203,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Group",
             path: "Group",
@@ -55648,7 +55648,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "GroupCharacteristic",
             path: "Group.characteristic",
@@ -55879,7 +55879,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "GroupMember",
             path: "Group.member",
@@ -55996,7 +55996,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "GuidanceResponse",
             path: "GuidanceResponse",
@@ -56363,7 +56363,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "HealthcareService",
             path: "HealthcareService",
@@ -56787,7 +56787,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "HealthcareServiceEligibility",
             path: "HealthcareService.eligibility",
@@ -57135,7 +57135,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingSelection",
             path: "ImagingSelection",
@@ -57511,7 +57511,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingSelectionImageRegion3D",
             path: "ImagingSelection.imageRegion3D",
@@ -57584,7 +57584,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingSelectionInstance",
             path: "ImagingSelection.instance",
@@ -57748,7 +57748,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingSelectionInstanceImageRegion2D",
             path: "ImagingSelection.instance.imageRegion2D",
@@ -57821,7 +57821,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingSelectionPerformer",
             path: "ImagingSelection.performer",
@@ -57903,7 +57903,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingStudy",
             path: "ImagingStudy",
@@ -58253,7 +58253,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingStudySeries",
             path: "ImagingStudy.series",
@@ -58443,7 +58443,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingStudySeriesInstance",
             path: "ImagingStudy.series.instance",
@@ -58555,7 +58555,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImagingStudySeriesPerformer",
             path: "ImagingStudy.series.performer",
@@ -58637,7 +58637,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Immunization",
             path: "Immunization",
@@ -59130,7 +59130,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImmunizationPerformer",
             path: "Immunization.performer",
@@ -59209,7 +59209,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImmunizationProgramEligibility",
             path: "Immunization.programEligibility",
@@ -59282,7 +59282,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImmunizationProtocolApplied",
             path: "Immunization.protocolApplied",
@@ -59394,7 +59394,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImmunizationReaction",
             path: "Immunization.reaction",
@@ -59480,7 +59480,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuide",
             path: "ImplementationGuide",
@@ -59907,7 +59907,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideDefinition",
             path: "ImplementationGuide.definition",
@@ -60019,7 +60019,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideDefinitionGrouping",
             path: "ImplementationGuide.definition.grouping",
@@ -60092,7 +60092,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideDefinitionPage",
             path: "ImplementationGuide.definition.page",
@@ -60208,7 +60208,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideDefinitionParameter",
             path: "ImplementationGuide.definition.parameter",
@@ -60281,7 +60281,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideDefinitionResource",
             path: "ImplementationGuide.definition.resource",
@@ -60421,7 +60421,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideDefinitionTemplate",
             path: "ImplementationGuide.definition.template",
@@ -60507,7 +60507,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideDependsOn",
             path: "ImplementationGuide.dependsOn",
@@ -60608,7 +60608,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideGlobal",
             path: "ImplementationGuide.global",
@@ -60683,7 +60683,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideManifest",
             path: "ImplementationGuide.manifest",
@@ -60795,7 +60795,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideManifestPage",
             path: "ImplementationGuide.manifest.page",
@@ -60881,7 +60881,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ImplementationGuideManifestResource",
             path: "ImplementationGuide.manifest.resource",
@@ -60982,7 +60982,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Ingredient",
             path: "Ingredient",
@@ -61228,7 +61228,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "IngredientManufacturer",
             path: "Ingredient.manufacturer",
@@ -61301,7 +61301,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "IngredientSubstance",
             path: "Ingredient.substance",
@@ -61376,7 +61376,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "IngredientSubstanceStrength",
             path: "Ingredient.substance.strength",
@@ -61537,7 +61537,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "IngredientSubstanceStrengthReferenceStrength",
             path: "Ingredient.substance.strength.referenceStrength",
@@ -61642,7 +61642,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsurancePlan",
             path: "InsurancePlan",
@@ -61845,7 +61845,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsurancePlanGeneralCost",
             path: "InsurancePlan.generalCost",
@@ -61944,7 +61944,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsurancePlanSpecificCost",
             path: "InsurancePlan.specificCost",
@@ -62017,7 +62017,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsurancePlanSpecificCostBenefit",
             path: "InsurancePlan.specificCost.benefit",
@@ -62090,7 +62090,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsurancePlanSpecificCostBenefitCost",
             path: "InsurancePlan.specificCost.benefit.cost",
@@ -62189,7 +62189,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsuranceProduct",
             path: "InsuranceProduct",
@@ -62483,7 +62483,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsuranceProductCoverage",
             path: "InsuranceProduct.coverage",
@@ -62569,7 +62569,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsuranceProductCoverageBenefit",
             path: "InsuranceProduct.coverage.benefit",
@@ -62655,7 +62655,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsuranceProductCoverageBenefitLimit",
             path: "InsuranceProduct.coverage.benefit.limit",
@@ -62728,7 +62728,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InsuranceProductRelated",
             path: "InsuranceProduct.related",
@@ -62814,7 +62814,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Invoice",
             path: "Invoice",
@@ -63161,7 +63161,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InvoiceLineItem",
             path: "Invoice.lineItem",
@@ -63266,7 +63266,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "InvoiceParticipant",
             path: "Invoice.participant",
@@ -63346,7 +63346,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Library",
             path: "Library",
@@ -63893,7 +63893,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "List",
             path: "List",
@@ -64205,7 +64205,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ListEntry",
             path: "List.entry",
@@ -64304,7 +64304,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Location",
             path: "Location",
@@ -64663,7 +64663,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "LocationPosition",
             path: "Location.position",
@@ -64749,7 +64749,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ManufacturedItemDefinition",
             path: "ManufacturedItemDefinition",
@@ -64991,7 +64991,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ManufacturedItemDefinitionComponent",
             path: "ManufacturedItemDefinition.component",
@@ -65116,7 +65116,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ManufacturedItemDefinitionComponentConstituent",
             path: "ManufacturedItemDefinition.component.constituent",
@@ -65215,7 +65215,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ManufacturedItemDefinitionProperty",
             path: "ManufacturedItemDefinition.property",
@@ -65306,7 +65306,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MarketingStatus",
             path: "MarketingStatus",
@@ -65418,7 +65418,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Measure",
             path: "Measure",
@@ -66043,7 +66043,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureGroup",
             path: "Measure.group",
@@ -66340,7 +66340,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureGroupComponent",
             path: "Measure.group.component",
@@ -66426,7 +66426,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureGroupPopulation",
             path: "Measure.group.population",
@@ -66577,7 +66577,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureGroupStratifier",
             path: "Measure.group.stratifier",
@@ -66715,7 +66715,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureGroupStratifierComponent",
             path: "Measure.group.stratifier.component",
@@ -66853,7 +66853,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureReport",
             path: "MeasureReport",
@@ -67201,7 +67201,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureReportGroup",
             path: "MeasureReport.group",
@@ -67459,7 +67459,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureReportGroupPopulation",
             path: "MeasureReport.group.population",
@@ -67623,7 +67623,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureReportGroupStratifier",
             path: "MeasureReport.group.stratifier",
@@ -67735,7 +67735,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureReportGroupStratifierStratum",
             path: "MeasureReport.group.stratifier.stratum",
@@ -67868,7 +67868,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureReportGroupStratifierStratumComponent",
             path: "MeasureReport.group.stratifier.stratum.component",
@@ -67983,7 +67983,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureReportGroupStratifierStratumPopulation",
             path: "MeasureReport.group.stratifier.stratum.population",
@@ -68121,7 +68121,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureSupplementalData",
             path: "Measure.supplementalData",
@@ -68259,7 +68259,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MeasureTerm",
             path: "Measure.term",
@@ -68332,7 +68332,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Medication",
             path: "Medication",
@@ -68566,7 +68566,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationAdministration",
             path: "MedicationAdministration",
@@ -68967,7 +68967,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationAdministrationDosage",
             path: "MedicationAdministration.dosage",
@@ -69095,7 +69095,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationAdministrationPerformer",
             path: "MedicationAdministration.performer",
@@ -69175,7 +69175,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationDispense",
             path: "MedicationDispense",
@@ -69665,7 +69665,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationDispensePerformer",
             path: "MedicationDispense.performer",
@@ -69747,7 +69747,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationDispenseSubstitution",
             path: "MedicationDispense.substitution",
@@ -69850,7 +69850,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationIngredient",
             path: "Medication.ingredient",
@@ -69957,7 +69957,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationInstance",
             path: "Medication.instance",
@@ -70043,7 +70043,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationPackageSize",
             path: "Medication.packageSize",
@@ -70116,7 +70116,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationRequest",
             path: "MedicationRequest",
@@ -70692,7 +70692,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationRequestDispenseRequest",
             path: "MedicationRequest.dispenseRequest",
@@ -70869,7 +70869,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationRequestDispenseRequestInitialFill",
             path: "MedicationRequest.dispenseRequest.initialFill",
@@ -70942,7 +70942,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationRequestSubstitution",
             path: "MedicationRequest.substitution",
@@ -71018,7 +71018,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationStatement",
             path: "MedicationStatement",
@@ -71384,7 +71384,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicationStatementAdherence",
             path: "MedicationStatement.adherence",
@@ -71457,7 +71457,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinition",
             path: "MedicinalProductDefinition",
@@ -71951,7 +71951,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinitionCharacteristic",
             path: "MedicinalProductDefinition.characteristic",
@@ -72042,7 +72042,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinitionContact",
             path: "MedicinalProductDefinition.contact",
@@ -72118,7 +72118,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinitionCrossReference",
             path: "MedicinalProductDefinition.crossReference",
@@ -72193,7 +72193,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinitionName",
             path: "MedicinalProductDefinition.name",
@@ -72292,7 +72292,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinitionNamePart",
             path: "MedicinalProductDefinition.name.part",
@@ -72365,7 +72365,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinitionNameUsage",
             path: "MedicinalProductDefinition.name.usage",
@@ -72451,7 +72451,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MedicinalProductDefinitionOperation",
             path: "MedicinalProductDefinition.operation",
@@ -72553,7 +72553,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MessageDefinition",
             path: "MessageDefinition",
@@ -72999,7 +72999,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MessageDefinitionAllowedResponse",
             path: "MessageDefinition.allowedResponse",
@@ -73072,7 +73072,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MessageDefinitionFocus",
             path: "MessageDefinition.focus",
@@ -73173,7 +73173,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MessageHeader",
             path: "MessageHeader",
@@ -73383,7 +73383,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MessageHeaderDestination",
             path: "MessageHeader.destination",
@@ -73479,7 +73479,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MessageHeaderResponse",
             path: "MessageHeader.response",
@@ -73565,7 +73565,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MessageHeaderSource",
             path: "MessageHeader.source",
@@ -73813,7 +73813,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "MonetaryComponent",
             path: "MonetaryComponent",
@@ -73959,7 +73959,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NamingSystem",
             path: "NamingSystem",
@@ -74477,7 +74477,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NamingSystemUniqueId",
             path: "NamingSystem.uniqueId",
@@ -74662,7 +74662,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionIntake",
             path: "NutritionIntake",
@@ -75024,7 +75024,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionIntakeNutritionItem",
             path: "NutritionIntake.nutritionItem",
@@ -75123,7 +75123,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionIntakeNutritionItemConsumedItem",
             path: "NutritionIntake.nutritionItem.consumedItem",
@@ -75225,7 +75225,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionIntakeNutritionItemConsumedItemTotalIntake",
             path: "NutritionIntake.nutritionItem.consumedItem.totalIntake",
@@ -75313,7 +75313,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionIntakeNutritionItemNotConsumedItem",
             path: "NutritionIntake.nutritionItem.notConsumedItem",
@@ -75399,7 +75399,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionIntakePerformer",
             path: "NutritionIntake.performer",
@@ -75481,7 +75481,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrder",
             path: "NutritionOrder",
@@ -75887,7 +75887,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderAdditive",
             path: "NutritionOrder.additive",
@@ -75986,7 +75986,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderEnteralFormula",
             path: "NutritionOrder.enteralFormula",
@@ -76140,7 +76140,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderEnteralFormulaAdministration",
             path: "NutritionOrder.enteralFormula.administration",
@@ -76229,7 +76229,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderEnteralFormulaAdministrationSchedule",
             path: "NutritionOrder.enteralFormula.administration.schedule",
@@ -76315,7 +76315,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderOralDiet",
             path: "NutritionOrder.oralDiet",
@@ -76440,7 +76440,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderOralDietNutrient",
             path: "NutritionOrder.oralDiet.nutrient",
@@ -76513,7 +76513,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderOralDietSchedule",
             path: "NutritionOrder.oralDiet.schedule",
@@ -76599,7 +76599,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderOralDietTexture",
             path: "NutritionOrder.oralDiet.texture",
@@ -76672,7 +76672,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderSupplement",
             path: "NutritionOrder.supplement",
@@ -76797,7 +76797,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionOrderSupplementSchedule",
             path: "NutritionOrder.supplement.schedule",
@@ -76883,7 +76883,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionProduct",
             path: "NutritionProduct",
@@ -77141,7 +77141,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionProductCharacteristic",
             path: "NutritionProduct.characteristic",
@@ -77228,7 +77228,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionProductIngredient",
             path: "NutritionProduct.ingredient",
@@ -77317,7 +77317,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionProductInstance",
             path: "NutritionProduct.instance",
@@ -77455,7 +77455,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "NutritionProductNutrient",
             path: "NutritionProduct.nutrient",
@@ -77533,7 +77533,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Observation",
             path: "Observation",
@@ -78115,7 +78115,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ObservationComponent",
             path: "Observation.component",
@@ -78253,7 +78253,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ObservationDefinition",
             path: "ObservationDefinition",
@@ -78875,7 +78875,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ObservationDefinitionComponent",
             path: "ObservationDefinition.component",
@@ -78974,7 +78974,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ObservationDefinitionQualifiedValue",
             path: "ObservationDefinition.qualifiedValue",
@@ -79190,7 +79190,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ObservationReferenceRange",
             path: "Observation.referenceRange",
@@ -79328,7 +79328,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ObservationTriggeredBy",
             path: "Observation.triggeredBy",
@@ -79414,7 +79414,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "OperationDefinition",
             path: "OperationDefinition",
@@ -79938,7 +79938,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "OperationDefinitionOverload",
             path: "OperationDefinition.overload",
@@ -80011,7 +80011,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "OperationDefinitionParameter",
             path: "OperationDefinition.parameter",
@@ -80229,7 +80229,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "OperationDefinitionParameterBinding",
             path: "OperationDefinition.parameter.binding",
@@ -80302,7 +80302,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "OperationDefinitionParameterReferencedFrom",
             path: "OperationDefinition.parameter.referencedFrom",
@@ -80612,7 +80612,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Organization",
             path: "Organization",
@@ -80854,7 +80854,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "OrganizationAffiliation",
             path: "OrganizationAffiliation",
@@ -81109,7 +81109,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "OrganizationQualification",
             path: "Organization.qualification",
@@ -81221,7 +81221,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PackagedProductDefinition",
             path: "PackagedProductDefinition",
@@ -81530,7 +81530,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PackagedProductDefinitionLegalStatusOfSupply",
             path: "PackagedProductDefinition.legalStatusOfSupply",
@@ -81603,7 +81603,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PackagedProductDefinitionPackaging",
             path: "PackagedProductDefinition.packaging",
@@ -81793,7 +81793,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PackagedProductDefinitionPackagingContainedItem",
             path: "PackagedProductDefinition.packaging.containedItem",
@@ -81872,7 +81872,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PackagedProductDefinitionPackagingProperty",
             path: "PackagedProductDefinition.packaging.property",
@@ -82374,7 +82374,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Patient",
             path: "Patient",
@@ -82704,7 +82704,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PatientCommunication",
             path: "Patient.communication",
@@ -82777,7 +82777,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PatientContact",
             path: "Patient.contact",
@@ -82954,7 +82954,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PatientLink",
             path: "Patient.link",
@@ -83030,7 +83030,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PaymentNotice",
             path: "PaymentNotice",
@@ -83353,7 +83353,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PaymentReconciliation",
             path: "PaymentReconciliation",
@@ -83867,7 +83867,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PaymentReconciliationAllocation",
             path: "PaymentReconciliation.allocation",
@@ -84127,7 +84127,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PaymentReconciliationProcessNote",
             path: "PaymentReconciliation.processNote",
@@ -84286,7 +84286,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Person",
             path: "Person",
@@ -84570,7 +84570,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PersonCommunication",
             path: "Person.communication",
@@ -84643,7 +84643,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PersonLink",
             path: "Person.link",
@@ -84721,7 +84721,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinition",
             path: "PlanDefinition",
@@ -85306,7 +85306,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionAction",
             path: "PlanDefinition.action",
@@ -85765,7 +85765,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActionCondition",
             path: "PlanDefinition.action.condition",
@@ -85838,7 +85838,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActionDynamicValue",
             path: "PlanDefinition.action.dynamicValue",
@@ -85911,7 +85911,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActionInput",
             path: "PlanDefinition.action.input",
@@ -85997,7 +85997,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActionOutput",
             path: "PlanDefinition.action.output",
@@ -86083,7 +86083,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActionParticipant",
             path: "PlanDefinition.action.participant",
@@ -86232,7 +86232,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActionRelatedAction",
             path: "PlanDefinition.action.relatedAction",
@@ -86334,7 +86334,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActor",
             path: "PlanDefinition.actor",
@@ -86420,7 +86420,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionActorOption",
             path: "PlanDefinition.actor.option",
@@ -86543,7 +86543,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionGoal",
             path: "PlanDefinition.goal",
@@ -86681,7 +86681,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PlanDefinitionGoalTarget",
             path: "PlanDefinition.goal.target",
@@ -86783,7 +86783,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Practitioner",
             path: "Practitioner",
@@ -87041,7 +87041,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PractitionerCommunication",
             path: "Practitioner.communication",
@@ -87114,7 +87114,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PractitionerQualification",
             path: "Practitioner.qualification",
@@ -87226,7 +87226,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "PractitionerRole",
             path: "PractitionerRole",
@@ -87533,7 +87533,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Procedure",
             path: "Procedure",
@@ -88047,7 +88047,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ProcedureFocalDevice",
             path: "Procedure.focalDevice",
@@ -88120,7 +88120,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ProcedurePerformer",
             path: "Procedure.performer",
@@ -88228,7 +88228,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ProductShelfLife",
             path: "ProductShelfLife",
@@ -88317,7 +88317,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Provenance",
             path: "Provenance",
@@ -88614,7 +88614,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ProvenanceAgent",
             path: "Provenance.agent",
@@ -88732,7 +88732,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ProvenanceEntity",
             path: "Provenance.entity",
@@ -88917,7 +88917,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Questionnaire",
             path: "Questionnaire",
@@ -89344,7 +89344,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "QuestionnaireItem",
             path: "Questionnaire.item",
@@ -89625,7 +89625,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "QuestionnaireItemAnswerOption",
             path: "Questionnaire.item.answerOption",
@@ -89720,7 +89720,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "QuestionnaireItemEnableWhen",
             path: "Questionnaire.item.enableWhen",
@@ -89832,7 +89832,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "QuestionnaireItemInitial",
             path: "Questionnaire.item.initial",
@@ -89918,7 +89918,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "QuestionnaireResponse",
             path: "QuestionnaireResponse",
@@ -90194,7 +90194,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "QuestionnaireResponseItem",
             path: "QuestionnaireResponse.item",
@@ -90306,7 +90306,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "QuestionnaireResponseItemAnswer",
             path: "QuestionnaireResponse.item.answer",
@@ -90684,7 +90684,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RegulatedAuthorization",
             path: "RegulatedAuthorization",
@@ -91009,7 +91009,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RegulatedAuthorizationCase",
             path: "RegulatedAuthorization.case",
@@ -91262,7 +91262,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RelatedPerson",
             path: "RelatedPerson",
@@ -91543,7 +91543,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RelatedPersonCommunication",
             path: "RelatedPerson.communication",
@@ -91616,7 +91616,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RelativeTime",
             path: "RelativeTime",
@@ -91749,7 +91749,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestration",
             path: "RequestOrchestration",
@@ -92115,7 +92115,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestrationAction",
             path: "RequestOrchestration.action",
@@ -92554,7 +92554,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestrationActionCondition",
             path: "RequestOrchestration.action.condition",
@@ -92627,7 +92627,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestrationActionDynamicValue",
             path: "RequestOrchestration.action.dynamicValue",
@@ -92700,7 +92700,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestrationActionInput",
             path: "RequestOrchestration.action.input",
@@ -92786,7 +92786,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestrationActionOutput",
             path: "RequestOrchestration.action.output",
@@ -92872,7 +92872,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestrationActionParticipant",
             path: "RequestOrchestration.action.participant",
@@ -93047,7 +93047,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequestOrchestrationActionRelatedAction",
             path: "RequestOrchestration.action.relatedAction",
@@ -93149,7 +93149,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Requirements",
             path: "Requirements",
@@ -93550,7 +93550,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequirementsActor",
             path: "Requirements.actor",
@@ -93623,7 +93623,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequirementsImports",
             path: "Requirements.imports",
@@ -93696,7 +93696,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequirementsStatement",
             path: "Requirements.statement",
@@ -93909,7 +93909,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequirementsStatementDerivedFrom",
             path: "Requirements.statement.derivedFrom",
@@ -93982,7 +93982,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RequirementsStatementPartOf",
             path: "Requirements.statement.partOf",
@@ -94055,7 +94055,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudy",
             path: "ResearchStudy",
@@ -94598,7 +94598,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyAssociatedParty",
             path: "ResearchStudy.associatedParty",
@@ -94714,7 +94714,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyComparisonGroup",
             path: "ResearchStudy.comparisonGroup",
@@ -94839,7 +94839,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyLabel",
             path: "ResearchStudy.label",
@@ -94925,7 +94925,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyObjective",
             path: "ResearchStudy.objective",
@@ -95024,7 +95024,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyObjectiveOutcomeMeasure",
             path: "ResearchStudy.objective.outcomeMeasure",
@@ -95201,7 +95201,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyObjectiveOutcomeMeasureEventHandling",
             path: "ResearchStudy.objective.outcomeMeasure.eventHandling",
@@ -95300,7 +95300,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyProgressStatus",
             path: "ResearchStudy.progressStatus",
@@ -95386,7 +95386,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyRecruitment",
             path: "ResearchStudy.recruitment",
@@ -95498,7 +95498,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchStudyRelatesTo",
             path: "ResearchStudy.relatesTo",
@@ -95580,7 +95580,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchSubject",
             path: "ResearchSubject",
@@ -95818,7 +95818,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchSubjectSubjectMilestone",
             path: "ResearchSubject.subjectMilestone",
@@ -95904,7 +95904,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ResearchSubjectSubjectState",
             path: "ResearchSubject.subjectState",
@@ -96063,7 +96063,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RiskAssessment",
             path: "RiskAssessment",
@@ -96400,7 +96400,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "RiskAssessmentPrediction",
             path: "RiskAssessment.prediction",
@@ -96696,7 +96696,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Schedule",
             path: "Schedule",
@@ -96934,7 +96934,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SearchParameter",
             path: "SearchParameter",
@@ -97465,7 +97465,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SearchParameterComponent",
             path: "SearchParameter.component",
@@ -97538,7 +97538,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ServiceRequest",
             path: "ServiceRequest",
@@ -98118,7 +98118,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ServiceRequestOrderDetail",
             path: "ServiceRequest.orderDetail",
@@ -98205,7 +98205,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ServiceRequestOrderDetailParameter",
             path: "ServiceRequest.orderDetail.parameter",
@@ -98294,7 +98294,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "ServiceRequestPatientInstruction",
             path: "ServiceRequest.patientInstruction",
@@ -98496,7 +98496,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Slot",
             path: "Slot",
@@ -98751,7 +98751,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Specimen",
             path: "Specimen",
@@ -99088,7 +99088,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenCollection",
             path: "Specimen.collection",
@@ -99264,7 +99264,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenContainer",
             path: "Specimen.container",
@@ -99337,7 +99337,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenDefinition",
             path: "SpecimenDefinition",
@@ -99818,7 +99818,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenDefinitionTypeTested",
             path: "SpecimenDefinition.typeTested",
@@ -99995,7 +99995,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenDefinitionTypeTestedContainer",
             path: "SpecimenDefinition.typeTested.container",
@@ -100100,7 +100100,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenDefinitionTypeTestedContainerAdditive",
             path: "SpecimenDefinition.typeTested.container.additive",
@@ -100175,7 +100175,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenDefinitionTypeTestedHandling",
             path: "SpecimenDefinition.typeTested.handling",
@@ -100274,7 +100274,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenFeature",
             path: "Specimen.feature",
@@ -100347,7 +100347,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenProcessing",
             path: "Specimen.processing",
@@ -100481,7 +100481,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SpecimenProcessingAdditive",
             path: "Specimen.processing.additive",
@@ -100557,7 +100557,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureDefinition",
             path: "StructureDefinition",
@@ -101051,7 +101051,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureDefinitionContext",
             path: "StructureDefinition.context",
@@ -101124,7 +101124,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureDefinitionDifferential",
             path: "StructureDefinition.differential",
@@ -101184,7 +101184,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureDefinitionMapping",
             path: "StructureDefinition.mapping",
@@ -101283,7 +101283,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureDefinitionSnapshot",
             path: "StructureDefinition.snapshot",
@@ -101343,7 +101343,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMap",
             path: "StructureMap",
@@ -101731,7 +101731,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapConst",
             path: "StructureMap.const",
@@ -101804,7 +101804,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapGroup",
             path: "StructureMap.group",
@@ -101929,7 +101929,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapGroupInput",
             path: "StructureMap.group.input",
@@ -102028,7 +102028,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapGroupRule",
             path: "StructureMap.group.rule",
@@ -102153,7 +102153,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapGroupRuleDependent",
             path: "StructureMap.group.rule.dependent",
@@ -102226,7 +102226,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapGroupRuleSource",
             path: "StructureMap.group.rule.source",
@@ -102416,7 +102416,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapGroupRuleTarget",
             path: "StructureMap.group.rule.target",
@@ -102554,7 +102554,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapGroupRuleTargetParameter",
             path: "StructureMap.group.rule.target.parameter",
@@ -102625,7 +102625,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "StructureMapStructure",
             path: "StructureMap.structure",
@@ -102726,7 +102726,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Subscription",
             path: "Subscription",
@@ -103069,7 +103069,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionFilterBy",
             path: "Subscription.filterBy",
@@ -103194,7 +103194,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionParameter",
             path: "Subscription.parameter",
@@ -103267,7 +103267,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionStatus",
             path: "SubscriptionStatus",
@@ -103470,7 +103470,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionStatusNotificationEvent",
             path: "SubscriptionStatus.notificationEvent",
@@ -103608,7 +103608,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionStatusNotificationEventAuthorizationHint",
             path: "SubscriptionStatus.notificationEvent.authorizationHint",
@@ -103681,7 +103681,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionStatusNotificationEventRelatedQuery",
             path: "SubscriptionStatus.notificationEvent.relatedQuery",
@@ -103754,7 +103754,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionTopic",
             path: "SubscriptionTopic",
@@ -104155,7 +104155,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionTopicTrigger",
             path: "SubscriptionTopic.trigger",
@@ -104306,7 +104306,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionTopicTriggerCanFilterBy",
             path: "SubscriptionTopic.trigger.canFilterBy",
@@ -104431,7 +104431,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionTopicTriggerNotificationShape",
             path: "SubscriptionTopic.trigger.notificationShape",
@@ -104530,7 +104530,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionTopicTriggerNotificationShapeRelatedQuery",
             path: "SubscriptionTopic.trigger.notificationShape.relatedQuery",
@@ -104603,7 +104603,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubscriptionTopicTriggerQueryCriteria",
             path: "SubscriptionTopic.trigger.queryCriteria",
@@ -104715,7 +104715,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Substance",
             path: "Substance",
@@ -104920,7 +104920,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinition",
             path: "SubstanceDefinition",
@@ -105331,7 +105331,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionCharacterization",
             path: "SubstanceDefinition.characterization",
@@ -105430,7 +105430,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionCode",
             path: "SubstanceDefinition.code",
@@ -105542,7 +105542,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionMoiety",
             path: "SubstanceDefinition.moiety",
@@ -105696,7 +105696,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionMolecularWeight",
             path: "SubstanceDefinition.molecularWeight",
@@ -105782,7 +105782,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionName",
             path: "SubstanceDefinition.name",
@@ -105972,7 +105972,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionNameOfficial",
             path: "SubstanceDefinition.name.official",
@@ -106058,7 +106058,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcid",
             path: "SubstanceDefinition.nucleicAcid",
@@ -106196,7 +106196,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidGene",
             path: "SubstanceDefinition.nucleicAcid.gene",
@@ -106284,7 +106284,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidGeneElement",
             path: "SubstanceDefinition.nucleicAcid.geneElement",
@@ -106372,7 +106372,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidSubunit",
             path: "SubstanceDefinition.nucleicAcid.subunit",
@@ -106523,7 +106523,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidSubunitLinkage",
             path: "SubstanceDefinition.nucleicAcid.subunit.linkage",
@@ -106611,7 +106611,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionNucleicAcidSubunitSugar",
             path: "SubstanceDefinition.nucleicAcid.subunit.sugar",
@@ -106686,7 +106686,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionPolymer",
             path: "SubstanceDefinition.polymer",
@@ -106811,7 +106811,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionPolymerMonomerSet",
             path: "SubstanceDefinition.polymer.monomerSet",
@@ -106884,7 +106884,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionPolymerMonomerSetStartingMaterial",
             path: "SubstanceDefinition.polymer.monomerSet.startingMaterial",
@@ -106985,7 +106985,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionPolymerRepeat",
             path: "SubstanceDefinition.polymer.repeat",
@@ -107071,7 +107071,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionPolymerRepeatRepeatUnit",
             path: "SubstanceDefinition.polymer.repeat.repeatUnit",
@@ -107185,7 +107185,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionPolymerRepeatRepeatUnitDegreeOfPolymerisation",
             path: "SubstanceDefinition.polymer.repeat.repeatUnit.degreeOfPolymerisation",
@@ -107284,7 +107284,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionProperty",
             path: "SubstanceDefinition.property",
@@ -107371,7 +107371,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionProtein",
             path: "SubstanceDefinition.protein",
@@ -107496,7 +107496,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionProteinSubunit",
             path: "SubstanceDefinition.protein.subunit",
@@ -107625,7 +107625,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionRelationship",
             path: "SubstanceDefinition.relationship",
@@ -107813,7 +107813,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionSourceMaterial",
             path: "SubstanceDefinition.sourceMaterial",
@@ -107925,7 +107925,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionStructure",
             path: "SubstanceDefinition.structure",
@@ -108076,7 +108076,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "SubstanceDefinitionStructureRepresentation",
             path: "SubstanceDefinition.structure.representation",
@@ -108175,7 +108175,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "Task",
             path: "Task",
@@ -108719,7 +108719,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "TaskFocus",
             path: "Task.focus",
@@ -108785,7 +108785,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "TaskInput",
             path: "Task.input",
@@ -108976,7 +108976,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "TaskOutput",
             path: "Task.output",
@@ -109167,7 +109167,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "TaskPerformer",
             path: "Task.performer",
@@ -109249,7 +109249,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "TaskRestriction",
             path: "Task.restriction",
@@ -113022,7 +113022,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "VisionPrescription",
             path: "VisionPrescription",
@@ -113312,7 +113312,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "VisionPrescriptionLensSpecification",
             path: "VisionPrescription.lensSpecification",
@@ -113541,7 +113541,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         TypeSchema {
             name: "VisionPrescriptionLensSpecificationPrism",
             path: "VisionPrescription.lensSpecification.prism",
@@ -113616,259 +113616,259 @@ pub static SCHEMAS: Schemas = Schemas {
         },
     ],
     resources: &[
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Account",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ActivityDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ActorDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "AdministrableProductDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "AdverseEvent",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "AllergyIntolerance",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Appointment",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "AppointmentResponse",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ArtifactAssessment",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "AuditEvent",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Basic",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Binary",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "BiologicallyDerivedProduct",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "BodyStructure",
         #[cfg(feature = "terminology")]
         "Bundle",
         #[cfg(feature = "terminology")]
         "CapabilityStatement",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "CarePlan",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "CareTeam",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Claim",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ClaimResponse",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ClinicalUseDefinition",
         #[cfg(feature = "terminology")]
         "CodeSystem",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Communication",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "CommunicationRequest",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "CompartmentDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Composition",
         #[cfg(feature = "terminology")]
         "ConceptMap",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Condition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Consent",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Contract",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Coverage",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "CoverageEligibilityRequest",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "CoverageEligibilityResponse",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DetectedIssue",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Device",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DeviceAlert",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DeviceAssociation",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DeviceDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DeviceMetric",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DeviceRequest",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DiagnosticReport",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "DocumentReference",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Encounter",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Endpoint",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "EnrollmentRequest",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "EnrollmentResponse",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "EpisodeOfCare",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "EventDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Evidence",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "EvidenceVariable",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ExampleScenario",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ExplanationOfBenefit",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "FamilyMemberHistory",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Flag",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Goal",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Group",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "GuidanceResponse",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "HealthcareService",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ImagingSelection",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ImagingStudy",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Immunization",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ImplementationGuide",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Ingredient",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "InsurancePlan",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "InsuranceProduct",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Invoice",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Library",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "List",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Location",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ManufacturedItemDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Measure",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MeasureReport",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Medication",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MedicationAdministration",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MedicationDispense",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MedicationRequest",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MedicationStatement",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MedicinalProductDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MessageDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "MessageHeader",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "NamingSystem",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "NutritionIntake",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "NutritionOrder",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "NutritionProduct",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Observation",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ObservationDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "OperationDefinition",
         #[cfg(feature = "terminology")]
         "OperationOutcome",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Organization",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "OrganizationAffiliation",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "PackagedProductDefinition",
         #[cfg(feature = "terminology")]
         "Parameters",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Patient",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "PaymentNotice",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "PaymentReconciliation",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Person",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "PlanDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Practitioner",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "PractitionerRole",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Procedure",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Provenance",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Questionnaire",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "QuestionnaireResponse",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "RegulatedAuthorization",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "RelatedPerson",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "RequestOrchestration",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Requirements",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ResearchStudy",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ResearchSubject",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "RiskAssessment",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Schedule",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "SearchParameter",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "ServiceRequest",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Slot",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Specimen",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "SpecimenDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "StructureDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "StructureMap",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Subscription",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "SubscriptionStatus",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "SubscriptionTopic",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Substance",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "SubstanceDefinition",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "Task",
         #[cfg(feature = "terminology")]
         "TerminologyCapabilities",
         #[cfg(feature = "terminology")]
         "ValueSet",
-        #[cfg(feature = "resources")]
+        #[cfg(any(feature = "resources", feature = "r6-resources"))]
         "VisionPrescription",
     ],
     primitives: &[

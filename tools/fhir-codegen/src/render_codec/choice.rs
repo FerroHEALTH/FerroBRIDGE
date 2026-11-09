@@ -151,7 +151,7 @@ pub(super) fn render_resource_enum(
     )?;
     writeln!(out, "        match self {{")?;
     for resource in resources {
-        out.push_str(&resource_scope(model, resource).cfg());
+        out.push_str(&resource_scope(model, resource).cfg(&model.name));
         writeln!(
             out,
             "            Self::{resource}(inner) => {C}::Json::to_json(inner.as_ref()),"
@@ -177,7 +177,7 @@ pub(super) fn render_resource_enum(
     )?;
     writeln!(out, "        match {C}::resource_type(object, path)? {{")?;
     for resource in resources {
-        out.push_str(&resource_scope(model, resource).cfg());
+        out.push_str(&resource_scope(model, resource).cfg(&model.name));
         writeln!(
             out,
             "            {resource:?} => Ok(Self::{resource}({C}::boxed(object, path)?)),"

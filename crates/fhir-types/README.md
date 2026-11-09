@@ -42,10 +42,12 @@ it. The default set is what a dependant gets with no feature list.
 | `r6` | the FHIR R6 (6.0.0-ballot5) module | yes |
 | `terminology` | the terminology root set, the closure of the types it references, and the operation contracts | yes |
 | `resources` | every concrete resource each package defines, with its complete closure; enables `terminology` | no |
+| `stu3-resources`, `r4-resources`, `r4b-resources`, `r5-resources`, `r6-resources` | the `resources` set in that version module alone; enables the version and `terminology` | no |
 
 A version module carries only the types the enabled root set selects, so
 `default-features = false` with `r4` and `terminology` builds the R4
-terminology surface alone. `Resource` holds one variant per resource the
+terminology surface alone, and `r4-resources` with `stu3` builds every R4
+resource beside the STU3 terminology surface, with no STU3 resource. `Resource` holds one variant per resource the
 enabled features select, and `UnknownResource` carries any other resource's
 JSON body unchanged.
 
@@ -58,7 +60,8 @@ contracts carry exactly the parameters 3.0.2 declares.
 
 ## The search parameter registry
 
-With `resources` on, each version module carries
+Each version module whose resources are on (through `resources` or its own
+`<version>-resources`) carries
 `search_parameters::SEARCH_PARAMETERS`, over the types in the crate-level
 `fhir_types::search` module: every `SearchParameter` the core package defines
 (its examples left out) with its canonical, code, base types, type and

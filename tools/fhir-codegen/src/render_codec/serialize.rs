@@ -358,7 +358,7 @@ pub(super) fn render_resource_serialize(
     )?;
     writeln!(out, "        match self {{")?;
     for resource in resources {
-        out.push_str(&resource_scope(model, resource).cfg());
+        out.push_str(&resource_scope(model, resource).cfg(&model.name));
         writeln!(
             out,
             "            Self::{resource}(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),"

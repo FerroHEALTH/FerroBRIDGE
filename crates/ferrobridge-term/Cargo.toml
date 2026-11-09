@@ -4,7 +4,7 @@
 name = "ferrobridge-term"
 description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate, $validate-code, $expand and $subsumes"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.151"
+version = "0.1.152"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -26,9 +26,9 @@ smart = ["dep:ferrohealth-smart"]
 # One feature per FHIR release the client speaks, each compiling that
 # release's fhir-types module and its writers and readers; a release left off
 # has no `WireVersion` variant. The default is the three releases the
-# workspace's consumers configure. R5 and R6 stay off by default because the
-# fhir-types `resources` feature, which a binary such as the bridge also
-# enables, then compiles every resource of those releases as well (#1737).
+# workspace's consumers configure. R5 and R6 stay off by default because a
+# dependant that enables the crate-wide fhir-types `resources` feature then
+# compiles every resource of those releases as well (#1737).
 default = ["stu3", "r4", "r4b"]
 stu3 = ["fhir-types/stu3"]
 r4 = ["fhir-types/r4"]
