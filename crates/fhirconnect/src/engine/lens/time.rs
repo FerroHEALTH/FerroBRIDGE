@@ -17,6 +17,7 @@
 //! dropped or seconds invented.
 
 use fhir_types::r4::primitives::Time;
+use openehr_base::v1_3::foundation_types::time::iso8601_time::Iso8601Time;
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_time::DvTime;
 
 use crate::engine::lens::Fallback;
@@ -83,40 +84,15 @@ impl Lens<DvTime, Time> for TimeLens {
 /// `hhmmss[.f]` gains its separators; both are the openEHR `Iso8601_time`
 /// forms (<https://specifications.openehr.org/releases/BASE/Release-1.2.0/foundation_types.html#_iso8601_time_class>).
 fn extended(value: &str) -> Option<String> {
-    let (clock, fraction) = match value.split_once(['.', ',']) {
-        Some((clock, fraction)) => (clock, Some(fraction)),
-        None => (value, None),
+    let time = Iso8601Time {
+        value: String::from(value),
     };
-    if let Some(fraction) = fraction
-        && (fraction.is_empty() || !fraction.bytes().all(|byte| byte.is_ascii_digit()))
-    {
+    if time.hour().is_none() || time.is_partial() || time.timezone().is_some() {
         return None;
     }
-    let digits: String = match clock.len() {
-        8 if clock.as_bytes().get(2) == Some(&b':') && clock.as_bytes().get(5) == Some(&b':') => {
-            clock
-                .chars()
-                .filter(|&character| character != ':')
-                .collect()
-        }
-        6 => String::from(clock),
-        _ => return None,
-    };
-    if digits.len() != 6 || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-        return None;
-    }
-    let (hours, rest) = digits.split_at(2);
-    let (minutes, seconds) = rest.split_at(2);
-    let fits = hours <= "23" && minutes <= "59" && seconds <= "60";
-    if !fits {
-        return None;
-    }
-    let mut text = format!("{hours}:{minutes}:{seconds}");
-    if let Some(fraction) = fraction {
-        text.push('.');
-        text.push_str(fraction);
-    }
-    Some(text)
+    // NOTE: R4 `time` writes its fraction after a full stop
+    // (<https://hl7.org/fhir/R4/datatypes.html#time>), so a comma decimal sign becomes one.
+    Some(time.as_string().replacen(',', ".", 1))
 }
 
 #[cfg(test)]

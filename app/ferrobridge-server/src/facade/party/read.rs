@@ -134,7 +134,7 @@ fn entry(
     resource: Object,
 ) -> Value {
     let location = party::location(facade, resource_type, version);
-    let id = crate::cdr::ids::versioned_object_uid(version);
+    let id = version.versioned_object_id();
     let method = if version.version_tree_id().is_first() {
         "POST"
     } else {

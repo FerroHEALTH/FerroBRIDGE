@@ -165,26 +165,11 @@ impl Source {
     /// identifier (RM Common §`OBJECT_VERSION_ID`), taken as written: the
     /// typed `Uid` accessor lower-cases a UUID, and the side table keys a
     /// composition by the spelling the CDR issued.
-    ///
-    /// # Panics
-    ///
-    /// Never: `ObjectVersionId::new` refuses a value whose `object_id` part
-    /// is not a legal `uid`, which is all `HierObjectId::new` checks.
     #[must_use]
-    #[expect(
-        clippy::expect_used,
-        reason = "ObjectVersionId::new checked the object_id part against the uid production HierObjectId::new checks"
-    )]
     pub fn new(ehr_id: HierObjectId, version_uid: ObjectVersionId) -> Self {
-        let object_id = version_uid
-            .value()
-            .split_once("::")
-            .map_or(version_uid.value(), |(head, _)| head);
-        let versioned_object_uid = HierObjectId::new(object_id)
-            .expect("the object_id of a constructed OBJECT_VERSION_ID should be a legal uid");
         Self {
             ehr_id,
-            versioned_object_uid,
+            versioned_object_uid: version_uid.versioned_object_id(),
             version_uid,
         }
     }
