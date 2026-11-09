@@ -3,7 +3,7 @@
 
 //! The selection of the message structure a lexed message is grouped by.
 
-use hl7v2_types::model::Structure;
+use hl7v2_types::model::{Node, Segment, Structure};
 
 use crate::parse::{Message, base_name};
 
@@ -251,4 +251,19 @@ fn version_key(version: &str) -> Option<Vec<u32>> {
             if digits { part.parse().ok() } else { None }
         })
         .collect()
+}
+
+/// Returns the table of the segment `id` as `structure` places it: the
+/// segment definition of the structure's own version, for a message written
+/// in that version.
+#[must_use]
+pub fn segment_of(structure: &'static Structure, id: &str) -> Option<&'static Segment> {
+    fn find(nodes: &'static [Node], id: &str) -> Option<&'static Segment> {
+        nodes.iter().find_map(|node| match node {
+            Node::Segment(reference) if reference.segment.id == id => Some(reference.segment),
+            Node::Group(group) => find(group.children, id),
+            _ => None,
+        })
+    }
+    find(structure.nodes, id)
 }

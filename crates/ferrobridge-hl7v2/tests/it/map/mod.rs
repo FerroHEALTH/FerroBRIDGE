@@ -7,6 +7,7 @@
 
 mod bundle;
 mod endpoint;
+mod inverse;
 mod offline;
 mod outcome;
 mod package;

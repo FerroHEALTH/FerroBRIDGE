@@ -1,0 +1,28 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "table-address-type-to-hl70190",
+  "url": "https://ferrobridge.eu/fhir/v2mappings/ConceptMap/table-address-type-to-hl70190",
+  "name": "FerroBRIDGEAddressTypeToHl70190",
+  "title": "FerroBRIDGE supplement: address-type to HL7 table 0190",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "Adds the FHIR-to-v2 direction of ConceptMap/table-hl70190-to-address-type of hl7.fhir.uv.v2mappings 1.0.0, which maps v2 to FHIR only. Reversed, that map gives postal two sources (M and SH); this map names M (Mailing) for postal, since SH (Shipping) is a delivery address for goods. physical and both have no source in that map and none here. Used by the PID inverse of FerroBRIDGE #1716.",
+  "group": [
+    {
+      "source": "http://hl7.org/fhir/address-type",
+      "target": "http://terminology.hl7.org/CodeSystem/v2-0190",
+      "element": [
+        {
+          "code": "postal",
+          "target": [
+            {
+              "code": "M",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
