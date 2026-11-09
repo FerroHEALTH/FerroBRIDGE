@@ -54,24 +54,39 @@ rule, machine-enforced by the `crate-version-guard` CI job.
 - Not every bumped version is published; gaps in the published sequence are
   normal. Publishing different content under an existing version is what is
   forbidden, and crates.io refuses it.
-- **A breaking change is a patch too** (owner decision 2026-10-17, #510): the
-  line moves one patch per change whether or not the change breaks a crate's
-  public API. Cargo reads a `0.x` caret requirement as compatible across
-  patches (<https://doc.rust-lang.org/cargo/reference/semver.html>), so a
-  consumer pins a crate of the line exactly (`fhirconnect = "=0.1.120"`), as
-  FerroFED does, and moves the pin deliberately. A PR that breaks a public API
-  says so in its body and its CHANGELOG entry, naming what a consumer changes.
+- **A published crate follows Cargo SemVer** (coordinator decision under the
+  owner's delegation, 2026-11-09, #1745, superseding the patch-per-change rule
+  of #510): a compatible change bumps the patch, and a breaking change bumps
+  the minor while the crate is 0.x (0.1.240 to 0.2.0), the rule Cargo reads a
+  caret requirement by (<https://doc.rust-lang.org/cargo/reference/semver.html>,
+  <https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#caret-requirements>).
+  `cargo-semver-checks` is the judge (`scripts/checks/semver.sh`, pinned in
+  `docs/VERSIONS.md`): `crate-version-guard` refuses any other step (a skipped
+  minor, a minor step whose patch is not 0, a step out of 0.x, which is an
+  owner decision), and CI then judges every crate that moved from a published
+  line against the target branch, refusing a break on a patch and a minor
+  bump with no break. A new variant goes at the end of an enum, since the
+  judge counts a moved discriminant as a break.
+- **A consumer outside this workspace requires a crate of the line by a caret
+  range** (`fhirconnect = "0.1"`, or `"0.1.240"` for a floor), so one
+  compatible release serves every crate in its build that uses it, and two
+  family crates built against different patches resolve together. Each
+  published crate's README states that range, and `crate-version-guard`
+  checks it names the line the manifest is on. A PR that breaks a public API
+  says so in its body and its CHANGELOG entry, naming what a consumer
+  changes.
 - **A crate of this line requires a sibling of this workspace exactly**
   (#1736): `ferrobridge-validator` requires `ferrobridge-term = "=0.1.147"`,
   in the root `[workspace.dependencies]` and wherever else a sibling is
-  named with a version. The line moves one patch per change, a breaking one
-  included, and Cargo reads a caret or tilde on `0.1.x` as compatible across
-  patches, so a published crate with a range would resolve a later sibling it
-  was never built with (validator 0.1.151 against term 0.1.146). An exact
-  requirement means a sibling's bump moves every member that requires it in
-  the same PR, which the bump rule above already demands, since the root
-  entry is packaged content. `crate-version-guard` fails a range between
-  workspace crates on every run.
+  named with a version. The siblings are built, tested and released
+  together from one commit, so a published crate names the one sibling
+  release it was verified with, and a consumer's lockfile cannot pair it
+  with a later sibling this workspace never built it against. A sibling's
+  bump then moves every member that requires it in the same PR, which the
+  bump rule above already demands, since the root entry is packaged
+  content. `crate-version-guard` fails a range between workspace crates on
+  every run. The caret ranges of the rule above are for consumers outside
+  this workspace.
 - **A crate of this line takes a caret requirement on another family shared
   crate** (owner decision 2026-10-26): `ferrobridge-term` requires
   `ferrohealth-smart = "0.8.3"`, never `=0.8.3`, because the FerroAUTH,

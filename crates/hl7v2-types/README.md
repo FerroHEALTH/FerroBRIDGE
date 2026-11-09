@@ -54,6 +54,21 @@ tables are published as FHIR `CodeSystem` and `ValueSet` resources in the HL7
 terminology package, which a terminology server serves by the value set URL a
 field names.
 
+## Requiring the crate
+
+The crate follows Cargo's SemVer rules: a compatible change moves the patch,
+and a breaking change moves the minor while the crate is 0.x. Require it with a
+caret range on its line, so one release serves every crate in your build that
+uses it:
+
+```toml
+[dependencies]
+hl7v2-types = "0.1"
+```
+
+Name a patch (`"0.1.N"`) when you need the first release that carries what
+you use; the range is the same caret range.
+
 ## Examples
 
 Find the structure a message's `MSH-9` selects, walk to a segment it places,
@@ -90,8 +105,8 @@ assert_eq!(orm.structure.id, "ORM_O01");
 assert_eq!(orm.structure.withdrawn_as_of, Some("2.7"));
 ```
 
-The crate is on the FerroBRIDGE crate line: every change moves it one patch,
-a breaking change included, so pin it exactly.
+The crate is on the FerroBRIDGE crate line, which follows Cargo SemVer:
+require it by the caret range under Requiring the crate above.
 
 ## Source
 
