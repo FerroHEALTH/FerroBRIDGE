@@ -399,8 +399,12 @@ async fn a_failing_token_endpoint_keeps_its_status() -> Result<(), Box<dyn Error
         .await
         .expect_err("a 503 is no token");
     assert!(
-        matches!(token_error(&error), TokenError::Refused { status, error: None, body } if *status == StatusCode::SERVICE_UNAVAILABLE && body == "restarting"),
+        matches!(token_error(&error), TokenError::Refused { status, error: None } if *status == StatusCode::SERVICE_UNAVAILABLE),
         "{error:?}"
+    );
+    assert!(
+        !format!("{error:?}").contains("restarting"),
+        "the refusal keeps nothing of the body: {error:?}"
     );
     assert_eq!(Some(StatusCode::SERVICE_UNAVAILABLE), error.status());
     Ok(())
@@ -466,7 +470,7 @@ async fn a_token_that_is_not_a_bearer_token_is_refused() -> Result<(), Box<dyn E
         .await
         .expect_err("the bridge sends bearer tokens");
     assert!(
-        matches!(token_error(&error), TokenError::TokenType { found } if found == "DPoP"),
+        matches!(token_error(&error), TokenError::TokenType { found, expected } if found == "DPoP" && *expected == "Bearer"),
         "{error:?}"
     );
     Ok(())

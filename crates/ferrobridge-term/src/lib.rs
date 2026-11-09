@@ -30,6 +30,15 @@
 //! serves several releases side by side puts the release in the base path.
 #![doc(test(attr(deny(warnings))))]
 
+#[cfg(not(any(
+    feature = "stu3",
+    feature = "r4",
+    feature = "r4b",
+    feature = "r5",
+    feature = "r6"
+)))]
+compile_error!("ferrobridge-term needs at least one release feature: stu3, r4, r4b, r5 or r6");
+
 pub mod client;
 pub mod concept;
 pub mod config;
@@ -45,7 +54,8 @@ mod wire;
 /// The HL7 FHIR release this crate targets.
 ///
 /// The release is published at <https://hl7.org/fhir/R4/>. STU3, R4B, R5 and
-/// the R6 ballot are accepted on the wire as well ([`WireVersion`](config::WireVersion)).
+/// the R6 ballot are accepted on the wire as well
+/// ([`WireVersion`](config::WireVersion)), each behind the feature of its name.
 pub const FHIR_VERSION: &str = "R4";
 
 /// `CodeSystem/$lookup`, as the operation is invoked

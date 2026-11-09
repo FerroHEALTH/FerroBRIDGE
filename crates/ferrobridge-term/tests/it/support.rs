@@ -12,8 +12,15 @@ use std::error::Error;
 use std::time::Duration;
 use wiremock::MockServer;
 
-/// The two releases every operation suite runs against.
-pub(crate) const RELEASES: [WireVersion; 2] = [WireVersion::R4, WireVersion::R4B];
+/// The releases among R4 and R4B the build compiles, which every operation
+/// suite runs against.
+#[cfg(any(feature = "r4", feature = "r4b"))]
+pub(crate) const RELEASES: &[WireVersion] = &[
+    #[cfg(feature = "r4")]
+    WireVersion::R4,
+    #[cfg(feature = "r4b")]
+    WireVersion::R4B,
+];
 
 /// Returns the path segment the reference server serves `version` under.
 ///
@@ -43,6 +50,7 @@ pub(crate) fn config(server: &MockServer, version: WireVersion) -> Result<Config
 
 /// Returns the values of request header `name` on the request `index` of
 /// `server`, in wire order.
+#[cfg(any(feature = "stu3", feature = "r4"))]
 pub(crate) async fn request_header(
     server: &MockServer,
     index: usize,
