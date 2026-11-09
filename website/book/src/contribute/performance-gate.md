@@ -4,7 +4,9 @@
 # The performance gate
 
 Every pull request that changes what the bridge is built from runs the
-`perf` job, and so does every push to `main` and every release. The job fails
+`perf` job, and so does every push to `main` and every release. The merge
+queue does not run it: there the job passes at once and its summary says so,
+since the pull request was judged and the push to `main` is judged again. The job fails
 when the bridge does work while idle, or when the change makes it slower,
 heavier or busier under load than its base, measured beside it on the same
 runner. FerroPIX shipped an outbox sender that busy-looped at about 8,000

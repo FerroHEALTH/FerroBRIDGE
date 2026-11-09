@@ -106,3 +106,6 @@
 - [Workers never idle on the merge queue](workers-never-idle-on-merge-queue.md): start the next independent issue while a PR waits in a queue
 - [Decide, do not ask](decide-dont-ask.md): make tracker, design and release calls yourself and act; ask the owner only when a tool is refused
 - [Workers own every open PR](workers-own-every-open-pr.md): drive all your open PRs to merge; the watcher shepherds auto-merge and bot PRs
+- [Merge queue runs functional gates only](merge-queue-functional-only.md):
+  perf and the browser journeys pass with a note in merge_group and run on
+  the PR and on main; owner 2026-11-09, #1790
