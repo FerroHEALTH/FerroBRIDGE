@@ -40,7 +40,7 @@ async fn a_served_code_system_counts_one_in_every_release() -> Result<(), Box<dy
 
 #[tokio::test]
 async fn an_unserved_code_system_counts_zero() -> Result<(), Box<dyn std::error::Error>> {
-    for version in RELEASES {
+    for &version in RELEASES {
         let server = MockServer::start().await;
         mount(&server, version, terminology::search_count(0)).await;
         let count = client(&server, version)?
