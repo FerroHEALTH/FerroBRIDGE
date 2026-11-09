@@ -128,7 +128,7 @@ uses it:
 
 ```toml
 [dependencies]
-eehrxf = "0.1"
+eehrxf = "0.2"
 ```
 
 Name a patch (`"0.1.N"`) when you need the first release that carries what

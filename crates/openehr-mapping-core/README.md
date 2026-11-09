@@ -46,7 +46,7 @@ uses it:
 
 ```toml
 [dependencies]
-openehr-mapping-core = "0.1"
+openehr-mapping-core = "0.2"
 ```
 
 Name a patch (`"0.1.N"`) when you need the first release that carries what
