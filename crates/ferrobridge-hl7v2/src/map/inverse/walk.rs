@@ -160,10 +160,16 @@ impl<'c> Inverse<'c> {
             if root && matches!(key.as_str(), "resourceType" | "id" | "meta") {
                 continue;
             }
+            // NOTE: R4 JSON §Primitive Types: a primitive's extensions sit under `_name`, so a row
+            // that steps through `name` into its `extension` reads them there.
+            let (name, extended) = match key.strip_prefix('_') {
+                Some(primitive) => (primitive, true),
+                None => (key.as_str(), false),
+            };
             let named: Vec<usize> = slots
                 .iter()
                 .enumerate()
-                .filter(|(_, (name, ..))| name == key)
+                .filter(|(_, (slot, ..))| slot == name)
                 .map(|(index, _)| index)
                 .collect();
             let (items, repeated): (Vec<&Value>, bool) = match member {
@@ -186,6 +192,17 @@ impl<'c> Inverse<'c> {
                 }
                 let Some((_, _, members)) = slots.get(slot) else {
                     continue;
+                };
+                let below: Vec<&Line<'c>>;
+                let members = if extended {
+                    below = members
+                        .iter()
+                        .copied()
+                        .filter(|line| line.steps.len() > depth.saturating_add(1))
+                        .collect();
+                    &below
+                } else {
+                    members
                 };
                 let held = instance.unwrap_or(&here).to_owned();
                 let found = self.assign(
@@ -212,7 +229,7 @@ impl<'c> Inverse<'c> {
         path: &'a str,
         inner: &'a [usize],
         grid: &'a mut Grid,
-    ) -> Pin<Box<dyn Future<Output = Result<(), InverseError>> + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<(), InverseError>> + Send + 'a>> {
         Box::pin(async move {
             let source_type = line.source_type.clone().unwrap_or_default();
             if let Some(map) = self.datatype_map(line, &source_type) {

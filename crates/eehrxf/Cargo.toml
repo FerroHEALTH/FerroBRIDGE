@@ -47,8 +47,7 @@ fhir-r4 = [
   "dep:ferrobridge-validator",
   "dep:fhir-types",
   "dep:http",
-  "fhir-types/r4",
-  "fhir-types/resources",
+  "fhir-types/r4-resources",
 ]
 # The mapping between openEHR compositions and the FHIR R4 exchange format, run
 # in process by the FHIRconnect 1.0.0 engine, which reads and writes R4 alone,

@@ -88,20 +88,36 @@ pub(crate) struct Tables {
 }
 
 impl Tables {
-    /// Adds the answer to `code` through the table map `id`.
+    /// Adds the answer to `code` through the guide's table map `id`.
     pub(crate) fn answer(
-        mut self,
+        self,
         id: &str,
         code: &str,
         system: &str,
         target: &str,
         display: &str,
     ) -> Self {
+        self.answer_at(
+            &format!("http://hl7.org/fhir/uv/v2mappings/ConceptMap/{id}"),
+            code,
+            system,
+            target,
+            display,
+        )
+    }
+
+    /// Adds the answer to `code` through the table map at `url`, a map the
+    /// crate's supplements add under FerroBRIDGE's own base among them.
+    pub(crate) fn answer_at(
+        mut self,
+        url: &str,
+        code: &str,
+        system: &str,
+        target: &str,
+        display: &str,
+    ) -> Self {
         self.answers.insert(
-            (
-                format!("http://hl7.org/fhir/uv/v2mappings/ConceptMap/{id}"),
-                String::from(code),
-            ),
+            (String::from(url), String::from(code)),
             (
                 String::from(system),
                 String::from(target),
