@@ -4,7 +4,7 @@
 name = "fhir-search"
 description = "The FHIR R4 search value grammar: the escaped value list, tokens, string matching and dates with their prefixes and ranges"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.129"
+version = "0.1.130"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

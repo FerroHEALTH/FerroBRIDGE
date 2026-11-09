@@ -10,9 +10,15 @@
 # Every requirement on a workspace crate names its version exactly (`=X.Y.Z`),
 # checked over the whole tree on every run (#1736).
 #
-# Versions are per crate here, not lockstep: the members on the crate line move
-# one patch per change and every other member still holds its name at the 0.0.0
-# placeholder (docs/VERSIONS.md).
+# Versions are per crate here, not lockstep, and follow Cargo SemVer (#1745): a
+# compatible change moves the patch, a breaking one the minor while the crate is
+# 0.x, and every other member still holds its name at the 0.0.0 placeholder
+# (docs/VERSIONS.md). The guard refuses any other step: a skipped minor, a minor
+# step that keeps its patch, or a step out of 0.x. Which of the two steps a
+# change needs is cargo-semver-checks' judgement (scripts/checks/semver.sh): the
+# guard names the crates to judge in `judged=` of $GITHUB_OUTPUT when CI sets
+# it. Every crate past 0.0.0 states the caret range consumers require,
+# `<name> = "0.Y"`, in its README, checked over the whole tree on every run.
 #
 #   crate-version-guard.sh <base-ref> [head-ref]
 #   crate-version-guard.sh --self-test
@@ -67,6 +73,7 @@ self_test() {
   cp "$guard" "$tmp/repo/scripts/checks/"
   printf '[workspace]\nmembers = ["crates/demo"]\n' > "$tmp/repo/Cargo.toml"
   echo 'pub fn a() {}' > "$tmp/repo/crates/demo/src/lib.rs"
+  printf 'demo = "0.1"\n' > "$tmp/repo/crates/demo/README.md"
   set_version 0.1.0
   t_git add -A
   t_git commit -qm base
@@ -143,9 +150,29 @@ self_test() {
   t_git commit -qam 'the requirement moves'
   expect 1 "a moved workspace dependency without a bump" patched HEAD
 
+  # The #1745 cases: a step is a patch or one minor with the patch at 0, and
+  # the README names the line the manifest is on.
+  t_git branch stepped
+  set_version 0.2.0
+  t_git commit -qam 'a minor step without its README'
+  expect 1 "a minor step whose README names the old line" stepped HEAD
+  printf 'demo = "0.2"\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'the README follows'
+  expect 0 "a minor step with its README" stepped HEAD
+  set_version 0.3.0
+  printf 'demo = "0.3"\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'a skipped minor'
+  expect 1 "a step over a minor" stepped HEAD
+  set_version 0.2.1
+  printf 'demo = "0.2"\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'a minor step keeping a patch'
+  expect 1 "a minor step whose patch is not 0" stepped HEAD
+  set_version 1.0.0
+  printf 'demo = "1"\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'out of 0.x'
+  expect 1 "a step out of 0.x" stepped HEAD
   # The #1736 case: a sibling requirement between workspace crates is exact,
-  # since every patch of the crate line may break and Cargo reads a caret on
-  # 0.1.x as compatible across patches.
+  # since the siblings are released together from one commit.
   t_git branch moved
   printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde = "2"\ndemo = { path = "crates/demo", version = "0.1.4" }\n' > "$tmp/repo/Cargo.toml"
   t_git commit -qam 'a caret sibling requirement'
@@ -169,12 +196,38 @@ if [[ "${1:-}" = "--self-test" ]]; then
   exit
 fi
 
+# The line a version sits on, as a caret requirement names it: `0.Y` while
+# the major is 0, the major otherwise.
+version_line() {
+  if [[ "${1%%.*}" == "0" ]]; then cut -d. -f1-2 <<<"$1"; else echo "${1%%.*}"; fi
+}
+
+package_field() {
+  local field="$1"
+  awk -F'"' -v key="$field" '/^\[package\]/{p=1} p && $0 ~ "^" key " = " {print $2; exit}'
+}
+
+# Every crate past 0.0.0 tells consumers the caret range to require, on the
+# line its manifest is on (#1745).
+unstated=0
+for manifest in crates/*/Cargo.toml; do
+  version="$(package_field version < "$manifest")"
+  [[ "$version" != "0.0.0" ]] || continue
+  name="$(package_field name < "$manifest")"
+  readme="$(dirname "$manifest")/README.md"
+  want="$name = \"$(version_line "$version")\""
+  if ! grep -qF -- "$want" "$readme" 2>/dev/null; then
+    echo "::error::$readme does not state the range consumers require, $want, for $name $version (.claude/rules/crates-publishing.md)." >&2
+    unstated=1
+  fi
+done
+[[ "$unstated" -eq 0 ]] || exit 1
 
 # Every requirement on a workspace crate that names a version names it
-# exactly (`=X.Y.Z`), in the root manifest and in any member's: the crate line
-# moves one patch per change, a breaking one included, and Cargo reads a caret
-# or tilde on 0.1.x as compatible across patches, so a published crate would
-# resolve a later, breaking sibling (#1736).
+# exactly (`=X.Y.Z`), in the root manifest and in any member's: the siblings
+# are released together, so a published crate names the sibling release it was
+# built with and never resolves one this workspace did not build it against
+# (#1736).
 inexact=0
 while IFS= read -r line; do
   [[ -z "$line" ]] && continue
@@ -236,13 +289,24 @@ version_above() {
   [[ "$candidate" != "$base_version" ]] && [[ "$(printf '%s\n%s\n' "$candidate" "$base_version" | sort -V | tail -n 1)" = "$candidate" ]]
 }
 
-package_field() {
-  local field="$1"
-  awk -F'"' -v key="$field" '/^\[package\]/{p=1} p && $0 ~ "^" key " = " {print $2; exit}'
+# Whether $2 is one Cargo SemVer step above $1: the patch on the same line,
+# or the next minor with the patch at 0 while the major is 0. Leaving 0.x is an
+# owner decision, never a step of the line.
+semver_step() {
+  local old="$1" new="$2" omaj omin nmaj nmin npat
+  IFS=. read -r omaj omin _ <<<"$old"
+  IFS=. read -r nmaj nmin npat <<<"$new"
+  [[ "$omaj" == "$nmaj" ]] || return 1
+  if [[ "$omaj" == "0" ]]; then
+    [[ "$omin" == "$nmin" ]] || [[ "$nmin" -eq $((omin + 1)) && "$npat" == "0" ]]
+  else
+    [[ "$omin" == "$nmin" ]] || [[ "$nmin" -gt "$omin" && "$npat" == "0" ]]
+  fi
 }
 
 fail=0
 bumped=""
+judged=""
 clean=""
 reserved=""
 for manifest in crates/*/Cargo.toml; do
@@ -284,6 +348,14 @@ for manifest in crates/*/Cargo.toml; do
     fail=1
     continue
   fi
+  if [[ -n "$old_ver" ]] && [[ "$old_ver" != "0.0.0" ]]; then
+    if ! semver_step "$old_ver" "$new_ver"; then
+      echo "::error::$name moves from $old_ver to $new_ver, which is neither a patch step nor the next minor at patch 0; a compatible change bumps the patch and a breaking one the minor (.claude/rules/crates-publishing.md)." >&2
+      fail=1
+      continue
+    fi
+    judged="$judged $name"
+  fi
 
   # An internal requirement only exists for a crate other members depend on;
   # when it does, it must name the same version.
@@ -302,6 +374,11 @@ for manifest in crates/*/Cargo.toml; do
 done
 
 [[ "$fail" -eq 0 ]] || exit 1
+# CI judges each crate that moved from a published line with
+# scripts/checks/semver.sh in the steps after this one.
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "judged=${judged# }" >> "$GITHUB_OUTPUT"
+fi
 if [[ -z "$bumped" ]]; then
   echo "crate-version-guard: no packaged content of crates/* changed."
 else
