@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.2"
+ferrobridge-hl7v2 = "0.1"
 ```
 
-Name a patch (`"0.2.N"`) when you need the first release that carries what
+Name a patch (`"0.1.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -93,7 +93,7 @@ the writer and the acknowledgment. A consumer that maps offline with no
 package on disk takes:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.2", default-features = false, features = ["shipped-maps"] }
+ferrobridge-hl7v2 = { version = "0.1.212", default-features = false, features = ["shipped-maps"] }
 ```
 
 ## Example
