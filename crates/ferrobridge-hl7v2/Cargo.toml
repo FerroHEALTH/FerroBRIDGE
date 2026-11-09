@@ -4,7 +4,7 @@
 name = "ferrobridge-hl7v2"
 description = "The FerroBRIDGE HL7 v2 face: MLLP framing, MSH-18 decoding, positional parsing over the generated v2 tables, the acknowledgment, and the v2-to-FHIR ConceptMap interpreter"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.214"
+version = "0.1.215"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -65,7 +65,7 @@ logos = { workspace = true, optional = true }
 # The FHIR writer: the path model over the fhir-types element table.
 fhirconnect = { workspace = true, optional = true }
 # The R4 model the ConceptMaps decode into and the output is checked against.
-fhir-types = { workspace = true, features = ["r4", "resources"], optional = true }
+fhir-types = { workspace = true, features = ["r4-resources"], optional = true }
 # R4, the release the guide's ConceptMaps are written in; the binary that
 # configures the client adds any other release it speaks.
 ferrobridge-term = { workspace = true, optional = true, features = ["r4"] }
@@ -87,6 +87,8 @@ uuid = { workspace = true, optional = true }
 # The suites also drive an STU3 terminology server.
 ferrobridge-term = { workspace = true, features = ["client", "stu3", "r4"] }
 ferrobridge-testkit.workspace = true
+# The R4 core definitions a mapped resource is validated against.
+ferrobridge-validator.workspace = true
 insta.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "net", "io-util", "test-util"] }

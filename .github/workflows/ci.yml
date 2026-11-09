@@ -670,7 +670,7 @@ jobs:
         run: cargo hack clippy -p eehrxf --feature-powerset --depth 2 --all-targets --locked -- -D warnings
 
   clippy-fhir-types:
-    name: clippy-fhir-types (${{ matrix.version }}, resources)
+    name: clippy-fhir-types (${{ matrix.version }}-resources)
     needs: detect
     if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
     runs-on: ubuntu-latest
@@ -690,10 +690,11 @@ jobs:
           components: clippy
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       # One version with every resource is what a consumer builds; each is one
-      # crate compile and fits the runner.
+      # crate compile and fits the runner. `<version>-resources` and
+      # `<version>,resources` select the same items.
       - env:
           VERSION: ${{ matrix.version }}
-        run: cargo clippy --locked -p fhir-types --all-targets --no-default-features --features "$VERSION,resources" -- -D warnings
+        run: cargo clippy --locked -p fhir-types --all-targets --no-default-features --features "$VERSION-resources" -- -D warnings
 
   # The reached packages in shards, as the clippy lane runs them.
   test:

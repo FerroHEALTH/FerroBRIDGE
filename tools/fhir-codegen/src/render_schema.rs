@@ -33,7 +33,7 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
         "//! The element table of the version's types: each element's path, cardinality,\n//! type codes, content reference and XML kind, in definition order\n//! (<https://hl7.org/fhir/R4/elementdefinition.html>).\n\n",
     );
     out.push_str("use super::super::schema::Schemas;\n");
-    out.push_str(&RootScope::Terminology.cfg());
+    out.push_str(&RootScope::Terminology.cfg(&model.name));
     out.push_str(
         "use super::super::schema::{FieldSchema, Kind, PrimitiveSchema, TypeSchema, ValueKind};\n\n",
     );
@@ -50,7 +50,7 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
         let TypeKind::Struct { fields } = &ty.kind else {
             continue;
         };
-        out.push_str(&ty.scope.cfg());
+        out.push_str(&ty.scope.cfg(&model.name));
         let base = ty
             .base
             .as_ref()
@@ -100,7 +100,7 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
     }
     out.push_str("    ],\n    resources: &[\n");
     for ty in model.types.values().filter(|t| t.is_resource) {
-        out.push_str(&ty.scope.cfg());
+        out.push_str(&ty.scope.cfg(&model.name));
         writeln!(out, "        {:?},", ty.name)?;
     }
     out.push_str("    ],\n    primitives: &[\n");
@@ -117,7 +117,7 @@ pub fn render_schema(model: &VersionModule) -> Result<String, fmt::Error> {
             .as_deref()
             .map(|base| primitive_code(model, base))
             .map_or_else(|| String::from("None"), |base| format!("Some({base:?})"));
-        out.push_str(&ty.scope.cfg());
+        out.push_str(&ty.scope.cfg(&model.name));
         writeln!(
             out,
             "        PrimitiveSchema {{ name: {code:?}, base: {base} }},"

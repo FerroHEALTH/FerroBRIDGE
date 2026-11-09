@@ -63,7 +63,9 @@ pub fn render_lib(models: &[VersionModule]) -> Result<String, fmt::Error> {
     writeln!(out, "pub mod definition;")?;
     writeln!(out, "pub mod operation;")?;
     writeln!(out, "pub mod schema;")?;
-    out.push_str(&RootScope::Resources.cfg());
+    out.push_str(
+        &RootScope::Resources.cfg_any(models.iter().map(|model| model.name.as_str())),
+    );
     writeln!(out, "pub mod search;")?;
     writeln!(out, "pub mod xml;")?;
     for model in models {
@@ -82,23 +84,24 @@ pub fn render_version_mod(model: &VersionModule) -> Result<String, fmt::Error> {
     let mut out = banner(model);
     writeln!(
         out,
-        "//! FHIR {} types: the root set the enabled features select and the complete\n//! closure of the datatypes and primitives it references, from `{}` {}.\n//!\n//! A type of the terminology root set is behind the `terminology` feature; a\n//! type only the wide resource root set reaches is behind `resources`.\n",
+        "//! FHIR {} types: the root set the enabled features select and the complete\n//! closure of the datatypes and primitives it references, from `{}` {}.\n//!\n//! A type of the terminology root set is behind the `terminology` feature; a\n//! type only the wide resource root set reaches is behind `resources`, which\n//! turns it on in every enabled version, or behind `{}-resources`, which turns\n//! it on in this version alone.\n",
         model.name.to_uppercase(),
         model.package_name,
-        model.package_version
+        model.package_version,
+        model.name
     )?;
     for module in model.modules().keys() {
-        out.push_str(&model.module_scope(module).cfg());
+        out.push_str(&model.module_scope(module).cfg(&model.name));
         writeln!(out, "pub mod {module};")?;
     }
     if crate::render_definition::defines_element_definition(model) {
         out.push_str(&crate::render_definition::definition_cfg(model));
         writeln!(out, "pub mod definition;")?;
     }
-    out.push_str(&RootScope::Terminology.cfg());
+    out.push_str(&RootScope::Terminology.cfg(&model.name));
     writeln!(out, "pub mod operations;")?;
     writeln!(out, "pub mod schema;")?;
-    out.push_str(&RootScope::Resources.cfg());
+    out.push_str(&RootScope::Resources.cfg(&model.name));
     writeln!(out, "pub mod search_parameters;")?;
     Ok(out)
 }
@@ -224,7 +227,7 @@ fn render_type(
             writeln!(out, "pub enum {} {{", ty.name)?;
             for resource in resources {
                 writeln!(out, "    /// A `{resource}` resource.")?;
-                out.push_str(&resource_scope(model, resource).cfg());
+                out.push_str(&resource_scope(model, resource).cfg(&model.name));
                 writeln!(
                     out,
                     "    {resource}(Box<super::{}::{resource}>),",
