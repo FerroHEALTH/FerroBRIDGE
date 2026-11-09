@@ -465,8 +465,8 @@ through `cargo hack clippy`, the way the `msrv` job compiles: a workspace-wide
 (`fhir-types` with its five versions, `openehr-am` behind the client) side by
 side, the hosted runner's seven gigabytes run out, and the runner kills the
 job with exit 143 and no diagnostic; per package the two never meet. The
-`clippy-fhir-types` matrix lints `fhir-types` per version with `resources`,
-which is what a consumer builds; the all-features union (five versions, every
+`clippy-fhir-types` matrix lints `fhir-types` per version with its
+`<version>-resources` feature, which is what a consumer builds; the all-features union (five versions, every
 resource, one crate) is no consumer's surface and is not linted in CI. A
 package with a feature its default set leaves off (`scripts/checks/featured.sh`
 names them: `eehrxf` and `ferrobridge-term` today) is also linted and tested
