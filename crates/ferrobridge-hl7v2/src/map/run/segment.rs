@@ -384,7 +384,7 @@ mod tests {
         let lexed = parse::lex::lex(text, Charset::Ascii).expect("it lexes");
         let structure = parse::structure::structure_for(&lexed.message).expect("a structure");
         assert_eq!((structure.id, structure.version), ("ORM_O01", "2.3"));
-        let parsed = parse::grouping::group(lexed, structure);
+        let parsed = parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE);
         let mut visits = Vec::new();
         collect(
             parsed.items(),
@@ -508,7 +508,7 @@ mod tests {
         let lexed = parse::lex::lex(text, Charset::Ascii).expect("it lexes");
         let structure = parse::structure::structure_for(&lexed.message).expect("a structure");
         assert_eq!(structure.withdrawn_as_of, None);
-        let parsed = parse::grouping::group(lexed, structure);
+        let parsed = parse::grouping::group(lexed, structure, &parse::profile::Profile::BASE);
         assert_eq!(
             definition_type(&corpus(), &hl7v2_types::segment::orc::ORC, 4).as_deref(),
             Some("EI")

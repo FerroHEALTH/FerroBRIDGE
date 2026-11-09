@@ -7,6 +7,7 @@
 use ferrobridge_hl7v2::ack::{Code, Error, Header, Stamp};
 use ferrobridge_hl7v2::decode::{Charset, DecodeError, decode};
 use ferrobridge_hl7v2::parse::lex::lex;
+use ferrobridge_hl7v2::parse::profile::IHE_ITI_21;
 use ferrobridge_hl7v2::parse::structure::{structure_declared, structure_for};
 use ferrobridge_hl7v2::parse::{Delimiters, ErrorCode, Location, Message, Unplaced};
 use ferrobridge_hl7v2::write::header::Msh;
@@ -311,6 +312,112 @@ fn an_echo_into_other_delimiters_is_refused() {
     assert_eq!(
         writer.echo_segment(&query, "QPD"),
         Err(EchoError::Delimiters)
+    );
+}
+
+/// A synthetic demographics query, QBP^Q22 in HL7 v2.5.
+const PDQ_QUERY: &str = "MSH|^~\\&|CONSUMER|EAST|PDQ|NORTH|20261025100000||QBP^Q22^QBP_Q21|Q-2|P|2.5\r\
+                         QPD|IHE PDQ Query|TAG-2|@PID.8^F\r\
+                         RCP|I\r";
+
+/// The ITI-21 RSP^K22 with one PID and no QRI.
+fn rsp_k22() -> (Header, Vec<Segment>) {
+    let query = lex(PDQ_QUERY, Charset::Ascii)
+        .expect("the query lexes")
+        .message;
+    let header = Header::from_text(PDQ_QUERY).expect("a header");
+    let writer = header.writer();
+    let qak = Segment::new(
+        "QAK",
+        [
+            writer
+                .echo(field(&query, "QPD", 2), query.delimiters())
+                .expect("same delimiters"),
+            Field::from("OK"),
+        ],
+    );
+    let qpd = writer
+        .echo_segment(&query, "QPD")
+        .expect("same delimiters")
+        .expect("the query holds a QPD");
+    let pid = Segment::new(
+        "PID",
+        [
+            Field::from("1"),
+            Field::default(),
+            Field::from_iter([cx("E-1", "EAST", "2.999.1.1", "ISO")]),
+            Field::default(),
+            Field::from(Repetition::from_iter(["Family", "Given"])),
+        ],
+    );
+    let segments = vec![
+        header.reply(
+            Field::from(Repetition::from_iter(["RSP", "K22", "RSP_K21"])),
+            stamp(),
+        ),
+        header.msa(Code::Accept),
+        qak,
+        qpd,
+        pid,
+    ];
+    (header, segments)
+}
+
+// NOTE: IHE ITI TF-2 §3.21.4.2.2 Table 3.21-6 makes QRI optional in the ITI-21 response,
+// where the v2.5 RSP_K21 requires one per PID.
+#[test]
+fn an_iti_21_response_without_qri_conforms_under_the_ihe_constraint_and_not_the_base() {
+    let (header, segments) = rsp_k22();
+    let refused = header
+        .writer()
+        .compose(&segments, structure_declared, Charset::Ascii);
+    let Err(ComposeError::Nonconforming { refusals, .. }) = refused else {
+        panic!("the base RSP_K21 requires QRI: {refused:?}");
+    };
+    assert!(
+        refusals
+            .iter()
+            .any(|refusal| refusal.detail.contains("RSP_K21.7-QUERY_RESPONSE.4-QRI")),
+        "{refusals:?}"
+    );
+    let composed = header
+        .writer()
+        .with_profile(&IHE_ITI_21)
+        .compose(&segments, structure_declared, Charset::Ascii)
+        .expect("the response conforms to RSP_K21 as ITI-21 constrains it");
+    assert_eq!(
+        composed.text(),
+        "MSH|^~\\&|PDQ|NORTH|CONSUMER|EAST|20261025100001+0000||RSP^K22^RSP_K21|ANSWER-1|P|2.5\r\
+         MSA|AA|Q-2\r\
+         QAK|TAG-2|OK\r\
+         QPD|IHE PDQ Query|TAG-2|@PID.8^F\r\
+         PID|1||E-1^^^EAST&2.999.1.1&ISO||Family^Given\r"
+    );
+}
+
+#[test]
+fn a_profile_relaxes_only_the_members_it_names() {
+    let (header, mut segments) = rsp_k22();
+    segments.retain(|segment| segment.id() != "QAK");
+    let refused = header.writer().with_profile(&IHE_ITI_21).compose(
+        &segments,
+        structure_declared,
+        Charset::Ascii,
+    );
+    let Err(ComposeError::Nonconforming { refusals, .. }) = refused else {
+        panic!("QAK stays required under ITI-21: {refused:?}");
+    };
+    assert!(
+        refusals
+            .iter()
+            .any(|refusal| refusal.detail.contains("QAK")),
+        "{refusals:?}"
+    );
+    assert!(
+        !refusals
+            .iter()
+            .any(|refusal| refusal.detail.contains("QRI")),
+        "{refusals:?}"
     );
 }
 
