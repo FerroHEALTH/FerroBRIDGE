@@ -13,10 +13,11 @@
 #   scripts/perf/gate.sh build [BASE]
 #       Builds target/release/ferrobridge of the checkout, the head, and of
 #       its base: the merge base of HEAD with BASE, a commit or ref, or with
-#       no BASE the newest v* tag before HEAD, else HEAD's first parent. The
-#       base is built from `git archive` of that commit under target/, with
-#       its own toolchain pin, into the same target directory, so the
-#       dependencies build once.
+#       no BASE the newest v* tag before HEAD, else HEAD's first parent. Both
+#       arms build in one tree, target/perf-build, with its own toolchain pin:
+#       first the base from `git archive` of that commit, then the same tree
+#       brought to the checkout by rewriting only the files that differ, so
+#       cargo rebuilds for the head only the crates the change reaches.
 #   scripts/perf/gate.sh run
 #       Starts both CDRs, their databases, RabbitMQ and FerroTERM over the
 #       v2-to-FHIR guide's table ConceptMaps on loopback, loads the
@@ -49,6 +50,7 @@ readonly BUSY_PLAN=perf/busy-loop.toml
 readonly CONFIG=perf/ferrobridge.toml
 readonly WORK=target/perf-run
 readonly BASE_TREE=target/perf-base
+readonly BUILD_TREE=target/perf-build
 readonly NETWORK=ferrobridge-perf
 readonly BROKER_NAME=ferrobridge-perf-broker
 readonly TERMINOLOGY_NAME=ferrobridge-perf-terminology
@@ -156,21 +158,41 @@ base_rev() {
   fi
 }
 
+# to_checkout REV TREE: brings TREE, an extract of REV, to the checkout's
+# files: each file the checkout changes against REV (committed or not) or
+# adds untracked is copied, and each it lacks is removed. A file left alone
+# keeps its modification time, which is what tells cargo it is unchanged.
+to_checkout() {
+  local rev="$1" tree="$2" path
+  while IFS= read -r -d '' path; do
+    if [[ -e "$root/$path" || -L "$root/$path" ]]; then
+      mkdir -p "$tree/$(dirname "$path")"
+      rm -f "$tree/$path"
+      cp -P "$root/$path" "$tree/$path"
+    else
+      rm -f "$tree/$path"
+    fi
+  done < <(git -C "$root" diff --name-only --no-renames -z "$rev" -- && git -C "$root" ls-files --others --exclude-standard -z)
+}
+
 # build [BASE]: the base's release binary into target/perf-base/ferrobridge,
-# then the head's into target/release/ferrobridge.
+# then the head's into target/release/ferrobridge, both from one tree and one
+# target directory.
 build() {
   local rev
   cd "$root"
   rev="$(base_rev "${1:-}")" || die "the base of ${1:-the previous release} cannot be resolved"
   echo "perf-gate: the base is $rev"
-  rm -rf "$BASE_TREE"
-  mkdir -p "$BASE_TREE/src"
+  rm -rf "$BASE_TREE" "$BUILD_TREE"
+  mkdir -p "$BASE_TREE/src" "$BUILD_TREE"
   git archive "$rev" | tar -x -C "$BASE_TREE/src"
+  git archive "$rev" | tar -x -C "$BUILD_TREE"
   printf '%s\n' "$rev" > "$BASE_TREE/rev"
-  # From inside the base's tree, so its own toolchain pin builds it.
-  (cd "$BASE_TREE/src" && cargo build --release --locked -p ferrobridge-server --bin ferrobridge --target-dir "$root/target")
+  # From inside the build tree, so its own toolchain pin builds each arm.
+  (cd "$BUILD_TREE" && cargo build --release --locked -p ferrobridge-server --bin ferrobridge --target-dir "$root/target")
   cp target/release/ferrobridge "$BASE_TREE/ferrobridge"
-  cargo build --release --locked -p ferrobridge-server --bin ferrobridge
+  to_checkout "$rev" "$BUILD_TREE"
+  (cd "$BUILD_TREE" && cargo build --release --locked -p ferrobridge-server --bin ferrobridge --target-dir "$root/target")
 }
 
 head_pid=""
@@ -475,6 +497,29 @@ self_test() {
     "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev 0000000000000000000000000000000000000000)"
   check "with no tag before it the base is the first parent" \
     "$(git -C "$repo" rev-parse v0.0.1~1)" "$(base_rev "" v0.0.1)"
+  printf 'a\n' > "$repo/kept"
+  printf 'b\n' > "$repo/changed"
+  printf 'c\n' > "$repo/gone"
+  git -C "$repo" add kept changed gone
+  commit files
+  local from tree="$work/tree"
+  from="$(git -C "$repo" rev-parse HEAD)"
+  mkdir -p "$tree"
+  git -C "$repo" archive "$from" | tar -x -C "$tree"
+  touch -t 200001010000 "$tree/kept" "$tree/changed"
+  printf 'B\n' > "$repo/changed"
+  git -C "$repo" rm --quiet gone
+  commit edit
+  mkdir -p "$repo/new"
+  printf 'n\n' > "$repo/new/file"
+  printf 'u\n' > "$repo/kept"
+  git -C "$repo" checkout --quiet -- kept
+  to_checkout "$from" "$tree"
+  check "a changed file takes the checkout's content" B "$(cat "$tree/changed")"
+  check "a changed file is newer than the extract" 1 "$([[ "$tree/changed" -nt "$tree/kept" ]] && echo 1 || echo 0)"
+  check "an unchanged file keeps its time" 200001010000 "$(date -r "$tree/kept" +%Y%m%d%H%M 2> /dev/null || stat -c %y "$tree/kept")"
+  check "a file the checkout removed is removed" 0 "$([[ -e "$tree/gone" ]] && echo 1 || echo 0)"
+  check "an untracked file is copied" n "$(cat "$tree/new/file")"
   root="$saved_root"
   [[ "$failed" -eq 0 ]] || exit 1
   echo "perf-gate: self-test OK ($n checks)."
