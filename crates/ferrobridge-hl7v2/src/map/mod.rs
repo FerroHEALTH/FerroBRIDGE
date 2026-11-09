@@ -37,6 +37,8 @@ pub mod condition;
 mod constraint;
 pub mod convert;
 pub mod corpus;
+#[cfg(feature = "shipped-maps")]
+pub mod guide;
 pub mod notation;
 mod run;
 pub mod single;

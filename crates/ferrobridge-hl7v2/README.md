@@ -41,7 +41,9 @@ specification, and the OMOP Common Data Model through the OMOCL specification.
 - `inbound`: the steps above for one message, settling the `AR` and `AE`
   answers a message owes before it is mapped.
 - `map`: the interpreter of the `hl7.fhir.uv.v2mappings` ConceptMaps, loaded
-  from a directory at run time (the corpus is never packaged). The message
+  from a directory at run time, or, with the `shipped-maps` feature, from the
+  guide's 263 maps the crate embeds (`Corpus::shipped`, about 3.9 MB; the
+  package is CC0-1.0). The message
   map names a resource per segment, the segment map maps the fields, a data
   type map maps the components, and a table map is answered by
   `ConceptMap/$translate` on a terminology server or, offline, by the same

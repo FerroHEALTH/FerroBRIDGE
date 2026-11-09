@@ -21,7 +21,15 @@ categories = ["parser-implementations", "network-programming", "science"]
 # The patterns are anchored at the root, so the LICENSE and README.md files of
 # the HL7 v2 message sets under vendor/ stay out of the package too.
 publish = true
-include = ["/src/**", "/supplements/**", "/README.md", "/LICENSE"]
+include = [
+    "/src/**",
+    "/supplements/**",
+    "/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md",
+    "/vendor/hl7.fhir.uv.v2mappings/repository/LICENSE",
+    "/vendor/hl7.fhir.uv.v2mappings/package/ConceptMap-*.json",
+    "/README.md",
+    "/LICENSE",
+]
 
 [features]
 # The v2-to-FHIR mapping (`map`), on by default. A consumer that takes only the
@@ -38,6 +46,9 @@ map = [
     "dep:sha2",
     "dep:uuid",
 ]
+# The v2-to-FHIR guide's ConceptMaps compiled in (`Corpus::shipped`), about
+# 3.9 MB of JSON, so a consumer maps with no package on disk.
+shipped-maps = ["map"]
 
 [dependencies]
 bytes.workspace = true
