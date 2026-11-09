@@ -2,25 +2,29 @@
 # SPDX-License-Identifier: BUSL-1.1
 
 # The performance gate (#1656), called by ci.yml on a change that reaches the
-# bridge and by release.yml on the release commit. Each attempt job builds
-# the release binary of the commit and of its base, installs ferrohealth-perf
-# (FerroHEALTH/FerroSYS#249) at its docs/VERSIONS.md pin and runs
-# scripts/perf/gate.sh once through .github/actions/perf-attempt: the tool's
-# A/B mode, the head's idle phase held to absolute limits with every
-# background worker running, then pairs of load phases against the base and
-# the head on the same runner, the head judged over the base, and the
-# planted poller of the head's CDR database the idle phase must fail. The
-# base is the merge base of the commit with the `base` input, or with none
-# the previous release.
+# bridge and by release.yml on the release commit. The build job builds the
+# release binary of the commit and of its base once, installs
+# ferrohealth-perf (FerroHEALTH/FerroSYS#249) at its docs/VERSIONS.md pin,
+# and hands all three to the attempt jobs as one artifact (#1778). Each
+# attempt job measures them on its own runner with scripts/perf/gate.sh
+# through .github/actions/perf-attempt: the tool's A/B mode, the head's idle
+# phase held to absolute limits with every background worker running, then
+# pairs of load phases against the base and the head on the same runner, the
+# head judged over the base, and the planted poller of the head's CDR
+# database the idle phase must fail. The base is the merge base of the
+# commit with the `base` input, or with none the previous release.
 # An attempt that ends with exit 2 could not be judged and says nothing about
 # the code, so it is retried on a fresh runner on any CPU model. Some runners
 # stall the gate for a whole job (FerroHEALTH/FerroPIX#511), so an attempt
 # that ends with exit 1 on a CPU model STALL_PRONE lists is retried too, and
 # so is an attempt job that ends cancelled while the run itself was not
-# cancelled (a runner that shut down mid-job ends with no exit code). At most
-# two retries run. The verdict job passes the gate when the last attempt that
-# ran passed; a breach on any other model fails at once, with no retry, and a
-# run cancelled by its concurrency group or by a person retries nothing.
+# cancelled (a runner that shut down mid-job ends with no exit code). An
+# attempt that lands on a stall-prone model before the last measures
+# nothing and ends with exit 2 at once, since such a run is almost never
+# judgeable (#1778). At most two retries run, and none builds again. The
+# verdict job passes the gate when the last attempt that ran passed; a breach
+# on any other model fails at once, with no retry, and a run cancelled by its
+# concurrency group or by a person retries nothing.
 # No specification governs this: our own design.
 name: Perf
 
@@ -53,22 +57,21 @@ env:
   FERROBRIDGE__USAGE_REPORT__ENABLED: "false"
   # The CPU models whose runners stall every route for 100 to 300 ms for a
   # whole job (FerroHEALTH/FerroPIX#511), one per line. A breach is retried
-  # only on one of them; an exit 2 is retried on any model.
+  # only on one of them; an exit 2 is retried on any model. Of 29 attempts
+  # on an AMD EPYC 9V74 from 2026-11-07 to 2026-11-09, 24 could not be
+  # judged, against 2 of 42 on every other model (#1778).
   STALL_PRONE: |
     AMD EPYC 9V74 80-Core Processor
 
 jobs:
-  perf:
-    name: perf (attempt 1)
+  build:
+    name: perf build
     runs-on: ubuntu-24.04
     # 90 while a base still compiles all five FHIR releases under swap (about
-    # 28 minutes) before the head and the measurement; #1743 lowers it again.
+    # 28 minutes) before the head; #1743 lowers it again.
     timeout-minutes: 90
     permissions:
       contents: read
-    outputs:
-      code: ${{ steps.attempt.outputs.code }}
-      retryable: ${{ steps.attempt.outputs.retryable }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -78,22 +81,80 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Install ferrohealth-perf
+        env:
+          VERSION: ${{ env.FERROHEALTH_PERF_VERSION }}
+        run: cargo install ferrohealth-perf --version "=${VERSION}" --locked
+      - name: Build the base and the head
+        env:
+          BASE: ${{ inputs.base }}
+          BUILD_SWAP: /perf-build.swap
+        # A release build of fhir-types with every resource of all five FHIR
+        # releases, which main compiled from #1717 until #1737, peaks above the
+        # runner's 16 GB on its own (#1737), so a swap file backs the build.
+        # The memory, swap and disk are logged each minute, so a runner that
+        # shuts down mid-build leaves the last reading in its log. Nothing is
+        # measured on this runner.
+        run: |
+          set -euo pipefail
+          swap="$BUILD_SWAP"
+          sudo fallocate -l 20G "$swap"
+          sudo chmod 600 "$swap"
+          sudo mkswap "$swap" > /dev/null
+          sudo swapon "$swap"
+          sample() {
+            while true; do
+              free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB, ", $3, $2 }
+                NR == 3 { printf "swap used %s of %s MB, ", $3, $2 }'
+              df -m . | awk 'NR == 2 { printf "disk free %s MB\n", $4 }'
+              sleep 60
+            done
+          }
+          sample &
+          sampler=$!
+          trap 'kill "$sampler" 2> /dev/null || true' EXIT
+          bash scripts/perf/gate.sh build "$BASE"
+          bash scripts/perf/gate.sh pack target/perf-arms.tar
+      # Every attempt measures these binaries, so a retry builds nothing.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-arms
+          path: target/perf-arms.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  perf:
+    name: perf (attempt 1)
+    needs: build
+    runs-on: ubuntu-24.04
+    # Measuring takes about 9 minutes; the images and the arms download first.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.attempt.outputs.code }}
+      retryable: ${{ steps.attempt.outputs.retryable }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The base's tree is extracted from history, so every commit is fetched.
+          fetch-depth: 0
       - id: attempt
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "1"
-          base: ${{ inputs.base }}
-          version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
   perf-retry:
     name: perf (attempt 2)
-    needs: perf
+    needs: [build, perf]
     # A cancelled attempt lost its runner while the run went on; !cancelled()
     # keeps a run cancelled by its concurrency group or a person from retrying.
-    if: ${{ !cancelled() && (needs.perf.outputs.retryable == 'true' || needs.perf.result == 'cancelled') }}
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.perf.outputs.retryable == 'true' || needs.perf.result == 'cancelled') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Measuring takes about 9 minutes; the images and the arms download first.
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
@@ -103,27 +164,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The base is built from history, so every commit is fetched.
+          # The base's tree is extracted from history, so every commit is fetched.
           fetch-depth: 0
-      - uses: ./.github/actions/setup-rust
-        with:
-          cache: ${{ inputs.cache && 'true' || 'false' }}
       - id: attempt
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "2"
-          base: ${{ inputs.base }}
-          version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
   perf-retry-2:
     name: perf (attempt 3)
-    needs: perf-retry
+    needs: [build, perf-retry]
     # A cancelled attempt lost its runner while the run went on; !cancelled()
     # keeps a run cancelled by its concurrency group or a person from retrying.
-    if: ${{ !cancelled() && (needs.perf-retry.outputs.retryable == 'true' || needs.perf-retry.result == 'cancelled') }}
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.perf-retry.outputs.retryable == 'true' || needs.perf-retry.result == 'cancelled') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Measuring takes about 9 minutes; the images and the arms download first.
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
@@ -133,17 +190,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The base is built from history, so every commit is fetched.
+          # The base's tree is extracted from history, so every commit is fetched.
           fetch-depth: 0
-      - uses: ./.github/actions/setup-rust
-        with:
-          cache: ${{ inputs.cache && 'true' || 'false' }}
       - id: attempt
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "3"
-          base: ${{ inputs.base }}
-          version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
   # The gate passes when the last attempt that ran passed. An attempt job
