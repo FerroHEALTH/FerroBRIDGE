@@ -61,12 +61,10 @@ struct Invariant {
 
 /// Every distinct invariant of the snapshots of a vendored package.
 fn constraints(package: &str) -> BTreeSet<Constraint> {
-    let vendor = if package == "hl7.fhir.uv.v2mappings" {
-        "crates/ferrobridge-hl7v2/vendor"
-    } else {
-        "tools/fhir-codegen/vendor"
-    };
-    let directory = root().join(vendor).join(package).join("package");
+    let directory = root()
+        .join("tools/fhir-codegen/vendor")
+        .join(package)
+        .join("package");
     let mut found = BTreeSet::new();
     for entry in std::fs::read_dir(&directory).expect("the package should be vendored") {
         let path = entry.expect("the entry should read").path();
