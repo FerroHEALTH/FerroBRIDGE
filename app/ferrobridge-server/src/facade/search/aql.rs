@@ -123,12 +123,6 @@ pub fn compare(path: IdentifiedPath, op: CompOp, parameter: &str) -> WhereExpr {
     })
 }
 
-/// Returns the condition that `path` equals the bound `parameter`.
-#[must_use]
-pub fn equals(path: IdentifiedPath, parameter: &str) -> WhereExpr {
-    compare(path, CompOp::Eq, parameter)
-}
-
 /// Returns the condition that `path` matches the pattern bound to
 /// `parameter` (QUERY AQL §3.8.1.1).
 #[must_use]
@@ -195,7 +189,7 @@ impl Conditions {
         );
         let template = attribute_path("c", &["archetype_details", "template_id", "value"]);
         Self {
-            clauses: vec![equals(template, TEMPLATE_PARAMETER)],
+            clauses: vec![compare(template, CompOp::Eq, TEMPLATE_PARAMETER)],
             parameters,
             next: 0,
             nodes: Vec::new(),
@@ -497,7 +491,7 @@ pub fn check_path(path: &str) -> Result<IdentifiedPath, String> {
 mod tests {
     use super::{
         Conditions, DEFAULT_ORDER, OrderKey, all, any, attribute_path, check_path, compare,
-        count_text, equals, exists, like, not, parses, rows_text,
+        count_text, exists, like, not, parses, rows_text,
     };
     use openehr_query::ast::IdentifiedPath;
     use openehr_query::lexer::CompOp;
@@ -533,9 +527,13 @@ mod tests {
     fn every_condition_form_the_criteria_write_parses() {
         let mut conditions = Conditions::new("t");
         let code = conditions.bind("44054006");
-        conditions.push(equals(path("c/content/code_string"), &code));
+        conditions.push(compare(path("c/content/code_string"), CompOp::Eq, &code));
         let system = conditions.bind("SNOMED-CT");
-        conditions.push(equals(path("c/content/terminology_id/value"), &system));
+        conditions.push(compare(
+            path("c/content/terminology_id/value"),
+            CompOp::Eq,
+            &system,
+        ));
         conditions.push(not(exists(path("c/content/terminology_id/value"))));
         let pattern = conditions.bind("diab*");
         conditions.push(like(path("c/content/value"), &pattern));
@@ -551,15 +549,15 @@ mod tests {
         let other = conditions.bind("aaaaaaaa-3b9b-4a4a-9e0b-9f4b3a0c9f11");
         conditions.push(
             any([
-                equals(path("e/ehr_id/value"), &ehr),
-                equals(path("e/ehr_id/value"), &other),
+                compare(path("e/ehr_id/value"), CompOp::Eq, &ehr),
+                compare(path("e/ehr_id/value"), CompOp::Eq, &other),
             ])
             .expect("two conditions"),
         );
         let container = conditions.bind("8849182c-82ad-4088-a07f-48ead4180515::*");
         conditions.push(
             all([
-                equals(path("e/ehr_id/value"), &ehr),
+                compare(path("e/ehr_id/value"), CompOp::Eq, &ehr),
                 like(path("v/uid/value"), &container),
             ])
             .expect("two conditions"),
@@ -586,16 +584,16 @@ mod tests {
         let code = conditions.bind("44054006");
         conditions.push(
             all([
-                equals(
+                compare(
                     path(&format!(
                         "{first}/data[at0001]/items[at0002]/value/defining_code/terminology_id/value"
-                    )),
+                    )), CompOp::Eq,
                     &system,
                 ),
-                equals(
+                compare(
                     path(&format!(
                         "{first}/data[at0001]/items[at0002]/value/defining_code/code_string"
-                    )),
+                    )), CompOp::Eq,
                     &code,
                 ),
             ])
@@ -636,7 +634,11 @@ mod tests {
         };
         let mut conditions = Conditions::new("t");
         let ehr = conditions.bind("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11");
-        conditions.push(equals(attribute_path("e", &["ehr_id", "value"]), &ehr));
+        conditions.push(compare(
+            attribute_path("e", &["ehr_id", "value"]),
+            CompOp::Eq,
+            &ehr,
+        ));
         let text = count_text(&conditions, Some(&entry));
         assert!(
             text.starts_with(

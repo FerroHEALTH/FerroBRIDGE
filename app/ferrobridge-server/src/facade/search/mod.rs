@@ -42,6 +42,7 @@ use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::template::Placement;
 use openehr_query::ast::IdentifiedPath;
+use openehr_query::lexer::CompOp;
 
 /// The page sizes a deployment configured.
 ///
@@ -360,7 +361,7 @@ fn check_paths(declared: &Declared) -> Result<(), DeclarationError> {
         let alias = conditions.alias(parameter.node());
         for path in parameter.paths(&alias) {
             let bound = conditions.bind("probe");
-            conditions.push(aql::equals(path.clone(), &bound));
+            conditions.push(aql::compare(path.clone(), CompOp::Eq, &bound));
             conditions.push(aql::not(aql::exists(path)));
         }
         if parameter.sortable() {

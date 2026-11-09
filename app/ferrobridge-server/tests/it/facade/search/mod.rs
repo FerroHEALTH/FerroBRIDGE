@@ -224,6 +224,20 @@ fn bound(body: &serde_json::Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Asserts that `text` parses as AQL and is the canonical print of what it
+/// parses to, so the query the facade sent is one AST printed whole.
+fn assert_canonical(text: &str) -> Result<(), Box<dyn Error>> {
+    let parsed = openehr_query::parser::parse_str(text)?;
+    let printed = openehr_query::printer::to_aql(&parsed, None);
+    assert_eq!(text, printed, "the query is not its AST's canonical print");
+    assert_eq!(
+        parsed,
+        openehr_query::parser::parse_str(&printed)?,
+        "the printed query does not parse back to its AST"
+    );
+    Ok(())
+}
+
 /// Returns the `url` of the link of `body` whose relation is `relation`.
 fn link<'a>(body: &'a serde_json::Value, relation: &str) -> Option<&'a str> {
     body["link"]

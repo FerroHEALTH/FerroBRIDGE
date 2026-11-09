@@ -56,7 +56,7 @@ pub fn conditions(
     for ehrs in &resolved.ehrs {
         let alternatives: Vec<WhereExpr> = ehrs
             .iter()
-            .map(|ehr| aql::equals(ehr_path(), &conditions.bind(ehr.as_str())))
+            .map(|ehr| aql::compare(ehr_path(), CompOp::Eq, &conditions.bind(ehr.as_str())))
             .collect();
         let Some(clause) = aql::any(alternatives) else {
             return Ok(None);
@@ -73,7 +73,7 @@ pub fn conditions(
                 // so `<object_id>::*` (QUERY AQL §3.8.1.1) matches every version of it.
                 let versions = conditions.bind(format!("{}::*", binding.versioned_object_uid));
                 aql::all([
-                    aql::equals(ehr_path(), &ehr),
+                    aql::compare(ehr_path(), CompOp::Eq, &ehr),
                     aql::like(aql::attribute_path("v", &["uid", "value"]), &versions),
                 ])
             })
@@ -157,7 +157,11 @@ fn condition(
             .map(
                 |text| match crate::facade::search::value::like_pattern(text, *matching) {
                     Ok(Some(pattern)) => Ok(aql::like(path.clone(), &conditions.bind(pattern))),
-                    Ok(None) => Ok(aql::equals(path.clone(), &conditions.bind(text.as_str()))),
+                    Ok(None) => Ok(aql::compare(
+                        path.clone(),
+                        CompOp::Eq,
+                        &conditions.bind(text.as_str()),
+                    )),
                     Err(error) => Err(CriteriaError::Unsupported {
                         name: filter.name.clone(),
                         reason: error.to_string(),
@@ -214,11 +218,19 @@ fn token_condition(
             // NOTE: no specification maps a FHIR system URI to an openEHR terminology id:
             // our own design, the declaration's `systems` table, else the URI verbatim.
             let terminology = systems.get(uri).map_or(uri, String::as_str);
-            parts.push(aql::equals(path, &conditions.bind(terminology)));
+            parts.push(aql::compare(
+                path,
+                CompOp::Eq,
+                &conditions.bind(terminology),
+            ));
         }
     }
     if let Some(code) = token.code() {
-        parts.push(aql::equals(code_path.clone(), &conditions.bind(code)));
+        parts.push(aql::compare(
+            code_path.clone(),
+            CompOp::Eq,
+            &conditions.bind(code),
+        ));
     }
     aql::all(parts).ok_or_else(|| CriteriaError::Invalid {
         name: name.to_owned(),

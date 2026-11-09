@@ -16,6 +16,7 @@
 use core::str::FromStr;
 use std::collections::BTreeSet;
 
+use openehr_sdt::flat::navigate::Navigator;
 use rust_decimal::Decimal;
 use serde_json::Value;
 
@@ -102,7 +103,7 @@ pub(crate) struct Task<'p> {
 /// The first pass over one composition.
 #[derive(Debug)]
 pub(crate) struct Walk<'p, 'c> {
-    composition: &'c Value,
+    navigator: &'c Navigator,
     pub(crate) drafts: Vec<Draft<'p>>,
     pub(crate) failed: Vec<Failed<'p>>,
     pub(crate) tasks: Vec<Task<'p>>,
@@ -113,9 +114,13 @@ pub(crate) struct Walk<'p, 'c> {
 
 impl<'p, 'c> Walk<'p, 'c> {
     /// Walks every scope of `program` over `composition`.
-    pub(crate) fn run(program: &'p Program, composition: &'c Value) -> Self {
+    pub(crate) fn run(
+        program: &'p Program,
+        composition: &'c Value,
+        navigator: &'c Navigator,
+    ) -> Self {
         let mut walk = Self {
-            composition,
+            navigator,
             drafts: Vec::new(),
             failed: Vec::new(),
             tasks: Vec::new(),
@@ -129,7 +134,7 @@ impl<'p, 'c> Walk<'p, 'c> {
                 up: 0,
                 down: scope.root().segments.clone(),
             };
-            for instance in follow(composition, &root, &hop) {
+            for instance in follow(navigator, &root, &hop) {
                 walk.scope(scope, &instance, &[]);
             }
         }
@@ -149,14 +154,14 @@ impl<'p, 'c> Walk<'p, 'c> {
                 BoundEntry::Record(ref record) => {
                     let anchors = match record.base {
                         None => vec![instance.clone()],
-                        Some(ref hop) => follow(self.composition, instance, hop),
+                        Some(ref hop) => follow(self.navigator, instance, hop),
                     };
                     for anchor in anchors {
                         self.record(scope, record, instance, &anchor, &chain);
                     }
                 }
                 BoundEntry::Include(ref include) => {
-                    for inner in follow(self.composition, instance, &include.hop) {
+                    for inner in follow(self.navigator, instance, &include.hop) {
                         for child in include.scopes() {
                             self.scope(child, &inner, &chain);
                         }
@@ -350,7 +355,7 @@ impl<'p, 'c> Walk<'p, 'c> {
         path: &BoundPath,
         key: &'static str,
     ) -> Result<Option<(Datum, String)>, Refused> {
-        let found = follow(self.composition, anchor, path.hop());
+        let found = follow(self.navigator, anchor, path.hop());
         match found.as_slice() {
             [] => Ok(None),
             [only] => {
