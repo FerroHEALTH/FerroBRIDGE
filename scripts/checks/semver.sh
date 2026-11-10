@@ -28,6 +28,9 @@
 # peaks near 1.3 GB and runs in under a minute on ubuntu-latest (#1834). Every
 # resource sits behind its release's resources set or the all-release
 # `resources` feature, so the five sets hold every item `resources` enables.
+# ferrobridge-term refuses to build with no release feature, so in place of
+# no feature it is judged on each release alone, the least a dependant with
+# default-features = false can build (#1840).
 #
 #   semver.sh [--baseline-rev <rev>] [<crate>...]
 #       Judge the named crates, or every crate past 0.0.0, against <rev> or,
@@ -160,6 +163,12 @@ feature_sets() {
     for version in stu3 r4 r4b r5 r6; do
       echo "--only-explicit-features --features $version,terminology"
       echo "--only-explicit-features --features $version-resources"
+    done
+  elif [[ "$1" == "ferrobridge-term" ]]; then
+    echo ""
+    local release
+    for release in stu3 r4 r4b r5 r6; do
+      echo "--only-explicit-features --features $release"
     done
   else
     echo ""

@@ -19,7 +19,7 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-validator = "0.3"
+ferrobridge-validator = "0.4"
 ```
 
 Name a patch (`"0.3.N"`) when you need the first release that carries what

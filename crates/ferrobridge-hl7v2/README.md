@@ -20,7 +20,7 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.5"
+ferrobridge-hl7v2 = "0.6"
 ```
 
 Name a patch (`"0.5.N"`) when you need the first release that carries what
@@ -88,7 +88,7 @@ With `map` off the crate is the listener, the decoder, the parser, the writer
 and the acknowledgment:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.5", default-features = false }
+ferrobridge-hl7v2 = { version = "0.6", default-features = false }
 ```
 
 ## Example
