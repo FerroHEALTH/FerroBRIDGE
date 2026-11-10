@@ -103,9 +103,7 @@ jobs:
     name: perf build
     if: inputs.measure
     runs-on: ubuntu-24.04
-    # 90 while a base still compiles all five FHIR releases under swap (about
-    # 28 minutes) before the head; #1743 lowers it again.
-    timeout-minutes: 90
+    timeout-minutes: 60
     permissions:
       contents: read
     outputs:
@@ -128,20 +126,11 @@ jobs:
         id: arms
         env:
           BASE: ${{ inputs.base }}
-          BUILD_SWAP: /perf-build.swap
-        # A release build of fhir-types with every resource of all five FHIR
-        # releases, which main compiled from #1717 until #1737, peaks above the
-        # runner's 16 GB on its own (#1737), so a swap file backs the build.
         # The memory, swap and disk are logged each minute, so a runner that
         # shuts down mid-build leaves the last reading in its log. Nothing is
         # measured on this runner.
         run: |
           set -euo pipefail
-          swap="$BUILD_SWAP"
-          sudo fallocate -l 20G "$swap"
-          sudo chmod 600 "$swap"
-          sudo mkswap "$swap" > /dev/null
-          sudo swapon "$swap"
           sample() {
             while true; do
               free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB, ", $3, $2 }
