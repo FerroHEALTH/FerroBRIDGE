@@ -133,10 +133,12 @@ in a playground.
 ## Quick start
 
 The quickstart runs the published image with every lane off. You need
-Docker Compose and `curl`. Download the `compose.yaml` of the latest release:
+Docker Compose 2.23.1 or newer and `curl`, and no checkout. Every release
+attaches the quickstart as one self-contained `compose.yaml`; download the
+latest release's into an empty directory:
 
 ```sh
-curl -LO https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest/download/compose.yaml
+curl -fsSLO https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest/download/compose.yaml
 ```
 
 Create the secret files it reads, empty for a lane you leave off:
