@@ -15,6 +15,13 @@
 //! the shape the engine's own losses take. The element stays in the
 //! composition's `FEEDER_AUDIT.original_content`. No specification governs
 //! this: our own design.
+//!
+//! The engine records a read where a mapping takes a value, so the section
+//! that leads to an entry records none. A project that accounts for
+//! [`SECTION`] declares each section of the received `Composition` none of
+//! whose entries resolves to a resource the run read, at the section, once.
+
+use std::collections::BTreeSet;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::operation_outcome::OperationOutcomeIssue;
@@ -22,6 +29,8 @@ use fhir_types::r4::primitives;
 use fhirconnect::engine::outcome::Location;
 use fhirconnect::operations::issues::WARNING;
 use fhirconnect::operations::issues::issue;
+
+use crate::receive::reference::{self, Target};
 
 /// The `IssueType` code of an element the composition does not carry
 /// (<https://hl7.org/fhir/R4/valueset-issue-type.html>), the code the engine
@@ -31,6 +40,10 @@ const INCOMPLETE: &str = "incomplete";
 /// The sentence every issue carries.
 const NOT_CARRIED: &str = "the element is carried into no structured element of the \
                            composition; the composition's original content keeps it";
+
+/// The accounted path of a section of the received `Composition`, carried
+/// when one of its entries is.
+const SECTION: &str = "Composition.section";
 
 /// Returns one issue per present instance of an element `accounted` names
 /// that no element of `reads` reached, in the entries of the Bundle `document`.
@@ -49,7 +62,11 @@ pub(super) fn not_carried(
     let Some(Value::Array(entries)) = document.get("entry") else {
         return issues;
     };
-    for resource in entries.iter().filter_map(|entry| entry.get("resource")) {
+    for (holder, resource) in entries
+        .iter()
+        .enumerate()
+        .filter_map(|(holder, entry)| Some((holder, entry.get("resource")?)))
+    {
         let Some(kind) = resource.get("resourceType").and_then(Value::as_str) else {
             continue;
         };
@@ -62,7 +79,10 @@ pub(super) fn not_carried(
             .filter(|location| location.resource() == reference.as_deref())
             .filter_map(Location::fhir)
             .collect();
-        for path in accounted {
+        if kind == "Composition" && accounted.contains(&SECTION) {
+            sections(document, holder, reads, &mut issues);
+        }
+        for path in accounted.iter().filter(|path| **path != SECTION) {
             let Some((root, steps)) = path.split_once('.') else {
                 continue;
             };
@@ -78,6 +98,56 @@ pub(super) fn not_carried(
         }
     }
     issues
+}
+
+/// Appends one issue per section of the `Composition` of the entry at
+/// `holder` none of whose entries resolves, among the Bundle `document`'s
+/// entries, to a resource `reads` reached.
+fn sections(
+    document: &Value,
+    holder: usize,
+    reads: &[Location],
+    issues: &mut Vec<OperationOutcomeIssue>,
+) {
+    let Some(tree) = document.as_object() else {
+        return;
+    };
+    let entries = reference::entries(tree);
+    let Some(Value::Array(held)) = entries
+        .get(holder)
+        .and_then(|entry| entry.resource)
+        .and_then(|composition| composition.get("section"))
+    else {
+        return;
+    };
+    let read: BTreeSet<&str> = reads.iter().filter_map(Location::resource).collect();
+    let named = |target: Target| {
+        let Target::Entry(index) = target else {
+            return None;
+        };
+        let resource = entries.get(index)?.resource?;
+        let kind = resource.get("resourceType").and_then(Value::as_str)?;
+        let id = resource.get("id").and_then(Value::as_str)?;
+        Some(format!("{kind}/{id}"))
+    };
+    for (index, section) in held.iter().enumerate() {
+        let carried = section
+            .get("entry")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(Value::as_object)
+            // NOTE: no specification governs this: our own design; an entry reference that names no
+            // single entry names no resource the run read, so it carries none of the section.
+            .filter_map(|entry| reference::resolve_in(&entries, holder, entry).ok())
+            .filter_map(named)
+            .any(|resource| read.contains(resource.as_str()));
+        if !carried {
+            let mut declared = issue(WARNING, INCOMPLETE, NOT_CARRIED);
+            declared.expression = vec![primitives::String::from(format!("{SECTION}[{index}]"))];
+            issues.push(declared);
+        }
+    }
 }
 
 /// Appends every instance of the element `steps` names below `value`, with

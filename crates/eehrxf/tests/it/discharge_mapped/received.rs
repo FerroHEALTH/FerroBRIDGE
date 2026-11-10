@@ -64,6 +64,7 @@ fn a_received_discharge_report_maps_into_one_composition_that_keeps_it()
             "the engine filled /context/setting",
             "the engine filled /language",
             "the engine filled /territory",
+            "the element is carried into no structured element of the composition; the composition's original content keeps it",
         ],
         "every element the composition does not carry is declared, and nothing else"
     );
