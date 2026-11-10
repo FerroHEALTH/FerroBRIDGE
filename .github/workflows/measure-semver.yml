@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A one-off measurement for #1834, never merged: the peak memory and time of
+# cargo-semver-checks on fhir-types with each per-release resources set, on
+# the hosted runner the crate-version-guard job uses.
+name: measure-semver
+on:
+  pull_request:
+    paths: [.github/workflows/measure-semver.yml]
+permissions: {}
+jobs:
+  measure:
+    name: measure (${{ matrix.set }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        set: [r4-resources, stu3-resources, r4b-resources, r5-resources, r6-resources]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache: 'false'
+      - id: pin
+        run: echo "version=$(bash scripts/checks/semver.sh --pin)" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-semver-checks@${{ steps.pin.outputs.version }}
+      - name: Judge fhir-types on one resources set
+        env:
+          SET: ${{ matrix.set }}
+        run: |
+          set -uo pipefail
+          sample() {
+            while true; do
+              free -m | awk 'NR == 2 { printf "measure: memory used %s of %s MB, ", $3, $2 }
+                NR == 3 { printf "swap used %s of %s MB\n", $3, $2 }'
+              sleep 15
+            done
+          }
+          sample &
+          sampler=$!
+          start=$(date +%s)
+          status=0
+          /usr/bin/time -v cargo semver-checks check-release --package fhir-types \
+            --baseline-rev origin/main --only-explicit-features --features "$SET" || status=$?
+          echo "measure: $SET exit $status in $(( $(date +%s) - start )) s"
+          kill "$sampler" || true
+          nproc
+          exit "$status"
