@@ -812,11 +812,26 @@ ours:
   `fc-unpaired-types`, naming file and line, and so is a data value mapped
   onto a resource root; a mapping that only runs out of openEHR may read a
   class through a row it inherits (`DV_CODED_TEXT.adoc`: "Inherits from
-  DV_TEXT"). A `reference` written into a choice element whose type the path
-  does not name is refused as `fc-reference-into-choice`, since FHIR names a
-  choice by the type it holds (<https://hl7.org/fhir/R4/formats.html#choice>).
-  Each of these failed only on the first run that carried the element before
-  (#1566).
+  DV_TEXT"). Each of these failed only on the first run that carried the
+  element before (#1566).
+- **A `reference` into a choice writes its `Reference` alternative.** A
+  `reference` writes a FHIR `Reference` (`concept-type/Reference.adoc`), and
+  FHIR names a choice by the type it holds
+  (<https://hl7.org/fhir/R4/formats.html#choice>), so a `reference` whose
+  `with.fhir` names a choice that admits `Reference` (`medication[x]`) writes
+  `medicationReference`, as `as(Reference)` would. A choice that admits no
+  `Reference` is refused at load as `fc-reference-into-choice` (coordinator
+  ruling on #1546, 2026-11-10).
+- **`$resource` in a slotted model is the root of the model's own
+  `fhirConfig` type.** `basics/Variables.adoc` defines `$resource` as the
+  "Path of the root resource", and `$archetype` names the root of the
+  model's own archetype even when a slot enters it as a `CLUSTER`. So inside
+  a slotted model whose `fhirConfig.structureDefinition` names no resource
+  (a `BackboneElement` or a data type), `$resource` names the FHIR element
+  the slot hands over, the slotting mapping's `$fhirRoot`; where it names a
+  resource, `$resource` stays the enclosing resource. `$fhirRoot` stays the
+  parent path of the previous mapping step (coordinator ruling on #1546,
+  2026-11-10).
 - **`instant` pairs with `DV_DATE_TIME`: our own design.** `DV_DATE_TIME.adoc`
   lists `dateTime` and `Period` and no `instant`. The R4 package's lexical
   form of `instant` is a strict subset of that of `dateTime`, so going into

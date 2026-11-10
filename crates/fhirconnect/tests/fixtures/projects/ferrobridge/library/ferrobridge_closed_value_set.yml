@@ -26,5 +26,5 @@ mappings:
           - path: value
             value: Observed
         fhir:
-          - path: note.text
+          - path: code.text
             value: Observed

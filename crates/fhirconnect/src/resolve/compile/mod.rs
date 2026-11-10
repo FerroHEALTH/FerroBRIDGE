@@ -121,6 +121,10 @@ struct Scope {
     /// Whether the walk is inside a context entered through `slotContext`,
     /// where a slot of a composition model is skipped.
     nested: bool,
+    /// The element `$resource` names in a slotted model whose
+    /// `fhirConfig.structureDefinition` names no resource, the element the
+    /// slot hands over; `None` where `$resource` is the resource root.
+    element_root: Option<FhirPath>,
 }
 
 impl Scope {
@@ -346,6 +350,7 @@ impl<'a> Compiler<'a> {
             prefix: String::new(),
             chain: vec![start_name.clone()],
             nested: false,
+            element_root: None,
         };
         let merged = self.merge(start);
         let mappings = self.mappings(&merged.mappings, &scope);

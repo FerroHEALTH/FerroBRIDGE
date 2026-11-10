@@ -42,7 +42,6 @@ expression: rows(&diagnostics)
   "medication.v1.yml:489 error fc-uncarried-tail",
   "medication.v1.yml:511 error fc-uncarried-tail",
   "medication.v1.yml:533 error fc-uncarried-tail",
-  "medication.v1.yml:77 error fc-reference-into-choice",
   "medication.v2.substance.yml:74 warning fc-excluded-template-node",
   "medication.v2.yml:23 warning fc-excluded-template-node",
   "medication.v2.yml:25 error fc-unpaired-types",
@@ -51,7 +50,5 @@ expression: rows(&diagnostics)
   "medication.v2.yml:40 warning fc-excluded-template-node",
   "medication.v2.yml:45 warning fc-excluded-template-node",
   "medication.v2.yml:45 warning fc-excluded-template-node",
-  "medication.v2.yml:72 error fc-reference-into-choice",
-  "medication.v2.yml:85 error fc-reference-into-choice",
   "medication.v2.yml:96 error fc-unknown-template-node"
 ]

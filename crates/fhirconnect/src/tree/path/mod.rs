@@ -266,6 +266,18 @@ impl FhirPath {
         Ok(Self::assembled(Head::Resource, steps))
     }
 
+    /// Returns this `$resource`-rooted expression with `root` in place of the
+    /// resource root, `None` for an expression rooted elsewhere.
+    #[must_use]
+    pub fn rooted_at(&self, root: &Self) -> Option<Self> {
+        if self.head != Head::Resource || root.head != Head::Resource {
+            return None;
+        }
+        let mut steps = root.steps.clone();
+        steps.extend(self.steps.iter().cloned());
+        Some(Self::assembled(Head::Resource, steps))
+    }
+
     /// Builds the expression this one names under a stack of anchors.
     ///
     /// `anchors` runs innermost first. A run of `^` that exhausts one anchor

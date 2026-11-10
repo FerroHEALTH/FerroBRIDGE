@@ -10,14 +10,13 @@
 //! recursion descends while the template carries a node and ends where it
 //! carries none (#1551; FHIRconnect v1.0.0 is silent: our own design).
 //!
-//! Neither model counts as reached (#101), and both are refused at load.
-//! `medication.v2.yml:25` maps the `Ratio` `Medication.amount` onto a
-//! `DV_QUANTITY`, which `types-of-mappings/data-type/DV_QUANTITY.adoc` does
-//! not pair, and `:72` and `:85` write a `reference` into the choice
-//! `Medication.ingredient.item[x]` without naming its type. `:96` slots the
-//! substance one constituent too deep. `medication.v2.substance.yml:43`
-//! writes its ingredient `reference` into the choice
-//! `Substance.ingredient.substance[x]` the same way. The recursion is pinned
+//! `medication.v2.yml` does not count as reached (#101): its line 25 maps the
+//! `Ratio` `Medication.amount` onto a `DV_QUANTITY`, which
+//! `types-of-mappings/data-type/DV_QUANTITY.adoc` does not pair, and `:96`
+//! slots the substance one constituent too deep. Its `:72` and `:85`, and
+//! `medication.v2.substance.yml:43`, write a `reference` into a choice
+//! (`Medication.ingredient.item[x]`, `Substance.ingredient.substance[x]`),
+//! which writes the one `Reference` alternative the choice admits. The recursion is pinned
 //! by the refusals each template depth raises: past these the template's
 //! nesting adds or removes only the template-node refusals.
 
@@ -225,11 +224,7 @@ fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
 
 /// The refusals the medication model raises at every depth the template
 /// nests it to (#101).
-const LIBRARY_REFUSALS: [&str; 3] = [
-    "medication.v2.yml:25 fc-unpaired-types",
-    "medication.v2.yml:72 fc-reference-into-choice",
-    "medication.v2.yml:85 fc-reference-into-choice",
-];
+const LIBRARY_REFUSALS: [&str; 1] = ["medication.v2.yml:25 fc-unpaired-types"];
 
 /// Returns the refusals of the medication context against the template
 /// nesting `depth` constituents.
@@ -241,8 +236,8 @@ fn refused(depth: usize) -> Result<Vec<String>, Box<dyn Error>> {
 }
 
 /// Compiles the substance context against the template nesting one
-/// constituent and returns its refusals.
-fn substance() -> Result<Vec<String>, Box<dyn Error>> {
+/// constituent.
+fn substance() -> Result<Arc<Program>, Box<dyn Error>> {
     let index = template(1)?;
     let set = set(SUBSTANCE, SUBSTANCE_FIXTURES)?;
     match compile(
@@ -252,8 +247,8 @@ fn substance() -> Result<Vec<String>, Box<dyn Error>> {
         &SCHEMAS,
         &Library,
     ) {
-        Ok(_) => Err("the substance context compiles".into()),
-        Err(diagnostics) => Ok(rows(&diagnostics)),
+        Ok(program) => Ok(program),
+        Err(diagnostics) => Err(crate::resolve::render(&diagnostics).into()),
     }
 }
 
@@ -262,12 +257,9 @@ fn the_recursion_ends_where_the_template_stops_nesting() -> Result<(), Box<dyn E
     // Two and three constituents raise no template-node refusal: the
     // recursion descends while the template carries a node. With two, `:96`
     // enters the substance at the deepest cluster, where its ingredients are
-    // left out; with three, they compile and `:43` is refused.
+    // left out; with three, they compile too.
     assert_eq!(refused(2)?, LIBRARY_REFUSALS, "2 constituents");
-    let mut deeper: Vec<&str> = LIBRARY_REFUSALS.to_vec();
-    deeper.push("medication.v2.substance.yml:43 fc-reference-into-choice");
-    deeper.sort_unstable();
-    assert_eq!(refused(3)?, deeper, "3 constituents");
+    assert_eq!(refused(3)?, LIBRARY_REFUSALS, "3 constituents");
     Ok(())
 }
 
@@ -326,13 +318,19 @@ fn a_recursion_past_the_depth_limit_refuses() -> Result<(), Box<dyn Error>> {
 
 /// FerroBRIDGE's substance model enters `medication.v2.substance.yml` at the
 /// administered cluster; its line 43 writes the ingredient `reference` into
-/// the choice `Substance.ingredient.substance[x]` without naming its type,
-/// so it is refused at load (#101).
+/// the choice `Substance.ingredient.substance[x]`, whose one `Reference`
+/// alternative is what a `reference` writes (FHIR R4 formats.html §Choice), so
+/// it compiles.
 #[test]
-fn the_substance_ingredient_reference_is_refused_at_load() -> Result<(), Box<dyn Error>> {
-    assert_eq!(
-        substance()?,
-        ["medication.v2.substance.yml:43 fc-reference-into-choice"]
-    );
+fn the_substance_ingredient_reference_writes_its_reference_alternative()
+-> Result<(), Box<dyn Error>> {
+    let program = substance()?;
+    assert_eq!(program.resource().as_str(), "Substance");
     Ok(())
+}
+
+/// Compiles the substance context and returns it with the published model
+/// it slots.
+pub(super) fn chain() -> Result<crate::support::Chain, Box<dyn Error>> {
+    Ok((SUBSTANCE, substance()?))
 }
