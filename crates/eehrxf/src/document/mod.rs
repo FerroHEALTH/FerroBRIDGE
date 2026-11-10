@@ -35,6 +35,7 @@ use fhir_types::r4::extension::{Extension, ExtensionValue};
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::narrative::Narrative;
+use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
@@ -187,6 +188,13 @@ pub enum DocumentError {
         /// The `fullUrl` both would take.
         full_url: String,
     },
+    /// The document names its custodian already, and FHIR R4
+    /// `Composition.custodian` is 0..1.
+    #[error("the document names its custodian already")]
+    Custodian {
+        /// The `fullUrl` of the custodian the document names.
+        full_url: String,
+    },
 }
 
 /// A document as it is assembled.
@@ -204,6 +212,7 @@ pub struct Document {
     report: Option<DiagnosticReport>,
     encounter: Option<String>,
     language: Option<String>,
+    custodian: Option<String>,
 }
 
 impl Document {
@@ -240,6 +249,7 @@ impl Document {
             report: None,
             encounter: None,
             language: None,
+            custodian: None,
         }
     }
 
@@ -302,6 +312,39 @@ impl Document {
                 resource: String::from("author"),
             })?;
         self.authors.push(full_url.clone());
+        Ok(full_url)
+    }
+
+    /// Adds `custodian` and names it the composition's `custodian`, returning
+    /// its `fullUrl`.
+    ///
+    /// FHIR R4 `Composition.custodian` is the organization "responsible for
+    /// ongoing maintenance of and access to the composition/document
+    /// information"; every form's `Composition` profile keeps it 0..1 with an
+    /// `Organization` target. The custodian takes precedence over the first
+    /// `Organization` author [`form::Authorship::ReportPerformers`] falls back
+    /// to, and that form still drops its `Organization` authors for the
+    /// report's performers. A profile the custodian claims is the caller's,
+    /// as it is for an author.
+    ///
+    /// # Errors
+    ///
+    /// [`DocumentError::Custodian`] when the document names its custodian
+    /// already, and the errors of [`Document::add`].
+    pub fn with_custodian(&mut self, custodian: Organization) -> Result<String, DocumentError> {
+        if let Some(full_url) = &self.custodian {
+            return Err(DocumentError::Custodian {
+                full_url: full_url.clone(),
+            });
+        }
+        let full_url = self
+            .add(&[Resource::Organization(Box::new(custodian))])?
+            .into_iter()
+            .next()
+            .ok_or_else(|| DocumentError::NoId {
+                resource: String::from("Organization"),
+            })?;
+        self.custodian = Some(full_url.clone());
         Ok(full_url)
     }
 

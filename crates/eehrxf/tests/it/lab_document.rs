@@ -25,6 +25,7 @@ use fhir_types::r4::coding::Coding;
 use fhir_types::r4::diagnostic_report::DiagnosticReport;
 use fhir_types::r4::human_name::HumanName;
 use fhir_types::r4::observation::Observation;
+use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
@@ -452,6 +453,61 @@ fn the_profile_requires_no_section_slice_so_the_form_requires_none() -> Result<(
             .iter()
             .any(|rule| matches!(rule, SectionRule::Required { .. })),
         "no required slice"
+    );
+    Ok(())
+}
+
+/// A synthetic organization `id`, named `name`.
+fn organization(id: &str, name: &str) -> Organization {
+    Organization {
+        id: Some(id.to_owned()),
+        name: Some(name.into()),
+        ..Organization::default()
+    }
+}
+
+#[test]
+fn the_custodian_a_document_names_is_its_composition_s() -> Result<(), Box<dyn Error>> {
+    let profile = package_member("package/StructureDefinition-Composition-eu-lab.json")?;
+    let custodian = profile["snapshot"]["element"]
+        .as_array()
+        .ok_or("a snapshot")?
+        .iter()
+        .find(|element| element["id"] == "Composition.custodian")
+        .ok_or("Composition.custodian")?;
+    assert_eq!(
+        (&custodian["min"], &custodian["max"]),
+        (&Value::from(0), &Value::from("1"))
+    );
+    assert_eq!(
+        custodian["type"][0]["targetProfile"][0],
+        "http://hl7.eu/fhir/base/StructureDefinition/organization-eu-core"
+    );
+
+    let mut document = document()?;
+    let full_url = document.with_custodian(organization("member", "Synthetic Member"))?;
+    assert_eq!(full_url, format!("{BASE}/Organization/member"));
+    let refused = document.with_custodian(organization("other", "Synthetic Other"));
+    assert!(
+        matches!(&refused, Err(DocumentError::Custodian { full_url: held }) if *held == full_url),
+        "Composition.custodian is 0..1: {refused:?}"
+    );
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    let composition = &bundle["entry"][0]["resource"];
+    assert_eq!(composition["custodian"]["reference"], full_url.as_str());
+    assert!(
+        bundle["entry"]
+            .as_array()
+            .ok_or("entries")?
+            .iter()
+            .any(|entry| entry["fullUrl"] == full_url.as_str()
+                && entry["resource"]["resourceType"] == "Organization"),
+        "the custodian resolves inside the Bundle"
+    );
+    assert_eq!(
+        of_type(&bundle, "Organization").len(),
+        1,
+        "the refused custodian is never added"
     );
     Ok(())
 }
