@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its model ferrobridge_problem_evidence (#1546).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_evidence.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Condition"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_ips_entries.v1.0.0"
+  archetypes:
+    - "ferrobridge_problem_evidence"
+    - "CLUSTER.clinical_evidence.v1"
+  start: "ferrobridge_problem_evidence"

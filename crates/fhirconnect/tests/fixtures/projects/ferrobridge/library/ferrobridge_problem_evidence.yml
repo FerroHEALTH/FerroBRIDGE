@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's Condition model over the CKM problem diagnosis evaluation,
+# slotting the library's clinical evidence cluster from Condition.evidence,
+# the BackboneElement its file comment names, at the evaluation's specific
+# details slot, as projects/org.openehr/IPS/problem/IPS_problem_diagnosis.yml
+# does at its line 74 (#1546).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_problem_evidence
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+mappings:
+  - name: problem
+    with:
+      fhir: $resource.code
+      openehr: $archetype/data[at0001]/items[at0002]
+  - name: evidence
+    with:
+      fhir: $resource.evidence
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.clinical_evidence.v1]
+    slotArchetype: CLUSTER.clinical_evidence.v1

@@ -45,8 +45,11 @@ paths=(
   "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.absence.v2.adl"
   "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.exclusion_global.v1.adl"
   "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.gender.v1.adl"
+  "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.adverse_reaction_risk.v2.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.device.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.case_identification.v0.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.clinical_evidence.v1.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"

@@ -8,6 +8,7 @@
 //! it never had.
 
 mod excluded;
+mod free_text;
 mod locate;
 
 use core::str::FromStr;

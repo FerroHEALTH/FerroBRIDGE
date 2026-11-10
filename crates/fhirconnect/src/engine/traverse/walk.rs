@@ -236,6 +236,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
             let Some(at_tail) = attribute_at(&value, target, &elements) else {
                 continue;
             };
+            let at_tail = if target.tail().segments.is_empty() {
+                text_of(at_tail)
+            } else {
+                at_tail
+            };
             read_at.push(unread::instance_of(target.node().flat_id(), &positions));
             found.present = found.present.saturating_add(1);
             found.types.push(String::from(target.node().rm_type()));
@@ -821,4 +826,24 @@ fn at_node<'positions>(
     positions
         .get(..target.occurrences().len())
         .unwrap_or(positions)
+}
+
+/// Returns the `value` of a text value a condition reads with an empty tail,
+/// and anything else as it stands.
+///
+/// A `manual` write treats an empty tail as the node's `value`
+/// (`types-of-mappings/concept-type/manual.adoc`), so a condition on the same
+/// path compares that text. No specification governs reading the tail: our
+/// own design.
+fn text_of(value: &serde_json::Value) -> &serde_json::Value {
+    let class = value.get("_type").and_then(serde_json::Value::as_str);
+    match (class, value.get("value")) {
+        (Some(class), Some(text))
+            if rm::carried::carried(class, &["value"])
+                .is_some_and(|(_, held)| held == Carried::Text) =>
+        {
+            text
+        }
+        _ => value,
+    }
 }

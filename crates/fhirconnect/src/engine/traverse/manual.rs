@@ -180,7 +180,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             } else {
                 &segments
             };
-            if rm::carried::carried(target.node().rm_type(), written)
+            if rm::carried::carried(target.value_class(), written)
                 .is_none_or(|(_, held)| held != Carried::Text)
             {
                 return Err(EngineError::UnsupportedTail {
@@ -201,7 +201,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 elements.last_mut().map(|(_, merged)| merged)
             };
             if let Some(merged) = merged {
-                merge(merged, target.node().rm_type(), written, text).map_err(|source| {
+                merge(merged, target.value_class(), written, text).map_err(|source| {
                     EngineError::TailWrite {
                         mapping: format!("{}.{}", mapping.name(), entry.name()),
                         node: String::from(target.node().aql_path().as_str()),
@@ -211,7 +211,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }
         }
         for (target, mut merged) in elements {
-            let rm_type = target.node().rm_type();
+            let rm_type = target.value_class();
             merged.insert(
                 String::from("_type"),
                 serde_json::Value::String(String::from(rm_type)),

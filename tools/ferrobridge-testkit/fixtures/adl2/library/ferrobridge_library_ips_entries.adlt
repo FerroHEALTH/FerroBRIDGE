@@ -1,0 +1,184 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's adverse
+-- reaction and clinical evidence mappings, over five published CKM
+-- archetypes (fixtures/ckm/library, fixtures/ckm/discharge): a report
+-- COMPOSITION whose content holds EVALUATION.adverse_reaction_risk.v2 with
+-- CLUSTER.adverse_reaction_event.v1 in its reaction event slot, and
+-- EVALUATION.problem_diagnosis.v1 with CLUSTER.clinical_evidence.v1 in its
+-- specific details slot, its result element constrained to a DV_CODED_TEXT,
+-- which the CKM source leaves unconstrained. No specification governs this
+-- template: our own design, carrying the archetypes the mappings name. Node
+-- identifiers are at-coded, the ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_ips_entries.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library allergy and evidence mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.adverse_reaction_risk-ferrobridge.v2]
+            use_archetype EVALUATION[at0000.3, openEHR-EHR-EVALUATION.problem_diagnosis-ferrobridge.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library IPS entries">
+                description = <"Library IPS entries">
+            >
+            ["at0000.2"] = <
+                text = <"Adverse reaction risk">
+                description = <"Adverse reaction risk">
+            >
+            ["at0000.3"] = <
+                text = <"Problem/Diagnosis">
+                description = <"Problem/Diagnosis">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-EVALUATION.adverse_reaction_risk-ferrobridge.v2.0.0
+
+specialize
+    openEHR-EHR-EVALUATION.adverse_reaction_risk.v2
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library allergy and evidence mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    EVALUATION[at0000.1] matches {
+        /data[at0001]/items matches {
+            use_archetype CLUSTER[at0129.1, openEHR-EHR-CLUSTER.adverse_reaction_event.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Adverse reaction risk">
+                description = <"Adverse reaction risk">
+            >
+            ["at0129.1"] = <
+                text = <"Reaction event">
+                description = <"Reaction event">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-EVALUATION.problem_diagnosis-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-EVALUATION.problem_diagnosis.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library allergy and evidence mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    EVALUATION[at0000.1] matches {
+        /data[at0001]/items matches {
+            use_archetype CLUSTER[at0043.1, openEHR-EHR-CLUSTER.clinical_evidence-ferrobridge.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Problem/Diagnosis">
+                description = <"Problem/Diagnosis">
+            >
+            ["at0043.1"] = <
+                text = <"Clinical evidence">
+                description = <"Clinical evidence">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-CLUSTER.clinical_evidence-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-CLUSTER.clinical_evidence.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library allergy and evidence mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    CLUSTER[at0000.1] matches {
+        /items[at0005]/value matches {
+            DV_CODED_TEXT matches {*}
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Clinical evidence">
+                description = <"Clinical evidence">
+            >
+        >
+    >

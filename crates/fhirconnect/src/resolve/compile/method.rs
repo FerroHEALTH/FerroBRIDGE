@@ -498,6 +498,7 @@ impl<'a> Compiler<'a> {
                 Some(ManualPath::new(Target::Openehr(Box::new(target)), value))
             })
             .collect();
+        let openehr = self.free_text(file, entry, path, pinned, openehr);
         Manual::new(
             entry.name.value().clone(),
             fhir,

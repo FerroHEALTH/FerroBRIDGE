@@ -148,6 +148,9 @@ pub enum ResolveCode {
     /// A programmed function declares openEHR ports, and the mapping that
     /// names it writes no `with.openehr` to anchor them.
     UnanchoredFunctionPort,
+    /// A `manual` entry writes a `DV_TEXT` at a `DV_CODED_TEXT` node whose
+    /// value set is closed.
+    ClosedValueSet,
 }
 
 impl ResolveCode {
@@ -208,6 +211,7 @@ impl ResolveCode {
             Self::PartyRefTarget => "fc-party-ref-target",
             Self::RepeatingFunctionPort => "fc-repeating-function-port",
             Self::UnanchoredFunctionPort => "fc-unanchored-function-port",
+            Self::ClosedValueSet => "fc-closed-value-set",
         }
     }
 
@@ -268,6 +272,7 @@ impl ResolveCode {
             Self::PartyRefTarget,
             Self::RepeatingFunctionPort,
             Self::UnanchoredFunctionPort,
+            Self::ClosedValueSet,
         ]
     }
 }

@@ -73,6 +73,8 @@ pub struct ResolvedNode {
     generation: Generation,
     /// The children of the node, in template order.
     children: Vec<FlatId>,
+    /// Whether the node's value set is open (`listOpen` of its input).
+    list_open: bool,
 }
 
 impl ResolvedNode {
@@ -134,6 +136,15 @@ impl ResolvedNode {
     #[must_use]
     pub fn children(&self) -> &[FlatId] {
         &self.children
+    }
+
+    /// Returns whether the node's value set is open (`listOpen: true` in the
+    /// Web Template), so a `DV_CODED_TEXT` leaf may hold a free-text
+    /// `DV_TEXT` instead (Simplified Formats, §Open Value-Sets and the
+    /// `|other` Suffix).
+    #[must_use]
+    pub const fn list_open(&self) -> bool {
+        self.list_open
     }
 
     /// Whether the node may occur more than once.
@@ -715,6 +726,10 @@ fn resolved_node(
         flat_id,
         generation,
         children,
+        list_open: node
+            .inputs
+            .iter()
+            .any(|input| input.list_open == Some(true)),
     })
 }
 
