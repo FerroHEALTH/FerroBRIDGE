@@ -69,7 +69,7 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   it publishes against crates.io. Each crate is judged on the judge's
   default feature set and, when it has features, on
   `--only-explicit-features`, and `fhir-types` on each FHIR version module
-  with its terminology set. The `cargo-semver-checks` README says the judge
+  with its terminology set and with its own `<version>-resources` set. The `cargo-semver-checks` README says the judge
   does not catch "breaking changes that exist when only a subset of all
   crate features are activated". `crate-version-guard` refuses two steps
   only: a minor step whose patch is not 0, which SemVer 2.0.0 §7 forbids

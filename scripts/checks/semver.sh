@@ -24,7 +24,10 @@
 # for a crate with features, --only-explicit-features, what a dependant built
 # with default-features = false compiles against. fhir-types is judged on its
 # default set, on no feature, and on each FHIR version module with the
-# terminology set; its resources sets are left out, which the run names.
+# terminology set and with its own resources set (<version>-resources), which
+# peaks near 1.3 GB and runs in under a minute on ubuntu-latest (#1834). Every
+# resource sits behind its release's resources set or the all-release
+# `resources` feature, so the five sets hold every item `resources` enables.
 #
 #   semver.sh [--baseline-rev <rev>] [<crate>...]
 #       Judge the named crates, or every crate past 0.0.0, against <rev> or,
@@ -156,8 +159,8 @@ feature_sets() {
     local version
     for version in stu3 r4 r4b r5 r6; do
       echo "--only-explicit-features --features $version,terminology"
+      echo "--only-explicit-features --features $version-resources"
     done
-    echo "semver: fhir-types: the resources sets (resources, <version>-resources) are not judged; resources does not fit a hosted runner, and no per-release set is measured on one" >&2
   else
     echo ""
     # A crate with no features has one feature set.

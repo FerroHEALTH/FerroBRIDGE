@@ -34,6 +34,8 @@ testcontainers.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["time", "net", "process"] }
 tokio-rustls.workspace = true
+# The configuration file of the relay CDR (`facility_cdr`).
+toml.workspace = true
 # The redirect an approved authorization request is answered with.
 url.workspace = true
 wiremock.workspace = true
@@ -64,7 +66,6 @@ anyhow.workspace = true
 thirtyfour.workspace = true
 # The screenshot capture compares a new image with the one on disk.
 png.workspace = true
-toml.workspace = true
 tracing-subscriber.workspace = true
 # The versioned object id of the events lane's parked composition.
 uuid.workspace = true

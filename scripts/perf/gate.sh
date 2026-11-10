@@ -335,9 +335,9 @@ cdr() {
     pg_isready --host 127.0.0.1 --username ferroehr --dbname ferroehr
   "$engine" run --quiet --detach --name "ferrobridge-perf-$arm-cdr" --network "$NETWORK" \
     --publish "127.0.0.1:$(port "$arm" cdr):8080" \
-    --env "FERROEHR__DB__URL=postgres://ferroehr:${CDR_DB_PASSWORD}@${db}:5432/ferroehr" \
-    --env FERROEHR__AUTH__ENABLED=false --env FERROEHR__EHR_INDEX__PROVIDER=local \
-    --env FERROEHR__USAGE_REPORT__ENABLED=false --env "FERROEHR__OUTBOX__READERS=${READER}" \
+    --env "FERROEHR__DATABASE__URL=postgres://ferroehr:${CDR_DB_PASSWORD}@${db}:5432/ferroehr" \
+    --env FERROEHR__AUTH__ENABLED=false --env FERROEHR__RECORD__SUBJECT_INDEX=local \
+    --env FERROEHR__USAGE_REPORT__ENABLED=false --env "FERROEHR__RECORD__CHANGE_FEED__READERS=${READER}" \
     "$cdr_image" > /dev/null
 }
 
