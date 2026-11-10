@@ -291,8 +291,8 @@ before a real cut.
    of them is missing.
 3. **The release pages name the release.** `README.md` (the latest release,
    its date, what it shipped and the image tag), the landing page
-   `website/landing/index.html` (the two meta descriptions, the hero status
-   and the status panel) and the book's `website/book/src/evaluate/build-order.md`
+   `website/landing/index.html` (the two meta descriptions and the hero
+   status) and the book's `website/book/src/evaluate/build-order.md`
    (a row under Released, and the release gone from Next). The versions guard
    compares each claim with the workspace version and the date of its
    `CHANGELOG.md` section, so it fails until the pages and the changelog move

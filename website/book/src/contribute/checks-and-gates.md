@@ -223,6 +223,4 @@ $ mdbook serve website/book
 
 Use the versions pinned in `docs/VERSIONS.md`, which are the ones CI installs.
 The site as GitHub Pages serves it, the landing page at the root and the book
-under `/docs/`, is assembled by `scripts/site/assemble.sh _site`. That script
-renders the roadmap block from the open milestones when `gh` is authenticated,
-and leaves the block empty without failing when it is not.
+under `/docs/`, is assembled by `scripts/site/assemble.sh _site`.
