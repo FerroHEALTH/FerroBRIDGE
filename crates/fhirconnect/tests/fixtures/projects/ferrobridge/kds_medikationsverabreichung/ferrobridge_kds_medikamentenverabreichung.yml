@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of
+# projects/org.highmed/KDS/medikationsverabreichung/KDS_medikamentenverabreichung.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name is FerroBRIDGE's. The published condition of
+# `medicationCode` (lines 38 to 54) names thirteen nodes the
+# KDS_Medikamentenverabreichungen template excludes, which the engine
+# refuses in an extension (#101); the condition here names the three it
+# carries, at0071, at0115 and at0133. Every other method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_kds_medikamentenverabreichung
+  version: 0.0.1-alpha 
+spec: 
+  system: FHIR
+  version: R4
+  extends: ACTION.medication.v1
+
+mappings:
+  - name: compositionMapping
+    extension: add
+    with:
+      fhir: $resource
+      openehr: $composition
+    slotArchetype: COMPOSITION.report.v1.MedicationAdministration
+
+  - name: metaURL
+    extension: add
+    unidirectional: openEHR->fhir
+    with:
+      fhir: $resource.meta
+    manual:
+      - name: profileUrl
+        fhir:
+          - path: profile
+            value: https://www.medizininformatik-initiative.de/fhir/core/modul-medikation/StructureDefinition/MedicationAdministration
+
+
+  - name: medicationCode
+    extension: overwrite
+    with:
+      fhir: $resource.medication.ofType(CodeableConcept).coding
+      openehr: $archetype/description[at0017]/items[openEHR-EHR-CLUSTER.medication.v2]/items[at0132]
+    openehrCondition:
+      targetRoot: $archetype/description[at0017]/items[openEHR-EHR-CLUSTER.medication.v2]
+      targetAttributes:
+        - /items[at0071]
+        - /items[at0115]
+        - /items[at0133]
+      operator: empty
+
+
+  - name: clinicalIndication
+    extension: overwrite
+    with:
+      fhir: $resource.reasonCode.coding.display
+      openehr: $archetype/description[at0017]/items[at0156]
+

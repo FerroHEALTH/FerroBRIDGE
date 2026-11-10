@@ -1,0 +1,158 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/composition/org.openehr/report.v1.MedicationAdministration.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed (#101): `healthcareFacility` (lines 17 to 20) names
+# `MedicationAdministration.request.requester`, which R4 does not define, and
+# `categoryEmpty` (lines 193 to 207) writes `Extension.code`, which R4 does
+# not define; both are left out. `statusDefault` (lines 22 to 29) writes
+# `final`, which the required R4 binding of `MedicationAdministration.status`
+# does not hold, over the status the ACTION mapped; it is left out.
+# `composerEmpty` (lines 36 to 52) and
+# `contextStartTimeEmpty` (lines 84 to 107) write `null_flavour` below the
+# PARTY_PROXY `composer` and the DV_DATE_TIME `context/start_time`, neither of
+# which is an ELEMENT; both are left out. Line 60 filters `$composition/context`
+# under the `with` path `$composition`, which basics/Conditions.adoc
+# §targetRoot calls an error; the condition here names `context/end_time`
+# below `$composition`. The `category` rows write
+# `defining_code/terminology_id` where types-of-mappings/concept-type/manual.adoc
+# writes `defining_code/terminology_id/value`, which they write here. Every
+# other method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.report.v1.MedicationAdministration
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.report.v1
+    revision: 1.2.4
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationAdministration
+
+
+mappings:
+
+  - name: composer
+    with:
+      fhir: $resource.performer.actor
+      openehr: $composition/composer
+
+  - name: effectivePeriodContext
+    with:
+      fhir: $resource.effective.as(Period)
+      openehr: $composition
+    openehrCondition:
+      targetRoot: $composition
+      targetAttribute: context/end_time
+      operator: not empty
+    followedBy:
+      mappings:
+        - name: effectiveEnd
+          with:
+            fhir: end
+            openehr: context/end_time
+
+
+        - name: effectiveStart
+          with:
+            fhir: start
+            openehr: context/start_time
+
+  - name: effectiveDateTimeContext
+    unidirectional: fhir->openehr
+    with:
+      fhir: $resource.effective.as(DateTime)
+      openehr: $composition/context/start_time
+
+
+
+
+  - name: category
+    with:
+      fhir: $resource.category.coding
+      openehr: $composition/context/setting
+    manual:
+      - name: outpatient
+        fhir:
+          - path: code
+            value: outpatient
+          - path: system
+            value: http://terminology.hl7.org/CodeSystem/medication-admin-category
+          - path: display
+            value: Outpatient
+        openehrCondition:
+          targetRoot: $openehrRoot
+          targetAttribute: defining_code/code_string
+          operator: one of
+          criteria: "228"
+        openehr:
+          - path: defining_code/terminology_id/value
+            value: openehr
+          - path: defining_code/code_string
+            value: "228"
+          - path: value
+            value: primary medical care
+        fhirCondition:
+          targetRoot: $fhirRoot
+          targetAttribute: code
+          operator: one of
+          criteria: outpatient
+
+      - name: inpatient
+        fhir:
+          - path: code
+            value: inpatient
+          - path: system
+            value: http://terminology.hl7.org/CodeSystem/medication-admin-category
+          - path: display
+            value: Inpatient
+        openehrCondition:
+          targetRoot: $openehrRoot
+          targetAttribute: defining_code/code_string
+          operator: one of
+          criteria: "232"
+        openehr:
+          - path: defining_code/terminology_id/value
+            value: openehr
+          - path: defining_code/code_string
+            value: "232"
+          - path: value
+            value: secondary medical care
+        fhirCondition:
+          targetRoot: $fhirRoot
+          targetAttribute: code
+          operator: one of
+          criteria: inpatient
+
+      - name: community
+        fhir:
+          - path: code
+            value: community
+          - path: system
+            value: http://terminology.hl7.org/CodeSystem/medication-admin-category
+          - path: display
+            value: Community
+        openehrCondition:
+          targetRoot: $openehrRoot
+          targetAttribute: defining_code/code_string
+          operator: one of
+          criteria: "238"
+        openehr:
+          - path: defining_code/terminology_id/value
+            value: openehr
+          - path: defining_code/code_string
+            value: "238"
+          - path: value
+            value: Community
+        fhirCondition:
+          targetRoot: $fhirRoot
+          targetAttribute: code
+          operator: one of
+          criteria: community
+

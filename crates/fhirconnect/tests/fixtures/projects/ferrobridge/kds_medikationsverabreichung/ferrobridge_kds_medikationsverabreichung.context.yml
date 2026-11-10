@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of
+# projects/org.highmed/KDS/medikationsverabreichung/KDS_medikationsverabreichung.context.yaml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's; the profile, the
+# template and the start are the published file's. The published file does
+# not list KDS_medication.v2, the KDS medication extension of its own
+# directory, which is listed here. KDS_composition.MedicationAdministration,
+# which maps an Identifier and the code `status` onto DV_CODED_TEXT nodes at
+# its lines 12 and 18 (#101), is not listed, and neither is
+# CLUSTER.case_identification.v0, which only that extension slots.
+# KDS_medication.v2.substance and its archetype are not listed, since
+# KDS_medication.v2 overwrites the one method that slots the substance.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_medikationsverabreichung.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: https://www.medizininformatik-initiative.de/fhir/core/modul-medikation/StructureDefinition/MedicationAdministration
+    version: 2025.0.0
+  template:
+    id: KDS_Medikamentenverabreichungen
+    sem_ver: 5.0.1
+  archetypes:
+    - ACTION.medication.v1
+    - CLUSTER.medication.v2
+    - CLUSTER.dosage.v2.BackboneElement
+    - COMPOSITION.report.v1.MedicationAdministration
+  extensions:
+    - ferrobridge_kds_medikamentenverabreichung
+    - KDS_medication.v2
+  start: ACTION.medication.v1
