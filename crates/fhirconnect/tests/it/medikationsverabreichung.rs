@@ -319,3 +319,77 @@ fn the_kds_medikationsverabreichung_chain_as_published_is_refused_exactly()
     );
     Ok(())
 }
+
+/// The published files the substance context loads and runs verbatim.
+pub(crate) const SUBSTANCE_PUBLISHED: &[&str] = &[
+    "projects/org.highmed/KDS/medikationsverabreichung/KDS_medication_substance.yml",
+    "model/cluster/org.openehr/medication.v2.substance.yml",
+];
+
+/// The files of the project directory the substance context loads, the
+/// context first.
+const SUBSTANCE_PROJECT: &[&str] = &[
+    "ferrobridge_kds_substance.context.yml",
+    "ferrobridge_kds_substance.yml",
+];
+
+/// Compiles the substance context against the published template.
+fn kds_substance_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+    let index = kds_template()?;
+    let files: Vec<String> = SUBSTANCE_PUBLISHED
+        .iter()
+        .map(|file| published(file))
+        .chain(SUBSTANCE_PROJECT.iter().map(|file| project(file)))
+        .collect();
+    let set = load_set(files, &Library).map_err(|diagnostics| render(&diagnostics))?;
+    let program = compile(
+        &set,
+        &MappingName::new("ferrobridge_kds_substance.context")?,
+        &index,
+        &SCHEMAS,
+        &Library,
+    )
+    .map_err(|diagnostics| render(&diagnostics))?;
+    Ok((program, index))
+}
+
+/// Compiles the substance context and returns it with the published files
+/// it loads, relative to the vendored library.
+pub(crate) fn kds_substance_chain() -> Result<crate::support::Chain, Box<dyn Error>> {
+    let (program, _) = kds_substance_program()?;
+    Ok((SUBSTANCE_PUBLISHED, program))
+}
+
+#[test]
+fn the_kds_substance_extension_applies_to_the_substance_cluster() -> Result<(), Box<dyn Error>> {
+    let (program, _) = kds_substance_program()?;
+    assert_eq!(program.resource().as_str(), "Substance");
+    let substance = program
+        .models()
+        .iter()
+        .find(|model| model.name().as_str() == "CLUSTER.medication.v2.substance")
+        .ok_or("the program compiles no substance cluster")?;
+    assert_eq!(
+        substance
+            .extensions()
+            .iter()
+            .map(MappingName::as_str)
+            .collect::<Vec<_>>(),
+        ["KDS_medication.v2.substance"]
+    );
+    Ok(())
+}
+
+/// `PutGet` over a synthetic substance: the KDS extension writes the coding
+/// display as the cluster's name.
+#[test]
+fn putget_holds_on_a_kds_substance() -> Result<(), Box<dyn Error>> {
+    let (program, index) = kds_substance_program()?;
+    let substance = serde_json::json!({
+        "resourceType": "Substance",
+        "code": {"coding": [{"display": "Ramipril"}]}
+    });
+    let declared = laws::putget(&program, &index, &substance, &laws::untouched)?;
+    insta::assert_json_snapshot!("kds_substance_putget", declared);
+    Ok(())
+}
