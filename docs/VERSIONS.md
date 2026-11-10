@@ -170,8 +170,8 @@ in code is the matching constant in
 |---|---|---|
 | PostgreSQL image | `postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280` | the `POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, the `sqlx-offline` service in `.github/workflows/ci.yml` |
 | RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
-| FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.6.0-rc10@sha256:c8bfd44a5a87c4a4df14ba4f8100e29e9720a5954e9bd792c551dc098f1f13ee` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
-| FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.6.0-rc10@sha256:ab451cd45ffe33ecd3ab140d274c34a003349a41bf7a0ef8221460dd022e29e3` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.7.0-rc2@sha256:137030d95ee0fd4e4209de357f29f83545bdd408d7f67335f61be20b5fb9858c` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.7.0-rc2@sha256:d04b07f4aca8340e1870f6cca9ee2b50d140adbb0128ba3d20d11607409b352e` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.2@sha256:1853486ae6f85a66424561cbf90f9905027c38d506bdeb24a9e1a831b4b97424` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 
 The CDR runs against its own published database image rather than the plain

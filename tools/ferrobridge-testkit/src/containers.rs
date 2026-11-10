@@ -12,7 +12,7 @@
 //! No specification governs the harness; it is FerroBRIDGE's own design.
 
 use crate::tls::TlsMaterial;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::AtomicU32;
 use std::time::Duration;
 use testcontainers::core::{AccessMode, Healthcheck, IntoContainerPort, Mount, WaitFor};
 use testcontainers::runners::AsyncRunner;
@@ -25,10 +25,10 @@ pub const E2E_GATE: &str = "FERROBRIDGE_E2E";
 pub const E2E_GATE_VALUE: &str = "1";
 
 /// The PostgreSQL port inside a container.
-const POSTGRES_PORT: u16 = 5432;
+pub(crate) const POSTGRES_PORT: u16 = 5432;
 
 /// The HTTP port the reference CDR listens on inside its container.
-const CDR_PORT: u16 = 8080;
+pub(crate) const CDR_PORT: u16 = 8080;
 
 /// The HTTP port the reference terminology server listens on inside its
 /// container.
@@ -79,7 +79,7 @@ const VALUES_MOUNT: &str = "/data/hl7v2-values";
 const POSTGRES_ROLE: &str = "ferrobridge";
 
 /// The database the reference CDR image creates for its own role.
-const CDR_DATABASE_ROLE: &str = "ferroehr";
+pub(crate) const CDR_DATABASE_ROLE: &str = "ferroehr";
 
 /// How long the readiness poll of the CDR waits before it gives up.
 const READINESS_BUDGET: Duration = Duration::from_secs(120);
@@ -94,7 +94,7 @@ const HEALTH_INTERVAL: Duration = Duration::from_secs(1);
 const HEALTH_RETRIES: u32 = 30;
 
 /// Distinguishes the networks of two harnesses in one process.
-static NETWORK_SEQUENCE: AtomicU32 = AtomicU32::new(0);
+pub(crate) static NETWORK_SEQUENCE: AtomicU32 = AtomicU32::new(0);
 
 /// Returns whether the container-backed tests may run.
 ///
@@ -138,7 +138,7 @@ impl PinnedImage {
 
     /// Returns the image with the digest in the tag position, which is how
     /// `testcontainers` spells a reference (`name:tag`).
-    fn image(&self) -> GenericImage {
+    pub(crate) fn image(&self) -> GenericImage {
         GenericImage::new(
             self.repository.to_owned(),
             format!("{}@{}", self.tag, self.digest),
@@ -163,12 +163,13 @@ pub const RABBITMQ: PinnedImage = PinnedImage {
 /// The reference openEHR CDR, which speaks ITS-REST 1.1.0.
 pub const CDR: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr",
-    tag: "5.6.0-rc10",
-    digest: "sha256:c8bfd44a5a87c4a4df14ba4f8100e29e9720a5954e9bd792c551dc098f1f13ee",
+    tag: "5.7.0-rc2",
+    digest: "sha256:137030d95ee0fd4e4209de357f29f83545bdd408d7f67335f61be20b5fb9858c",
 };
 
 /// The readers the reference CDR serves its outbox feed to, each named in its
-/// `[outbox] readers` (`FERROEHR__OUTBOX__READERS`, a comma-separated list).
+/// `[record.change_feed] readers` (`FERROEHR__RECORD__CHANGE_FEED__READERS`, a
+/// comma-separated list).
 pub const CDR_READERS: [&str; 2] = ["ferrobridge-feed", "ferrobridge-events"];
 
 /// The PostgreSQL the reference CDR image documents as its database.
@@ -178,8 +179,8 @@ pub const CDR_READERS: [&str; 2] = ["ferrobridge-feed", "ferrobridge-events"];
 /// rather than against a bare PostgreSQL.
 pub const CDR_POSTGRES: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr-postgres",
-    tag: "5.6.0-rc10",
-    digest: "sha256:ab451cd45ffe33ecd3ab140d274c34a003349a41bf7a0ef8221460dd022e29e3",
+    tag: "5.7.0-rc2",
+    digest: "sha256:d04b07f4aca8340e1870f6cca9ee2b50d140adbb0128ba3d20d11607409b352e",
 };
 
 /// The reference FHIR terminology server.
@@ -273,13 +274,13 @@ impl Postgres {
 #[derive(Debug)]
 pub struct Cdr {
     /// The server itself.
-    server: ContainerAsync<GenericImage>,
+    pub(crate) server: ContainerAsync<GenericImage>,
     /// The database it was started against.
-    database: ContainerAsync<GenericImage>,
+    pub(crate) database: ContainerAsync<GenericImage>,
     /// The openEHR REST API root, the path `/ehr` and `/query` live under.
-    base_url: String,
+    pub(crate) base_url: String,
     /// The root of the CDR's extensions, the outbox feed among them.
-    extensions_url: String,
+    pub(crate) extensions_url: String,
 }
 
 impl Cdr {
@@ -576,60 +577,9 @@ pub async fn postgres_tls(material: &TlsMaterial) -> Result<Postgres, HarnessErr
 /// [`HarnessError::Probe`] when the readiness probe cannot be sent, and
 /// [`HarnessError::NotReady`] when the CDR does not answer it in time.
 pub async fn cdr() -> Result<Cdr, HarnessError> {
-    let sequence = NETWORK_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let process = std::process::id();
-    let network = format!("ferrobridge-e2e-{process}-{sequence}");
-    let database_name = format!("ferrobridge-e2e-db-{process}-{sequence}");
-
-    let database = CDR_POSTGRES
-        .image()
-        .with_wait_for(WaitFor::healthcheck())
-        .with_health_check(postgres_health_check(CDR_DATABASE_ROLE, CDR_DATABASE_ROLE))
-        .with_env_var("POSTGRES_PASSWORD", "postgres")
-        .with_network(network.clone())
-        .with_container_name(database_name.clone())
-        .start()
-        .await
-        .map_err(|source| HarnessError::Container {
-            image: CDR_POSTGRES.repository,
-            source,
-        })?;
-
-    let dsn = format!(
-        "postgres://{CDR_DATABASE_ROLE}:{CDR_DATABASE_ROLE}@{database_name}:{POSTGRES_PORT}/{CDR_DATABASE_ROLE}"
-    );
-    let cdr =
-        cdr_request(dsn, network)
-            .start()
-            .await
-            .map_err(|source| HarnessError::Container {
-                image: CDR.repository,
-                source,
-            })?;
-
-    let host = cdr
-        .get_host()
-        .await
-        .map_err(|source| HarnessError::Container {
-            image: CDR.repository,
-            source,
-        })?;
-    let port = cdr
-        .get_host_port_ipv4(CDR_PORT.tcp())
-        .await
-        .map_err(|source| HarnessError::Container {
-            image: CDR.repository,
-            source,
-        })?;
-    let origin = format!("http://{host}:{port}");
-    await_readiness(&format!("{origin}/health/readiness")).await?;
-
-    Ok(Cdr {
-        server: cdr,
-        database,
-        base_url: format!("{origin}/ferroehr/rest/openehr/v1"),
-        extensions_url: format!("{origin}/ferroehr/rest/extensions/v1"),
-    })
+    let (database, placement) = crate::facility_cdr::database().await?;
+    let request = cdr_request(placement.dsn.clone(), placement.network.clone());
+    crate::facility_cdr::serve(database, request).await
 }
 
 /// Returns the request that starts the reference terminology server over
@@ -666,16 +616,19 @@ fn terminology_request(directories: &[(&str, &str)]) -> ContainerRequest<Generic
 /// runner's environment, so the CDR's own CI detection cannot see that it runs
 /// in a test, and every run would report itself as an installation. The EHR
 /// index is the CDR's own, since the harness runs no patient identity source.
-fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
+pub(crate) fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
     CDR.image()
         .with_wait_for(WaitFor::message_on_stdout("ferroehr-rest listening"))
         .with_exposed_port(CDR_PORT.tcp())
         .with_network(network)
-        .with_env_var("FERROEHR__DB__URL", dsn)
+        .with_env_var("FERROEHR__DATABASE__URL", dsn)
         .with_env_var("FERROEHR__AUTH__ENABLED", "false")
-        .with_env_var("FERROEHR__EHR_INDEX__PROVIDER", "local")
+        .with_env_var("FERROEHR__RECORD__SUBJECT_INDEX", "local")
         .with_env_var("FERROEHR__USAGE_REPORT__ENABLED", "false")
-        .with_env_var("FERROEHR__OUTBOX__READERS", CDR_READERS.join(","))
+        .with_env_var(
+            "FERROEHR__RECORD__CHANGE_FEED__READERS",
+            CDR_READERS.join(","),
+        )
 }
 
 /// Returns the health check that answers when PostgreSQL accepts TCP
@@ -686,7 +639,7 @@ fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
 /// named explicitly because the entrypoint's initialisation server listens on
 /// the Unix socket alone; a socket probe would report ready before the port
 /// the harness hands out serves anything.
-fn postgres_health_check(role: &str, database: &str) -> Healthcheck {
+pub(crate) fn postgres_health_check(role: &str, database: &str) -> Healthcheck {
     Healthcheck::cmd(["pg_isready", "-h", "127.0.0.1", "-U", role, "-d", database])
         .with_interval(HEALTH_INTERVAL)
         .with_timeout(HEALTH_INTERVAL)
@@ -694,7 +647,7 @@ fn postgres_health_check(role: &str, database: &str) -> Healthcheck {
 }
 
 /// Polls `url` until it answers `200`, or the budget runs out.
-async fn await_readiness(url: &str) -> Result<(), HarnessError> {
+pub(crate) async fn await_readiness(url: &str) -> Result<(), HarnessError> {
     let client = reqwest::Client::builder()
         .timeout(READINESS_INTERVAL.saturating_mul(8))
         .build()
