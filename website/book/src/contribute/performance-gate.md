@@ -28,6 +28,9 @@ release that carries no gate contract (neither `perf/arm.env` nor
 `scripts/perf/gate.sh`) gives way to the oldest commit after it that carries
 one, the nearest point both arms can be booted from. The build prints which
 commit it chose and why, and the release notes' performance line names it.
+A manual dispatch of the `Perf` workflow on `main` with an empty `base`
+resolves and measures the base the next release will take, so the base is
+proven before the tag.
 
 ## What runs
 

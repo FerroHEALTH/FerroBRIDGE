@@ -25,10 +25,31 @@
 # verdict job passes the gate when the last attempt that ran passed; a breach
 # on any other model fails at once, with no retry, and a run cancelled by its
 # concurrency group or by a person retries nothing.
-# No specification governs this: our own design.
+# A manual dispatch runs it on any branch, with an empty `base` resolving
+# the base as the release lane does, so a release's base is proven before
+# its tag. No specification governs this: our own design.
 name: Perf
 
 on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: >-
+          The commit or ref the base is the merge base with. Empty takes the
+          previous release, as the release lane does.
+        required: false
+        default: ""
+        type: string
+      cache:
+        description: Restore and save the Rust build cache; false measures as the release lane does.
+        required: false
+        default: false
+        type: boolean
+      measure:
+        description: Build and measure.
+        required: false
+        default: true
+        type: boolean
   workflow_call:
     inputs:
       base:
