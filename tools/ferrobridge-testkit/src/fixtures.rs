@@ -337,9 +337,10 @@ macro_rules! library_template {
 /// slot, the health summary holds an ad hoc section with the absence and
 /// global exclusion evaluations, and the report result, medication list,
 /// encounter and person compositions each hold the gender evaluation; the
-/// clusters template holds the clusters that FerroBRIDGE models slot. A
-/// suite builds the ADL 2 operational templates at test time.
-pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 7] = [
+/// clusters template holds the clusters that FerroBRIDGE models slot, and
+/// the allergy template holds the adverse reaction risk evaluation. A suite
+/// builds the ADL 2 operational templates at test time.
+pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 8] = [
     library_template!("report"),
     library_template!("report_result"),
     library_template!("medication_list"),
@@ -347,24 +348,27 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 7] = [
     library_template!("person"),
     library_template!("health_summary"),
     library_template!("clusters"),
+    library_template!("allergy"),
 ];
 
-/// The eight international CKM archetypes of the library templates.
+/// The nine international CKM archetypes of the library templates.
 ///
 /// They are the report, report result and medication list compositions, the
-/// absence, global exclusion and gender evaluations, and the device and case
-/// identification clusters of [`FERROBRIDGE_LIBRARY_TEMPLATES`].
+/// absence, global exclusion, gender and adverse reaction risk evaluations,
+/// and the device and case identification clusters of
+/// [`FERROBRIDGE_LIBRARY_TEMPLATES`].
 ///
 /// `scripts/vendor/ckm-library.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 8] = [
+pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 9] = [
     ckm_library!("openEHR-EHR-COMPOSITION.report.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.report-result.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.medication_list.v1.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.absence.v2.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.exclusion_global.v1.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.gender.v1.adl"),
+    ckm_library!("openEHR-EHR-EVALUATION.adverse_reaction_risk.v2.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.device.v1.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.case_identification.v0.adl"),
 ];

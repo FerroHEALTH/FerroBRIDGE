@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 
 use fhir_types::codec::Value;
+use openehr_mapping_core::index::ResolvedNode;
 
 use crate::engine::absent::DATA_ABSENT_REASON;
 use crate::engine::absent::absent_element;
@@ -210,22 +211,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 })?;
             }
         }
-        for (target, mut merged) in elements {
-            let rm_type = target.node().rm_type();
-            merged.insert(
-                String::from("_type"),
-                serde_json::Value::String(String::from(rm_type)),
-            );
-            let value = RmValue::from_canonical(
-                rm_type,
-                target.node().aql_path().as_str(),
-                &serde_json::Value::Object(merged),
-            )
-            .map_err(|source| EngineError::Rm {
-                mapping: format!("{}.{}", mapping.name(), entry.name()),
-                node: String::from(target.node().aql_path().as_str()),
-                source: Box::new(source),
-            })?;
+        for (target, merged) in elements {
+            let value = self.manual_element(mapping, entry, target.node(), merged)?;
             self.store(Written {
                 flat_id: target.node().flat_id().clone(),
                 positions: binding.openehr.clone(),
@@ -233,6 +220,49 @@ impl<T: Table + ?Sized> Run<'_, T> {
             });
         }
         Ok(())
+    }
+
+    /// Builds the data element one manual entry's paths merged into at
+    /// `node`.
+    ///
+    /// "Full FHIR or openEHR elements are created from all given paths"
+    /// (`types-of-mappings/concept-type/manual.adoc`). At a `DV_CODED_TEXT`
+    /// node whose value set is open, paths that write no `defining_code`
+    /// create the `DV_TEXT` the leaf may carry instead (Simplified Formats
+    /// master04 §Open Value-Sets and the `|other` Suffix). The node's own
+    /// class answers otherwise, and its refusal stands.
+    fn manual_element(
+        &self,
+        mapping: &Mapping,
+        entry: &Manual,
+        node: &ResolvedNode,
+        mut merged: serde_json::Map<String, serde_json::Value>,
+    ) -> Result<RmValue, EngineError> {
+        let name = || format!("{}.{}", mapping.name(), entry.name());
+        let free_text = !merged.contains_key("defining_code")
+            && self
+                .index
+                .admits_free_text(node)
+                .map_err(|source| EngineError::Template {
+                    mapping: name(),
+                    node: String::from(node.aql_path().as_str()),
+                    source: Box::new(source),
+                })?;
+        let rm_type = if free_text { "DV_TEXT" } else { node.rm_type() };
+        merged.insert(
+            String::from("_type"),
+            serde_json::Value::String(String::from(rm_type)),
+        );
+        RmValue::from_canonical(
+            rm_type,
+            node.aql_path().as_str(),
+            &serde_json::Value::Object(merged),
+        )
+        .map_err(|source| EngineError::Rm {
+            mapping: name(),
+            node: String::from(node.aql_path().as_str()),
+            source: Box::new(source),
+        })
     }
 
     /// Writes the FHIR paths of one manual entry into one element.

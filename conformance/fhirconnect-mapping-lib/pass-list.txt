@@ -18,6 +18,7 @@ projects/org.highmed/KDS/procedure/KDS_anatomical_location.yml
 projects/org.highmed/KDS/todesursache/KDS_cause_of_death.yml
 projects/org.highmed/KDS/todesursache/KDS_problem_qualifier.yml
 projects/org.highmed/KDS/vitalstatus/KDS_vitalsigns.yml
+projects/org.openehr/IPS/allergy/IPS_adverse_reaction.yml
 projects/org.openehr/IPS/medication/IPS_medication.context.yml
 projects/org.openehr/IPS/medication/IPS_medication_section.yml
 total 129

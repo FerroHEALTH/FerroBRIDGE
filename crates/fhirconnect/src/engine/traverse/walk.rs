@@ -238,8 +238,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
             };
             read_at.push(unread::instance_of(target.node().flat_id(), &positions));
             found.present = found.present.saturating_add(1);
-            found.types.push(String::from(target.node().rm_type()));
-            if let Some(text) = scalar(at_tail) {
+            found
+                .types
+                .push(held_class(at_tail, target.node().rm_type()));
+            if let Some(text) = scalar(at_tail).or_else(|| text_of(at_tail, target)) {
                 found.values.push(text);
             }
         }
@@ -821,4 +823,38 @@ fn at_node<'positions>(
     positions
         .get(..target.occurrences().len())
         .unwrap_or(positions)
+}
+
+/// Returns the class the `type` operator tests a condition attribute by: the
+/// data value's own class.
+///
+/// `basics/Conditions.adoc` §Conditions in openEHR names an `ELEMENT`
+/// (`items[at0001]`) and tests `DV_CODED_TEXT`, the class of its value, and a
+/// polymorphic value or a `DV_TEXT` held at a coded node with an open list
+/// carries its class in `_type` (openEHR ITS-JSON). The node's declared class
+/// answers for a value that states none.
+fn held_class(value: &serde_json::Value, declared: &str) -> String {
+    let own = value.get("_type").and_then(serde_json::Value::as_str);
+    let held = match own {
+        Some("ELEMENT") => value
+            .get("value")
+            .and_then(|inner| inner.get("_type"))
+            .and_then(serde_json::Value::as_str),
+        other => other,
+    };
+    String::from(held.unwrap_or(declared))
+}
+
+/// Returns the text a condition compares at a data value node whose tail is
+/// empty: the value's own `value`, which a `manual` path ending on the node
+/// writes.
+///
+/// No specification governs this: our own design, the reading side of the
+/// rule `manual.rs` applies when it writes an empty tail as the node's
+/// `value`, so a condition and the manual it guards name one element.
+fn text_of(value: &serde_json::Value, target: &OpenehrTarget) -> Option<String> {
+    if !target.tail().segments.is_empty() {
+        return None;
+    }
+    value.get("value").and_then(scalar)
 }

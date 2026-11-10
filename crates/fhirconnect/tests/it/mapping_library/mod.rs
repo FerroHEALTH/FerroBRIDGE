@@ -11,6 +11,7 @@
 //! archetypes its source specialises, is carried into the index, because
 //! `create_opt` writes an OPT that states no parent.
 
+mod allergy;
 mod clusters;
 mod compositions;
 mod ips;
@@ -202,6 +203,7 @@ pub(crate) fn library_chains() -> Result<Vec<crate::support::Chain>, Box<dyn Err
     chains.extend(clusters::chains()?);
     chains.extend(compositions::chains()?);
     chains.push(ips::chain()?);
+    chains.push(allergy::chain()?);
     Ok(chains)
 }
 

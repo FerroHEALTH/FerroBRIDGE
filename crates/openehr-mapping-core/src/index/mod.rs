@@ -19,6 +19,7 @@
 mod alternative;
 mod amend;
 mod facts;
+mod free_text;
 pub mod matching;
 pub mod ordinals;
 pub mod paths;

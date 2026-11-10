@@ -1,0 +1,50 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's IPS allergy
+-- extension over two published CKM archetypes (fixtures/ckm/library): a report
+-- COMPOSITION holding EVALUATION.adverse_reaction_risk.v2. No specification
+-- governs this template: our own design, carrying the archetype the mappings
+-- name. Node identifiers are at-coded, the ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_allergy.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library model mappings FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.adverse_reaction_risk.v2]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library allergy">
+                description = <"Library allergy">
+            >
+            ["at0000.2"] = <
+                text = <"Adverse reaction risk">
+                description = <"Adverse reaction risk">
+            >
+        >
+    >
+
