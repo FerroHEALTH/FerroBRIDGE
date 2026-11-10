@@ -290,13 +290,13 @@ before a real cut.
    job checks the first three against the tag and refuses the release when one
    of them is missing.
 3. **The release pages name the release.** `README.md` (the latest release,
-   its date, what it shipped and the image tag), the landing page
-   `website/landing/index.html` (the two meta descriptions and the hero
-   status) and the book's `website/book/src/evaluate/build-order.md`
-   (a row under Released, and the release gone from Next). The versions guard
+   its date, what it shipped and the image tag) and the book's
+   `website/book/src/operate/releases.md`
+   (a row under Released). The versions guard
    compares each claim with the workspace version and the date of its
    `CHANGELOG.md` section, so it fails until the pages and the changelog move
-   with the version.
+   with the version. The landing page's hero badge needs no edit:
+   `scripts/site/assemble.sh` renders it from the workspace version.
 4. **The EHDS system documents are the newest.** Move
    `docs/ehds/system-documents.env` to the newest commit of
    FerroHEALTH/FerroHEALTH that touches `website/book/src/ehds/`, with the
