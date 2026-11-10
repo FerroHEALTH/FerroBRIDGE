@@ -530,17 +530,20 @@ impl Ingest<'_> {
             ContributionCreateOutcome::BadRequest { body } => Err(refuse_all(
                 mapped,
                 &status::BAD_REQUEST,
-                &status::diagnostics(StatusCode::BAD_REQUEST, &body),
+                StatusCode::BAD_REQUEST,
+                &body,
             )),
             ContributionCreateOutcome::NotFound { body } => Err(refuse_all(
                 mapped,
                 &status::NOT_FOUND,
-                &status::diagnostics(StatusCode::NOT_FOUND, &body),
+                StatusCode::NOT_FOUND,
+                &body,
             )),
             ContributionCreateOutcome::Conflict { body } => Err(refuse_all(
                 mapped,
                 &status::PRECONDITION_FAILED,
-                &status::diagnostics(StatusCode::CONFLICT, &body),
+                StatusCode::CONFLICT,
+                &body,
             )),
         }
     }

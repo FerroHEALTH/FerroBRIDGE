@@ -373,6 +373,17 @@ impl CdrError {
         }
     }
 
+    /// Returns the status the CDR answered, when the call reached it.
+    #[must_use]
+    pub fn upstream_status(&self) -> Option<StatusCode> {
+        match self {
+            Self::Client { upstream, .. } | Self::Renewal { upstream, .. } => {
+                upstream.as_deref().map(Upstream::status)
+            }
+            _ => None,
+        }
+    }
+
     /// Returns whether asking again may succeed: the call reached no answer,
     /// or the service answered a failure the generated client counts
     /// retryable ([`ClientError::is_retryable`]).

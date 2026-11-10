@@ -117,6 +117,8 @@ pub struct Refused {
     entity_tag: Option<String>,
     /// The `WWW-Authenticate` challenge the CDR sent, when it sent one.
     challenge: Option<String>,
+    /// The status the CDR answered, when the refusal is the CDR's.
+    upstream: Option<StatusCode>,
 }
 
 impl Refused {
@@ -134,6 +136,7 @@ impl Refused {
             issues,
             entity_tag: None,
             challenge: None,
+            upstream: None,
         }
     }
 
@@ -145,7 +148,15 @@ impl Refused {
             issues: vec![answer.issue().clone()],
             entity_tag: answer.entity_tag().map(str::to_owned),
             challenge: answer.challenge().map(str::to_owned),
+            upstream: None,
         }
+    }
+
+    /// Returns this refusal recording `upstream`, the status the CDR answered.
+    #[must_use]
+    pub const fn with_upstream(mut self, upstream: Option<StatusCode>) -> Self {
+        self.upstream = upstream;
+        self
     }
 
     /// Returns this refusal with `issue` rendered after its own.
@@ -177,6 +188,13 @@ impl Refused {
     #[must_use]
     pub fn challenge(&self) -> Option<&str> {
         self.challenge.as_deref()
+    }
+
+    /// Returns the status the CDR answered, when the refusal is the CDR's:
+    /// the status table may answer a different one.
+    #[must_use]
+    pub const fn upstream(&self) -> Option<StatusCode> {
+        self.upstream
     }
 }
 
