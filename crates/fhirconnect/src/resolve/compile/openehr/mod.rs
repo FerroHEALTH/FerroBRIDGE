@@ -18,7 +18,7 @@ use openehr_mapping_core::diagnostic::ModelPath;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::index::WebTemplateIndex;
-use openehr_mapping_core::index::matching::node_id_matches;
+use openehr_mapping_core::index::matching::segment_matches;
 use openehr_mapping_core::path::MappingPath;
 use openehr_mapping_core::position::Located;
 use openehr_mapping_core::template::PathError;
@@ -379,14 +379,10 @@ pub(super) fn compaction_map(template: &WebTemplateIndex) -> Vec<(RmPath, &Resol
 }
 
 /// Whether a path a mapping writes names the place `carried` holds in the
-/// template.
-///
-/// A mapping names an archetype node by its node id, and the template may
-/// constrain the same node further with a name, which the `aqlPath` carries.
-/// A name the mapping does not write selects nothing, the rule the index
-/// applies to an indexed node; a node id the mapping writes must be the one
-/// the template carries, and one it does not write matches only a segment
-/// that carries none. No specification governs this: our own design.
+/// template: both absolute or both relative, as long, and every segment
+/// matched by the foundation's one segment rule
+/// ([`segment_matches`]),
+/// against the name the template's `aqlPath` carries there.
 fn names_same_place(written: &RmPath, carried: &RmPath) -> bool {
     written.absolute == carried.absolute
         && written.segments.len() == carried.segments.len()
@@ -395,25 +391,6 @@ fn names_same_place(written: &RmPath, carried: &RmPath) -> bool {
             .iter()
             .zip(&carried.segments)
             .all(|(wanted, held)| {
-                let node_id = match (
-                    wanted.predicate.archetype_node_id.as_deref(),
-                    held.predicate.archetype_node_id.as_deref(),
-                ) {
-                    (Some(wanted), Some(held)) => node_id_matches(wanted, held),
-                    (None, None) => true,
-                    (Some(_), None) | (None, Some(_)) => false,
-                };
-                let name = match (
-                    wanted.predicate.name_value.as_deref(),
-                    held.predicate.name_value.as_deref(),
-                ) {
-                    (Some(wanted), Some(held)) => wanted == held,
-                    (Some(_) | None, None) | (None, Some(_)) => true,
-                };
-                !wanted.descendant
-                    && wanted.attribute == held.attribute
-                    && wanted.predicate.position == held.predicate.position
-                    && node_id
-                    && name
+                segment_matches(wanted, held, held.predicate.name_value.as_deref())
             })
 }

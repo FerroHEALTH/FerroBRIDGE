@@ -10,8 +10,9 @@ use openehr_rm::v1_2::model::Container;
 use openehr_rm::v1_2::paths::RmPath;
 use openehr_rm::v1_2::typing::RmType;
 use openehr_rm::v1_2::typing::base_name;
-use openehr_rm::v1_2::typing::path_type;
 
+use super::tail_walk;
+use super::tail_walk::concrete_forms;
 use super::{ENTRY_TIMES, FAMILIES, PARTY_ROOTS};
 
 /// What the attribute a tail ends on holds.
@@ -115,8 +116,7 @@ struct Walked {
     lists: Vec<usize>,
 }
 
-/// Walks a tail below a data value, typing each step with
-/// `openehr_rm::v1_2::typing::path_type`.
+/// Walks a tail below a data value with [`tail_walk::steps`].
 ///
 /// A step through a `Set` or `Hash` is `None`, since neither orders its
 /// members (openEHR BASE Release 1.2.0, foundation types §Container types),
@@ -128,7 +128,8 @@ fn walk(rm_type: &str, tail: &[&str]) -> Option<Walked> {
     }
     let owner = owner_of(class.name(), tail.first()?)?;
     let path = tail.join("/").parse::<RmPath>().ok()?;
-    let steps = path_type(&class, &path).ok()?;
+    // NOTE: a tail the model refuses or stops on is one the engine cannot carry, which `None` answers.
+    let steps = tail_walk::steps(rm_type, &path).ok().flatten()?;
     let mut lists = Vec::new();
     for (position, step) in steps.iter().enumerate() {
         match step.container() {
@@ -159,20 +160,6 @@ fn owner_of(rm_type: &str, attribute: &str) -> Option<&'static str> {
             .iter()
             .any(|&other| other != form && model::is_a(form, other))
     })
-}
-
-/// Returns the reference-model class plus every concrete class below it.
-fn concrete_forms(rm_type: &str) -> Vec<&'static str> {
-    let Some(class) = model::class(rm_type) else {
-        return Vec::new();
-    };
-    let mut forms = vec![class.name];
-    for &descendant in class.descendants {
-        if !forms.contains(&descendant) {
-            forms.push(descendant);
-        }
-    }
-    forms
 }
 
 /// Returns what an attribute of `declared_type` holds, `None` for a type the

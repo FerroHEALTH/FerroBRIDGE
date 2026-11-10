@@ -59,9 +59,10 @@ impl core::fmt::Display for Generation {
 
 /// An operational template, in the generation it was served in.
 ///
-/// This is the same two-variant shape the ITS-REST client returns. The client
-/// owns the fetch and this crate owns the build, so the type is spelled here
-/// and the client converts into it.
+/// The one template source of the workspace: a file on disk reads into it,
+/// and an ITS-REST client answers it from whichever of the two definition
+/// routes served the template. The generation is the route's, never a field
+/// of the body.
 #[derive(Debug)]
 pub enum TemplateSource {
     /// A parsed OPT 1.4, the body of the `adl1.4` route.
@@ -70,7 +71,8 @@ pub enum TemplateSource {
     Opt2 {
         /// The operational template itself.
         template: Box<OperationalTemplate>,
-        /// The full HRID the request resolved to, as the client read it.
+        /// The physical id of the full HRID the request resolved to, as the
+        /// client read it.
         resolved_id: String,
         /// The path of every attribute the template removed for `existence
         /// matches {0}` (`openehr_adl::opt::RawOpt`), which the Web Template

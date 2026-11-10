@@ -13,11 +13,11 @@ use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
 
+use crate::engine::rm::tail_walk::concrete_forms;
 use crate::model::ast::keyword::Variable;
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Scope;
 use crate::resolve::compile::openehr::LocateError;
-use crate::resolve::compile::openehr::locate::concrete_forms;
 use crate::resolve::compile::openehr::locate::rm_tail;
 use crate::resolve::compile::openehr::names_same_place;
 

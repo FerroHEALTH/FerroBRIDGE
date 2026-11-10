@@ -6,11 +6,10 @@
 
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::template::PathError;
-use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::RmPath;
-use openehr_rm::v1_2::typing::RmType;
-use openehr_rm::v1_2::typing::TypingError;
-use openehr_rm::v1_2::typing::path_type;
+
+use crate::engine::rm::tail_walk;
+use crate::engine::rm::tail_walk::concrete_leaf;
 
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::openehr::LocateError;
@@ -197,54 +196,11 @@ const ELEMENT_VALUE: &str = "value";
 /// the item type's class, or its one concrete descendant when that class is
 /// abstract and has exactly one.
 pub(super) fn rm_tail(rm_type: &str, tail: &RmPath) -> Result<Option<String>, String> {
-    let Ok(class) = rm_type.parse::<RmType>() else {
-        return Ok(None);
-    };
-    if model::class(class.name()).is_none() {
-        return Ok(None);
-    }
-    match path_type(&class, tail) {
-        Ok(steps) => Ok(steps.last().map(|step| concrete_leaf(step.item().name()))),
-        Err(TypingError::UnknownClass(_)) => Ok(None),
-        Err(error) => Err(error.to_string()),
-    }
-}
-
-/// Returns the one concrete form of an abstract class, or the class itself.
-fn concrete_leaf(declared: &str) -> String {
-    let Some(class) = model::class(declared) else {
-        return String::from(declared);
-    };
-    if !class.is_abstract {
-        return String::from(declared);
-    }
-    let concrete: Vec<&str> = class
-        .descendants
-        .iter()
-        .copied()
-        .filter(|name| model::class(name).is_some_and(|found| !found.is_abstract))
-        .collect();
-    match *concrete.as_slice() {
-        [only] => String::from(only),
-        _ => String::from(declared),
-    }
-}
-
-/// Returns the reference-model class plus every concrete class below it.
-///
-/// An empty result means the reference model carries no class of that name,
-/// which is what stops [`rm_tail`] rather than refusing.
-pub(super) fn concrete_forms(rm_type: &str) -> Vec<&'static str> {
-    let Some(class) = model::class(rm_type) else {
-        return Vec::new();
-    };
-    let mut forms: Vec<&'static str> = vec![class.name];
-    for descendant in class.descendants {
-        if !forms.contains(descendant) {
-            forms.push(descendant);
-        }
-    }
-    forms
+    tail_walk::steps(rm_type, tail)
+        .map(|steps| {
+            steps.and_then(|steps| steps.last().map(|step| concrete_leaf(step.item().name())))
+        })
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

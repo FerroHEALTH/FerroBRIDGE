@@ -7,7 +7,8 @@
 use super::support;
 use ferrobridge_server::cdr::error::CdrError;
 use ferrobridge_server::cdr::ids::template_id;
-use ferrobridge_server::cdr::template::{TemplateOutcome, TemplateSource};
+use ferrobridge_server::cdr::template::TemplateOutcome;
+use openehr_mapping_core::template::TemplateSource;
 use std::error::Error;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -75,7 +76,7 @@ async fn a_404_on_adl1_4_falls_back_to_adl2() -> Result<(), Box<dyn Error>> {
         .await?;
     match outcome {
         TemplateOutcome::Found(TemplateSource::Opt2 { resolved_id, .. }) => {
-            assert_eq!(support::OPT2_HRID, resolved_id.physical_id());
+            assert_eq!(support::OPT2_HRID, resolved_id);
         }
         other => return Err(format!("expected an ADL 2 template, got {other:?}").into()),
     }
