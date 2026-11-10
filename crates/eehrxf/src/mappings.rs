@@ -179,7 +179,10 @@ pub const MPD: Project = Project {
 /// It maps over FerroBRIDGE's imaging report template: the imaging
 /// examination result to the `DiagnosticReportEuImaging` the document holds
 /// beside its composition, and the study it reports to the
-/// `ImagingStudyEuImaging` the report references.
+/// `ImagingStudyEuImaging` the report references. A received report
+/// declares each section none of whose entries it carries, and each element
+/// of the report and of its studies it carries into no structured element,
+/// such as the performing organization ([`Project::accounted`]).
 #[cfg(feature = "imaging")]
 pub const IMAGING: Project = Project {
     directory: "imaging",
@@ -189,7 +192,49 @@ pub const IMAGING: Project = Project {
         shipped!("imaging", "ferrobridge_imaging_exam_result.v1.yml"),
         shipped!("imaging", "ferrobridge_eu_imaging_report.yml"),
     ],
-    accounted: &[],
+    // NOTE: no specification governs this: our own design; every section and every element of the report and
+    // its study but identity, subject, choice elements and `imagingStudy` (whose studies declare their own) is accounted.
+    accounted: &[
+        "Composition.section",
+        "DiagnosticReport.extension",
+        "DiagnosticReport.modifierExtension",
+        "DiagnosticReport.identifier",
+        "DiagnosticReport.basedOn",
+        "DiagnosticReport.status",
+        "DiagnosticReport.category",
+        "DiagnosticReport.code",
+        "DiagnosticReport.encounter",
+        "DiagnosticReport.issued",
+        "DiagnosticReport.performer",
+        "DiagnosticReport.resultsInterpreter",
+        "DiagnosticReport.specimen",
+        "DiagnosticReport.result",
+        "DiagnosticReport.media",
+        "DiagnosticReport.conclusion",
+        "DiagnosticReport.conclusionCode",
+        "DiagnosticReport.presentedForm",
+        "ImagingStudy.extension",
+        "ImagingStudy.modifierExtension",
+        "ImagingStudy.identifier",
+        "ImagingStudy.status",
+        "ImagingStudy.modality",
+        "ImagingStudy.encounter",
+        "ImagingStudy.started",
+        "ImagingStudy.basedOn",
+        "ImagingStudy.referrer",
+        "ImagingStudy.interpreter",
+        "ImagingStudy.endpoint",
+        "ImagingStudy.numberOfSeries",
+        "ImagingStudy.numberOfInstances",
+        "ImagingStudy.procedureReference",
+        "ImagingStudy.procedureCode",
+        "ImagingStudy.location",
+        "ImagingStudy.reasonCode",
+        "ImagingStudy.reasonReference",
+        "ImagingStudy.note",
+        "ImagingStudy.description",
+        "ImagingStudy.series",
+    ],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
