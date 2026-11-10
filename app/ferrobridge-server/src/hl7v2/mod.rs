@@ -78,6 +78,8 @@ pub struct Face {
     senders: Vec<Sender>,
     /// The senders that are devices.
     devices: Vec<crate::config::hl7v2::Device>,
+    /// The issuer a facility's namespace id is written under.
+    facility_issuer: Option<String>,
     /// The DNS name each sender's client certificate carries.
     subjects: Vec<crate::config::hl7v2::Subject>,
     /// The usage report's window each message and acknowledgment is counted
@@ -176,6 +178,7 @@ impl Face {
             log_outcomes: settings.log_outcomes,
             senders: settings.senders.clone(),
             devices: settings.devices.clone(),
+            facility_issuer: settings.facility_issuer.clone(),
             subjects: settings.subjects.clone(),
             usage: Arc::new(crate::usage_report::window()),
             access_log: None,
@@ -327,7 +330,7 @@ impl Face {
     /// and [`Settled::NoClinician`] for a result naming no clinician from a
     /// sender that is no device.
     fn responsible(&self, message: &Message) -> Result<origin::Responsible, Settled> {
-        let facility = origin::facility(message);
+        let facility = origin::facility(message, self.facility_issuer.as_deref());
         if let Some(facility) = facility.as_ref()
             && !facility.listed(&self.senders)
         {
@@ -435,7 +438,7 @@ impl Face {
                 origin::performing_organisation(message),
             );
         if let Some(composer) = composer {
-            ingest = ingest.with_composer(composer.name, composer.id);
+            ingest = ingest.with_composer(composer);
         }
         let outcome = ingest
             .ingest_bundle(&bundle, self.unmapped, &provenance)

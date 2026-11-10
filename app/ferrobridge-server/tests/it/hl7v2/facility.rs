@@ -272,3 +272,115 @@ async fn a_composition_without_context_names_the_facility_as_the_originating_loc
     }
     running.stop().await
 }
+
+/// The issuer the cases configure for a facility's namespace id.
+const FACILITY_ISSUER: &str = "urn:oid:2.999.1";
+
+/// Starts the face as [`listing_facilities`] does, writing a facility's
+/// namespace id under [`FACILITY_ISSUER`], with `universal` listed too.
+async fn issuing(universal: Option<Sender>) -> Result<Running, Box<dyn Error>> {
+    let mut lane = face_settings(true);
+    lane.facility_issuer = Some(String::from(FACILITY_ISSUER));
+    lane.senders.extend([
+        Sender::Namespace(String::from("NORTHWARD")),
+        Sender::Namespace(String::from("ORDERDESK")),
+    ]);
+    lane.senders.extend(universal);
+    let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
+    Running::start_with(lane, lookup).await
+}
+
+/// Returns the facility identifiers of every composition.
+async fn identifiers(running: &Running) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
+    Ok(compositions(running)
+        .await?
+        .iter()
+        .map(|composition| composition["context"]["health_care_facility"]["identifiers"].clone())
+        .collect())
+}
+
+#[tokio::test]
+async fn a_facility_namespace_id_is_issued_by_the_configured_issuer() -> Result<(), Box<dyn Error>>
+{
+    let running = issuing(None).await?;
+    running
+        .send(&edited("MSG-FAC-ISSUER", |text| with_visit(&text))?)
+        .await?;
+    let found = identifiers(&running).await?;
+    assert!(!found.is_empty(), "one composition");
+    for identifiers in found {
+        assert_eq!(
+            serde_json::json!([{
+                "_type": "DV_IDENTIFIER", "issuer": FACILITY_ISSUER,
+                "id": "NORTHWARD", "type": "namespace"
+            }]),
+            identifiers
+        );
+    }
+    running.stop().await
+}
+
+#[tokio::test]
+async fn a_facility_universal_id_is_issued_by_its_type() -> Result<(), Box<dyn Error>> {
+    let running = issuing(Some(Sender::Universal {
+        id: String::from("2.999.4.2"),
+        kind: String::from("ISO"),
+    }))
+    .await?;
+    running
+        .send(&edited("MSG-FAC-UNIVERSAL", |text| {
+            text.replace("\rORC|", "\rPV1|1|O|ROOM-1^^^NORTHWARD&2.999.4.2&ISO\rORC|")
+        })?)
+        .await?;
+    for identifiers in identifiers(&running).await? {
+        assert_eq!(
+            Some("ISO"),
+            identifiers
+                .as_array()
+                .and_then(|all| all.iter().find(|item| item["id"] == "2.999.4.2"))
+                .and_then(|item| item["issuer"].as_str()),
+            "HD.3 issues HD.2: {identifiers}"
+        );
+    }
+    running.stop().await
+}
+
+#[tokio::test]
+async fn an_ordering_facility_identifier_is_issued_by_its_assigning_authority()
+-> Result<(), Box<dyn Error>> {
+    let running = issuing(None).await?;
+    running
+        .send(&edited("MSG-FAC-XON6", |text| {
+            text.replace(
+                "ORC|RE|PLC-1|FIL-1",
+                "ORC|RE|PLC-1|FIL-1||||||||||||||||||Synthetic order desk^^^^^REGISTRY^^^^ORDERDESK",
+            )
+        })?)
+        .await?;
+    for identifiers in identifiers(&running).await? {
+        assert_eq!(
+            Some("REGISTRY"),
+            identifiers
+                .pointer("/0/issuer")
+                .and_then(serde_json::Value::as_str),
+            "XON.6 issues XON.10: {identifiers}"
+        );
+    }
+    running.stop().await
+}
+
+#[tokio::test]
+async fn a_facility_namespace_id_names_no_issuer_when_none_is_configured()
+-> Result<(), Box<dyn Error>> {
+    let running = listing_facilities().await?;
+    running
+        .send(&edited("MSG-FAC-NOISSUER", |text| with_visit(&text))?)
+        .await?;
+    for identifiers in identifiers(&running).await? {
+        assert!(
+            identifiers.pointer("/0/issuer").is_none(),
+            "no issuer is invented: {identifiers}"
+        );
+    }
+    running.stop().await
+}

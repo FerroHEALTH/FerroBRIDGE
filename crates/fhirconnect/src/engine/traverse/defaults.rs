@@ -6,6 +6,7 @@
 
 use openehr_term::codes as term;
 
+use crate::engine::origin::ItemId;
 use crate::engine::origin::Origin;
 use crate::engine::origin::Party;
 
@@ -26,6 +27,7 @@ pub struct Defaults {
     origin: Option<Origin>,
     pub(super) facility: Option<Party>,
     pub(super) composer_id: Option<ComposerId>,
+    pub(super) composer_identifiers: Vec<ItemId>,
 }
 
 /// The identifier of a default composer: the `external_ref` the Simplified
@@ -62,6 +64,7 @@ impl Defaults {
             origin: None,
             facility: None,
             composer_id: None,
+            composer_identifiers: Vec::new(),
         }
     }
 
@@ -131,6 +134,19 @@ impl Defaults {
     #[must_use]
     pub fn with_composer_id(mut self, id: ComposerId) -> Self {
         self.composer_id = Some(id);
+        self
+    }
+
+    /// Returns these defaults naming the default composer by `identifiers`, its
+    /// formal identifiers (RM Common IM, `PARTY_IDENTIFIED.identifiers`), beside
+    /// its name and its `external_ref`.
+    ///
+    /// The `ctx/` keys of the composer carry no identifiers (Simplified Formats
+    /// master06 §Composer), so a composer with identifiers travels whole as
+    /// `composer|raw` (master04 §Raw canonical JSON).
+    #[must_use]
+    pub fn with_composer_identifiers(mut self, identifiers: Vec<ItemId>) -> Self {
+        self.composer_identifiers = identifiers;
         self
     }
 

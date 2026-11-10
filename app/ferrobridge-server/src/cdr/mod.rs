@@ -148,6 +148,9 @@ pub struct CdrClient {
     /// The person the client calls the CDR as, when it carries an onward
     /// token.
     on_behalf: Option<onward::OnwardSubject>,
+    /// The client id of the bridge's own client credentials grant, when the
+    /// client authenticates with one.
+    client_id: Option<String>,
 }
 
 impl CdrClient {
@@ -168,6 +171,10 @@ impl CdrClient {
         }
         let transport = ReqwestTransport::with_builder_timeout(builder, config.timeout)
             .map_err(|source| CdrError::Build { source })?;
+        let client_id = match config.credentials.as_ref() {
+            Some(CdrCredentials::OAuth(oauth)) => Some(oauth.client_id.clone()),
+            _ => None,
+        };
         let auth = match config.credentials.clone() {
             None => None,
             Some(CdrCredentials::Basic { user, password }) => {
@@ -187,6 +194,7 @@ impl CdrClient {
             demographic: config.demographic,
             onward: config.onward.clone(),
             on_behalf: None,
+            client_id,
         })
     }
 
@@ -200,6 +208,7 @@ impl CdrClient {
             demographic: self.demographic,
             onward: self.onward.clone(),
             on_behalf: self.on_behalf.clone(),
+            client_id: self.client_id.clone(),
         }
     }
 
@@ -235,6 +244,7 @@ impl CdrClient {
             demographic: self.demographic,
             onward: None,
             on_behalf: Some(exchanged.subject),
+            client_id: self.client_id.clone(),
         })
     }
 
@@ -243,6 +253,13 @@ impl CdrClient {
     #[must_use]
     pub const fn on_behalf(&self) -> Option<&onward::OnwardSubject> {
         self.on_behalf.as_ref()
+    }
+
+    /// Returns the client id the client authenticates as with its own client
+    /// credentials grant, when it has one.
+    #[must_use]
+    pub fn client_id(&self) -> Option<&str> {
+        self.client_id.as_deref()
     }
 
     /// Returns the openEHR REST API root every call is resolved under.
