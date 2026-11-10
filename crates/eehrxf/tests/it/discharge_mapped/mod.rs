@@ -463,6 +463,7 @@ fn section_entries(composition: &Value, code: &str) -> Vec<String> {
         .collect()
 }
 
+mod accounted;
 mod composition;
 mod declared;
 mod document;
