@@ -186,6 +186,8 @@ classify() {
     .dockerignore | .editorconfig | .gitattributes | .gitignore | .hadolint.yaml | .mcp.json) echo inert ;;
     scripts/checks/comment-style.sh) echo inert ;;
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
+    # Read by the CI `crate-version-guard` job and the release plan alone.
+    scripts/checks/semver.sh) echo inert ;;
     # Read by crate-version-guard.sh and semver.sh alone.
     scripts/checks/lib/public-deps.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
