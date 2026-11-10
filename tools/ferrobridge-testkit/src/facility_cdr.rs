@@ -111,8 +111,9 @@ pub struct Facility {
     pub id: String,
 }
 
-/// The client credentials client the CDR declares as its relay client, and
-/// the `machines` issuer whose tokens name it.
+/// The client credentials client the CDR declares as a system client, of the
+/// `relay` origin, the `device` origin or both, and the `machines` issuer whose
+/// tokens name it.
 #[derive(Debug, Clone)]
 pub struct RelayClient {
     /// The issuer identifier its tokens carry in `iss`.
@@ -130,6 +131,10 @@ pub struct RelayClient {
     /// The operational templates it may commit, each uploaded before the
     /// declaring boot: the template id and the OPT 1.4 document.
     pub templates: Vec<(String, Vec<u8>)>,
+    /// The origins it commits under: `relay`, `device` or both.
+    pub origins: Vec<String>,
+    /// The issuers of the device identifiers a `device` client names.
+    pub device_identifier_issuers: Vec<String>,
 }
 
 /// A relay CDR could not be booted.
@@ -221,7 +226,8 @@ struct SystemClient<'a> {
     provider: &'a Facility,
     facilities: &'a [Facility],
     writes: Vec<&'a str>,
-    origins: Vec<&'a str>,
+    origins: &'a [String],
+    device_identifier_issuers: &'a [String],
 }
 
 impl RelayClient {
@@ -251,7 +257,8 @@ impl RelayClient {
                     provider: &self.provider,
                     facilities: &self.facilities,
                     writes: self.templates.iter().map(|(id, _)| id.as_str()).collect(),
-                    origins: vec!["relay"],
+                    origins: &self.origins,
+                    device_identifier_issuers: &self.device_identifier_issuers,
                 }],
             },
         };
@@ -321,6 +328,31 @@ mod tests {
     use super::{Facility, RelayClient};
 
     #[test]
+    fn a_device_client_declares_its_identifier_issuers() {
+        let client = RelayClient {
+            issuer: String::from("https://machines.example"),
+            audience: String::from("ferroehr-machines"),
+            keys: jsonwebtoken::jwk::JwkSet { keys: Vec::new() },
+            client_id: String::from("ferrobridge"),
+            provider: Facility {
+                issuer: String::from("urn:oid:2.999.7"),
+                id: String::from("clinic"),
+            },
+            facilities: Vec::new(),
+            templates: Vec::new(),
+            origins: vec![String::from("device")],
+            device_identifier_issuers: vec![String::from("urn:oid:2.999.9")],
+        };
+        let written: toml::Table = toml::from_str(&client.configuration().unwrap()).unwrap();
+        let declared = &written["authz"]["system_client"][0];
+        assert_eq!("device", declared["origins"][0].as_str().unwrap());
+        assert_eq!(
+            "urn:oid:2.999.9",
+            declared["device_identifier_issuers"][0].as_str().unwrap()
+        );
+    }
+
+    #[test]
     fn the_configuration_declares_the_client_as_a_relay_of_its_templates() {
         let client = RelayClient {
             issuer: String::from("https://machines.example"),
@@ -336,6 +368,8 @@ mod tests {
                 id: String::from("NORTHWARD"),
             }],
             templates: vec![(String::from("synthetic.v1"), Vec::new())],
+            origins: vec![String::from("relay")],
+            device_identifier_issuers: Vec::new(),
         };
         let written: toml::Table = toml::from_str(&client.configuration().unwrap()).unwrap();
         let declared = &written["authz"]["system_client"][0];
