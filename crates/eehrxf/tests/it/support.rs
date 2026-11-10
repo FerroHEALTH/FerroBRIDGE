@@ -64,7 +64,7 @@ pub(crate) fn hdr(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
 ///
 /// Under CI (`CI=true`) an absent tree is an error, so a lane cannot pass by
 /// skipping the package-gated tests.
-#[cfg(all(feature = "discharge", feature = "fhir-r4"))]
+#[cfg(all(feature = "fhir-r4", any(feature = "discharge", feature = "imaging")))]
 pub(crate) fn profile_set() -> Result<Option<ferrobridge_validator::set::PackageSet>, Box<dyn Error>>
 {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");

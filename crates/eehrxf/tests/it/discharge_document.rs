@@ -23,6 +23,7 @@ use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::encounter::Encounter;
 use fhir_types::r4::human_name::HumanName;
+use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
 use flate2::read::GzDecoder;
 use serde_json::Value;
@@ -314,6 +315,51 @@ fn the_profile_requires_no_section_slice_so_the_form_requires_none() -> Result<(
             .iter()
             .any(|rule| matches!(rule, SectionRule::Required { .. })),
         "no required slice"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_custodian_a_document_names_is_its_composition_s() -> Result<(), Box<dyn Error>> {
+    let profile = package_member("package/StructureDefinition-composition-eu-hdr.json")?;
+    let custodian = profile["snapshot"]["element"]
+        .as_array()
+        .ok_or("a snapshot")?
+        .iter()
+        .find(|element| element["id"] == "Composition.custodian")
+        .ok_or("Composition.custodian")?;
+    assert_eq!(
+        (&custodian["min"], &custodian["max"]),
+        (&Value::from(0), &Value::from("1"))
+    );
+    assert!(
+        custodian["type"][0]["targetProfile"][0]
+            .as_str()
+            .is_some_and(
+                |target| target.starts_with("http://hl7.org/fhir/StructureDefinition/Organization")
+            ),
+        "{custodian}"
+    );
+
+    let mut document = document(true, true)?;
+    let full_url = document.with_custodian(Organization {
+        id: Some(String::from("member")),
+        name: Some("Synthetic Member".into()),
+        ..Organization::default()
+    })?;
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    assert_eq!(
+        bundle["entry"][0]["resource"]["custodian"]["reference"],
+        full_url.as_str()
+    );
+    assert!(
+        bundle["entry"]
+            .as_array()
+            .ok_or("entries")?
+            .iter()
+            .any(|entry| entry["fullUrl"] == full_url.as_str()
+                && entry["resource"]["resourceType"] == "Organization"),
+        "the custodian resolves inside the Bundle"
     );
     Ok(())
 }

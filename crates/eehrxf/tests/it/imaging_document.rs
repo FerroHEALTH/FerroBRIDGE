@@ -21,6 +21,8 @@ use eehrxf::document::imaging::{
 };
 use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::document::{Document, DocumentError, LOINC};
+use eehrxf::receive::ReceivedDocument;
+use ferrobridge_term::client::Client;
 use fhir_types::r4::bundle::{Bundle, BundleEntry};
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
@@ -28,7 +30,9 @@ use fhir_types::r4::composition::{Composition, CompositionSection};
 use fhir_types::r4::device::Device;
 use fhir_types::r4::diagnostic_report::DiagnosticReport;
 use fhir_types::r4::human_name::HumanName;
+use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::imaging_study::ImagingStudy;
+use fhir_types::r4::meta::Meta;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
@@ -36,7 +40,7 @@ use fhir_types::r4::resource::Resource;
 use flate2::read::GzDecoder;
 use serde_json::Value;
 
-use super::support::imaging_package;
+use super::support::{imaging_package, profile_set};
 
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
@@ -150,10 +154,12 @@ fn document(code: Option<&str>) -> Result<Document, Box<dyn Error>> {
             family: Some("Synthetic".into()),
             ..HumanName::default()
         }],
+        birth_date: Some("1970-01-01".into()),
         ..Patient::default()
     })?;
     document.with_author(&Resource::Device(Box::new(Device {
         id: Some(String::from("gateway")),
+        owner: Some(reference("Organization/operator")),
         ..Device::default()
     })))?;
     document.with_author(&Resource::Organization(Box::new(Organization {
@@ -169,6 +175,27 @@ fn document(code: Option<&str>) -> Result<Document, Box<dyn Error>> {
         })),
         Resource::ImagingStudy(Box::new(ImagingStudy {
             id: Some(String::from("study-1")),
+            meta: Some(Meta {
+                profile: vec![
+                    "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging".into(),
+                ],
+                ..Meta::default()
+            }),
+            // NOTE: ImagingStudyEuImaging `identifier:studyInstanceUid` is 1..1; the UID is a
+            // synthetic one under the ITU-T X.667 `2.25` arc.
+            identifier: vec![Identifier {
+                r#type: Some(CodeableConcept {
+                    coding: vec![Coding {
+                        system: Some("http://dicom.nema.org/resources/ontology/DCM".into()),
+                        code: Some("110180".into()),
+                        ..Coding::default()
+                    }],
+                    ..CodeableConcept::default()
+                }),
+                system: Some("urn:dicom:uid".into()),
+                value: Some("urn:oid:2.25.1819".into()),
+                ..Identifier::default()
+            }],
             status: "available".into(),
             subject: reference(&subject),
             ..ImagingStudy::default()
@@ -508,5 +535,68 @@ fn the_empty_reason_a_mapping_run_writes_reaches_the_document() -> Result<(), Bo
         .ok_or("the findings section")?;
     assert_eq!(written["emptyReason"]["coding"][0]["code"], "LA4720-4");
     assert_eq!(written["emptyReason"]["coding"][0]["system"], LOINC);
+    Ok(())
+}
+
+/// The imaging report of [`document`] naming the member it was read at as
+/// its custodian, returning the custodian's `fullUrl` with it.
+fn custodied() -> Result<(Document, String), Box<dyn Error>> {
+    let mut document = document(Some(MR_BRAIN))?;
+    let custodian = document.with_custodian(Organization {
+        id: Some(String::from("member")),
+        name: Some("Synthetic Member".into()),
+        ..Organization::default()
+    })?;
+    Ok((document, custodian))
+}
+
+#[test]
+fn a_named_custodian_replaces_the_first_organization_author() -> Result<(), Box<dyn Error>> {
+    let composition = package_member("package/StructureDefinition-CompositionEuImaging.json")?;
+    let custodian = element(&composition, "Composition.custodian")?;
+    assert_eq!(
+        (&custodian["min"], &custodian["max"]),
+        (&Value::from(0), &Value::from("1"))
+    );
+    assert_eq!(
+        custodian["type"][0]["targetProfile"][0],
+        "http://hl7.eu/fhir/base/StructureDefinition/organization-eu-core"
+    );
+
+    let (document, full_url) = custodied()?;
+    assert_eq!(full_url, format!("{BASE}/Organization/member"));
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    let composition = the(&bundle, "Composition")?;
+    assert_eq!(composition["custodian"]["reference"], full_url.as_str());
+    let authors: Vec<&str> = composition["author"]
+        .as_array()
+        .ok_or("authors")?
+        .iter()
+        .filter_map(|author| author["reference"].as_str())
+        .collect();
+    assert_eq!(
+        authors,
+        [
+            format!("{BASE}/Device/gateway").as_str(),
+            "Organization/radiology"
+        ],
+        "dr-comp-author-org: the given Organization authors give way to the report's performers"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_imaging_report_naming_its_custodian_validates_against_bundle_report_eu_imaging()
+-> Result<(), Box<dyn Error>> {
+    let Some(set) = profile_set()? else {
+        return Ok(());
+    };
+    let (document, _) = custodied()?;
+    let text = serde_json::to_string(&document.into_bundle()?)?;
+    let received = ReceivedDocument::read(&text)?;
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime
+        .block_on(received.validate(&set, IMAGING_BUNDLE, None::<&Client>))
+        .map_err(|error| format!("{error:?}"))?;
     Ok(())
 }

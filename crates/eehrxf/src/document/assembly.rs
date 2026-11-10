@@ -24,7 +24,9 @@ impl Document {
     /// (`Bundle-eu-lab` `dr-comp-category`). Under
     /// [`Authorship::ReportPerformers`] the composition's `Organization`
     /// authors are the report's performing organizations
-    /// (`BundleReportEuImaging` `dr-comp-author-org`).
+    /// (`BundleReportEuImaging` `dr-comp-author-org`), and the first given
+    /// `Organization` author is the custodian when the document names none
+    /// ([`Document::with_custodian`]).
     pub(super) fn arrange(&self, composition: &mut Composition, report: Option<&DiagnosticReport>) {
         composition.r#type.coding = match (self.form.kind, report) {
             (Kind::Fixed(kind), _) => vec![coding(kind)],
@@ -57,6 +59,9 @@ impl Document {
                     .filter(|performer| names_organization(performer))
                     .cloned(),
             );
+        }
+        if let Some(custodian) = &self.custodian {
+            composition.custodian = Some(reference(custodian));
         }
     }
 
