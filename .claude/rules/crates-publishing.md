@@ -94,6 +94,28 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   against the target branch or crates.io, and accepts the minor step it
   answers. A sibling's minor step therefore moves every published member
   that requires it to its next minor too.
+- **A third-party crate the public API names is a public dependency too**
+  (#1851, the rule FerroSYS holds under the same grounds). `fhir-types` and
+  `openehr-mapping-core` hand out `serde_json::Value`, `fhir-search` returns
+  `jiff::civil::Date`, and `ferrobridge-hl7v2`'s sender takes
+  `tokio::net::ToSocketAddrs`. A move of such a crate to another line breaks
+  every consumer that names its types, by the same two grounds: the Cargo
+  Book chapter's introduction and the `cargo-semver-checks` README
+  limitation. Each member declares those crates in the `public-dependencies`
+  array of its `[package.metadata.ferrohealth]` table, and both guards count
+  a declared crate as they count a family one. A crate either side of a
+  change declares counts on both, so dropping the declaration in the change
+  that moves the line hides nothing. `scripts/checks/public-surface.sh`
+  keeps each declaration true. It builds the crate's rustdoc JSON with every
+  feature and collects the crates whose items the public API names (a
+  signature, a field, a bound, a trait implementation, a re-export). A crate
+  that is not a direct dependency (`serde_core`) is attributed to the direct
+  dependency whose source re-exports it. The check fails when the
+  declaration misses an attributed crate or names one the API does not
+  reach. It leaves out the standard library, rustdoc's blanket and
+  auto-trait implementations, and paths through a `__`-prefixed module, a
+  macro's hidden support. Which items make a dependency public is our own
+  design: no specification says which of its items a crate exposes.
 - **A consumer outside this workspace requires a crate of the line by a caret
   range** (`fhirconnect = "0.1"`, or `"0.1.240"` for a floor), so one
   compatible release serves every crate in its build that uses it, and two
@@ -165,5 +187,6 @@ graduates past `0.x`.
 
 - The Cargo Book, SemVer Compatibility: <https://doc.rust-lang.org/cargo/reference/semver.html>
 - `cargo-semver-checks` README, v0.51.0: <https://github.com/obi1kenobi/cargo-semver-checks/blob/v0.51.0/README.md>
+- The rustdoc JSON output: <https://doc.rust-lang.org/rustdoc/unstable-features.html#json-output>
 - Trusted Publishing on crates.io: <https://crates.io/docs/trusted-publishing>
 - `cargo publish`: <https://doc.rust-lang.org/cargo/commands/cargo-publish.html>

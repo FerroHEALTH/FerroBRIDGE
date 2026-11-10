@@ -4,7 +4,7 @@
 name = "ferrobridge-term"
 description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate, $validate-code, $expand and $subsumes"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.4.0"
+version = "0.4.2"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -18,6 +18,16 @@ categories = ["web-programming::http-client", "science"]
 # The crate line is published on crates.io; include is the packaged content.
 publish = true
 include = ["src/**", "README.md", "LICENSE"]
+
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = [
+  "http",
+  "reqwest",
+  "secrecy",
+  "serde_json",
+  "url",
+]
 
 [features]
 # The client credentials token of ferrohealth-smart as the client's

@@ -4,7 +4,7 @@
 name = "openehr-mapping-core"
 description = "The shared foundation of the FerroBRIDGE mapping languages: the common header model, the YAML loader, the mapping registry, the diagnostic model, and openEHR path resolution and execution over the Web Template"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.153"
+version = "0.1.154"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -18,6 +18,15 @@ categories = ["parser-implementations", "science"]
 # The crate line is published on crates.io; include is the packaged content.
 publish = true
 include = ["src/**", "README.md", "LICENSE"]
+
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = [
+  "jsonschema",
+  "serde",
+  "serde-saphyr",
+  "serde_json",
+]
 
 [dependencies]
 openehr-am.workspace = true

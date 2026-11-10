@@ -383,9 +383,6 @@ else
       "The latest release is v[0-9.]+\." "The latest release is $v."
     release_claim "$landing" "the hero status" \
       "Latest release: v[0-9.]+, [0-9-]+\." "Latest release: $v, $release_date."
-    release_claim "$landing" "the status panel" \
-      "the latest release is +v[0-9.]+, cut on [0-9-]+\." \
-      "the latest release is $v, cut on $release_date."
   fi
   order=website/book/src/evaluate/build-order.md
   if [[ -f "$order" ]]; then

@@ -1,0 +1,53 @@
+---
+source: crates/fhirconnect/tests/it/medikationsverabreichung.rs
+expression: created
+---
+[
+  {
+    "code": {
+      "coding": [
+        {
+          "display": "Ramipril 5 mg Tabletten"
+        }
+      ]
+    },
+    "form": {
+      "coding": [
+        {
+          "code": "10219000",
+          "display": "Tablet",
+          "system": "http://standardterms.edqm.eu"
+        }
+      ],
+      "text": "Tablet"
+    },
+    "id": "6a4c638532aec8869a2fd9cd2c1c02c63cc11ae16579f8b838d50144127064db",
+    "ingredient": [
+      {
+        "itemCodeableConcept": {
+          "coding": [
+            {
+              "display": "Active"
+            }
+          ],
+          "text": "Ramipril"
+        },
+        "strength": {
+          "denominator": {
+            "code": "1",
+            "system": "http://unitsofmeasure.org",
+            "unit": "1",
+            "value": 1
+          },
+          "numerator": {
+            "code": "1",
+            "system": "http://unitsofmeasure.org",
+            "unit": "1",
+            "value": 5
+          }
+        }
+      }
+    ],
+    "resourceType": "Medication"
+  }
+]

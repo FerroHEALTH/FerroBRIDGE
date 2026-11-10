@@ -26,6 +26,10 @@ include = ["src/**", "ddl/**", "sql/**", ".sqlx/**", "README.md", "LICENSE"]
 # resolver, the CDM writer and the derived tables. A consumer that reads only
 # the metadata and the record graph takes the crate with
 # `default-features = false` and builds no database client.
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["rustls", "sqlx", "tokio-postgres"]
+
 [features]
 default = ["database"]
 database = [

@@ -42,7 +42,7 @@ pub(crate) fn untouched(_: &mut serde_json::Value) -> bool {
     true
 }
 
-/// Runs `PutGet` over `resource` and returns its declared set.
+/// Runs `PutGet` over `resource` with no seam and returns its declared set.
 ///
 /// `corrupt` edits the composition between the two legs; it answers whether
 /// it found what it changes, so a corruption that misses is a failure rather
@@ -53,13 +53,25 @@ pub(crate) fn putget(
     resource: &serde_json::Value,
     corrupt: Corruption<'_>,
 ) -> Result<serde_json::Value, Box<dyn Error>> {
+    putget_with(program, index, resource, corrupt, &Seams::default())
+}
+
+/// Runs `PutGet` over `resource` with `seams` on both legs and returns its
+/// declared set, as [`putget`] does.
+pub(crate) fn putget_with(
+    program: &Program,
+    index: &WebTemplateIndex,
+    resource: &serde_json::Value,
+    corrupt: Corruption<'_>,
+    seams: &Seams<'_>,
+) -> Result<serde_json::Value, Box<dyn Error>> {
     let document = Value::from_serde_json(resource.clone());
     let inbound = to_openehr(
         program,
         &SCHEMAS,
         index,
         &document,
-        &Seams::default(),
+        seams,
         &defaults(),
         &CallContext::new(),
     )?;
@@ -73,7 +85,7 @@ pub(crate) fn putget(
         &SCHEMAS,
         index,
         &middle,
-        &Seams::default(),
+        seams,
         &CallContext::new(),
     )?;
     let output = outbound
