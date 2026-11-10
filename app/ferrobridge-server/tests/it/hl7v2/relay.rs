@@ -12,7 +12,9 @@
 //! person primarily responsible for the content of the Composition"), or
 //! the CDR refuses the commit with `422`. The bridge reaches it with its own
 //! client credentials token (RFC 6749 §4.4), signed by the test issuer the
-//! CDR trusts. Every message, identifier and name is synthetic.
+//! CDR trusts. A client of the `device` origin alone commits a device's result
+//! only as a device act, whose composer identifier is its originating system.
+//! Every message, identifier and name is synthetic.
 
 use std::error::Error;
 use std::path::Path;
@@ -20,7 +22,7 @@ use std::sync::Arc;
 
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
-use ferrobridge_server::config::hl7v2::{Sender, Subject};
+use ferrobridge_server::config::hl7v2::{Device, Sender, Subject};
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
@@ -47,6 +49,9 @@ const CLIENT: &str = "ferrobridge";
 
 /// The issuer of the facility identifiers the CDR checks.
 const FACILITIES: &str = "urn:oid:2.999.1";
+
+/// The issuer of the device identifiers a device sender's results name.
+const DEVICES: &str = "urn:oid:2.999.9";
 
 /// The scopes the bridge's token carries: every composition, the templates
 /// and every query (SMART on openEHR, `system/` resource scopes).
@@ -149,9 +154,11 @@ async fn stored_facilities(base_url: &str, token: &str) -> Result<Vec<String>, B
     Ok(names)
 }
 
-/// Starts the CDR as a node that declares the bridge as its relay client
-/// for the facilities `NORTHWARD` and `SOUTHWARD`, trusting `provider`'s key.
-async fn node(provider: &Provider) -> Result<Cdr, Box<dyn Error>> {
+/// Starts the CDR as a node that declares the bridge as its system client of
+/// `origins` for the facilities `NORTHWARD` and `SOUTHWARD`, trusting
+/// `provider`'s key, with [`DEVICES`] as its device identifier issuer when
+/// it is a `device` client.
+async fn node(provider: &Provider, origins: &[&str]) -> Result<Cdr, Box<dyn Error>> {
     let facility = |id: &str| Facility {
         issuer: String::from(FACILITIES),
         id: String::from(id),
@@ -172,13 +179,24 @@ async fn node(provider: &Provider) -> Result<Cdr, Box<dyn Error>> {
                 .as_bytes()
                 .to_vec(),
         )],
+        origins: origins.iter().map(|origin| (*origin).to_owned()).collect(),
+        device_identifier_issuers: origins
+            .contains(&"device")
+            .then(|| String::from(DEVICES))
+            .into_iter()
+            .collect(),
     })
     .await?)
 }
 
 /// Starts the face over `cdr`, reached with the client credentials grant at
-/// `provider`, accepting NORTHLAB and SOUTHLAB on their own certificates.
-async fn face(cdr: &Cdr, provider: &Provider) -> Result<Serving, Box<dyn Error>> {
+/// `provider`, accepting NORTHLAB and SOUTHLAB on their own certificates,
+/// with `devices` declared `origin = "device"`.
+async fn face(
+    cdr: &Cdr,
+    provider: &Provider,
+    devices: Vec<Device>,
+) -> Result<Serving, Box<dyn Error>> {
     let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?).with_oauth(
         ClientCredentials::new(
             Endpoint::Token(provider.token_endpoint().parse()?),
@@ -199,6 +217,7 @@ async fn face(cdr: &Cdr, provider: &Provider) -> Result<Serving, Box<dyn Error>>
     ));
     let mut lane = face_settings(true);
     lane.facility_issuer = Some(String::from(FACILITIES));
+    lane.devices = devices;
     lane.senders = ["NORTHLAB", "SOUTHLAB", "NORTHWARD", "SOUTHWARD", "EASTWARD"]
         .into_iter()
         .map(|name| Sender::Namespace(String::from(name)))
@@ -216,12 +235,9 @@ async fn face(cdr: &Cdr, provider: &Provider) -> Result<Serving, Box<dyn Error>>
     Serving::start(facade, lane, None).await
 }
 
-#[tokio::test]
-async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
--> Result<(), Box<dyn Error>> {
-    if !ferrobridge_testkit::containers::e2e_enabled() {
-        return Ok(());
-    }
+/// Starts the test issuer, answering the bridge's client credentials grant
+/// with its token, and returns it with that token.
+async fn issuing() -> Result<(Provider, String), Box<dyn Error>> {
     let provider = Provider::start().await?;
     let access = token(&provider)?;
     provider
@@ -233,8 +249,18 @@ async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
             },
         )
         .await?;
-    let cdr = node(&provider).await?;
-    let serving = face(&cdr, &provider).await?;
+    Ok((provider, access))
+}
+
+#[tokio::test]
+async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
+-> Result<(), Box<dyn Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
+    let (provider, access) = issuing().await?;
+    let cdr = node(&provider, &["relay"]).await?;
+    let serving = face(&cdr, &provider, Vec::new()).await?;
     let southlab = PKI.client(SOUTHLAB_SUBJECT)?;
 
     let north = send_as(
@@ -294,6 +320,82 @@ async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
         vec![String::from("NORTHWARD"), String::from("SOUTHWARD")],
         stored_facilities(cdr.base_url(), &access).await?,
         "nothing is committed for the refused facility"
+    );
+    serving.stop().await
+}
+
+/// Returns the composer's first identifier and the originating system of
+/// every composition the CDR holds.
+async fn device_acts(base_url: &str, token: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    let answer: serde_json::Value = reqwest::Client::new()
+        .post(format!("{base_url}/query/aql"))
+        .bearer_auth(token)
+        .json(&serde_json::json!({
+            "q": "SELECT c/composer, c/feeder_audit FROM EHR e CONTAINS COMPOSITION c"
+        }))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    answer["rows"]
+        .as_array()
+        .ok_or("the result set carries rows")?
+        .iter()
+        .map(|row| {
+            let identifier = row
+                .pointer("/0/identifiers/0/id")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| format!("the composer carries no identifier: {row}"))?;
+            let system = row
+                .pointer("/1/originating_system_audit/system_id")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| format!("the composition names no originating system: {row}"))?;
+            Ok((identifier.to_owned(), system.to_owned()))
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_device_sender_s_result_commits_as_a_device_act_named_by_its_system_id()
+-> Result<(), Box<dyn Error>> {
+    // NOTE: no specification governs a device act: FerroEHR's own design (FerroHEALTH/FerroEHR#5008),
+    // a composer identifier of a declared issuer equal to originating_system_audit.system_id.
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
+    let (provider, access) = issuing().await?;
+    let cdr = node(&provider, &["device"]).await?;
+    let serving = face(
+        &cdr,
+        &provider,
+        vec![Device {
+            sender: Sender::Namespace(String::from("NORTHLAB")),
+            identifier_issuer: String::from(DEVICES),
+        }],
+    )
+    .await?;
+    let message = String::from_utf8(result(
+        "NORTHLAB",
+        "MSG-DEVICE-N1",
+        "synthetic-north-0002",
+        "NORTHWARD",
+        "DR-N",
+    ))?
+    .replace(
+        "|||20260925130000+0200",
+        "|||20260925130000+0200||||ANALYSER-9",
+    );
+    let ack = send_as(&serving, &NORTHLAB, message.as_bytes()).await?;
+    assert_eq!(
+        Some("MSA|AA|MSG-DEVICE-N1"),
+        msa(&ack),
+        "a client of the device origin alone commits only a device act: {ack}"
+    );
+    assert_eq!(
+        vec![(String::from("ANALYSER-9"), String::from("ANALYSER-9"))],
+        device_acts(cdr.base_url(), &access).await?,
+        "the composer's identifier is the originating system"
     );
     serving.stop().await
 }
