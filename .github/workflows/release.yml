@@ -278,14 +278,18 @@ jobs:
               ;;
           esac
 
-      # The quickstart compose file rides along as a release asset: it pulls
-      # the image this tag publishes, so a downloader never clones the
-      # repository.
+      # The quickstart compose file rides along as a release asset with its
+      # SHA-256 in sha256sum form: one self-contained file that pulls the image
+      # this tag publishes and mounts nothing from the repository, so a
+      # downloader never clones it (#1874).
       - name: Attach the quickstart compose file
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
-        run: gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber compose.yaml
+        run: |
+          set -euo pipefail
+          sha256sum compose.yaml > compose.yaml.sha256sum
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber compose.yaml compose.yaml.sha256sum
 
       # The EHR system's information sheet and instructions for use accompany
       # every release free of charge (EHDS Art. 30(1)(d)): the FerroHEALTH
@@ -533,7 +537,9 @@ jobs:
                 || missing="$missing ferrobridge-console-${TAG}-${target}${suffix}"
             done
           done < <(printf '%s' "$CONSOLE_TARGETS" | jq -r '.include[].target')
-          printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
+          for asset in compose.yaml compose.yaml.sha256sum; do
+            printf '%s\n' "$assets" | grep -Fxq "$asset" || missing="$missing $asset"
+          done
           for page in information-sheet instructions-for-use; do
             printf '%s\n' "$assets" | grep -Fxq "ferrobridge-${TAG}-${page}.md" || missing="$missing ferrobridge-${TAG}-${page}.md"
           done

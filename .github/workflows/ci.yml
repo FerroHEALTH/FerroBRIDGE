@@ -220,6 +220,19 @@ jobs:
           docker compose --profile cdm --profile vocab --profile console config --quiet
       # Every upstream credential variable set in the shell reaches the bridge,
       # and its password is mounted as a secret.
+      # compose.yaml is the whole quickstart a release attaches, so it binds
+      # nothing from the repository: the only host paths it reads are the
+      # secrets, the configuration and mapping directories and the
+      # vocabulary, which the reader supplies beside it (#1874).
+      - name: compose.yaml mounts nothing from the repository
+        run: |
+          set -euo pipefail
+          sources="$(docker compose --profile cdm --profile vocab --profile console config --format json \
+            | jq -r --arg root "$PWD/" '[.services[].volumes[]? | select(.type == "bind") | .source] + [.secrets[]?.file] + [.configs[]?.file // empty] | .[] | ltrimstr($root)')"
+          if grep -vE '^(secrets|config|operator-mappings|vocabulary)(/|$)' <<< "$sources"; then
+            echo "::error::compose.yaml reads the host paths above from the repository; inline them as configs" >&2
+            exit 1
+          fi
       - name: compose.yaml passes the upstream credentials through
         run: |
           set -euo pipefail
