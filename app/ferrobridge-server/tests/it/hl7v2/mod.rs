@@ -486,3 +486,4 @@ mod certificate;
 mod clinician;
 mod facility;
 mod feeder_audit;
+mod relay;
