@@ -421,3 +421,35 @@ pub const HDR: Project = Project {
         "MedicationRequest.eventHistory",
     ],
 };
+
+/// Every project the enabled features ship.
+const SHIPPED: &[Project] = &[
+    #[cfg(any(feature = "prescription", feature = "dispensation"))]
+    MPD,
+    #[cfg(feature = "imaging")]
+    IMAGING,
+    #[cfg(feature = "laboratory")]
+    LABORATORY,
+    #[cfg(feature = "patient-summary")]
+    EPS,
+    #[cfg(feature = "discharge")]
+    HDR,
+];
+
+/// Returns the received elements the shipped projects that compile a
+/// context mapping `contexts` names account for, each once, in project
+/// order: none when no shipped project compiles one of them.
+pub(crate) fn accounted_for(contexts: &[&str]) -> Vec<&'static str> {
+    let mut accounted: Vec<&'static str> = Vec::new();
+    for project in SHIPPED
+        .iter()
+        .filter(|project| project.contexts.iter().any(|held| contexts.contains(held)))
+    {
+        for element in project.accounted {
+            if !accounted.contains(element) {
+                accounted.push(element);
+            }
+        }
+    }
+    accounted
+}
