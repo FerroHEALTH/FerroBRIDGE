@@ -378,21 +378,7 @@ async fn fetch(client: &crate::cdr::CdrClient, template: &str) -> Result<Templat
             source: Box::new(source),
         })?;
     match outcome {
-        crate::cdr::template::TemplateOutcome::Found(
-            crate::cdr::template::TemplateSource::Opt14(opt),
-        ) => Ok(TemplateSource::Opt14(opt)),
-        crate::cdr::template::TemplateOutcome::Found(
-            crate::cdr::template::TemplateSource::Opt2 {
-                template: opt,
-                resolved_id,
-            },
-        ) => Ok(TemplateSource::Opt2 {
-            template: opt,
-            resolved_id: resolved_id.physical_id(),
-            // NOTE: ITS-REST 1.1.0 `definition` serves the OPT2 alone, so the attributes its
-            // template removed are not known here and the Web Template is built with none.
-            prohibited_attributes: Vec::new(),
-        }),
+        crate::cdr::template::TemplateOutcome::Found(source) => Ok(source),
         // NOTE: the client reports `UnknownTemplate` only for a `404` from both
         // definition routes (`definition-codegen.openapi.yaml`, ITS-REST 1.1.0).
         crate::cdr::template::TemplateOutcome::UnknownTemplate => Err(Error::TemplateNotHeld {

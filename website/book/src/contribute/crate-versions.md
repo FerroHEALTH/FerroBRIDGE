@@ -33,13 +33,15 @@ A half-done bump fails the same way a missing one does.
 
 ## Which number moves
 
-The crates follow Cargo's SemVer rules
+The crates follow Cargo's SemVer rules and no rule of their own
 ([SemVer compatibility](https://doc.rust-lang.org/cargo/reference/semver.html)).
-A change that keeps every consumer compiling bumps the patch (0.1.240 to
-0.1.241). A breaking change bumps the minor while the crate is 0.x (0.1.240 to
-0.2.0), because Cargo reads a caret requirement on `0.1.240` as any 0.1.x at or
-above it. No other step is accepted: no skipped minor, no minor step that keeps
-its patch, and no step out of 0.x, which is the owner's decision.
+A breaking change bumps the minor while the crate is 0.x (0.1.240 to 0.2.0),
+because Cargo reads a caret requirement on `0.1.240` as any 0.1.x at or above
+it. A change that keeps every consumer compiling bumps the patch (0.1.240 to
+0.1.241) or the minor. Two steps are refused: a minor step that keeps its
+patch, since the patch resets to 0 when the minor moves
+([SemVer 2.0.0 §7](https://semver.org/#spec-item-7)), and a step out of 0.x,
+which is the owner's decision.
 
 `cargo-semver-checks` decides which of the two your change needs. Run it
 before you push, against the branch you target:
@@ -48,7 +50,10 @@ before you push, against the branch you target:
 scripts/checks/semver.sh --baseline-rev origin/main fhirconnect
 ```
 
-It refuses a break on a patch bump and a minor bump with no break. Add a new
+It refuses a break on a patch bump. It judges each crate on the judge's
+default feature set and, when the crate has features, with no default
+features, because a break can exist in a feature subset alone. `fhir-types` is
+judged on each FHIR version module with its terminology set as well. Add a new
 enum variant at the end of the enum: the judge counts a moved discriminant as
 a break.
 

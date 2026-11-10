@@ -129,14 +129,11 @@ each minute. The hosted runner has 16 GB. A release build of `fhir-types` with
 every resource of all five FHIR releases peaks above it on its own: on #1737
 the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
 and the runner shut down. The bridge therefore compiles only the releases it
-speaks, through the release features of `ferrobridge-term`. A base from
-before that change still compiles all five, so the build job backs both
-builds with a 20 GB swap file. Nothing is measured on that runner: each
-attempt runs on a fresh one with the swap it booted with, and logs the swap
-and memory before the gate measures anything. Swap changes how fast the
-build runs, never the binary it makes. The swap file goes once a perf run on
-`main` shows both builds well under 16 GB without it
-([#1743](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1743)).
+speaks, through the release features of `ferrobridge-term`, and only the
+resources of each release it asks for, through the per-release resources
+features of `fhir-types`. Both builds then peak near 7 GB with no swap in
+use. Nothing is measured on the build runner: each attempt runs on a fresh
+one and logs its memory before the gate measures anything.
 
 ## Running it yourself
 

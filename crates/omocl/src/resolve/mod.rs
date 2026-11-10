@@ -22,6 +22,7 @@ use std::sync::Arc;
 use openehr_mapping_core::header::archetype::ArchetypeId;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::index::matching::node_id_matches;
+use openehr_mapping_core::index::matching::segment_matches;
 use openehr_mapping_core::path::MappingPath;
 use openehr_rm::v1_2::paths::PathSegment;
 use openehr_rm::v1_2::paths::RmPath;
@@ -542,32 +543,12 @@ const fn self_hop() -> Hop {
 /// Whether `written` names the leading segments of `carried`.
 fn prefix_of(written: &[PathSegment], carried: &[PathSegment]) -> bool {
     written.len() <= carried.len()
-        && written
-            .iter()
-            .zip(carried)
-            .all(|(wanted, held)| segment_matches(wanted, held))
+        && written.iter().zip(carried).all(|(wanted, held)| {
+            segment_matches(wanted, held, held.predicate.name_value.as_deref())
+        })
 }
 
 /// Whether `written` names exactly `carried`.
 fn same_place(written: &[PathSegment], carried: &[PathSegment]) -> bool {
     written.len() == carried.len() && prefix_of(written, carried)
-}
-
-/// Whether one written segment names one template segment.
-///
-/// A node id the file writes must be the one the template carries, in its
-/// interface form; a name the template fixes and the file does not write
-/// selects nothing.
-fn segment_matches(wanted: &PathSegment, held: &PathSegment) -> bool {
-    if wanted.attribute != held.attribute {
-        return false;
-    }
-    match (
-        wanted.predicate.archetype_node_id.as_deref(),
-        held.predicate.archetype_node_id.as_deref(),
-    ) {
-        (Some(wanted), Some(held)) => node_id_matches(wanted, held),
-        (None, _) => true,
-        (Some(_), None) => false,
-    }
 }

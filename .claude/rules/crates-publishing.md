@@ -54,31 +54,44 @@ rule, machine-enforced by the `crate-version-guard` CI job.
 - Not every bumped version is published; gaps in the published sequence are
   normal. Publishing different content under an existing version is what is
   forbidden, and crates.io refuses it.
-- **A published crate follows Cargo SemVer** (coordinator decision under the
-  owner's delegation, 2026-11-09, #1745, superseding the patch-per-change rule
-  of #510): a compatible change bumps the patch, and a breaking change bumps
-  the minor while the crate is 0.x (0.1.240 to 0.2.0), the rule Cargo reads a
-  caret requirement by (<https://doc.rust-lang.org/cargo/reference/semver.html>,
-  <https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#caret-requirements>).
+- **A published crate follows the Cargo SemVer rules and no rule of its
+  own** (owner decision 2026-11-10, #1830, over #1745): The Cargo Book,
+  "SemVer Compatibility"
+  (<https://doc.rust-lang.org/cargo/reference/semver.html>), is the one
+  authority. A 0.y.z release "can treat changes in "y" as a major release,
+  and "z" as a minor release", so a breaking change bumps the minor while
+  the crate is 0.x (0.1.240 to 0.2.0) and a compatible change may bump
+  either. That is the rule Cargo reads a caret requirement by
+  (<https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#caret-requirements>).
   `cargo-semver-checks` is the judge (`scripts/checks/semver.sh`, pinned in
-  `docs/VERSIONS.md`): `crate-version-guard` refuses any other step (a skipped
-  minor, a minor step whose patch is not 0, a step out of 0.x, which is an
-  owner decision), and CI then judges every crate that moved from a published
-  line against the target branch, refusing a break on a patch and a minor
-  bump with no break. A new variant goes at the end of an enum, since the
-  judge counts a moved discriminant as a break.
+  `docs/VERSIONS.md`). CI judges every crate that moved from a published
+  line against the target branch, and the release plan judges every crate
+  it publishes against crates.io. Each crate is judged on the judge's
+  default feature set and, when it has features, on
+  `--only-explicit-features`, and `fhir-types` on each FHIR version module
+  with its terminology set. The `cargo-semver-checks` README says the judge
+  does not catch "breaking changes that exist when only a subset of all
+  crate features are activated". `crate-version-guard` refuses two steps
+  only: a minor step whose patch is not 0, which SemVer 2.0.0 §7 forbids
+  (<https://semver.org/#spec-item-7>), and a step out of 0.x, which is an
+  owner decision. A new variant goes at the end of an enum, since the judge
+  counts a moved discriminant as a break.
 - **A public dependency moved to an incompatible version is a breaking
-  change** (coordinator ruling, 2026-11-09, #1777): The Cargo Book, "SemVer
-  Compatibility", counts changing the major version of a public dependency
-  as a major change, and for a 0.x dependency the incompatible step is the
-  left-most non-zero component (`openehr-rm` 0.0.135 to 0.0.136, `fhirconnect`
-  0.1 to 0.2). `cargo-semver-checks` cannot see it, so the crate bumps its
-  minor. A public dependency is any normal dependency of the `openehr-*`,
-  `fhir-types`, `hl7v2-types` and `ferrohealth-*` families or a sibling of
-  this workspace (`scripts/checks/lib/public-deps.sh`), optional ones
-  included. `crate-version-guard` refuses a patch step for a member whose
-  public dependency moved line in the diff, and `semver.sh` refuses it
-  against the target branch or crates.io and accepts the minor step it
+  change** (coordinator ruling, 2026-11-09, #1777; grounds corrected by
+  #1830). The Cargo Book chapter has no entry for it. Its intro counts as
+  breaking the "changes that will cause cargo and rustc to fail to build
+  something that previously worked", and a type of the dependency in the
+  crate's API becomes another type on the new line. The `cargo-semver-checks`
+  README lists "breaking type changes, for example in the type of a field or
+  function parameter" among what the judge does not catch. For a 0.x
+  dependency, the incompatible step is the left-most non-zero component
+  (`openehr-rm` 0.0.135 to 0.0.136, `fhirconnect` 0.1 to 0.2). The crate
+  bumps its minor. A public dependency is any normal dependency of the
+  `openehr-*`, `fhir-types`, `hl7v2-types` and `ferrohealth-*` families or a
+  sibling of this workspace (`scripts/checks/lib/public-deps.sh`), optional
+  ones included. `crate-version-guard` refuses a patch step for a member
+  whose public dependency moved line in the diff. `semver.sh` refuses it
+  against the target branch or crates.io, and accepts the minor step it
   answers. A sibling's minor step therefore moves every published member
   that requires it to its next minor too.
 - **A consumer outside this workspace requires a crate of the line by a caret
@@ -150,5 +163,7 @@ graduates past `0.x`.
 
 ## Official documentation (durable citations)
 
+- The Cargo Book, SemVer Compatibility: <https://doc.rust-lang.org/cargo/reference/semver.html>
+- `cargo-semver-checks` README, v0.51.0: <https://github.com/obi1kenobi/cargo-semver-checks/blob/v0.51.0/README.md>
 - Trusted Publishing on crates.io: <https://crates.io/docs/trusted-publishing>
 - `cargo publish`: <https://doc.rust-lang.org/cargo/commands/cargo-publish.html>

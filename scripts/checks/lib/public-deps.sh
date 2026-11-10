@@ -4,12 +4,18 @@
 # The public dependencies of a published crate and the compatibility line each
 # is required on, shared by crate-version-guard.sh and semver.sh (#1777).
 #
-# Moving a public dependency to an incompatible version is a breaking change
-# (The Cargo Book, "SemVer Compatibility", <https://doc.rust-lang.org/cargo/reference/semver.html>),
-# which cargo-semver-checks cannot see, so the two scripts compare these lines
-# themselves. A public dependency is one of the families whose types the
-# crates of this line expose (`openehr-*`, `fhir-types`, `hl7v2-types`,
-# `ferrohealth-*`) or a sibling of this workspace. Every normal dependency of
+# Moving a public dependency to an incompatible version is a breaking change.
+# The Cargo Book, "SemVer Compatibility"
+# (<https://doc.rust-lang.org/cargo/reference/semver.html>), has no entry for
+# it; its intro counts as breaking the "changes that will cause cargo and rustc
+# to fail to build something that previously worked", and a type of the
+# dependency in the crate's API becomes another type on the new line. The
+# cargo-semver-checks README (v0.51.0) lists "breaking type changes, for
+# example in the type of a field or function parameter" among what the judge
+# does not catch, so the two scripts compare these lines themselves. A public
+# dependency is one of the families whose types the crates of this line expose
+# (`openehr-*`, `fhir-types`, `hl7v2-types`, `ferrohealth-*`) or a sibling of
+# this workspace. Every normal dependency of
 # those names counts, optional ones included: no specification says which
 # items a crate exposes, so the rule assumes it exposes them all, our own
 # design.
