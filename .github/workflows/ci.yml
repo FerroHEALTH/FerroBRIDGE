@@ -1156,6 +1156,17 @@ jobs:
         run: >-
           cargo nextest run --locked -p ferrobridge-testkit
           -E 'test(/^journeys::/)'
+      - name: Repeat the events journeys ten times
+        if: github.event_name != 'merge_group'
+        env:
+          FERROBRIDGE_CHROME: ${{ steps.chrome.outputs.chrome-path }}
+          FERROBRIDGE_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+        run: |
+          set -euo pipefail
+          for run in $(seq 1 10); do
+            echo "events journeys, run ${run} of 10"
+            cargo nextest run --locked -p ferrobridge-testkit -E 'test(/^journeys::events::/)'
+          done
 
   # The performance gate (#1656): ferrohealth-perf's A/B mode, the head
   # judged against its base on the same runner, in perf.yml, which the release
