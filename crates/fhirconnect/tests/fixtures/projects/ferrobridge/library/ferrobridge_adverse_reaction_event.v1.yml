@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
-# SPDX-License-Identifier: Apache-2.0
-# A modified copy of model/cluster/org.openehr/adverse_reaction_event.v1.yml, a
-# derivative of it under its licence.
+# SPDX-License-Identifier: BUSL-1.1
+# A modified copy of model/cluster/org.openehr/adverse_reaction_event.v1.yml, used under the
+# Apache License 2.0 of its source.
 # Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
 # under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
 # file carries no copyright line to keep.
