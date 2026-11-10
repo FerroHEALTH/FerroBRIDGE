@@ -7,7 +7,17 @@
 #   scripts/site/assemble.sh OUT
 #
 # The landing page lands at the site root and the mdBook under /docs/, which is
-# what book.toml's site-url declares.
+# what book.toml's site-url declares. Two markers of the landing pages are
+# rendered on the way, and a marker nothing renders fails the assembly:
+#
+#   * {{version:ferrobridge}} becomes the [workspace.package] version of the
+#     root Cargo.toml, so the hero badge always names the release main
+#     carries.
+#   * {{hash:style.css}} becomes the first twelve hex digits of the
+#     stylesheet's sha256, so a browser that cached an older stylesheet
+#     fetches the new one with the new page.
+#
+# No specification governs the assembly: our own design.
 #
 # The brand assets (assets/brand) and llms.txt live outside the landing
 # directory and are copied in here, because both are addressed from the site
@@ -25,6 +35,12 @@ cd "$root"
 
 readonly OUT="${1:?usage: $0 OUT}"
 readonly LANDING=website/landing
+
+# product_version: the [workspace.package] version of the root Cargo.toml.
+product_version() {
+  awk '/^\[workspace\.package\]/ { p = 1; next } /^\[/ { p = 0 }
+    p && $1 == "version" { if (match($0, /"[^"]*"/)) { print substr($0, RSTART + 1, RLENGTH - 2); exit } }' Cargo.toml
+}
 
 # One temporary tree for the rendered book, removed on every exit path.
 # `mdbook build --dest-dir` resolves a relative path against the book root, so
@@ -69,5 +85,20 @@ for definition in crates/eehrxf/src/*/StructureDefinition-*.json; do
   cp "$definition" "$OUT/fhir/StructureDefinition/$id"
   cp "$definition" "$OUT/fhir/StructureDefinition/$id.json"
 done
+
+version="$(product_version)"
+if [[ -z "$version" ]]; then
+  echo "assemble: Cargo.toml has no [workspace.package] version" >&2
+  exit 1
+fi
+style_hash="$(shasum -a 256 "$OUT/style.css" | cut -c1-12)"
+while IFS= read -r page; do
+  VERSION="$version" STYLE_HASH="$style_hash" perl -pi -e \
+    's/\{\{version:ferrobridge\}\}/$ENV{VERSION}/g; s/\{\{hash:style\.css\}\}/$ENV{STYLE_HASH}/g' "$page"
+  if grep -q '{{' "$page"; then
+    echo "assemble: $page keeps a marker nothing renders" >&2
+    exit 1
+  fi
+done < <(find "$OUT" -path "$OUT/docs" -prune -o -name '*.html' -print)
 
 echo "assemble: site at $OUT"

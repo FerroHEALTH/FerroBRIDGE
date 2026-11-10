@@ -10,7 +10,6 @@
 - [Architecture](evaluate/architecture.md)
 - [The two mapping specifications](evaluate/mapping-specifications.md)
 - [Pinned versions](evaluate/versions.md)
-- [Build order](evaluate/build-order.md)
 - [EHDS readiness](evaluate/ehds-readiness.md)
 - [The interoperability component](evaluate/interoperability-component.md)
   - [The category crosswalks](evaluate/category-crosswalks.md)
@@ -21,6 +20,16 @@
   - [Discharge reports from openEHR](evaluate/discharge-mapping.md)
 - [Licensing](evaluate/licensing.md)
 - [CRA information for users](evaluate/cra-user-information.md)
+
+# Integrate
+
+- [The FHIR facade](integrate/fhir-facade.md)
+- [The FHIRconnect operations](integrate/operations.md)
+- [The OMOP ETL](integrate/omop-etl.md)
+- [The change feed](integrate/change-feed.md)
+  - [The events lane](integrate/events.md)
+  - [The outbound FHIR lane](integrate/fhir-outbound.md)
+- [Writing and loading mappings](integrate/mappings.md)
 
 # Operate
 
@@ -36,16 +45,7 @@
 - [Failure and identity behaviour](operate/failure-and-identity.md)
 - [The usage report](operate/usage-report.md)
 - [Version lines and releases](operate/versions-and-releases.md)
-
-# Integrate
-
-- [The FHIR facade](integrate/fhir-facade.md)
-- [The FHIRconnect operations](integrate/operations.md)
-- [The OMOP ETL](integrate/omop-etl.md)
-- [The change feed](integrate/change-feed.md)
-  - [The events lane](integrate/events.md)
-  - [The outbound FHIR lane](integrate/fhir-outbound.md)
-- [Writing and loading mappings](integrate/mappings.md)
+- [Releases](operate/releases.md)
 
 # Contribute
 
@@ -54,3 +54,7 @@
 - [The performance gate](contribute/performance-gate.md)
 - [Crate versions and the bump rule](contribute/crate-versions.md)
 - [Cutting a release](contribute/release.md)
+
+---
+
+[Changelog](changelog.md)

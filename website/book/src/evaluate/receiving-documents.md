@@ -99,7 +99,7 @@ not evaluated, never passed in silence.
 `hl7.fhir.eu.eps` 1.0.0-ballot, with
 [`ferrobridge-validator`](https://docs.rs/ferrobridge-validator), over a
 package set that holds the profile and its whole dependency closure. A
-discharge report is not yet validated this way: `hl7.fhir.eu.hdr` 1.0.0
+discharge report is not validated this way: `hl7.fhir.eu.hdr` 1.0.0
 depends on `xtehr.eu.ehds.models` 1.0.0, a FHIR R5 package whose own
 closure reaches the R5 core package, which an R4 package set cannot hold.
 The validation holds the document, at every occurrence of every element in

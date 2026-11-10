@@ -19,11 +19,18 @@ site-url = "/docs/"
 # The tab icon is a theme override: mdBook copies theme/favicon.svg and
 # theme/favicon.png into the build output and links them from every page. Both
 # are regenerated from assets/brand/favicon.svg (assets/brand/README.md).
-default-theme = "rust"
-preferred-dark-theme = "coal"
+# The two themes theme/ferrobridge.css recolours with the indigo palette, and
+# theme/fonts/fonts.css keeps mdBook's bundled web fonts out.
+default-theme = "light"
+preferred-dark-theme = "navy"
+additional-css = ["theme/ferrobridge.css"]
 git-repository-url = "https://github.com/FerroHEALTH/FerroBRIDGE"
 edit-url-template = "https://github.com/FerroHEALTH/FerroBRIDGE/edit/main/website/book/src/{path}"
 additional-js = ["vendor/mermaid/mermaid.min.js", "vendor/mermaid/mermaid-init.js"]
+
+# The old address of the Releases page.
+[output.html.redirect]
+"/evaluate/build-order.html" = "../operate/releases.html"
 
 [output.html.search]
 enable = true

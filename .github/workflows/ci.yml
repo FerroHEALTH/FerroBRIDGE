@@ -240,6 +240,24 @@ jobs:
             jq -e --arg s "$secret" 'any(.services.ferrobridge.secrets[]; .source == $s)' <<<"$rendered" > /dev/null ||
               { echo "compose.yaml does not mount the ${secret} secret on the bridge" >&2; exit 1; }
           done
+      # The README's quick start is the anchored steps of this script: the
+      # self-test holds each copy to its anchor, and the run starts the
+      # published image with every lane off and asks for liveness.
+      - name: The README's quick start holds every step of the tour
+        run: bash scripts/quickstart/tour.sh --self-test
+      # The images compose.yaml names are tagged only once their release is
+      # published, after the version bump reached main; until then there is
+      # nothing to pull, and the tour waits for the publish.
+      - name: The README's quick start runs as written
+        run: |
+          set -euo pipefail
+          image="$(docker compose config --format json | jq -r '.services.ferrobridge.image')"
+          if ! docker manifest inspect "$image" > /dev/null 2>&1; then
+            echo "::notice::$image is not published yet; the tour runs once its release is."
+            exit 0
+          fi
+          bash scripts/quickstart/tour.sh
+          docker compose down --volumes
       - name: docker/console/Dockerfile builds from a staged tree
         run: |
           set -euo pipefail

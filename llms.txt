@@ -16,7 +16,7 @@
 
 - [Architecture at a glance](https://ferrobridge.eu/docs/evaluate/architecture.html): the short tour of the design.
 - [The two mapping specifications](https://ferrobridge.eu/docs/evaluate/mapping-specifications.html): what FHIRconnect and OMOCL share, and where they part.
-- [Build order](https://ferrobridge.eu/docs/evaluate/build-order.html): what exists today and what gets built next.
+- [Releases](https://ferrobridge.eu/docs/operate/releases.html): what each release shipped.
 - [What FerroBRIDGE runs beside](https://ferrobridge.eu/docs/operate/deployment-shape.html): the CDR, the terminology server, and the CDM database.
 - [The FHIR facade](https://ferrobridge.eu/docs/integrate/fhir-facade.html) and [the OMOP ETL](https://ferrobridge.eu/docs/integrate/omop-etl.html): the two target surfaces.
 - [Writing and loading mappings](https://ferrobridge.eu/docs/integrate/mappings.html): the mapping files that drive both sides.

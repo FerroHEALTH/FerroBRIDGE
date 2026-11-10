@@ -1,22 +1,24 @@
 /* SPDX-FileCopyrightText: Cadasto B.V. */
 /* SPDX-License-Identifier: BUSL-1.1 */
 
-/* FerroBRIDGE landing page: tokens and layout. Self-contained: a system font
-   stack, no external asset, and light and dark through prefers-color-scheme.
-   Relative URLs only. */
+/* FerroBRIDGE landing page: tokens and layout, the family site's layout with
+   FerroBRIDGE's own palette. Self-contained: a system font stack, no external
+   asset, and light and dark through prefers-color-scheme. Relative URLs only.
+   The accent is the indigo of assets/brand/tokens.css. */
 
 :root {
-  /* accent */
+  /* accent: indigo, with a deeper step for hover and a pale fill */
   --fb-accent: #4f46e5;
   --fb-accent-600: #4338ca;
   --fb-accent-050: #eef2ff;
-  /* light theme */
+  --fb-on-accent: #ffffff;
+  /* light theme: surface and ink from the brand tokens */
   --fb-bg: #ffffff;
-  --fb-surface: #f5f7fa;
-  --fb-text: #14181f;
-  --fb-muted: #58616e;
-  --fb-border: #dde3eb;
-  --fb-shadow: 0 1px 2px rgba(20, 24, 31, 0.06), 0 8px 24px rgba(20, 24, 31, 0.06);
+  --fb-surface: #f8fafc;
+  --fb-text: #0f172a;
+  --fb-muted: #526070;
+  --fb-border: #dbe3ec;
+  --fb-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
   /* fonts */
   --fb-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --fb-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -27,19 +29,30 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fb-bg: #0d1117;
-    --fb-surface: #151c26;
-    --fb-text: #eef2f7;
-    --fb-muted: #a4aebc;
-    --fb-border: #263041;
+    /* dark theme: the tile ground and mist text, violet as the voice */
+    --fb-bg: #0b1020;
+    --fb-surface: #121a2e;
+    --fb-text: #f1f5f9;
+    --fb-muted: #a3b0c2;
+    --fb-border: #24304a;
     --fb-accent: #818cf8;
     --fb-accent-600: #a5b4fc;
     --fb-accent-050: #171a2e;
+    /* violet is a light fill, so text on it takes the tile ground */
+    --fb-on-accent: #0b1020;
     --fb-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 }
 
 * { box-sizing: border-box; }
+
+/* Smooth scrolling and the hover transitions run only for a reader who has
+   not asked for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  .btn { transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease; }
+  .card { transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+}
 
 body {
   margin: 0;
@@ -53,15 +66,24 @@ body {
 
 a { color: var(--fb-accent); text-decoration: none; }
 a:hover { color: var(--fb-accent-600); text-decoration: underline; }
+/* Every link and button shows where the keyboard is. */
+a:focus-visible {
+  outline: 2px solid var(--fb-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 
 img, svg { max-width: 100%; height: auto; }
 
+/* Inline code breaks anywhere, so a long URL or image name wraps inside its
+   box at any width; a shell transcript (.cmd) scrolls instead. */
 code {
   font-family: var(--fb-mono);
   font-size: 0.88em;
   background: var(--fb-accent-050);
   padding: 0.1em 0.35em;
   border-radius: 5px;
+  overflow-wrap: anywhere;
 }
 
 .wrap {
@@ -120,8 +142,8 @@ code {
   border: 1.5px solid transparent;
 }
 .btn:hover { text-decoration: none; transform: translateY(-1px); }
-.btn-primary { background: var(--fb-accent); color: #fff; }
-.btn-primary:hover { background: var(--fb-accent-600); color: #fff; }
+.btn-primary { background: var(--fb-accent); color: var(--fb-on-accent); }
+.btn-primary:hover { background: var(--fb-accent-600); color: var(--fb-on-accent); }
 .btn-ghost { border-color: var(--fb-border); color: var(--fb-text); background: var(--fb-surface); }
 .btn-ghost:hover { border-color: var(--fb-accent); color: var(--fb-accent); }
 
@@ -142,19 +164,9 @@ code {
   pointer-events: none;
 }
 .hero > * { position: relative; }
+/* The mark is the brand SVG as shipped on the light ground; the page swaps
+   in ferrobridge-icon-dark.svg through <picture> on the dark one. */
 .hero-logo { width: 88px; height: 88px; margin: 0 auto 1.25rem; display: block; }
-.status {
-  display: inline-block;
-  margin: 0 auto 1.25rem;
-  padding: 0.3rem 0.85rem;
-  border-radius: 999px;
-  background: var(--fb-accent-050);
-  border: 1px solid var(--fb-border);
-  color: var(--fb-accent);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
 .hero h1 {
   font-size: clamp(1.6rem, 3.6vw, 2.5rem);
   line-height: 1.2;
@@ -168,6 +180,20 @@ code {
   max-width: 62ch;
   margin: 0 auto 2rem;
 }
+/* The release badge at the top of the hero. */
+.status {
+  display: inline-block;
+  margin: 0 auto 1.25rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  background: var(--fb-accent-050);
+  border: 1px solid var(--fb-border);
+  color: var(--fb-accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.status:hover { text-decoration: none; border-color: var(--fb-accent); }
 .hero-cta { display: flex; gap: 0.85rem; justify-content: center; flex-wrap: wrap; }
 .hero .note {
   margin: 1.5rem auto 0;
@@ -209,9 +235,12 @@ section { padding: clamp(3rem, 7vw, 4.5rem) 0; }
 /* Cards */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 1.1rem;
 }
+/* A grid item may shrink below its content's width, so nothing inside it
+   pushes it past its column. */
+.grid > * { min-width: 0; }
 .card {
   background: var(--fb-bg);
   border: 1px solid var(--fb-border);
@@ -227,7 +256,7 @@ section { padding: clamp(3rem, 7vw, 4.5rem) 0; }
 .card p { margin: 0; color: var(--fb-muted); font-size: 0.94rem; }
 .card code { font-size: 0.85em; }
 
-.audiences { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.audiences { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
 .audience ul {
   margin: 0.75rem 0 0;
   padding: 0;
@@ -236,6 +265,65 @@ section { padding: clamp(3rem, 7vw, 4.5rem) 0; }
   flex-direction: column;
   gap: 0.35rem;
 }
+
+/* A shell transcript: scrolls inside its own box, so a long line never widens
+   the page. */
+.cmd {
+  max-width: 760px;
+  margin: 0 auto;
+  background: var(--fb-bg);
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  padding: 1.1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--fb-mono);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+.cmd code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+
+.prose { max-width: 68ch; margin: 1.75rem auto 0; color: var(--fb-muted); }
+.prose p { margin: 0 0 0.9rem; }
+
+/* A card that is one link reads as a card, not as link text: hovering lifts
+   the card (the .card:hover above) and underlines its title alone, never its
+   body, and the keyboard focus rings the whole card. */
+a.card,
+a.card:hover,
+a.card:focus-visible { display: block; color: inherit; text-decoration: none; }
+a.card * { text-decoration: none; }
+a.card h3 { color: var(--fb-accent); }
+a.card:hover h3,
+a.card:focus-visible h3 { text-decoration: underline; text-underline-offset: 3px; }
+a.card:focus-visible {
+  outline: 2px solid var(--fb-accent);
+  outline-offset: 3px;
+  border-radius: var(--fb-radius);
+}
+
+/* A screenshot of the console, light or dark with the reader's scheme. It
+   scales inside its box, so it never widens the page. */
+.shot { max-width: 960px; margin: 0 auto; }
+.shot img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  box-shadow: var(--fb-shadow);
+}
+.shot figcaption {
+  margin-top: 0.8rem;
+  text-align: center;
+  color: var(--fb-muted);
+  font-size: 0.9rem;
+}
+
+/* A page of its own (the 404 page, a code-system page): one column of prose
+   under the nav. */
+.page { padding: clamp(3rem, 8vw, 5rem) 0; }
+.page h1 { font-size: clamp(1.5rem, 3.2vw, 2.2rem); line-height: 1.2; margin: 0 0 1rem; }
+.page p { max-width: 68ch; color: var(--fb-muted); }
+.page .hero-cta { justify-content: flex-start; margin-top: 2rem; }
 
 /* Footer */
 .footer {
@@ -274,9 +362,8 @@ section { padding: clamp(3rem, 7vw, 4.5rem) 0; }
   .nav-links .hide-sm { display: none; }
 }
 
-/* Motion only for a reader who has not asked the system to reduce it. */
-@media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
-  .btn { transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease; }
-  .card { transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+/* A phone keeps the commands on one line inside their box where it can; a
+   longer line still scrolls inside the box, never the page. */
+@media (max-width: 480px) {
+  .cmd { font-size: 0.7rem; padding: 0.9rem 0.75rem; }
 }
