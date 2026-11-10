@@ -139,13 +139,17 @@ fn one(
 
 /// Returns the answer to a refusal of the ingest.
 ///
-/// A status no content change can clear is `AR`: a `5xx` (the CDR failed or
-/// could not be reached), a `401`, `403` or `407` (the CDR refused the
-/// bridge's own credentials), a `408` and a `429`. Every other refusal is
-/// about the message and is `AE` (no specification governs the split: our
-/// own design over §2.9.2.2's two definitions).
+/// The status judged is the CDR's own when the CDR answered, since the status
+/// table may render a CDR's refusal of the content (`400`, `422`) as a
+/// gateway or server status of the facade. A status no content change can
+/// clear is `AR`: a `5xx` (the CDR failed or could not be reached), a `401`,
+/// `403` or `407` (the CDR refused the bridge's own credentials), a `408`
+/// and a `429`. Every other refusal is about the message and is `AE`, so a
+/// sender never resends a message the CDR refuses for its content (MSA-1,
+/// HL7 table 0008, original mode, HL7 v2.5.1 §2.9.2.2; the split is our own
+/// design over its two definitions).
 fn of_refusal(refused: &Refused) -> (Code, Vec<Error>) {
-    let status = refused.status();
+    let status = refused.upstream().unwrap_or(refused.status());
     let unrelated = status.is_server_error()
         || [
             StatusCode::UNAUTHORIZED,
@@ -265,6 +269,48 @@ mod tests {
             StatusCode::TOO_MANY_REQUESTS,
         ] {
             assert_eq!(Code::Reject, acknowledgment(&refused(status)).0, "{status}");
+        }
+    }
+
+    /// A refusal the status table answers with `rendered` for a CDR that
+    /// answered `answered`.
+    fn answered(rendered: StatusCode, answered: StatusCode) -> Settled {
+        let Settled::Refused(refusal) = refused(rendered) else {
+            panic!("refused builds a refusal");
+        };
+        Settled::Refused(refusal.with_upstream(Some(answered)))
+    }
+
+    #[test]
+    fn a_cdr_refusal_of_the_content_is_ae_whatever_the_facade_renders() {
+        for (rendered, cdr) in [
+            (StatusCode::INTERNAL_SERVER_ERROR, StatusCode::BAD_REQUEST),
+            (StatusCode::BAD_GATEWAY, StatusCode::UNPROCESSABLE_ENTITY),
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+        ] {
+            assert_eq!(
+                Code::Error,
+                acknowledgment(&answered(rendered, cdr)).0,
+                "{cdr} rendered as {rendered}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_cdr_that_failed_is_ar() {
+        for cdr in [
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::SERVICE_UNAVAILABLE,
+            StatusCode::REQUEST_TIMEOUT,
+        ] {
+            assert_eq!(
+                Code::Reject,
+                acknowledgment(&answered(StatusCode::BAD_GATEWAY, cdr)).0,
+                "{cdr}"
+            );
         }
     }
 

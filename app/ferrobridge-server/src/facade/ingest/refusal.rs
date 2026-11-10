@@ -23,7 +23,7 @@ use super::Refused;
 /// Returns the refusal a CDR call that reached no usable documented answer
 /// renders as, through the status table.
 pub(super) fn cdr_refusal(error: &CdrError) -> Refused {
-    Refused::of_answer(&status::of_client_error(error))
+    Refused::of_answer(&status::of_client_error(error)).with_upstream(error.upstream_status())
 }
 
 /// Returns the refusal a documented CDR `answered` refusal with `body` decides
@@ -37,26 +37,34 @@ pub(super) fn upstream_refusal(
         row,
         status::diagnostics(answered, body),
     ))
+    .with_upstream(Some(answered))
 }
 
-/// Returns the refusal a rejected contribution renders as.
+/// Returns the refusal a contribution the CDR rejected with `answered` and
+/// `body` renders as.
 ///
 /// Nothing was committed, so the answer names every entry the Bundle mapped:
 /// a caller cannot tell from a partial list which entries still stand.
-pub(super) fn refuse_all(mapped: &[Mapped], row: &status::Row, detail: &str) -> Refused {
+pub(super) fn refuse_all(
+    mapped: &[Mapped],
+    row: &status::Row,
+    answered: StatusCode,
+    body: &openehr_its::rest::client::ErrorBody,
+) -> Refused {
+    let detail = status::diagnostics(answered, body);
     let mut issues = vec![
         Issue::error(row.issue())
-            .diagnosing(detail.to_owned())
+            .diagnosing(detail.clone())
             .detailing("the CDR refused the contribution, so no entry of this Bundle is stored"),
     ];
     for entry in mapped {
         issues.push(
             Issue::error(row.issue())
-                .diagnosing(detail.to_owned())
+                .diagnosing(detail.clone())
                 .at(entry.full_url.clone()),
         );
     }
-    Refused::of(row.status(), issues)
+    Refused::of(row.status(), issues).with_upstream(Some(answered))
 }
 
 /// Returns the refusal an EHR resolution of a single write renders as.
