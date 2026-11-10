@@ -179,6 +179,19 @@ self_test() {
   printf 'demo = "1"\n' > "$tmp/repo/crates/demo/README.md"
   t_git commit -qam 'out of 0.x'
   expect 1 "a step out of 0.x" stepped HEAD
+  # The #1859 case: a README that names the line once and an older line
+  # elsewhere is stale.
+  t_git checkout -q stepped
+  set_version 0.2.0
+  printf 'demo = "0.2"\nName a patch ("0.1.N").\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'a stale patch placeholder'
+  expect 1 "a README naming a patch on an older line" stepped HEAD
+  printf 'demo = "0.2"\ndemo = "0.1"\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'a stale requirement'
+  expect 1 "a README naming a requirement on an older line" stepped HEAD
+  printf 'demo = "0.2"\nName a patch ("0.2.N").\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'the README on one line'
+  expect 0 "a README naming one line throughout" stepped HEAD
   # The #1736 case: a sibling requirement between workspace crates is exact,
   # since the siblings are released together from one commit.
   t_git branch moved
@@ -284,11 +297,19 @@ for manifest in crates/*/Cargo.toml; do
   [[ "$version" != "0.0.0" ]] || continue
   name="$(package_field name < "$manifest")"
   readme="$(dirname "$manifest")/README.md"
-  want="$name = \"$(version_line "$version")\""
+  line="$(version_line "$version")"
+  want="$name = \"$line\""
   if ! grep -qF -- "$want" "$readme" 2>/dev/null; then
     echo "::error::$readme does not state the range consumers require, $want, for $name $version (.claude/rules/crates-publishing.md)." >&2
     unstated=1
   fi
+  # A requirement or a patch placeholder on any other line is stale (#1859).
+  while IFS= read -r stale; do
+    [[ -z "$stale" ]] && continue
+    echo "::error::$readme:${stale%%:*} names ${stale#*:}, off the line $line of $name $version (.claude/rules/crates-publishing.md)." >&2
+    unstated=1
+  done < <(grep -noE -- "($name = \"[0-9][0-9.]*\"|\"[0-9]+\.[0-9]+\.N\")" "$readme" 2>/dev/null \
+    | grep -vE -- ":($name = \"${line//./\\.}\"|\"${line//./\\.}\.N\")$" || true)
 done
 [[ "$unstated" -eq 0 ]] || exit 1
 
