@@ -70,7 +70,6 @@ from the file `tls.key_file` names.
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes of the run, by kind, at debug level |
 | `facility_identifier_issuer` | none | The `DV_IDENTIFIER.issuer` a facility's namespace id (HD.1) is written under: the issuer the CDR client's declared facilities name it by. Unset, the identifier names no issuer, and a CDR that checks facilities refuses the commit |
 | `senders` | none, required | The sending facilities (MSH-4) the face accepts, at least one, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3) with `certificate_subject = "..."`, the DNS name its client certificate carries in its subject alternative name; a facility a composition names is one of them too. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
-
 | `tls.certificate_file` | none, required | The PEM certificate chain the listener serves |
 | `tls.key_file` | none, required | The PEM private key of that chain |
 | `tls.client_ca_file` | none, required | The PEM authorities a sender's client certificate must chain to |

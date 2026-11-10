@@ -1,0 +1,42 @@
+---
+source: crates/fhirconnect/tests/it/fall.rs
+expression: rows(&diagnostics)
+---
+[
+  "KDS_anatomical_location.yml:15 error fc-unknown-fhir-element",
+  "KDS_composition.yml:25 error fc-unpaired-types",
+  "KDS_composition.yml:31 error fc-unpaired-types",
+  "anatomical_location.v1.yml:27 error fc-unpaired-types",
+  "anatomical_location.v1.yml:33 error fc-unknown-fhir-element",
+  "episode_institution_local.v0.yml:63 error fc-unknown-fhir-element",
+  "episode_institution_local.v0.yml:64 error fc-unknown-template-node",
+  "episode_institution_local.v0.yml:67 error fc-unknown-fhir-element",
+  "episode_institution_local.v0.yml:73 error fc-unknown-fhir-element",
+  "episode_institution_local.v0.yml:74 error fc-unknown-template-node",
+  "fall.v1.Encounter.yml:55 error fc-unknown-template-node",
+  "fall.v1.Encounter.yml:57 error fc-unknown-template-node",
+  "fall.v1.Encounter.yml:59 error fc-unknown-template-node",
+  "fall.v1.Encounter.yml:78 error fc-unknown-template-node",
+  "fall.v1.Encounter.yml:80 error fc-unknown-template-node",
+  "fall.v1.Encounter.yml:82 error fc-unknown-template-node",
+  "location.v1.yml:112 error fc-unknown-fhir-element",
+  "location.v1.yml:116 error fc-unknown-fhir-element",
+  "location.v1.yml:121 error fc-unknown-fhir-element",
+  "location.v1.yml:123 error fc-unknown-fhir-element",
+  "location.v1.yml:130 error fc-unpaired-types",
+  "location.v1.yml:31 error fc-unknown-fhir-element",
+  "location.v1.yml:35 error fc-unknown-fhir-element",
+  "location.v1.yml:40 error fc-unknown-fhir-element",
+  "location.v1.yml:42 error fc-unknown-fhir-element",
+  "location.v1.yml:48 error fc-unpaired-types",
+  "location.v1.yml:71 error fc-unknown-fhir-element",
+  "location.v1.yml:75 error fc-unknown-fhir-element",
+  "location.v1.yml:80 error fc-unknown-fhir-element",
+  "location.v1.yml:82 error fc-unknown-fhir-element",
+  "location.v1.yml:89 error fc-unpaired-types",
+  "problem_diagnosis.v1.yml:114 warning fc-excluded-template-node",
+  "problem_diagnosis.v1.yml:45 error fc-uncarried-tail",
+  "problem_diagnosis.v1.yml:47 error fc-uncarried-tail",
+  "problem_diagnosis.v1.yml:71 error fc-uncarried-tail",
+  "problem_diagnosis.v1.yml:73 error fc-uncarried-tail"
+]

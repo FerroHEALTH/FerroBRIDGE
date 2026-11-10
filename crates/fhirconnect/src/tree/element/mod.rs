@@ -64,6 +64,7 @@ pub struct Field {
     max: Option<u32>,
     types: &'static [&'static str],
     target_profiles: &'static [&'static str],
+    rivals: Vec<String>,
 }
 
 impl Field {
@@ -119,6 +120,17 @@ impl Field {
         self.target_profiles
     }
 
+    /// Returns the JSON keys of the other alternatives of the choice this
+    /// element is one alternative of, empty for any other element.
+    ///
+    /// A choice element holds one alternative at a time
+    /// (<https://hl7.org/fhir/R4/formats.html#choice>), so writing this
+    /// alternative removes the others.
+    #[must_use]
+    pub fn rivals(&self) -> &[String] {
+        &self.rivals
+    }
+
     /// Returns whether the element repeats, so the JSON holds an array.
     #[must_use]
     pub fn repeats(&self) -> bool {
@@ -135,6 +147,7 @@ impl Field {
             max: self.max,
             types: self.types,
             target_profiles: self.target_profiles,
+            rivals: self.rivals.clone(),
         }
     }
 }
