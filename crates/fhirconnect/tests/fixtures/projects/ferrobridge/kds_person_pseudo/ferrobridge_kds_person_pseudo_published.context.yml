@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/person_pseudo/pseudo_person.context.yaml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published file repeats the `metadata.name` of the person
+# project's context and names its extensions by names no file declares, so
+# this copy names them as their files declare them and starts at the gender
+# evaluation, whose KDS_gender_pseudo.v1 slots the person data; the published
+# KDS_admin_entry_perso_pseudo and KDS_composition are not listed (#101). It
+# pins the refusals of the published files and is no chain of its own.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_person_pseudo_published.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/PatientPseudonymisiert
+    version: 2025.0.0
+  template:
+    id: KDS_Person_Pseudonymisiert
+    sem_ver: 63.0.0
+  archetypes:
+    - EVALUATION.gender.v1
+    - ADMIN_ENTRY.person_data.v0
+    - CLUSTER.person.v1
+    - CLUSTER.address.v1
+    - CLUSTER.person_birth_data_iso.v0
+  extensions:
+    - KDS_address_pseudo
+    - person_pseudo_cluster.v1
+    - KDS_gender_pseudo.v1
+  start: EVALUATION.gender.v1

@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/person_pseudo/KDS_gender.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name is FerroBRIDGE's. The published lines 30 to 51
+# write `other_context` and slot ADMIN_ENTRY.versicherungsinformationen.v0,
+# which KDS_Person_Pseudonymisiert does not carry (#101); those two methods
+# are left out, and every other method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_kds_gender_pseudo
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  extends: EVALUATION.gender.v1
+
+mappings:
+  - name: metaURL
+    extension: add
+    unidirectional: openEHR->fhir
+    with:
+      fhir: $resource.meta
+    manual:
+      - name: profileUrl
+        fhir:
+          - path: profile
+            value: https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/Patient
+
+  - name: adminEntryPerson
+    extension: add
+    with:
+      fhir: $resource
+      openehr: $composition/content[openEHR-EHR-ADMIN_ENTRY.person_data.v0]
+    slotArchetype: ADMIN_ENTRY.person_data.v0
+
+
+  - name: other-amtlich
+    extension: add
+    with:
+      fhir: $resource.gender.extension
+      openehr: $archetype/data[at0002]/items[at0014]
+    followedBy:
+      mappings:
+        - name: staticExtensionUrl
+          with:
+            fhir: $fhirRoot
+          manual:
+            - name: staticUrl
+              fhir:
+                - path: url
+                  value: http://fhir.de/StructureDefinition/gender-amtlich-de
+
+        - name: otherAmtlichValueCoding
+          with:
+            fhir: $fhirRoot.value
+            openehr: $openehrRoot/defining_code

@@ -1,0 +1,22 @@
+---
+source: crates/fhirconnect/tests/it/person_pseudo.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "the mapping metaURL did not run: its unidirectional marker names the other direction",
+    "the engine filled /composer",
+    "the engine filled /context/start_time",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [
+    "active = true"
+  ],
+  "added": [
+    "meta.profile[0] = \"https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/Patient\""
+  ],
+  "changed": []
+}

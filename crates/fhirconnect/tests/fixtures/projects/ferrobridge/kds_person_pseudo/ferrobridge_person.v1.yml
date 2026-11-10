@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/cluster/org.openehr/person.v1.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published lines 17 to 21 slot CLUSTER.structured_name.v1 and
+# lines 29 to 40 slot CLUSTER.organisation.v1, two slots
+# KDS_Person_Pseudonymisiert leaves unfilled, so neither method compiles
+# against it and both are left out; the address method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name:  CLUSTER.person.v1
+  version: 0.0.1-alpha 
+spec: 
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-CLUSTER.person.v1
+    revision: 1.0.3
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Patient
+
+
+mappings:
+  - name: address
+    with:
+      fhir: $resource.address
+      openehr: $archetype/items[openEHR-EHR-CLUSTER.address.v1]
+    slotArchetype: CLUSTER.address.v1
+

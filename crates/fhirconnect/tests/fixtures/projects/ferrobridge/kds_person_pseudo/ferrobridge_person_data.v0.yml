@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/admin_entry/org.highmed/person_data.v0.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published lines 58 to 76 read `link.type.value` on a
+# Reference at line 75, which defines no `link` (#101). That method is left
+# out; every other method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ADMIN_ENTRY.person_data.v0
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ADMIN_ENTRY.person_data.v0
+    revision: 0.0.1-alpha
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Patient
+
+
+preprocessor:
+  fhirCondition:
+      targetRoot: $resource
+      targetAttribute: active  # exclude non-active patients
+      operator: not of
+      criteria: "false"
+
+mappings:
+  - name: personData
+    with:
+      fhir: $resource
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.person.v1]
+    slotArchetype: CLUSTER.person.v1
+
+
+  - name: death
+    with:
+      fhir: $resource
+      openehr: $archetype/data[at0001]/items[at0024]
+    followedBy:
+      mappings:
+        - name: deathBoolean
+          with:
+            fhir: deceased.as(Boolean)
+            openehr: items[at0025]
+          openehrCondition:
+            targetRoot: $openehrRoot
+            targetAttribute: items[openEHR-EHR-CLUSTER.death_details.v1]/items[at0001]
+            operator: empty
+        - name: deathTime
+          with:
+            fhir: deceased.as(DateTime)
+            openehr: $archetype/data[at0001]/items[at0024]/items[openEHR-EHR-CLUSTER.death_details.v1]
+          slotArchetype: CLUSTER.death_details.v1
+
+
+  - name: personBirthDate
+    with:
+      fhir: $resource.birthDate
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.person_birth_data_iso.v0]
+    slotArchetype: CLUSTER.person_birth_data_iso.v0
+

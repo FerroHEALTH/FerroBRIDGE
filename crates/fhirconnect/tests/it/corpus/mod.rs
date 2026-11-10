@@ -571,6 +571,7 @@ fn compiled_reach() -> Result<BTreeSet<String>, Box<dyn Error>> {
         owned(crate::prozedur::kds_prozedur_chain()?),
         owned(crate::vitalstatus::kds_vitalstatus_chain()?),
         owned(crate::fall::kds_fall_chain()?),
+        owned(crate::person_pseudo::kds_person_pseudo_chain()?),
     ];
     chains.extend(
         crate::mapping_library::library_chains()?
