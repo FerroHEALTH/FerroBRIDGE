@@ -4,7 +4,7 @@
 name = "fhir-search"
 description = "The FHIR R4 search value grammar: the escaped value list, tokens, string matching and dates with their prefixes and ranges"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.130"
+version = "0.1.131"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -18,6 +18,10 @@ categories = ["parser-implementations", "science"]
 # The crate line is published on crates.io; include is the packaged content.
 publish = true
 include = ["src/**", "README.md", "LICENSE"]
+
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["jiff"]
 
 [features]
 # The instants a date's range holds and the calendar day it starts on, as jiff

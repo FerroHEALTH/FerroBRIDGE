@@ -3,7 +3,7 @@
 [package]
 name = "fhir-types"
 description = "Generated per-version FHIR types and terminology operation contracts"
-version = "0.1.130"
+version = "0.1.131"
 edition.workspace = true
 rust-version.workspace = true
 # The one first-party crate under Apache-2.0 (docs/architecture.md section 4.1).
@@ -18,6 +18,10 @@ categories = ["data-structures", "encoding", "science"]
 # The crate line is published on crates.io; `include` is the packaged content.
 publish = true
 include = ["src/**", "README.md", "LICENSE"]
+
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["serde", "serde_json"]
 
 [features]
 # The default set is every version module and the terminology root set, so a

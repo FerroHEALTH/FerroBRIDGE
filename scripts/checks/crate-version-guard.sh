@@ -214,6 +214,45 @@ self_test() {
   t_git commit -qam 'a private dependency on another line'
   expect 0 "a private dependency on another line with a patch step" public-base HEAD
 
+  # The #1851 cases: a third-party crate the manifest declares in
+  # `[package.metadata.ferrohealth] public-dependencies` is public too.
+  # $1 the version, $2 serde_json, $3 jiff, $4 the declaration.
+  with_declared() {
+    printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nserde_json = "%s"\njiff = { version = "%s", default-features = false }\n' "$2" "$3" > "$tmp/repo/Cargo.toml"
+    set_version "$1"
+    printf '\n[package.metadata.ferrohealth]\npublic-dependencies = [%s]\n\n[dependencies]\nserde_json.workspace = true\njiff.workspace = true\n' "$4" >> "$tmp/repo/crates/demo/Cargo.toml"
+    printf 'demo = "%s"\n' "$(cut -d. -f1-2 <<<"$1")" > "$tmp/repo/crates/demo/README.md"
+  }
+  t_git checkout -q -b declared main
+  with_declared 0.1.3 1.0.0 0.2.0 '"serde_json", "jiff"'
+  t_git commit -qam 'declared public dependencies'
+  t_git branch declared-base
+  with_declared 0.1.4 1.0.9 0.2.5 '"serde_json", "jiff"'
+  t_git commit -qam 'patch steps on the declared lines'
+  expect 0 "patch steps on the declared lines" declared-base HEAD
+  with_declared 0.1.4 2.0.0 0.2.0 '"serde_json", "jiff"'
+  t_git commit -qam 'a declared serde_json on another line on a patch'
+  expect 1 "a declared serde_json on another line with a patch step" declared-base HEAD
+  with_declared 0.2.0 2.0.0 0.2.0 '"serde_json", "jiff"'
+  t_git commit -qam 'a declared serde_json on another line on a minor'
+  expect 0 "a declared serde_json on another line with the next minor" declared-base HEAD
+  with_declared 0.1.4 1.0.0 0.3.0 '"serde_json", "jiff"'
+  t_git commit -qam 'a declared jiff on another line on a patch'
+  expect 1 "a declared jiff on another line with a patch step" declared-base HEAD
+  with_declared 0.3.0 1.0.0 0.3.0 '"serde_json", "jiff"'
+  t_git commit -qam 'a declared jiff on another line on a skipping minor'
+  expect 0 "a declared jiff on another line with a minor that skips one" declared-base HEAD
+  with_declared 0.1.4 1.0.0 0.3.0 '"serde_json"'
+  t_git commit -qam 'a jiff the change stops declaring'
+  expect 1 "a jiff the change stops declaring, on another line with a patch step" declared-base HEAD
+  t_git checkout -q -b undeclared main
+  with_declared 0.1.3 1.0.0 0.2.0 '"serde_json"'
+  t_git commit -qam 'jiff undeclared'
+  t_git branch undeclared-base
+  with_declared 0.1.4 1.0.0 0.3.0 '"serde_json"'
+  t_git commit -qam 'an undeclared jiff on another line'
+  expect 0 "an undeclared jiff on another line with a patch step" undeclared-base HEAD
+
   if [[ "$failures" -ne 0 ]]; then
     echo "crate-version-guard: self-test: $failures case(s) failed" >&2
     return 1
@@ -381,10 +420,13 @@ for manifest in crates/*/Cargo.toml; do
       continue
     fi
     # A public dependency required on another compatibility line breaks the
-    # crate (#1777), which cargo-semver-checks cannot see.
+    # crate (#1777), which cargo-semver-checks cannot see. A third-party one
+    # either side declares counts on both (#1851): one that stops being
+    # declared in the same change still moved under its consumers.
+    declared="$( (git show "$base:$manifest" 2>/dev/null | declared_public; head_file "$manifest" | declared_public) | LC_ALL=C sort -u)"
     moved="$(moved_lines \
-      "$(manifest_requirements <(git show "$base:Cargo.toml") <(git show "$base:$manifest") | public_lines)" \
-      "$(manifest_requirements <(head_file Cargo.toml) <(head_file "$manifest") | public_lines)")"
+      "$(manifest_requirements <(git show "$base:Cargo.toml") <(git show "$base:$manifest") | public_lines "$declared")" \
+      "$(manifest_requirements <(head_file Cargo.toml) <(head_file "$manifest") | public_lines "$declared")")"
     if [[ -n "$moved" ]] &&[[ "$(version_line "$old_ver")" == "$(version_line "$new_ver")" ]]; then
       echo "::error::$name moves from $old_ver to $new_ver while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
       fail=1

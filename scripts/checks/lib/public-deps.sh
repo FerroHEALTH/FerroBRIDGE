@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: BUSL-1.1
 # shellcheck shell=bash
 # The public dependencies of a published crate and the compatibility line each
-# is required on, shared by crate-version-guard.sh and semver.sh (#1777).
+# is required on, shared by crate-version-guard.sh, semver.sh and
+# public-surface.sh (#1777, #1851).
 #
 # Moving a public dependency to an incompatible version is a breaking change.
 # The Cargo Book, "SemVer Compatibility"
@@ -12,20 +13,49 @@
 # dependency in the crate's API becomes another type on the new line. The
 # cargo-semver-checks README (v0.51.0) lists "breaking type changes, for
 # example in the type of a field or function parameter" among what the judge
-# does not catch, so the two scripts compare these lines themselves. A public
-# dependency is one of the families whose types the crates of this line expose
-# (`openehr-*`, `fhir-types`, `hl7v2-types`, `ferrohealth-*`) or a sibling of
-# this workspace. Every normal dependency of
-# those names counts, optional ones included: no specification says which
-# items a crate exposes, so the rule assumes it exposes them all, our own
-# design.
+# does not catch, so the two scripts compare these lines themselves.
+#
+# A public dependency is one of the families whose types the crates of this
+# line expose (`openehr-*`, `fhir-types`, `hl7v2-types`, `ferrohealth-*`), a
+# sibling of this workspace, or a third-party crate the member manifest
+# declares in the `public-dependencies` array of its
+# `[package.metadata.ferrohealth]` table. Every family and sibling requirement
+# counts, optional ones included, since the rule assumes a crate exposes them
+# all, our own design. The declaration names the third-party crates whose
+# items the crate's public API names, and scripts/checks/public-surface.sh
+# derives that set from the rustdoc JSON of every crate and refuses a
+# declaration that differs from it.
 
-# Whether crate $1 is a public dependency of the crates of this line.
+# The names in the `public-dependencies` array of the
+# `[package.metadata.ferrohealth]` table of the manifest on stdin, one per
+# line. The array may span lines; a `#` comment is left out.
+declared_public() {
+  awk '
+    /^[[:space:]]*\[/ {
+      table = ($0 ~ /^[[:space:]]*\[package\.metadata\.ferrohealth\][[:space:]]*(#.*)?$/)
+      on = 0
+      next
+    }
+    table && /^[[:space:]]*public-dependencies[[:space:]]*=/ { on = 1; sub(/^[^=]*=/, "") }
+    on {
+      line = $0
+      sub(/#.*/, "", line)
+      while (match(line, /"[^"]*"/)) {
+        print substr(line, RSTART + 1, RLENGTH - 2)
+        line = substr(line, RSTART + RLENGTH)
+      }
+      if (line ~ /\]/) on = 0
+    }
+  '
+}
+
+# Whether crate $1 is a public dependency of the crates of this line, given
+# the declared third-party names $2, one per line.
 public_dependency() {
   case "$1" in
     openehr-* | fhir-types | hl7v2-types | ferrohealth-*) return 0 ;;
   esac
-  [[ -f "crates/$1/Cargo.toml" ]]
+  [[ -f "crates/$1/Cargo.toml" ]] || grep -qxF -- "$1" <<<"${2-}"
 }
 
 # The compatibility line of requirement $1, as Cargo reads a caret or an exact
@@ -77,11 +107,11 @@ manifest_requirements() {
 }
 
 # The sorted `name line` pairs of the public dependencies among the
-# `name requirement` pairs on stdin.
+# `name requirement` pairs on stdin, given the declared third-party names $1.
 public_lines() {
-  local name requirement
+  local declared="${1-}" name requirement
   while read -r name requirement; do
-    public_dependency "$name" || continue
+    public_dependency "$name" "$declared" || continue
     echo "$name $(compat_line "$requirement")"
   done | LC_ALL=C sort
 }

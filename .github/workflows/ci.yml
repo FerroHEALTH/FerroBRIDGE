@@ -381,6 +381,10 @@ jobs:
       # The crate bump guard over synthetic histories, on every run, because
       # its own job runs on pull requests only and skips under its label.
       - run: bash scripts/checks/crate-version-guard.sh --self-test
+      # The SemVer judge's public dependency verdict and the public surface
+      # derivation, over fixtures with no judge and no build (#1851).
+      - run: bash scripts/checks/semver.sh --self-test
+      - run: bash scripts/checks/public-surface.sh --self-test
       # The crates.io upload order over synthetic workspace graphs (#1785).
       - run: bash scripts/release/publish-crates.sh --self-test
       # The performance gate reads its pins, checks its plan's placeholders,
@@ -1194,6 +1198,40 @@ jobs:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo doc --locked --workspace --no-deps --all-features --document-private-items
 
+  # Each reached published crate's declared third-party public dependencies
+  # are the crates its rustdoc JSON API names, so the SemVer guards count
+  # their line moves (.claude/rules/crates-publishing.md, #1851). The rustdoc
+  # JSON of every crate with every feature takes six minutes from cold on an
+  # eight-core host, so the lane documents the reached crates alone.
+  public-surface:
+    name: public dependencies
+    needs: detect
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
+      - env:
+          PACKAGES: ${{ needs.detect.outputs.packages }}
+        run: |
+          set -euo pipefail
+          crates=()
+          for package in $PACKAGES; do
+            [[ ! -f "crates/$package/Cargo.toml" ]] || crates+=("$package")
+          done
+          if [[ "${#crates[@]}" -eq 0 ]]; then
+            echo "public-surface: the change reaches no published crate."
+            exit 0
+          fi
+          bash scripts/checks/public-surface.sh "${crates[@]}"
+
   # Runs on every change: the advisory database moves without one.
   cargo-deny:
     name: cargo-deny
@@ -1669,6 +1707,7 @@ jobs:
       - e2e
       - sqlx-offline
       - doc
+      - public-surface
       - cargo-deny
       - msrv
       - fhir-types-features
