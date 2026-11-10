@@ -179,13 +179,13 @@ struct Configuration<'a> {
 #[derive(Debug, Serialize)]
 struct Auth<'a> {
     enabled: bool,
-    issuer: Vec<Issuer<'a>>,
+    issuer: Vec<TrustedIssuer<'a>>,
     smart: Smart<'a>,
 }
 
 /// One `[[auth.issuer]]` table.
 #[derive(Debug, Serialize)]
-struct Issuer<'a> {
+struct TrustedIssuer<'a> {
     issuer: &'a str,
     kind: &'a str,
     audience: Vec<&'a str>,
@@ -230,7 +230,7 @@ impl RelayClient {
         let configuration = Configuration {
             auth: Auth {
                 enabled: true,
-                issuer: vec![Issuer {
+                issuer: vec![TrustedIssuer {
                     issuer: &self.issuer,
                     kind: "machines",
                     audience: vec![&self.audience],

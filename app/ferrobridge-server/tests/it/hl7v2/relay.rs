@@ -25,6 +25,7 @@ use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
+use ferrobridge_testkit::containers::Cdr;
 use ferrobridge_testkit::facility_cdr::{Facility, RelayClient, relay};
 use ferrobridge_testkit::mllp_tls::ClientIdentity;
 use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
@@ -148,28 +149,14 @@ async fn stored_facilities(base_url: &str, token: &str) -> Result<Vec<String>, B
     Ok(names)
 }
 
-#[tokio::test]
-async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
--> Result<(), Box<dyn Error>> {
-    if !ferrobridge_testkit::containers::e2e_enabled() {
-        return Ok(());
-    }
-    let provider = Provider::start().await?;
-    let access = token(&provider)?;
-    provider
-        .answer_grant(
-            "grant_type=client_credentials",
-            &TokenAnswer {
-                expires_in: Some(3600),
-                ..TokenAnswer::bearer(&access)
-            },
-        )
-        .await?;
+/// Starts the CDR as a node that declares the bridge as its relay client
+/// for the facilities `NORTHWARD` and `SOUTHWARD`, trusting `provider`'s key.
+async fn node(provider: &Provider) -> Result<Cdr, Box<dyn Error>> {
     let facility = |id: &str| Facility {
         issuer: String::from(FACILITIES),
         id: String::from(id),
     };
-    let cdr = relay(&RelayClient {
+    Ok(relay(&RelayClient {
         issuer: String::from(MACHINES),
         audience: String::from(AUDIENCE),
         keys: provider.jwks(),
@@ -186,7 +173,12 @@ async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
                 .to_vec(),
         )],
     })
-    .await?;
+    .await?)
+}
+
+/// Starts the face over `cdr`, reached with the client credentials grant at
+/// `provider`, accepting NORTHLAB and SOUTHLAB on their own certificates.
+async fn face(cdr: &Cdr, provider: &Provider) -> Result<Serving, Box<dyn Error>> {
     let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?).with_oauth(
         ClientCredentials::new(
             Endpoint::Token(provider.token_endpoint().parse()?),
@@ -221,7 +213,28 @@ async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
             name: String::from(SOUTHLAB_SUBJECT),
         },
     ];
-    let serving = Serving::start(facade, lane, None).await?;
+    Serving::start(facade, lane, None).await
+}
+
+#[tokio::test]
+async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
+-> Result<(), Box<dyn Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
+    let provider = Provider::start().await?;
+    let access = token(&provider)?;
+    provider
+        .answer_grant(
+            "grant_type=client_credentials",
+            &TokenAnswer {
+                expires_in: Some(3600),
+                ..TokenAnswer::bearer(&access)
+            },
+        )
+        .await?;
+    let cdr = node(&provider).await?;
+    let serving = face(&cdr, &provider).await?;
     let southlab = PKI.client(SOUTHLAB_SUBJECT)?;
 
     let north = send_as(
