@@ -103,7 +103,8 @@ pub enum Authorship {
     /// The given authors that are no `Organization`, and the `Organization`s
     /// the report names as its performers, as `BundleReportEuImaging`'s
     /// `dr-comp-author-org` requires; the first given `Organization`, the
-    /// operator, is the composition's `custodian`.
+    /// operator, is the composition's `custodian` unless the document names
+    /// one ([`super::Document::with_custodian`]).
     ReportPerformers,
 }
 
