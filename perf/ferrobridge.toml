@@ -13,8 +13,8 @@
 [server]
 listen = "127.0.0.1:18080"
 
-[cdr]
-base_url = "http://127.0.0.1:18090/ferroehr/rest/openehr/v1"
+[cdr.endpoint]
+url = "http://127.0.0.1:18090/ferroehr/rest/openehr/v1"
 
 [mappings]
 directory = "app/ferrobridge-server/tests/it/repeated"
