@@ -154,16 +154,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
         let path = format!("{}.{}", self.owner, field.name);
         self.owner.clone_from(&path);
         self.location = self.landing(field.kind)?;
-        self.moves.push(Move::Member(Field {
-            path,
-            key: String::from(field.name),
-            kind: field.kind,
-            min: field.min,
-            max: field.max,
-            types: field.types,
-            target_profiles: field.target_profiles,
-            rivals: Vec::new(),
-        }));
+        self.moves.push(Move::Member(single(path, field)));
         Ok(())
     }
 
@@ -365,16 +356,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
         self.owner.clone_from(&path);
         self.location = self.landing(field.kind)?;
         self.moves.push(Move::Extension {
-            field: Field {
-                path,
-                key: String::from(field.name),
-                kind: field.kind,
-                min: field.min,
-                max: field.max,
-                types: field.types,
-                target_profiles: field.target_profiles,
-                rivals: Vec::new(),
-            },
+            field: single(path, field),
             url: String::from(url),
         });
         Ok(())
@@ -505,4 +487,19 @@ fn rivals(field: &'static FieldSchema, chosen: &str) -> Vec<String> {
         .map(|form| format!("{}{}", field.name, form.suffix))
         .filter(|key| key != chosen)
         .collect()
+}
+
+/// The element `field` defines at `path`, written under its own name, which
+/// is no alternative of a choice.
+fn single(path: String, field: &'static FieldSchema) -> Field {
+    Field {
+        path,
+        key: String::from(field.name),
+        kind: field.kind,
+        min: field.min,
+        max: field.max,
+        types: field.types,
+        target_profiles: field.target_profiles,
+        rivals: Vec::new(),
+    }
 }
