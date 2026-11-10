@@ -25,6 +25,548 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.23] - 2026-11-10
+
+The request under its person, and the family endpoint. Each facade caller
+reaches the CDR through the onward issuer of its kind, the CDR derives the
+committer from the exchanged token, a machine caller is named as the
+originating system, and a write to a party under a binding key is refused.
+The bridge moves to `ferrohealth-smart` 0.16, `ferrohealth-config` 0.4,
+`ferrohealth-server` 0.8 and FerroAUDIT 0.10: every span of time and amount
+of data is a `Duration` or `ByteSize`, every outbound lane (`[cdr]`,
+`[terminology]`, `[audit]`, `[fhir_outbound]`) takes its server as one
+`endpoint` table with its TLS, and traces and metrics go to an OpenTelemetry
+collector. These configuration changes break: each entry below carries its
+upgrade step, and `config check` names the key to move. The HL7 v2 face
+serves MLLP over TLS with client certificates, and its compositions name the
+facility, the clinician and the `FEEDER_AUDIT` of the message.
+`ferrobridge-hl7v2` 0.5.0 carries the v2-to-FHIR maps generated from the
+guide, writes messages and writes a `Patient` back as a PID;
+`ferrobridge-term` 0.3.0 speaks FHIR R5 and R6 with one feature per release;
+the new `fhir-search` crate holds the FHIR search value grammar; and the
+published crates follow Cargo SemVer. Each breaking crate change names what a
+consumer changes.
+
+### Added
+
+- The FHIR facade carries a patient onto the CDR through an onward issuer of
+  `kind = "patients"`, and each `[[cdr.onward]]` table adds a `persons`,
+  `federation` or `patients` issuer beside `[cdr.credentials.onward]`, so
+  every caller is exchanged at the issuer of its kind. Two issuers of one
+  kind refuse the start (#1636).
+- A composition the facade commits for a machine caller names the caller's
+  client as the originating system (`feeder_audit.originating_system_audit.system_id`)
+  and the bridge as the feeder system (`feeder_system_audit.system_id`).
+  `fhirconnect` gains `Origin::with_originating_system` for it (#1637).
+- `[cdr.credentials.onward]` refuses the start when `[cdr.credentials.oauth]`
+  names neither `resource` nor `scope`, so the bridge's own token, which a
+  machine's request reaches the CDR under, is asked for the CDR alone (#1637).
+- `[facade] binding_identifier_issuers`: a create, update or delete of a party
+  resource whose `PERSON` carries a binding key, an identifier of one of the
+  listed issuers, is refused with `403 forbidden` before the bridge writes to
+  the CDR. A professional bound to a login is provisioned through the CDR's
+  SCIM service, never through the facade (#1640).
+- An HL7 v2 message's compositions name their health care facility, read
+  from PV1-3.4, PV1-39, ORC-21 and MSH-4 in that order, or name it as the
+  originating system's location when they have no `EVENT_CONTEXT`. With
+  `[[hl7v2.senders]]` set, a facility no sender names is answered `AE` naming
+  it, and nothing is committed. The performing organisation (OBX-23) is
+  recorded as the originating system's provider. `fhirconnect` gains
+  `Defaults::with_facility`, `Origin::with_location` and `with_provider` (#1665).
+- An HL7 v2 message's compositions name the clinician the message names as
+  their composer, from the first of EVN-5, OBX-16, ORC-12 and OBR-16, with
+  its identifier. A message carrying a result that names no clinician is
+  answered `AE`. A sender declared `origin = "device"` with its
+  `device_identifier_issuer` in `[[hl7v2.senders]]` commits its results as
+  acts of the device: the composer names the equipment (OBX-18), and the
+  device is the originating system. `fhirconnect` gains
+  `Defaults::with_composer_id` (#1666).
+- `fhirconnect` compiles an openEHR path that steps through a `List`
+  attribute of the reference model, such as `DV_TEXT.mappings` or
+  `DV_ORDERED.other_reference_ranges`, as an occurrence axis inside the
+  node's value: a mapping anchored on the list takes one element per input
+  occurrence, its children name the attributes of that element
+  (`meaning`, `range/lower`), and the run reads and writes each element in
+  both directions. A path that ends on a list with no child to fill an
+  element is still refused at load as `fc-uncarried-tail`. The range of a
+  `REFERENCE_RANGE<DV_QUANTITY>` reads as `DV_INTERVAL<DV_QUANTITY>`, the
+  type the openEHR RM gives it. `OpenehrTarget::new` and
+  `OpenehrTarget::with_element_tail` are no longer `const`, and
+  `OpenehrTarget::lists` and `ListAxis` are new (#1694).
+- The `eehrxf` laboratory mapping carries a result's typed reference ranges
+  both ways: a received `Observation.referenceRange` with a `type` becomes
+  one `other_reference_ranges` entry of the result's quantity, its `meaning`
+  from the `type`, and is no longer declared lost, and each entry is served
+  back as a `referenceRange` with that `type` (#1694).
+- A FHIRconnect `link` whose FHIR side is the resource an enclosing
+  `reference` mapping entered (`$fhirRoot` inside it, the shape of the
+  published KDS `KDS_composition.yml` extensions) now runs in both
+  directions. Going into openEHR the entered resource is handed to the
+  `LinkedCompositions` seam under the literal it was entered by, with no
+  second fetch; going out the link target becomes the reference the
+  enclosing mapping writes, and no copy of the resource is created, declared
+  as `SkipReason::LinkedResource` (`skipped-linked-resource` in the facade's
+  loss log). Any other `link` side is refused when the program compiles, as
+  `fc-link-side`, naming file and line, where it was refused on the first
+  run before. `fhirconnect` adds `resolve::program::mapping::LinkSide`,
+  `ResolveCode::LinkSide`, `EngineError::LinkedTwice` and
+  `SkipReason::LinkedResource`; a consumer that matches one of those enums
+  exhaustively adds the variant (#1695).
+- A `fhirconnect` run out of openEHR declares each archetype element the
+  composition holds at the mapped occurrence that no mapping reads, as the new
+  `Loss::Unread` warning naming the element's node id and openEHR path, so a
+  served resource never drops recorded content with no trace. An element a
+  `manual` entry carries through its `openehrCondition` counts as read, and an
+  element a skipped mapping already names is declared once (#1701).
+- The `eehrxf` discharge report mapping serves a problem's severity, date of
+  resolution and diagnostic certainty (`provisional` or `confirmed`), a
+  procedure's reasons, outcome and complications, and a discharge medicine's
+  route and order start in its one `dosageInstruction` (#1701).
+- The `eehrxf` imaging mapping serves each imaging diagnosis as a
+  `DiagnosticReport.conclusionCode` and receives one back, and a served
+  imaging report declares the findings, the differential diagnoses, the
+  comparison findings, the clinical summary, the recommendations and the
+  comments the composition records (#1700) (#1701).
+- `ferrobridge-hl7v2` composes any HL7 v2 message: `write::Writer` joins
+  `write::value` segments, fields, repetitions, components and subcomponents
+  in the message's delimiters, escapes each value of its own by HL7 v2.9
+  chapter 2 §2.7.1 (the truncation character as `\P\` among them), echoes a
+  field read in the same delimiters as the message wrote it, and
+  `Writer::compose` checks the message against the structure the
+  `hl7v2-types` tables define for the type and version its MSH declares and
+  encodes it in the character set MSH-18 names. `write::header::Msh` writes
+  an originated header, and `ack::Header::reply` and `ack::Header::msa` the
+  header and MSA of any reply. `ack::render` is built on the writer, and an
+  `ack::Error` converts to its `ERR` segment (#1715).
+- `map::single::segment` maps one placed segment to one resource through its
+  segment map, outside a message `Bundle` (a PID to the `Patient` a FHIR
+  source would send), with the same outcomes and the resources its `(Type)`
+  rows create beside it (#1716).
+- A shipped supplement of `datatype-xpn-to-string` writes XPN.1 through
+  `$value` where the guide writes `$this`, a target its notation does not
+  define, so PID-6 maps to the mother's maiden name extension (#1728) (#1716).
+- `ferrobridge-hl7v2` writes a FHIR R4 resource back as a v2 segment through
+  the same v2-to-FHIR maps (`map::inverse::segment`), a `Patient` as a PID,
+  returned as a `write::value::Segment`. The guide maps v2 to FHIR only, so
+  the inverse follows rules of our own over its rows, stated in the module
+  documentation; every element it does not write back, a table value no map
+  translates back and one that translates back to several codes are typed,
+  counted `inverse::Outcome`s, never a guess. Five shipped FHIR-to-v2 table
+  maps name one code where the guide's maps, reversed, give several
+  (administrative-gender, name-use, address-use, address-type and
+  contact-point-system). `parse::structure::segment_of` gives a segment's
+  table as a structure of a version places it, and `map::convert::temporal`
+  converts a FHIR date or time back to its v2 form (#1716).
+- `ferrobridge-term` speaks FHIR R5 and the R6 ballot (6.0.0-ballot5) beside STU3, R4 and R4B, each request written and each answer read through that release's generated `fhir-types` contract, so the `$translate` renames (`sourceCode`, `targetSystem`, `sourceSystem`, `sourceVersion`) and `match.relationship` come from the generated tables. It also sends `CodeSystem/$validate-code`, the instance-level forms, an inline `ValueSet` to `$expand`, and the inputs `activeOnly`, `excludeNested`, `displayLanguage` and `conceptMapVersion`; invokes an operation in the `GET` form where every input is primitive (`Config::with_form`); sends any request through `Client::send`; and writes and reads requests without its transport (`invocation::Invocation::new`, `invocation::answer`) for a caller that sends through its own (#1717).
+- The `fhir-search` crate, the one FHIR R4 search value grammar
+  (search.html §3.1.1.4) the FerroHEALTH FHIR servers read search values
+  with: the split at unescaped `,`, `|` and `$`, `unescape` refusing an
+  escape of any other character, `escape`, the four token forms and
+  `:of-type`, the default, `:contains` and `:exact` string matches with the
+  fold they compare, the nine prefixes, and the date to any precision with
+  the range its precision implies, its instants in a caller's zone and the
+  recommended `ap` margin. The facade reads its search values through it, so
+  a token with more than one unescaped `|`, an unknown letter prefix and a
+  year `0000` are refused as the grammar says, a date with more than nine
+  fraction digits is read exactly, and a date in the year 9999 is read with a
+  range open at the end of the calendar (#1718).
+- `ferrobridge-term` sends a whole authored `ValueSet` as the `valueSet`
+  input of `ValueSet/$expand` (`request::ValueSetSource::Authored`), with its
+  enumerated concepts, imported value sets, excludes and `compose.inactive`,
+  in every release it speaks, and refuses one the release cannot read with
+  `Error::AuthoredValueSet` before sending. `invocation::expand_answer` reads
+  an `$expand` answer without the request that asked for it (#1735).
+- `ferrobridge-hl7v2` 0.1.207 composes a v2 message against its structure
+  as an integration profile constrains it: `Writer::with_profile` takes a
+  `parse::profile::Profile`, whose constraints set the minimum cardinality
+  of named structure nodes, and the crate ships `IHE_ITI_21`, which makes
+  the QRI of the ITI-21 RSP^K22 optional (IHE ITI TF-2 §3.21.4.2.2, Table
+  3.21-6) where the v2.5 `RSP_K21` requires it. Breaking:
+  `parse::grouping::group` takes the profile as a third argument; pass
+  `&Profile::BASE` for the base structure (#1746).
+- `fhir-types` has one resources feature per release: `stu3-resources`,
+  `r4-resources`, `r4b-resources`, `r5-resources` and `r6-resources`. Each
+  turns on every resource of that release alone, while `resources` still
+  turns on every resource of each enabled release. `fhirconnect`,
+  `ferrobridge-hl7v2`, `eehrxf`, `ferrobridge-fhirpath`,
+  `ferrobridge-validator` and the bridge now ask only for the releases whose
+  resources they use. A build that adds a release for terminology alone, as
+  `ferrobridge-term` does with STU3 and R4B, then compiles none of that
+  release's resources (#1754).
+- `ferrobridge-hl7v2`'s `write::value::Segment` returns its fields
+  (`fields`, `field(position)`) and sets one (`set(position, field)`), so a
+  consumer can fill a field no map writes back, such as PID-1 or a PID-3
+  from its own identifier domains, in a segment `map::inverse::segment`
+  returns (#1766).
+- The bridge and the operator console export their traces and metrics to an
+  OpenTelemetry collector under `[telemetry.otlp]`, dialing an `https://`
+  collector through the platform verifier with the trust roots, client
+  identity and minimum version of `[telemetry.otlp.tls]` (#1795).
+
+### Changed
+
+- Under `[cdr.credentials.onward]` the facade lets the CDR derive the
+  committer from the exchanged token: a single write sends no
+  `openehr-audit-details` header, and a transaction's CONTRIBUTION carries
+  the placeholder committer, a `PARTY_IDENTIFIED` whose one `DV_IDENTIFIER`
+  names the token's `iss` and `sub`, in its `audit` and every version's
+  `commit_audit` (#1635).
+- The HL7 v2 face serves MLLP over TLS and requires a client certificate
+  that chains to `[hl7v2.tls] client_ca_file`. Each `[[hl7v2.senders]]`
+  entry names the `certificate_subject` its certificate carries, and a
+  message is accepted only on a connection whose certificate names the
+  sender its MSH-4 names; otherwise it is answered `AR`. The bridge refuses
+  to start without `[hl7v2.tls]` `certificate_file`, `key_file` and
+  `client_ca_file`, without a sender, or with a sender that names no
+  `certificate_subject`. Upgrade step: issue each sender a client
+  certificate, add its DNS name as `certificate_subject`, and configure
+  `[hl7v2.tls]`. `ferrobridge-hl7v2` gains `mllp::listener::serve_tls`,
+  `mllp::tls` and `Connection::certificate` (#1638).
+- An HL7 v2 message's compositions name the sending application (MSH-3) as
+  the originating system and the bridge as the feeder system in
+  `FEEDER_AUDIT`, record the placer and filler numbers (ORC-2, ORC-3, OBR-2,
+  OBR-3) as `originating_system_item_ids`, and move the message control id
+  (MSH-10) to `feeder_system_item_ids`. `fhirconnect` gains
+  `Origin::with_originating_items` and `with_feeder_items` for it (#1664).
+- `fhirconnect`: `Defaults` and `ComposerId` move to
+  `fhirconnect::engine::traverse::defaults`. A consumer imports
+  `fhirconnect::engine::traverse::defaults::Defaults` and
+  `fhirconnect::engine::traverse::defaults::ComposerId` in place of the
+  `engine::traverse` paths, which no longer resolve (#1673).
+- The `eehrxf` patient summary project (`mappings::EPS`) has one root context,
+  `ferrobridge_eu_eps.context`, which maps the composition to a
+  `composition-eu-eps` and enters each section through the sub-context its
+  section path names (FHIRconnect 1.0.0 sub-contexts). A medication action
+  under the medication summary section is now a `MedicationStatement-eu-eps`
+  of the medication summary, and one under the immunisations section stays an
+  immunisation. This breaks the project's API: `EPS.contexts()` names the
+  root alone, `ferrobridge_eu_eps_medication.context` and
+  `ferrobridge_eu_eps_immunization.context` are `scope: sub` and are no
+  longer compiled on their own, and a document takes the run with
+  `Document::with_mapped_composition` (#1696).
+- `Document::with_mapped_section` takes one section of a run whose context
+  wrote the `Composition`: the entries that section names, and each
+  `Provenance` narrowed to them. A document assembled one section at a time
+  takes only what it assembles from each run (#1696).
+- `openehr_mapping_core::index::WebTemplateIndex::example_composition` builds
+  the example with `openehr_sdt::flat::example::example_composition` at the
+  `medium` detail level, falling back to `required`, gives it the output
+  form's deterministic `uid` and validates it against the template. The
+  method takes no `now` argument any more, so a caller drops it, and an
+  example names the `uid` `openehr-sdt` derives from the template id
+  (`<uuid>::example.server::1`) and that crate's synthetic values. The
+  operator API's `GET /operator/templates/{id}/example` answers the same
+  example (#1705).
+- `openehr_mapping_core::index::WebTemplateIndex::build_party` and
+  `accept_party` validate the party with
+  `openehr_sdt::rm_instance::validate_party` (the template, the RM
+  invariants and the RM-mandated openEHR terminology), as a composition is
+  validated, and refuse one that breaks them with the new
+  `PartyError::Unvalidated`, which carries the validation's messages. The
+  FHIR facade answers a served party its template refuses with a `502`, and
+  `$toopenehr` refuses a mapped party that does not validate. A consumer
+  that matches `PartyError` exhaustively adds the variant (#1706).
+- `openehr-mapping-core` reads, names and amends a node instance, and `omocl` follows a hop, through the `openehr-sdt` `Navigator` the `WebTemplateIndex` now holds (`WebTemplateIndex::navigator`), so an instance whose runtime name differs from the name its template path spells is reached where that name is redundant, and an OPT2-inlined archetype root is matched by the identifier the template records. `fhirconnect` writes a manual entry's text through `openehr_rm::v1_2::paths::write::set_at_path`, and a path it cannot write is the refusal `EngineError::TailWrite` (#1707).
+- `openehr-mapping-core`, `fhirconnect` and `eehrxf` read the operational-template facts of a node (the embedded template id, the archetype's term definitions, the ordinal options), the FLAT key of an RM attribute and the relative path between two nodes from `openehr-sdt` instead of walking the OPT 1.4 themselves. An archetype root below an OPT 1.4 `T_COMPLEX_OBJECT` now answers its embedded template and terms in the index, as it already did in `eehrxf`. Breaking for a crate consumer: `eehrxf::terminology::local::TermDefinitions::from_template` returns a `Result` (a template that builds no Web Template is `TermDefinitionsError::Build`); `fhirconnect::engine::rm::ENTRY_TIMES` loses its key column and `family_of` takes the owning class and answers an `Option`; `openehr_mapping_core::index::paths::relative` no longer returns `MalformedAqlPath` (#1708).
+- `fhirconnect` and `openehr-mapping-core` read a generic RM type name (`DV_INTERVAL<DV_QUANTITY>`) and the class an attribute holds below it through `openehr_rm::v1_2::typing` (`RmType`, `base_name`, `attribute_type`) instead of splitting the name by hand. Breaking for a crate consumer: `fhirconnect::resolve::derive::base_class` is gone (use `openehr_rm::v1_2::typing::base_name`), and `derive::type_argument` answers an `RmType` (#1709).
+- The facade's FHIR search builds its AQL as the `openehr-query` AST and prints it with the crate's canonical printer, which spaces WHERE comparisons and writes only the parentheses precedence needs. `openehr-mapping-core` names a built composition's `rm_version` from `openehr_rm::Generation::earliest_for_composition` instead of its own check of one `GENERIC_ENTRY` difference, so a composition no RM release decodes (a `GENERIC_ENTRY` over an `ITEM_SINGLE`) is refused as `PathError::InvalidComposition` where it was named 1.2.0. The `openehr-*` crates move to 0.0.136 (#1710).
+- The null flavours, the default
+  `EVENT_CONTEXT.setting`, the version container of an `OBJECT_VERSION_ID`,
+  the `ETag` entity tag, the ISO 8601 parts of a `DV_DURATION`, a `DV_TIME`
+  and a visit's start and end, and the interface form of an archetype id are
+  read through those crates. Breaking for a consumer of `fhirconnect`:
+  `engine::lens::null_flavour::FLAVOURS` gives way to `fhir_default`, and
+  `BRIDGE` pairs each code with an `openehr_term::codes::NullFlavour`;
+  `engine::lens::duration::Component` gives way to
+  `openehr_base`'s `DurationDesignator`; and
+  `engine::identity::versioned_object_uid` returns a `String` (#1710).
+- `$toopenehr` and the facade's writes give a `DV_CODED_TEXT` in the
+  `openehr` terminology whose value the mapping filled from its code the
+  concept's rubric from the openEHR terminology (`openehr-term`), in the
+  template's default language, where it stood as the code before. The code
+  still stands for a language or a code the terminology does not carry (#1710).
+- The bridge and `ferrobridge-term` 0.1.148 take `ferrohealth-smart` 0.13.0,
+  the operator console `ferrohealth-session` 0.7.0, and the server
+  `ihe-atna` and `ehds-logging` 0.8.0, whose FHIR Feed bearer is on the same
+  line, so the lock holds one `ferrohealth-smart`. The 0.13 line refuses a
+  malformed JSON document without quoting it (GHSA-mhv7-3975-6xq3), and a
+  refused token request keeps no part of the answer's body. `[cdr.credentials.onward]`
+  and each `[[cdr.onward]]` table take `cache`: `false` holds no onward
+  token, so every CDR call exchanges one at the issuer, with a warning at
+  start, for a performance measurement and never for production. They also
+  take `actor_assertion` (default `false`): `true` names the bridge's client
+  as the actor of an exchange sent without an actor token, with an
+  assertion signed by the `oauth` key. Under the `keycloak` profile, a
+  Keycloak 26.8 impersonation token, which carries an RFC 8693 `act` claim,
+  is admitted as delegated only when the issuer's `delegates` lists the
+  impersonator. A product that hands its `TokenSource` to `ferrobridge-term`
+  moves to `ferrohealth-smart` 0.13 with it (#1714).
+- `ferrobridge-hl7v2` reads `\P\` as the truncation character a v2.7 or
+  later MSH-2 declares, and refuses it only in a message that declares none
+  (HL7 v2.9 chapter 2 §2.7.1). A field beyond the table of a segment whose
+  last field is `varies` (QPD-3 "User Parameters (in successive fields)",
+  RDT) is no longer counted as `extra-field`. `parse::Field::written` returns
+  a field as the message wrote it, `parse::Location::components` the ERL
+  components, and `parse::Delimiters::escape` escapes the truncation
+  character. Breaking for a consumer: `ack::Header` holds `parse::Delimiters`
+  (`Header::delimiters`), and a reply's trailing empty fields are left out
+  up to the last field valued or echoed (#1715).
+- `ferrobridge-term` 0.1.146 breaks its public API. The request types moved from `outcome` to `request`. `Validation.value_set_url` is `Validation.value_set` (a `request::Target`, built by `Validation::new`), `Expansion.value_set_url` is `Expansion.value_set` (a `request::ValueSetSource`), and `Subsumption.system` is `Subsumption.code_system`. `Request::Lookup` carries `display_language`, `Translation` carries `concept_map_version`, and `Expansion` and `Validation` carry the new inputs. On the answers, `ValidateOutcome::Valid` and `Invalid` both carry `display`, `outcome` and `details`, `TranslateOutcome::Translated` and `NoMatch` both carry `matches` and `used_maps`, `LookupOutcome::Found` carries `definition`, `Expanded` carries `parameters` and `unclosed`, and `Match` and `error::Issue` carry the further elements of the answer. Pattern matches that name every field and struct literals of these types change; `..` keeps a match compiling (#1717).
+- The `openehr-*` crates move to 0.0.133. `openehr_mapping_core::template::TemplateSource::Opt2`
+  gains `prohibited_attributes`, the attributes the template removed for
+  `existence matches {0}` as `openehr_adl::opt::create_opt` reports them in
+  its `RawOpt`, which the Web Template leaves out; a consumer that builds an
+  `Opt2` source passes them, or an empty list for an OPT2 received without
+  them, as the bridge does for an OPT2 the CDR serves (#1719).
+- The `openehr-*` crates move to 0.0.135, and `openehr-mapping-core`,
+  `fhirconnect` and `eehrxf` are released on it. An archetype id in a mapping
+  path or a node predicate is compared in its interface form with its
+  namespace, so a namespaced reference
+  (`org.example::openEHR-EHR-EVALUATION.note.v1`) no longer matches a
+  template root that carries the id without one: "a namespace is never a
+  wildcard" (openEHR BASE `master07-referencing.adoc` §Referencing) (#1724).
+- `fhir-search` 0.1.129 keeps `jiff` behind its default feature `jiff`.
+  With `default-features = false` the escape, token, string, prefix and
+  date grammar, the calendar check and the range a date's precision implies
+  compile with no time library; `SearchDate::instants`, `approximate`,
+  `Instants` and `first_day` need the feature. A consumer that reads
+  tokens and escapes alone, such as `ihe-iti`'s PIXm and PDQm sides, turns
+  it off (#1730).
+- `ferrobridge-term` 0.1.147 breaks its public API: each FHIR release is a feature, `stu3`, `r4`, `r4b`, `r5` and `r6`, and the default is `stu3`, `r4` and `r4b`. A release whose feature is off has no `WireVersion` variant, so a client in it does not compile. A consumer that speaks R5 or the R6 ballot turns `r5` or `r6` on. `ferrobridge-validator` 0.1.153 enables `stu3` and `r4`, and `ferrobridge-hl7v2` 0.1.204 and `eehrxf` 0.1.186 enable `r4`. The bridge compiles the three releases its `[terminology] wire_version` accepts, so its release build no longer compiles every R5 and R6 resource, which ran the hosted runner out of memory (#1737).
+- The published crates follow Cargo SemVer: a compatible change bumps the
+  patch, and a breaking change bumps the minor while a crate is 0.x, judged
+  by `cargo-semver-checks` on every pull request, in the merge queue and in
+  the release plan. Require a crate of the line by a caret range
+  (`fhirconnect = "0.1"`) in place of an exact `=` pin; each crate's README
+  states the range. `eehrxf`, `ferrobridge-fhirpath`, `ferrobridge-hl7v2`,
+  `ferrobridge-term`, `ferrobridge-validator`, `fhir-search`, `fhir-types`,
+  `fhirconnect`, `hl7v2-types` and `openehr-mapping-core` move one patch for
+  the README section (#1745).
+- `fhirconnect` 0.1.246 puts the FHIRconnect language (`model`, `resolve`,
+  `engine`, `operations`) behind a default `mapping` feature. With
+  `default-features = false` the crate is the FHIR path model (`tree`) over
+  `fhir-types`, with no openEHR crate and no `jsonschema`. A consumer that
+  turns default features off and uses the language adds
+  `features = ["mapping"]` (#1750).
+- `ferrobridge-term` 0.1.152 puts its HTTP client (`reqwest`, the retry
+  budget, the credentials and the token provider) behind a default `client`
+  feature, composed with the per-release features; `smart` implies it. With
+  `default-features = false` the crate keeps the request, concept and outcome
+  types and the transport-free writers and readers. A consumer that turns
+  default features off and calls a server adds `features = ["client"]` (#1750).
+- `SECURITY.md`, the post-market record and the book's CRA user information
+  name `security@cadasto.com` as the email route for a vulnerability report,
+  in place of `info@cadasto.com`, which stays the manufacturer's general
+  address and the address for licensing and other business questions (#1772).
+- Breaking for a `ferrobridge-hl7v2` consumer (0.2.0): the v2-to-FHIR
+  message, segment and data type maps are generated into the crate at build
+  time from the pinned `hl7.fhir.uv.v2mappings` 1.0.0 package, with
+  FerroBRIDGE's structure corrections as generator inputs, and
+  `map::maps::Maps::corrected()` (or `Maps::guide()`, the guide alone)
+  replaces `Corpus`. Every table value is translated by
+  `ConceptMap/$translate` on a terminology server: `map::map`,
+  `map::single::segment` and `map::inverse::segment` take an
+  `Option<&ferrobridge_term::client::Client>`, and the `map` feature carries
+  the client. A table map's `TableGroup` names its source and target systems
+  only (#1775).
+- FerroBRIDGE's value maps for the HL7 v2 face (the corrected copy of
+  `table-hl70202-to-contact-point-system` as
+  `table-hl70202-equipment-to-contact-point-system`, the added
+  `table-hl70202-to-contact-point-use` and the FHIR-to-v2 maps the PID
+  inverse uses) ship as the FHIR package `terminology/hl7v2-values/`, each
+  under an id of its own and a url of `https://ferrobridge.eu/fhir/v2mappings/`. Load it into the
+  terminology server beside the guide's package; the HL7 v2 face page of the
+  book says how (#1775).
+- Every span of time and amount of data in the bridge's and the console's
+  configuration is a family `Duration` (`"30s"`, `"5min"`) or `ByteSize`
+  (`"1MiB"`), and its key names no unit. `[server]` takes the
+  `ferrohealth-server` 0.7 keys: `request_timeout`, `header_read_timeout`,
+  `idle_timeout`, `body_limit`, `drain_delay`, `shutdown_timeout`,
+  `retry_after`, `compression_min_size` and `tls.reload_interval`. The
+  bridge's own keys follow: `[cdr]`, `[terminology]`, `[fhir_outbound]` and
+  `[facade.references]` `timeout`; `[cdr.retry]` and `[terminology.retry]`
+  `initial_backoff` and `max_backoff`; `[hl7v2]` `idle_timeout`,
+  `frame_timeout` and `frame_limit`; `[change_feed]` `poll_interval`,
+  `backoff` and `max_backoff`; `[events]` `confirm_timeout`; `[audit]`
+  `max_size` and `write_timeout`; and the console's
+  `[bridge] timeout`. A file or an environment that sets an old key is
+  refused as an unknown key; rewrite it in the new form (#1795).
+- `ferrobridge-term` 0.2.0 builds on `ferrohealth-smart` 0.15, whose
+  `TokenSource` its `smart` feature takes, so a consumer requires
+  `ferrobridge-term = "0.2"` and moves to `ferrohealth-smart` 0.15 in the
+  same change. `ferrobridge-validator` 0.2.0, `eehrxf` 0.2.0 and
+  `ferrobridge-hl7v2` 0.4.0 take the minor step with it, since each requires
+  `ferrobridge-term` exactly (#1795).
+- The `[auth]`, `[<lane>.credentials]` and console `[oidc]` and `[session]`
+  tables take the keys of `ferrohealth-smart` 0.15 and
+  `ferrohealth-session` 0.9: every span of time is a `Duration` with no unit
+  in its key (`clock_skew`, `jwks_max_age`, `jwks_refresh_interval`,
+  `timeout`, `introspection.cache_max_age`, `[auth.basic] cache_ttl`,
+  `refresh_margin`, `previous_key_overlap`, `sign_in_timeout`,
+  `idle_timeout`, `absolute_timeout`, and `max_onward_lifetime` such as
+  `"1h"`), and the outbound TLS of each is one `tls` table
+  (`trust_roots_file`, `client_identity_file` or `client_identity`,
+  `min_version`) in place of `ca_file`, `client_certificate_file` and
+  `client_key_file`. The old keys are refused as unknown keys (#1795).
+- The HL7 v2 value package keeps its FHIR manifest as
+  `terminology/hl7v2-values/fhir-package.json`, and
+  `scripts/terminology/pack-hl7v2-values.sh` packs it into the FHIR package
+  tarball with `package/package.json`, which is the form you load into the
+  terminology server. A file named `package.json` in the source tree was read
+  as an npm manifest whose FHIR package dependencies npm resolves to other
+  projects. A committed guard now refuses such a manifest (#1797).
+- `[audit]` takes its Audit Record Repository as one `endpoint` table,
+  `url`, `timeout`, `connect_timeout`, `retry`, `tls` and `credentials`,
+  sent through `ihe-atna` 0.10's FHIR Feed over `ferrohealth-smart`'s
+  outbound client. `retry` is the tries of one delivery, and its
+  `max_backoff` the wait between two rounds; the lane-level `base_url`,
+  `timeout`, `retry_max` and `credentials` are gone (#1809).
+- `[fhir_outbound]` takes its endpoint as one `endpoint` table, `url`,
+  `timeout`, `connect_timeout`, `retry`, `tls` and `credentials`, sent
+  through `ferrohealth-smart`'s outbound client: a delivery that got no
+  answer or a `5xx` is tried again as `retry` allows, an `https` endpoint
+  behind a private root or asking for a client certificate is reached with
+  the identity and roots `tls` names, and the lane-level `base_url`,
+  `timeout` and `credentials` are gone (#1809).
+- `ferrobridge-term` 0.3.0 builds on `ferrohealth-smart` 0.16. Behind the `smart`
+  feature, `Client::from_endpoint` builds a client from a product's
+  `[<lane>.endpoint]` table (smart's `EndpointSection`) through smart's
+  `OutboundClient`: the table's timeouts, no redirect, the TLS the product's
+  `TlsBuilder` builds, the retry, and the credential (HTTP Basic, or the
+  client credentials token renewed once on a `401`).
+  `Client::with_http` is removed: a consumer that handed in its own
+  `reqwest` client for mutual TLS or private roots names them in the
+  table's `tls` and builds through `from_endpoint`. `Credentials::Header`
+  carries an `Authorization` value as it stands, and `Error::Endpoint` is the
+  outbound client's refusal of the table (#1809).
+- `ferrobridge-validator` 0.3.0, `eehrxf` 0.3.0 and `ferrobridge-hl7v2`
+  0.5.0 take the minor step with `ferrobridge-term` 0.3.0, which each
+  requires exactly (#1809).
+- `[cdr]` and `[terminology]` take their server as one `endpoint` table,
+  `url`, `timeout`, `connect_timeout`, `retry`, `tls` and `credentials`,
+  the family's outbound endpoint table, beside each lane's own keys
+  (`demographic` and `onward`; `wire_version` and `display_fallback`). The
+  CDR's engine and the terminology client speak the TLS `endpoint.tls`
+  names, so a CDR or a terminology server behind a private root, or one that
+  asks for a client certificate, is reached. The lane-level `base_url`,
+  `timeout`, `retry` and `credentials` are gone, and the environment
+  follows (`FERROBRIDGE__CDR__ENDPOINT__URL`) (#1810).
+
+### Removed
+
+- The `[hl7v2]` keys `concept_maps` and `supplements`: the bridge carries the
+  v2-to-FHIR structure maps and reads no ConceptMap directory, and the
+  configuration refuses either key as unknown. The operator API's
+  `GET /operator/hl7v2/concept-maps` document drops its `directory` and
+  `supplements` members, and the console's HL7 v2 settings and ConceptMaps
+  tab drop them too (#1775).
+- From `ferrobridge-hl7v2`: `Corpus` with `Corpus::load`, `Corpus::shipped`
+  and `Corpus::supplement`, `map::translate::Translator` with its offline
+  translator, `map::guide`, `map::supplement`, and the `shipped-maps` and
+  `terminology-server` features (#1775).
+
+### Fixed
+
+- A debug build of `eehrxf` builds an operational template from the CKM
+  archetypes, compiles the EU MPD and EPS projects and maps them on a
+  thread with the default 2 MiB stack, so a consumer no longer needs a
+  larger stack for it. The overflow was in the `openehr-lang` lexer, which
+  0.0.130, the pinned version, fixes (FerroHEALTH/FerroEHR#4961) (#1526).
+- `eehrxf::document::Document::with_mapped_composition` keeps the
+  `emptyReason` a mapping run writes on a section, in the new
+  `MappedSection::empty_reason` field, and `MappedSection::into_section`
+  carries it into the document, which writes the concept as the run wrote
+  it (a code of `list-empty-reason`, or LOINC `LA4720-4`, which
+  `SectionEmptyReasonEuImaging` also includes). Before, the reason was
+  dropped and the document refused the empty section. A consumer that
+  writes a `MappedSection` literal adds the field, and
+  `Section::empty_because` is no longer a `const fn` (#1626).
+- A FHIRconnect `hierarchy.split` whose node lies outside the repeating
+  anchor of the file it is slotted from no longer takes that anchor's
+  instance for the repeating nodes above it: each group creates the next
+  free element under the instances those nodes are bound to. Coming out of
+  openEHR, a mapping whose node sits below two or more repeating nodes its
+  parent does not bind reads every instance of each, where it read only the
+  first instance of all but the outermost (#1647).
+- A FHIRconnect `openehrCondition` whose target lies outside the repeating
+  node its mapping reads (a `targetRoot` under `$archetype/protocol`, say,
+  on a mapping inside an event) reads the target's own instance coming out
+  of openEHR instead of the input's instance at the same depth, so the
+  condition no longer fails for every event past the first (#1648).
+- A composition whose operational template prohibits its `context`
+  (existence `0..0`, which RM `COMPOSITION.context` `0..1` allows) is built
+  with no `EVENT_CONTEXT` and no context defaults, and the facility an HL7 v2
+  message names goes to `feeder_audit.originating_system_audit.location`. The
+  `openehr-*` crates move to 0.0.130, whose Web Template leaves `/context`
+  out of such a template (#1689).
+- A `fhirconnect` context refuses an extension's `overwrite` or `appendTo`
+  that addresses a name two sibling methods share, as
+  `fc-duplicate-method-name`, even when no slot of the context reaches the
+  model the extension extends. Before, such an edit was refused or accepted
+  depending on whether the context reached its model (#1702).
+- A FHIR `Duration` whose value has a fraction in any unit but the seconds
+  (`1.5 d`) is refused going into openEHR, where it was written as the
+  duration `P1.5D`, which openEHR BASE does not admit. A visit start or end
+  written in the ISO 8601 basic form is read, and a facade `If-Match` that
+  names an openEHR version of a composition whose id is an upper-case UUID
+  is compared in the spelling the CDR issued (#1710).
+- A `DV_INTERVAL` a mapping writes bound by bound, such as the `range` of
+  another reference range of a quantity, carries all four flags ITS-JSON
+  requires (`lower_unbounded`, `upper_unbounded`, `lower_included`,
+  `upper_included`): an absent bound is unbounded and not included, a present
+  one bounded and included, and a flag a mapping wrote is kept (#1722).
+- Every published crate of the line requires its workspace siblings exactly
+  (`=X.Y.Z`), so a crate published from here always builds against the
+  sibling it was released with. A range let `ferrobridge-validator` 0.1.151,
+  already on crates.io, resolve `ferrobridge-term` 0.1.146, whose breaking
+  change it never saw. `eehrxf`, `ferrobridge-fhirpath`,
+  `ferrobridge-hl7v2`, `ferrobridge-term`, `ferrobridge-validator` and
+  `fhirconnect` move one patch for the new requirements, and
+  `crate-version-guard` refuses a caret or tilde between workspace crates (#1736).
+- A FHIR identifier search through the demographic extension counts two parties whose `HIER_OBJECT_ID`s share a root and differ in their `extension` as two parties. The facade reads each party uid through `openehr-base`, naming a version by its `object_id` verbatim and any other uid whole, where it kept only the text before the first `::` (#1741).
+- `ferrobridge-hl7v2`'s map writes an XTN-3 of `CP` as `ContactPoint.system`
+  `phone` with `use` `mobile` (when XTN-2 is empty). Before, it wrote
+  `system` `mobile`, which the required R4 binding of `ContactPoint.system`
+  does not allow. The fix ships as supplements over the guide's
+  `table-hl70202-to-contact-point-system` and `datatype-xtn-to-contactpoint` (#1762).
+- `ferrobridge-hl7v2`'s map writes the guide's data-absent-reason `unknown`
+  on `ContactPoint.system` for an XTN with neither XTN-3 nor XTN-4, so the
+  `ContactPoint` keeps R4's `cpt-2`. The inverse reads a primitive's
+  extensions under its `_name` member, so that `ContactPoint` writes back
+  with nothing left over (#1763).
+- `ferrobridge-hl7v2`'s `map::inverse::segment` returns a `Send` future, so
+  it can run inside a task on a multi-threaded tokio runtime (#1769).
+- `fhirconnect` 0.1.249 converts a composition out of openEHR when a mapping
+  reads a value its node does not hold and a later mapping writes the same
+  repeating FHIR element. The empty mapping took the first instance, so the
+  run refused with an occurrence gap: a KDS vital status composition with a
+  composer and no health care facility did not convert to an `Observation` (#1781).
+- Breaking for a `ferrobridge-hl7v2` consumer (0.3.0): `parse::profile::Profile`
+  gains `repetitions`, the fields whose repetition a profile sets, and
+  `IHE_ITI_21` lets QPD-3 repeat in `QBP_Q21` and `RSP_K21` of v2.5, as
+  IHE ITI TF-2 §3.21.4.1.2.3 makes it ("one or more repetitions", one per
+  query parameter). A writer `with_profile(&IHE_ITI_21)` therefore composes an
+  RSP^K22 that echoes a query with two parameters instead of refusing it with
+  an `ExtraRepetition` at QPD-3. QPD-2 keeps its one repetition (#1805).
+
+### Security
+
+Shipped with functional changes because: FerroBRIDGE has refused a Basic user holding a `system/` scope at start-up since the change that moved it to `ferrohealth-smart` 0.9.0, so no FerroBRIDGE build is exposed to GHSA-jhg2-jwjp-hq74 and there is no security update to separate from the other changes this release carries.
+
+- A Basic user of `[[auth.basic.users]]` holding a `system/` scope is
+  refused by `ferrohealth-smart` 0.9.1 (GHSA-jhg2-jwjp-hq74, CWE-269,
+  CWE-863), which names the user and the scope, and a Basic caller never
+  carries a `system/` scope at request time. The bridge's own start-up
+  check for the same rule is removed in its favour. Upgrade step: give each
+  Basic user the `user/` scopes a person holds, and move each machine on
+  Basic to a client credentials client (RFC 6749 §4.4) of a `machines` or
+  `persons` issuer (#1641).
+- The bridge takes `ferrohealth-smart` 0.13.1 (GHSA-5qm7-v4fw-p2v9): a
+  refusal from an issuer's key set, discovery or token introspection
+  endpoint no longer keeps the upstream response body in its error, so no
+  body reaches a log line. Introspection keeps only the bounded RFC 6749
+  §5.2 `error` code (#1798).
+
 ## [0.0.22] - 2026-11-06
 
 Callers by kind, and each request under its person. The bridge moves to
@@ -6149,7 +6691,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.22...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.23...HEAD
+[0.0.23]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.22...v0.0.23
 [0.0.22]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.21...v0.0.22
 [0.0.21]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.20...v0.0.21
 [0.0.20]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.19...v0.0.20
