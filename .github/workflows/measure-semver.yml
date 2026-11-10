@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # A one-off measurement for #1834, never merged: the peak memory and time of
-# cargo-semver-checks on fhir-types with each per-release resources set, on
+# cargo-semver-checks on fhir-types with each per-release resources set
+# (`--features <version>,resources`), on
 # the hosted runner the crate-version-guard job uses.
 name: measure-semver
 on:
@@ -18,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        set: [r4-resources, stu3-resources, r4b-resources, r5-resources, r6-resources]
+        set: [r4, stu3, r4b, r5, r6]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,8 +50,8 @@ jobs:
           start=$(date +%s)
           status=0
           /usr/bin/time -v cargo semver-checks check-release --package fhir-types \
-            --baseline-rev origin/main --only-explicit-features --features "$SET" || status=$?
-          echo "measure: $SET exit $status in $(( $(date +%s) - start )) s"
+            --baseline-rev origin/main --only-explicit-features --features "$SET,resources" || status=$?
+          echo "measure: $SET,resources exit $status in $(( $(date +%s) - start )) s"
           kill "$sampler" || true
           nproc
           exit "$status"
