@@ -44,11 +44,14 @@ binaries and builds nothing:
    each at its pin in `docs/VERSIONS.md`, and loads the
    testkit's synthetic `ferrobridge.diagnoses.v1` and
    `ferrobridge.diagnose.v1` templates into each CDR;
-2. starts each arm's `ferrobridge` in its own tree with the head's
-   `perf/ferrobridge.toml`, the harness the plan is written for, so a change
-   to the harness reaches both arms (a key the base binary does not know
-   stops the base at boot, exit 2): the FHIR
-   facade over the facade tests' mapping set, the HL7 v2 face over TLS
+2. starts each arm's `ferrobridge` in its own tree under that tree's
+   configuration contract: its `perf/ferrobridge.toml` and the
+   `FERROBRIDGE__` overrides of its `perf/arm.env`, or, in a tree from
+   before that file, the overrides its own copy of the gate set. A pull
+   request that renames a configuration key changes both files for the head
+   alone, and the base boots on the keys its binary reads; a base that still
+   cannot start ends the run with exit 2, quoting its log. Each arm runs the
+   FHIR facade over the facade tests' mapping set, the HL7 v2 face over TLS
    through the face tests' Observation context, and the change feed with its
    events lane following its CDR's outbox;
 3. creates one Condition through each facade, the record the read and the
