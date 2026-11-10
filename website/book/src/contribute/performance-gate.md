@@ -23,7 +23,11 @@ machine fails unchanged code on another. The gate builds the change, the
 head, and its base, and measures both on one runner in one job, so the
 difference between machines cancels. The base is the merge base of the
 change with the pull request's base (with the merge group's, or with the
-commit before a push), and on a release the previous release.
+commit before a push), and on a release the previous release. A previous
+release that carries no gate contract (neither `perf/arm.env` nor
+`scripts/perf/gate.sh`) gives way to the oldest commit after it that carries
+one, the nearest point both arms can be booted from. The build prints which
+commit it chose and why, and the release notes' performance line names it.
 
 ## What runs
 

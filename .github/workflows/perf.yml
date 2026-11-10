@@ -51,6 +51,13 @@ on:
         required: false
         default: true
         type: boolean
+    outputs:
+      base:
+        description: The commit the base arm was built from; empty when nothing was measured.
+        value: ${{ jobs.build.outputs.base }}
+      base-why:
+        description: Why that commit is the base, the reason scripts/perf/gate.sh build gives.
+        value: ${{ jobs.build.outputs.why }}
 
 permissions: {}
 
@@ -80,6 +87,9 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+    outputs:
+      base: ${{ steps.arms.outputs.base }}
+      why: ${{ steps.arms.outputs.why }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -94,6 +104,7 @@ jobs:
           VERSION: ${{ env.FERROHEALTH_PERF_VERSION }}
         run: cargo install ferrohealth-perf --version "=${VERSION}" --locked
       - name: Build the base and the head
+        id: arms
         env:
           BASE: ${{ inputs.base }}
           BUILD_SWAP: /perf-build.swap
@@ -123,6 +134,10 @@ jobs:
           trap 'kill "$sampler" 2> /dev/null || true' EXIT
           bash scripts/perf/gate.sh build "$BASE"
           bash scripts/perf/gate.sh pack target/perf-arms.tar
+          {
+            echo "base=$(< target/perf-base/rev)"
+            echo "why=$(< target/perf-base/why)"
+          } >> "$GITHUB_OUTPUT"
       # Every attempt measures these binaries, so a retry builds nothing.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

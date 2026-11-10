@@ -13,7 +13,9 @@
 #   scripts/perf/gate.sh build [BASE]
 #       Builds target/release/ferrobridge of the checkout, the head, and of
 #       its base: the merge base of HEAD with BASE, a commit or ref, or with
-#       no BASE the newest v* tag before HEAD, else HEAD's first parent. Both
+#       no BASE the newest v* tag before HEAD (the oldest commit after it
+#       with the gate contract when the tag carries none), else HEAD's first
+#       parent, and writes why into target/perf-base/why. Both
 #       arms build in one tree, target/perf-build, with its own toolchain pin:
 #       first the base from `git archive` of that commit, then the same tree
 #       brought to the checkout by rewriting only the files that differ, so
@@ -165,18 +167,49 @@ broker_up() {
 }
 
 # base_rev [BASE] [AT]: the commit the base is built from, as `build` names
-# it, resolved from AT (HEAD by default).
+# it, resolved from AT (HEAD by default), with the reason on stderr. A
+# previous release that carries no gate contract (neither perf/arm.env nor
+# scripts/perf/gate.sh) gives way to the oldest commit after it that does,
+# the nearest point both arms can be booted and measured from.
 base_rev() {
-  local base="${1:-}" at="${2:-HEAD}" tag
+  local base="${1:-}" at="${2:-HEAD}" tag tagged rev
   # The commit before the push that created a branch is all zeros.
   [[ "$base" =~ ^0+$ ]] && base=""
   if [[ -n "$base" ]]; then
     git -C "$root" merge-base "$at" "$base"
+    echo "the merge base of $at with $base" >&2
   elif tag="$(git -C "$root" describe --tags --abbrev=0 --match 'v*' "$at^" 2> /dev/null)"; then
-    git -C "$root" rev-parse "$tag^{commit}"
+    tagged="$(git -C "$root" rev-parse "$tag^{commit}")"
+    if has_contract "$tagged"; then
+      echo "$tagged"
+      echo "the previous release $tag" >&2
+      return 0
+    fi
+    while IFS= read -r rev; do
+      if has_contract "$rev"; then
+        echo "$rev"
+        echo "the oldest commit after $tag that carries the gate contract, since $tag carries neither $ARM_ENV nor a $GATE whose serve() sets the arm's overrides" >&2
+        return 0
+      fi
+    done < <(git -C "$root" rev-list --reverse --first-parent --ancestry-path "$tagged..$at")
+    echo "no commit after $tag up to $at carries the gate contract" >&2
+    return 1
   else
     git -C "$root" rev-parse "$at^1"
+    echo "the first parent of $at" >&2
   fi
+}
+
+# has_contract REV: REV carries the gate contract, a perf/arm.env or a gate
+# whose serve() sets the FERROBRIDGE__ overrides an arm's are derived from.
+has_contract() {
+  git -C "$root" cat-file -e "$1:$ARM_ENV" 2> /dev/null && return 0
+  git -C "$root" show "$1:$GATE" 2> /dev/null | serve_block | grep -qE '^[[:space:]]*FERROBRIDGE__[A-Z0-9_]+='
+}
+
+# serve_block: the serve() function of the gate on stdin.
+serve_block() {
+  awk '/^serve\(\) \{/ { on = 1 } on { print } on && /^\}/ { exit }'
 }
 
 # to_checkout REV TREE: brings TREE, an extract of REV, to the checkout's
@@ -200,13 +233,15 @@ to_checkout() {
 # then the head's into target/release/ferrobridge, both from one tree and one
 # target directory.
 build() {
-  local rev
+  local rev why
   cd "$root"
-  rev="$(base_rev "${1:-}")" || die "the base of ${1:-the previous release} cannot be resolved"
-  echo "perf-gate: the base is $rev"
+  why="$(mktemp)"
+  rev="$(base_rev "${1:-}" 2> "$why")" || die "the base of ${1:-the previous release} cannot be resolved: $(< "$why")"
+  echo "perf-gate: the base is $rev, $(< "$why")"
   rm -rf "$BASE_TREE" "$BUILD_TREE"
   mkdir -p "$BUILD_TREE"
   base_source "$rev"
+  mv "$why" "$BASE_TREE/why"
   git archive "$rev" | tar -x -C "$BUILD_TREE"
   # From inside the build tree, so its own toolchain pin builds each arm.
   (cd "$BUILD_TREE" && cargo build --release --locked -p ferrobridge-server --bin ferrobridge --target-dir "$root/target")
@@ -358,12 +393,18 @@ fill() {
 
 # derive ARM GATE: the variables the serve() of GATE, a tree's own copy of
 # this script from before perf/arm.env, set on its bridge, evaluated for ARM
-# with the names that function read (arm, dir, root, WORK, TERMINOLOGY and
-# the port helpers).
+# with the names that function read: arm, dir, tree, root, the port helpers,
+# and GATE's own scalar constants this script does not define.
 derive() {
   local arm="$1" gate="$2" line name value found=0
   # shellcheck disable=SC2034 # read by the evaluated values
   local dir="$root/$WORK/$1"
+  while IFS= read -r line; do
+    [[ "$line" =~ ^readonly[[:space:]]+([A-Z_][A-Z0-9_]*)=([^\(].*)$ ]] || continue
+    name="${BASH_REMATCH[1]}"
+    [[ -z "${!name+set}" ]] || continue
+    eval "local $name=${BASH_REMATCH[2]}" || die "$gate: its constant $name cannot be evaluated"
+  done < "$gate"
   while IFS= read -r line; do
     [[ "$line" =~ ^[[:space:]]*(FERROBRIDGE__[A-Z0-9_]+)=(.*)$ ]] || continue
     name="${BASH_REMATCH[1]}"
@@ -373,7 +414,7 @@ derive() {
     eval "value=$value" || die "$gate: the value of $name cannot be evaluated"
     printf '%s=%s\n' "$name" "$value"
     found=$((found + 1))
-  done < <(awk '/^serve\(\) \{/ { on = 1 } on { print } on && /^\}/ { exit }' "$gate")
+  done < <(serve_block < "$gate")
   [[ "$found" -gt 0 ]] || die "$gate: its serve() sets no FERROBRIDGE__ variable"
 }
 
@@ -597,6 +638,9 @@ self_test() {
   mkdir -p "$old/scripts/perf" "$layout/perf" "$layout/scripts/perf"
   # A tree from before perf/arm.env, its gate naming the CDR on the old key.
   cat > "$old/$GATE" <<'GATE'
+readonly WORK=elsewhere
+readonly OLD_ONLY=fixtures/old
+readonly OLD_LIST=(a b)
 serve() {
   local arm="$1" binary="$2" tree="$3" dir="$root/$WORK/$1" config="$root/$CONFIG" fixtures
   (
@@ -608,6 +652,7 @@ serve() {
       FERROBRIDGE__CDR__BASE_URL="$(cdr_origin "$arm")/ferroehr/rest/openehr/v1" \
       FERROBRIDGE__FACADE__IDENTITY_STORE="$dir/identity.redb" \
       FERROBRIDGE__EVENTS__EXCHANGE="ferrobridge.perf.$arm" \
+      FERROBRIDGE__HL7V2__CONCEPT_MAPS="$tree/$OLD_ONLY" \
       FERROBRIDGE__TERMINOLOGY__BASE_URL="$TERMINOLOGY/r4" \
       exec "$binary" --config "$config" serve > "$dir/server.log" 2>&1
   ) &
@@ -620,7 +665,8 @@ GATE
     "$(printf '%s\n' FERROBRIDGE__USAGE_REPORT__ENABLED=false FERROBRIDGE__SERVER__LISTEN=127.0.0.1:18081 \
       FERROBRIDGE__CDR__BASE_URL=http://127.0.0.1:18091/ferroehr/rest/openehr/v1 \
       "FERROBRIDGE__FACADE__IDENTITY_STORE=$root/$WORK/base/identity.redb" \
-      FERROBRIDGE__EVENTS__EXCHANGE=ferrobridge.perf.base "FERROBRIDGE__TERMINOLOGY__BASE_URL=$TERMINOLOGY/r4")" \
+      FERROBRIDGE__EVENTS__EXCHANGE=ferrobridge.perf.base "FERROBRIDGE__HL7V2__CONCEPT_MAPS=$old/fixtures/old" \
+      "FERROBRIDGE__TERMINOLOGY__BASE_URL=$TERMINOLOGY/r4")" \
     "$(arm_env base "$old")"
   printf '# a note\n\nFERROBRIDGE__CDR__ENDPOINT__URL=@CDR@/v1\nFERROBRIDGE__X__LISTEN=127.0.0.1:@MLLP_PORT@\nFERROBRIDGE__Y__DIR=@DIR@/a @TLS@ @FACADE@ @FACADE_PORT@ @ARM@ @TERMINOLOGY@\n' \
     > "$layout/$ARM_ENV"
@@ -644,6 +690,9 @@ GATE
   local repo="$work/repo" saved_root="$root"
   git init --quiet "$repo"
   commit() { git -C "$repo" -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false commit --quiet --allow-empty -m "$1"; }
+  mkdir -p "$repo/perf"
+  printf 'FERROBRIDGE__A=1\n' > "$repo/$ARM_ENV"
+  git -C "$repo" add "$ARM_ENV"
   commit one
   commit two
   git -C "$repo" -c tag.gpgsign=false tag v0.0.1
@@ -655,13 +704,38 @@ GATE
   git -C "$repo" checkout --quiet -
   root="$repo"
   check "with no BASE the base is the newest tag before HEAD" \
-    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev "")"
+    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev "" 2> /dev/null)"
   check "a BASE names its merge base with HEAD" \
-    "$(git -C "$repo" rev-parse HEAD~1)" "$(base_rev side)"
+    "$(git -C "$repo" rev-parse HEAD~1)" "$(base_rev side 2> /dev/null)"
   check "an all-zero BASE takes the previous release" \
-    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev 0000000000000000000000000000000000000000)"
+    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev 0000000000000000000000000000000000000000 2> /dev/null)"
   check "with no tag before it the base is the first parent" \
-    "$(git -C "$repo" rev-parse v0.0.1~1)" "$(base_rev "" v0.0.1)"
+    "$(git -C "$repo" rev-parse v0.0.1~1)" "$(base_rev "" v0.0.1 2> /dev/null)"
+  local release="$work/release"
+  git init --quiet "$release"
+  rcommit() { git -C "$release" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit --quiet --allow-empty -m "$1"; }
+  rcommit before-gate
+  git -C "$release" -c tag.gpgsign=false tag v0.1.0
+  rcommit still-before
+  root="$release"
+  check "a release with no contract after it either leaves no base" 1 "$( (base_rev "") > /dev/null 2>&1; echo $?)"
+  mkdir -p "$release/scripts/perf"
+  printf 'start() {\n  FERROBRIDGE__A=1 bridge\n}\n' > "$release/$GATE"
+  git -C "$release" add "$GATE"
+  rcommit one-arm-gate
+  printf 'serve() {\n  FERROBRIDGE__A=1 \\\n    exec bridge\n}\n' > "$release/$GATE"
+  git -C "$release" add "$GATE"
+  rcommit gate
+  rcommit after-gate
+  rcommit release-commit
+  check "a previous release without the gate contract gives way to the oldest commit after it with one" \
+    "$(git -C "$release" rev-parse HEAD~2)" "$(base_rev "" 2> /dev/null)"
+  check "the base says why it is not the previous release" \
+    "the oldest commit after v0.1.0 that carries the gate contract, since v0.1.0 carries neither $ARM_ENV nor a $GATE whose serve() sets the arm's overrides" \
+    "$(base_rev "" 2>&1 > /dev/null)"
+  check "a previous release with the contract is the base, and says so" "the previous release v0.0.1" \
+    "$(root="$repo" base_rev "" 2>&1 > /dev/null)"
+  root="$repo"
   printf 'a\n' > "$repo/kept"
   printf 'b\n' > "$repo/changed"
   printf 'c\n' > "$repo/gone"
