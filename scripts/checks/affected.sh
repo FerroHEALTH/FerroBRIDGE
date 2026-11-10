@@ -193,6 +193,12 @@ classify() {
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     # Read by the CI `duplication` job alone, which runs on every change.
     scripts/checks/duplication.sh | scripts/checks/duplication.count | scripts/checks/duplication-baseline.txt) echo inert ;;
+    # Read by the CI `forwarders` job alone, which runs on every change and
+    # builds tools/forwarders itself.
+    scripts/checks/forwarders.sh | scripts/checks/forwarders.count | scripts/checks/forwarders-baseline.txt) echo inert ;;
+    # Read by the CI `conflict-markers` and `fhir-manifests` jobs alone, which
+    # run on every change.
+    scripts/checks/conflict-markers.sh | scripts/checks/fhir-manifests.sh) echo inert ;;
     scripts/checks/pin-freshness.sh | scripts/checks/versions.sh) echo inert ;;
     scripts/checks/changelog-released.sh | scripts/checks/changelog-structure.sh) echo inert ;;
     scripts/checks/changelog-security.sh | scripts/lib/guard-args.sh) echo inert ;;
@@ -732,6 +738,15 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     echo "self-test: an ignored file was read: '$read_lines'" >&2
     failures=$((failures + 1))
   fi
+  # Every guard under scripts/checks/ has a rule of its own: one whose CI job
+  # runs on every change is inert, so no guard falls through to `global`.
+  local guard
+  while IFS= read -r guard; do
+    if [[ "$(classify "$guard")" = global ]]; then
+      echo "self-test: $guard has no rule, so a change to it alone runs every lane" >&2
+      failures=$((failures + 1))
+    fi
+  done < <(git ls-files scripts/checks)
   if [[ "$failures" -ne 0 ]]; then
     die "self-test: $failures check(s) failed"
   fi
