@@ -14,11 +14,13 @@
 mod clusters;
 mod compositions;
 mod ips;
+mod ips_entries;
 mod medication;
 
 use core::error::Error;
 use std::sync::Arc;
 
+use ferrobridge_testkit::fixtures::CKM_DISCHARGE_ARCHETYPES;
 use ferrobridge_testkit::fixtures::CKM_HIGHMED_ARCHETYPES;
 use ferrobridge_testkit::fixtures::CKM_LIBRARY_ARCHETYPES;
 use ferrobridge_testkit::fixtures::CKM_MEDICATION_ARCHETYPES;
@@ -106,6 +108,7 @@ fn repository() -> Result<ArchetypeRepository, Box<dyn Error>> {
     for (file, source) in CKM_LIBRARY_ARCHETYPES
         .iter()
         .chain(&CKM_HIGHMED_ARCHETYPES)
+        .chain(&CKM_DISCHARGE_ARCHETYPES)
         .chain(&CKM_MEDICATION_ARCHETYPES)
     {
         let archetype = openehr_adl::assemble::parse_artefact(source, Dialect::Adl14)
@@ -202,6 +205,7 @@ pub(crate) fn library_chains() -> Result<Vec<crate::support::Chain>, Box<dyn Err
     chains.extend(clusters::chains()?);
     chains.extend(compositions::chains()?);
     chains.push(ips::chain()?);
+    chains.push(ips_entries::chain()?);
     Ok(chains)
 }
 

@@ -152,6 +152,7 @@ pub struct OpenehrTarget {
     lists: Vec<ListAxis>,
     leaf_class: Option<String>,
     on_element: bool,
+    value_class: Option<String>,
 }
 
 /// One `List` attribute a tail steps through: an occurrence axis inside the
@@ -209,6 +210,7 @@ impl OpenehrTarget {
             lists: Vec::new(),
             leaf_class: None,
             on_element: false,
+            value_class: None,
         };
         target.lists = target.list_axes();
         target
@@ -287,6 +289,27 @@ impl OpenehrTarget {
         } else {
             self.node.rm_type()
         }
+    }
+
+    /// Returns this target with `class` as the class of the value it writes
+    /// at its node, where that differs from the node's own class.
+    ///
+    /// A `DV_CODED_TEXT` node whose value set is open may hold a `DV_TEXT`
+    /// (Simplified Formats, §Open Value-Sets and the `|other` Suffix), which
+    /// is what a `manual` entry writing no `defining_code` there creates.
+    #[must_use]
+    pub fn with_value_class(mut self, class: impl Into<String>) -> Self {
+        self.value_class = Some(class.into());
+        self
+    }
+
+    /// Returns the class of the value this target writes at its node: the
+    /// class [`Self::with_value_class`] set, the node's class otherwise.
+    #[must_use]
+    pub fn value_class(&self) -> &str {
+        self.value_class
+            .as_deref()
+            .unwrap_or_else(|| self.node.rm_type())
     }
 
     /// Returns this target with `class` as the reference-model class of the

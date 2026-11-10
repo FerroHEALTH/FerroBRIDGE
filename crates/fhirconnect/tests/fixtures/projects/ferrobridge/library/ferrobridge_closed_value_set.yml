@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE extension that writes free text at the clinical evidence
+# result, which the library IPS entries template constrains to a
+# DV_CODED_TEXT alone, for the refusal of a DV_TEXT the node's value set does
+# not hold (#1861).
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_closed_value_set
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: CLUSTER.clinical_evidence.v1
+mappings:
+  - name: freeTextResult
+    extension: add
+    with:
+      fhir: $resource
+      openehr: $archetype/items[at0005]
+      type: NONE
+    manual:
+      - name: observed
+        openehr:
+          - path: value
+            value: Observed
+        fhir:
+          - path: note.text
+            value: Observed

@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's adverse reaction risk model with
+# the IPS adverse reaction extension (#1546). The published
+# IPS_allergy.context.yml is a sub-context entered only from IPS.context.yml
+# and lists IPS_allergy_section, which writes a path under `$reference`
+# (#1436), so this root starts at the evaluation itself.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_allergy.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/uv/ips/StructureDefinition/AllergyIntolerance-uv-ips"
+    version: "2.0.0"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_ips_entries.v1.0.0"
+  archetypes:
+    - "EVALUATION.adverse_reaction_risk.v2"
+    - "CLUSTER.adverse_reaction_event.v1"
+  extensions:
+    - "IPS_adverse_reaction"
+  start: "EVALUATION.adverse_reaction_risk.v2"

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its model ferrobridge_problem_evidence with the
+# ferrobridge_closed_value_set extension (#1861).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_closed_value_set.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Condition"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_ips_entries.v1.0.0"
+  archetypes:
+    - "ferrobridge_problem_evidence"
+    - "CLUSTER.clinical_evidence.v1"
+  extensions:
+    - "ferrobridge_closed_value_set"
+  start: "ferrobridge_problem_evidence"

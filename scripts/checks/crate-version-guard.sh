@@ -189,6 +189,9 @@ self_test() {
   printf 'demo = "0.2"\ndemo = "0.1"\n' > "$tmp/repo/crates/demo/README.md"
   t_git commit -qam 'a stale requirement'
   expect 1 "a README naming a requirement on an older line" stepped HEAD
+  printf 'demo = "0.2"\ndemo = { version = "0.1", default-features = false }\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'a stale inline-table requirement'
+  expect 1 "a README naming an inline-table requirement on an older line" stepped HEAD
   printf 'demo = "0.2"\nName a patch ("0.2.N").\n' > "$tmp/repo/crates/demo/README.md"
   t_git commit -qam 'the README on one line'
   expect 0 "a README naming one line throughout" stepped HEAD
@@ -308,8 +311,8 @@ for manifest in crates/*/Cargo.toml; do
     [[ -z "$stale" ]] && continue
     echo "::error::$readme:${stale%%:*} names ${stale#*:}, off the line $line of $name $version (.claude/rules/crates-publishing.md)." >&2
     unstated=1
-  done < <(grep -noE -- "($name = \"[0-9][0-9.]*\"|\"[0-9]+\.[0-9]+\.N\")" "$readme" 2>/dev/null \
-    | grep -vE -- ":($name = \"${line//./\\.}\"|\"${line//./\\.}\.N\")$" || true)
+  done < <(grep -noE -- "($name = (\{ version = )?\"[0-9][0-9.]*\"|\"[0-9]+\.[0-9]+\.N\")" "$readme" 2>/dev/null \
+    | grep -vE -- ":($name = (\{ version = )?\"${line//./\\.}\"|\"${line//./\\.}\.N\")$" || true)
 done
 [[ "$unstated" -eq 0 ]] || exit 1
 
