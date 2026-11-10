@@ -175,12 +175,11 @@ ferrohealth-usage-report = { version = "=0.4.0", default-features = false }
 # The family's audit crates (FerroAUDIT): `ehds-logging` builds the EHDS access
 # record of Regulation (EU) 2025/327 Annex II 3.2 and its BALP `AuditEvent`
 # (`balp`), and `ihe-atna` spools it and sends it over the ITI-20 ATX: FHIR
-# Feed (`balp`) with a client credentials bearer (`smart`, on the 0.16 line of
-# ferrohealth-smart, which the lock carries beside 0.17 until ihe-atna moves;
-# no smart type passes between it and the server). Pinned exactly, as a
-# product pins every shared crate; only the server links them.
-ehds-logging = { version = "=0.10.0", default-features = false }
-ihe-atna = { version = "=0.10.0", default-features = false }
+# Feed (`balp`) with a client credentials bearer (`smart`, on the 0.17 line of
+# ferrohealth-smart). Pinned exactly, as a product pins every shared crate;
+# only the server links them.
+ehds-logging = { version = "=0.11.0", default-features = false }
+ihe-atna = { version = "=0.11.0", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
