@@ -1,1 +1,0 @@
-- A FHIR identifier search through the demographic extension counts two parties whose `HIER_OBJECT_ID`s share a root and differ in their `extension` as two parties. The facade reads each party uid through `openehr-base`, naming a version by its `object_id` verbatim and any other uid whole, where it kept only the text before the first `::`.

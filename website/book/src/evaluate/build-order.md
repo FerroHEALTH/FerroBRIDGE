@@ -37,15 +37,16 @@ has every change of every release.
 | [v0.0.20](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.20) | 2026-11-05 | Toward the FHIRconnect mapping library: a composition model starts a context compiled against an ADL 2 operational template through the lineage of its root, a `slotArchetype` may name a model already on its slot chain, and the `eehrxf` laboratory project lists its composition context beside the laboratory result. |
 | [v0.0.21](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.21) | 2026-11-05 | Correctness on the way to the FHIRconnect mapping library: a template over a specialised ADL 1.4 composition archetype carries one `context`, and the compiler refuses at load a mapping whose types no data-type page pairs and a `reference` into an untyped choice, which failed only on their first run before. |
 | [v0.0.22](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.22) | 2026-11-06 | Callers by kind: the bridge on `ferrohealth-smart` 0.9.0, every trusted issuer an `[[auth.issuer]]` table with its `kind` and profile, Basic credentials for people only, each facade request reaching the CDR under a token exchanged for its caller, and `ferrobridge-term` released on the new token types. The `eehrxf` discharge and imaging reports mapped between openEHR and HL7 Europe and received, documents held to their profiles' section rules, and a validator that holds a dependency of another FHIR release. |
+| [v0.0.23](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.23) | 2026-11-10 | The request under its person and the family endpoint: onward issuers by kind, the committer derived from the exchanged token and a machine caller named as the originating system, party writes under a binding key refused, and every outbound lane (`[cdr]`, `[terminology]`, `[audit]`, `[fhir_outbound]`) one `endpoint` table with its TLS on the FerroHEALTH family crates, with OpenTelemetry export. The HL7 v2 face over MLLP with TLS and client certificates, its compositions naming facility, clinician and `FEEDER_AUDIT`, the v2-to-FHIR maps generated into `ferrobridge-hl7v2` with a message writer and the inverse of a `Patient` as a PID, `ferrobridge-term` on FHIR R5 and R6 with per-release features, and the `fhir-search` crate. |
 
 ## Next
 
-The milestones after v0.0.22, each one theme:
+The milestones after v0.0.23, each one theme:
 
-1. **v0.0.23, the mapping library and the exchange format.** Every mapping
-   of the published FHIRconnect library passing, the HL7 v2 face over MLLP
-   with TLS, and the patient summary re-checked against the adopted
-   Art 15(1) act.
+1. **v0.0.24, the mapping library and the exchange format.** Every mapping
+   of the published FHIRconnect library passing, two HL7 v2 senders tested
+   against a FerroEHR node that checks facilities, and the patient summary
+   re-checked against the adopted Art 15(1) act.
 
 ## How correctness is measured
 
