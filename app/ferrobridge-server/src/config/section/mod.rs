@@ -80,6 +80,10 @@ pub struct Hl7v2 {
     /// Whether an `AE` or an `AR` also logs, at debug level, the counted
     /// outcomes of the run by kind.
     pub log_outcomes: bool,
+    /// The `DV_IDENTIFIER.issuer` of a facility's namespace id (HD.1), the
+    /// issuer the CDR client's `facilities` name it under; empty, the
+    /// identifier names no issuer.
+    pub facility_identifier_issuer: String,
     /// The sending facilities (MSH-4) the face accepts, at least one.
     pub senders: Vec<Hl7v2Sender>,
     /// The TLS the MLLP listener serves, with the client certificates it
@@ -116,6 +120,7 @@ impl Default for Hl7v2 {
             frame_timeout: Duration::from_secs(30),
             frame_limit: ByteSize::from_mib(1),
             log_outcomes: false,
+            facility_identifier_issuer: String::new(),
             senders: Vec::new(),
             tls: Hl7v2Tls::default(),
         }

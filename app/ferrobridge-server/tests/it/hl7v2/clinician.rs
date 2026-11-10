@@ -186,3 +186,102 @@ async fn a_device_sender_s_result_commits_as_a_device_act() -> Result<(), Box<dy
     }
     running.stop().await
 }
+
+#[tokio::test]
+async fn the_composer_carries_its_id_issued_by_the_assigning_authority()
+-> Result<(), Box<dyn Error>> {
+    // RM Common IM, `DV_IDENTIFIER.issuer`: "Authority which issues the kind of
+    // id used in the id field"; XCN.9 is the assigning authority of XCN.1.
+    let running = Running::start(true, Duration::ZERO).await?;
+    running.send(&oru_r01(CONTROL_ID)).await?;
+    let compositions = compositions(&running).await?;
+    assert!(!compositions.is_empty(), "one composition");
+    for composition in &compositions {
+        assert_eq!(
+            serde_json::json!([{
+                "_type": "DV_IDENTIFIER", "issuer": "NORTHLAB", "id": "DR-1", "type": "XCN"
+            }]),
+            composition["composer"]["identifiers"],
+            "{composition}"
+        );
+    }
+    running.stop().await
+}
+
+#[tokio::test]
+async fn the_composer_s_identifier_is_typed_by_the_identifier_type_code()
+-> Result<(), Box<dyn Error>> {
+    let running = Running::start(true, Duration::ZERO).await?;
+    running
+        .send(&edited("MSG-CLIN-XCN13", |text| {
+            text.replace(ORDERING, &format!("{ORDERING}^^^^NPI"))
+        })?)
+        .await?;
+    for composition in compositions(&running).await? {
+        assert_eq!(
+            Some("NPI"),
+            composition
+                .pointer("/composer/identifiers/0/type")
+                .and_then(serde_json::Value::as_str),
+            "XCN.13 types the identifier: {composition}"
+        );
+    }
+    running.stop().await
+}
+
+#[tokio::test]
+async fn a_composer_without_an_assigning_authority_carries_no_identifier()
+-> Result<(), Box<dyn Error>> {
+    let running = Running::start(true, Duration::ZERO).await?;
+    running
+        .send(&edited("MSG-CLIN-NOAUTH", |text| {
+            text.replace(ORDERING, "|||||||||DR-1^Doctor^Dana")
+        })?)
+        .await?;
+    for composition in compositions(&running).await? {
+        let composer = &composition["composer"];
+        assert!(
+            composer.get("identifiers").is_none(),
+            "no issuer is invented: {composer}"
+        );
+        assert_eq!(
+            Some("DR-1"),
+            composer
+                .pointer("/external_ref/id/value")
+                .and_then(serde_json::Value::as_str),
+            "{composer}"
+        );
+    }
+    running.stop().await
+}
+
+#[tokio::test]
+async fn a_device_composer_carries_its_id_issued_in_the_device_namespace()
+-> Result<(), Box<dyn Error>> {
+    let mut lane = face_settings(true);
+    lane.devices = vec![Device {
+        sender: Sender::Namespace(String::from("NORTHLAB")),
+        identifier_issuer: String::from("urn:example:devices"),
+    }];
+    let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
+    let running = Running::start_with(lane, lookup).await?;
+    running
+        .send(&edited("MSG-CLIN-DEVICE-ID", |text| {
+            text.replace(ORDERING, "").replace(
+                "|||20260925130000+0200",
+                "|||20260925130000+0200||||ANALYSER-9",
+            )
+        })?)
+        .await?;
+    for composition in compositions(&running).await? {
+        assert_eq!(
+            serde_json::json!([{
+                "_type": "DV_IDENTIFIER", "issuer": "urn:example:devices",
+                "id": "ANALYSER-9", "type": "device"
+            }]),
+            composition["composer"]["identifiers"],
+            "{composition}"
+        );
+    }
+    running.stop().await
+}

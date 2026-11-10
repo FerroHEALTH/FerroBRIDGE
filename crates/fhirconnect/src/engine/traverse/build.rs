@@ -71,21 +71,34 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
     ) -> Result<Vec<String>, EngineError> {
         let mut filled = Vec::new();
         self.release_void_composer()?;
-        if self.unwritten(COMPOSER)?.is_some()
-            && let Some(id) = defaults.composer_id.as_ref()
-        {
-            for (field, value) in [
-                ("composer_id", &id.id),
-                ("id_namespace", &id.namespace),
-                ("id_scheme", &id.scheme),
-            ] {
-                self.context_keys.push(NodeValue::context(
-                    field,
-                    serde_json::Value::String(value.clone()),
-                ));
+        let identified = self
+            .unwritten(COMPOSER)?
+            .filter(|_| !defaults.composer_identifiers.is_empty());
+        if let Some(node) = identified {
+            self.families.push(family::composer(
+                node,
+                &defaults.composer,
+                defaults.composer_id.as_ref(),
+                &defaults.composer_identifiers,
+            ));
+            self.defaulted(&mut filled, COMPOSER);
+        } else {
+            if self.unwritten(COMPOSER)?.is_some()
+                && let Some(id) = defaults.composer_id.as_ref()
+            {
+                for (field, value) in [
+                    ("composer_id", &id.id),
+                    ("id_namespace", &id.namespace),
+                    ("id_scheme", &id.scheme),
+                ] {
+                    self.context_keys.push(NodeValue::context(
+                        field,
+                        serde_json::Value::String(value.clone()),
+                    ));
+                }
             }
+            self.default_context(&mut filled, COMPOSER, "composer_name", &defaults.composer)?;
         }
-        self.default_context(&mut filled, COMPOSER, "composer_name", &defaults.composer)?;
         self.default_context(
             &mut filled,
             "/context/start_time",

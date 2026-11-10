@@ -41,10 +41,12 @@ use openehr_sdt::flat::path::Segment;
 
 use crate::engine::demographics::PartyIdentity;
 use crate::engine::lens::null_flavour::NullFlavour;
+use crate::engine::origin::ItemId;
 use crate::engine::origin::Origin;
 use crate::engine::origin::Party;
 use crate::engine::origin::UNKNOWN_SOURCE;
 use crate::engine::rm::RAW;
+use crate::engine::traverse::defaults::ComposerId;
 
 /// The `feeder_system_item_ids` type every defaulted field is recorded under.
 ///
@@ -170,8 +172,16 @@ pub fn feeder_audit(
 /// Returns the `PARTY_IDENTIFIED` of `party`: its name and its identifiers.
 #[must_use]
 pub fn party_identified(party: &Party) -> PartyIdentified {
-    let identifiers: Vec<DvIdentifier> = party
-        .identifiers
+    PartyIdentified::PartyIdentified(PartyIdentifiedData {
+        external_ref: None,
+        name: party.name.clone(),
+        identifiers: dv_identifiers(&party.identifiers),
+    })
+}
+
+/// Returns `items` as the `DV_IDENTIFIER`s of a `PARTY_IDENTIFIED`.
+fn dv_identifiers(items: &[ItemId]) -> Option<openehr_base::containers::NonEmptyVec<DvIdentifier>> {
+    let identifiers: Vec<DvIdentifier> = items
         .iter()
         .map(|item| DvIdentifier {
             issuer: item.issuer.clone(),
@@ -180,13 +190,38 @@ pub fn party_identified(party: &Party) -> PartyIdentified {
             r#type: Some(item.kind.clone()),
         })
         .collect();
-    PartyIdentified::PartyIdentified(PartyIdentifiedData {
-        external_ref: None,
-        name: party.name.clone(),
-        // NOTE: RM Common IM, `PARTY_IDENTIFIED.identifiers` is optional; a party with none
-        // legitimately has no list, which is the only failure of the constructor.
-        identifiers: openehr_base::containers::NonEmptyVec::new(identifiers).ok(),
-    })
+    // NOTE: RM Common IM, `PARTY_IDENTIFIED.identifiers` is optional; a party with none
+    // legitimately has no list, which is the only failure of the constructor.
+    openehr_base::containers::NonEmptyVec::new(identifiers).ok()
+}
+
+/// Returns the default composer at the `composer` node, whole: its name, the
+/// `external_ref` `id` names and its `identifiers` (RM EHR IM,
+/// `COMPOSITION.composer`; RM Common IM, `PARTY_IDENTIFIED`).
+///
+/// The reference is the one the Simplified Formats builder writes from
+/// `ctx/composer_id`, `ctx/id_namespace` and `ctx/id_scheme`, typed `PERSON`
+/// (master06 §Composer).
+#[must_use]
+pub fn composer(
+    node: &ResolvedNode,
+    name: &str,
+    id: Option<&ComposerId>,
+    identifiers: &[ItemId],
+) -> NodeValue {
+    let party = PartyIdentified::PartyIdentified(PartyIdentifiedData {
+        external_ref: id.map(|id| PartyRef {
+            namespace: id.namespace.clone(),
+            r#type: String::from("PERSON"),
+            id: ObjectId::GenericId(GenericId {
+                value: id.id.clone(),
+                scheme: id.scheme.clone(),
+            }),
+        }),
+        name: Some(String::from(name)),
+        identifiers: dv_identifiers(identifiers),
+    });
+    NodeValue::new(node, to_canonical_value(&party)).with_datum(RAW)
 }
 
 /// Returns the `_health_care_facility` family of the `context` node naming

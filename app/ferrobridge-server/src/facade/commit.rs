@@ -96,6 +96,17 @@ pub enum Committer {
     /// The bridge, named by its system id: a write no authenticated caller
     /// made, such as an HL7 v2 message or a request on an open surface.
     Bridge,
+    /// The bridge as the client of its own client credentials grant, named by
+    /// its client id: a write no authenticated caller made, which reaches the
+    /// CDR under the bridge's token.
+    ///
+    /// ITS-REST 1.1.0 §openehr-version and openehr-audit-details provisions the
+    /// committer "based on authentication and authorization runtime data", and
+    /// the authenticated party is that client.
+    Client {
+        /// The client id the grant authenticates as.
+        client_id: String,
+    },
     /// The caller the request authenticated.
     Caller {
         /// The token's `sub`, or the Basic user-id.
@@ -131,7 +142,7 @@ impl Committer {
             };
         }
         let Some(caller) = access.caller() else {
-            return Self::Bridge;
+            return Self::unattended(client);
         };
         let namespace = match (caller.via(), caller.issuer()) {
             (Via::Bearer, Some(issuer)) => issuer,
@@ -141,6 +152,18 @@ impl Committer {
             subject: caller.subject().to_owned(),
             namespace: namespace.to_owned(),
         }
+    }
+
+    /// Returns the committer of a write no authenticated caller made through
+    /// `client`: its own client credentials client when it authenticates with
+    /// one, the bridge otherwise.
+    #[must_use]
+    pub fn unattended(client: &crate::cdr::CdrClient) -> Self {
+        client
+            .client_id()
+            .map_or(Self::Bridge, |client_id| Self::Client {
+                client_id: client_id.to_owned(),
+            })
     }
 
     /// Returns the `PARTY_PROXY` this committer is written as.
@@ -168,6 +191,7 @@ impl Committer {
                 ));
             }
             Self::Bridge => (system_id, None),
+            Self::Client { client_id } => (client_id.as_str(), None),
             Self::Caller { subject, namespace } => (
                 subject.as_str(),
                 legal_namespace(namespace).then(|| PartyRef {
@@ -296,7 +320,7 @@ pub fn audit(change: Change, system_id: &str, committer: &Committer) -> UpdateAu
 fn header_audit(change: Change, system_id: &str, committer: &Committer) -> Option<UpdateAuditData> {
     match committer {
         Committer::Placeholder { .. } => None,
-        Committer::Bridge | Committer::Caller { .. } => {
+        Committer::Bridge | Committer::Client { .. } | Committer::Caller { .. } => {
             Some(audit_data(change, system_id, committer))
         }
     }
@@ -461,6 +485,53 @@ mod tests {
         };
         assert_eq!(Some("FerroBRIDGE"), party.name.as_deref());
         assert_eq!(None, party.external_ref);
+    }
+
+    #[test]
+    fn a_write_under_the_bridges_own_grant_names_its_client() {
+        let client = Committer::Client {
+            client_id: String::from("ferrobridge"),
+        };
+        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &client) else {
+            panic!("the facade writes an UPDATE_AUDIT");
+        };
+        assert_eq!(
+            Some("FerroBRIDGE"),
+            data.system_id.as_deref(),
+            "the bridge commits"
+        );
+        let PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) = data.committer
+        else {
+            panic!("the client is a PARTY_IDENTIFIED");
+        };
+        assert_eq!(Some("ferrobridge"), party.name.as_deref());
+        assert_eq!(None, party.external_ref, "the client states nothing more");
+        assert_eq!(None, party.identifiers);
+    }
+
+    #[test]
+    fn an_unattended_write_names_the_client_of_an_oauth_cdr_client_only() {
+        let base: url::Url = "http://cdr.example.org/v1".parse().expect("a base URL");
+        let open = crate::cdr::CdrClient::new(&crate::cdr::config::CdrConfig::new(base.clone()))
+            .expect("an open client");
+        assert_eq!(Committer::Bridge, Committer::unattended(&open));
+        let granted =
+            crate::cdr::CdrClient::new(&crate::cdr::config::CdrConfig::new(base).with_oauth(
+                ferrohealth_smart::client::ClientCredentials::new(
+                    ferrohealth_smart::client::Endpoint::Token(
+                        "http://as.example.org/token".parse().expect("a token URL"),
+                    ),
+                    String::from("ferrobridge"),
+                    secrecy::SecretString::from("synthetic-secret"),
+                ),
+            ))
+            .expect("a client credentials client");
+        assert_eq!(
+            Committer::Client {
+                client_id: String::from("ferrobridge"),
+            },
+            Committer::unattended(&granted)
+        );
     }
 
     fn placeholder() -> Committer {

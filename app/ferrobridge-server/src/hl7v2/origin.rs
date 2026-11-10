@@ -22,6 +22,7 @@ use fhirconnect::engine::origin::Party;
 use fhirconnect::engine::traverse::defaults::ComposerId;
 
 use crate::config::hl7v2::Sender;
+use crate::facade::engine::Composer;
 
 /// The HL7 table 0203 code of a placer identifier.
 const PLACER: &str = "PLAC";
@@ -147,8 +148,14 @@ impl Facility {
 /// under whose care the event took place", "the most specific workgroup or
 /// delivery unit", so the most specific field the message holds wins; the
 /// order is our own design.
+///
+/// A namespace id (HD.1) is "a locally defined coded value" (HL7 v2.5.1
+/// chapter 2A, `HD`), so its identifier is issued by `namespace_issuer`, the
+/// deployment's; a universal id (HD.2) by its universal id type (HD.3); an
+/// organisation identifier (XON.10) by its assigning authority (XON.6), or
+/// by `namespace_issuer` when it names none.
 #[must_use]
-pub fn facility(message: &Message) -> Option<Facility> {
+pub fn facility(message: &Message, namespace_issuer: Option<&str>) -> Option<Facility> {
     let first = |id: &str, position: usize| {
         message
             .segments()
@@ -159,7 +166,13 @@ pub fn facility(message: &Message) -> Option<Facility> {
     };
     if let Some(found) = first("PV1", 3)
         .and_then(|location| location.component(4))
-        .and_then(|hd| hierarchic(|position| hd.subcomponent(position), ("PV1", 3)))
+        .and_then(|hd| {
+            hierarchic(
+                |position| hd.subcomponent(position),
+                ("PV1", 3),
+                namespace_issuer,
+            )
+        })
     {
         return Some(found);
     }
@@ -171,11 +184,14 @@ pub fn facility(message: &Message) -> Option<Facility> {
                     .flatten()
             },
             ("PV1", 39),
+            namespace_issuer,
         )
     }) {
         return Some(found);
     }
-    if let Some(found) = first("ORC", 21).and_then(organisation_facility) {
+    if let Some(found) =
+        first("ORC", 21).and_then(|xon| organisation_facility(xon, namespace_issuer))
+    {
         return Some(found);
     }
     let sending = message.header()?.field(4)?.repetitions().first()?;
@@ -186,6 +202,7 @@ pub fn facility(message: &Message) -> Option<Facility> {
                 .and_then(|component| component.subcomponent(1))
         },
         ("MSH", 4),
+        namespace_issuer,
     )
 }
 
@@ -198,12 +215,15 @@ pub fn performing_organisation(message: &Message) -> Option<Party> {
         .iter()
         .filter(|segment| segment.id() == "OBX")
         .filter_map(|segment| segment.field(23)?.repetitions().first())
-        .find_map(|xon| organisation(xon).map(|(party, _)| party))
+        .find_map(|xon| organisation(xon, None).map(|(party, _)| party))
 }
 
 /// Returns the facility an ordering facility (ORC-21, `XON`) names.
-fn organisation_facility(xon: &ferrobridge_hl7v2::parse::Repetition) -> Option<Facility> {
-    let (party, names) = organisation(xon)?;
+fn organisation_facility(
+    xon: &ferrobridge_hl7v2::parse::Repetition,
+    namespace_issuer: Option<&str>,
+) -> Option<Facility> {
+    let (party, names) = organisation(xon, namespace_issuer)?;
     Some(Facility {
         party,
         names,
@@ -213,8 +233,12 @@ fn organisation_facility(xon: &ferrobridge_hl7v2::parse::Repetition) -> Option<F
 
 /// Returns the party an `XON` names, its name (XON.1) and its identifier
 /// (XON.10, or XON.3 where an older sender puts it), with the facility names
-/// the identifier gives.
-fn organisation(xon: &ferrobridge_hl7v2::parse::Repetition) -> Option<(Party, Vec<Sender>)> {
+/// the identifier gives, issued by its assigning authority (XON.6) or, when it
+/// names none, by `fallback_issuer`.
+fn organisation(
+    xon: &ferrobridge_hl7v2::parse::Repetition,
+    fallback_issuer: Option<&str>,
+) -> Option<(Party, Vec<Sender>)> {
     let part = |position: usize| {
         xon.component(position)
             .and_then(|component| component.subcomponent(1))
@@ -228,7 +252,7 @@ fn organisation(xon: &ferrobridge_hl7v2::parse::Repetition) -> Option<(Party, Ve
         .map(|id| ItemId {
             id: id.to_owned(),
             kind: String::from(NAMESPACE),
-            issuer: None,
+            issuer: part(6).or(fallback_issuer).map(str::to_owned),
         })
         .into_iter()
         .collect();
@@ -240,10 +264,12 @@ fn organisation(xon: &ferrobridge_hl7v2::parse::Repetition) -> Option<(Party, Ve
 }
 
 /// Returns the facility an `HD` names through `part`, its namespace id (HD.1)
-/// and its universal id (HD.2) of the type HD.3.
+/// issued by `namespace_issuer`, and its universal id (HD.2) issued by its type
+/// HD.3.
 fn hierarchic<'a>(
     part: impl Fn(usize) -> Option<&'a str>,
     field: (&'static str, usize),
+    namespace_issuer: Option<&str>,
 ) -> Option<Facility> {
     let namespace = part(1);
     let universal = part(2).zip(part(3));
@@ -256,7 +282,7 @@ fn hierarchic<'a>(
         identifiers.push(ItemId {
             id: namespace.to_owned(),
             kind: String::from(NAMESPACE),
-            issuer: None,
+            issuer: namespace_issuer.map(str::to_owned),
         });
         names.push(Sender::Namespace(namespace.to_owned()));
     }
@@ -264,7 +290,7 @@ fn hierarchic<'a>(
         identifiers.push(ItemId {
             id: id.to_owned(),
             kind: kind.to_owned(),
-            issuer: None,
+            issuer: Some(kind.to_owned()),
         });
         names.push(Sender::Universal {
             id: id.to_owned(),
@@ -294,23 +320,16 @@ const CLINICIANS: [(&str, usize); 4] = [("EVN", 5), ("OBX", 16), ("ORC", 12), ("
 /// `XCN` data type it was read from (our own design).
 const XCN: &str = "XCN";
 
-/// The person a message names as primarily responsible for its content.
-///
-/// It is the composition's composer (RM EHR IM, `COMPOSITION.composer`, "The
-/// person primarily responsible for the content of the Composition").
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Clinician {
-    /// The name the composer carries.
-    pub name: String,
-    /// The identifier the composer carries, when the message names one.
-    pub id: Option<ComposerId>,
-}
-
 /// Returns the clinician `message` names, from the first of EVN-5, OBX-16,
 /// ORC-12 and OBR-16 that names one: XCN.3 and XCN.2 the name, XCN.1 the id,
 /// and the assigning authority (XCN.9) its namespace.
+///
+/// With an assigning authority the id is also the composer's identifier:
+/// XCN.9 is the authority that issued it (`DV_IDENTIFIER.issuer`, "Authority
+/// which issues the kind of id used in the id field") and the identifier type
+/// code (XCN.13) its type, `XCN` when the message names none.
 #[must_use]
-pub fn clinician(message: &Message) -> Option<Clinician> {
+pub fn clinician(message: &Message) -> Option<Composer> {
     CLINICIANS.iter().find_map(|(id, position)| {
         message
             .segments()
@@ -322,7 +341,7 @@ pub fn clinician(message: &Message) -> Option<Clinician> {
 }
 
 /// Returns the clinician an `XCN` names.
-fn person(xcn: &ferrobridge_hl7v2::parse::Repetition) -> Option<Clinician> {
+fn person(xcn: &ferrobridge_hl7v2::parse::Repetition) -> Option<Composer> {
     let part = |component: usize, sub: usize| {
         xcn.component(component)
             .and_then(|component| component.subcomponent(sub))
@@ -338,13 +357,23 @@ fn person(xcn: &ferrobridge_hl7v2::parse::Repetition) -> Option<Clinician> {
     } else {
         name
     };
-    Some(Clinician {
+    let authority = part(9, 1);
+    Some(Composer {
         name,
         id: id.map(|id| ComposerId {
             id: id.to_owned(),
-            namespace: part(9, 1).unwrap_or(NO_AUTHORITY).to_owned(),
+            namespace: authority.unwrap_or(NO_AUTHORITY).to_owned(),
             scheme: String::from(XCN),
         }),
+        identifiers: id
+            .zip(authority)
+            .map(|(id, authority)| ItemId {
+                id: id.to_owned(),
+                kind: part(13, 1).unwrap_or(XCN).to_owned(),
+                issuer: Some(authority.to_owned()),
+            })
+            .into_iter()
+            .collect(),
     })
 }
 
@@ -354,9 +383,11 @@ const NO_AUTHORITY: &str = "unknown";
 
 /// Returns the device a device sender's result is an act of: the equipment
 /// instance (OBX-18, `EI`) of its first result, or the sending application
-/// (MSH-3) when none names one, identified in `issuer`.
+/// (MSH-3) when none names one.
+///
+/// The device is identified in `issuer`, which issues its identifier.
 #[must_use]
-pub fn device(message: &Message, issuer: &str) -> Option<Clinician> {
+pub fn device(message: &Message, issuer: &str) -> Option<Composer> {
     let equipment = message
         .segments()
         .iter()
@@ -368,8 +399,13 @@ pub fn device(message: &Message, issuer: &str) -> Option<Clinician> {
         })
         .map(str::to_owned);
     let id = equipment.or_else(|| sending_system(message))?;
-    Some(Clinician {
+    Some(Composer {
         name: id.clone(),
+        identifiers: vec![ItemId {
+            id: id.clone(),
+            kind: String::from(DEVICE),
+            issuer: Some(issuer.to_owned()),
+        }],
         id: Some(ComposerId {
             id,
             namespace: issuer.to_owned(),
@@ -397,7 +433,7 @@ pub struct Responsible {
     /// The health care facility the message names.
     pub facility: Option<Facility>,
     /// The composer: the clinician the message names, or the device.
-    pub composer: Option<Clinician>,
+    pub composer: Option<Composer>,
     /// The device the message is an act of, when its sender is a device.
     pub device_id: Option<String>,
 }

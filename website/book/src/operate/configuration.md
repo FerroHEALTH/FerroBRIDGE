@@ -1068,6 +1068,7 @@ it answers.
 | `frame_timeout` | `"30s"` | How long one frame may take to arrive whole; `"0s"` waits |
 | `frame_limit` | `"1MiB"` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes by kind at debug level |
+| `facility_identifier_issuer` | none | The issuer a facility's namespace id (HD.1) is written under, the issuer the CDR client's declared facilities name it by |
 | `senders` | none, required | The MSH-4 sending facilities accepted, at least one: `{ namespace_id }` or `{ universal_id, universal_id_type }`, each with its `certificate_subject` and an optional `origin = "device"` with its `device_identifier_issuer` |
 | `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none, required | The PEM chain and key the MLLP listener serves over TLS, and the authorities a sender's client certificate must chain to |
 
