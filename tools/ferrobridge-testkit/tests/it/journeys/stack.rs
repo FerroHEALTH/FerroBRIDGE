@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
-use ferrobridge_server::change_feed::{Domain, Event, Position, ReaderName, Seq};
+use ferrobridge_server::change_feed::{ChangedVersion, Domain, Event, Position, ReaderName, Seq};
 use ferrobridge_server::config::Process;
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
@@ -558,7 +558,9 @@ const EVENTS_READER: &str = "ferrobridge";
 pub(crate) const PARKED_ID: u64 = 1;
 
 /// Parks one synthetic event, clinical seq 17, for the events lane in the
-/// dead-letter store at `store`.
+/// dead-letter store at `store`. It carries one changed composition, so a
+/// replay publishes a message and meets the closed broker, a transient
+/// failure that keeps the replay requested on every pass.
 fn park(store: &Path) -> Result<(), Box<dyn Error>> {
     let event = Event {
         position: Position::Outbox {
@@ -571,7 +573,16 @@ fn park(store: &Path) -> Result<(), Box<dyn Error>> {
         )?),
         ehr_id: None,
         committed_at: None,
-        versions: Vec::new(),
+        versions: vec![ChangedVersion {
+            vo_id: Some(uuid::Uuid::from_u128(
+                0x0d4a_3c52_5b51_4b4b_9e0e_0000_0000_0017,
+            )),
+            kind: String::from("COMPOSITION"),
+            sys_version: Some(1),
+            version_tree_id: Some(String::from("1")),
+            change_type: String::from("249"),
+            template_id: None,
+        }],
         envelope: serde_json::Map::new(),
     };
     let parked = ferrobridge_server::change_feed::dead_letter::DeadLetters::open(store)?.park(

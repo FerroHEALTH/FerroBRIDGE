@@ -1935,6 +1935,7 @@ dependencies = [
  "toml",
  "tracing-subscriber",
  "url",
+ "uuid",
  "wiremock",
 ]
 
