@@ -725,3 +725,148 @@ fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), 
     );
     Ok(())
 }
+
+/// The expressions of the issues the run over the received `text` declares
+/// not carried, in the order the run declares them.
+fn not_carried(text: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let document = ReceivedDocument::read(text)?;
+    let composition = mapping()?.to_openehr(&document, &settings())?;
+    let outcome =
+        serde_json::to_value(composition.outcome().ok_or("the run declared its losses")?)?;
+    Ok(outcome["issue"]
+        .as_array()
+        .ok_or("the outcome's issues")?
+        .iter()
+        .filter(|issue| {
+            issue["details"]["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("no structured element"))
+        })
+        .filter_map(|issue| issue["expression"][0].as_str())
+        .map(str::to_owned)
+        .collect())
+}
+
+/// The path of the section of the received `document` coded `code`.
+fn section_at(document: &Value, code: &str) -> Result<String, Box<dyn Error>> {
+    let index = only(document, "Composition")?["section"]
+        .as_array()
+        .ok_or("the sections")?
+        .iter()
+        .position(|section| section["code"]["coding"][0]["code"] == code)
+        .ok_or_else(|| format!("the section {code}"))?;
+    Ok(format!("Composition.section[{index}]"))
+}
+
+/// The path of the element of the received report's `member` list whose
+/// `field` is `value`.
+fn report_member_at(
+    document: &Value,
+    member: &str,
+    field: &str,
+    value: &str,
+) -> Result<String, Box<dyn Error>> {
+    let index = only(document, "DiagnosticReport")?[member]
+        .as_array()
+        .ok_or_else(|| format!("the report's {member}"))?
+        .iter()
+        .position(|held| held.pointer(field).and_then(Value::as_str) == Some(value))
+        .ok_or_else(|| format!("the report's {member} {value}"))?;
+    Ok(format!("DiagnosticReport.{member}[{index}]"))
+}
+
+// NOTE: CompositionEuImaging requires the order, history and procedure sections, which the
+// template holds no section for, and DiagnosticReportEuImaging the composition link and two categories.
+#[test]
+fn a_received_report_declares_each_section_and_element_it_does_not_carry()
+-> Result<(), Box<dyn Error>> {
+    let text = received_text()?;
+    let document: Value = serde_json::from_str(&text)?;
+    let declared = not_carried(&text)?;
+    assert_eq!(
+        declared,
+        [
+            section_at(&document, "55115-0")?,
+            section_at(&document, "11329-0")?,
+            section_at(&document, "55111-9")?,
+            report_member_at(
+                &document,
+                "extension",
+                "/url",
+                "http://hl7.org/fhir/5.0/StructureDefinition/extension-DiagnosticReport.composition",
+            )?,
+            report_member_at(&document, "category", "/coding/0/code", "85430-7")?,
+            report_member_at(&document, "category", "/coding/0/code", "Medical-Imaging")?,
+            String::from("DiagnosticReport.performer[0]"),
+        ],
+        "each required section with no entry, the report's link, categories and performing \
+         organization, and nothing the template carries"
+    );
+    assert!(
+        !declared.contains(&section_at(&document, "18726-0")?),
+        "the imaging study section lists the carried study"
+    );
+    Ok(())
+}
+
+#[test]
+fn each_report_and_study_element_and_narrative_section_is_declared() -> Result<(), Box<dyn Error>> {
+    let mut document: Value = serde_json::from_str(&received_text()?)?;
+    let entries = document["entry"].as_array_mut().ok_or("the entries")?;
+    for entry in entries.iter_mut() {
+        let resource = &mut entry["resource"];
+        match resource["resourceType"].as_str() {
+            Some("Composition") => resource["section"]
+                .as_array_mut()
+                .ok_or("the sections")?
+                .push(serde_json::json!({
+                    "title": "Findings",
+                    "code": {"coding": [{"system": "http://loinc.org", "code": "59776-5"}]},
+                    "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Synthetic findings.</div>"
+                    }
+                })),
+            Some("DiagnosticReport") => {
+                resource["issued"] = serde_json::json!("2026-03-02T09:00:00+01:00");
+                resource["resultsInterpreter"] =
+                    serde_json::json!([{"reference": "Organization/synthetic-radiology"}]);
+            }
+            Some("ImagingStudy") => {
+                resource["numberOfSeries"] = serde_json::json!(1);
+                resource["note"] = serde_json::json!([{"text": "A synthetic study note."}]);
+            }
+            _ => {}
+        }
+    }
+    let findings = section_at(&document, "59776-5")?;
+    let declared = not_carried(&serde_json::to_string(&document)?)?;
+    for expression in [
+        findings.as_str(),
+        "DiagnosticReport.issued",
+        "DiagnosticReport.resultsInterpreter[0]",
+        "ImagingStudy.numberOfSeries",
+        "ImagingStudy.note[0]",
+    ] {
+        assert!(
+            declared.iter().any(|held| held == expression),
+            "{expression} is declared: {declared:?}"
+        );
+    }
+    for carried in [
+        "DiagnosticReport.status",
+        "DiagnosticReport.code",
+        "DiagnosticReport.conclusion",
+        "ImagingStudy.identifier",
+        "ImagingStudy.status",
+        "ImagingStudy.modality",
+        "ImagingStudy.started",
+        "ImagingStudy.description",
+    ] {
+        assert!(
+            !declared.iter().any(|held| held.starts_with(carried)),
+            "{carried} is carried, not declared: {declared:?}"
+        );
+    }
+    Ok(())
+}
