@@ -6,7 +6,7 @@
 //! The write creates what the element table's cardinality says to create: a
 //! repeating element becomes an array the occurrence index extends by one at a
 //! time, a scalar becomes the object member, a resolved choice becomes the
-//! suffixed member, and a primitive's extension becomes the sibling named with
+//! suffixed member in place of any other alternative, and a primitive's extension becomes the sibling named with
 //! a leading underscore (<https://hl7.org/fhir/R4/json.html>).
 //!
 //! A write is all or nothing. It runs over a copy and replaces the document
@@ -208,10 +208,18 @@ fn object_mut<'draft>(
 }
 
 /// The member of a scalar element, created when it is absent.
+///
+/// A choice alternative takes the place of any other alternative of its
+/// choice the object holds, since the choice holds one at a time
+/// (<https://hl7.org/fhir/R4/formats.html#choice>).
 fn scalar<'draft>(
     object: &'draft mut Object,
     field: &Field,
 ) -> Result<&'draft mut Value, WriteError> {
+    for rival in field.rivals() {
+        object.remove(rival);
+        object.remove(&format!("_{rival}"));
+    }
     let slot = object
         .entry(String::from(field.key()))
         .or_insert(Value::Null);

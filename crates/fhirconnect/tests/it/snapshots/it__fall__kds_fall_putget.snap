@@ -1,0 +1,36 @@
+---
+source: crates/fhirconnect/tests/it/fall.rs
+expression: declared
+---
+{
+  "first_leg": [
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "second_leg": [],
+  "lost": [
+    "class.code = \"IMP\"",
+    "class.system = \"http://terminology.hl7.org/CodeSystem/v3-ActCode\"",
+    "status = \"finished\"",
+    "subject.reference = \"Patient/synthetic-1\""
+  ],
+  "added": [
+    "extension[0].extension[0].valueCoding.display = \"01\"",
+    "extension[0].extension[1].valueCoding.display = \"0\"",
+    "extension[0].extension[2].valueCoding.display = \"1\"",
+    "hospitalization.admitSource.coding[0].display = \"E\"",
+    "hospitalization.dischargeDisposition.extension[0].extension[0].valueCoding.display = \"01\"",
+    "serviceProvider.display = \"FHIRconnect\""
+  ],
+  "changed": []
+}
