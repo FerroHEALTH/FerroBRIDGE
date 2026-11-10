@@ -3,6 +3,7 @@ model/cluster/org.highmed/diagnoseTyp.yml
 model/cluster/org.highmed/entry_category.v0.yml
 model/cluster/org.highmed/identifier_fhir.v0.yml
 model/cluster/org.openehr/death_details.v1.yml
+model/cluster/org.openehr/dosage.v2.BackboneElement.yml
 model/cluster/org.openehr/organisation.v1.yml
 model/cluster/org.openehr/person_birth_data_iso.v0.yml
 model/composition/org.openehr/health_summary.v1.Composition.yml
@@ -11,6 +12,7 @@ model/evaluation/org.openehr/absence.v2.yml
 model/evaluation/org.openehr/exclusion_global.v1.yml
 model/evaluation/org.openehr/gender.v1.yml
 projects/org.highmed/KDS/fall/KDS_fall_problem_diagnose.yml
+projects/org.highmed/KDS/medikationsverabreichung/KDS_medication.yml
 projects/org.highmed/KDS/person/KDS_Composition.yml
 projects/org.highmed/KDS/person/KDS_gender.yml
 projects/org.highmed/KDS/person_pseudo/KDS_pseudo_person_cluster.yml
