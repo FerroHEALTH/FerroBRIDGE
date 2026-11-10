@@ -7,7 +7,8 @@
 //! example that breaks R4 is refused for that defect, and one planted profile
 //! violation is reported. The set is read from the
 //! trees that script fetches into the ignored `docs/specs/fhir-packages/`; a
-//! test returns early when they are absent, and fails under CI.
+//! test fails when they are absent, unless a local run opts out
+//! (`crate::support::profile_set`).
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -17,56 +18,16 @@
 use std::error::Error;
 use std::io::Read;
 use std::path::Path;
-use std::path::PathBuf;
-use std::sync::OnceLock;
 
 use eehrxf::category::Category;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::conform::{Finding, FindingKind};
 use eehrxf::receive::validation::{Validated, ValidationError};
 use ferrobridge_term::client::Client;
-use ferrobridge_validator::release::R4;
 use ferrobridge_validator::set::PackageSet;
 use flate2::read::GzDecoder;
 
-/// The package set of R4 core and every fetched profile package, read once
-/// per test binary: `None` when the trees are absent outside CI, an error
-/// when they are absent under CI or do not load.
-fn profile_set() -> Result<Option<&'static PackageSet>, Box<dyn Error>> {
-    static SET: OnceLock<Result<Option<PackageSet>, String>> = OnceLock::new();
-    SET.get_or_init(|| load().map_err(|error| error.to_string()))
-        .as_ref()
-        .map(Option::as_ref)
-        .map_err(|error| error.clone().into())
-}
-
-/// Reads the package set [`profile_set`] holds.
-fn load() -> Result<Option<PackageSet>, Box<dyn Error>> {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let root = workspace.join("docs/specs/fhir-packages");
-    if !root
-        .join("hl7.fhir.eu.eps#1.0.0-ballot/package/package.json")
-        .is_file()
-    {
-        if std::env::var("CI").is_ok_and(|value| value == "true") {
-            return Err(format!(
-                "the profile packages are absent from {} under CI; run scripts/vendor/profile-packages.sh before the tests",
-                root.display()
-            )
-            .into());
-        }
-        return Ok(None);
-    }
-    let mut paths: Vec<PathBuf> =
-        vec![workspace.join("tools/fhir-codegen/vendor/hl7.fhir.r4.core")];
-    for entry in std::fs::read_dir(&root)? {
-        let path = entry?.path();
-        if path.join("package/package.json").is_file() {
-            paths.push(path);
-        }
-    }
-    Ok(Some(PackageSet::<R4>::load(paths)?))
-}
+use crate::support::profile_set;
 
 /// Returns every document `Bundle` example of the vendored guide `tarball`
 /// under `package/example/`, by member path, with its text.

@@ -596,7 +596,7 @@ fn an_imaging_report_naming_its_custodian_validates_against_bundle_report_eu_ima
     let received = ReceivedDocument::read(&text)?;
     let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     runtime
-        .block_on(received.validate(&set, IMAGING_BUNDLE, None::<&Client>))
+        .block_on(received.validate(set, IMAGING_BUNDLE, None::<&Client>))
         .map_err(|error| format!("{error:?}"))?;
     Ok(())
 }
