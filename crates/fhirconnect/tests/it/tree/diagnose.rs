@@ -220,6 +220,26 @@ fn a_primitive_extension_round_trips_through_the_underscore_sibling() -> Result<
 
 #[test]
 fn a_document_with_two_alternatives_of_one_choice_is_refused() -> Result<(), Box<dyn Error>> {
+    // The writer keeps one alternative of a choice, so a received document
+    // carrying two is built as JSON.
+    let document = Value::from_serde_json(serde_json::json!({
+        "resourceType": "Condition",
+        "onsetDateTime": "2026-01-01",
+        "onsetPeriod": {"start": "2026-01-01"}
+    }));
+    let path: FhirPath = "$resource.onset".parse()?;
+    assert!(matches!(
+        read(&SCHEMAS, &document, &path),
+        Err(ReadError::AmbiguousChoice { ref element, .. }) if element == "Condition.onset[x]"
+    ));
+    Ok(())
+}
+
+/// A choice element holds one alternative at a time
+/// (<https://hl7.org/fhir/R4/formats.html#choice>), so a write of one
+/// alternative takes the place of the other the document holds.
+#[test]
+fn a_write_of_one_alternative_replaces_the_other() -> Result<(), Box<dyn Error>> {
     let mut document = document("Condition");
     set(
         &mut document,
@@ -231,13 +251,36 @@ fn a_document_with_two_alternatives_of_one_choice_is_refused() -> Result<(), Box
         &mut document,
         "$resource.onset.ofType(Period).start",
         &[],
-        Value::String(String::from("2026-01-01")),
+        Value::String(String::from("2026-01-02")),
     )?;
-    let path: FhirPath = "$resource.onset".parse()?;
-    assert!(matches!(
-        read(&SCHEMAS, &document, &path),
-        Err(ReadError::AmbiguousChoice { ref element, .. }) if element == "Condition.onset[x]"
-    ));
+    assert_eq!(
+        document.to_serde_json(&mut Path::root("Condition"))?,
+        serde_json::json!({"resourceType": "Condition", "onsetPeriod": {"start": "2026-01-02"}})
+    );
+    Ok(())
+}
+
+/// A write that names the suffixed member itself replaces the other
+/// alternative too, with the primitive's underscore sibling
+/// (<https://hl7.org/fhir/R4/json.html#primitive>).
+#[test]
+fn a_write_of_a_suffixed_member_replaces_the_other_alternative_and_its_sibling()
+-> Result<(), Box<dyn Error>> {
+    let mut document = Value::from_serde_json(serde_json::json!({
+        "resourceType": "Condition",
+        "onsetString": "spring",
+        "_onsetString": {"id": "synthetic"}
+    }));
+    set(
+        &mut document,
+        "$resource.onsetAge.value",
+        &[],
+        Value::from_serde_json(serde_json::json!(42)),
+    )?;
+    assert_eq!(
+        document.to_serde_json(&mut Path::root("Condition"))?,
+        serde_json::json!({"resourceType": "Condition", "onsetAge": {"value": 42}})
+    );
     Ok(())
 }
 

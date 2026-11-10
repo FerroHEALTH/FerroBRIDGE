@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/fall/KDS_fall_einfach.context.yaml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's; the profile, the
+# template and the start are the published file's. CLUSTER.location.v1,
+# CLUSTER.anatomical_location.v1, CLUSTER.kontakttyp.v0 and
+# CLUSTER.organization.v0 are not listed, since no mapping of the chain
+# slots them, and CLUSTER.organisation.v1, which the serviceProvider
+# reference slots, is. Neither the KDS_anatomical_location extension, which
+# reads `value` on a CodeableConcept at its line 15, nor the KDS_composition
+# extension, which maps the code `status` and an Identifier onto
+# DV_CODED_TEXT nodes at its lines 25 and 31, is listed (#101).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_fall.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: https://www.medizininformatik-initiative.de/fhir/core/modul-fall/StructureDefinition/KontaktGesundheitseinrichtung
+    version: 2025.0.0
+  template:
+    id: KDS_Fall_einfach
+    sem_ver: 8.0.0
+  archetypes:
+    - EVALUATION.problem_diagnosis.v1
+    - ADMIN_ENTRY.episode_institution_local.v0
+    - CLUSTER.diagnosetyp.v0
+    - CLUSTER.organisation.v1
+    - COMPOSITION.fall.v1.encounter
+  extensions:
+    - KDS_episode_institution_local
+    - KDS_fall_problem_diagnose
+  start: ADMIN_ENTRY.episode_institution_local.v0

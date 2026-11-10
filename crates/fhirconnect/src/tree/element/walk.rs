@@ -119,6 +119,11 @@ impl<T: Table + ?Sized> Walk<'_, T> {
                 owner: String::from(schema.path),
                 name: String::from(name),
             })?;
+        let rivals = if let Kind::Choice(_) = kind {
+            Vec::new()
+        } else {
+            rivals(field, &key)
+        };
         let resolved = Field {
             path: String::from(field.path),
             key,
@@ -127,6 +132,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             max: field.max,
             types,
             target_profiles: field.target_profiles,
+            rivals,
         };
         self.owner = String::from(field.path);
         if let Kind::Choice(_) = kind {
@@ -156,6 +162,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             max: field.max,
             types: field.types,
             target_profiles: field.target_profiles,
+            rivals: Vec::new(),
         }));
         Ok(())
     }
@@ -246,6 +253,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
             max: field.max,
             types,
             target_profiles: field.target_profiles,
+            rivals: rivals(schema, &format!("{}{suffix}", field.key)),
         };
         self.location = self.landing(kind)?;
         let last = self.moves.len().saturating_sub(1);
@@ -365,6 +373,7 @@ impl<T: Table + ?Sized> Walk<'_, T> {
                 max: field.max,
                 types: field.types,
                 target_profiles: field.target_profiles,
+                rivals: Vec::new(),
             },
             url: String::from(url),
         });
@@ -483,4 +492,17 @@ fn alternative(types: &'static [&'static str], suffix: &str) -> &'static [&'stat
         .position(|code| code.eq_ignore_ascii_case(suffix))
         .and_then(|at| types.get(at))
         .map_or(types, core::slice::from_ref)
+}
+
+/// The JSON keys of every alternative of the choice element `field` other
+/// than `chosen`, none when `field` is no choice.
+///
+/// A choice element is written under one suffixed key at a time
+/// (<https://hl7.org/fhir/R4/formats.html#choice>).
+fn rivals(field: &'static FieldSchema, chosen: &str) -> Vec<String> {
+    field
+        .choices()
+        .map(|form| format!("{}{}", field.name, form.suffix))
+        .filter(|key| key != chosen)
+        .collect()
 }
