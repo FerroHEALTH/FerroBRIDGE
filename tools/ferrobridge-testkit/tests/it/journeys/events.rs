@@ -81,10 +81,17 @@ async fn a_parked_event_is_replayed_from_the_page() -> Result<(), Box<dyn Error>
             ))
             .await?;
         // The broker is down, so the replay meets a transient failure and
-        // stays requested.
-        browser
-            .element(By::XPath("//*[normalize-space(.) = 'Replay requested']"))
-            .await?;
+        // stays requested; the page is read again until the consumer's pass
+        // that offers it has ended, since the row drawn during it is another.
+        until("the replay stays requested", async || {
+            browser.goto(&stack.url("/events")).await?;
+            Ok(!browser
+                .driver()
+                .find_all(By::XPath("//*[normalize-space(.) = 'Replay requested']"))
+                .await?
+                .is_empty())
+        })
+        .await?;
         Ok(())
     })
     .await?;

@@ -3,7 +3,8 @@
 
 # The plan of the performance gate (ferrohealth-perf, FerroHEALTH/FerroSYS
 # #249), run by scripts/perf/gate.sh in the A/B mode against the base and the
-# head bridge of perf/ferrobridge.toml, each over its own FerroEHR CDR. The
+# head bridge, each under its own tree's perf/ferrobridge.toml and
+# perf/arm.env and over its own FerroEHR CDR. The
 # gate seeds each arm's CDR through its facade and gives each arm the values
 # of the upper-case placeholders between at signs, so the committed plan names
 # no id and the read names the Condition each arm's CDR stored. The creates
