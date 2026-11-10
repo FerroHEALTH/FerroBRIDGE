@@ -454,6 +454,8 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
         },
         frame_limit,
         log_outcomes: hl7v2.log_outcomes,
+        facility_issuer: Some(hl7v2.facility_identifier_issuer.clone())
+            .filter(|issuer| !issuer.is_empty()),
         senders: hl7v2
             .senders
             .iter()

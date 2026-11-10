@@ -402,6 +402,9 @@ pub struct Hl7v2Settings {
     pub frame_limit: usize,
     /// Whether an `AE` or an `AR` also logs the counted outcomes.
     pub log_outcomes: bool,
+    /// The issuer a facility's namespace id is written under, when one is
+    /// configured.
+    pub facility_issuer: Option<String>,
     /// The sending facilities the face accepts; empty accepts any.
     pub senders: Vec<hl7v2::Sender>,
     /// The senders that are devices, whose results commit as device acts.

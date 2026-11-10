@@ -244,6 +244,7 @@ pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
         timeouts: Timeouts::default(),
         frame_limit: 1024 * 1024,
         log_outcomes: true,
+        facility_issuer: None,
         senders: vec![Sender::Namespace(String::from("NORTHLAB"))],
         devices: Vec::new(),
         subjects: vec![Subject {

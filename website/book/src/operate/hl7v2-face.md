@@ -68,6 +68,7 @@ from the file `tls.key_file` names.
 | `frame_timeout` | `"30s"` | How long one message may take from its first byte to its trailer before it is answered `AR`; `"0s"` waits |
 | `frame_limit` | `"1MiB"` | The largest message one frame may carry |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes of the run, by kind, at debug level |
+| `facility_identifier_issuer` | none | The `DV_IDENTIFIER.issuer` a facility's namespace id (HD.1) is written under: the issuer the CDR client's declared facilities name it by. Unset, the identifier names no issuer, and a CDR that checks facilities refuses the commit |
 | `senders` | none, required | The sending facilities (MSH-4) the face accepts, at least one, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3) with `certificate_subject = "..."`, the DNS name its client certificate carries in its subject alternative name; a facility a composition names is one of them too. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
 
 | `tls.certificate_file` | none, required | The PEM certificate chain the listener serves |
@@ -121,15 +122,24 @@ sender cannot send as another. The bridge refuses to start without the
    `EVENT_CONTEXT` names it as `originating_system_audit.location` instead.
    With `[[hl7v2.senders]]` set, a facility no sender names is answered `AE`
    with an `ERR` at its field naming it, and nothing is committed. The
+   Each facility identifier names its issuer: a namespace id (HD.1)
+   `facility_identifier_issuer`, a universal id (HD.2) its type (HD.3), and
+   an organisation identifier (XON.10) its assigning authority (XON.6), or
+   `facility_identifier_issuer` when it names none.
    performing organisation (OBX-23) is `originating_system_audit.provider`,
    never the facility or the composer.
    The composer is the clinician the message names, from the first of EVN-5,
    OBX-16, ORC-12 and OBR-16 (`XCN`: the given and family name, XCN.1 as
-   the identifier in the namespace XCN.9), never the committer. A message
+   the identifier in the namespace XCN.9), never the committer. With an
+   assigning authority (XCN.9) the composer also carries XCN.1 as an
+   identifier issued by it, typed by XCN.13 or `XCN`, so a CDR that checks
+   for the professional finds one. A message
    carrying a result (an `OBX`) that names no clinician is answered `AE`.
    A device sender's result is an act of the device: the composer is the
    equipment instance (OBX-18), or MSH-3 when none, in the sender's
-   `device_identifier_issuer`, and the device is the originating system.
+   `device_identifier_issuer`, and the device is the originating system. The
+   device's identifier is a composer identifier issued by
+   `device_identifier_issuer`.
 6. The acknowledgment is sent once the ingest settled, so `AA` means the CDR
    holds the message's compositions.
 

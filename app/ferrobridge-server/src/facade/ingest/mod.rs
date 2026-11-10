@@ -39,7 +39,6 @@ use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::NoReferences;
 use fhirconnect::engine::seam::ReferenceSource;
-use fhirconnect::engine::traverse::defaults::ComposerId;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
@@ -54,6 +53,7 @@ use crate::cdr::ids::EhrId;
 use crate::facade::Settings;
 use crate::facade::commit;
 use crate::facade::commit::Committer;
+use crate::facade::engine::Composer;
 use crate::facade::identity::FhirResourceId;
 use crate::facade::identity::claims::Claims;
 use crate::facade::identity::record::ConsumedSource;
@@ -451,7 +451,7 @@ pub struct Ingest<'a> {
     /// Who created or handled the item in the originating system.
     provider: Option<Party>,
     /// The composer every composition names, when the face named one.
-    composer: Option<(String, Option<ComposerId>)>,
+    composer: Option<Composer>,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -464,13 +464,14 @@ impl<'a> Ingest<'a> {
     /// `claims` is the one set of in-flight source keys every ingest into
     /// `store` shares, so two deliveries of one source cannot both commit.
     #[must_use]
-    pub const fn new(
+    pub fn new(
         programs: Arc<Programs>,
         store: &'a dyn Store,
         claims: &'a Claims,
         client: CdrClient,
         settings: &'a Settings,
     ) -> Self {
+        let committer = Committer::unattended(&client);
         Self {
             programs,
             store,
@@ -481,7 +482,7 @@ impl<'a> Ingest<'a> {
             references: &NoReferences,
             usage: None,
             demographics: &NoDemographics,
-            committer: Committer::Bridge,
+            committer,
             originating: None,
             originating_items: None,
             feeder_items: Vec::new(),
@@ -524,11 +525,11 @@ impl<'a> Ingest<'a> {
         self
     }
 
-    /// Returns this ingest naming `name`, identified by `id`, as the composer
-    /// of every composition no mapping gave one.
+    /// Returns this ingest naming `composer` as the composer of every
+    /// composition no mapping gave one.
     #[must_use]
-    pub fn with_composer(mut self, name: String, id: Option<ComposerId>) -> Self {
-        self.composer = Some((name, id));
+    pub fn with_composer(mut self, composer: Composer) -> Self {
+        self.composer = Some(composer);
         self
     }
 

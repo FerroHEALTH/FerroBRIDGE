@@ -1,0 +1,1 @@
+- A write no caller made (an HL7 v2 message, a request on an open surface) that reaches the CDR under the bridge's own `[cdr.credentials.oauth]` grant names the grant's client id as `AUDIT_DETAILS.committer` instead of the bridge's system id, so FerroEHR 5.7.0, which writes the committer of a system caller itself, accepts it.
