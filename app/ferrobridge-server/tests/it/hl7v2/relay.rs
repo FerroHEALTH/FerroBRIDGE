@@ -281,10 +281,10 @@ async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
         ),
     )
     .await?;
-    assert_ne!(
-        Some("MSA|AA|MSG-RELAY-E1"),
+    assert_eq!(
+        Some("MSA|AE|MSG-RELAY-E1"),
         msa(&east),
-        "the CDR refuses a facility its relay client does not commit for: {east}"
+        "the CDR refuses a facility its relay client does not commit for, which is about the content: {east}"
     );
     assert!(
         east.contains("422") && east.contains("health_care_facility"),

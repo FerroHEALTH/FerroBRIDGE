@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.3.5"
+version = "0.4.1"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1562,9 +1562,9 @@ dependencies = [
 
 [[package]]
 name = "ehds-logging"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7c78963c07eed0c436179bce0cb92f6152c1580e0648c43814b0333f0f1c3b2"
+checksum = "d982999e4100e5347a38ec44fc45380d125a0e63446373b513fef0994ac67dad"
 dependencies = [
  "async-trait",
  "ihe-atna",
@@ -1769,7 +1769,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1880,7 +1880,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "backon",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -2030,9 +2030,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66ec21f48153af605f7b9c584ecd87975f600e8874009ea2f884d28b42cf5d98"
+checksum = "f08b69675cb43a40de942e10af400dc1309c653d0b7e36de2796a22e630cff8b"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -2055,9 +2055,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a911955711aa1861bd5713298a2e3a8679b16b718b005e9a9c4f54a6e8b55faf"
+checksum = "1c98e84b2d4f212401f565f5ef1101865f36be91022baa69679ea67f065636f9"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -3096,9 +3096,9 @@ dependencies = [
 
 [[package]]
 name = "ihe-atna"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "898c4278e44f1960453b423256a414f4eae7a32b376c0494b3dc2831391bf9c9"
+checksum = "c11c0a5003cedb63952922f4960c308f59b6dcd32826eb8aa6406803de64c3b1"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -7256,14 +7256,15 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "9.1.3"
+version = "9.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1156b39d142a34b999c2310a50455e0cb3760bf7efad0122f796d813bee26ccb"
+checksum = "e408c6cc4699dd017d53dc080cd51c2cea2b5354af57a1479bd265ed42911487"
 dependencies = [
  "crc32fast",
  "flate2",
  "getrandom 0.4.3",
  "indexmap 2.14.2",
+ "libc",
  "memchr",
  "nix",
  "typed-path",
