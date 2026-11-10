@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The facade's caller carried onto the CDR under `[cdr.credentials.onward]`:
+//! The facade's caller carried onto the CDR under `[cdr.endpoint.credentials.onward]`:
 //! a person's token exchanged per request at a `wiremock` token endpoint that
 //! checks what it is sent, a machine kept on the bridge's own token, and a
 //! refused exchange never sent under the bridge's credential.
@@ -99,7 +99,7 @@ enum Grant {
 }
 
 impl Grant {
-    /// Returns the `[cdr.credentials.onward]` table of this grant at `issuer`.
+    /// Returns the `[cdr.endpoint.credentials.onward]` table of this grant at `issuer`.
     fn table(self, issuer: &str) -> String {
         let (profile, target) = match self {
             Self::Standard => ("rfc9068", format!("indicators = [\"{CDR_AUDIENCE}\"]")),
@@ -114,14 +114,14 @@ impl Grant {
         };
         format!(
             concat!(
-                "[cdr.credentials.onward]\n",
+                "[cdr.endpoint.credentials.onward]\n",
                 "issuer = \"{issuer}\"\n",
                 "kind = \"persons\"\n",
                 "profile = \"{profile}\"\n",
                 "token_endpoint = \"{issuer}/token\"\n",
                 "audiences = [\"{audience}\"]\n",
                 "{target}\n",
-                "[cdr.credentials.onward.keys]\n",
+                "[cdr.endpoint.credentials.onward.keys]\n",
                 "max_onward_lifetime = \"1h\"\n",
                 "{keys}",
             ),
@@ -175,8 +175,8 @@ impl World {
         )?;
         let text = format!(
             concat!(
-                "[cdr]\nbase_url = \"{cdr}/\"\n\n",
-                "[cdr.credentials.oauth]\n",
+                "[cdr]\nendpoint.url = \"{cdr}/\"\n\n",
+                "[cdr.endpoint.credentials.oauth]\n",
                 "token_endpoint = \"{issuer}/token\"\n",
                 "client_id = \"{client}\"\n",
                 "client_auth = \"private_key_jwt\"\n",

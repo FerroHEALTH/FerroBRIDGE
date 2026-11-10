@@ -476,7 +476,7 @@ async fn bridge(
         )
     });
     let text = format!(
-        "[cdr]\nbase_url = \"{cdr}/\"\ntimeout = \"2s\"\n\n[cdr.retry]\nmax_attempts = 1\n\n\
+        "[cdr]\nendpoint.url = \"{cdr}/\"\nendpoint.timeout = \"2s\"\n\n[cdr.endpoint.retry]\nmax_attempts = 1\n\n\
          [mappings]\ndirectory = {mappings}\ntemplates = {templates}\n\n\
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\

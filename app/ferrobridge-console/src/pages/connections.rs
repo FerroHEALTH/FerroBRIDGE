@@ -84,7 +84,7 @@ fn upstream_state(l: &Locale, readiness: &Readiness, name: &str) -> Html {
 /// The host of the upstream `name`, from its base URL; the CDM database's
 /// URL is a secret, so its host is never read.
 fn host(configuration: &Configuration, name: &str) -> Option<String> {
-    let entry = configuration.entry(&format!("{name}.base_url"))?;
+    let entry = configuration.entry(&format!("{name}.endpoint.url"))?;
     let Value::String(base) = &entry.value else {
         return None;
     };

@@ -6,7 +6,7 @@
 //!
 //! The access token a person or a patient presented is exchanged for a
 //! token of the CDR's issuer that names the same person, as
-//! `[cdr.credentials.onward]` and each `[[cdr.onward]]` table declare it.
+//! `[cdr.endpoint.credentials.onward]` and each `[[cdr.onward]]` table declare it.
 //!
 //! `ferrohealth-smart` runs the grant its issuer profile picks: token
 //! exchange (RFC 8693 §2.1), the caller's token as `subject_token` and the

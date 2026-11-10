@@ -187,7 +187,7 @@ pub(super) const PAGES: [Shot; 37] = [
         "connection-cdr-settings",
         "/connections/:name/:tab",
         "/connections/cdr/settings",
-        "//*[contains(., 'cdr.base_url')]",
+        "//*[contains(., 'cdr.endpoint.url')]",
     ),
     Shot::page(
         "configuration",

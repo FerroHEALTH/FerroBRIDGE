@@ -37,7 +37,7 @@ fn a_file_states_every_section_and_the_resolver_reads_it() -> Result<(), Box<dyn
     let terminology = settings.terminology.as_ref().ok_or("the lane is on")?;
     assert_eq!(
         ferrobridge_term::config::WireVersion::R4B,
-        terminology.wire_version
+        terminology.config().wire_version
     );
     assert_eq!(
         Some("postgres://bridge@db.invalid/cdm?sslmode=disable"),
@@ -146,7 +146,7 @@ fn the_omocl_directory_is_read_from_the_mappings_section() -> Result<(), Box<dyn
 #[test]
 fn the_display_fallback_is_off_unless_the_terminology_lane_turns_it_on()
 -> Result<(), Box<dyn std::error::Error>> {
-    let lane = "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\n";
+    let lane = "[terminology]\nendpoint.url = \"http://tx.invalid/fhir\"\n";
     let off = Config::from_sources(Some(lane), &BTreeMap::new())?.resolve(Process::Server)?;
     assert!(
         !off.display_fallback,
@@ -177,12 +177,12 @@ fn the_terminology_lane_accepts_each_release_the_client_speaks()
         ("r4b", ferrobridge_term::config::WireVersion::R4B),
     ] {
         let text = format!(
-            "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\nwire_version = \"{spelled}\"\n"
+            "[terminology]\nendpoint.url = \"http://tx.invalid/fhir\"\nwire_version = \"{spelled}\"\n"
         );
         let settings =
             Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
         let terminology = settings.terminology.as_ref().ok_or("the lane is on")?;
-        assert_eq!(expected, terminology.wire_version, "{spelled}");
+        assert_eq!(expected, terminology.config().wire_version, "{spelled}");
     }
     Ok(())
 }

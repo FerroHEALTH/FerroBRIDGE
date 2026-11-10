@@ -159,7 +159,14 @@ impl CdrClient {
     /// be built, and [`CdrError::Client`] when the base URL cannot carry a
     /// path.
     pub fn new(config: &CdrConfig) -> Result<Self, CdrError> {
-        let transport = ReqwestTransport::with_timeout(config.timeout)
+        let mut builder = reqwest::Client::builder();
+        if let Some(connect) = config.connect_timeout {
+            builder = builder.connect_timeout(connect);
+        }
+        if let Some(tls) = config.tls.as_deref() {
+            builder = builder.tls_backend_preconfigured(rustls::ClientConfig::clone(tls));
+        }
+        let transport = ReqwestTransport::with_builder_timeout(builder, config.timeout)
             .map_err(|source| CdrError::Build { source })?;
         let auth = match config.credentials.clone() {
             None => None,

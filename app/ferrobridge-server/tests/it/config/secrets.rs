@@ -16,7 +16,7 @@ fn a_secret_file_sibling_is_read_at_boot() -> Result<(), Box<dyn std::error::Err
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "synthetic-password")?;
     let text = format!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\nuser = \"bridge\"\npassword_file = {:?}\n",
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials]\nuser = \"bridge\"\npassword_file = {:?}\n",
         file.path()
     );
 
@@ -74,8 +74,8 @@ fn a_cdm_tls_ca_file_is_read_through_its_environment_name() -> Result<(), Box<dy
 fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn std::error::Error>>
 {
     let text = concat!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nuser = \"bridge\"\npassword = \"inline\"\npassword_file = \"/run/secrets/password\"\n",
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.endpoint.credentials]\nuser = \"bridge\"\npassword = \"inline\"\npassword_file = \"/run/secrets/password\"\n",
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
@@ -85,7 +85,7 @@ fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn 
         Error::Credentials { section, source }
             if let ConfigError::Secret { key } = source.as_ref() =>
         {
-            assert_eq!("cdr.credentials", section);
+            assert_eq!("cdr.endpoint.credentials", section);
             assert_eq!(&"credentials.password", key);
         }
         other => return Err(format!("expected a conflict, got {other:?}").into()),
@@ -96,8 +96,8 @@ fn a_value_and_its_file_sibling_together_refuse_to_boot() -> Result<(), Box<dyn 
 #[test]
 fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nuser = \"bridge\"\npassword_file = \"/nonexistent/password\"\n",
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.endpoint.credentials]\nuser = \"bridge\"\npassword_file = \"/nonexistent/password\"\n",
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
@@ -107,7 +107,7 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn std
         Error::Credentials { section, source }
             if let ConfigError::SecretFile { path, .. } = source.as_ref() =>
         {
-            assert_eq!("cdr.credentials", section);
+            assert_eq!("cdr.endpoint.credentials", section);
             assert_eq!(std::path::Path::new("/nonexistent/password"), path);
             assert!(
                 std::error::Error::source(&error).is_some(),
@@ -122,8 +122,8 @@ fn a_secret_file_that_cannot_be_read_refuses_to_boot() -> Result<(), Box<dyn std
 #[test]
 fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nuser = \"bridge\"\n",
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.endpoint.credentials]\nuser = \"bridge\"\n",
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
@@ -133,7 +133,7 @@ fn a_user_without_a_password_refuses_to_boot() -> Result<(), Box<dyn std::error:
         Error::Credentials { section, source }
             if let ConfigError::Secret { key } = source.as_ref() =>
         {
-            assert_eq!("cdr.credentials", section);
+            assert_eq!("cdr.endpoint.credentials", section);
             assert_eq!(&"credentials.password", key);
         }
         other => return Err(format!("expected a missing password, got {other:?}").into()),
@@ -150,7 +150,7 @@ fn a_user_file_sibling_is_an_unknown_key() {
         "user = \"bridge\"\nuser_file = \"/run/secrets/user\"\npassword = \"p\"\n",
     ] {
         let text = format!(
-            "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[cdr.credentials]\n{credentials}"
+            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials]\n{credentials}"
         );
         let error = Config::from_sources(Some(&text), &BTreeMap::new())
             .expect_err("user_file is no key of the table");
@@ -165,8 +165,8 @@ fn a_user_file_sibling_is_an_unknown_key() {
 #[test]
 fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\npassword = \"p\"\n",
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.endpoint.credentials]\npassword = \"p\"\n",
     );
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
         .resolve(Process::Server)
@@ -191,10 +191,10 @@ fn a_password_without_a_user_refuses_to_boot() -> Result<(), Box<dyn std::error:
 fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials]\nuser = \"bridge\"\npassword = \"synthetic-cdr-password\"\n\n",
-        "[terminology]\nbase_url = \"http://tx.invalid/fhir\"\n\n",
-        "[terminology.credentials]\nuser = \"bridge\"\npassword = \"synthetic-tx-password\"\n\n",
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.endpoint.credentials]\nuser = \"bridge\"\npassword = \"synthetic-cdr-password\"\n\n",
+        "[terminology]\nendpoint.url = \"http://tx.invalid/fhir\"\n\n",
+        "[terminology.endpoint.credentials]\nuser = \"bridge\"\npassword = \"synthetic-tx-password\"\n\n",
         "[cdm]\nurl = \"postgres://bridge:synthetic-db-password@db.invalid/cdm?sslmode=disable\"\n",
     );
     let config = Config::from_sources(Some(text), &BTreeMap::new())?;
@@ -219,8 +219,8 @@ fn no_inline_secret_reaches_the_debug_rendering_of_the_tree_or_the_settings()
 fn no_inline_client_secret_reaches_the_debug_rendering_of_the_tree()
 -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
-        "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n",
-        "[cdr.credentials.oauth]\ntoken_endpoint = \"https://idp.invalid/token\"\n",
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n",
+        "[cdr.endpoint.credentials.oauth]\ntoken_endpoint = \"https://idp.invalid/token\"\n",
         "client_id = \"bridge\"\nclient_secret = \"synthetic-client-secret\"\n",
     );
     let config = Config::from_sources(Some(text), &BTreeMap::new())?;

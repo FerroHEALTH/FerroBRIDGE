@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! A `persons` issuer under `[cdr.credentials.onward]` and a `patients`
+//! A `persons` issuer under `[cdr.endpoint.credentials.onward]` and a `patients`
 //! issuer under `[[cdr.onward]]`, side by side: each caller is exchanged
 //! (RFC 8693 §2.1) at the issuer of its kind and never at the other. The
 //! patient's token is a `patient/` grant with its `patient` launch context

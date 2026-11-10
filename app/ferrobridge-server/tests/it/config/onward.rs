@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `[cdr.credentials.onward]` table and the `[[cdr.onward]]` tables
+//! The `[cdr.endpoint.credentials.onward]` table and the `[[cdr.onward]]` tables
 //! beside it: the onward lane the facade reaches the CDR under its caller
 //! through, one issuer per kind, and every refusal of it.
 
@@ -17,7 +17,7 @@ use ferrohealth_smart::kind::IssuerKind;
 
 /// The client credentials grant every case's lane authenticates with.
 const OAUTH: &str = concat!(
-    "[cdr.credentials.oauth]\n",
+    "[cdr.endpoint.credentials.oauth]\n",
     "token_endpoint = \"https://as.example.org/token\"\n",
     "client_id = \"ferrobridge\"\n",
     "client_secret = \"synthetic-secret\"\n",
@@ -26,13 +26,13 @@ const OAUTH: &str = concat!(
 
 /// A complete onward table: a `persons` issuer exchanging under RFC 8693.
 const ONWARD: &str = concat!(
-    "[cdr.credentials.onward]\n",
+    "[cdr.endpoint.credentials.onward]\n",
     "issuer = \"https://as.example.org\"\n",
     "kind = \"persons\"\n",
     "token_endpoint = \"https://as.example.org/token\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.credentials.onward.keys]\n",
+    "[cdr.endpoint.credentials.onward.keys]\n",
     "max_onward_lifetime = \"5min\"\n",
 );
 
@@ -72,7 +72,7 @@ const FEDERATION: &str = concat!(
 
 /// Returns the text of a CDR lane carrying `tables` under its credentials.
 fn cdr(tables: &str) -> String {
-    format!("[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n{tables}")
+    format!("[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n{tables}")
 }
 
 /// Returns the refusal `text` resolves to as `process`.
@@ -123,8 +123,8 @@ fn an_onward_table_caches_its_tokens_by_default() -> Result<(), Box<dyn std::err
 #[test]
 fn an_onward_table_with_cache_off_holds_no_token() -> Result<(), Box<dyn std::error::Error>> {
     let table = ONWARD.replace(
-        "[cdr.credentials.onward.keys]\n",
-        "cache = false\n[cdr.credentials.onward.keys]\n",
+        "[cdr.endpoint.credentials.onward.keys]\n",
+        "cache = false\n[cdr.endpoint.credentials.onward.keys]\n",
     );
     let settings = Config::from_sources(Some(&cdr(&format!("{OAUTH}{table}"))), &BTreeMap::new())?
         .resolve(Process::Job)?;
@@ -153,7 +153,7 @@ fn an_onward_table_without_its_oauth_table_is_refused() -> Result<(), Box<dyn st
         matches!(
             &error,
             Error::Credentials { section, source }
-                if section == "cdr.credentials" && matches!(source.as_ref(), ConfigError::Missing { .. })
+                if section == "cdr.endpoint.credentials" && matches!(source.as_ref(), ConfigError::Missing { .. })
         ),
         "{error:?}"
     );
@@ -186,7 +186,7 @@ fn an_onward_table_on_a_server_without_auth_is_refused() -> Result<(), Box<dyn s
         matches!(
             &error,
             Error::Needs { key, needs }
-                if key == "cdr.credentials.onward" && needs == "auth.enabled"
+                if key == "cdr.endpoint.credentials.onward" && needs == "auth.enabled"
         ),
         "{error:?}"
     );
@@ -196,7 +196,7 @@ fn an_onward_table_on_a_server_without_auth_is_refused() -> Result<(), Box<dyn s
 #[test]
 fn an_onward_table_on_the_terminology_lane_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
-        "[terminology]\nbase_url = \"http://tx.invalid/r4\"\nwire_version = \"r4\"\n\n{}{}",
+        "[terminology]\nendpoint.url = \"http://tx.invalid/r4\"\nwire_version = \"r4\"\n\n{}{}",
         OAUTH.replace("[cdr.", "[terminology."),
         ONWARD.replace("[cdr.", "[terminology."),
     );
@@ -204,7 +204,7 @@ fn an_onward_table_on_the_terminology_lane_is_refused() -> Result<(), Box<dyn st
     assert!(
         matches!(
             &error,
-            Error::OnwardLane { section } if section == "terminology.credentials"
+            Error::OnwardLane { section } if section == "terminology.endpoint.credentials"
         ),
         "{error:?}"
     );
@@ -222,7 +222,7 @@ fn an_onward_lane_whose_own_grant_names_no_cdr_is_refused() -> Result<(), Box<dy
         matches!(
             &error,
             Error::Needs { key, needs }
-                if key == "cdr.credentials.onward" && needs.contains("resource")
+                if key == "cdr.endpoint.credentials.onward" && needs.contains("resource")
         ),
         "{error:?}"
     );
@@ -285,8 +285,11 @@ fn a_patients_issuer_alone_carries_patients_and_refuses_persons()
 #[test]
 fn two_issuers_of_one_kind_are_refused() -> Result<(), Box<dyn std::error::Error>> {
     let twice = ONWARD
-        .replace("[cdr.credentials.onward]", "[[cdr.onward]]")
-        .replace("[cdr.credentials.onward.keys]", "[cdr.onward.keys]");
+        .replace("[cdr.endpoint.credentials.onward]", "[[cdr.onward]]")
+        .replace(
+            "[cdr.endpoint.credentials.onward.keys]",
+            "[cdr.onward.keys]",
+        );
     let error = refusal(&cdr(&format!("{OAUTH}{ONWARD}{twice}")), Process::Job)?;
     assert!(
         matches!(
@@ -331,7 +334,7 @@ fn an_onward_array_on_a_server_without_auth_is_refused() -> Result<(), Box<dyn s
         matches!(
             &error,
             Error::Needs { key, needs }
-                if key == "cdr.credentials.onward" && needs == "auth.enabled"
+                if key == "cdr.endpoint.credentials.onward" && needs == "auth.enabled"
         ),
         "{error:?}"
     );

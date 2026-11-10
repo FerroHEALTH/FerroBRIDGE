@@ -155,8 +155,8 @@ In a second terminal, check that it runs:
 curl http://127.0.0.1:8080/health/liveness
 ```
 
-Every lane is off until you configure it: set `FERROBRIDGE__CDR__BASE_URL`
-to reach your openEHR record server and `FERROBRIDGE__TERMINOLOGY__BASE_URL`
+Every lane is off until you configure it: set `FERROBRIDGE__CDR__ENDPOINT__URL`
+to reach your openEHR record server and `FERROBRIDGE__TERMINOLOGY__ENDPOINT__URL`
 for your terminology server. The header of `compose.yaml` names every
 setting, and the `cdm` and `console` profiles add an OMOP database and the
 operator console. The image is `ghcr.io/ferrohealth/ferrobridge:0.0.22`.

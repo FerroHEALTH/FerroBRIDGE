@@ -193,10 +193,10 @@ never carries the token, another claim, a query value or a body.
 The bridge never forwards the caller's token to the CDR, because an access
 token is bound to the audience it was issued for. By default it reaches the
 CDR with its own credential
-([`[cdr.credentials.oauth]`](../operate/configuration.md#cdrcredentialsoauth-and-terminologycredentialsoauth)),
+([`[cdr.endpoint.credentials.oauth]`](../operate/configuration.md#cdrendpointcredentialsoauth-and-terminologyendpointcredentialsoauth)),
 so the CDR records the bridge as the actor and the caller's identity lives in
 the bridge's audit line. With
-[`[cdr.credentials.onward]`](../operate/configuration.md#cdrcredentialsonward)
+[`[cdr.endpoint.credentials.onward]`](../operate/configuration.md#cdrendpointcredentialsonward)
 it exchanges the caller's token per request for a token of the CDR's issuer
 that names the same person (RFC 8693 token exchange, or the Entra ID
 on-behalf-of grant), so the CDR records the clinician too; a machine keeps the
@@ -359,7 +359,7 @@ caller made, such as an HL7 v2 message or a request while `[auth]` is off,
 commits under the bridge's name. Reads reach the CDR under the bridge's own
 credential, so the CDR's access log names the bridge for them.
 
-Under [`[cdr.credentials.onward]`](../operate/configuration.md#cdrcredentialsonward)
+Under [`[cdr.endpoint.credentials.onward]`](../operate/configuration.md#cdrendpointcredentialsonward)
 the request reaches the CDR under the token the caller's was exchanged for,
 and the CDR derives the committer from that token. A single write then sends
 no `openehr-audit-details` header, which ITS-REST 1.1.0 leaves optional. A

@@ -1854,6 +1854,7 @@ dependencies = [
  "rcgen",
  "redb",
  "reqwest",
+ "rustls",
  "secrecy",
  "serde",
  "serde-saphyr",

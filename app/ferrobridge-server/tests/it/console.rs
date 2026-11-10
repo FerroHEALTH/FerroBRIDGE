@@ -14,10 +14,10 @@ use std::error::Error;
 /// taking their templates from the CDR and the terminology lane on.
 const FILE: &str = r#"
 [cdr]
-base_url = "http://synthetic:s3cret@cdr.invalid:8080/v1"
+endpoint.url = "http://synthetic:s3cret@cdr.invalid:8080/v1"
 
 [terminology]
-base_url = "https://tx.invalid/r4"
+endpoint.url = "https://tx.invalid/r4"
 wire_version = "r4"
 
 [mappings]

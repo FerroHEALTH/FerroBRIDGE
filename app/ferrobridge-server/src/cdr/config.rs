@@ -50,8 +50,14 @@ pub struct CdrConfig {
     /// Whether the client reaches the ITS-REST 1.1.0 Demographic API, which
     /// the release marks `x-status: DEVELOPMENT`.
     pub demographic: bool,
+    /// How long opening the connection may take; `None`, only `timeout`
+    /// bounds it.
+    pub connect_timeout: Option<Duration>,
+    /// The TLS the engine speaks, built from `[cdr.endpoint.tls]`; `None`,
+    /// the engine's own default.
+    pub tls: Option<std::sync::Arc<rustls::ClientConfig>>,
     /// The onward lane a facade request reaches the CDR under its caller
-    /// through, when `[cdr.credentials.onward]` declares one.
+    /// through, when `[cdr.endpoint.credentials.onward]` declares one.
     pub onward: Option<crate::cdr::onward::CdrOnward>,
 }
 
@@ -69,7 +75,24 @@ impl CdrConfig {
             credentials: None,
             demographic: false,
             onward: None,
+            connect_timeout: None,
+            tls: None,
         }
+    }
+
+    /// Returns this configuration bounding the opening of the connection by
+    /// `connect_timeout`.
+    #[must_use]
+    pub const fn with_connect_timeout(mut self, connect_timeout: Option<Duration>) -> Self {
+        self.connect_timeout = connect_timeout;
+        self
+    }
+
+    /// Returns this configuration speaking the TLS `tls` describes.
+    #[must_use]
+    pub fn with_tls(mut self, tls: std::sync::Arc<rustls::ClientConfig>) -> Self {
+        self.tls = Some(tls);
+        self
     }
 
     /// Returns this configuration with `timeout` as its per-request budget.

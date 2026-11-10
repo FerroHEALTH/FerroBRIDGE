@@ -71,7 +71,7 @@ async fn the_configuration_opens_how_it_works_and_each_tab_reads_its_keys()
             .goto(&stack.url("/connections/cdr/settings"))
             .await?;
         browser
-            .element(By::XPath("//*[contains(., 'cdr.base_url')]"))
+            .element(By::XPath("//*[contains(., 'cdr.endpoint.url')]"))
             .await?;
         browser.console_clean("the running configuration").await
     })

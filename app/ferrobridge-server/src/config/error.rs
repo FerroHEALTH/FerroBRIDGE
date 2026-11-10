@@ -140,7 +140,7 @@ pub enum Error {
     /// A `[<lane>.credentials]` table breaks a rule of `ferrohealth-smart`.
     #[error("[{section}] is refused")]
     Credentials {
-        /// The table, such as `cdr.credentials`.
+        /// The table, such as `cdr.endpoint.credentials`.
         section: String,
         /// The rule, naming its key under the table.
         #[source]
@@ -148,10 +148,10 @@ pub enum Error {
     },
     /// A `[<lane>.credentials.onward]` table names a lane other than the CDR's.
     #[error(
-        "[{section}.onward] is set; only the CDR lane reaches its upstream on a caller's behalf, under [cdr.credentials.onward]"
+        "[{section}.onward] is set; only the CDR lane reaches its upstream on a caller's behalf, under [cdr.endpoint.credentials.onward]"
     )]
     OnwardLane {
-        /// The credentials table, such as `terminology.credentials`.
+        /// The credentials table, such as `terminology.endpoint.credentials`.
         section: String,
     },
     /// A base URL is no http or https base without a query or a fragment.

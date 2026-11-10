@@ -76,7 +76,7 @@ pub fn lanes(settings: &Settings) -> Vec<Lane> {
     let terminology_host = settings
         .terminology
         .as_ref()
-        .and_then(|terminology| host_of(&terminology.base_url));
+        .and_then(|terminology| host_of(&terminology.config().base_url));
     let facade = settings.facade.is_some();
     let hl7v2 = settings.hl7v2.as_ref();
     let operations = settings.operations.enabled && settings.mapping_directory.is_some();

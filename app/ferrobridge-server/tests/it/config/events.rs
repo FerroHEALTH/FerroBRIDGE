@@ -13,7 +13,7 @@ use std::time::Duration;
 use super::refusal;
 
 /// A CDR and a change feed the lane can follow.
-const FEED: &str = "[cdr]\nbase_url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n";
+const FEED: &str = "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n";
 
 /// Returns a configuration whose `[events]` section adds `keys` to an
 /// enabled lane.

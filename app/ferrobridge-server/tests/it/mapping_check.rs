@@ -260,7 +260,7 @@ fn client(
     cdr: &MockServer,
 ) -> Result<ferrobridge_server::cdr::CdrClient, Box<dyn std::error::Error>> {
     let text = format!(
-        "[cdr]\nbase_url = \"{}/\"\ntimeout = \"2s\"\n\n[cdr.retry]\nmax_attempts = 1\n",
+        "[cdr]\nendpoint.url = \"{}/\"\nendpoint.timeout = \"2s\"\n\n[cdr.endpoint.retry]\nmax_attempts = 1\n",
         cdr.uri()
     );
     let settings = ferrobridge_server::config::Config::from_sources(

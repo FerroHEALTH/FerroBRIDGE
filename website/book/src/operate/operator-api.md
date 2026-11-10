@@ -169,7 +169,7 @@ holds what it runs on until the next start:
   `FERROBRIDGE_CONFIG` named it, or `null` when it read none;
 - `read_at`: when it read the configuration, RFC 3339 UTC;
 - `entries`: every key the configuration holds a value for, in key order,
-  each with its dotted `key` (`cdr.credentials.oauth.client_id`), its
+  each with its dotted `key` (`cdr.endpoint.credentials.oauth.client_id`), its
   `value` and its `source`: `file`, `environment` (a `FERROBRIDGE__`
   variable, `FERROBRIDGE_LOG_FORMAT` or `RUST_LOG`, which win over the
   file), `set` (a `--set` argument, which wins over both) or `default`.
@@ -177,8 +177,8 @@ holds what it runs on until the next start:
 A `value` carries its `kind` (`string`, `integer`, `float`, `boolean`,
 `list`, `table` or `secret`) beside it. A secret is never answered by value.
 A secret and its `_file` sibling are one entry, keyed by the secret
-(`cdm.url`, `cdr.credentials.password`,
-`cdr.credentials.oauth.client_secret`, the same two of `[terminology]`, and
+(`cdm.url`, `cdr.endpoint.credentials.password`,
+`cdr.endpoint.credentials.oauth.client_secret`, the same two of `[terminology]`, and
 `password_hash` of each `[[auth.basic.users]]` user), whose value is its
 `state`: `set` (set as a value, in the file or the environment), `file` with
 the `path` it is read from, or `unset`. The file of a private key

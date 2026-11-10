@@ -230,13 +230,12 @@ impl Config {
         // holds a token to exchange, so every facade request would be refused.
         if serves
             && !self.auth.enabled
-            && self
-                .cdr
-                .as_ref()
-                .is_some_and(|cdr| cdr.credentials.onward.is_some() || !cdr.onward.is_empty())
+            && self.cdr.as_ref().is_some_and(|cdr| {
+                cdr.endpoint.credentials.onward.is_some() || !cdr.onward.is_empty()
+            })
         {
             return Err(Error::Needs {
-                key: String::from("cdr.credentials.onward"),
+                key: String::from("cdr.endpoint.credentials.onward"),
                 needs: String::from("auth.enabled"),
             });
         }
@@ -422,8 +421,8 @@ pub struct Settings {
     pub telemetry: TelemetrySection,
     /// The CDR client configuration, when the lane is on.
     pub cdr: Option<crate::cdr::config::CdrConfig>,
-    /// The terminology client configuration, when the lane is on.
-    pub terminology: Option<ferrobridge_term::config::Config>,
+    /// The terminology client, when the lane is on.
+    pub terminology: Option<ferrobridge_term::client::Client>,
     /// Whether a code the terminology server does not know takes its code as
     /// display (`[terminology] display_fallback`).
     pub display_fallback: bool,

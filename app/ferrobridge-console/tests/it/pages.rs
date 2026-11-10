@@ -47,7 +47,7 @@ const PAGES: [(&str, &str); 29] = [
     ("/omop/settings", "etl.page_size"),
     ("/connections", ">Connections</h1>"),
     ("/connections/terminology", "answers 503"),
-    ("/connections/cdr/settings", "cdr.base_url"),
+    ("/connections/cdr/settings", "cdr.endpoint.url"),
     ("/configuration", ">Configuration</h1>"),
     ("/configuration/mappings", "mappings.directory"),
     ("/configuration/core", "server.listen"),

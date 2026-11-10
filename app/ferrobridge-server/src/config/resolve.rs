@@ -8,7 +8,6 @@ use omocl::engine::concept::VocabularyAliases;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::Duration;
 
 use super::CdmSettings;
@@ -30,8 +29,6 @@ use super::section::Mappings;
 use super::section::Operator;
 use super::section::Terminology;
 use super::section::facade::Facade;
-use ferrobridge_term::smart::SmartToken;
-use ferrohealth_smart::client::cache::TokenSource;
 
 /// Returns the mapping-set paths `mappings` names, when it names both.
 ///
@@ -470,22 +467,43 @@ pub(super) fn resolve_hl7v2(hl7v2: &Hl7v2, facade: bool) -> Result<Hl7v2Settings
 
 /// Returns the CDR client configuration `cdr` describes.
 pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Error> {
-    let base_url = url_of("cdr.base_url", &cdr.base_url)?;
+    let endpoint = &cdr.endpoint;
+    let refused = |source| Error::Credentials {
+        section: String::from("cdr.endpoint"),
+        source: Box::new(source),
+    };
+    url_of("cdr.endpoint.url", endpoint.url.expose())?;
+    let base_url = endpoint.validate().map_err(refused)?;
+    let tls = ferrohealth_smart::config::TlsBuilder::build(
+        &ferrohealth_smart::config::ServerTls,
+        "cdr.endpoint.tls",
+        &endpoint.tls,
+    )
+    .map_err(|source| Error::Client {
+        upstream: "cdr",
+        source,
+    })?;
     let mut config = crate::cdr::config::CdrConfig::new(base_url)
-        .with_timeout(cdr.timeout.get())
+        .with_timeout(endpoint.timeout.get())
+        .with_connect_timeout(
+            endpoint
+                .connect_timeout
+                .map(ferrohealth_config::units::Duration::get),
+        )
+        .with_tls(std::sync::Arc::clone(tls.config()))
         .with_demographic(cdr.demographic)
         .with_retry(openehr_its::rest::client::RetryPolicy {
             // NOTE: no specification governs this: our own design; a u32 fits a
             // usize on every target the server builds for, so the clamp never bites.
-            max_attempts: usize::try_from(cdr.retry.max_attempts).unwrap_or(usize::MAX),
-            initial_backoff: cdr.retry.initial_backoff.get(),
-            max_backoff: cdr.retry.max_backoff.get(),
+            max_attempts: usize::try_from(endpoint.retry.max_attempts).unwrap_or(usize::MAX),
+            initial_backoff: endpoint.retry.initial_backoff.get(),
+            max_backoff: endpoint.retry.max_backoff.get(),
         });
     let own = ferrohealth_smart::config::credentials::CredentialsSection {
         onward: None,
-        ..cdr.credentials.clone()
+        ..endpoint.credentials.clone()
     };
-    match resolve_credentials("cdr.credentials", &own)? {
+    match resolve_credentials("cdr.endpoint.credentials", &own)? {
         Some(Upstream::Basic { user, password }) => {
             config = config.with_basic(user, password);
         }
@@ -498,16 +516,16 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
     // NOTE: RFC 8707 §2 and Microsoft's `scope=api://<cdr>/.default`: a machine's commit
     // goes under the bridge's own token, which must name the CDR alone.
     if onward.is_some()
-        && cdr
+        && endpoint
             .credentials
             .oauth
             .as_ref()
             .is_some_and(|oauth| oauth.resource.is_empty() && oauth.scope.is_empty())
     {
         return Err(Error::Needs {
-            key: String::from("cdr.credentials.onward"),
+            key: String::from("cdr.endpoint.credentials.onward"),
             needs: String::from(
-                "cdr.credentials.oauth.resource or cdr.credentials.oauth.scope naming the CDR",
+                "cdr.endpoint.credentials.oauth.resource or cdr.endpoint.credentials.oauth.scope naming the CDR",
             ),
         });
     }
@@ -517,7 +535,7 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
     Ok(config)
 }
 
-/// Returns the onward lane of `cdr`: the issuer of `credentials.onward`
+/// Returns the onward lane of `cdr`: the issuer of `endpoint.credentials.onward`
 /// and each `[[cdr.onward]]` issuer, at most one of each kind, or `None`
 /// when it declares none.
 fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Error> {
@@ -527,10 +545,12 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
     };
     let mut issuers = Vec::new();
     if let (Some(lane), Some(kind)) = (
-        cdr.credentials
+        cdr.endpoint
+            .credentials
             .onward_with_tls(&ferrohealth_smart::config::ServerTls)
-            .map_err(|source| refused("cdr.credentials", source))?,
-        cdr.credentials
+            .map_err(|source| refused("cdr.endpoint.credentials", source))?,
+        cdr.endpoint
+            .credentials
             .onward
             .as_ref()
             .and_then(|onward| onward.kind),
@@ -538,11 +558,11 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
         issuers.push((lane, kind));
     }
     for section in &cdr.onward {
-        let oauth = cdr.credentials.oauth.as_ref().ok_or_else(|| {
+        let oauth = cdr.endpoint.credentials.oauth.as_ref().ok_or_else(|| {
             refused(
                 "cdr.onward",
                 ferrohealth_smart::config::ConfigError::Missing {
-                    key: "cdr.credentials.oauth, which cdr.onward authenticates with",
+                    key: "cdr.endpoint.credentials.oauth, which cdr.onward authenticates with",
                 },
             )
         })?;
@@ -575,11 +595,21 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
     }))
 }
 
-/// Returns the terminology client configuration `terminology` describes.
+/// Returns the terminology client `terminology` describes, built from its
+/// `endpoint` table with the family's TLS reader.
 pub(super) fn resolve_terminology(
     terminology: &Terminology,
-) -> Result<ferrobridge_term::config::Config, Error> {
-    let base_url = url_of("terminology.base_url", &terminology.base_url)?;
+) -> Result<ferrobridge_term::client::Client, Error> {
+    url_of(
+        "terminology.endpoint.url",
+        terminology.endpoint.url.expose(),
+    )?;
+    // NOTE: no specification governs this: our own design; the credentials are checked by the
+    // bridge's rules first, the onward table refused on this lane, before the client takes them.
+    let _checked = resolve_credentials(
+        "terminology.endpoint.credentials",
+        &terminology.endpoint.credentials,
+    )?;
     let wire_version = match terminology.wire_version.to_ascii_lowercase().as_str() {
         "stu3" => ferrobridge_term::config::WireVersion::Stu3,
         "r4" => ferrobridge_term::config::WireVersion::R4,
@@ -591,30 +621,16 @@ pub(super) fn resolve_terminology(
             });
         }
     };
-    let mut config = ferrobridge_term::config::Config::new(base_url, wire_version)
-        .with_timeout(terminology.timeout.get())
-        .with_retry(ferrobridge_term::config::RetryPolicy {
-            max_attempts: terminology.retry.max_attempts,
-            initial_backoff: terminology.retry.initial_backoff.get(),
-            max_backoff: terminology.retry.max_backoff.get(),
-        });
-    match resolve_credentials("terminology.credentials", &terminology.credentials)? {
-        Some(Upstream::Basic { user, password }) => {
-            config = config
-                .with_credentials(ferrobridge_term::config::Credentials::Basic { user, password });
-        }
-        Some(Upstream::OAuth(grant)) => {
-            let source = TokenSource::new(*grant).map_err(|source| Error::Client {
-                upstream: "terminology",
-                source: Box::new(source),
-            })?;
-            config = config.with_credentials(ferrobridge_term::config::Credentials::OAuth(
-                Arc::new(SmartToken::from(source)),
-            ));
-        }
-        None => {}
-    }
-    Ok(config)
+    ferrobridge_term::client::Client::from_endpoint(
+        &terminology.endpoint,
+        "terminology.endpoint",
+        &ferrohealth_smart::config::ServerTls,
+        wire_version,
+    )
+    .map_err(|source| Error::Client {
+        upstream: "terminology",
+        source: Box::new(source),
+    })
 }
 
 /// Returns the CDM database `cdm` describes.
