@@ -265,3 +265,31 @@ fn free_text_at_an_open_coded_node_is_held_as_a_dv_text() -> Result<(), Box<dyn 
     );
     Ok(())
 }
+
+/// The onset of the published model is a polymorphic `ELEMENT`, and each of
+/// its alternatives gates on `operator: type` with the element as the
+/// attribute, which tests the class of the value the element holds
+/// (`basics/Conditions.adoc` §openehrCondition, #1864): an `onsetDateTime`
+/// goes into openEHR as a `DV_DATE_TIME` and comes back out unchanged.
+#[test]
+fn the_onset_date_time_comes_back_through_its_type_condition() -> Result<(), Box<dyn Error>> {
+    let (program, index) = allergy()?;
+    let allergy = serde_json::json!({
+        "resourceType": "AllergyIntolerance",
+        "code": {"text": "Synthetic substance"},
+        "patient": {"reference": "Patient/synthetic-1"},
+        "onsetDateTime": "2026-09-14T08:00:00Z"
+    });
+    let declared = laws::putget(&program, &index, &allergy, &laws::untouched)?;
+    let lost = declared
+        .get("lost")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("the declared set names no losses")?;
+    assert!(
+        lost.iter()
+            .filter_map(serde_json::Value::as_str)
+            .all(|loss| !loss.starts_with("onset")),
+        "{declared}"
+    );
+    Ok(())
+}

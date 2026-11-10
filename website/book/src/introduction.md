@@ -25,12 +25,11 @@ licensing and trademark terms are written once, in the
 The four parts follow what you came to do.
 
 - **Evaluate** answers whether FerroBRIDGE fits your problem: the design, the
-  two mapping languages it reads, the version pins, the build order, and the
-  licence.
-- **Operate** covers what the running bridge needs around it and how it behaves
-  when a mapping or an upstream call fails.
+  two mapping languages it reads, the version pins, and the licence.
 - **Integrate** covers the two target surfaces and the mapping files that drive
   them.
+- **Operate** covers what the running bridge needs around it, how it behaves
+  when a mapping or an upstream call fails, and what each release shipped.
 - **Contribute** covers how the work is tracked and which checks a change has
   to pass.
 

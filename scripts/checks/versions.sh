@@ -23,10 +23,12 @@
 #   4. product version     CITATION.cff version against the docs/VERSIONS.md
 #                          product-version row, and against the root Cargo.toml
 #                          [workspace.package] version once that exists.
-#                          The release pages: the latest release README.md,
-#                          the landing page and the build-order page name
-#                          against the workspace version and its CHANGELOG.md
-#                          date, so a cut cannot leave them behind.
+#                          The release pages: the latest release README.md
+#                          and the book's Releases page name against the
+#                          workspace version and its CHANGELOG.md date, so a
+#                          cut cannot leave them behind. The landing page
+#                          names no release: scripts/site/assemble.sh renders
+#                          its badge from the workspace version.
 #   5. CI tool pins        the zizmor, actionlint, shellcheck, hadolint and
 #                          sqlx-cli versions .github/workflows/ci.yml installs
 #                          (sqlx-cli also against the sqlx crate row), its
@@ -377,23 +379,11 @@ else
       'ghcr\.io/ferrohealth/ferrobridge:[0-9.]+`' \
       "ghcr.io/ferrohealth/ferrobridge:$release_ver\`"
   fi
-  landing=website/landing/index.html
-  if [[ -f "$landing" ]]; then
-    release_claim "$landing" "the meta descriptions" \
-      "The latest release is v[0-9.]+\." "The latest release is $v."
-    release_claim "$landing" "the hero status" \
-      "Latest release: v[0-9.]+, [0-9-]+\." "Latest release: $v, $release_date."
-  fi
-  order=website/book/src/evaluate/build-order.md
+  order=website/book/src/operate/releases.md
   if [[ -f "$order" ]]; then
     release_claim "$order" "the row of $v" \
       "\| \[${v//./\\.}\]\($tag\) \| [0-9-]+ \|" \
       "| [$v](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/$v) | $release_date |"
-    release_claim "$order" "the Next heading" \
-      "The milestones after v[0-9.]+," "The milestones after $v,"
-    if grep -qE "^[0-9]+\. \*\*${v//./\\.}," "$order"; then
-      bad "release pages: $order still lists $v under Next"
-    fi
   fi
 fi
 

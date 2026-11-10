@@ -8,7 +8,7 @@
 
 [Documentation](https://ferrobridge.eu/docs/) ·
 [Quick start](#quick-start) ·
-[What ships today](#what-ships-today) ·
+[What it implements](#what-it-implements) ·
 [Licensing](https://ferrobridge.eu/docs/evaluate/licensing.html)
 
 <!-- badges:begin -->
@@ -79,7 +79,8 @@
 
 </div>
 
-## What FerroBRIDGE does
+
+## What FerroBRIDGE is
 
 Health data rarely lives in one format. A hospital may keep its records in
 openEHR, an open standard for structured health records, while the apps that
@@ -87,115 +88,130 @@ need them speak HL7 FHIR, the exchange format most modern health software
 uses, and the researchers who study them work in OMOP, the common data model
 of the international OHDSI research network.
 
-FerroBRIDGE translates between them. It reads records from any openEHR
-record server and offers them as FHIR, so a FHIR app can read and write them
-without knowing openEHR. It also copies records into an OMOP research
-database, so studies can run over them. Hospital messages in HL7 v2, the
-older format many hospital systems still send, come in through it as well.
+FerroBRIDGE translates between them, in pure Rust. It reads records from any
+openEHR CDR it reaches over the ITS-REST API and offers them as FHIR, so a
+FHIR app reads and writes them without knowing openEHR. It copies records
+into an OMOP CDM database, so studies run over them. HL7 v2 messages, the
+format many hospital systems send, come in through it as well. It stores no
+clinical data of its own: the record stays in the CDR.
 
-Every translation is a mapping file, written in two published languages:
-FHIRconnect for FHIR and OMOCL for OMOP. A clinical informatician can read
-and change a mapping without a programmer, and FerroBRIDGE checks each file
-against the published rules when it loads it. It stores no clinical data of
-its own: the record stays in the record server.
+Every translation is a mapping file, written in one of two published
+languages: FHIRconnect for FHIR and OMOCL for OMOP. A clinical informatician
+reads and changes a mapping without a programmer, and FerroBRIDGE checks each
+file against the published schema when it loads it. Nothing is hand-coded per
+FHIR resource or per OMOP table.
 
-### Who it is for
-
-- **Hospitals and regions** that keep records in openEHR and need to share
-  them with FHIR apps, national exchanges or partners.
-- **Research groups and data offices** that want openEHR data in an OMOP
-  database for observational studies.
-- **Software vendors and integrators** that build FHIR applications over an
-  openEHR back end, or need the FHIR and HL7 v2 libraries on their own.
-
-### Why you can trust what it claims
-
-Every release is signed and comes with a software bill of materials (the
-list of every component inside) and SLSA build provenance, so you can check
-that what you install is what was built here. The source is public, and
-every feature is in this repository: there is no paid edition with extra
-functions. Each conformance badge above links to its pass list, the cases
-that pass against the published test suites of FHIRconnect, OMOCL, FHIR,
-FHIRPath and HL7 v2, so you can check a result against the standard
-yourself.
-
-## Part of FerroHEALTH
-
-FerroBRIDGE is one of five [FerroHEALTH](https://ferrohealth.eu) servers.
-Each does one job and reaches the others only over published standards:
-FerroEHR stores the record, FerroBRIDGE translates it to FHIR and the OMOP
-research model, FerroFED connects records across organisations and borders,
-FerroPIX matches patient identities, and FerroTERM serves the code systems
-(the shared lists of medical terms). FerroBRIDGE works with any openEHR
-record server and any FHIR terminology server, not only FerroEHR and
-FerroTERM. Sign-in, the audit trail and the web consoles come from three
-shared libraries: FerroAUTH, FerroAUDIT and FerroUI.
+It is for hospitals and regions that keep records in openEHR and share them
+with FHIR apps, national exchanges or partners; for research groups and data
+offices that want openEHR data in an OMOP database; and for vendors and
+integrators that build FHIR applications over an openEHR back end or use its
+FHIR and HL7 v2 libraries on their own.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="website/book/src/operate/img/console/dashboard-dark.png">
   <img src="website/book/src/operate/img/console/dashboard.png" alt="The FerroBRIDGE operator console dashboard">
 </picture>
 
+## What it implements
+
+| Lane | Specifications | What it does |
+|---|---|---|
+| [The FHIR facade](https://ferrobridge.eu/docs/integrate/fhir-facade.html) | FHIRconnect 1.0.0, HL7 FHIR R4, SMART App Launch 2 | A FHIR R4 server over the CDR: read, vread, create, update, search, transaction, batch, `$validate` and `Composition/$document`, every request driven by the mappings and every access token checked against the SMART v2 scope its interaction needs |
+| [The FHIRconnect operations](https://ferrobridge.eu/docs/integrate/operations.html) | FHIRconnect REST API | `$tofhir` and `$toopenehr`, which run a mapping as a pure transformation with no CDR |
+| [The OMOP ETL](https://ferrobridge.eu/docs/integrate/omop-etl.html) | OMOCL 1.0.0, OMOP CDM v5.4 | `cdm init` creates a CDM v5.4 database and `etl run` fills it from the CDR over AQL, with [concept resolution](https://ferrobridge.eu/docs/integrate/omop-etl.html#concept-resolution-is-sql-not-terminology) as SQL over the OHDSI vocabulary you load, and [FHIR R4 loaded with no CDR](https://ferrobridge.eu/docs/integrate/omop-etl.html#loading-fhir-with-no-cdr) |
+| [The HL7 v2 face](https://ferrobridge.eu/docs/operate/hl7v2-face.html) | HL7 v2 over MLLP, the HL7 v2-to-FHIR guide | An MLLP listener that maps each message through the guide's ConceptMaps and writes it into the CDR as one transaction, acknowledged once the CDR commits or refuses it |
+| [The change feed](https://ferrobridge.eu/docs/integrate/change-feed.html) | openEHR ITS-REST 1.1.0 | Hands each commit of the CDR to [the events lane](https://ferrobridge.eu/docs/integrate/events.html), the incremental OMOP load and [the outbound FHIR lane](https://ferrobridge.eu/docs/integrate/fhir-outbound.html), which posts one transaction Bundle per changed composition |
+| [The interoperability component](https://ferrobridge.eu/docs/evaluate/interoperability-component.html) | Regulation (EU) 2025/327 | The `eehrxf` crate: the European exchange format in FHIR R4 for prescriptions and dispensations, laboratory, imaging and discharge reports, mapped from openEHR through FHIRconnect |
+
+[Writing and loading mappings](https://ferrobridge.eu/docs/integrate/mappings.html)
+covers the model, extension and context files, `ferrobridge mapping check`,
+and the operator API that reloads a running bridge.
+[The operator console](https://ferrobridge.eu/docs/operate/operator-console.html)
+shows the running mapping set, edits and checks a draft, and runs a mapping
+in a playground.
+
 ## Quick start
 
-The latest release is [v0.0.23](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.23), cut on 2026-11-10.
-Download its `compose.yaml`, create the four secret files it reads (empty
-for a lane you leave off), and start the bridge:
+The quickstart runs the published image with every lane off. You need
+Docker Compose and `curl`. Download the `compose.yaml` of the latest release:
 
 ```sh
 curl -LO https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest/download/compose.yaml
-mkdir -p secrets
-touch secrets/cdm_url secrets/cdm_password secrets/cdr_password secrets/terminology_password
-docker compose up
 ```
 
-In a second terminal, check that it runs:
+Create the secret files it reads, empty for a lane you leave off:
 
+<!-- tour:secrets -->
 ```sh
-curl http://127.0.0.1:8080/health/liveness
+mkdir -p secrets && umask 077
+touch secrets/cdm_url secrets/cdm_password secrets/cdr_password \
+  secrets/terminology_password secrets/console_oidc_client_secret
 ```
 
-Every lane is off until you configure it: set `FERROBRIDGE__CDR__ENDPOINT__URL`
-to reach your openEHR record server and `FERROBRIDGE__TERMINOLOGY__ENDPOINT__URL`
-for your terminology server. The header of `compose.yaml` names every
-setting, and the `cdm` and `console` profiles add an OMOP database and the
-operator console. The image is `ghcr.io/ferrohealth/ferrobridge:0.0.23`.
+Start the bridge and ask for liveness:
+
+<!-- tour:start -->
+```sh
+docker compose up --wait
+curl --fail-with-body -s http://127.0.0.1:8080/health/liveness
+```
+
+Every command above is a step of
+[`scripts/quickstart/tour.sh`](scripts/quickstart/tour.sh), which CI runs
+against `compose.yaml`. Turn a lane on by setting its variable:
+`FERROBRIDGE__CDR__ENDPOINT__URL` reaches your openEHR CDR and
+`FERROBRIDGE__TERMINOLOGY__ENDPOINT__URL` your terminology server. The header
+of `compose.yaml` names every setting, and the `cdm` and `console` profiles
+add an OMOP database and the operator console.
 [Configuring the server](https://ferrobridge.eu/docs/operate/configuration.html)
-and [the container image](https://ferrobridge.eu/docs/operate/container.html)
-continue from here.
+continues from here.
 
-## What ships today
+## Deploy it
 
-### FHIR
+Every release publishes, from one tag:
 
-- [The FHIR R4 facade](https://ferrobridge.eu/docs/integrate/fhir-facade.html) over the record server: create, read, update, transaction, batch, search and `$validate`
-- [The FHIRconnect operations](https://ferrobridge.eu/docs/integrate/operations.html) `$tofhir` and `$toopenehr`, which run a mapping without a record server
-- [SMART App Launch](https://ferrobridge.eu/docs/integrate/fhir-facade.html): every access token checked, with SMART v2 scopes per interaction
-- [Mappings in FHIRconnect](https://ferrobridge.eu/docs/integrate/mappings.html), checked against the published schemas when they load
+- the bridge image `ghcr.io/ferrohealth/ferrobridge` and the console image
+  `ghcr.io/ferrohealth/ferrobridge-console`, for `linux/amd64` and
+  `linux/arm64`, on a distroless base;
+- the static `ferrobridge` binary for Linux and the quickstart
+  `compose.yaml` on the [GitHub release](https://github.com/FerroHEALTH/FerroBRIDGE/releases);
+- the library crates whose version moved, on crates.io.
 
-### OMOP
+The latest release is [v0.0.23](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.23), cut on 2026-11-10.
+Its image is `ghcr.io/ferrohealth/ferrobridge:0.0.23`.
+The bridge runs beside an openEHR CDR over ITS-REST, a FHIR terminology
+server and, for the OMOP side, a CDM v5.4 database with the OHDSI vocabulary
+loaded ([What FerroBRIDGE runs beside](https://ferrobridge.eu/docs/operate/deployment-shape.html)).
+[The container image](https://ferrobridge.eu/docs/operate/container.html)
+covers the images, the probes and the compose profiles.
 
-- [The OMOP ETL](https://ferrobridge.eu/docs/integrate/omop-etl.html): `cdm init` creates a CDM v5.4 database, `etl run` fills it from the record server through OMOCL
-- [FHIR R4 into OMOP with no record server](https://ferrobridge.eu/docs/integrate/omop-etl.html#loading-fhir-with-no-cdr)
-- [Concept resolution](https://ferrobridge.eu/docs/integrate/omop-etl.html#concept-resolution-is-sql-not-terminology) over the OHDSI vocabulary you load
+## Security and conformance
 
-### HL7 v2
+- **Who may call it:** the facade and the operator API are a SMART App
+  Launch 2 resource server, and every access is written to the
+  [access record](https://ferrobridge.eu/docs/operate/access-record.html)
+  of Regulation (EU) 2025/327.
+- **How it fails:** an upstream failure is reported with its status, never
+  turned into an empty answer
+  ([Failure and identity behaviour](https://ferrobridge.eu/docs/operate/failure-and-identity.html)).
+- **What you install:** every release is signed and carries an SBOM and
+  SLSA Build Level 3 provenance, and every scan finding an OpenVEX
+  judgement ([verifying a release](SECURITY.md#verifying-a-release)).
+- **Conformance:** each conformance badge above links to its pass list, the
+  cases that pass against the published FHIRconnect and OMOCL mapping
+  libraries, the HL7 FHIR examples per version, the HL7 FHIRPath test suite
+  and the HL7 v2 message sets
+  ([Checks and gates](https://ferrobridge.eu/docs/contribute/checks-and-gates.html)).
 
-- [The HL7 v2 face](https://ferrobridge.eu/docs/operate/hl7v2-face.html): an MLLP listener that maps each message through HL7's v2-to-FHIR guide and writes it as one transaction
+The source is public and every feature is in this repository; there is no
+paid edition with extra functions.
 
-### Operations
+## Crates
 
-- [The operator console](https://ferrobridge.eu/docs/operate/operator-console.html): engine state, mapping files, a transform playground and a validation dry run
-- [The operator API](https://ferrobridge.eu/docs/operate/operator-api.html) behind the same sign-in
-- [Failure and identity behaviour](https://ferrobridge.eu/docs/operate/failure-and-identity.html): an upstream failure is always reported, never hidden
-- [Container images and release binaries](https://ferrobridge.eu/docs/operate/container.html) for amd64 and arm64, signed, with a software bill of materials
-
-### Libraries
-
-- The FHIR model for STU3 to R6, HL7 v2 tables, a FHIRPath evaluator, a FHIR R4 profile validator and a terminology client, published as Rust crates (listed below)
-
-<details>
-<summary><b>Published crates</b> (12)</summary>
+The mapping languages, the FHIR and HL7 v2 models and the clients the
+bridge is built from are published as Rust crates. Pin a crate exactly:
+every change moves it one patch
+([Crate versions](https://ferrobridge.eu/docs/contribute/crate-versions.html)).
 
 | Crate | What it does | Version | Docs | Downloads |
 |---|---|---|---|---|
@@ -213,21 +229,39 @@ continue from here.
 | [`eehrxf`](https://crates.io/crates/eehrxf) | The European interoperability component of an EHR system under the EHDS Regulation: the exchange format in FHIR R4, mapped from openEHR | [![crates.io](https://img.shields.io/crates/v/eehrxf?logo=rust&label=crates.io)](https://crates.io/crates/eehrxf) | [![docs.rs](https://img.shields.io/docsrs/eehrxf?logo=docsdotrs&label=docs.rs)](https://docs.rs/eehrxf) | [![downloads](https://img.shields.io/crates/d/eehrxf?logo=rust&label=downloads)](https://crates.io/crates/eehrxf) |
 | [`ferrobridge-operator-api`](https://crates.io/crates/ferrobridge-operator-api) | The health and operator documents the bridge and its console share | [![crates.io](https://img.shields.io/crates/v/ferrobridge-operator-api?logo=rust&label=crates.io)](https://crates.io/crates/ferrobridge-operator-api) | [![docs.rs](https://img.shields.io/docsrs/ferrobridge-operator-api?logo=docsdotrs&label=docs.rs)](https://docs.rs/ferrobridge-operator-api) | [![downloads](https://img.shields.io/crates/d/ferrobridge-operator-api?logo=rust&label=downloads)](https://crates.io/crates/ferrobridge-operator-api) |
 
-</details>
+## Part of FerroHEALTH
 
-## Learn more
+FerroBRIDGE is one of five [FerroHEALTH](https://ferrohealth.eu) servers.
+Each does one job and reaches the others only over published standards:
+FerroEHR stores the record, FerroBRIDGE translates it to FHIR and the OMOP
+research model, FerroFED connects records across organisations and borders,
+FerroPIX matches patient identities, and FerroTERM serves the code systems.
+FerroBRIDGE works with any openEHR CDR and any FHIR terminology server.
 
-- [Documentation](https://ferrobridge.eu/docs/) and the [FerroHEALTH book](https://ferrohealth.eu/docs/)
-- [Architecture](https://ferrobridge.eu/docs/evaluate/architecture.html) and [the two mapping specifications](https://ferrobridge.eu/docs/evaluate/mapping-specifications.html)
-- [Crate versions](https://ferrobridge.eu/docs/contribute/crate-versions.html): pin a crate exactly, every change moves it one patch
-- [Changelog](CHANGELOG.md) and [milestones](https://github.com/FerroHEALTH/FerroBRIDGE/milestones)
-- [Security policy](SECURITY.md), with [verifying a release](SECURITY.md#verifying-a-release)
-- [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md), [support](SUPPORT.md), [governance](GOVERNANCE.md), [maintainers](MAINTAINERS.md) and the [AI statement](AI_STATEMENT.md)
+## Documentation
+
+- [The FerroBRIDGE book](https://ferrobridge.eu/docs/): evaluate,
+  integrate, operate and contribute, and the
+  [FerroHEALTH book](https://ferrohealth.eu/docs/) for what the family
+  shares
+- [Architecture](https://ferrobridge.eu/docs/evaluate/architecture.html) and
+  [the two mapping specifications](https://ferrobridge.eu/docs/evaluate/mapping-specifications.html)
+- [Releases](https://ferrobridge.eu/docs/operate/releases.html), the
+  [changelog](CHANGELOG.md) and the
+  [GitHub releases](https://github.com/FerroHEALTH/FerroBRIDGE/releases)
+
+## Support and contributing
+
+- [Support](SUPPORT.md) and the [security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md),
+  [governance](GOVERNANCE.md), [maintainers](MAINTAINERS.md) and the
+  [AI statement](AI_STATEMENT.md)
 
 ## Licence
 
-Business Source License 1.1 ([LICENSE](LICENSE)), with Apache License 2.0 as
-the Change License four years after each version; `fhir-types` and
-`hl7v2-types` are Apache-2.0 today. The
+Business Source License 1.1 ([LICENSE](LICENSE)): free outside production
+and for non-commercial production use, a commercial licence from Cadasto
+B.V. for other production use, and Apache License 2.0 four years after each
+version; `fhir-types` and `hl7v2-types` are Apache-2.0 today. The
 [licensing page](https://ferrobridge.eu/docs/evaluate/licensing.html) says
-when you need a commercial licence from Cadasto B.V.
+which applies to you.

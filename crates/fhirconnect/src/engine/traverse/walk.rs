@@ -243,7 +243,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
             };
             read_at.push(unread::instance_of(target.node().flat_id(), &positions));
             found.present = found.present.saturating_add(1);
-            found.types.push(String::from(target.node().rm_type()));
+            found
+                .types
+                .push(held_class(at_tail, target.node().rm_type()));
             if let Some(text) = scalar(at_tail) {
                 found.values.push(text);
             }
@@ -846,4 +848,23 @@ fn text_of(value: &serde_json::Value) -> &serde_json::Value {
         }
         _ => value,
     }
+}
+
+/// Returns the class the `type` operator tests a condition attribute by: the
+/// class of the data value the attribute holds.
+///
+/// `basics/Conditions.adoc` §openehrCondition names `items[at0001]`, an
+/// `ELEMENT`, and tests `DV_CODED_TEXT`, the class of its value; a value
+/// states its class as `_type` (openEHR ITS-JSON). The node's declared class
+/// answers for a value that states none.
+fn held_class(value: &serde_json::Value, declared: &str) -> String {
+    let stated = value.get("_type").and_then(serde_json::Value::as_str);
+    let held = match stated {
+        Some("ELEMENT") => value
+            .get("value")
+            .and_then(|inner| inner.get("_type"))
+            .and_then(serde_json::Value::as_str),
+        other => other,
+    };
+    String::from(held.unwrap_or(declared))
 }

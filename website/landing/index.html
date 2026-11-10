@@ -11,9 +11,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>FerroBRIDGE: an openEHR bridge to HL7 FHIR and the OMOP Common Data Model</title>
-  <meta name="description" content="FerroBRIDGE is a pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through the FHIRconnect specification, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML, never hand-coded per resource or table. The latest release is v0.0.23.">
+  <meta name="description" content="FerroBRIDGE is a pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through the FHIRconnect specification, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML, never hand-coded per resource or table.">
   <link rel="canonical" href="https://ferrobridge.eu/">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v={{hash:style.css}}">
   <link rel="icon" href="./assets/brand/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="./assets/brand/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="alternate icon" href="./assets/brand/favicon.ico" sizes="32x32 16x16">
@@ -21,7 +21,7 @@
   <meta property="og:url" content="https://ferrobridge.eu/">
   <meta property="og:site_name" content="FerroBRIDGE">
   <meta property="og:title" content="FerroBRIDGE: an openEHR bridge to HL7 FHIR and the OMOP Common Data Model">
-  <meta property="og:description" content="A pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through FHIRconnect, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML. The latest release is v0.0.23.">
+  <meta property="og:description" content="A pure-Rust, standalone bridge between openEHR and two targets: HL7 FHIR through FHIRconnect, and the OMOP Common Data Model through OMOCL. Mappings are specification-conformant YAML.">
   <meta property="og:image" content="https://ferrobridge.eu/assets/brand/ferrobridge-social.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
@@ -43,7 +43,8 @@
     "codeRepository": "https://github.com/FerroHEALTH/FerroBRIDGE",
     "programmingLanguage": "Rust",
     "license": "https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/LICENSE",
-    "applicationCategory": "HealthApplication"
+    "applicationCategory": "HealthApplication",
+    "runtimePlatform": "Linux"
   }
   </script>
 </head>
@@ -52,13 +53,17 @@
   <header class="nav">
     <div class="wrap">
       <a class="brand" href="./">
-        <img src="./assets/brand/ferrobridge-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+        <picture>
+          <source srcset="./assets/brand/ferrobridge-icon-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="./assets/brand/ferrobridge-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+        </picture>
         <span>FerroBRIDGE</span>
       </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="./docs/">Docs</a>
+        <a href="./docs/operate/container.html#running-it-with-compose" class="hide-sm">Quickstart</a>
+        <a href="./docs/integrate/mappings.html" class="hide-sm">Mappings</a>
         <a href="./docs/evaluate/architecture.html" class="hide-sm">Architecture</a>
-        <a href="./docs/evaluate/build-order.html" class="hide-sm">Build order</a>
         <a href="https://github.com/FerroHEALTH/FerroBRIDGE" rel="noopener">GitHub</a>
       </nav>
     </div>
@@ -68,8 +73,14 @@
 
     <section class="hero">
       <div class="wrap">
-        <img class="hero-logo" src="./assets/brand/ferrobridge-icon.svg" alt="FerroBRIDGE" width="88" height="88">
-        <p class="status" role="note">Latest release: v0.0.23, 2026-11-10.</p>
+        <picture>
+          <source srcset="./assets/brand/ferrobridge-icon-dark.svg" media="(prefers-color-scheme: dark)">
+          <img class="hero-logo" src="./assets/brand/ferrobridge-icon.svg" alt="FerroBRIDGE" width="88" height="88">
+        </picture>
+        <!-- The version is rendered from the root Cargo.toml when the site is
+             assembled (scripts/site/assemble.sh), so it is always the release
+             main carries. -->
+        <a class="status" href="https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest" rel="noopener">v{{version:ferrobridge}} released</a>
         <h1>One bridge from openEHR to HL7 FHIR and to the OMOP Common Data Model.</h1>
         <p class="sub">
           FerroBRIDGE reads FHIRconnect and OMOCL mapping files and runs them
@@ -78,112 +89,247 @@
           nothing is hand-coded per FHIR resource or per OMOP table.
         </p>
         <div class="hero-cta">
-          <a class="btn btn-primary" href="https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest" rel="noopener">Get the latest release</a>
+          <a class="btn btn-primary" href="./docs/operate/container.html#running-it-with-compose">Run the quickstart</a>
           <a class="btn btn-ghost" href="./docs/evaluate/architecture.html">Read the architecture</a>
         </div>
         <p class="note">
-          Each release ships the <code>ferrobridge</code> binary for Linux, the
-          container image <code>ghcr.io/ferrohealth/ferrobridge</code>, the
-          operator console image, and library crates on crates.io. The
-          repository's <code>compose.yaml</code> starts the bridge with one
-          command.
+          A server image and an operator console image on GHCR and the
+          <code>ferrobridge</code> binary for Linux, built at SLSA Build Level
+          3, and the mapping and FHIR crates on crates.io.
         </p>
       </div>
     </section>
 
-    <section id="decided" class="surface">
+    <section id="lanes" class="surface">
       <div class="wrap">
         <div class="section-head">
-          <span class="eyebrow">What is decided</span>
-          <h2>Four decisions the rest of the design follows from</h2>
+          <span class="eyebrow">What it does</span>
+          <h2>One mapping foundation behind every lane</h2>
           <p>
-            Each one is recorded with its ground in the architecture document,
-            including the places where no specification governs the choice and
-            FerroBRIDGE makes its own.
+            FHIRconnect and OMOCL share a header, a YAML loader, a mapping
+            registry and the openEHR path model. Each language keeps its own
+            parser, validator and interpreter, and every lane below runs the
+            mapping files you load.
+          </p>
+        </div>
+        <div class="grid">
+
+          <a class="card" href="./docs/integrate/fhir-facade.html">
+            <span class="tag">FHIRconnect 1.0.0 on FHIR R4</span>
+            <h3>The FHIR facade</h3>
+            <p>
+              A FHIR client sees one FHIR server, and every request becomes
+              CDR operations driven by the mappings: read, vread, create,
+              update, search, transaction and batch. The facade stores no
+              clinical data of its own.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/integrate/omop-etl.html">
+            <span class="tag">OMOCL 1.0.0 into CDM v5.4</span>
+            <h3>The OMOP ETL</h3>
+            <p>
+              A batch job over AQL turns each composition into typed rows of
+              an OMOP CDM v5.4 database, and resolves every concept by SQL
+              over the OHDSI vocabulary you loaded.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/integrate/mappings.html">
+            <span class="tag">Specification-conformant YAML</span>
+            <h3>Mappings are the product</h3>
+            <p>
+              Model, extension and context files, each checked against its
+              published schema at load. <code>ferrobridge mapping check</code>
+              checks a tree without serving it, and the operator API reloads a
+              running bridge.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/integrate/operations.html">
+            <span class="tag">$tofhir and $toopenehr</span>
+            <h3>The FHIRconnect operations</h3>
+            <p>
+              The two operations the FHIRconnect specification defines for its
+              engine, as pure transformations: neither reaches a CDR, so a
+              facade, a test harness or a shell can call them.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/operate/hl7v2-face.html">
+            <span class="tag">HL7 v2 over MLLP</span>
+            <h3>The HL7 v2 face</h3>
+            <p>
+              Each message becomes an R4 Bundle through the ConceptMaps of the
+              HL7 v2-to-FHIR implementation guide and reaches the CDR through
+              the facade's ingest service, acknowledged once the CDR commits
+              or refuses it.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/evaluate/interoperability-component.html">
+            <span class="tag">EHDS, Regulation (EU) 2025/327</span>
+            <h3>The interoperability component</h3>
+            <p>
+              The <code>eehrxf</code> crate builds and receives the European
+              exchange format in FHIR R4: prescriptions and dispensations,
+              laboratory, imaging and discharge reports, mapped from openEHR
+              through FHIRconnect.
+            </p>
+          </a>
+
+        </div>
+      </div>
+    </section>
+
+    <section id="console">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">The operator console</span>
+          <h2>See the mapping set a bridge runs, and try a draft</h2>
+          <p>
+            The console is its own server, reached over the bridge's operator
+            API. It shows the loaded mappings and their diagnostics, edits a
+            draft and checks it before the bridge reloads, and runs a mapping
+            against a sample in the playground.
+          </p>
+        </div>
+        <figure class="shot">
+          <picture>
+            <source srcset="./docs/operate/img/console/dashboard-dark.png" media="(prefers-color-scheme: dark)">
+            <img src="./docs/operate/img/console/dashboard.png" alt="The console's dashboard: the contexts loaded, the errors of the running load and the upstreams reachable, and the flow from the callers through the faces and the mapping set to the openEHR CDR, the terminology server and the OMOP CDM database." width="1440" height="900" loading="lazy">
+          </picture>
+          <figcaption>
+            The dashboard, drawn with synthetic data.
+            <a href="./docs/operate/operator-console.html">Every page of the console</a>,
+            and <a href="./docs/operate/operator-api.html">the operator API behind it</a>.
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="run" class="surface">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">Run it</span>
+          <h2>One binary beside the CDR you already run</h2>
+          <p>
+            The bridge is one static binary on a distroless base. It needs an
+            openEHR CDR over ITS-REST, a FHIR terminology server and, for the
+            OMOP side, a CDM v5.4 database with the OHDSI vocabulary loaded.
+          </p>
+        </div>
+        <div class="grid">
+
+          <a class="card" href="./docs/operate/container.html#running-it-with-compose">
+            <span class="tag">Compose</span>
+            <h3>The quickstart</h3>
+            <p>
+              <code>compose.yaml</code> ships with every release. Create the
+              secret files beside it and <code>docker compose up</code>; the
+              <code>cdm</code> profiles add PostgreSQL and the
+              <code>console</code> profile adds the console.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/operate/container.html#what-the-image-is">
+            <span class="tag">OCI images</span>
+            <h3>The container images</h3>
+            <p>
+              <code>ghcr.io/ferrohealth/ferrobridge</code> and
+              <code>ghcr.io/ferrohealth/ferrobridge-console</code>, for amd64
+              and arm64, each with SLSA provenance and an SBOM you verify
+              before you run it.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/operate/deployment-shape.html">
+            <span class="tag">Around it</span>
+            <h3>What it runs beside</h3>
+            <p>
+              The CDR, the terminology server and the CDM database it reaches,
+              the probes an orchestrator reads, and how the bridge behaves
+              when one of them fails.
+            </p>
+          </a>
+
+        </div>
+      </div>
+    </section>
+
+    <section id="family">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">In the family</span>
+          <h2>The product that maps openEHR outward</h2>
+          <p>
+            The FerroHEALTH products reach each other only over published
+            protocols. FerroBRIDGE is where openEHR content becomes FHIR and
+            OMOP, and its parsers and mapping crates serve the others.
           </p>
         </div>
         <div class="grid">
 
           <article class="card">
-            <h3>A standalone server</h3>
+            <h3>FerroEHR</h3>
             <p>
-              FerroBRIDGE is its own process and its own image. It is not a
-              crate inside a CDR, not a plugin, and not a library a CDR links.
-              It reaches the CDR over ITS-REST like any other client, which is
-              what lets it work against a CDR it did not build.
+              The reference openEHR CDR. The bridge reaches it over ITS-REST
+              1.1.0 like any other client, so it runs against a CDR it did not
+              build.
             </p>
           </article>
 
           <article class="card">
-            <h3>Mapping-driven, never hand-coded</h3>
+            <h3>FerroTERM</h3>
             <p>
-              FHIRconnect files are validated against the two published draft-07
-              JSON schemas. OMOCL publishes none, so FerroBRIDGE authors one
-              from the grammar tables and the published library, and validates
-              every file against it.
+              The reference FHIR terminology server, asked for code systems
+              and value sets through <code>$lookup</code>,
+              <code>$translate</code> and <code>$validate-code</code>.
             </p>
           </article>
 
           <article class="card">
-            <h3>One foundation, two interpreters</h3>
+            <h3>FerroPIX and FerroFED</h3>
             <p>
-              FHIRconnect and OMOCL share a header and nothing else. The header
-              model, the YAML loader, the mapping registry, and the RM-path
-              model are shared; each language keeps its own parser, validator,
-              and interpreter.
-            </p>
-          </article>
-
-          <article class="card">
-            <h3>Two sinks, two shapes</h3>
-            <p>
-              The FHIR side is a REST facade over the CDR that stores no
-              clinical data. The OMOP side is a batch ETL over AQL that writes
-              typed rows into a CDM v5.4 database, with concept resolution as
-              SQL over the loaded OHDSI vocabulary.
+              The patient index reads HL7 v2 with the bridge's parser and MLLP
+              codec, and the federation gateway serves the documents the
+              <code>eehrxf</code> crate builds.
             </p>
           </article>
 
         </div>
+        <div class="prose">
+          <p>
+            Building on the mapping languages in Rust? The FHIRconnect
+            language is the
+            <a href="https://crates.io/crates/fhirconnect" rel="noopener"><code>fhirconnect</code></a>
+            crate, and the FHIR model it writes is
+            <a href="https://crates.io/crates/fhir-types" rel="noopener"><code>fhir-types</code></a>:
+          </p>
+        </div>
+        <pre class="cmd"><code>cargo add fhirconnect</code></pre>
       </div>
     </section>
 
-    <section id="audiences">
+    <section id="audiences" class="surface">
       <div class="wrap">
         <div class="section-head">
-          <span class="eyebrow">Where to start</span>
-          <h2>Four questions, four answers</h2>
+          <span class="eyebrow">The documentation</span>
+          <h2>Four questions, four parts of the book</h2>
         </div>
         <div class="grid audiences">
 
           <article class="card audience">
             <span class="tag">Evaluate</span>
-            <h3>Does this fit my problem?</h3>
+            <h3>Does it fit my problem?</h3>
             <p>
               The design as decided, the two mapping languages it reads, the
-              version pins and why each one is what it is, and what gets built
-              next.
+              version pins and why each one is what it is, and the licence.
             </p>
             <ul>
               <li><a href="./docs/evaluate/architecture.html">Architecture</a></li>
               <li><a href="./docs/evaluate/mapping-specifications.html">The two mapping specifications</a></li>
               <li><a href="./docs/evaluate/versions.html">Pinned versions</a></li>
-              <li><a href="./docs/evaluate/build-order.html">Build order</a></li>
-            </ul>
-          </article>
-
-          <article class="card audience">
-            <span class="tag">Operate</span>
-            <h3>What does it need around it?</h3>
-            <p>
-              An openEHR CDR over ITS-REST, a FHIR terminology server, and for
-              the OMOP side a CDM v5.4 database with the OHDSI vocabulary
-              loaded. Plus the failure behaviour you should know before you run
-              it.
-            </p>
-            <ul>
-              <li><a href="./docs/operate/deployment-shape.html">What FerroBRIDGE runs beside</a></li>
-              <li><a href="./docs/operate/failure-and-identity.html">Failure and identity behaviour</a></li>
             </ul>
           </article>
 
@@ -192,8 +338,7 @@
             <h3>How do I call it, and what do I write?</h3>
             <p>
               A FHIR R4 facade on one side, a batch ETL into the CDM on the
-              other, and the mapping files that drive both, including where the
-              specifications leave a decision open.
+              other, and the mapping files that drive both.
             </p>
             <ul>
               <li><a href="./docs/integrate/fhir-facade.html">The FHIR facade</a></li>
@@ -203,17 +348,32 @@
           </article>
 
           <article class="card audience">
+            <span class="tag">Operate</span>
+            <h3>What does running it involve?</h3>
+            <p>
+              Every configuration key, the images and compose, the access
+              record, the console, and the failure behaviour you should know
+              before you run it.
+            </p>
+            <ul>
+              <li><a href="./docs/operate/configuration.html">Configuring the server</a></li>
+              <li><a href="./docs/operate/container.html">The container image</a></li>
+              <li><a href="./docs/operate/failure-and-identity.html">Failure and identity behaviour</a></li>
+            </ul>
+          </article>
+
+          <article class="card audience">
             <span class="tag">Contribute</span>
             <h3>How is the work organised?</h3>
             <p>
-              The tracker is the worklist and the checks are committed scripts
-              you can run yourself. Code against an open issue and cited
-              evidence are both welcome.
+              The tracker is the worklist, every check is a committed script
+              you can run, and a change cites the specification section it
+              implements.
             </p>
             <ul>
               <li><a href="./docs/contribute/how-the-work-is-organised.html">How the work is organised</a></li>
               <li><a href="./docs/contribute/checks-and-gates.html">Checks and gates</a></li>
-              <li><a href="./docs/evaluate/licensing.html">Licensing</a></li>
+              <li><a href="./docs/changelog.html">Changelog</a></li>
             </ul>
           </article>
 
@@ -228,26 +388,27 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <a class="brand" href="./">
-            <img src="./assets/brand/ferrobridge-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+            <picture>
+              <source srcset="./assets/brand/ferrobridge-icon-dark.svg" media="(prefers-color-scheme: dark)">
+              <img src="./assets/brand/ferrobridge-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+            </picture>
             <span>FerroBRIDGE</span>
           </a>
           <p>
-            A pure-Rust, standalone bridge between openEHR and two
-            interoperability targets: HL7 FHIR through the FHIRconnect
-            specification, and the OMOP Common Data Model through OMOCL. The
-            software is licensed under the
-            <a href="https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/LICENSE" rel="noopener">Business Source License 1.1</a>;
-            the Licensor is Cadasto B.V.
+            A pure-Rust bridge from openEHR to HL7 FHIR and the OMOP Common
+            Data Model, one of the
+            <a href="https://ferrohealth.eu/" rel="noopener">FerroHEALTH</a>
+            family. The software is licensed under the
+            <a href="https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/LICENSE" rel="noopener">Business Source License 1.1</a>:
+            free outside production and for non-commercial production use, a
+            commercial licence for other production use, and Apache License
+            2.0 four years after each version.
+            <a href="./docs/evaluate/licensing.html">Which applies to you</a>.
           </p>
           <p>
-            Development, testing, evaluation and non-commercial production use
-            are free. A care provider, a company running it in production, a
-            hosted service and a for-fee distribution need a commercial
-            licence from Cadasto B.V.
-            (<a href="mailto:info@cadasto.com">info@cadasto.com</a>). Each
-            version becomes Apache License 2.0 four years after it is
-            published.
-            <a href="./docs/evaluate/licensing.html#do-you-need-a-commercial-licence">Do you need a commercial licence?</a>
+            Manufactured by Cadasto B.V., Comeniusstraat 2d, 1817 MS Alkmaar,
+            The Netherlands:
+            <a href="mailto:info@cadasto.com">info@cadasto.com</a>.
           </p>
         </div>
         <div class="footer-links">
@@ -255,17 +416,21 @@
             <h4>Read</h4>
             <ul>
               <li><a href="./docs/">Documentation</a></li>
-              <li><a href="./docs/evaluate/architecture.html">Architecture</a></li>
-              <li><a href="./docs/evaluate/build-order.html">Build order</a></li>
-              <li><a href="./docs/evaluate/licensing.html">Licensing</a></li>
+              <li><a href="./docs/operate/container.html#running-it-with-compose">Quickstart</a></li>
+              <li><a href="./docs/operate/configuration.html">Configuration</a></li>
+              <li><a href="./docs/integrate/mappings.html">Mappings</a></li>
+              <li><a href="https://ferrohealth.eu/docs/" rel="noopener">The family book</a></li>
+              <li><a href="https://sevkohler.github.io/FHIRconnect-spec/build/site/FHIRconnect/v1.0.0/index.html" rel="noopener">FHIRconnect</a></li>
             </ul>
           </div>
           <div>
             <h4>Project</h4>
             <ul>
               <li><a href="https://github.com/FerroHEALTH/FerroBRIDGE" rel="noopener">GitHub</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroBRIDGE/releases" rel="noopener">Releases</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroBRIDGE/milestones" rel="noopener">Roadmap</a></li>
               <li><a href="https://github.com/FerroHEALTH/FerroBRIDGE/issues" rel="noopener">Issues</a></li>
-              <li><a href="https://github.com/FerroHEALTH/FerroBRIDGE/milestones" rel="noopener">Milestones</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroBRIDGE/security/policy" rel="noopener">Security policy</a></li>
             </ul>
           </div>
         </div>
