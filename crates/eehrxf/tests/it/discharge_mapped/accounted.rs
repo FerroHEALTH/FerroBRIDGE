@@ -41,7 +41,7 @@ fn issues(text: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
         .collect())
 }
 
-/// The FHIRPaths the issues of `issues` declare not carried.
+/// The element paths the issues of `issues` declare not carried.
 fn not_carried(issues: &[(String, String)]) -> Vec<&str> {
     issues
         .iter()
