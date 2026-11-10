@@ -25,7 +25,6 @@ expression: declared
     "clinicalStatus.text = \"active\"",
     "code.text = \"I21.9\"",
     "meta.profile[0] = \"https://www.medizininformatik-initiative.de/fhir/core/modul-person/StructureDefinition/Todesursache\"",
-    "onsetPeriod.start = \"2026-09-12T10:00:00+02:00\"",
     "recorder.display = \"FHIRconnect\""
   ],
   "changed": [

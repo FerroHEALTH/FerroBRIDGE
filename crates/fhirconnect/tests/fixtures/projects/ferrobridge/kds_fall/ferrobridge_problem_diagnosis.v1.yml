@@ -1,0 +1,102 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/evaluation/org.openehr/problem_diagnosis.v1.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published lines 31 to 50 and 57 to 77 write the text
+# `asserter` onto the DV_TEXT `function` itself rather than its `value`
+# (manual.adoc) and map the asserter Reference onto the PARTICIPATION rather
+# than its `performer` (#101); lines 105 to 109 slot
+# CLUSTER.anatomical_location.v1, which anchors its methods on `$resource`
+# (#173). Those three methods are left out; every other method is the
+# published one.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: EVALUATION.problem_diagnosis.v1
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+    revision: 1.4.1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+
+
+preprocessor:
+  fhirCondition:
+    targetRoot: $resource # exclude all conditions with entered-in-error, since there is no mapping for this code
+    targetAttribute: verificationStatus.coding.code
+    operator: not of
+    criteria: entered-in-error
+
+mappings:
+
+  - name: contextStartTime
+    with:
+      fhir: $resource.recordedDate
+      openehr: $composition/context/start_time
+
+  - name: composer
+    with:
+      fhir: $resource.recorder
+      openehr: $composition/composer # often required therefore simplified mapping engine is to resolve Reference -> Composer
+
+
+  - name: provider
+    with:
+      fhir: $resource.recorder
+      openehr: $archetype/provider  # often required therefore simplified mapping engine is to resolve Reference -> Participations
+
+
+  - name: problemDiagnose
+    with:
+      fhir: $resource.code
+      openehr: $archetype/data[at0001]/items[at0002]
+
+
+  - name: note
+    with:
+      fhir: $resource.note.text
+      openehr: $archetype/data[at0001]/items[at0069]
+
+  - name: dateTime
+    with:
+      fhir: $resource.onset
+      openehr: $archetype/data[at0001]/items[at0077]
+
+  - name: bodySite
+    with:
+      fhir: $resource.bodySite
+      openehr: $archetype/data[at0001]/items[at0012]
+
+
+  - name: severity
+    with:
+      fhir: $resource.severity
+      openehr: $archetype/data[at0001]/items[at0005]
+
+# unmapped openEHR  (archetype 1.4.1, CKM latest 1.7.4)
+# data[at0001]/items[at0003]      Date/time clinically recognised  KDS maps it (KDS_problem_diagnose)
+# data[at0001]/items[at0009]      Clinical description
+# data[at0001]/items[at0012]      Body site                        referenced with a different path, check
+# data[at0001]/items[at0030]      Date/time of resolution
+# data[at0001]/items[at0072]      Course description
+# data[at0001]/items[at0073]      Diagnostic certainty             KDS maps it (KDS_problem_diagnose)
+# data[at0001]/items[at0078]      Cause
+# data[at0001]/items[at0079]      Variant
+# data[at0001]/items[at0080]      Impact
+# protocol[at0032]/items[at0070]  Last updated
+# unmapped FHIR  (Condition R4)
+# Condition.identifier
+# Condition.clinicalStatus
+# Condition.verificationStatus
+# Condition.category
+# Condition.abatement[x]
+# Condition.stage
+# Condition.evidence
