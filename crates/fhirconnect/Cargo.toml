@@ -4,7 +4,7 @@
 name = "fhirconnect"
 description = "The FHIRconnect mapping language for Rust: the mapping file model and its validation, context resolution into an immutable program, and the bidirectional interpreter between openEHR compositions and FHIR resources"
 # On the crate line, the fhir-types line, since its first publish (docs/VERSIONS.md).
-version = "0.1.252"
+version = "0.1.253"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -18,6 +18,10 @@ categories = ["parser-implementations", "science"]
 # The crate line is published on crates.io; include is the packaged content.
 publish = true
 include = ["src/**", "schemas/**", "README.md", "LICENSE"]
+
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["jsonschema", "serde_json"]
 
 [features]
 # The FHIRconnect language (`model`, `resolve`, `engine`, `operations`), on by

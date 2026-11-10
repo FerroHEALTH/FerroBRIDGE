@@ -19,6 +19,10 @@ categories = ["parser-implementations", "science"]
 publish = true
 include = ["src/**", "schemas/**", "README.md", "LICENSE"]
 
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["jsonschema"]
+
 [dependencies]
 jsonschema.workspace = true
 # The CDM v5.4 column metadata the key-to-column projection names and the

@@ -4,7 +4,7 @@
 name = "ferrobridge-validator"
 description = "A FHIR R4 and STU3 profile validator over packages read offline, the generated fhir-types model and its element table"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.4.0"
+version = "0.4.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -18,6 +18,10 @@ categories = ["science"]
 # The crate line is published on crates.io; include is the packaged content.
 publish = true
 include = ["src/**", "README.md", "LICENSE"]
+
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["http", "regex", "serde_json"]
 
 [dependencies]
 # A binding the package set cannot decide goes to a terminology server as

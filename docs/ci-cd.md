@@ -105,6 +105,7 @@ maps it. Each lane then reads one output:
 |---|---|
 | `clippy`, `test`, `msrv` | any package is reached; each runs the reached packages only, in shards |
 | `rustdoc`, `publish-dry-run` | any package is reached |
+| `public dependencies` | any package is reached; it builds the rustdoc JSON of the reached published crates with every feature and holds each crate's `public-dependencies` declaration to the third-party crates its API names (`scripts/checks/public-surface.sh`, #1851) |
 | `clippy-fhir-types`, `fhir-types-features` | `fhir-types` is reached |
 | `codegen-drift`, `codegen-emit-tests` | `fhir-codegen` is reached (its sources, its vendored packages, `fhir-types` or `hl7v2-types`) |
 | `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |

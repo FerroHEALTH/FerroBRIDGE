@@ -188,8 +188,11 @@ classify() {
     scripts/checks/crate-version-guard.sh | scripts/checks/favicon-sync.sh) echo inert ;;
     # Read by the CI `crate-version-guard` job and the release plan alone.
     scripts/checks/semver.sh) echo inert ;;
-    # Read by crate-version-guard.sh and semver.sh alone.
+    # Read by crate-version-guard.sh, semver.sh and public-surface.sh alone.
     scripts/checks/lib/public-deps.sh) echo inert ;;
+    # Self-tested in tier 1 on every change, and run over every published
+    # crate on main, where every lane runs.
+    scripts/checks/public-surface.sh) echo inert ;;
     scripts/checks/file-length.sh | scripts/checks/file-length-allow.txt) echo inert ;;
     # Read by the CI `duplication` job alone, which runs on every change.
     scripts/checks/duplication.sh | scripts/checks/duplication.count | scripts/checks/duplication-baseline.txt) echo inert ;;

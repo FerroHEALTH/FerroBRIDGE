@@ -5,7 +5,7 @@ name = "eehrxf"
 description = "The European interoperability software component of an EHR system under Regulation (EU) 2025/327: the format-neutral dataset model of the priority categories read from the Xt-EHR EHDS logical models, and the European electronic health record exchange format in FHIR R4, mapped from openEHR by FHIRconnect"
 # On the crate line, the fhir-types line, since it moved here from FerroFED at
 # 0.0.40 (docs/VERSIONS.md).
-version = "0.4.2"
+version = "0.4.3"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -25,6 +25,10 @@ include = ["src/**", "mappings/**", "README.md", "LICENSE"]
 # governs this: our own design). The crate depends on no gateway and on no
 # logging component, so the two harmonised components stay independent of
 # each other.
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["http", "serde_json"]
+
 [features]
 # Article 14(1)(a), patient summaries.
 patient-summary = []

@@ -38,6 +38,9 @@
 #       at its baseline's version, or new since it, is left out.
 #   semver.sh --pin
 #       Print the cargo-semver-checks version docs/VERSIONS.md pins.
+#   semver.sh --self-test
+#       Run the public dependency verdict over fixtures, with no judge and no
+#       network.
 #
 # The installed cargo-semver-checks must be the pinned version. Exit 0 when
 # every crate's version answers its change, 1 when one does not, 2 on a usage
@@ -49,9 +52,117 @@ cd "$root"
 . scripts/checks/lib/public-deps.sh
 
 usage() {
-  echo "usage: semver.sh [--baseline-rev <rev>] [<crate>...] | --pin" >&2
+  echo "usage: semver.sh [--baseline-rev <rev>] [<crate>...] | --pin | --self-test" >&2
   exit 2
 }
+
+# Whether $1 and $2 share their compatibility line: the major, and the minor
+# too while the major is 0 (the Cargo caret rule).
+same_line() {
+  local a="$1" b="$2"
+  if [[ "${a%%.*}" == "0" ]]; then
+    [[ "$(cut -d. -f1-2 <<<"$a")" == "$(cut -d. -f1-2 <<<"$b")" ]]
+  else
+    [[ "${a%%.*}" == "${b%%.*}" ]]
+  fi
+}
+
+# The third-party crates crate $1 declares public in the tree and, when $2
+# names a revision, at that revision too, one per line (#1851).
+declared_of() {
+  {
+    declared_public < "crates/$1/Cargo.toml"
+    [[ -z "${2:-}" ]] || git show "$2:crates/$1/Cargo.toml" 2>/dev/null | declared_public
+  } | LC_ALL=C sort -u
+}
+
+# The public dependency lines (scripts/checks/lib/public-deps.sh) of crate $1
+# in the tree, given the declared third-party names $2.
+tree_lines() {
+  manifest_requirements Cargo.toml "crates/$1/Cargo.toml" | public_lines "$2"
+}
+
+# The public dependency lines of the crates.io dependencies document on stdin,
+# given the declared third-party names $1.
+document_lines() {
+  jq -r '.dependencies[] | select(.kind == "normal") | "\(.crate_id) \(.req)"' | public_lines "$1"
+}
+
+# The verdict on crate $1 moving from $2 to $3 while the public dependencies
+# `moved` ($4) left their lines: the move breaks its consumers, so it needs
+# another line of its own.
+dependency_verdict() {
+  local crate="$1" previous="$2" current="$3" moved="$4"
+  [[ -n "$moved" ]] || return 0
+  if same_line "$previous" "$current"; then
+    echo "::error::semver: $crate moves from $previous to $current while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
+    return 1
+  fi
+  echo "semver: $crate leaves its line for its public dependencies ($moved)"
+}
+
+# The verdict over a scratch tree and a crates.io document, with no judge and
+# no network: a declared serde_json and jiff count as family crates do (#1851).
+self_test() {
+  local tmp failures=0
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' RETURN
+  mkdir -p "$tmp/crates/demo"
+  printf '{"dependencies": [
+    {"crate_id": "openehr-rm", "req": "^0.0.135", "kind": "normal"},
+    {"crate_id": "serde_json", "req": "^1.0.0", "kind": "normal"},
+    {"crate_id": "jiff", "req": "^0.2.0", "kind": "normal"},
+    {"crate_id": "regex", "req": "^1.0.0", "kind": "normal"},
+    {"crate_id": "tokio", "req": "^1.0.0", "kind": "dev"}]}' > "$tmp/release.json"
+  # The tree requiring openehr-rm $1, serde_json $2, jiff $3 and regex $4,
+  # declaring $5 public.
+  tree() {
+    printf '[workspace]\nmembers = ["crates/demo"]\n\n[workspace.dependencies]\nopenehr-rm = "%s"\nserde_json = "%s"\njiff = { version = "%s", default-features = false }\nregex = "%s"\n' \
+      "$1" "$2" "$3" "$4" > "$tmp/Cargo.toml"
+    printf '[package]\nname = "demo"\nversion = "0.1.4"\n\n[package.metadata.ferrohealth]\npublic-dependencies = [%s]\n\n[dependencies]\nopenehr-rm.workspace = true\nserde_json.workspace = true\njiff.workspace = true\nregex.workspace = true\n' \
+      "$5" > "$tmp/crates/demo/Cargo.toml"
+  }
+  expect() {
+    local want="$1" label="$2" got=0
+    (
+      cd "$tmp"
+      declared="$(declared_of demo)"
+      dependency_verdict demo "$4" "$3" \
+        "$(moved_lines "$(document_lines "$declared" < release.json)" "$(tree_lines demo "$declared")")"
+    ) > /dev/null 2>&1 || got=1
+    if [[ "$got" -ne "$want" ]]; then
+      echo "semver: self-test: $label: exit $got, wanted $want" >&2
+      failures=$((failures + 1))
+    fi
+  }
+
+  tree 0.0.135 1.0.9 0.2.5 1.11.0 '"serde_json", "jiff"'
+  expect 0 "patch steps on every line" 0.1.4 0.1.3
+  tree 0.0.135 1.0.0 0.2.0 2.0.0 '"serde_json", "jiff"'
+  expect 0 "an undeclared regex on another line with a patch step" 0.1.4 0.1.3
+  tree 0.0.136 1.0.0 0.2.0 1.0.0 '"serde_json", "jiff"'
+  expect 1 "a family dependency on another line with a patch step" 0.1.4 0.1.3
+  tree 0.0.135 2.0.0 0.2.0 1.0.0 '"serde_json", "jiff"'
+  expect 1 "a declared serde_json on another line with a patch step" 0.1.4 0.1.3
+  expect 0 "a declared serde_json on another line with the next minor" 0.2.0 0.1.3
+  tree 0.0.135 1.0.0 0.3.0 1.0.0 '"serde_json", "jiff"'
+  expect 1 "a declared jiff on another line with a patch step" 0.1.4 0.1.3
+  expect 0 "a declared jiff on another line with a minor that skips one" 0.3.0 0.1.3
+  tree 0.0.135 1.0.0 0.3.0 1.0.0 '"serde_json"'
+  expect 0 "an undeclared jiff on another line with a patch step" 0.1.4 0.1.3
+
+  if [[ "$failures" -ne 0 ]]; then
+    echo "semver: self-test: $failures case(s) failed" >&2
+    return 1
+  fi
+  echo "semver: self-test passed"
+}
+
+if [[ "${1:-}" == "--self-test" ]]; then
+  [[ "$#" -eq 1 ]] || usage
+  self_test
+  exit
+fi
 
 # The Pin cell of the cargo-semver-checks row, its backticks stripped.
 pin="$(awk -F'|' '{ k = $2; gsub(/[` ]/, "", k) } k == "cargo-semver-checks" { v = $3; gsub(/[^0-9.]/, "", v); print v; exit }' docs/VERSIONS.md)"
@@ -109,46 +220,32 @@ baseline_version() {
   fi
 }
 
-# Whether $1 and $2 share their compatibility line: the major, and the minor
-# too while the major is 0 (the Cargo caret rule).
-same_line() {
-  local a="$1" b="$2"
-  if [[ "${a%%.*}" == "0" ]]; then
-    [[ "$(cut -d. -f1-2 <<<"$a")" == "$(cut -d. -f1-2 <<<"$b")" ]]
-  else
-    [[ "${a%%.*}" == "${b%%.*}" ]]
-  fi
-}
-
-# The public dependency lines (scripts/checks/lib/public-deps.sh) of crate $1
-# in the tree, at revision $2, and of release $2 on crates.io.
-tree_lines() {
-  manifest_requirements Cargo.toml "crates/$1/Cargo.toml" | public_lines
-}
 revision_lines() {
-  manifest_requirements <(git show "$2:Cargo.toml") <(git show "$2:crates/$1/Cargo.toml") | public_lines
+  manifest_requirements <(git show "$2:Cargo.toml") <(git show "$2:crates/$1/Cargo.toml") |
+    public_lines "$3"
 }
 release_lines() {
-  crates_io "$1/$2/dependencies" |
-    jq -r '.dependencies[] | select(.kind == "normal") | "\(.crate_id) \(.req)"' | public_lines
+  crates_io "$1/$2/dependencies" | document_lines "$3"
 }
 
 # The public dependencies of crate $1 that moved to another compatibility line
 # since version $2 at the baseline (#1777). Against a revision, the newest
 # release on crates.io counts too while it shares the line of $2: a move that
 # landed under an unpublished patch still breaks the consumers of that release.
+# A third-party crate the tree or the baseline declares counts on both (#1851).
 moved_since() {
-  local crate="$1" previous="$2" current published moved=""
-  current="$(tree_lines "$crate")"
+  local crate="$1" previous="$2" current published moved="" declared
+  declared="$(declared_of "$crate" "$baseline_rev")"
+  current="$(tree_lines "$crate" "$declared")"
   if [[ -n "$baseline_rev" ]]; then
-    moved="$(moved_lines "$(revision_lines "$crate" "$baseline_rev")" "$current")"
+    moved="$(moved_lines "$(revision_lines "$crate" "$baseline_rev" "$declared")" "$current")"
     published="$(newest_release "$crate")"
     if [[ -n "$published" ]] && ! same_line "$published" "$previous"; then published=""; fi
   else
     published="$previous"
   fi
   if [[ -z "$moved" ]] && [[ -n "$published" ]]; then
-    moved="$(moved_lines "$(release_lines "$crate" "$published")" "$current")"
+    moved="$(moved_lines "$(release_lines "$crate" "$published" "$declared")" "$current")"
   fi
   echo "$moved"
 }
@@ -240,15 +337,8 @@ for crate in "${crates[@]}"; do
   fi
   # A public dependency on another line breaks the crate where the judge
   # cannot see it (#1777), so it needs the minor.
-  moved="$(moved_since "$crate" "$previous")"
-  if [[ -n "$moved" ]]; then
-    if same_line "$previous" "$current"; then
-      echo "::error::semver: $crate moves from $previous to $current while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
-      failed="$failed $crate"
-    else
-      echo "semver: $crate leaves its line for its public dependencies ($moved)"
-    fi
-  fi
+  dependency_verdict "$crate" "$previous" "$current" "$(moved_since "$crate" "$previous")" ||
+    failed="$failed $crate"
 done
 
 if [[ -n "$failed" ]]; then

@@ -1535,7 +1535,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1750,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.1.135"
+version = "0.1.136"
 dependencies = [
  "base64 0.23.1",
  "chumsky",
@@ -1769,7 +1769,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1880,7 +1880,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "async-trait",
  "backon",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-search"
-version = "0.1.130"
+version = "0.1.131"
 dependencies = [
  "jiff",
  "proptest",
@@ -2186,7 +2186,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.130"
+version = "0.1.131"
 dependencies = [
  "quick-xml",
  "regex",
@@ -2196,7 +2196,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.1.252"
+version = "0.1.253"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -4013,7 +4013,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.152"
+version = "0.1.153"
 dependencies = [
  "ferrobridge-testkit",
  "insta",

@@ -4,7 +4,7 @@
 name = "ferrobridge-fhirpath"
 description = "A FHIRPath Normative Release 2.0.0 evaluator with the FHIR R4 additions, over the fhir-types element table"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.1.135"
+version = "0.1.136"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -19,6 +19,10 @@ categories = ["parser-implementations", "science"]
 publish = true
 # The UCUM essence ships whole with its licence and provenance (vendor/ucum/PROVENANCE.md).
 include = ["src/**", "vendor/ucum/**", "README.md", "LICENSE"]
+
+# scripts/checks/public-surface.sh: a line move of one takes the next minor.
+[package.metadata.ferrohealth]
+public-dependencies = ["jiff", "regex", "rust_decimal"]
 
 [dependencies]
 # The base64 and url base64 forms of FHIRPath 3.0.0 encode() and decode().
