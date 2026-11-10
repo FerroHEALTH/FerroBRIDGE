@@ -51,17 +51,20 @@ bad cut ships forward as the next patch version.
 
 ## Running it with compose
 
-`compose.yaml` at the repository root is the quickstart, and it ships as a
-release asset. Download it, create the secret files beside it, and start:
+`compose.yaml` at the repository root is the quickstart, and every release
+attaches it with its `.sha256sum`. It is one self-contained file that mounts
+nothing from the repository, so it needs Docker Compose 2.23.1 or newer and
+no checkout. Download it, create the secret files beside it, and start:
 
 ```sh
+curl -fsSLO https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest/download/compose.yaml
 mkdir -p secrets
 printf '%s' "$CDM_PASSWORD" > secrets/cdm_password
 printf 'postgresql://ferrobridge:%s@cdm:5432/omop?sslmode=disable' "$CDM_PASSWORD" > secrets/cdm_url
 printf '%s' "$CDR_PASSWORD" > secrets/cdr_password
 printf '%s' "$TX_PASSWORD" > secrets/terminology_password
 
-docker compose up
+docker compose up --wait
 curl http://127.0.0.1:8080/health/liveness
 ```
 
