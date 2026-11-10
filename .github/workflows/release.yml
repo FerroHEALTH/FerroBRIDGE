@@ -229,6 +229,17 @@ jobs:
       # Created as a DRAFT and finalized only after every asset is attached. A
       # draft is mutable, which is the window the binary uploads need, and it
       # is not visible to anyone browsing releases.
+      # The perf line names the commit the release was measured against and
+      # why, which is not the previous release when that tag carries no gate
+      # contract (#1814).
+      - name: Name the performance gate's base in the notes
+        env:
+          BASE: ${{ needs.perf.outputs.base }}
+          WHY: ${{ needs.perf.outputs.base-why }}
+        run: |
+          set -euo pipefail
+          [ -n "$BASE" ] || { echo "::error::the performance gate names no base"; exit 1; }
+          printf "\nPerformance: the gate measured this release A/B against \`%s\`, %s.\n" "$BASE" "$WHY" >> release-notes.md
       - name: Create the release as a draft
         env:
           GH_TOKEN: ${{ github.token }}

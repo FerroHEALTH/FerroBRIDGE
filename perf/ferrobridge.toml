@@ -7,8 +7,9 @@
 # requests and the HL7 v2 face the ORU^R01 of the plan; the change feed's
 # events lane runs beside them, so the idle phase measures it with nothing to
 # do. Every path is relative to the arm's tree; the gate sets the listeners,
-# the CDR, the mapping directory and the work files of each arm through
-# FERROBRIDGE__ variables. No specification governs this: our own design.
+# the CDR, the mapping directory and the work files of each arm through the
+# FERROBRIDGE__ variables of perf/arm.env beside this file, which each tree
+# carries for its own binary. No specification governs this: our own design.
 
 [server]
 listen = "127.0.0.1:18080"
