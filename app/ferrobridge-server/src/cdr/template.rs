@@ -18,6 +18,7 @@ use openehr_its::rest::generated::definition::DefinitionTemplateAdl14GetParams;
 use openehr_its::rest::generated::definition::client::DefinitionClient;
 use openehr_its::rest::generated::definition::client::DefinitionTemplateAdl2GetOutcome;
 use openehr_its::rest::generated::definition::client::DefinitionTemplateAdl14GetOutcome;
+use openehr_mapping_core::template::TemplateSource;
 use serde::Deserialize;
 
 use crate::cdr::CdrClient;
@@ -33,27 +34,12 @@ const CANONICAL_JSON: &str = "application/json";
 /// The `_type` an AOM2 operational template declares.
 const OPERATIONAL_TEMPLATE: &str = "OPERATIONAL_TEMPLATE";
 
-/// A template, in the generation the service served it in.
-///
-/// Both generations resolve to the same Web Template downstream, so the
-/// generation is decided by which route answered, never by a field of the
-/// body.
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum TemplateSource {
-    /// The canonical OPT 1.4 XML of the `adl1.4` route.
-    Opt14(Box<openehr_its::opt14::types::OperationalTemplate>),
-    /// The AOM2 canonical JSON of the `adl2` route.
-    Opt2 {
-        /// The operational template itself.
-        template: Box<OperationalTemplate>,
-        /// The full HRID the partial request resolved to; its
-        /// `physical_id` is the identifier to cache under.
-        resolved_id: ArchetypeHrid,
-    },
-}
-
 /// What the two-route template fetch answered.
+///
+/// A found template is the mapping foundation's [`TemplateSource`], in the
+/// generation of the route that answered: both generations resolve to the
+/// same Web Template downstream, so the generation is decided by which route
+/// answered, never by a field of the body.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum TemplateOutcome {
@@ -147,10 +133,13 @@ impl CdrClient {
                 let text = String::from_utf8_lossy(&body);
                 let template = openehr_its::json::from_canonical_json::<OperationalTemplate>(&text)
                     .map_err(|source| body_error(BodyError::CanonicalJson(source)))?;
-                let resolved_id = resolved_id(&answered.upstream, &template);
+                let resolved_id = resolved_id(&answered.upstream, &template).physical_id();
                 Ok(TemplateOutcome::Found(TemplateSource::Opt2 {
                     template: Box::new(template),
                     resolved_id,
+                    // NOTE: ITS-REST 1.1.0 `definition` serves the OPT2 alone, so the attributes its
+                    // template removed are not known here and the Web Template is built with none.
+                    prohibited_attributes: Vec::new(),
                 }))
             }
             DefinitionTemplateAdl2GetOutcome::BadRequest { .. } => {

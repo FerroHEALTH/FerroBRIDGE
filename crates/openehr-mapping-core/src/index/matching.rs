@@ -60,31 +60,51 @@ fn matches_prefix(query: &RmPath, node_path: &RmPath, name: Option<&str>) -> boo
                 } else {
                     node_segment.predicate.name_value.as_deref()
                 };
-                matches_segment(query_segment, node_segment, carried)
+                segment_matches(query_segment, node_segment, carried)
             })
         })
 }
 
-/// Whether one query segment matches one node segment.
-fn matches_segment(query: &PathSegment, node: &PathSegment, name: Option<&str>) -> bool {
-    if query.descendant || query.attribute != node.attribute {
+/// Whether one segment a mapping writes names one segment a template
+/// carries, `name` being the name the template fixes there.
+///
+/// This is the one segment rule every mapping language of the workspace
+/// matches a written path against a template with:
+///
+/// - a descendant step (`//`) names no template segment, and the attributes
+///   must be the same;
+/// - a node id the mapping writes must be the one the template carries,
+///   compared by [`node_id_matches`]; a segment that writes none names every
+///   node of its attribute, as a path segment with no predicate does
+///   (openEHR BASE Release 1.2.0 §Paths and Locators);
+/// - a name or a position is compared only when both sides carry one.
+///
+/// No specification governs the last rule: our own design, a name or
+/// position predicate over a node whose template fixes none selects an
+/// instance at runtime.
+#[must_use]
+pub fn segment_matches(written: &PathSegment, carried: &PathSegment, name: Option<&str>) -> bool {
+    if written.descendant || written.attribute != carried.attribute {
         return false;
     }
-    if let Some(wanted) = query.predicate.archetype_node_id.as_deref()
-        && !node
+    if let Some(wanted) = written.predicate.archetype_node_id.as_deref()
+        && !carried
             .predicate
             .archetype_node_id
             .as_deref()
-            .is_some_and(|carried| node_id_matches(wanted, carried))
+            .is_some_and(|held| node_id_matches(wanted, held))
     {
         return false;
     }
-    // NOTE: no specification governs this: our own design, a name predicate
-    // over a node whose template fixes no name selects an instance at runtime.
-    match (query.predicate.name_value.as_deref(), name) {
-        (Some(wanted), Some(carried)) => wanted == carried,
+    let name = match (written.predicate.name_value.as_deref(), name) {
+        (Some(wanted), Some(held)) => wanted == held,
         _ => true,
-    }
+    };
+    let position = match (written.predicate.position, carried.predicate.position) {
+        (Some(wanted), Some(held)) => wanted == held,
+        _ => true,
+    };
+    name && position
 }
 
 /// Whether a node-id predicate matches a node id the template carries.

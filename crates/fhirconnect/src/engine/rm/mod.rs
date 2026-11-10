@@ -47,6 +47,7 @@ use serde_json::Value;
 pub mod carried;
 pub mod interval;
 pub mod null_flavour;
+pub(crate) mod tail_walk;
 
 use crate::engine::rm::null_flavour::NULL_FLAVOUR;
 use crate::resolve::derive::type_argument;

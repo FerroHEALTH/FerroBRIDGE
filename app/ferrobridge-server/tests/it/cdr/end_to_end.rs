@@ -13,7 +13,7 @@ use super::support;
 use ferrobridge_server::cdr::commit::CommitContext;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::{EhrId, SubjectId, SubjectNamespace, template_id};
-use ferrobridge_server::cdr::template::{TemplateOutcome, TemplateSource};
+use ferrobridge_server::cdr::template::TemplateOutcome;
 use ferrobridge_server::cdr::{CdrClient, Prefer, Returned};
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures;
@@ -26,6 +26,7 @@ use openehr_its::rest::generated::ehr::client::{
 };
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::client::QueryExecuteAdhocQueryBodyOutcome;
+use openehr_mapping_core::template::TemplateSource;
 use openehr_rm::v1_2::composition::composition::Composition;
 use openehr_rm::v1_2::ehr::ehr_status::EhrStatus;
 use std::error::Error;
