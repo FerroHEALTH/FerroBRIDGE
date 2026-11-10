@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/admin_entry/org.highmed/episode_institution_local.v0.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published lines 37 to 41 slot CLUSTER.location.v1, whose
+# methods read `identifier`, `physicalType` and `status` on the Encounter
+# rather than on `Encounter.location.location` (#101); lines 61 to 74 read
+# `location.identifier` and `status` below `Encounter.period` and write
+# `items[at0024]` and `items[at0028]`, which sit below `items[at0018]` in
+# the archetype (#101). Those three methods are left out; every other
+# method is the published one.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ADMIN_ENTRY.episode_institution_local.v0
+  version: 0.0.1-alpha 
+spec: 
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ADMIN_ENTRY.episode_institution_local.v0
+    revision: 0.0.1-alpha
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+
+mappings:
+
+  - name: healthcareFacility
+    with:
+      fhir: $resource.serviceProvider
+      openehr: $composition/context/health_care_facility
+
+  - name: contextPeriod
+    with:
+      fhir: $resource.period
+      openehr: $composition/context
+    followedBy:
+      mappings:
+        - name: contextStart
+          with:
+            fhir: start
+            openehr: start_time
+        - name: contextEnd
+          with:
+            fhir: end
+            openehr: end_time
+
+  - name: period
+    with:
+      fhir: $resource.period
+      openehr: $archetype
+      type: NONE
+    followedBy:
+      mappings:
+        - name: admissionDate
+          with:
+            fhir: start
+            openehr: data[at0001]/items[at0004]
+
+        - name: seperationDate
+          with:
+            fhir: end
+            openehr: data[at0001]/items[at0002]
+
+

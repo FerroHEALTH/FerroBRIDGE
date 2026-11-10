@@ -20,6 +20,7 @@ mod eu_patient;
 mod eu_test_result;
 mod event_time;
 mod events;
+mod fall;
 mod kds_coding;
 mod laborauftrag;
 mod laws;
