@@ -10,12 +10,14 @@
 # Every requirement on a workspace crate names its version exactly (`=X.Y.Z`),
 # checked over the whole tree on every run (#1736).
 #
-# Versions are per crate here, not lockstep, and follow Cargo SemVer (#1745): a
-# compatible change moves the patch, a breaking one the minor while the crate is
-# 0.x, and every other member still holds its name at the 0.0.0 placeholder
-# (docs/VERSIONS.md). The guard refuses any other step: a skipped minor, a minor
-# step that keeps its patch, or a step out of 0.x. Which of the two steps a
-# change needs is cargo-semver-checks' judgement (scripts/checks/semver.sh): the
+# Versions are per crate here, not lockstep, and follow the Cargo SemVer rules
+# (#1745, #1830; The Cargo Book, "SemVer Compatibility"): while a crate is
+# 0.x a breaking change moves the minor and a compatible one may move either,
+# and every other member still holds its name at the 0.0.0 placeholder
+# (docs/VERSIONS.md). The guard refuses two steps: a minor step that keeps its
+# patch, since the patch resets to 0 when the minor moves (SemVer 2.0.0 §7),
+# and a step out of 0.x, which is an owner decision. Whether a change needs
+# the minor is cargo-semver-checks' judgement (scripts/checks/semver.sh): the
 # guard names the crates to judge in `judged=` of $GITHUB_OUTPUT when CI sets
 # it. Every crate past 0.0.0 states the caret range consumers require,
 # `<name> = "0.Y"`, in its README, checked over the whole tree on every run.
@@ -156,8 +158,8 @@ self_test() {
   t_git commit -qam 'the requirement moves'
   expect 1 "a moved workspace dependency without a bump" patched HEAD
 
-  # The #1745 cases: a step is a patch or one minor with the patch at 0, and
-  # the README names the line the manifest is on.
+  # The #1745 and #1830 cases: a step is a later patch or a later minor with
+  # the patch at 0, and the README names the line the manifest is on.
   t_git branch stepped
   set_version 0.2.0
   t_git commit -qam 'a minor step without its README'
@@ -168,7 +170,7 @@ self_test() {
   set_version 0.3.0
   printf 'demo = "0.3"\n' > "$tmp/repo/crates/demo/README.md"
   t_git commit -qam 'a skipped minor'
-  expect 1 "a step over a minor" stepped HEAD
+  expect 0 "a step over a minor, which Cargo SemVer allows" stepped HEAD
   set_version 0.2.1
   printf 'demo = "0.2"\n' > "$tmp/repo/crates/demo/README.md"
   t_git commit -qam 'a minor step keeping a patch'
@@ -317,19 +319,15 @@ version_above() {
   [[ "$candidate" != "$base_version" ]] && [[ "$(printf '%s\n%s\n' "$candidate" "$base_version" | sort -V | tail -n 1)" = "$candidate" ]]
 }
 
-# Whether $2 is one Cargo SemVer step above $1: the patch on the same line,
-# or the next minor with the patch at 0 while the major is 0. Leaving 0.x is an
-# owner decision, never a step of the line.
+# Whether $2 is a SemVer step above $1 within its major: a later patch of the
+# same minor, or a later minor with the patch reset to 0 (SemVer 2.0.0 §7).
+# Leaving 0.x is an owner decision, never a step of the line.
 semver_step() {
   local old="$1" new="$2" omaj omin nmaj nmin npat
   IFS=. read -r omaj omin _ <<<"$old"
   IFS=. read -r nmaj nmin npat <<<"$new"
   [[ "$omaj" == "$nmaj" ]] || return 1
-  if [[ "$omaj" == "0" ]]; then
-    [[ "$omin" == "$nmin" ]] || [[ "$nmin" -eq $((omin + 1)) && "$npat" == "0" ]]
-  else
-    [[ "$omin" == "$nmin" ]] || [[ "$nmin" -gt "$omin" && "$npat" == "0" ]]
-  fi
+  [[ "$omin" == "$nmin" ]] || [[ "$nmin" -gt "$omin" && "$npat" == "0" ]]
 }
 
 fail=0
@@ -378,7 +376,7 @@ for manifest in crates/*/Cargo.toml; do
   fi
   if [[ -n "$old_ver" ]] && [[ "$old_ver" != "0.0.0" ]]; then
     if ! semver_step "$old_ver" "$new_ver"; then
-      echo "::error::$name moves from $old_ver to $new_ver, which is neither a patch step nor the next minor at patch 0; a compatible change bumps the patch and a breaking one the minor (.claude/rules/crates-publishing.md)." >&2
+      echo "::error::$name moves from $old_ver to $new_ver, which is neither a later patch nor a later minor at patch 0 (SemVer 2.0.0 §7; .claude/rules/crates-publishing.md)." >&2
       fail=1
       continue
     fi
