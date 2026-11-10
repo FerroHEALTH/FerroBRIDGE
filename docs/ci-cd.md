@@ -636,9 +636,15 @@ a commit gets one run. An `edited`, `labeled` or `unlabeled` event would start a
 second run on the same commit, the concurrency group would cancel the first,
 and that run's `conclusion` would report a failure on the head commit. The
 guards read the `no-changelog` and `no-crate-bump` labels from the API when
-they run, and `pr-guards.yml` listens for `labeled` and `unlabeled`, waits for the CI run on the head commit to complete, and re-runs the guard the
-change affects, which re-runs `conclusion` with it
+they run. `pr-guards.yml` listens for `labeled` and `unlabeled` and for the
+completion of a pull request's CI run (`workflow_run`), and re-runs a guard
+whose label changed after the guard job started when the labels now flip its
+verdict, which re-runs `conclusion` with it
 (<https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run>).
+It never waits for CI: on a label event while the CI run is in flight it
+exits, and that run's completion starts it again, so it holds a runner for
+seconds (#1869). The `workflow_run` job runs main's copy with a write token,
+checks nothing out and reads the pull request through the API only.
 
 ## Owner actions (one-time, not scriptable)
 
