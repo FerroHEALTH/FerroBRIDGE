@@ -557,7 +557,13 @@ fn one_provenance_covers_the_mapped_composition() -> Result<(), Box<dyn Error>> 
 /// The issues of severity `warning` the run that mapped the received
 /// document into openEHR declared, by the expression each names.
 fn declared_losses() -> Result<Vec<String>, Box<dyn Error>> {
-    let document = ReceivedDocument::read(&received_text()?)?;
+    expressions(&received_text()?, |issue| issue["severity"] == "warning")
+}
+
+/// The expression of each issue `keep` holds to, in the order the run that
+/// mapped the received `text` into openEHR declared them.
+fn expressions(text: &str, keep: impl Fn(&Value) -> bool) -> Result<Vec<String>, Box<dyn Error>> {
+    let document = ReceivedDocument::read(text)?;
     let composition = mapping()?.to_openehr(&document, &settings())?;
     let outcome = composition.outcome().ok_or("the run declared its losses")?;
     let outcome = serde_json::to_value(outcome)?;
@@ -565,7 +571,7 @@ fn declared_losses() -> Result<Vec<String>, Box<dyn Error>> {
         .as_array()
         .ok_or("the outcome's issues")?
         .iter()
-        .filter(|issue| issue["severity"] == "warning")
+        .filter(|issue| keep(issue))
         .filter_map(|issue| issue["expression"][0].as_str())
         .map(str::to_owned)
         .collect())
@@ -729,22 +735,11 @@ fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), 
 /// The expressions of the issues the run over the received `text` declares
 /// not carried, in the order the run declares them.
 fn not_carried(text: &str) -> Result<Vec<String>, Box<dyn Error>> {
-    let document = ReceivedDocument::read(text)?;
-    let composition = mapping()?.to_openehr(&document, &settings())?;
-    let outcome =
-        serde_json::to_value(composition.outcome().ok_or("the run declared its losses")?)?;
-    Ok(outcome["issue"]
-        .as_array()
-        .ok_or("the outcome's issues")?
-        .iter()
-        .filter(|issue| {
-            issue["details"]["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("no structured element"))
-        })
-        .filter_map(|issue| issue["expression"][0].as_str())
-        .map(str::to_owned)
-        .collect())
+    expressions(text, |issue| {
+        issue["details"]["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("no structured element"))
+    })
 }
 
 /// The path of the section of the received `document` coded `code`.
