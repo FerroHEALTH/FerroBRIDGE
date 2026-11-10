@@ -5,4 +5,4 @@
   now tells the sender that a received report's performing organization
   (`DiagnosticReport.performer`) is not carried; before, such a mapping
   declared none of the project's elements. `Mapping::accounting` still
-  replaces the list and is no longer a `const fn`.
+  replaces the list.

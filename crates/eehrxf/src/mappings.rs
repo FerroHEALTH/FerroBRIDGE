@@ -436,20 +436,15 @@ const SHIPPED: &[Project] = &[
     HDR,
 ];
 
-/// Returns the received elements the shipped projects that compile a
-/// context mapping `contexts` names account for, each once, in project
-/// order: none when no shipped project compiles one of them.
-pub(crate) fn accounted_for(contexts: &[&str]) -> Vec<&'static str> {
-    let mut accounted: Vec<&'static str> = Vec::new();
-    for project in SHIPPED
+/// Returns the received elements the shipped project that compiles a
+/// context mapping `contexts` names accounts for: none when no shipped
+/// project compiles one of them.
+///
+/// Every context of one [`crate::mapping::Mapping`] maps its one template,
+/// and no two shipped projects map the same template, so one project answers.
+pub(crate) fn accounted_for(contexts: &[&str]) -> &'static [&'static str] {
+    SHIPPED
         .iter()
-        .filter(|project| project.contexts.iter().any(|held| contexts.contains(held)))
-    {
-        for element in project.accounted {
-            if !accounted.contains(element) {
-                accounted.push(element);
-            }
-        }
-    }
-    accounted
+        .find(|project| project.contexts.iter().any(|held| contexts.contains(held)))
+        .map_or(&[], |project| project.accounted)
 }

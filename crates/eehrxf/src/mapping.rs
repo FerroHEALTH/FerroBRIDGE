@@ -54,7 +54,7 @@ use crate::transformation::Pin;
 pub struct Mapping {
     programs: ProgramSet,
     files: Vec<String>,
-    accounted: Vec<&'static str>,
+    accounted: &'static [&'static str],
 }
 
 impl Mapping {
@@ -188,14 +188,14 @@ impl Mapping {
     /// [`Mapping::compile_template`]); this replaces them, for a context no
     /// shipped project compiles or a deployment that accounts for more.
     #[must_use]
-    pub fn accounting(mut self, accounted: &'static [&'static str]) -> Self {
-        self.accounted = accounted.to_vec();
+    pub const fn accounting(mut self, accounted: &'static [&'static str]) -> Self {
+        self.accounted = accounted;
         self
     }
 
     /// Returns the received elements the mapping accounts for.
-    pub(crate) fn accounted(&self) -> &[&'static str] {
-        &self.accounted
+    pub(crate) const fn accounted(&self) -> &'static [&'static str] {
+        self.accounted
     }
 
     /// Returns how many compiled context mappings the mapping holds.
