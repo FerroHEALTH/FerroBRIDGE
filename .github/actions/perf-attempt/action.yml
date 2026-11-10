@@ -53,7 +53,6 @@ runs:
       # could not be judged (#1778), so only the last attempt measures there.
       run: |
         set -uo pipefail
-        echo "perf-gate: swap before measuring: $(tail -n +2 /proc/swaps | awk '{ printf "%s (%s kB used) ", $1, $4 }')"
         free -m | awk 'NR == 2 { printf "perf-gate: memory used %s of %s MB before measuring\n", $3, $2 }'
         model="$(awk '{ key = $0; sub(/[[:space:]]*:.*/, "", key) }
           key == "model name" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/[[:space:]]+$/, ""); print; exit }' /proc/cpuinfo)"
