@@ -45,6 +45,47 @@ fn config_check_prints_the_running_tree_with_every_secret_redacted() {
     );
 }
 
+/// A configured issuer identifier with a password in its userinfo reaches
+/// neither stream of `config check`, rendered or refused (RFC 3986 §3.2.1:
+/// the password is never rendered in clear text): the inbound issuer, the
+/// CDR grant's issuer and the onward issuer.
+#[test]
+fn config_check_never_renders_an_issuers_userinfo() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    for (name, text) in [
+        (
+            "auth",
+            "[auth]\nenabled = true\n\n[[auth.issuer]]\nissuer = \"https://u:SYNTH_AUTH_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://bridge.example.org/fhir\"]\n",
+        ),
+        (
+            "oauth",
+            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials.oauth]\nissuer = \"https://u:SYNTH_OAUTH_PW@as.example.org/realms/ferro\"\nclient_id = \"ferrobridge\"\nclient_secret = \"synthetic-client-secret\"\n",
+        ),
+        (
+            "onward",
+            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials.onward]\nissuer = \"https://u:SYNTH_ONWARD_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\n",
+        ),
+    ] {
+        let path = dir.path().join(format!("{name}.toml"));
+        std::fs::write(&path, text)?;
+        let file = path.to_str().ok_or("a UTF-8 path")?;
+        let output = binary(&["config", "check"], &[("FERROBRIDGE_CONFIG", file)]);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stdout.contains("as.example.org") || stderr.contains("as.example.org"),
+            "{name}: the issuer is named: {stdout}{stderr}"
+        );
+        for shown in [&stdout, &stderr] {
+            assert!(
+                !shown.contains("_PW@") && !shown.contains("SYNTH_"),
+                "{name}: no issuer password reaches config check: {shown}"
+            );
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn config_check_names_a_refused_key_and_exits_seventy_eight() {
     let output = binary(
