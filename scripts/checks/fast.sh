@@ -18,7 +18,9 @@
 #   --no-emit      leave out the full-emit tests (about ten minutes)
 #   --no-fetch     do not fetch the build-time corpora the reached packages
 #                  read (the fetch is a no-op when they are on disk at their
-#                  pins; without them those tests skip locally)
+#                  pins; without them most of those tests skip locally, and
+#                  the eehrxf validator tests fail unless
+#                  FERROBRIDGE_SKIP_PROFILE_PACKAGES=1 is set)
 #   --dry-run      print the plan and run nothing
 #
 # Each step is one cargo invocation over the whole reached set, so a shared
@@ -109,8 +111,10 @@ if [[ "$fetch" = true ]]; then
     has "$packages" ferrobridge-validator; then
     run scripts/vendor/fhir-packages.sh --build-time
   fi
-  # fhirconnect maps the HL7 Europe EPS example documents of one of them.
-  if has "$packages" ferrobridge-validator || has "$packages" fhirconnect; then
+  # fhirconnect maps the HL7 Europe EPS example documents of one of them, and
+  # the eehrxf tests validate their documents against the whole set.
+  if has "$packages" ferrobridge-validator || has "$packages" fhirconnect ||
+    has "$packages" eehrxf; then
     run scripts/vendor/profile-packages.sh
   fi
 fi

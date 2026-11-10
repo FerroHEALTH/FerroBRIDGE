@@ -231,7 +231,7 @@ fn the_mapped_report_validates_against_bundle_eu_hdr() -> Result<(), Box<dyn Err
     let document = ReceivedDocument::read(&text)?;
     let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     runtime
-        .block_on(document.validate(&set, HDR_BUNDLE, None::<&Client>))
+        .block_on(document.validate(set, HDR_BUNDLE, None::<&Client>))
         .map_err(|error| format!("{error:?}"))?;
     Ok(())
 }

@@ -147,6 +147,22 @@ count and tree digest the pin records, keeps a tree already at both, and
 `--cache-key` names the key CI restores them under. Run it before the FHIR
 corpus tests; without the packages those tests say they skipped.
 
+The FHIR profile packages the R4 profile validator reads (the HL7 Europe
+guides and their dependency closure) are fetched the same way, by
+`scripts/vendor/profile-packages.sh`, into
+`docs/specs/fhir-packages/<package>#<version>/package/`. Run it before the
+`eehrxf`, `ferrobridge-validator` and `fhirconnect` tests;
+`scripts/checks/fast.sh` runs it for you when your change reaches one of them.
+Without the packages every `eehrxf` test that validates a document fails and
+names the script, so a run cannot pass without validating anything. To run the
+rest of the suite locally without them, set `FERROBRIDGE_SKIP_PROFILE_PACKAGES=1`;
+those tests then return early. CI ignores the variable.
+
+```bash
+scripts/vendor/profile-packages.sh
+cargo nextest run --locked -p eehrxf --all-features
+```
+
 The HL7 v2 definitions are the one input whose terms do not permit
 redistribution, so they are never committed. `scripts/vendor/v2ig.sh` fetches
 them at build time into `tools/fhir-codegen/vendor/hl7-v2ig/`, which

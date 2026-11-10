@@ -146,7 +146,8 @@ fn a_discharge_code_in_another_system_names_no_category() -> Result<(), Box<dyn 
 
 /// Validates the HDR example at `path`, with `edit` applied to its tree,
 /// against `bundle-eu-hdr` over every fetched profile package, with no
-/// terminology server (a binding the set cannot decide stays listed); `None` when the packages are absent outside CI.
+/// terminology server (a binding the set cannot decide stays listed);
+/// `None` when a local run opts out of the absent packages.
 fn validated(
     path: &str,
     edit: impl FnOnce(&mut serde_json::Value) -> Result<(), Box<dyn Error>>,
@@ -159,7 +160,7 @@ fn validated(
     let document = ReceivedDocument::read(&serde_json::to_string(&tree)?)?;
     let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     Ok(Some(runtime.block_on(document.validate(
-        &set,
+        set,
         HDR_BUNDLE,
         None::<&Client>,
     ))))

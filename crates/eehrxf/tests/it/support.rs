@@ -58,39 +58,97 @@ pub(crate) fn hdr(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
     )?)
 }
 
-/// The package set of every profile package `scripts/vendor/profile-packages.sh`
-/// fetched, with the vendored R4 core package, `None` when the packages are
-/// absent outside CI.
+/// The variable that lets a local run skip the tests that need the profile
+/// packages; CI ignores it.
+#[cfg(all(
+    feature = "fhir-r4",
+    any(
+        feature = "discharge",
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging"
+    )
+))]
+pub(crate) const SKIP_PROFILE_PACKAGES: &str = "FERROBRIDGE_SKIP_PROFILE_PACKAGES";
+
+/// The package set of R4 core and every profile package
+/// `scripts/vendor/profile-packages.sh` fetched, read once per test binary.
 ///
-/// Under CI (`CI=true`) an absent tree is an error, so a lane cannot pass by
-/// skipping the package-gated tests.
-#[cfg(all(feature = "fhir-r4", any(feature = "discharge", feature = "imaging")))]
-pub(crate) fn profile_set() -> Result<Option<ferrobridge_validator::set::PackageSet>, Box<dyn Error>>
-{
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");
-    if !root
-        .join("hl7.fhir.eu.hdr#1.0.0/package/package.json")
-        .is_file()
-    {
-        if std::env::var("CI").is_ok_and(|value| value == "true") {
-            return Err(format!(
-                "the profile packages are absent from {} under CI; run scripts/vendor/profile-packages.sh before the tests",
-                root.display()
-            )
-            .into());
+/// An absent tree is an error naming that script, so a run cannot pass by
+/// skipping the validator tests. A local run (no `CI=true`) opts out by
+/// setting [`SKIP_PROFILE_PACKAGES`] to `1`, and then gets `None`.
+///
+/// # Errors
+///
+/// When the packages are absent without the opt-out, or do not load.
+#[cfg(all(
+    feature = "fhir-r4",
+    any(
+        feature = "discharge",
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging"
+    )
+))]
+pub(crate) fn profile_set()
+-> Result<Option<&'static ferrobridge_validator::set::PackageSet>, Box<dyn Error>> {
+    static SET: std::sync::OnceLock<
+        Result<Option<ferrobridge_validator::set::PackageSet>, String>,
+    > = std::sync::OnceLock::new();
+    SET.get_or_init(|| load_profile_set().map_err(|error| error.to_string()))
+        .as_ref()
+        .map(Option::as_ref)
+        .map_err(|error| error.clone().into())
+}
+
+/// Reads the package set [`profile_set`] holds.
+#[cfg(all(
+    feature = "fhir-r4",
+    any(
+        feature = "discharge",
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging"
+    )
+))]
+fn load_profile_set() -> Result<Option<ferrobridge_validator::set::PackageSet>, Box<dyn Error>> {
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = workspace.join("docs/specs/fhir-packages");
+    let absent: Vec<String> = std::fs::read_dir(&root)?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|path| path.join("PROVENANCE.md").is_file())
+        .filter(|path| !path.join("package/package.json").is_file())
+        .map(|path| path.display().to_string())
+        .collect();
+    if !absent.is_empty() {
+        let ci = std::env::var("CI").is_ok_and(|value| value == "true");
+        if !ci && std::env::var(SKIP_PROFILE_PACKAGES).is_ok_and(|value| value == "1") {
+            return Ok(None);
         }
-        return Ok(None);
+        return Err(format!(
+            "{} pinned profile package(s) are not fetched under {}; run scripts/vendor/profile-packages.sh before the tests{}",
+            absent.len(),
+            root.display(),
+            if ci {
+                ""
+            } else {
+                ", or set FERROBRIDGE_SKIP_PROFILE_PACKAGES=1 to skip the tests that need them"
+            }
+        )
+        .into());
     }
-    let mut paths = vec![
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tools/fhir-codegen/vendor/hl7.fhir.r4.core"),
-    ];
+    let mut fetched = Vec::new();
     for entry in std::fs::read_dir(&root)? {
         let path = entry?.path();
         if path.join("package/package.json").is_file() {
-            paths.push(path);
+            fetched.push(path);
         }
     }
+    fetched.sort();
+    let mut paths = vec![workspace.join("tools/fhir-codegen/vendor/hl7.fhir.r4.core")];
+    paths.extend(fetched);
     Ok(Some(ferrobridge_validator::set::PackageSet::load(paths)?))
 }
 
