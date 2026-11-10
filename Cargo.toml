@@ -245,7 +245,7 @@ tar = { version = "0.4.46", default-features = false }
 similar = { version = "3.2.1", default-features = false, features = ["std", "text"] }
 # The mapping-set archive the operator API exports and imports (#610): a ZIP
 # written with fixed timestamps in sorted order, read with a ceiling. MIT.
-zip = { version = "=9.2.2", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "=9.3.0", default-features = false, features = ["deflate-flate2"] }
 # The FerroHEALTH components the operator console (app/ferrobridge-console,
 # #599) draws with: the server-rendered views, the shell, the table model, the
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script
