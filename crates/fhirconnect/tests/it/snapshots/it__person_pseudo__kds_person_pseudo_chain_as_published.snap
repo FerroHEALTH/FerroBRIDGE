@@ -1,0 +1,41 @@
+---
+source: crates/fhirconnect/tests/it/person_pseudo.rs
+expression: rows(&diagnostics)
+---
+[
+  "KDS_address.yml:100 error fc-unknown-fhir-element",
+  "KDS_address.yml:100 error fc-unknown-fhir-element",
+  "KDS_address.yml:104 error fc-unknown-fhir-element",
+  "KDS_address.yml:104 error fc-unknown-fhir-element",
+  "KDS_address.yml:34 error fc-unpaired-types",
+  "KDS_address.yml:34 error fc-unpaired-types",
+  "KDS_address.yml:47 error fc-uncarried-tail",
+  "KDS_address.yml:47 error fc-uncarried-tail",
+  "KDS_address.yml:55 error fc-unknown-fhir-element",
+  "KDS_address.yml:55 error fc-unknown-fhir-element",
+  "KDS_address.yml:60 error fc-unknown-fhir-element",
+  "KDS_address.yml:60 error fc-unknown-fhir-element",
+  "KDS_address.yml:70 error fc-uncarried-tail",
+  "KDS_address.yml:70 error fc-uncarried-tail",
+  "KDS_address.yml:78 error fc-unknown-fhir-element",
+  "KDS_address.yml:78 error fc-unknown-fhir-element",
+  "KDS_address.yml:82 error fc-unknown-fhir-element",
+  "KDS_address.yml:82 error fc-unknown-fhir-element",
+  "KDS_address.yml:92 error fc-uncarried-tail",
+  "KDS_address.yml:92 error fc-uncarried-tail",
+  "KDS_gender.yml:34 error fc-unknown-template-node",
+  "KDS_gender.yml:45 error fc-unknown-template-node",
+  "KDS_gender.yml:46 error fc-archetype-mismatch",
+  "gender.v1.yml:17 error fc-unpaired-types",
+  "organisation.v1.yml:19 warning fc-excluded-template-node",
+  "person.v1.yml:20 error fc-unknown-template-node",
+  "person.v1.yml:21 error fc-archetype-mismatch",
+  "person.v1.yml:39 error fc-unknown-template-node",
+  "person.v1.yml:40 error fc-archetype-mismatch",
+  "person_data.v0.yml:75 error fc-unknown-fhir-element",
+  "structured_name.v1.yml:20 warning fc-excluded-template-node",
+  "structured_name.v1.yml:25 warning fc-excluded-template-node",
+  "structured_name.v1.yml:30 warning fc-excluded-template-node",
+  "structured_name.v1.yml:35 warning fc-excluded-template-node",
+  "versicherungsinformationen.v0.yml:19 error fc-unknown-template-node"
+]
