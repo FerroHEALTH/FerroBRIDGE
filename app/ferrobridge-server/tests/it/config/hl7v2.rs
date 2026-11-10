@@ -81,6 +81,7 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
         "frame_timeout = \"5s\"\n",
         "frame_limit = \"64KiB\"\n",
         "log_outcomes = true\n",
+        "facility_identifier_issuer = \"urn:oid:2.999.1\"\n",
         "senders = [{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }, { universal_id = \"1.2.3.4\", universal_id_type = \"ISO\", certificate_subject = \"iso.example.org\" }]\n",
         "profiles = [{ resource_type = \"Observation\", profile = \"http://example.org/fhir/StructureDefinition/lab\" }]\n",
     ));
@@ -106,6 +107,7 @@ fn an_enabled_hl7v2_face_resolves_every_key() -> Result<(), Box<dyn std::error::
     assert_eq!(Some(Duration::from_secs(5)), face.timeouts.frame);
     assert_eq!(65536, face.frame_limit);
     assert!(face.log_outcomes);
+    assert_eq!(Some("urn:oid:2.999.1"), face.facility_issuer.as_deref());
     assert_eq!(
         vec![
             ferrobridge_server::config::hl7v2::Sender::Namespace(String::from("NORTHLAB")),
@@ -143,6 +145,10 @@ fn the_hl7v2_defaults_skip_and_count_with_both_timeouts() -> Result<(), Box<dyn 
     assert_eq!(Some(Duration::from_secs(30)), face.timeouts.frame);
     assert_eq!(1024 * 1024, face.frame_limit);
     assert!(!face.log_outcomes);
+    assert_eq!(
+        None, face.facility_issuer,
+        "a facility namespace id names no issuer by default"
+    );
     assert_eq!(1, face.senders.len(), "the case names its one sender");
     Ok(())
 }

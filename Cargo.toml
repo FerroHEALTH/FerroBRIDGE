@@ -103,7 +103,7 @@ ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "=0.6.0" }
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version. Its `mapping` feature is off here: each consumer of the
 # language names it, and ferrobridge-hl7v2 takes the FHIR path model alone.
-fhirconnect = { path = "crates/fhirconnect", version = "=0.1.250", default-features = false }
+fhirconnect = { path = "crates/fhirconnect", version = "=0.1.251", default-features = false }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }

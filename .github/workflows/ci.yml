@@ -1616,6 +1616,23 @@ jobs:
         run: bash scripts/checks/conflict-markers.sh --self-test
       - run: bash scripts/checks/conflict-markers.sh
 
+  # Every script a workflow or the book runs directly, with no bash in
+  # front, is committed executable (#1833; no specification governs the
+  # guard: our own design).
+  exec-bits:
+    name: exec-bits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The guard finds each direct invocation and refuses a 100644 script
+        run: bash scripts/checks/exec-bits.sh --self-test
+      - run: bash scripts/checks/exec-bits.sh
+
   # ---- The single required check -------------------------------------------
   # conclusion is the one status check the branch ruleset requires. It `needs`
   # every other job and runs on always(), so it reports even when every gated
@@ -1665,6 +1682,7 @@ jobs:
       - journeys
       - perf
       - conflict-markers
+      - exec-bits
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

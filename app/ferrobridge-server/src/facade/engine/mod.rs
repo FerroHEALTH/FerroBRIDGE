@@ -16,6 +16,7 @@ use fhir_types::codec::Value;
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::engine::demographics::Demographics;
 use fhirconnect::engine::library::Library;
+use fhirconnect::engine::origin::ItemId;
 use fhirconnect::engine::origin::Origin;
 use fhirconnect::engine::origin::Party;
 use fhirconnect::engine::origin::SourceItem;
@@ -92,9 +93,23 @@ pub struct Recorded {
     pub origin: Origin,
     /// The facility the run defaults, when the face named one.
     pub facility: Option<Party>,
-    /// The composer the run defaults, its name and its identifier, when the
-    /// face named one.
-    pub composer: Option<(String, Option<ComposerId>)>,
+    /// The composer the run defaults, when the face named one.
+    pub composer: Option<Composer>,
+}
+
+/// The composer a run defaults when no mapping sets one (RM EHR IM,
+/// `COMPOSITION.composer`, "The person primarily responsible for the content
+/// of the Composition").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Composer {
+    /// The name the composer carries.
+    pub name: String,
+    /// The reference the composer carries, `PARTY_PROXY.external_ref`, when the
+    /// face names one.
+    pub id: Option<ComposerId>,
+    /// The formal identifiers the composer carries, each with its issuer
+    /// (`PARTY_IDENTIFIED.identifiers`).
+    pub identifiers: Vec<ItemId>,
 }
 
 /// Returns the origin of a run under `settings`: the bridge as the system the
@@ -153,9 +168,11 @@ pub fn inbound_from(
     if let Some(facility) = recorded.facility {
         defaults = defaults.with_facility(facility);
     }
-    if let Some((name, id)) = recorded.composer {
-        defaults = defaults.with_composer(name);
-        if let Some(id) = id {
+    if let Some(composer) = recorded.composer {
+        defaults = defaults
+            .with_composer(composer.name)
+            .with_composer_identifiers(composer.identifiers);
+        if let Some(id) = composer.id {
             defaults = defaults.with_composer_id(id);
         }
     }

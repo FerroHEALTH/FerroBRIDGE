@@ -423,3 +423,60 @@ fn a_default_composer_carries_its_identifier() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+#[test]
+fn a_default_composer_carries_its_identifiers_beside_its_reference() -> Result<(), Box<dyn Error>> {
+    // RM Common IM, `PARTY_IDENTIFIED.identifiers`: "One or more formal
+    // identifiers"; the composer's `ctx/` keys carry none (master06
+    // §Composer), so the composer travels whole as `composer|raw`.
+    let program = compiled("ferrobridge_diagnose_minimal")?;
+    let index = template()?;
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_document()?,
+        &Seams::default(),
+        &defaults()
+            .with_composer("Dana Doctor")
+            .with_composer_id(fhirconnect::engine::traverse::defaults::ComposerId {
+                id: String::from("DR-1"),
+                namespace: String::from("NORTHLAB"),
+                scheme: String::from("XCN"),
+            })
+            .with_composer_identifiers(vec![fhirconnect::engine::origin::ItemId {
+                id: String::from("DR-1"),
+                kind: String::from("XCN"),
+                issuer: Some(String::from("NORTHLAB")),
+            }]),
+        &CallContext::new(),
+    )?;
+    let composer = inbound
+        .value()
+        .value()
+        .get("composer")
+        .ok_or("the composition names a composer")?;
+    assert_eq!(Some("Dana Doctor"), composer["name"].as_str(), "{composer}");
+    assert_eq!(
+        Some("DR-1"),
+        composer
+            .pointer("/external_ref/id/value")
+            .and_then(serde_json::Value::as_str),
+        "{composer}"
+    );
+    assert_eq!(
+        serde_json::json!([{
+            "_type": "DV_IDENTIFIER", "issuer": "NORTHLAB", "id": "DR-1", "type": "XCN"
+        }]),
+        composer["identifiers"],
+        "{composer}"
+    );
+    assert!(
+        inbound.warnings().iter().any(|warning| matches!(
+            warning.loss(),
+            Loss::Defaulted { field } if field == "/composer"
+        )),
+        "the composer is recorded as defaulted"
+    );
+    Ok(())
+}
