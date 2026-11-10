@@ -385,3 +385,57 @@ async fn each_map_a_message_ran_through_counts_it_once() -> Result<(), Box<dyn E
     assert_eq!(Some(0), messages("message-adt-a01-to-bundle"));
     running.stop().await
 }
+
+/// Starts the face over a CDR that answers every contribution with `status`
+/// and an openEHR error body.
+async fn refusing_contributions(status: u16) -> Result<Running, Box<dyn Error>> {
+    let running = Running::start(true, Duration::ZERO).await?;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path(format!("/ehr/{EHR_ID}/contribution")))
+        .respond_with(
+            ResponseTemplate::new(status).set_body_json(serde_json::json!({
+                "error": "the content cannot be processed",
+                "message": "EVENT_CONTEXT.health_care_facility names no facility of the client"
+            })),
+        )
+        .with_priority(1)
+        .mount(&running.cdr)
+        .await;
+    Ok(running)
+}
+
+#[tokio::test]
+async fn a_contribution_the_cdr_refuses_for_its_content_is_answered_ae()
+-> Result<(), Box<dyn Error>> {
+    // NOTE: HL7 v2.5.1 §2.9.2.2, MSA-1 (table 0008): AE is an error in processing
+    // the content, AR a reason unrelated to it; a CDR 400 or 422 is about the content.
+    for status in [400, 422] {
+        let running = refusing_contributions(status).await?;
+        let ack = running.send(&oru_r01(CONTROL_ID)).await?;
+        assert_eq!(
+            vec![format!("MSA|AE|{CONTROL_ID}")],
+            segments(&ack, "MSA"),
+            "a CDR {status} is about the content, so the sender does not resend: {ack}"
+        );
+        assert!(
+            segments(&ack, "ERR")
+                .iter()
+                .any(|error| error.contains("health_care_facility")),
+            "the ERR carries the CDR's words: {ack}"
+        );
+        running.stop().await?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_contribution_the_cdr_fails_is_answered_ar() -> Result<(), Box<dyn Error>> {
+    let running = refusing_contributions(500).await?;
+    let ack = running.send(&oru_r01(CONTROL_ID)).await?;
+    assert_eq!(
+        vec![format!("MSA|AR|{CONTROL_ID}")],
+        segments(&ack, "MSA"),
+        "a CDR failure is unrelated to the content, so the sender resends: {ack}"
+    );
+    running.stop().await
+}
