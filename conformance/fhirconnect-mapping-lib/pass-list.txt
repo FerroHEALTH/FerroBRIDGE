@@ -16,6 +16,7 @@ model/evaluation/org.openehr/gender.v1.yml
 model/section/org.openehr/adhoc.v1.yml
 projects/org.highmed/KDS/fall/KDS_fall_problem_diagnose.yml
 projects/org.highmed/KDS/medikationsverabreichung/KDS_medication.yml
+projects/org.highmed/KDS/medikationsverabreichung/KDS_medication_substance.yml
 projects/org.highmed/KDS/person/KDS_Composition.yml
 projects/org.highmed/KDS/person/KDS_gender.yml
 projects/org.highmed/KDS/person_pseudo/KDS_pseudo_person_cluster.yml
