@@ -490,20 +490,16 @@ fn a_manual_path_no_flat_part_carries_is_refused_at_load() -> Result<(), Box<dyn
     Ok(())
 }
 
-/// The published cluster anchors on `$resource`, which is "Path of the root
-/// resource" (`docs/specs/fhirconnect/modules/ROOT/pages/basics/Variables.adoc`),
-/// so its condition reads `Condition.coding`, an element FHIR R4 does not
-/// define (<https://hl7.org/fhir/R4/condition.html>). Reported as #173. The
-/// warning beside the refusals is `problem_diagnosis.v1.yml` line 103, the
-/// `bodySite` node the template excludes, and the four `fc-uncarried-tail`
-/// rows are its lines 45, 47, 71 and 73, tails no FLAT part of
-/// `EVENT_CONTEXT` or `EVALUATION` carries. The `fc-unpaired-types` row is
-/// `anatomical_location.v1.yml` line 27, a `string` onto the body site name
-/// at `items[at0001]`, a pair no page of the data-type chapter writes for
-/// that node's class.
+/// The published cluster names `BackboneElement` as its `fhirConfig` type and
+/// anchors on `$resource`, the "Path of the root resource" of the model
+/// (`docs/specs/fhirconnect/modules/ROOT/pages/basics/Variables.adoc`), so
+/// inside the slot it names the `Condition.bodySite` the slot hands over and
+/// its condition reads `bodySite.coding`. The warning beside the refusals is
+/// `problem_diagnosis.v1.yml` line 103, the `bodySite` node the template
+/// excludes, and the four `fc-uncarried-tail` rows are its lines 45, 47, 71
+/// and 73, tails no FLAT part of `EVENT_CONTEXT` or `EVALUATION` carries.
 #[test]
-fn the_published_anatomical_location_slot_is_refused_naming_the_element()
--> Result<(), Box<dyn Error>> {
+fn the_published_anatomical_location_slot_reads_the_slot_element() -> Result<(), Box<dyn Error>> {
     let set = chain(&[
         CONTEXT,
         EXTENSION,
@@ -521,15 +517,13 @@ fn the_published_anatomical_location_slot_is_refused_naming_the_element()
             "fc-uncarried-tail",
             "fc-uncarried-tail",
             "fc-uncarried-tail",
-            "fc-unknown-fhir-element",
-            "fc-unpaired-types"
         ]
     );
     let named = diagnostics
         .iter()
         .map(Diagnostic::message)
-        .find(|message| message.contains("`Condition` defines no element `coding`"));
-    assert!(named.is_some(), "{}", render(&diagnostics));
+        .find(|message| message.contains("defines no element `coding`"));
+    assert!(named.is_none(), "{}", render(&diagnostics));
     Ok(())
 }
 
@@ -646,5 +640,24 @@ fn the_uncarried_tail_fixtures_are_refused_at_load() -> Result<(), Box<dyn Error
             "{fixture}: {error}"
         );
     }
+    Ok(())
+}
+
+/// A `reference` writes a FHIR `Reference` (`concept-type/Reference.adoc`), and
+/// `Condition.onset[x]` admits no `Reference`
+/// (<https://hl7.org/fhir/R4/condition.html>, formats.html §Choice), so the
+/// mapping is refused at load.
+#[test]
+fn a_reference_into_a_choice_that_admits_no_reference_is_refused() -> Result<(), Box<dyn Error>> {
+    let body = "mappings:\n  - name: \"onset\"\n    with:\n      fhir: \"$resource.onset\"\n      openehr: \"$reference\"\n    reference:\n      resourceType: \"Observation\"\n      mappings:\n        - name: \"code\"\n          with:\n            fhir: \"$fhirRoot.code\"\n            openehr: \"$archetype/data[at0001]/items[at0002]\"\n";
+    let files = [
+        ("model.yml", start_model(body)),
+        (
+            "context.yml",
+            context("synthetic.context", &start_context(&[])),
+        ),
+    ];
+    let diagnostics = refusals(&borrow(&files), "synthetic.context")?;
+    assert_eq!(codes(&diagnostics), vec!["fc-reference-into-choice"]);
     Ok(())
 }

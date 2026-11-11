@@ -64,8 +64,7 @@ pub enum ResolveCode {
     /// A mapping with no `type` key pairs an openEHR class with a FHIR type
     /// no page of the data-type chapter pairs in a direction it runs.
     UnpairedTypes,
-    /// A `reference` writes a choice element whose type its path does not
-    /// name.
+    /// A `reference` writes a choice element that admits no `Reference`.
     ReferenceIntoChoice,
     /// A `link` whose FHIR side is neither a `Reference`, its `reference`
     /// string, nor the resource an enclosing `reference` mapping entered.

@@ -18,10 +18,9 @@
 //! holds as `DV_TEXT` (#1861).
 //!
 //! The clinical evidence cluster, which only `IPS_problem_diagnosis.yml`
-//! slots, is slotted by a FerroBRIDGE Condition model the same way. It does
-//! not count as reached: its line 20 maps `$resource.code`, the root
-//! `Condition.code` under a slot, where the file means the evidence the slot
-//! hands over (#101).
+//! slots, is slotted by a FerroBRIDGE Condition model the same way. Its
+//! `fhirConfig` names a `BackboneElement`, so its `$resource.code` is the code
+//! of the `Condition.evidence` the slot hands over (`basics/Variables.adoc`).
 
 use core::error::Error;
 use std::sync::Arc;
@@ -71,10 +70,10 @@ fn evidence() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
     )
 }
 
-/// Compiles the allergy context and returns it with the published file it
+/// Compiles both contexts and returns each with the published files it
 /// reaches.
-pub(super) fn chain() -> Result<crate::support::Chain, Box<dyn Error>> {
-    Ok((ALLERGY, allergy()?.0))
+pub(super) fn chains() -> Result<Vec<crate::support::Chain>, Box<dyn Error>> {
+    Ok(vec![(ALLERGY, allergy()?.0), (EVIDENCE, evidence()?.0)])
 }
 
 #[test]
@@ -188,9 +187,7 @@ fn putget_holds_on_a_synthetic_ips_allergy() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// `PutGet` over the synthetic condition, with what the chain declares lost:
-/// the evidence code goes out of the resource and the condition's own code
-/// comes back as its text, since the cluster reads `Condition.code` (#101).
+/// `PutGet` over the synthetic condition, with what the chain declares lost.
 #[test]
 fn putget_holds_on_a_synthetic_evidenced_condition() -> Result<(), Box<dyn Error>> {
     let (program, index) = evidence()?;
