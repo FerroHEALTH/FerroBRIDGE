@@ -2,9 +2,8 @@
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's extension of the library health summary model: one section,
 # the ad hoc SECTION the library health summary template holds, slotted through
-# FerroBRIDGE's stand-in for the library's ad hoc section model, which does not
-# compile (#101). The library's IPS composition slots its sections through
-# sub-contexts instead.
+# the library's ad hoc section model. The library's IPS composition slots its
+# sections through sub-contexts instead.
 grammar: FHIRConnect/v1.0.0
 type: extension
 metadata:
@@ -20,4 +19,4 @@ mappings:
     with:
       fhir: "$resource.section"
       openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1]"
-    slotArchetype: "ferrobridge_section_adhoc.v1"
+    slotArchetype: "SECTION.adhoc.v1"

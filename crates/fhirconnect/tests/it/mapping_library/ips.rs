@@ -10,9 +10,9 @@
 //! extensions write a path under `$reference` (#1436). The medication
 //! sub-context needs neither, so FerroBRIDGE's context enters it alone
 //! (`types-of-mapping-files/sub-contexts.adoc`, §`slotContext`). It starts
-//! at `SECTION.adhoc.v1`, whose published model does not compile under a
-//! slot (#101), so the project directory carries a stand-in under the
-//! published name.
+//! at the published `SECTION.adhoc.v1`, whose `fhirConfig` names a
+//! `BackboneElement`, so its `$resource` is the section the slot hands over
+//! (`basics/Variables.adoc`).
 
 use core::error::Error;
 use std::sync::Arc;
@@ -46,6 +46,7 @@ const MODELS: &[&str] = &[
     "model/composition/org.openehr/health_summary.v1.Composition.yml",
     "model/evaluation/org.openehr/absence.v2.yml",
     "model/evaluation/org.openehr/exclusion_global.v1.yml",
+    "model/section/org.openehr/adhoc.v1.yml",
 ];
 
 /// Compiles the medication context against the library health summary
@@ -56,10 +57,7 @@ fn medication() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
         HEALTH_SUMMARY,
         CONTEXT,
         &files,
-        &[
-            "ferrobridge_ips_section_adhoc.v1.yml",
-            "ferrobridge_ips_medication.yml",
-        ],
+        &["ferrobridge_ips_medication.yml"],
     )
 }
 
