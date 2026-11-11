@@ -28,8 +28,10 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
 use crate::support::FIXTURES;
+use crate::support::Recorded;
 use crate::support::render;
 use crate::support::rows;
+use crate::support::unrecorded;
 
 /// The vendored mapping library, relative to this crate's manifest.
 const CORPUS: &str = concat!(
@@ -314,6 +316,78 @@ fn the_published_admin_entry_extension_names_a_function_the_engine_lacks()
 ///   address to `$resource`.
 #[test]
 fn the_kds_person_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "kds_person_chain_as_published",
+        person_chain_as_published()?
+    );
+    Ok(())
+}
+
+/// The #101 comment that records each refusal of the person chain as
+/// published.
+const RECORDED: Recorded = &[
+    ("KDS_address.yml:21", 6_785_324_425),
+    ("KDS_address.yml:26", 6_785_324_425),
+    ("KDS_address.yml:31", 6_785_324_425),
+    ("KDS_address.yml:34", 6_651_397_610),
+    ("KDS_address.yml:36", 6_785_324_425),
+    ("KDS_address.yml:47", 6_771_393_133),
+    ("KDS_address.yml:55", 6_771_393_133),
+    ("KDS_address.yml:60", 6_771_393_133),
+    ("KDS_address.yml:70", 6_771_393_133),
+    ("KDS_address.yml:78", 6_771_393_133),
+    ("KDS_address.yml:82", 6_771_393_133),
+    ("KDS_address.yml:92", 6_771_393_133),
+    ("KDS_address.yml:100", 6_771_393_133),
+    ("KDS_address.yml:104", 6_771_393_133),
+    ("KDS_admin_entry_person.yml:19", 6_804_895_011),
+    (
+        "KDS_structured_name.v1.person_name-structured_name.yml:17",
+        6_806_390_482,
+    ),
+    (
+        "KDS_structured_name.v1.person_name-structured_name.yml:31",
+        6_806_390_482,
+    ),
+    ("gender.v1.yml:17", 6_651_397_610),
+    ("person.v1.Patient.yml:18", 6_644_134_630),
+    ("person.v1.Patient.yml:23", 6_644_134_630),
+    ("person.v1.Patient.yml:30", 6_644_134_630),
+    ("person.v1.Patient.yml:34", 6_644_134_630),
+    ("person.v1.Patient.yml:45", 6_644_134_630),
+    ("person.v1.Patient.yml:55", 6_644_134_630),
+    ("person.v1.Patient.yml:57", 6_644_134_630),
+    ("person.v1.Patient.yml:59", 6_644_134_630),
+    ("person.v1.Patient.yml:64", 6_644_134_630),
+    ("person.v1.Patient.yml:69", 6_644_134_630),
+    ("person.v1.Patient.yml:73", 6_644_134_630),
+    ("person.v1.Patient.yml:78", 6_644_134_630),
+    ("person.v1.Patient.yml:80", 6_644_134_630),
+    ("person.v1.Patient.yml:82", 6_644_134_630),
+    ("person_data.v0.yml:75", 6_804_630_244),
+    ("structured_name.v1.yml:20", 6_770_548_776),
+];
+
+/// Every refusal the person chain as published raises is a library defect
+/// recorded on #101, and every record names a refusal the chain still
+/// raises ([`RECORDED`]).
+#[test]
+fn every_refusal_of_the_kds_person_chain_is_recorded() -> Result<(), Box<dyn Error>> {
+    let (missing, stale) = unrecorded(&person_chain_as_published()?, RECORDED);
+    assert!(
+        missing.is_empty(),
+        "refused with no #101 record: {missing:?}"
+    );
+    assert!(
+        stale.is_empty(),
+        "recorded and no longer refused: {stale:?}"
+    );
+    Ok(())
+}
+
+/// Compiles the person chain as the library publishes it and returns its
+/// refusals as rows.
+fn person_chain_as_published() -> Result<Vec<String>, Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     let context = std::fs::read_to_string(published(
         "projects/org.highmed/KDS/person/person.context.yaml",
@@ -342,8 +416,7 @@ fn the_kds_person_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn 
     )
     .err()
     .ok_or("the person chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_person_chain_as_published", rows(&diagnostics));
-    Ok(())
+    Ok(rows(&diagnostics))
 }
 
 /// The published address model, compiled without the KDS extension that

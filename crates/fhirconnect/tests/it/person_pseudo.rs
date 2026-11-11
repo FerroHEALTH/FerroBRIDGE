@@ -25,8 +25,10 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
 use crate::support::FIXTURES;
+use crate::support::Recorded;
 use crate::support::render;
 use crate::support::rows;
+use crate::support::unrecorded;
 
 /// The vendored mapping library, relative to this crate's manifest.
 const CORPUS: &str = concat!(
@@ -204,6 +206,54 @@ const REPLACED: &[&str] = &[
 ///   code `Address.type`.
 #[test]
 fn the_kds_person_pseudo_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "kds_person_pseudo_chain_as_published",
+        person_pseudo_chain_as_published()?
+    );
+    Ok(())
+}
+
+/// The #101 comment that records each refusal of the pseudonymised person
+/// chain as published.
+const RECORDED: Recorded = &[
+    ("KDS_address.yml:34", 6_771_393_133),
+    ("KDS_address.yml:47", 6_771_393_133),
+    ("KDS_address.yml:55", 6_771_393_133),
+    ("KDS_address.yml:60", 6_771_393_133),
+    ("KDS_address.yml:70", 6_771_393_133),
+    ("KDS_address.yml:78", 6_771_393_133),
+    ("KDS_address.yml:82", 6_771_393_133),
+    ("KDS_address.yml:92", 6_771_393_133),
+    ("KDS_address.yml:100", 6_771_393_133),
+    ("KDS_address.yml:104", 6_771_393_133),
+    ("KDS_gender.yml:34", 6_771_393_133),
+    ("KDS_gender.yml:45", 6_771_393_133),
+    ("KDS_gender.yml:46", 6_771_393_133),
+    ("gender.v1.yml:17", 6_651_397_610),
+    ("person_data.v0.yml:75", 6_804_630_244),
+    ("versicherungsinformationen.v0.yml:19", 6_806_390_482),
+];
+
+/// Every refusal the pseudonymised person chain as published raises is a
+/// library defect recorded on #101, and every record names a refusal the
+/// chain still raises ([`RECORDED`]).
+#[test]
+fn every_refusal_of_the_kds_person_pseudo_chain_is_recorded() -> Result<(), Box<dyn Error>> {
+    let (missing, stale) = unrecorded(&person_pseudo_chain_as_published()?, RECORDED);
+    assert!(
+        missing.is_empty(),
+        "refused with no #101 record: {missing:?}"
+    );
+    assert!(
+        stale.is_empty(),
+        "recorded and no longer refused: {stale:?}"
+    );
+    Ok(())
+}
+
+/// Compiles the pseudonymised person chain as the library publishes it and
+/// returns its refusals as rows.
+fn person_pseudo_chain_as_published() -> Result<Vec<String>, Box<dyn Error>> {
     let files: Vec<String> = PUBLISHED
         .iter()
         .chain(REPLACED)
@@ -223,8 +273,7 @@ fn the_kds_person_pseudo_chain_as_published_is_refused_exactly() -> Result<(), B
     )
     .err()
     .ok_or("the pseudonymised person chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_person_pseudo_chain_as_published", rows(&diagnostics));
-    Ok(())
+    Ok(rows(&diagnostics))
 }
 
 /// An open slot leaves out only the archetypes it admits: with the

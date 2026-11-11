@@ -148,3 +148,30 @@ pub(crate) type Chain = (&'static [&'static str], Arc<Program>);
 /// A compiled program with the library files its set loaded, owned, for a
 /// file list computed at run time.
 pub(crate) type OwnedChain = (Vec<String>, Arc<Program>);
+
+/// The #101 comment that records each refusal a chain pins as a library
+/// defect, keyed by `file:line`.
+///
+/// The suite cannot read the tracker, so each chain pins the id of the
+/// comment beside the row, checked by hand when it is added.
+pub(crate) type Recorded = &'static [(&'static str, u64)];
+
+/// Returns the `file:line` of every error row with no recorded comment, and
+/// every recorded `file:line` no error row names any more.
+pub(crate) fn unrecorded(rows: &[String], recorded: Recorded) -> (Vec<String>, Vec<String>) {
+    let errors: std::collections::BTreeSet<String> = rows
+        .iter()
+        .filter_map(|row| {
+            let (place, rest) = row.split_once(' ')?;
+            rest.starts_with("error ").then(|| place.to_owned())
+        })
+        .collect();
+    let pinned: std::collections::BTreeSet<String> = recorded
+        .iter()
+        .map(|&(place, _)| place.to_owned())
+        .collect();
+    (
+        errors.difference(&pinned).cloned().collect(),
+        pinned.difference(&errors).cloned().collect(),
+    )
+}
