@@ -52,7 +52,10 @@ const CORPUS: &str = concat!(
 );
 
 /// The published files the project context loads, as the library ships them.
-pub(crate) const PUBLISHED: &[&str] = &["model/cluster/org.openehr/organisation.v1.yml"];
+pub(crate) const PUBLISHED: &[&str] = &[
+    "model/cluster/org.openehr/organisation.v1.yml",
+    "model/cluster/org.openehr/specimen.v1.yml",
+];
 
 /// The project directory this crate authored for the round trip.
 const PROJECT_DIR: &str = "projects/ferrobridge/kds_laborauftrag";
@@ -73,7 +76,6 @@ const CONTEXT: &str = "ferrobridge_kds_laborauftrag.context";
 const REPLACED: &[&str] = &[
     "model/instruction/org.openehr/service_request.v1.yml",
     "model/composition/org.openehr/request.v1.ServiceRequest.yml",
-    "model/cluster/org.openehr/specimen.v1.yml",
     "model/cluster/org.openehr/case_identification.v0.yml",
     "projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml",
     "projects/org.highmed/KDS/laborauftrag/KDS_composition.yml",
@@ -81,6 +83,9 @@ const REPLACED: &[&str] = &[
 
 /// The `id` the synthetic request's contained requester carries.
 const CONTAINED_ID: &str = "einsender";
+
+/// The `id` the synthetic request's contained specimen carries.
+const SPECIMEN_ID: &str = "probe";
 
 /// Returns the absolute path of a file of the vendored library.
 fn published(file: &str) -> String {
@@ -140,20 +145,18 @@ fn kds_service_request() -> Result<serde_json::Value, Box<dyn Error>> {
     )?)
 }
 
-/// Returns the `Organization` the synthetic request contains.
-fn contained_organization(
-    request: &serde_json::Value,
-) -> Result<serde_json::Value, Box<dyn Error>> {
+/// Returns the resource the synthetic request contains under `id`.
+fn contained(request: &serde_json::Value, id: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     request
         .get("contained")
         .and_then(serde_json::Value::as_array)
         .and_then(|contained| {
-            contained.iter().find(|entry| {
-                entry.get("id").and_then(serde_json::Value::as_str) == Some(CONTAINED_ID)
-            })
+            contained
+                .iter()
+                .find(|entry| entry.get("id").and_then(serde_json::Value::as_str) == Some(id))
         })
         .cloned()
-        .ok_or_else(|| "the synthetic request contains no requester".into())
+        .ok_or_else(|| format!("the synthetic request contains no `{id}`").into())
 }
 
 /// Builds the synthetic `KDS_Laborauftrag` composition from its FLAT fixture.
@@ -170,12 +173,27 @@ fn json_of(document: &Value, resource_type: &str) -> Result<serde_json::Value, B
     Ok(document.to_serde_json(&mut fhir_types::codec::Path::root(resource_type))?)
 }
 
-/// Returns the one `Organization` a run out of openEHR created.
-fn created_organization(created: &[Value]) -> Result<serde_json::Value, Box<dyn Error>> {
-    let [ref organization] = *created else {
-        return Err(format!("the run created {} resources, not one", created.len()).into());
-    };
-    json_of(organization, "Organization")
+/// The resources a run out of openEHR creates for the request, by type: the
+/// requester and the specimen.
+const CREATED: [&str; 2] = ["Organization", "Specimen"];
+
+/// Returns the one resource of `resource_type` a run out of openEHR created,
+/// after checking the run created exactly one of each type in [`CREATED`].
+fn created_of(created: &[Value], resource_type: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+    let types: Vec<Option<&str>> = created
+        .iter()
+        .map(|resource| resource.get("resourceType").and_then(Value::as_str))
+        .collect();
+    if types != CREATED.map(Some) {
+        return Err(format!("the run created {types:?}, not {CREATED:?}").into());
+    }
+    let resource = created
+        .iter()
+        .find(|resource| {
+            resource.get("resourceType").and_then(Value::as_str) == Some(resource_type)
+        })
+        .ok_or_else(|| format!("the run created no {resource_type}"))?;
+    json_of(resource, resource_type)
 }
 
 /// Returns the losses one leg declared, as the messages a reader reviews.
@@ -238,16 +256,30 @@ fn putget_holds_on_the_kds_service_request() -> Result<(), Box<dyn Error>> {
 /// Runs `PutGet` over the requester `Organization` and returns its declared
 /// set.
 ///
-/// The request goes into openEHR with its contained requester and comes back
-/// with a created `Organization` it references; the law compares the
-/// contained resource with the created one, the `id` the identity sink
-/// assigns aside.
+/// # Errors
+///
+/// The errors of [`contained_putget`].
+pub(crate) fn organization_putget() -> Result<serde_json::Value, Box<dyn Error>> {
+    contained_putget("Organization", CONTAINED_ID, "/requester/reference")
+}
+
+/// Runs `PutGet` over the resource the request contains under `id` and
+/// returns its declared set.
+///
+/// The request goes into openEHR with the contained resource and comes back
+/// with a created resource of `resource_type` it references at `pointer`; the
+/// law compares the contained resource with the created one, the `id` the
+/// identity sink assigns aside.
 ///
 /// # Errors
 ///
 /// Returns an error when a leg refuses or the request does not reference the
-/// `Organization` the run created.
-pub(crate) fn organization_putget() -> Result<serde_json::Value, Box<dyn Error>> {
+/// resource the run created.
+fn contained_putget(
+    resource_type: &str,
+    id: &str,
+    pointer: &str,
+) -> Result<serde_json::Value, Box<dyn Error>> {
     let (program, index) = kds_laborauftrag_program()?;
     let request = kds_service_request()?;
     let into = inbound(&program, &index, request.clone())?;
@@ -259,22 +291,20 @@ pub(crate) fn organization_putget() -> Result<serde_json::Value, Box<dyn Error>>
         &Seams::default(),
         &CallContext::new(),
     )?;
-    let created = created_organization(outbound.created())?;
+    let created = created_of(outbound.created(), resource_type)?;
     let back = json_of(outbound.value(), "ServiceRequest")?;
-    let id = created
+    let created_id = created
         .get("id")
         .and_then(serde_json::Value::as_str)
-        .ok_or("the created Organization carries no id")?;
-    let reference = back
-        .pointer("/requester/reference")
-        .and_then(serde_json::Value::as_str);
-    if reference != Some(format!("Organization/{id}").as_str()) {
+        .ok_or_else(|| format!("the created {resource_type} carries no id"))?;
+    let reference = back.pointer(pointer).and_then(serde_json::Value::as_str);
+    if reference != Some(format!("{resource_type}/{created_id}").as_str()) {
         return Err(format!(
-            "the request references {reference:?}, not the Organization the run created"
+            "the request references {reference:?}, not the {resource_type} the run created"
         )
         .into());
     }
-    let mut original = contained_organization(&request)?;
+    let mut original = contained(&request, id)?;
     let mut answered = created.clone();
     for document in [&mut original, &mut answered] {
         if let Some(object) = document.as_object_mut() {
@@ -312,7 +342,9 @@ pub(crate) fn laborauftrag_getput() -> Result<serde_json::Value, Box<dyn Error>>
         &Seams::default(),
         &CallContext::new(),
     )?;
-    created_organization(outbound.created())?;
+    for resource_type in CREATED {
+        created_of(outbound.created(), resource_type)?;
+    }
     let entries: Vec<(Option<String>, Value)> = outbound
         .created()
         .iter()
@@ -349,7 +381,20 @@ fn putget_holds_on_the_requester_organization() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// `GetPut` over the composition, the organisation cluster included.
+/// The contained `Specimen` maps into `CLUSTER.specimen.v1` through the
+/// published specimen model and comes back as the resource the run creates,
+/// which the request references.
+#[test]
+fn putget_holds_on_the_contained_specimen() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "kds_laborauftrag_specimen_putget",
+        contained_putget("Specimen", SPECIMEN_ID, "/specimen/0/reference")?
+    );
+    Ok(())
+}
+
+/// `GetPut` over the composition, the organisation and specimen clusters
+/// included.
 #[test]
 fn getput_holds_on_the_kds_laborauftrag_composition() -> Result<(), Box<dyn Error>> {
     insta::assert_json_snapshot!("kds_laborauftrag_getput", laborauftrag_getput()?);

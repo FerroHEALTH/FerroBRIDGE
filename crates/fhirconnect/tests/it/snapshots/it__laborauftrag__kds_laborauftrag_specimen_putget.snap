@@ -1,0 +1,18 @@
+---
+source: crates/fhirconnect/tests/it/laborauftrag.rs
+expression: "contained_putget(\"Specimen\", SPECIMEN_ID, \"/specimen/0/reference\")?"
+---
+{
+  "first_leg": [
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory",
+    "the engine filled /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/narrative"
+  ],
+  "second_leg": [],
+  "lost": [],
+  "added": [],
+  "changed": []
+}

@@ -8,6 +8,7 @@ model/cluster/org.openehr/dosage.v2.BackboneElement.yml
 model/cluster/org.openehr/medication.v2.substance.yml
 model/cluster/org.openehr/organisation.v1.yml
 model/cluster/org.openehr/person_birth_data_iso.v0.yml
+model/cluster/org.openehr/specimen.v1.yml
 model/composition/org.openehr/health_summary.v1.Composition.yml
 model/composition/org.openehr/medication_list.v1.MedicationStatement.yml
 model/evaluation/org.openehr/absence.v2.yml
