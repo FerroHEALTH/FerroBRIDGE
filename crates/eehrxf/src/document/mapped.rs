@@ -92,6 +92,18 @@ impl Document {
 }
 
 impl Document {
+    /// Returns the `fullUrl` of each `ImagingStudy` the document holds, in
+    /// the order its entries were added: the studies a mapped imaging run
+    /// wrote, which the `imagingstudy` section of `CompositionEuImaging`
+    /// lists (HL7 Europe Imaging Report 1.0.0-ballot).
+    #[cfg(feature = "imaging")]
+    pub fn studies(&self) -> impl Iterator<Item = &str> {
+        self.entries
+            .iter()
+            .filter(|(_, resource)| matches!(resource, Resource::ImagingStudy(_)))
+            .map(|(full_url, _)| full_url.as_str())
+    }
+
     /// Adds the resources of `run`, the `Bundle` one mapping run answers,
     /// whose context wrote the document's `Composition`, and returns each
     /// section that composition holds, placed in the form by its code.
