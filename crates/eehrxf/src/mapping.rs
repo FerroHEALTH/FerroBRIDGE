@@ -142,7 +142,7 @@ impl Mapping {
             .iter()
             .map(|file| file.name.to_owned())
             .collect();
-        Ok(Self::from_set(index, &set, project.contexts(), files)?.accounting(project.accounted()))
+        Self::from_set(index, &set, project.contexts(), files)
     }
 
     /// Compiles the context mappings `contexts` names from `set` against
@@ -173,7 +173,7 @@ impl Mapping {
         Ok(Self {
             programs,
             files,
-            accounted: &[],
+            accounted: crate::mappings::accounted_for(contexts),
         })
     }
 
@@ -182,8 +182,11 @@ impl Mapping {
     /// run carries into no structured element is declared in the run's
     /// `OperationOutcome` ([`Mapping::to_openehr`]).
     ///
-    /// [`Mapping::compile_project`] accounts for its project's elements; a
-    /// mapping compiled from files accounts for none until this names them.
+    /// A mapping accounts for the elements of the shipped project that
+    /// compiles its contexts, whether it was compiled from the project
+    /// ([`Mapping::compile_project`]) or from files ([`Mapping::compile`],
+    /// [`Mapping::compile_template`]); this replaces them, for a context no
+    /// shipped project compiles or a deployment that accounts for more.
     #[must_use]
     pub const fn accounting(mut self, accounted: &'static [&'static str]) -> Self {
         self.accounted = accounted;
