@@ -265,7 +265,7 @@ base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # with its idle and absolute lifetimes, the refresh, and the four routes with
 # the session watch FerroUI's pages ask. Pinned exactly, as a product pins
 # every shared crate; the console adds `axum`.
-ferrohealth-session = { version = "=0.12.0", default-features = false }
+ferrohealth-session = { version = "=0.13.0", default-features = false }
 # Test-only.
 wiremock = "0.6.5"
 # The operator console's browser journeys (#602): a WebDriver client in Rust

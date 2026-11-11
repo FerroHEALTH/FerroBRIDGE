@@ -151,7 +151,7 @@ impl Config {
 /// console adds for its sign-out.
 fn resolve_oidc(oidc: &OidcSection) -> Result<OidcSettings, Error> {
     let checked = oidc.check_with_tls(&ferrohealth_smart::config::ServerTls)?;
-    let redirect_uri = Url::parse(&oidc.redirect_uri).map_err(|source| Error::Url {
+    let redirect_uri = Url::parse(oidc.redirect_uri.expose()).map_err(|source| Error::Url {
         key: String::from("oidc.redirect_uri"),
         source,
     })?;
@@ -170,7 +170,7 @@ fn resolve_oidc(oidc: &OidcSection) -> Result<OidcSettings, Error> {
     }
     Ok(OidcSettings {
         checked,
-        issuer: oidc.issuer.clone(),
+        issuer: oidc.issuer.expose().to_owned(),
         redirect_uri,
         endpoints_given,
     })

@@ -482,3 +482,101 @@ fn the_profile_elements_of_the_laboratory_specimen_survive_the_round_trip()
     );
     Ok(())
 }
+
+/// The library's `EEHRxF` lab analyte extension, which counts once its
+/// context runs.
+const LAB_ANALYTE: &[&str] = &["projects/org.openehr/EEHRxF/lab/bundle/lab_analyte.yml"];
+
+/// The context FerroBRIDGE authored over the lab analyte extension.
+const LAB_ANALYTE_CONTEXT: &str = "ferrobridge_library_lab_analyte.context";
+
+/// Compiles the laboratory context with the library's lab analyte extension
+/// applied after the shipped ones.
+///
+/// `eehrxf_lab_analyte` slots the analyte cluster into itself through
+/// `hasMember`, and FHIRconnect v1.0.0 does not say where such a recursion
+/// ends. The compiler unfolds it as deep as the template instantiates it
+/// (our own design, `docs/architecture.md`): `KDS_Laborbericht` nests no
+/// analyte in an analyte, so the self-slot is left out at the first level.
+fn lab_analyte_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
+    let index = kds_laborbericht_template()?;
+    let files: Vec<String> = SHIPPED_LABORATORY
+        .iter()
+        .skip(1)
+        .map(|file| format!("{SHIPPED}/laboratory/{file}"))
+        .chain(LAB_ANALYTE.iter().map(|file| {
+            format!(
+                "{}/../../docs/specs/fhirconnect-mapping-lib/{file}",
+                env!("CARGO_MANIFEST_DIR")
+            )
+        }))
+        .chain([format!(
+            "{}/tests/fixtures/projects/ferrobridge/library/{LAB_ANALYTE_CONTEXT}.yml",
+            env!("CARGO_MANIFEST_DIR")
+        )])
+        .collect();
+    let set = load_set(files, &StaticMappingCodes::default())
+        .map_err(|diagnostics| render(&diagnostics))?;
+    let program = compile(
+        &set,
+        &MappingName::new(LAB_ANALYTE_CONTEXT)?,
+        &index,
+        &SCHEMAS,
+        &StaticMappingCodes::default(),
+    )
+    .map_err(|diagnostics| render(&diagnostics))?;
+    Ok((program, index))
+}
+
+/// Compiles the lab analyte context and runs the synthetic report through
+/// it both ways, and returns it with the published file it reaches.
+pub(crate) fn lab_analyte_chain() -> Result<crate::support::Chain, Box<dyn Error>> {
+    let (program, index) = lab_analyte_program()?;
+    round_trip(&program, &index)?;
+    Ok((LAB_ANALYTE, program))
+}
+
+/// The recursive self-slot ends where the template stops nesting the
+/// analyte, with no refusal and no warning, and the report comes back out
+/// with the one result it referenced.
+#[test]
+fn the_self_slotting_lab_analyte_unfolds_as_deep_as_the_template() -> Result<(), Box<dyn Error>> {
+    let (program, index) = lab_analyte_program()?;
+    assert!(program.warnings().is_empty(), "{:?}", program.warnings());
+    let Outbound { results, .. } = round_trip(&program, &index)?;
+    assert_eq!(results.len(), 1, "{results:?}");
+    Ok(())
+}
+
+/// A slot of an archetype the chain does not hold, at a place the template
+/// lacks below the analyte it does instantiate, is still refused: only a
+/// recursion ends where the template stops.
+#[test]
+fn a_slot_off_the_recursion_at_a_missing_node_is_still_refused() {
+    let extension = "grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_analyte_tail
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: CLUSTER.laboratory_test_analyte.v1
+mappings:
+  - name: \"specimenBelowAnalyte\"
+    extension: \"add\"
+    with:
+      fhir: \"$resource.specimen\"
+      openehr: \"$archetype/items[openEHR-EHR-CLUSTER.specimen.v1]\"
+    slotArchetype: \"CLUSTER.specimen.v1\"
+";
+    let Err(refusals) = compiled_with_tail(extension) else {
+        panic!("a specimen below the analyte compiles");
+    };
+    assert!(
+        refusals
+            .iter()
+            .any(|refusal| refusal.contains("has no node at")),
+        "{refusals:?}"
+    );
+}
