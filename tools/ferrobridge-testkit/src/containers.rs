@@ -163,8 +163,8 @@ pub const RABBITMQ: PinnedImage = PinnedImage {
 /// The reference openEHR CDR, which speaks ITS-REST 1.1.0.
 pub const CDR: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr",
-    tag: "5.7.0-rc2",
-    digest: "sha256:137030d95ee0fd4e4209de357f29f83545bdd408d7f67335f61be20b5fb9858c",
+    tag: "5.7.0",
+    digest: "sha256:44c9268cb8a154df118a10ffe84329633f22923ea2cc54261ff0cea57a2ee7e7",
 };
 
 /// The readers the reference CDR serves its outbox feed to, each named in its
@@ -179,8 +179,8 @@ pub const CDR_READERS: [&str; 2] = ["ferrobridge-feed", "ferrobridge-events"];
 /// rather than against a bare PostgreSQL.
 pub const CDR_POSTGRES: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr-postgres",
-    tag: "5.7.0-rc2",
-    digest: "sha256:d04b07f4aca8340e1870f6cca9ee2b50d140adbb0128ba3d20d11607409b352e",
+    tag: "5.7.0",
+    digest: "sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a",
 };
 
 /// The reference FHIR terminology server.
