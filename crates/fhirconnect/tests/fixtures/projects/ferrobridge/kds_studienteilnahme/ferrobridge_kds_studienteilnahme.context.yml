@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of projects/org.highmed/KDS/studienteilnahme/studienteilnahme.context.yaml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 2ba7cf5d (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the metadata name and version are FerroBRIDGE's; the profile, the
+# template, the archetypes and the start are the published file's. The
+# KDS_informed_consent extension is not listed: its `mappings` is `null`,
+# which the published model-mapping schema refuses (#101).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_studienteilnahme.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: https://www.medizininformatik-initiative.de/fhir/modul-consent/StructureDefinition/mii-pr-consent-einwilligung
+    version: 2025.0.0
+  template:
+    id: Studienteilnahme
+    sem_ver: 13.0.0
+  archetypes:
+    - ACTION.informed_consent.v0
+    - CLUSTER.study_details.v1
+    - CLUSTER.study_participation.v1
+  start: ACTION.informed_consent.v0
