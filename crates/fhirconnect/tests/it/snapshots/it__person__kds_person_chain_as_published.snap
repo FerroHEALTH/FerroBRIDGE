@@ -32,8 +32,6 @@ expression: rows(&diagnostics)
   "KDS_structured_name.v1.person_name-structured_name.yml:31 error fc-unknown-fhir-element",
   "KDS_structured_name.v1.person_name-structured_name.yml:31 error fc-unknown-fhir-element",
   "gender.v1.yml:17 error fc-unpaired-types",
-  "organisation.v1.yml:19 warning fc-excluded-template-node",
-  "organisation.v1.yml:24 warning fc-excluded-template-node",
   "person.v1.Patient.yml:18 error fc-unknown-fhir-element",
   "person.v1.Patient.yml:23 error fc-unknown-fhir-element",
   "person.v1.Patient.yml:30 error fc-unknown-fhir-element",
@@ -48,8 +46,7 @@ expression: rows(&diagnostics)
   "person.v1.Patient.yml:78 error fc-unknown-template-node",
   "person.v1.Patient.yml:80 error fc-unknown-template-node",
   "person.v1.Patient.yml:82 error fc-unknown-template-node",
-  "person.v1.yml:39 error fc-unknown-template-node",
-  "person.v1.yml:40 error fc-archetype-mismatch",
+  "person.v1.yml:39 warning fc-excluded-template-node",
   "person_data.v0.yml:75 error fc-unknown-fhir-element",
   "structured_name.v1.yml:20 error fc-ambiguous-template-node",
   "structured_name.v1.yml:20 error fc-ambiguous-template-node"

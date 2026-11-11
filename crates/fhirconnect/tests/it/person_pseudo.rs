@@ -47,6 +47,15 @@ pub(crate) const PUBLISHED: &[&str] = &[
     "projects/org.highmed/KDS/person_pseudo/KDS_pseudo_person_cluster.yml",
     "model/cluster/org.openehr/person_birth_data_iso.v0.yml",
     "model/cluster/org.openehr/death_details.v1.yml",
+    "model/cluster/org.openehr/person.v1.yml",
+];
+
+/// The published models the set loads so the two slots of `person.v1.yml`
+/// (`:21`, `:40`) name a loaded model; `KDS_Person_Pseudonymisiert` fills
+/// neither slot, so neither model runs.
+const LOADED: &[&str] = &[
+    "model/cluster/org.openehr/structured_name.v1.yml",
+    "model/cluster/org.openehr/organisation.v1.yml",
 ];
 
 /// The project directory this crate authored for the chain.
@@ -56,7 +65,6 @@ const PROJECT_DIR: &str = "projects/ferrobridge/kds_person_pseudo";
 const PROJECT: &[&str] = &[
     "ferrobridge_kds_person_pseudo.context.yml",
     "ferrobridge_person_data.v0.yml",
-    "ferrobridge_person.v1.yml",
     "ferrobridge_address.v1.yml",
     "ferrobridge_kds_gender_pseudo.yml",
     "../kds_person/ferrobridge_gender.v1.yml",
@@ -87,6 +95,7 @@ fn kds_person_pseudo_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
 fn kds_person_pseudo_set() -> Result<MappingSet, Box<dyn Error>> {
     let files: Vec<String> = PUBLISHED
         .iter()
+        .chain(LOADED)
         .map(|file| published(file))
         .chain(PROJECT.iter().map(|file| project(file)))
         .collect();
@@ -171,7 +180,6 @@ fn putget_holds_on_the_kds_pseudonymised_patient() -> Result<(), Box<dyn Error>>
 const REPLACED: &[&str] = &[
     "model/admin_entry/org.highmed/person_data.v0.yml",
     "model/admin_entry/org.highmed/versicherungsinformationen.v0.yml",
-    "model/cluster/org.openehr/person.v1.yml",
     "model/cluster/org.openehr/address.v1.yml",
     "model/cluster/org.openehr/structured_name.v1.yml",
     "model/cluster/org.openehr/organisation.v1.yml",
@@ -186,8 +194,6 @@ const REPLACED: &[&str] = &[
 /// applied, is refused exactly; each refusal is recorded on #101:
 ///
 /// - `person_data.v0.yml:75`: `link.type.value` read on a `Reference`.
-/// - `person.v1.yml:20`, `:21`, `:39`, `:40`: the structured name and
-///   organisation slots, which `KDS_Person_Pseudonymisiert` leaves unfilled.
 /// - `gender.v1.yml:17`: the code `gender` onto a `DV_CODED_TEXT`.
 /// - `KDS_gender.yml:34`, `:45`, `:46`: `other_context` and the insurance
 ///   entry, which the template does not carry; the insurance model the
@@ -218,5 +224,54 @@ fn the_kds_person_pseudo_chain_as_published_is_refused_exactly() -> Result<(), B
     .err()
     .ok_or("the pseudonymised person chain as published compiles")?;
     insta::assert_json_snapshot!("kds_person_pseudo_chain_as_published", rows(&diagnostics));
+    Ok(())
+}
+
+/// An open slot leaves out only the archetypes it admits: with the
+/// structured name slot of `person.v1.yml` (`:20`) renamed to an OBSERVATION,
+/// which no `CLUSTER` slot of `KDS_Person_Pseudonymisiert` admits, the path
+/// is refused as every other node identity the template does not carry is.
+#[test]
+fn a_slot_path_the_open_slot_does_not_admit_is_refused() -> Result<(), Box<dyn Error>> {
+    let directory = tempfile::tempdir()?;
+    let source = std::fs::read_to_string(published("model/cluster/org.openehr/person.v1.yml"))?;
+    let written = "$archetype/items[openEHR-EHR-CLUSTER.structured_name.v1]";
+    if source.matches(written).count() != 1 {
+        return Err("the published person cluster no longer writes its name slot once".into());
+    }
+    let renamed = directory.path().join("person.v1.yml");
+    std::fs::write(
+        &renamed,
+        source.replace(
+            written,
+            "$archetype/items[openEHR-EHR-OBSERVATION.blood_pressure.v2]",
+        ),
+    )?;
+    let files: Vec<String> = PUBLISHED
+        .iter()
+        .filter(|file| !file.ends_with("/person.v1.yml"))
+        .chain(LOADED)
+        .map(|file| published(file))
+        .chain([renamed.to_string_lossy().into_owned()])
+        .chain(PROJECT.iter().map(|file| project(file)))
+        .collect();
+    let codes = StaticMappingCodes::default();
+    let set = load_set(files, &codes).map_err(|d| render(&d))?;
+    let diagnostics = compile(
+        &set,
+        &MappingName::new(CONTEXT)?,
+        &kds_person_pseudo_template()?,
+        &SCHEMAS,
+        &codes,
+    )
+    .err()
+    .ok_or("a slot path the template's slot does not admit compiles")?;
+    let found = rows(&diagnostics);
+    assert!(
+        found.contains(&String::from(
+            "person.v1.yml:20 error fc-unknown-template-node"
+        )),
+        "{found:?}"
+    );
     Ok(())
 }

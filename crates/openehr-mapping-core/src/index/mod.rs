@@ -22,6 +22,7 @@ mod facts;
 pub mod matching;
 pub mod ordinals;
 pub mod paths;
+pub mod slots;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -37,6 +38,7 @@ use crate::index::matching::parse_aql_path;
 use crate::index::ordinals::OrdinalOption;
 use crate::index::paths::AqlPath;
 use crate::index::paths::FlatId;
+use crate::index::slots::OpenSlot;
 use crate::path::MappingPath;
 use crate::template::Binding;
 use crate::template::BindingKind;
@@ -221,6 +223,8 @@ pub struct WebTemplateIndex {
     ordinals: BTreeMap<AqlPath, Vec<OrdinalOption>>,
     /// The archetypes the template root specialises, the nearest first.
     root_lineage: Vec<String>,
+    /// The archetype slots the template keeps open.
+    open_slots: Vec<OpenSlot>,
     /// The instance navigation of `openehr-sdt` over this template.
     navigator: Navigator,
 }
@@ -321,6 +325,7 @@ impl WebTemplateIndex {
                 source: openehr_rm::v1_2::paths::PathError::Empty,
             })?;
         let navigator = Navigator::new(&web_template);
+        let open_slots = slots::read(&web_template.tree)?;
         Ok(Self {
             web_template,
             generation,
@@ -332,6 +337,7 @@ impl WebTemplateIndex {
             archetype_terms: BTreeMap::new(),
             ordinals: BTreeMap::new(),
             root_lineage: Vec::new(),
+            open_slots,
             navigator,
         })
     }
@@ -425,6 +431,17 @@ impl WebTemplateIndex {
         self.archetype_terms
             .get(root.aql_path())
             .map(|codes| codes.contains(code))
+    }
+
+    /// Returns the archetype slots the template keeps open, each with the
+    /// absolute path of the attribute it constrains.
+    ///
+    /// An open slot admits archetypes the template holds none of at that place
+    /// (AOM 1.4 `ARCHETYPE_SLOT`), so a path through one names a node the
+    /// template does not carry, as a path to an excluded node does.
+    #[must_use]
+    pub fn open_slots(&self) -> &[OpenSlot] {
+        &self.open_slots
     }
 
     /// Returns the ordinal options the template constrains at `node`, in
