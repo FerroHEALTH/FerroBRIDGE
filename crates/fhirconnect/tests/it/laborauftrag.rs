@@ -434,11 +434,14 @@ fn an_unresolved_requester_builds_no_kds_laborauftrag_composition() -> Result<()
     Ok(())
 }
 
-/// A requester naming a contained resource of another type is refused,
-/// because the mapping names `Organization`
-/// (`types-of-mappings/concept-type/Reference.adoc`, `resourceType`).
+/// A requester naming a contained resource of another type is no input of
+/// the mapping, which names `Organization`
+/// (`types-of-mappings/concept-type/Reference.adoc`, `resourceType`; our own
+/// design on the silence, #1888), so the mandatory `Einsender` cluster stays
+/// empty and the template admits no composition.
 #[test]
-fn a_requester_of_another_type_is_refused() -> Result<(), Box<dyn Error>> {
+fn a_requester_of_another_type_builds_no_kds_laborauftrag_composition() -> Result<(), Box<dyn Error>>
+{
     let (program, index) = kds_laborauftrag_program()?;
     let mut request = kds_service_request()?;
     if let Some(contained) = request
@@ -455,14 +458,19 @@ fn a_requester_of_another_type_is_refused() -> Result<(), Box<dyn Error>> {
         contained.remove("name");
     }
     let Err(error) = inbound(&program, &index, request) else {
-        return Err("a Practitioner requester is expected to be refused".into());
+        return Err("a Practitioner requester leaves the sender empty".into());
     };
     assert!(
         matches!(
             error,
-            fhirconnect::engine::traverse::error::EngineError::Reference { .. }
+            fhirconnect::engine::traverse::error::EngineError::Build { .. }
         ),
         "{error}"
+    );
+    let rendered = format!("{error:?}");
+    assert!(
+        rendered.contains("'Einsender']: mandatory node is missing"),
+        "{rendered}"
     );
     Ok(())
 }

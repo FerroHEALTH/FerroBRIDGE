@@ -894,6 +894,19 @@ ours:
   check is added when a mapping can produce its breach; holding output to the
   whole constraint set is the profile validator's job (section 4.9). No
   specification governs where the check runs: our own design.
+- **A reference whose target is of another type is no input of the
+  mapping** (#1888). A `reference` mapping names "the type of resource we
+  want to initialize" in `resourceType` (FHIRconnect v1.0.0
+  `types-of-mappings/concept-type/Reference.adoc`), and the specification is
+  silent on an occurrence whose target is of another type. A repeating
+  reference such as R4 `DiagnosticReport.performer` admits several, and a
+  project maps one of them. Going into openEHR, the engine skips such an
+  occurrence and records no read for it, as the engine "proceeds with the
+  mapping" when it cannot use a target (`engine/references.adoc`). A caller
+  that accounts for unread elements, as `eehrxf` does, then declares it. A
+  reference the engine cannot read stays a refusal or a skip as before, and
+  the openEHR-to-FHIR direction is unchanged. No specification governs this:
+  our own design.
 - **A start archetype the composition holds more than once maps one
   occurrence at a time** (#1254). FHIRconnect v1.0.0 does not say how a
   context binds then; the per-occurrence runs of a `hierarchy.split`
