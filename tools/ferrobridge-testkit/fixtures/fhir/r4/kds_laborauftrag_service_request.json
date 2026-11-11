@@ -17,6 +17,23 @@
         }
       ],
       "name": "Synthetisches Einsenderlabor"
+    },
+    {
+      "resourceType": "Specimen",
+      "id": "probe",
+      "accessionIdentifier": {
+        "system": "http://example.org/fhir/sid/eingangsnummern",
+        "value": "EN-0001"
+      },
+      "collection": {
+        "collector": {
+          "identifier": {
+            "system": "http://example.org/fhir/sid/entnehmende",
+            "value": "ENT-0001"
+          }
+        },
+        "collectedDateTime": "2026-02-15T09:45:00+01:00"
+      }
     }
   ],
   "identifier": [
@@ -49,6 +66,11 @@
   "requester": {
     "reference": "#einsender"
   },
+  "specimen": [
+    {
+      "reference": "#probe"
+    }
+  ],
   "authoredOn": "2026-02-15T10:28:00+01:00",
   "note": [
     {

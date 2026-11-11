@@ -6,9 +6,8 @@
 # under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
 # file carries no copyright line to keep.
 # Changed: the metadata name and version are FerroBRIDGE's; the profile, the
-# template and the start are the published file's. CLUSTER.specimen.v1 is
-# not listed, because specimen.v1.yml does not compile against
-# KDS_Laborauftrag. The extension list names FerroBRIDGE's stand-in for
+# template and the start are the published file's. The extension list
+# names FerroBRIDGE's stand-in for
 # KDS_laborauftrag and KDS_composition. The
 # round-trip test records each published refusal by line.
 grammar: FHIRConnect/v1.0.0
@@ -28,6 +27,7 @@ context:
   archetypes:
     - "INSTRUCTION.service_request.v1"
     - "CLUSTER.organisation.v1"
+    - "CLUSTER.specimen.v1"
     - "COMPOSITION.request.v1.ServiceRequest"
   extensions:
     - "ferrobridge_kds_laborauftrag"

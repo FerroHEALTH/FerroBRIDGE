@@ -6,8 +6,10 @@
 # under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
 # file carries no copyright line to keep.
 # Changed: the metadata name and version are FerroBRIDGE's. The published
-# lines 23 to 44 slot CLUSTER.specimen.v1, whose model does not compile
-# against KDS_Laborauftrag, so the method is left out. The manual paths of
+# specimen method (lines 19 to 43) is kept less its `specimenIdentifier`
+# (lines 40 to 43), which adds `Specimen.identifier` on `items[at0001]`, the
+# node the specimen model maps `accessionIdentifier` onto at its line 86, so
+# one of the two would not come back. The manual paths of
 # lines 54, 83 and 116 write a string onto TERMINOLOGY_ID, so they name its
 # `value` here, as manual.adoc writes `defining_code/terminology_id/value`.
 # The `status` overwrite (lines 108 to 135) is the published one, over the
@@ -29,6 +31,26 @@ mappings:
       fhir: "$resource"
       openehr: "$composition"
     slotArchetype: "COMPOSITION.request.v1.ServiceRequest"
+
+  - name: specimen
+    extension: add
+    with:
+      fhir: $resource.specimen
+      openehr: $archetype/activities[at0001]/description[at0009]/items[openEHR-EHR-CLUSTER.specimen.v1]
+    followedBy:
+      mappings:
+        - name: specimenReference
+          with:
+            fhir: $fhirRoot
+            openehr: $reference
+          reference:
+            resourceType: Specimen
+            mappings:
+              - name: specimenRecurring
+                with:
+                  fhir: $fhirRoot
+                  openehr: $openehrRoot
+                slotArchetype: CLUSTER.specimen.v1
 
   - name: "intent"
     extension: "overwrite"

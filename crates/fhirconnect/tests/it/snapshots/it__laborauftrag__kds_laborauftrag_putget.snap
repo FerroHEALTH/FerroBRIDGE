@@ -18,6 +18,13 @@ expression: declared
     "contained[0].identifier[0].value = \"EINS-0001\"",
     "contained[0].name = \"Synthetisches Einsenderlabor\"",
     "contained[0].resourceType = \"Organization\"",
+    "contained[1].accessionIdentifier.system = \"http://example.org/fhir/sid/eingangsnummern\"",
+    "contained[1].accessionIdentifier.value = \"EN-0001\"",
+    "contained[1].collection.collectedDateTime = \"2026-02-15T09:45:00+01:00\"",
+    "contained[1].collection.collector.identifier.system = \"http://example.org/fhir/sid/entnehmende\"",
+    "contained[1].collection.collector.identifier.value = \"ENT-0001\"",
+    "contained[1].id = \"probe\"",
+    "contained[1].resourceType = \"Specimen\"",
     "id = \"ferrobridge-kds-labrequest-1\"",
     "meta.profile[0] = \"https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ServiceRequestLab\""
   ],
@@ -26,6 +33,7 @@ expression: declared
     "code.text = \"Synthetic blood count panel\""
   ],
   "changed": [
-    "requester.reference: \"#einsender\" became \"Organization/768bf573c28b33629dc25336956dc1ccad0e5a70345239b0d0a29b04e53c8381\""
+    "requester.reference: \"#einsender\" became \"Organization/768bf573c28b33629dc25336956dc1ccad0e5a70345239b0d0a29b04e53c8381\"",
+    "specimen[0].reference: \"#probe\" became \"Specimen/115f06d65552df7a7b2941d2789e51d8e84c9c8fd09c5cbe853409be92d7a451\""
   ]
 }
