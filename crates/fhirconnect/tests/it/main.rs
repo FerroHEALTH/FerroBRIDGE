@@ -41,6 +41,7 @@ mod repeated_start;
 mod resolve;
 mod roundtrip;
 mod split_outside;
+mod studienteilnahme;
 mod support;
 mod term_mapping;
 mod todesursache;

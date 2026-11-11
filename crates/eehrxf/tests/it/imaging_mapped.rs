@@ -342,7 +342,13 @@ fn round_trip() -> Result<(String, String), Box<dyn Error>> {
             _ => None,
         })
         .ok_or("the mapped study")?;
-    let study = out.full_url("ImagingStudy", &study_id);
+    let studies: Vec<&str> = out.studies().collect();
+    assert_eq!(
+        vec![out.full_url("ImagingStudy", &study_id).as_str()],
+        studies,
+        "the document names the run's one study with the fullUrl its entry holds"
+    );
+    let study = studies.first().ok_or("the mapped study")?.to_string();
     with_sections(&mut out, &study)?;
     Ok((received, serde_json::to_string(&out.into_bundle()?)?))
 }
@@ -574,6 +580,25 @@ fn the_imaging_service_is_served_as_the_performing_organization() -> Result<(), 
         organization["meta"]["profile"][0],
         "http://hl7.eu/fhir/base/StructureDefinition/organization-eu-core",
         "{organization}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_study_section_lists_the_study_entry_the_document_holds() -> Result<(), Box<dyn Error>> {
+    let (_, written) = round_trip()?;
+    let output: Value = serde_json::from_str(&written)?;
+    let composition = only(&output, "Composition")?;
+    let section = composition["section"]
+        .as_array()
+        .ok_or("sections")?
+        .iter()
+        .find(|section| section["code"]["coding"][0]["code"] == "18726-0")
+        .ok_or("the imagingstudy section")?;
+    assert_eq!(
+        Some(full_url(&output, "ImagingStudy")?),
+        section["entry"][0]["reference"].as_str(),
+        "Document::studies names the study with the fullUrl of the entry that holds it"
     );
     Ok(())
 }

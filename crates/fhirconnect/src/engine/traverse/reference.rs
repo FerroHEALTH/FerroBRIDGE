@@ -29,6 +29,16 @@ use crate::engine::traverse::Run;
 use crate::engine::traverse::empty_resource;
 use crate::engine::traverse::error::EngineError;
 
+/// What one literal reference points at, for the mapping that follows it.
+enum Target {
+    /// A resource of the type the mapping names.
+    Found(Value),
+    /// No resource the run can reach.
+    Missing,
+    /// A resource of another type, which is no input of the mapping.
+    OtherType,
+}
+
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Returns the identity request of a resource this run creates.
     pub(super) fn identity_request(&self, resource_type: &str, mapping: &str) -> IdentityRequest {
@@ -137,16 +147,22 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 reference: literal,
             });
         }
-        let Some(fetched) = self.resolve_reference(mapping, &literal, resource)? else {
-            let location = self.locate(mapping, input);
-            self.warnings.push(Warning::new(
-                Loss::Skipped {
-                    mapping: String::from(mapping.name()),
-                    reason: SkipReason::UnresolvedReference { reference: literal },
-                },
-                location,
-            ));
-            return Ok(());
+        let fetched = match self.resolve_reference(mapping, &literal, resource)? {
+            Target::Found(fetched) => fetched,
+            Target::Missing => {
+                let location = self.locate(mapping, input);
+                self.warnings.push(Warning::new(
+                    Loss::Skipped {
+                        mapping: String::from(mapping.name()),
+                        reason: SkipReason::UnresolvedReference { reference: literal },
+                    },
+                    location,
+                ));
+                return Ok(());
+            }
+            // NOTE: no specification governs this: our own design (docs/architecture.md); Reference.adoc's
+            // `resourceType` names the resource the mapping takes, so a target of another type is no input.
+            Target::OtherType => return Ok(()),
         };
         // NOTE: sub-contexts.adoc §Rules: "A resource consumed through `slotContext` is marked as
         // resolved", so the run names it for the caller that splits the Bundle.
@@ -165,8 +181,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         ran
     }
 
-    /// Returns the resource a literal reference points at, checked against
-    /// the type the mapping names.
+    /// Returns what a literal reference points at, held to the type the
+    /// mapping names.
     ///
     /// A `#id` reference names a resource in the current document's
     /// `contained` (<https://hl7.org/fhir/R4/references.html#contained>); any
@@ -176,7 +192,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         mapping: &Mapping,
         literal: &str,
         resource: &ResourceType,
-    ) -> Result<Option<Value>, EngineError> {
+    ) -> Result<Target, EngineError> {
         let refuse = |source: ReferenceError| EngineError::Reference {
             mapping: String::from(mapping.name()),
             source: Box::new(source),
@@ -198,20 +214,16 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 .map_err(refuse)?
         };
         let Some(found) = found else {
-            return Ok(None);
+            return Ok(Target::Missing);
         };
         let kind = found
             .get("resourceType")
             .and_then(Value::as_str)
             .unwrap_or_default();
         if kind != resource.as_str() {
-            return Err(refuse(ReferenceError::WrongType {
-                reference: String::from(literal),
-                expected: String::from(resource.as_str()),
-                found: String::from(kind),
-            }));
+            return Ok(Target::OtherType);
         }
-        Ok(Some(found))
+        Ok(Target::Found(found))
     }
 
     /// Returns the literal reference the mapping's FHIR side holds at one

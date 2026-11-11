@@ -1,0 +1,12 @@
+---
+source: crates/fhirconnect/tests/it/studienteilnahme.rs
+expression: rows(&diagnostics)
+---
+[
+  "informed_consent.v0.yml:102 error fc-uncarried-tail",
+  "informed_consent.v0.yml:124 error fc-uncarried-tail",
+  "informed_consent.v0.yml:146 error fc-uncarried-tail",
+  "informed_consent.v0.yml:35 error fc-uncarried-tail",
+  "informed_consent.v0.yml:58 error fc-uncarried-tail",
+  "informed_consent.v0.yml:80 error fc-uncarried-tail"
+]
