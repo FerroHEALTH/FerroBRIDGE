@@ -1,0 +1,1 @@
+- `ferrobridge config check` no longer prints the password of an issuer written with userinfo (`https://user:password@…`) in `[[auth.attributes]]`, `[[auth.federation]]`, `[[auth.party]]` or `auth.scopeless_subjects`: it renders as `https://***@…`, as `[[auth.issuer]]` already did. `ferrohealth-smart` 0.19 holds the issuer of every configuration table as a `SecretUrl` (#1897).
