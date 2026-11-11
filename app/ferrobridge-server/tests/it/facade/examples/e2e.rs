@@ -58,13 +58,18 @@ fn sample() -> Result<Vec<String>, Box<dyn Error>> {
 #[tokio::test(flavor = "multi_thread")]
 async fn the_first_passing_facade_examples_round_trip_through_a_real_cdr()
 -> Result<(), Box<dyn Error>> {
-    if !containers::e2e_enabled() || !super::fetched() {
+    if !containers::e2e_enabled() {
         return Ok(());
+    }
+    // The gated lane is this test's one run, so a missing package fails it.
+    if !Package::R4.fetched() {
+        return Err(format!("the gated run needs {}", Package::R4).into());
     }
     let cases = sample()?;
     let cdr = containers::cdr().await?;
-    crate::facade_e2e::upload_template(cdr.base_url()).await?;
-    crate::facade_e2e::upload_kds_template(cdr.base_url()).await?;
+    for (_, opt) in super::TEMPLATES {
+        crate::facade_e2e::upload_published(cdr.base_url(), opt).await?;
+    }
     for id in cases {
         let (context_id, file) = id.split_once('/').ok_or("a case id names its context")?;
         let context = Context::ALL
