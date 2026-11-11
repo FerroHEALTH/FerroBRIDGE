@@ -19,6 +19,7 @@ expression: rows(&diagnostics)
   "KDS_medikamentenverabreichung.yml:51 error fc-unknown-template-node",
   "KDS_medikamentenverabreichung.yml:52 error fc-unknown-template-node",
   "KDS_medikamentenverabreichung.yml:54 error fc-unknown-template-node",
+  "KDS_medikationsverabreichung.context.yaml:27 warning fc-unreached-extension",
   "case_identification.v0.yml:16 error fc-unpaired-types",
   "case_identification.v0.yml:16 error fc-unpaired-types",
   "medication.v1.yml:19 error fc-unknown-template-node",
@@ -42,16 +43,11 @@ expression: rows(&diagnostics)
   "medication.v1.yml:489 error fc-uncarried-tail",
   "medication.v1.yml:511 error fc-uncarried-tail",
   "medication.v1.yml:533 error fc-uncarried-tail",
-  "medication.v1.yml:77 error fc-reference-into-choice",
-  "medication.v2.substance.yml:74 warning fc-excluded-template-node",
   "medication.v2.yml:23 warning fc-excluded-template-node",
   "medication.v2.yml:25 error fc-unpaired-types",
   "medication.v2.yml:28 warning fc-excluded-template-node",
   "medication.v2.yml:40 warning fc-excluded-template-node",
   "medication.v2.yml:40 warning fc-excluded-template-node",
   "medication.v2.yml:45 warning fc-excluded-template-node",
-  "medication.v2.yml:45 warning fc-excluded-template-node",
-  "medication.v2.yml:72 error fc-reference-into-choice",
-  "medication.v2.yml:85 error fc-reference-into-choice",
-  "medication.v2.yml:96 error fc-unknown-template-node"
+  "medication.v2.yml:45 warning fc-excluded-template-node"
 ]

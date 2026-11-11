@@ -9,6 +9,7 @@ use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::diagnostic::ModelPath;
 use openehr_mapping_core::header::archetype::ArchetypeId;
 use openehr_mapping_core::header::metadata::MappingType;
+use openehr_mapping_core::position::Located;
 use openehr_mapping_core::position::Position;
 
 use crate::model::ast::Condition;
@@ -69,17 +70,20 @@ impl<'a> Compiler<'a> {
     /// A slot chain may enter a model already on it
     /// ([`crate::resolve::program::SLOT_DEPTH_LIMIT`]), and the recursion
     /// descends while the template carries a node. Inside a chain that has
-    /// entered an archetype again (two models of one archetype, as a
-    /// medication and its substance are, count once each), a method whose
-    /// place lies where the template
-    /// stops nesting an archetype of the chain is where no composition can
-    /// hold a value, so it is left out with everything under it; any other
+    /// entered an archetype again, or at a method that slots an archetype the
+    /// chain already holds (two models of one archetype, as a medication and
+    /// its substance are, count once each), a method whose place lies where
+    /// the template stops nesting an archetype of the chain is where no
+    /// composition can hold a value, so it is left out with everything under
+    /// it: the template, never the mapping, sets the depth. Any other
     /// place the template does not carry is refused where it stands. No
     /// specification governs a recursive slot: our own design.
     fn ends_recursion(&self, node: &Node<'a>, scope: &Scope) -> bool {
+        let slotted = node.mapping.slot_archetype.as_ref().map(Located::value);
         let archetypes: Vec<&str> = scope
             .chain
             .iter()
+            .chain(slotted)
             .filter_map(|model| self.set.model(model))
             .filter_map(archetype_of)
             .map(ArchetypeId::as_str)
@@ -144,8 +148,59 @@ impl<'a> Compiler<'a> {
         true
     }
 
-    /// Refuses a `reference` written into a choice element whose type the
-    /// path does not name.
+    /// Returns the `Reference` alternative of the choice element a `reference`
+    /// mapping writes, and `target` itself for any other mapping, a target
+    /// that names no choice and a choice that admits no `Reference`.
+    ///
+    /// A `reference` writes a FHIR `Reference`
+    /// (`types-of-mappings/concept-type/Reference.adoc`), and FHIR names a choice
+    /// by the type it holds (<https://hl7.org/fhir/R4/formats.html#choice>), so
+    /// the path names one element: the one `as(Reference)` would name.
+    fn reference_alternative(
+        &mut self,
+        node: &Node<'a>,
+        target: FhirTarget,
+        scope: &Scope,
+        path: &ModelPath,
+        direction: Option<Direction>,
+    ) -> FhirTarget {
+        let file = node.origin;
+        let written = node
+            .mapping
+            .with
+            .as_ref()
+            .and_then(|with| with.fhir.as_ref());
+        let (true, Location::Choice(_), Some(written)) = (
+            node.mapping.reference.is_some(),
+            target.resolved().location(),
+            written,
+        ) else {
+            return target;
+        };
+        let typed = Located::new(
+            written.position(),
+            format!("{}.as(Reference)", written.value()),
+        );
+        // NOTE: a choice that admits no Reference fails this probe, and its refusal is
+        // `fc-reference-into-choice`, so the probe's own diagnostics are dropped.
+        let raised = self.diagnostics.len();
+        let alternative = self.fhir_target(
+            file.file(),
+            file.header().name().value(),
+            &typed,
+            scope,
+            &path.field("with").field("fhir"),
+            Site::Write(direction),
+        );
+        alternative.unwrap_or_else(|| {
+            self.diagnostics.truncate(raised);
+            target
+        })
+    }
+
+    /// Refuses a `reference` written into a choice element that admits no
+    /// `Reference` (FHIR R4 formats.html §Choice), where
+    /// [`Self::reference_alternative`] found none to write.
     fn reference_into_choice(
         &mut self,
         node: &Node<'a>,
@@ -168,8 +223,8 @@ impl<'a> Compiler<'a> {
             &path.field("with").field("fhir"),
             format!(
                 "`{}` is a choice element, which FHIR names by the type it holds \
-                 (<https://hl7.org/fhir/R4/formats.html#choice>), so a `reference` writes \
-                 into it only where the path names the type, as `as(Reference)` does",
+                 (<https://hl7.org/fhir/R4/formats.html#choice>), and it admits no \
+                 `Reference`, which is what a `reference` writes",
                 target.expression()
             ),
         ));
@@ -228,15 +283,10 @@ impl<'a> Compiler<'a> {
             .as_ref()
             .map_or(inherited, |located| Some(*located.value()));
         let with = method.with.as_ref();
-        let fhir = with.and_then(|with| {
-            self.fhir_side(
-                file,
-                with,
-                scope,
-                &path.field("with"),
-                Site::Write(direction),
-            )
-        });
+        let site = Site::Write(direction);
+        let fhir = with
+            .and_then(|with| self.fhir_side(file, with, scope, &path.field("with"), site))
+            .map(|target| self.reference_alternative(node, target, scope, path, direction));
         let openehr =
             with.and_then(|with| self.openehr_side(file, with, scope, &path.field("with")));
         let anchored = fhir

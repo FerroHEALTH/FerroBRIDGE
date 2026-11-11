@@ -66,7 +66,10 @@ impl<'a> Compiler<'a> {
         site: Site,
     ) -> Option<FhirTarget> {
         let expression = match FhirPath::from_str(written.value()) {
-            Ok(expression) => expression,
+            Ok(expression) => match scope.element_root {
+                Some(ref root) => expression.rooted_at(root).unwrap_or(expression),
+                None => expression,
+            },
             Err(error) => {
                 self.diagnostics.push(diagnostic(
                     file,
