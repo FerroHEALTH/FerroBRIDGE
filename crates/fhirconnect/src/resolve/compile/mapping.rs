@@ -54,8 +54,8 @@ impl<'a> Compiler<'a> {
             // NOTE: composition-element.adoc: a context entered via `slotContext` "maps into the
             // parent composition; if its `start` slots a composition model, that mapping is skipped".
             if (scope.nested && slots_composition(node.mapping))
-                || self.ignores_excluded(node, scope)
                 || self.ends_recursion(node, scope)
+                || self.ignores_excluded(node, scope)
             {
                 continue;
             }

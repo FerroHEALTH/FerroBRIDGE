@@ -276,18 +276,32 @@ fn one_constituent_leaves_the_substance_two_levels_down_out() -> Result<(), Box<
     Ok(())
 }
 
+/// A template with no constituent keeps the CKM cluster's constituent slot
+/// open and fills it with nothing, so the `ingredients` method that slots a
+/// constituent (`medication.v2.yml:50`) addresses nodes the template does not
+/// carry and is ignored with a warning, as `model-mappings.adoc` §Mapping 0..0
+/// fields ignores a mapping not part of the template (coordinator ruling on
+/// #1546, 2026-11-11).
 #[test]
-fn a_template_with_no_constituent_refuses_the_constituent_path() -> Result<(), Box<dyn Error>> {
-    // A path the template does not carry below the one cluster it holds,
-    // and that slots no archetype of the chain, is refused as every other
-    // unknown node is (#1883).
+fn a_template_with_no_constituent_ignores_the_constituent_slot() -> Result<(), Box<dyn Error>> {
     let Err(diagnostics) = compiled(0)? else {
         return Err("the cluster compiled with no constituent in the template".into());
     };
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code().as_str() == "fc-unknown-template-node"),
+    let rows: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let line = diagnostic
+                .position()
+                .map_or(0, openehr_mapping_core::position::Position::line);
+            format!("{line} {} {}", diagnostic.severity(), diagnostic.code())
+        })
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            "25 error fc-unpaired-types",
+            "50 warning fc-excluded-template-node"
+        ],
         "{}",
         crate::resolve::render(&diagnostics)
     );

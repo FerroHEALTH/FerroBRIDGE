@@ -303,8 +303,6 @@ fn the_published_admin_entry_extension_names_a_function_the_engine_lacks()
 ///   defines (#475); lines `55, 57, 59, 78, 80, 82`: `null_flavour` below a
 ///   `DV_DATE_TIME` and a `PARTY_PROXY`, which the RM gives none.
 /// - `person_data.v0.yml:75`: `link` below a `Reference`.
-/// - `person.v1.yml:39, 40`: `CLUSTER.organisation.v1`, a slot `KDS_Person`
-///   leaves unfilled, with `organisation.v1.yml:19, 24` below it.
 /// - `structured_name.v1.yml:20`: `items[at0001]`, two nodes of `KDS_Person`.
 /// - `KDS_structured_name.v1.person_name-structured_name.yml:17, 31, 37`:
 ///   `items[at0006]`, which `KDS_Person` does not carry, `url` below

@@ -11,6 +11,7 @@ use openehr_mapping_core::path::MappingPath;
 use openehr_mapping_core::position::Located;
 use openehr_rm::v1_2::model;
 use openehr_rm::v1_2::paths::PathSegment;
+use openehr_rm::v1_2::paths::Predicate;
 use openehr_rm::v1_2::paths::RmPath;
 
 use crate::engine::rm::tail_walk::concrete_forms;
@@ -64,6 +65,48 @@ impl<'a> Compiler<'a> {
         }
         let root = self.enclosing_archetype_root(node)?;
         (self.template.archetype_defines(root, code) == Some(true)).then(|| (code.to_owned(), root))
+    }
+
+    /// Returns the archetype id of the first segment of `path` past its
+    /// deepest template node, with the path of the attribute holding it, when
+    /// the template keeps an open slot there that admits the archetype and
+    /// fills it with none of it.
+    ///
+    /// An unfilled slot holds no archetype in this template, so a model
+    /// mapping's slot into it addresses nodes "not part of the corresponding
+    /// Profile/Templates", which "are ignored and not executed"
+    /// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mapping-files/model-mappings.adoc`,
+    /// §Mapping 0..0 fields). A slot that does not admit the archetype leaves
+    /// the path refused, so a mistyped archetype id is still reported.
+    pub(super) fn unfilled_slot(&self, path: &RmPath, taken: usize) -> Option<(String, RmPath)> {
+        let end = (taken..path.segments.len()).find(|&end| {
+            let prefix = RmPath {
+                absolute: path.absolute,
+                segments: path.segments.get(..=end).unwrap_or_default().to_vec(),
+            };
+            !self
+                .interior
+                .iter()
+                .any(|interior| names_same_place(&prefix, interior))
+        })?;
+        let segment = path.segments.get(end)?;
+        let archetype = segment.predicate.archetype_node_id.as_deref()?;
+        if !archetype.starts_with(ARCHETYPE_ID_PREFIX) {
+            return None;
+        }
+        let mut attribute = path.segments.get(..=end).unwrap_or_default().to_vec();
+        if let Some(last) = attribute.last_mut() {
+            last.predicate = Predicate::default();
+        }
+        let attribute = RmPath {
+            absolute: path.absolute,
+            segments: attribute,
+        };
+        self.template
+            .open_slots()
+            .iter()
+            .any(|slot| names_same_place(&attribute, slot.attribute()) && slot.admits(archetype))
+            .then(|| (archetype.to_owned(), attribute))
     }
 
     /// Returns whether the template carries a node at the place of the segment
@@ -192,8 +235,9 @@ impl<'a> Compiler<'a> {
     /// Returns whether the place `written` names under `scope` lies where the
     /// template stops nesting one of `archetypes`.
     ///
-    /// It does when the template carries no node there and the first step it
-    /// carries no node for is an archetype root of one of `archetypes`. Any
+    /// It does when the template carries no node there, whether or not it
+    /// keeps an open slot there, and the first step it carries no node for is
+    /// an archetype root of one of `archetypes`. Any
     /// other unreached place, a mistyped code or a wrong attribute, answers
     /// `false`, so it is refused where [`Compiler::openehr_target`] locates it.
     pub(in crate::resolve::compile) fn nesting_ends(
@@ -205,7 +249,10 @@ impl<'a> Compiler<'a> {
         let Some(resolved) = Self::anchored(written, scope) else {
             return false;
         };
-        if !matches!(self.locate(&resolved), Err(LocateError::Unknown(_))) {
+        if !matches!(
+            self.locate(&resolved),
+            Err(LocateError::Unknown(_) | LocateError::Excluded(_))
+        ) {
             return false;
         }
         let unreached = (0..resolved.segments.len()).find(|&end| {

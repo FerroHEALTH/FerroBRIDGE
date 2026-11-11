@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.1.154"
+version = "0.1.155"
 dependencies = [
  "jsonschema",
  "openehr-am",
@@ -744,6 +744,7 @@ dependencies = [
  "openehr-its",
  "openehr-rm",
  "openehr-sdt",
+ "regex",
  "serde",
  "serde-saphyr",
  "serde_json",

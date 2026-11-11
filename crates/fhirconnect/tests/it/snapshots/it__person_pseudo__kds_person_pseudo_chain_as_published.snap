@@ -27,15 +27,8 @@ expression: rows(&diagnostics)
   "KDS_gender.yml:45 error fc-unknown-template-node",
   "KDS_gender.yml:46 error fc-archetype-mismatch",
   "gender.v1.yml:17 error fc-unpaired-types",
-  "organisation.v1.yml:19 warning fc-excluded-template-node",
-  "person.v1.yml:20 error fc-unknown-template-node",
-  "person.v1.yml:21 error fc-archetype-mismatch",
-  "person.v1.yml:39 error fc-unknown-template-node",
-  "person.v1.yml:40 error fc-archetype-mismatch",
+  "person.v1.yml:20 warning fc-excluded-template-node",
+  "person.v1.yml:39 warning fc-excluded-template-node",
   "person_data.v0.yml:75 error fc-unknown-fhir-element",
-  "structured_name.v1.yml:20 warning fc-excluded-template-node",
-  "structured_name.v1.yml:25 warning fc-excluded-template-node",
-  "structured_name.v1.yml:30 warning fc-excluded-template-node",
-  "structured_name.v1.yml:35 warning fc-excluded-template-node",
   "versicherungsinformationen.v0.yml:19 error fc-unknown-template-node"
 ]

@@ -86,6 +86,13 @@ impl<'a> Compiler<'a> {
                         self.template.template_id()
                     )));
                 }
+                if let Some((archetype, attribute)) = self.unfilled_slot(path, taken) {
+                    return Err(LocateError::Excluded(format!(
+                        "`{path}` names `{archetype}`, which the open slot of the template `{}` \
+                         at `{attribute}` admits and the template fills with no such archetype",
+                        self.template.template_id()
+                    )));
+                }
                 return Err(LocateError::Unknown(format!(
                     "the template `{}` has no node at `{path}`; the deepest node it reaches is \
                      `{}` and `{}` below it names a node identity the template does not carry",

@@ -839,6 +839,23 @@ ours:
   resource, `$resource` stays the enclosing resource. `$fhirRoot` stays the
   parent path of the previous mapping step (coordinator ruling on #1546,
   2026-11-10).
+- **A slot the template leaves unfilled is ignored as an excluded node.**
+  Model mappings "contain some mappings that are not part of the
+  corresponding Profile/Templates", and "These are ignored and not executed"
+  (`types-of-mapping-files/model-mappings.adoc` §Mapping 0..0 fields). A
+  template that keeps an `ARCHETYPE_SLOT` open and fills it with no archetype
+  of a given id holds no node of that archetype there. So a model mapping
+  whose `with.openehr` names that archetype in the slot is left out with
+  everything under it, with the same `fc-excluded-template-node` warning an
+  excluded at-coded node gets (`person.v1.yml:20` and `:39` against
+  `KDS_Person_Pseudonymisiert`). The slots come from the Web Template's
+  closed attributes (`openehr-sdt`), and the slot admits the archetype by its
+  reference-model class and its include and exclude patterns (AOM 1.4
+  `ARCHETYPE_SLOT`). A path whose archetype no open slot there admits stays a
+  refusal, and so does a method an extension contributes, since an extension
+  is written for one template. A slot that re-enters an archetype on its
+  chain ends silently where the template stops nesting it, as the recursive
+  slot rule in section 15 says (coordinator ruling on #1546, 2026-11-11).
 - **`instant` pairs with `DV_DATE_TIME`: our own design.** `DV_DATE_TIME.adoc`
   lists `dateTime` and `Period` and no `instant`. The R4 package's lexical
   form of `instant` is a strict subset of that of `dateTime`, so going into
@@ -3113,6 +3130,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Engine surface | `$tofhir` and `$toopenehr` per the REST API chapter, at the pinned specification commit, ahead of the facade | the specification's own conformance surface; no CDR needed; an external facade can call it | facade only |
 | openEHR wire | canonical JSON; Web Template built locally from the OPT; FLAT only at the operations edge | canonical is mandatory in ITS-REST; `WebTemplate` does not deserialise; node ids are server-specific; the REST API requires both serialisations | FLAT on the CDR wire; fetching `wt+json` |
 | Recursive slots | a `slotArchetype` may name a model on its chain; compiled along the template, ended where the template stops nesting the chain's archetype, refused past `SLOT_DEPTH_LIMIT` (8) or when the re-entry does not descend (section 4.3, #1551) | the CKM medication cluster nests itself; the template bounds what a composition can hold; FHIRconnect v1.0.0 is silent: our own design | refusing every slot that names a model on the chain; recursing at run time over paths the program never resolved |
+| Unfilled slots | a model mapping into an open `ARCHETYPE_SLOT` the template fills with no archetype of that id is ignored with `fc-excluded-template-node`; an archetype no open slot there admits stays refused | `model-mappings.adoc` §Mapping 0..0 fields ignores mappings not part of the template; AOM 1.4 `ARCHETYPE_SLOT` admits by class and pattern (coordinator ruling on #1546, 2026-11-11) | refusing every unfilled slot as an unknown node |
 | Composition start on an OPT2 | the template root carries the archetypes its lineage names, kept on the index from the OPT2's `parent_archetype_id` or passed by a caller holding the template source; ids are never rewritten (section 4.3, #1550) | a template and its OPT are specialised (AM Release-2.3.0 AOM2 §3.6.4, §3.6.6); FHIRconnect v1.0.0 is silent: our own design | rewriting the root node id to the parent archetype; refusing composition models against every OPT2 |
 | Template generations | both ADL 1.4 and ADL 2, resolved `adl1.4` then `adl2` on one id, decoded into two OPT types, built into one `WebTemplate` (section 3) | owner requirement 2026-09-12; the Simplified Formats seam is generation-neutral; ITS-REST 1.1.0 serves both | ADL 1.4 only; a second pipeline per generation |
 | ADL 2 fetch form | `Accept: application/json`, AOM2 canonical JSON into `openehr-am`'s `OperationalTemplate` | the server already compiled the OPT2; ADL 2 source would cost the parser, the flattener and a repository | `text/plain` source through `openehr-adl` |
