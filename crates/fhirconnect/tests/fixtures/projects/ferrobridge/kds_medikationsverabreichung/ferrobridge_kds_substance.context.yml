@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its model ferrobridge_kds_substance against the
+# published KDS_Medikamentenverabreichungen template, applying the published
+# KDS_medication.v2.substance extension of the medikationsverabreichung
+# project (#1546).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_kds_substance.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: http://hl7.org/fhir/StructureDefinition/Substance
+  template:
+    id: KDS_Medikamentenverabreichungen
+    sem_ver: 5.0.1
+  archetypes:
+    - ferrobridge_kds_substance
+    - CLUSTER.medication.v2.substance
+  extensions:
+    - KDS_medication.v2.substance
+  start: ferrobridge_kds_substance
