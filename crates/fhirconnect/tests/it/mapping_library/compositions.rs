@@ -39,20 +39,17 @@ const REPORT_RESULT: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_report_
 const MEDICATION_LIST_FILES: &[&str] =
     &["model/composition/org.openehr/medication_list.v1.MedicationStatement.yml"];
 
-/// The health summary composition and the two evaluations its section
-/// slots, mapped onto `Composition`.
+/// The health summary composition, the ad hoc section and the two
+/// evaluations the section slots, mapped onto `Composition`.
 const HEALTH_SUMMARY_FILES: &[&str] = &[
     "model/composition/org.openehr/health_summary.v1.Composition.yml",
     "model/evaluation/org.openehr/absence.v2.yml",
     "model/evaluation/org.openehr/exclusion_global.v1.yml",
+    "model/section/org.openehr/adhoc.v1.yml",
 ];
 
-/// FerroBRIDGE's section extension and its stand-in for the library's ad hoc
-/// section model, relative to the project directory.
-const HEALTH_SUMMARY_FIXTURES: &[&str] = &[
-    "ferrobridge_library_health_summary.yml",
-    "ferrobridge_section_adhoc.v1.yml",
-];
+/// FerroBRIDGE's section extension, relative to the project directory.
+const HEALTH_SUMMARY_FIXTURES: &[&str] = &["ferrobridge_library_health_summary.yml"];
 
 /// The composition models that refuse against their template for the
 /// library defects #101 records, as `(template slug, context, file)`.
@@ -218,7 +215,7 @@ fn the_health_summary_compiles_its_section_evaluations() -> Result<(), Box<dyn E
         models(&program),
         [
             "COMPOSITION.health_summary.v1",
-            "ferrobridge_section_adhoc.v1",
+            "SECTION.adhoc.v1",
             "EVALUATION.absence.v2",
             "EVALUATION.exclusion_global.v1"
         ]

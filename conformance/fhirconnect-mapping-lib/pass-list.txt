@@ -13,6 +13,7 @@ model/composition/org.openehr/medication_list.v1.MedicationStatement.yml
 model/evaluation/org.openehr/absence.v2.yml
 model/evaluation/org.openehr/exclusion_global.v1.yml
 model/evaluation/org.openehr/gender.v1.yml
+model/section/org.openehr/adhoc.v1.yml
 projects/org.highmed/KDS/fall/KDS_fall_problem_diagnose.yml
 projects/org.highmed/KDS/medikationsverabreichung/KDS_medication.yml
 projects/org.highmed/KDS/person/KDS_Composition.yml
