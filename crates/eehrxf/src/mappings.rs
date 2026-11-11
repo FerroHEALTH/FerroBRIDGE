@@ -421,3 +421,30 @@ pub const HDR: Project = Project {
         "MedicationRequest.eventHistory",
     ],
 };
+
+/// Every project the enabled features ship.
+const SHIPPED: &[Project] = &[
+    #[cfg(any(feature = "prescription", feature = "dispensation"))]
+    MPD,
+    #[cfg(feature = "imaging")]
+    IMAGING,
+    #[cfg(feature = "laboratory")]
+    LABORATORY,
+    #[cfg(feature = "patient-summary")]
+    EPS,
+    #[cfg(feature = "discharge")]
+    HDR,
+];
+
+/// Returns the received elements the shipped project that compiles a
+/// context mapping `contexts` names accounts for: none when no shipped
+/// project compiles one of them.
+///
+/// Every context of one [`crate::mapping::Mapping`] maps its one template,
+/// and no two shipped projects map the same template, so one project answers.
+pub(crate) fn accounted_for(contexts: &[&str]) -> &'static [&'static str] {
+    SHIPPED
+        .iter()
+        .find(|project| project.contexts.iter().any(|held| contexts.contains(held)))
+        .map_or(&[], |project| project.accounted)
+}

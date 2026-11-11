@@ -563,8 +563,17 @@ fn declared_losses() -> Result<Vec<String>, Box<dyn Error>> {
 /// The expression of each issue `keep` holds to, in the order the run that
 /// mapped the received `text` into openEHR declared them.
 fn expressions(text: &str, keep: impl Fn(&Value) -> bool) -> Result<Vec<String>, Box<dyn Error>> {
+    expressions_by(&mapping()?, text, keep)
+}
+
+/// The expressions of [`expressions`], the run made by `mapping`.
+fn expressions_by(
+    mapping: &Mapping,
+    text: &str,
+    keep: impl Fn(&Value) -> bool,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let document = ReceivedDocument::read(text)?;
-    let composition = mapping()?.to_openehr(&document, &settings())?;
+    let composition = mapping.to_openehr(&document, &settings())?;
     let outcome = composition.outcome().ok_or("the run declared its losses")?;
     let outcome = serde_json::to_value(outcome)?;
     Ok(outcome["issue"]
@@ -735,11 +744,51 @@ fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), 
 /// The expressions of the issues the run over the received `text` declares
 /// not carried, in the order the run declares them.
 fn not_carried(text: &str) -> Result<Vec<String>, Box<dyn Error>> {
-    expressions(text, |issue| {
+    not_carried_by(&mapping()?, text)
+}
+
+/// The expressions of [`not_carried`], the run made by `mapping`.
+fn not_carried_by(mapping: &Mapping, text: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    expressions_by(mapping, text, |issue| {
         issue["details"]["text"]
             .as_str()
             .is_some_and(|text| text.contains("no structured element"))
     })
+}
+
+// NOTE: no specification governs this: our own design; a gateway that compiles the shipped files
+// from disk, as FerroFED's receive path does, declares what the compiled project declares.
+#[test]
+fn a_report_mapped_by_the_shipped_files_declares_its_performing_organization()
+-> Result<(), Box<dyn Error>> {
+    let directory = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("eehrxf-imaging-files");
+    std::fs::create_dir_all(&directory)?;
+    let files = IMAGING.write_to(&directory)?;
+    let from_files = Mapping::compile_template(&template()?, &files, &[CONTEXT])?;
+    let text = received_text()?;
+    let document: Value = serde_json::from_str(&text)?;
+    let report = only(&document, "DiagnosticReport")?;
+    assert_eq!(
+        report["performer"][0]["reference"], "Organization/synthetic-radiology",
+        "{report}"
+    );
+    assert!(
+        of_type(&document, "Organization").iter().any(
+            |held| held["id"] == "synthetic-radiology" && held["name"] == "Synthetic radiology"
+        ),
+        "the document holds the performing organization"
+    );
+    let declared = not_carried_by(&from_files, &text)?;
+    assert!(
+        declared.contains(&String::from("DiagnosticReport.performer[0]")),
+        "the performing organization is declared not carried: {declared:?}"
+    );
+    assert_eq!(
+        declared,
+        not_carried(&text)?,
+        "the files declare what the compiled project declares, and nothing the composition carries"
+    );
+    Ok(())
 }
 
 /// The path of the section of the received `document` coded `code`.
