@@ -158,33 +158,59 @@ fn a_reference_that_resolves_to_nothing_is_a_declared_skip() -> Result<(), Box<d
     Ok(())
 }
 
-// NOTE: no specification governs this: our own design (docs/architecture.md, #1888); Reference.adoc's
-// `resourceType` names the resource the mapping takes, so a target of another type is no input.
-#[test]
-fn a_reference_of_another_type_is_no_input_of_the_mapping() -> Result<(), Box<dyn Error>> {
+/// The synthetic `Specimen` an evidence detail may name in place of an
+/// `Observation`.
+const SPECIMEN: &str = "Specimen/synthetic-specimen-1";
+
+/// Maps a `Condition` whose evidence details name `details` into openEHR,
+/// the reference source holding the synthetic `Specimen` and evidence
+/// `Observation`.
+fn evidence_over(
+    details: &[&str],
+) -> Result<
+    (
+        WebTemplateIndex,
+        fhirconnect::engine::outcome::Outcome<CanonicalComposition>,
+    ),
+    Box<dyn Error>,
+> {
     let program = compiled("ferrobridge_reference")?;
     let index = template()?;
-    let mut held = BTreeMap::new();
-    held.insert(
-        String::from("Specimen/synthetic-specimen-1"),
-        Value::from_serde_json(serde_json::json!({
-            "resourceType": "Specimen",
-            "id": "synthetic-specimen-1",
-            "note": [{"text": "A synthetic specimen note"}]
-        })),
-    );
-    let references = MapReferences(held);
+    let references = MapReferences(BTreeMap::from([
+        (
+            String::from(SPECIMEN),
+            Value::from_serde_json(serde_json::json!({
+                "resourceType": "Specimen",
+                "id": "synthetic-specimen-1",
+                "note": [{"text": "A synthetic specimen note"}]
+            })),
+        ),
+        (
+            String::from("Observation/synthetic-observation-1"),
+            evidence_observation(),
+        ),
+    ]));
+    let detail: Vec<serde_json::Value> = details
+        .iter()
+        .map(|reference| serde_json::json!({"reference": reference}))
+        .collect();
     let inbound = to_openehr(
         &program,
         &SCHEMAS,
         &index,
-        &condition_with(serde_json::json!({
-            "evidence": [{"detail": [{"reference": "Specimen/synthetic-specimen-1"}]}]
-        }))?,
+        &condition_with(serde_json::json!({"evidence": [{"detail": detail}]}))?,
         &Seams::default().with_references(&references),
         &defaults(),
         &CallContext::new(),
     )?;
+    Ok((index, inbound))
+}
+
+// NOTE: no specification governs this: our own design (docs/architecture.md, #1888); Reference.adoc's
+// `resourceType` names the resource the mapping takes, so a target of another type is no input.
+#[test]
+fn a_reference_of_another_type_is_no_input_of_the_mapping() -> Result<(), Box<dyn Error>> {
+    let (index, inbound) = evidence_over(&[SPECIMEN])?;
     assert_eq!(comment_of(&index, inbound.value())?, None);
     assert!(
         !inbound
@@ -198,7 +224,7 @@ fn a_reference_of_another_type_is_no_input_of_the_mapping() -> Result<(), Box<dy
         !inbound
             .reads()
             .iter()
-            .any(|read| read.resource() == Some("Specimen/synthetic-specimen-1")),
+            .any(|read| read.resource() == Some(SPECIMEN)),
         "the run reads nothing of the other resource: {:?}",
         inbound.reads()
     );
@@ -207,35 +233,7 @@ fn a_reference_of_another_type_is_no_input_of_the_mapping() -> Result<(), Box<dy
 
 #[test]
 fn a_repeating_reference_maps_the_targets_of_its_type_alone() -> Result<(), Box<dyn Error>> {
-    let program = compiled("ferrobridge_reference")?;
-    let index = template()?;
-    let mut held = BTreeMap::new();
-    held.insert(
-        String::from("Specimen/synthetic-specimen-1"),
-        Value::from_serde_json(serde_json::json!({
-            "resourceType": "Specimen",
-            "id": "synthetic-specimen-1"
-        })),
-    );
-    held.insert(
-        String::from("Observation/synthetic-observation-1"),
-        evidence_observation(),
-    );
-    let references = MapReferences(held);
-    let inbound = to_openehr(
-        &program,
-        &SCHEMAS,
-        &index,
-        &condition_with(serde_json::json!({
-            "evidence": [{"detail": [
-                {"reference": "Specimen/synthetic-specimen-1"},
-                {"reference": "Observation/synthetic-observation-1"}
-            ]}]
-        }))?,
-        &Seams::default().with_references(&references),
-        &defaults(),
-        &CallContext::new(),
-    )?;
+    let (index, inbound) = evidence_over(&[SPECIMEN, "Observation/synthetic-observation-1"])?;
     assert_eq!(
         comment_of(&index, inbound.value())?.as_deref(),
         Some("Synthetic evidence one"),
