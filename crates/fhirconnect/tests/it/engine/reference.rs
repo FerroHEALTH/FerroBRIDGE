@@ -158,31 +158,96 @@ fn a_reference_that_resolves_to_nothing_is_a_declared_skip() -> Result<(), Box<d
     Ok(())
 }
 
+// NOTE: no specification governs this: our own design (docs/architecture.md, #1888); Reference.adoc's
+// `resourceType` names the resource the mapping takes, so a target of another type is no input.
 #[test]
-fn a_reference_of_the_wrong_type_refuses() -> Result<(), Box<dyn Error>> {
+fn a_reference_of_another_type_is_no_input_of_the_mapping() -> Result<(), Box<dyn Error>> {
     let program = compiled("ferrobridge_reference")?;
     let index = template()?;
     let mut held = BTreeMap::new();
     held.insert(
-        String::from("Observation/synthetic-observation-1"),
-        Value::from_serde_json(serde_json::json!({"resourceType": "Specimen", "id": "x"})),
+        String::from("Specimen/synthetic-specimen-1"),
+        Value::from_serde_json(serde_json::json!({
+            "resourceType": "Specimen",
+            "id": "synthetic-specimen-1",
+            "note": [{"text": "A synthetic specimen note"}]
+        })),
     );
     let references = MapReferences(held);
-    let error = to_openehr(
+    let inbound = to_openehr(
         &program,
         &SCHEMAS,
         &index,
         &condition_with(serde_json::json!({
-            "evidence": [{"detail": [{"reference": "Observation/synthetic-observation-1"}]}]
+            "evidence": [{"detail": [{"reference": "Specimen/synthetic-specimen-1"}]}]
         }))?,
         &Seams::default().with_references(&references),
         &defaults(),
         &CallContext::new(),
-    )
-    .expect_err("a Specimen is no Observation");
+    )?;
+    assert_eq!(comment_of(&index, inbound.value())?, None);
     assert!(
-        matches!(error, EngineError::Reference { .. }),
-        "the refusal is the reference's: {error}"
+        !inbound
+            .warnings()
+            .iter()
+            .any(|warning| matches!(*warning.loss(), Loss::Skipped { .. })),
+        "the occurrence is no input, so no mapping of it is skipped: {:?}",
+        inbound.warnings()
+    );
+    assert!(
+        !inbound
+            .reads()
+            .iter()
+            .any(|read| read.resource() == Some("Specimen/synthetic-specimen-1")),
+        "the run reads nothing of the other resource: {:?}",
+        inbound.reads()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_repeating_reference_maps_the_targets_of_its_type_alone() -> Result<(), Box<dyn Error>> {
+    let program = compiled("ferrobridge_reference")?;
+    let index = template()?;
+    let mut held = BTreeMap::new();
+    held.insert(
+        String::from("Specimen/synthetic-specimen-1"),
+        Value::from_serde_json(serde_json::json!({
+            "resourceType": "Specimen",
+            "id": "synthetic-specimen-1"
+        })),
+    );
+    held.insert(
+        String::from("Observation/synthetic-observation-1"),
+        evidence_observation(),
+    );
+    let references = MapReferences(held);
+    let inbound = to_openehr(
+        &program,
+        &SCHEMAS,
+        &index,
+        &condition_with(serde_json::json!({
+            "evidence": [{"detail": [
+                {"reference": "Specimen/synthetic-specimen-1"},
+                {"reference": "Observation/synthetic-observation-1"}
+            ]}]
+        }))?,
+        &Seams::default().with_references(&references),
+        &defaults(),
+        &CallContext::new(),
+    )?;
+    assert_eq!(
+        comment_of(&index, inbound.value())?.as_deref(),
+        Some("Synthetic evidence one"),
+        "the Observation is mapped beside the skipped Specimen"
+    );
+    assert!(
+        inbound
+            .reads()
+            .iter()
+            .any(|read| read.resource() == Some("Observation/synthetic-observation-1")),
+        "the run reads the Observation: {:?}",
+        inbound.reads()
     );
     Ok(())
 }
