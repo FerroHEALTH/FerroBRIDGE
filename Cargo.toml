@@ -45,10 +45,10 @@ rust_decimal = { version = "1.43.0", default-features = false, features = ["std"
 regex = "1.13.1"
 # The openEHR RM model and the BASE path parser: the code conforms to RM
 # Release 1.1.0 and compiles against the `v1_2` generation (docs/VERSIONS.md).
-openehr-rm = "0.0.136"
+openehr-rm = "0.1.0"
 # The BASE identification types the RM leaves to it: TERMINOLOGY_ID is a
 # CODE_PHRASE field, so a lens that builds one names this crate.
-openehr-base = "0.0.136"
+openehr-base = "0.1.0"
 # anyhow is a binary-only error type (.claude/rules/rust-style.md).
 anyhow = "1.0.104"
 # The forwarder ratchet parses the hand-written Rust (tools/forwarders).
@@ -116,19 +116,19 @@ omocl = { path = "crates/omocl" }
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
 # engines (FLAT, STRUCTURED, Web Template, TDD, RM-instance validation) live in
 # openehr-sdt, taken without its `cache` feature (`moka`).
-openehr-its = { version = "0.0.136", default-features = false, features = ["opt14", "json"] }
-openehr-sdt = { version = "0.0.136", default-features = false, features = ["flat"] }
-openehr-am = "0.0.136"
+openehr-its = { version = "0.1.0", default-features = false, features = ["opt14", "json"] }
+openehr-sdt = { version = "0.1.0", default-features = false, features = ["flat"] }
+openehr-am = "0.1.0"
 # The AQL 1.1.0 parser: the ETL checks its configured queries at load
 # (docs/architecture.md section 5.4).
-openehr-query = "0.0.136"
+openehr-query = "0.1.0"
 # The ADL 2 parser: openehr-mapping-core compiles its ADL 2 test fixtures from
 # their .adls sources with it, and the server reads the archetype HRID an adl2
 # template ETag carries with its `hrid::parse_hrid`.
-openehr-adl = "0.0.136"
+openehr-adl = "0.1.0"
 # The openEHR terminology: the `audit_change_type` and
 # `version_lifecycle_state` concepts a commit codes (`codes`).
-openehr-term = "0.0.136"
+openehr-term = "0.1.0"
 # The HTTP client for the CDR wire. reqwest 0.13 spells the rustls selection
 # "rustls"; it carries its own platform verifier and aws-lc-rs provider.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }
@@ -152,11 +152,11 @@ ferrohealth-smart = { version = "0.19.0", default-features = false, features = [
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
 # `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
 # query masked. Pinned exactly, as a product pins every shared crate.
-ferrohealth-secret = "=0.2.0"
+ferrohealth-secret = "=0.2.1"
 # The family's configuration loader (FerroSYS): the file, the `FERROBRIDGE__`
 # environment and its aliases, `--set`, strict with the closest known key, the
 # provenance of every key and the `config check` rendering.
-ferrohealth-config = "=0.4.0"
+ferrohealth-config = "=0.4.4"
 # The family's health document, indicator registry and process lifecycle
 # (FerroSYS). The default build is the document alone, which the operator
 # console reads; the server takes `registry`.
@@ -166,13 +166,13 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body.
-ferrohealth-server = { version = "=0.8.0", default-features = false }
+ferrohealth-server = { version = "=0.8.4", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
 # the request log and the panic line.
-ferrohealth-telemetry = { version = "=0.4.0", default-features = false }
+ferrohealth-telemetry = { version = "=0.4.1", default-features = false }
 # The family's installation report to FerroPULSE (FerroSYS): envelope v2, the
 # latency window the request log fills and the start and daily reporter.
-ferrohealth-usage-report = { version = "=0.4.0", default-features = false }
+ferrohealth-usage-report = { version = "=0.4.1", default-features = false }
 # The family's audit crates (FerroAUDIT): `ehds-logging` builds the EHDS access
 # record of Regulation (EU) 2025/327 Annex II 3.2 and its BALP `AuditEvent`
 # (`balp`), and `ihe-atna` spools it and sends it over the ITI-20 ATX: FHIR
@@ -252,7 +252,7 @@ zip = { version = "=9.3.0", default-features = false, features = ["deflate-flate
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script
 # modules with the router that serves them, shared by every FerroHEALTH
 # console. Pinned exactly, so the console moves to a new version deliberately.
-ferrohealth-ui = "=0.6.8"
+ferrohealth-ui = "=0.6.9"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.

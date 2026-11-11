@@ -675,9 +675,9 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "openehr-am"
-version = "0.0.136"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7aa7ceda6b694d4b3679c5169c5c5574660fa47908f3f74a911056a382d19e6"
+checksum = "3c5fc2b8f2cf27e45daf1accf67beef69599562367b9525901e9936ebbc0db07"
 dependencies = [
  "indexmap",
  "openehr-base",
@@ -688,9 +688,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-base"
-version = "0.0.136"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8ae1ae6d02dcaa29ae3b4b80b5250aae114122a80e195ca6e25d5c1aefeb151"
+checksum = "24ed8aea27427aa5e7e5c5cd244f7cf9324b83d1d4f5c31652d50bb7d3df7fdf"
 dependencies = [
  "serde",
  "serde_json",
@@ -700,9 +700,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-its"
-version = "0.0.136"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "130b0a129b7ea5315ff2b941ed33dd397ea4f0ba4d4f35e9637208693cb965d1"
+checksum = "30fa37a748efaeadc20367feb044ecfdd058301bfe06290ad27ab8a9a1f66fbc"
 dependencies = [
  "indexmap",
  "openehr-am",
@@ -721,9 +721,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-lang"
-version = "0.0.136"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0d03089722114a1e67354bbc9b63bcb3d3aee7e3b89f1ca791d8c3855eb0226"
+checksum = "dd34c7cb65ea9f93afffb1290de889442ca20f4202223ef4fcbdf72fa4f62491"
 dependencies = [
  "chumsky",
  "indexmap",
@@ -752,9 +752,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-rm"
-version = "0.0.136"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbe67f6f797f13626005c4fe84a131399ae23f1b340066c7cfc60cd111ebc328"
+checksum = "4e590f8defb9ab4732ff175ba49b9f938bddaca162bdac1b1eef73f2c520829e"
 dependencies = [
  "openehr-base",
  "openehr-term",
@@ -769,9 +769,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-sdt"
-version = "0.0.136"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7617f7319f1830c1d34009a018ef58b00345005bba8d83b7575c54674fdb2890"
+checksum = "de05b82c4a64a7590b67ba3e8a007e2b2e3b97593974ef70e7b62ef4e013ba68"
 dependencies = [
  "fancy-regex 0.20.0",
  "indexmap",
@@ -789,9 +789,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-term"
-version = "0.0.136"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd76799b16a76d27c5a7dbafc3c4c7c1e66296847ac30e787661c6bccf1dbc7a"
+checksum = "86cbee950efb23c7d894ccebc50b6313dcfb44ec51bc624c62a5390ce51b1b60"
 dependencies = [
  "openehr-base",
  "roxmltree",
@@ -1076,9 +1076,9 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "ryu-js"
-version = "0.2.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6518fc26bced4d53678a22d6e423e9d8716377def84545fe328236e3af070e7f"
+checksum = "04d056b875a9d2e6cb9a61d127afee9ac5999b9f87bcb32079d1318e505be714"
 
 [[package]]
 name = "scopeguard"
