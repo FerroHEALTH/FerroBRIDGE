@@ -38,6 +38,7 @@ use ferrobridge_testkit::conformance::Case;
 use ferrobridge_testkit::conformance::Corpus;
 use ferrobridge_testkit::conformance::record_set_aside;
 use ferrobridge_testkit::examples::Package;
+use ferrobridge_testkit::fixtures;
 use ferrohealth_health::registry::Registry;
 use fhir_types::codec::Json;
 use http::Request;
@@ -67,6 +68,16 @@ struct Refusal {
     /// What one diagnostic of the refusal names.
     names: &'static str,
 }
+
+/// Every template a corpus context names, by id, with its operational template.
+const TEMPLATES: [(&str, &str); 3] = [
+    (fixtures::DIAGNOSE_TEMPLATE_ID, fixtures::DIAGNOSE_OPT),
+    (fixtures::DIAGNOSES_TEMPLATE_ID, fixtures::DIAGNOSES_OPT),
+    (
+        fixtures::KDS_DIAGNOSE_TEMPLATE_ID,
+        fixtures::KDS_DIAGNOSE_OPT,
+    ),
+];
 
 /// The expected refusals: each passes when its create answers `422` with a
 /// diagnostic naming what is refused, and fails on any other answer.
@@ -183,20 +194,7 @@ impl Compiled {
 /// Compiles `context` against a stub CDR that serves its template.
 async fn compile(context: Context) -> Result<Compiled, Box<dyn Error>> {
     let cdr = MockServer::start().await;
-    for (id, opt) in [
-        (
-            "ferrobridge.diagnose.v1",
-            ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
-        ),
-        (
-            "ferrobridge.diagnoses.v1",
-            ferrobridge_testkit::fixtures::DIAGNOSES_OPT,
-        ),
-        (
-            "KDS_Diagnose",
-            ferrobridge_testkit::fixtures::KDS_DIAGNOSE_OPT,
-        ),
-    ] {
+    for (id, opt) in TEMPLATES {
         Mock::given(matchers::method("GET"))
             .and(matchers::path(format!("/definition/template/adl1.4/{id}")))
             .respond_with(

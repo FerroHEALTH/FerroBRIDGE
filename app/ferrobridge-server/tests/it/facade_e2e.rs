@@ -331,7 +331,7 @@ pub(crate) async fn upload_published(base_url: &str, opt: &str) -> Result<(), Bo
     assert_eq!(
         StatusCode::CREATED,
         response.status(),
-        "the CDR refused the KDS template: {}",
+        "the CDR refused the template: {}",
         response.text().await?
     );
     Ok(())

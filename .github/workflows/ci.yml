@@ -1081,6 +1081,24 @@ jobs:
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: cargo-nextest
+      # The facade examples round trip reads the R4 examples package, and
+      # fails in this lane when it is absent. The cache entry is the one the
+      # test job writes, so the paths match that job's list.
+      - name: Read the pinned FHIR examples packages
+        id: fhir-examples
+        run: echo "key=$(bash scripts/vendor/fhir-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the FHIR examples packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            tools/ferrobridge-testkit/vendor/hl7.fhir.r3.examples/package
+            tools/ferrobridge-testkit/vendor/hl7.fhir.r4.examples/package
+            tools/ferrobridge-testkit/vendor/hl7.fhir.r4b.examples/package
+            tools/ferrobridge-testkit/vendor/hl7.fhir.r5.examples/package
+            tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/package
+          key: fhir-examples-${{ steps.fhir-examples.outputs.key }}
+      - name: Fetch and verify the FHIR examples packages
+        run: bash scripts/vendor/fhir-packages.sh --build-time
       - env:
           PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
         run: |
