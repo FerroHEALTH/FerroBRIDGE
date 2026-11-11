@@ -57,9 +57,7 @@ fn medication() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
         HEALTH_SUMMARY,
         CONTEXT,
         &files,
-        &[
-            "ferrobridge_ips_medication.yml",
-        ],
+        &["ferrobridge_ips_medication.yml"],
     )
 }
 
