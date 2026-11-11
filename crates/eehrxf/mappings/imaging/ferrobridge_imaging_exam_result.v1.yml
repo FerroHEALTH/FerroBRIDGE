@@ -10,7 +10,9 @@
 # result reports is the ImagingStudy the report references, mapped below
 # the event: the modality and the study date from the event, and from the
 # protocol the study instance identifier, the study status over its local
-# codes, which are R4 imagingstudy-status codes, and the description. No
+# codes, which are R4 imagingstudy-status codes, and the description. The
+# organisation in the Imaging service slot is the report's performer, an
+# Organization the library's CLUSTER.organisation.v1 mapping writes. No
 # specification governs these choices: our own design.
 grammar: FHIRConnect/v1.0.0
 type: model
@@ -409,3 +411,28 @@ mappings:
     with:
       fhir: "$resource.identifier"
       openehr: "$archetype/protocol[at0025]/items[at0104]"
+
+  # NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer:organization, an
+  # organization-eu-core; CKM imaging_exam_result.v1 at0026 "Imaging service" slots CLUSTER.organisation.
+  - name: "performer"
+    with:
+      fhir: "$resource.performer"
+      openehr: "$reference"
+    reference:
+      resourceType: "Organization"
+      mappings:
+        - name: "organizationProfile"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "$fhirRoot.meta"
+          manual:
+            - name: "profileUrl"
+              fhir:
+                - path: "profile"
+                  value: "http://hl7.eu/fhir/base/StructureDefinition/organization-eu-core"
+
+        - name: "imagingService"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$archetype/protocol[at0025]/items[openEHR-EHR-CLUSTER.organisation.v1]"
+          slotArchetype: "CLUSTER.organisation.v1"

@@ -3,7 +3,7 @@
 
 # Provenance: the CKM archetypes of the FHIRconnect mapping library
 
-11 published archetypes of the openEHR Clinical Knowledge Manager,
+12 published archetypes of the openEHR Clinical Knowledge Manager,
 vendored verbatim by `scripts/vendor/ckm-library.sh`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -11,8 +11,8 @@ docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/openEHR/CKM-mirror>, the mirror of the international CKM
 - Pin: commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `283b5608463fe472efd4c959a980a5267fd8e2b6d6f26744b172c86637091052`
-- Fetched: 2026-11-10
+  `PROVENANCE.md` excluded): `97c4dca34d0f99b98c20d0619b8ce5d167b7fc88262a7fac0a082df85b4ad559`
+- Fetched: 2026-11-11
 - Upstream licence: Creative Commons Attribution-ShareAlike 3.0 Unported, the
   mirror's `LICENSE` file at the same commit, vendored beside this file
 - Use: the archetypes the FHIRconnect mapping library's model mappings
@@ -35,3 +35,4 @@ Files:
 - `openEHR-EHR-CLUSTER.case_identification.v0.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.case_identification.v0.adl`, sha256 `57a81376648a098b70bfd500e4db3f62d1acd2c48d52535004fde8f1aea55121`
 - `openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl`, sha256 `e7b4aaa58db2c298e335edc99a5d08919848bdd1d2267b5901a074f70ad0f33d`
 - `openEHR-EHR-CLUSTER.clinical_evidence.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.clinical_evidence.v1.adl`, sha256 `dd63ccfdf05f3631c582276755ebf1f2ca083fa6c3d11419dad5a58d7594a23f`
+- `openEHR-EHR-CLUSTER.organisation.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.organisation.v1.adl`, sha256 `ed947e4085b72940e10aab3bc19d68ff8e677bd9494667a3732e4966db8cab8e`

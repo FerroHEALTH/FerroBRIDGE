@@ -353,17 +353,19 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 8] = [
     library_template!("ips_entries"),
 ];
 
-/// The eleven international CKM archetypes of the library templates.
+/// The twelve international CKM archetypes of the library templates.
 ///
 /// They are the report, report result and medication list compositions, the
 /// absence, global exclusion, gender and adverse reaction risk evaluations,
 /// and the device, case identification, adverse reaction event and clinical
-/// evidence clusters of [`FERROBRIDGE_LIBRARY_TEMPLATES`].
+/// evidence clusters of [`FERROBRIDGE_LIBRARY_TEMPLATES`], and the
+/// organisation cluster the imaging service slot of
+/// [`FERROBRIDGE_IMAGING_TEMPLATE`] holds.
 ///
 /// `scripts/vendor/ckm-library.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 11] = [
+pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 12] = [
     ckm_library!("openEHR-EHR-COMPOSITION.report.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.report-result.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.medication_list.v1.adl"),
@@ -375,6 +377,7 @@ pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 11] = [
     ckm_library!("openEHR-EHR-CLUSTER.case_identification.v0.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.clinical_evidence.v1.adl"),
+    ckm_library!("openEHR-EHR-CLUSTER.organisation.v1.adl"),
 ];
 
 /// The seven published `HiGHmed` CKM archetypes of the library templates.
@@ -514,7 +517,8 @@ pub const R4_OBSERVATION: &str = include_str!("../fixtures/fhir/r4/observation.j
 /// FerroBRIDGE's ADL 2 imaging report template.
 ///
 /// A report result `COMPOSITION` holding one
-/// `OBSERVATION.imaging_exam_result.v1`, at-coded with the ADL 1.4 codes of
+/// `OBSERVATION.imaging_exam_result.v1`, whose imaging service slot holds a
+/// `CLUSTER.organisation.v1`, at-coded with the ADL 1.4 codes of
 /// [`CKM_LIBRARY_ARCHETYPES`] and [`CKM_IMAGING_ARCHETYPES`]. A suite builds
 /// the ADL 2 operational template from them at test time. The template
 /// identifier is [`FERROBRIDGE_IMAGING_TEMPLATE_ID`].

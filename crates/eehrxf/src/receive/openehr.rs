@@ -177,7 +177,12 @@ impl Mapping {
         })?;
         let received: Value = serde_json::from_str(original)
             .map_err(|source| ReceiveMappingError::Original { source })?;
-        let not_carried = accounted::not_carried(&received, self.accounted(), transformed.reads());
+        let not_carried = accounted::not_carried(
+            &received,
+            self.accounted(),
+            self.followed(),
+            transformed.reads(),
+        );
         let response = transformed.into_response();
         let mut outcome = response.outcome().cloned();
         if !not_carried.is_empty() {

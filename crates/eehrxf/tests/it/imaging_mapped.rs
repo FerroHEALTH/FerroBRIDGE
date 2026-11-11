@@ -35,6 +35,7 @@ use fhir_types::r4::device::{Device, DeviceDeviceName};
 use fhir_types::r4::human_name::HumanName;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
+use fhir_types::r4::practitioner::Practitioner;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
@@ -229,15 +230,26 @@ fn received_text() -> Result<String, Box<dyn Error>> {
 
 /// The received document of [`received_text`], its report `report`.
 fn received_text_of(report: &Value) -> Result<String, Box<dyn Error>> {
+    received_text_with(report, None)
+}
+
+/// The received document of [`received_text_of`], holding `practitioner`
+/// beside the performing organization when one is given.
+fn received_text_with(
+    report: &Value,
+    practitioner: Option<Practitioner>,
+) -> Result<String, Box<dyn Error>> {
     let (mut document, _, _) = imaging_document("urn:uuid:5b0c3f7e-0000-4000-8000-00000000d001")?;
-    let urls = document.add(&[
+    let mut added = vec![
         Resource::Organization(Box::new(Organization {
             id: Some(String::from("synthetic-radiology")),
             name: Some("Synthetic radiology".into()),
             ..Organization::default()
         })),
         resource("ImagingStudy", &study())?,
-    ])?;
+    ];
+    added.extend(practitioner.map(|held| Resource::Practitioner(Box::new(held))));
+    let urls = document.add(&added)?;
     let study_url = urls.get(1).ok_or("the study's fullUrl")?.clone();
     with_sections(&mut document, &study_url)?;
     let Resource::DiagnosticReport(report) = resource("DiagnosticReport", report)? else {
@@ -414,6 +426,18 @@ fn a_received_imaging_report_maps_into_one_composition_that_keeps_it() -> Result
         Some(text.as_str()),
         "the document is kept byte for byte"
     );
+    let mut structured = canonical.clone();
+    structured
+        .as_object_mut()
+        .ok_or("the composition is a JSON object")?
+        .remove("feeder_audit");
+    let structured = structured.to_string();
+    for value in ["Synthetic radiology", "openEHR-EHR-CLUSTER.organisation.v1"] {
+        assert!(
+            structured.contains(value),
+            "the performing organization is in the imaging service slot: {structured}"
+        );
+    }
     Ok(())
 }
 
@@ -524,6 +548,36 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
     Ok(())
 }
 
+// NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer:organization
+// is an organization-eu-core, whose name is 1..1; the imaging service slot holds the name.
+#[test]
+fn the_imaging_service_is_served_as_the_performing_organization() -> Result<(), Box<dyn Error>> {
+    let (_, written) = round_trip()?;
+    let output: Value = serde_json::from_str(&written)?;
+    let performer = only(&output, "DiagnosticReport")?["performer"][0]["reference"]
+        .as_str()
+        .ok_or("the served report names a performer")?
+        .to_owned();
+    let organization = of_type(&output, "Organization")
+        .into_iter()
+        .find(|resource| {
+            resource["id"]
+                .as_str()
+                .is_some_and(|id| performer.ends_with(&format!("Organization/{id}")))
+        })
+        .ok_or_else(|| format!("the organization {performer} names"))?;
+    assert_eq!(
+        organization["name"], "Synthetic radiology",
+        "{organization}"
+    );
+    assert_eq!(
+        organization["meta"]["profile"][0],
+        "http://hl7.eu/fhir/base/StructureDefinition/organization-eu-core",
+        "{organization}"
+    );
+    Ok(())
+}
+
 #[test]
 fn one_provenance_covers_the_mapped_composition() -> Result<(), Box<dyn Error>> {
     let (_, written) = round_trip()?;
@@ -546,6 +600,21 @@ fn one_provenance_covers_the_mapped_composition() -> Result<(), Box<dyn Error>> 
                 })
         })
         .collect();
+    let performer = only(&output, "DiagnosticReport")?["performer"][0]["reference"]
+        .as_str()
+        .ok_or("the mapped report names its performing organization")?;
+    let organization = of_type(&output, "Organization")
+        .into_iter()
+        .find(|resource| {
+            resource["id"]
+                .as_str()
+                .is_some_and(|id| performer.ends_with(&format!("Organization/{id}")))
+        })
+        .ok_or_else(|| format!("the organization {performer} the report names"))?;
+    mapped.push(format!(
+        "Organization/{}",
+        organization["id"].as_str().ok_or("the organization's id")?
+    ));
     mapped.sort_unstable();
     assert_eq!(
         targets, mapped,
@@ -756,32 +825,49 @@ fn not_carried_by(mapping: &Mapping, text: &str) -> Result<Vec<String>, Box<dyn 
     })
 }
 
+// NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer admits a
+// Practitioner beside the organization slice; the imaging service slot holds an organisation alone.
+#[test]
+fn a_performer_that_is_no_organization_is_declared_and_the_organization_carried()
+-> Result<(), Box<dyn Error>> {
+    let mut performed = report();
+    performed["performer"] = serde_json::json!([
+        {"reference": "Organization/synthetic-radiology"},
+        {"reference": "Practitioner/synthetic-radiologist"}
+    ]);
+    let text = received_text_with(
+        &performed,
+        Some(Practitioner {
+            id: Some(String::from("synthetic-radiologist")),
+            ..Practitioner::default()
+        }),
+    )?;
+    let declared = not_carried(&text)?;
+    assert!(
+        declared.contains(&String::from("DiagnosticReport.performer[1]")),
+        "the practitioner is declared not carried: {declared:?}"
+    );
+    assert!(
+        !declared.contains(&String::from("DiagnosticReport.performer[0]")),
+        "the organization is carried: {declared:?}"
+    );
+    Ok(())
+}
+
 // NOTE: no specification governs this: our own design; a gateway that compiles the shipped files
 // from disk, as FerroFED's receive path does, declares what the compiled project declares.
 #[test]
-fn a_report_mapped_by_the_shipped_files_declares_its_performing_organization()
+fn a_report_mapped_by_the_shipped_files_declares_what_the_project_declares()
 -> Result<(), Box<dyn Error>> {
     let directory = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("eehrxf-imaging-files");
     std::fs::create_dir_all(&directory)?;
     let files = IMAGING.write_to(&directory)?;
     let from_files = Mapping::compile_template(&template()?, &files, &[CONTEXT])?;
     let text = received_text()?;
-    let document: Value = serde_json::from_str(&text)?;
-    let report = only(&document, "DiagnosticReport")?;
-    assert_eq!(
-        report["performer"][0]["reference"], "Organization/synthetic-radiology",
-        "{report}"
-    );
-    assert!(
-        of_type(&document, "Organization").iter().any(
-            |held| held["id"] == "synthetic-radiology" && held["name"] == "Synthetic radiology"
-        ),
-        "the document holds the performing organization"
-    );
     let declared = not_carried_by(&from_files, &text)?;
     assert!(
-        declared.contains(&String::from("DiagnosticReport.performer[0]")),
-        "the performing organization is declared not carried: {declared:?}"
+        !declared.is_empty(),
+        "the files declare the report's losses"
     );
     assert_eq!(
         declared,
@@ -841,10 +927,9 @@ fn a_received_report_declares_each_section_and_element_it_does_not_carry()
             )?,
             report_member_at(&document, "category", "/coding/0/code", "85430-7")?,
             report_member_at(&document, "category", "/coding/0/code", "Medical-Imaging")?,
-            String::from("DiagnosticReport.performer[0]"),
         ],
-        "each required section with no entry, the report's link, categories and performing \
-         organization, and nothing the template carries"
+        "each required section with no entry, the report's link and categories, and nothing the \
+         template carries"
     );
     assert!(
         !declared.contains(&section_at(&document, "18726-0")?),
