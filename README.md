@@ -179,8 +179,8 @@ Every release publishes, from one tag:
   `compose.yaml` on the [GitHub release](https://github.com/FerroHEALTH/FerroBRIDGE/releases);
 - the library crates whose version moved, on crates.io.
 
-The latest release is [v0.0.23](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.23), cut on 2026-11-10.
-Its image is `ghcr.io/ferrohealth/ferrobridge:0.0.23`.
+The latest release is [v0.0.24](https://github.com/FerroHEALTH/FerroBRIDGE/releases/tag/v0.0.24), cut on 2026-11-11.
+Its image is `ghcr.io/ferrohealth/ferrobridge:0.0.24`.
 The bridge runs beside an openEHR CDR over ITS-REST, a FHIR terminology
 server and, for the OMOP side, a CDM v5.4 database with the OHDSI vocabulary
 loaded ([What FerroBRIDGE runs beside](https://ferrobridge.eu/docs/operate/deployment-shape.html)).

@@ -26,6 +26,145 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.24] - 2026-11-11
+
+The family on `ferrohealth-smart` 0.18, and the EU documents. The bridge and
+its crates move to smart 0.18 (`ferrobridge-term` 0.5.0), so `config check`
+and every other rendering of the bridge's and the console's configuration
+show an issuer or a sign-in URL written with userinfo masked, never its
+password. `eehrxf` names a document's custodian; the imaging and discharge
+projects declare in their `OperationOutcome` what a received report holds and
+they do not carry; the imaging report carries its performing organization,
+and `Document::studies` names its studies. `fhirconnect` writes one
+alternative of a FHIR choice element at a time, unfolds a recursive slot as
+deep as the template does, and skips a reference of another type. The HL7 v2
+face answers `AE` when the CDR refuses a contribution for its content and
+names its facility and composer by identifiers with their issuer, and the
+quickstart `compose.yaml` a release attaches carries its checksum. The
+bridge and console images are distroless static with no OpenSSL package, so
+the OpenSSL 3.5.7 advisory of 2026-11-10 does not reach them. Each breaking
+crate change below names what a consumer changes.
+
+### Added
+
+- `eehrxf` 0.3.1: `Document::with_custodian` adds an `Organization` and
+  names it the document's `Composition.custodian` in every form. In the
+  imaging report it takes the place of the first `Organization` author,
+  which the form drops for the report's performers, so a gateway can name
+  the member it read the report at and leave no unreferenced entry (#1819).
+- `eehrxf`: mapping a received discharge report with the `HDR` project
+  declares in its `OperationOutcome` each section none of whose entries
+  the project carries, such as the hospital course, and each element of a
+  carried entry that the composition does not hold, such as
+  `Condition.severity` and `verificationStatus`. Each is an `incomplete`
+  warning at the element's FHIRPath. The composition's original content
+  still keeps every one of them (#1820).
+- `eehrxf`: mapping a received imaging report with the `IMAGING` project
+  declares in its `OperationOutcome` each section none of whose entries the
+  project carries, such as the order, history and procedure sections, and
+  each element of the report or its study that the composition does not
+  hold, such as the performing organization (`DiagnosticReport.performer`)
+  and a study note. Each is an `incomplete` warning at the element's
+  FHIRPath. The composition's original content still keeps every one of
+  them (#1827).
+- `eehrxf`: the `IMAGING` project carries the organization that performed an
+  imaging report. A received `DiagnosticReport.performer` naming an
+  `Organization` is written into the Imaging service slot of
+  `OBSERVATION.imaging_exam_result.v1` as a `CLUSTER.organisation.v1` (its
+  name and identifiers), and a served report names that organisation as its
+  performer, an `organization-eu-core`. A performer that is no
+  `Organization` is still declared not carried. FerroBRIDGE's imaging report
+  template fills the slot, so a CDR that stores these reports needs the
+  template's new revision (#1878).
+- `eehrxf` 0.6.4: `Document::studies` (feature `imaging`) returns the
+  `fullUrl` of each `ImagingStudy` the document holds, in the order the
+  entries were added. A writer whose mapping run added an imaging study
+  lists it in the `imagingstudy` section of `CompositionEuImaging`
+  without searching the run's `Bundle` again (#1887).
+
+### Changed
+
+- In a slotted model whose `fhirConfig.structureDefinition` names no
+  resource (a `BackboneElement` or a data type), `$resource` now names the
+  FHIR element the slot hands over, the root of the model's own type
+  (`basics/Variables.adoc`), as `$archetype` names the slotted archetype;
+  `$fhirRoot` is unchanged. A `reference` whose `with.fhir` names a choice
+  that admits `Reference` now writes that alternative
+  (`medication[x]` gives `medicationReference`), and only a choice that
+  admits no `Reference` is refused as `fc-reference-into-choice` (#1546).
+- FHIRconnect and OMOCL now match a written openEHR path against a template by one segment rule, `openehr_mapping_core::index::matching::segment_matches`, which the Web Template index already used. A segment that writes no node id names every node of its attribute. A name or a position is compared only when both the mapping and the template carry one. A descendant step names no template segment. Before this change, FHIRconnect matched a segment without a node id only to a template segment without one, and OMOCL compared no names. The ITS-REST client of the server answers a found template as the foundation's `TemplateSource`, so the workspace has one template source type (#1711).
+- The crates move to `ferrohealth-smart` 0.17. `ferrobridge-term` 0.4.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.17 line in `Client::from_endpoint`, so a dependant on smart 0.17 passes its own types. `ferrobridge-validator` 0.4.0, `ferrobridge-hl7v2` 0.6.0 and `eehrxf` 0.4.0 follow `ferrobridge-term` 0.4. The server takes `ihe-atna` and `ehds-logging` 0.11.0, and the operator console takes `ferrohealth-session` 0.11.0, the releases on the same smart line (#1840).
+- Every published crate declares the third-party crates its public API names in `[package.metadata.ferrohealth] public-dependencies`, and a move of one of them to another compatibility line takes the crate's next minor, as a move of a family crate does (`serde_json` and `serde` in `fhir-types` and `openehr-mapping-core`, `jiff` in `fhir-search`, `tokio` in `ferrobridge-hl7v2`, and the rest the declarations list). `eehrxf` 0.4.3, `ferrobridge-fhirpath` 0.1.136, `ferrobridge-hl7v2` 0.6.2, `ferrobridge-term` 0.4.1, `ferrobridge-validator` 0.4.1, `fhir-search` 0.1.131, `fhir-types` 0.1.131, `fhirconnect` 0.1.253 and `openehr-mapping-core` 0.1.153 carry the declaration (#1851).
+- The quickstart `compose.yaml` each release attaches now carries its
+  `.sha256sum`, CI refuses a host path it would read from the repository,
+  and the README and the book download it with `curl -fsSLO` from the
+  latest release and name Docker Compose 2.23.1 or newer (#1874).
+- The crates move to `ferrohealth-smart` 0.18. `ferrobridge-term` 0.5.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.18 line in `Client::from_endpoint`, so a dependant on smart 0.18 passes its own types. `ferrobridge-validator` 0.5.0, `ferrobridge-hl7v2` 0.8.0 and `eehrxf` 0.6.0 follow `ferrobridge-term` 0.5. The server takes `ihe-atna` and `ehds-logging` 0.12.0, and the operator console takes `ferrohealth-session` 0.12.0, the releases on the same smart line (#1880).
+- `fhirconnect`: going into openEHR, a `reference` mapping skips a reference
+  whose target is a resource of another type than its `resourceType`, and
+  records no read for it, where it refused the whole run before. A repeating
+  reference that admits several target types, such as R4
+  `DiagnosticReport.performer`, now maps the targets of its type and leaves
+  the others to the caller's accounting. FHIRconnect 1.0.0 is silent on such
+  a target; this is FerroBRIDGE's own design, recorded in
+  `docs/architecture.md`. A reference that resolves to nothing is still a
+  declared skip, and the openEHR-to-FHIR direction is unchanged (#1888).
+
+### Fixed
+
+- `fhirconnect` writes one alternative of a FHIR choice element at a time: a
+  mapping that writes `value.as(Coding)` after another wrote the element's
+  `valueCodeableConcept` replaces it, so a produced resource no longer carries
+  two `value[x]` members, which FHIR R4 forbids (formats.html §Choice). The
+  KDS case extension `KDS_fall_problem_diagnose` of the FHIRconnect mapping
+  library now runs verbatim against the published `KDS_Fall_einfach`
+  template, and the library passes 21 of 129 (#1546).
+- An HL7 v2 composition names its health care facility and its composer by identifiers that carry their issuer, so a CDR that checks the facilities and the professional of the bridge's relay client (FerroEHR 5.7.0) admits it. A facility's namespace id (HD.1) is issued by the new `[hl7v2] facility_identifier_issuer`, a universal id (HD.2) by its type (HD.3), and an ordering facility's identifier (XON.10) by its assigning authority (XON.6). The clinician's id (XCN.1) is a composer identifier issued by its assigning authority (XCN.9) and typed by XCN.13, and a device sender's device id one issued by its `device_identifier_issuer`. In `fhirconnect` 0.1.251, `Defaults::with_composer_identifiers` writes a default composer with its identifiers whole as `composer|raw` (#1826).
+- A write no caller made (an HL7 v2 message, a request on an open surface) that reaches the CDR under the bridge's own `[cdr.credentials.oauth]` grant names the grant's client id as `AUDIT_DETAILS.committer` instead of the bridge's system id, so FerroEHR 5.7.0, which writes the committer of a system caller itself, accepts it (#1828).
+- The HL7 v2 face answers `AE` when the CDR refuses a message's contribution for its content (`400` or `422`), and `AR` only when the CDR fails or refuses the bridge's credentials, so a sender no longer resends a message the CDR will always refuse (HL7 v2.5.1 §2.9.2.2). The face judges the status the CDR answered, which the FHIR facade's status table may render as a `500` or `502` of its own (#1829).
+- The READMEs of `eehrxf`, `ferrobridge-term`, `ferrobridge-validator` and
+  `ferrobridge-hl7v2` name the patch to require on the line each crate is on;
+  they named the line before the last minor step (#1859).
+- A `manual` entry that writes free text (a `value` and no `defining_code`)
+  at a `DV_CODED_TEXT` node whose value set is open writes a `DV_TEXT`
+  there, which FLAT carries under `|other` (Simplified Formats, Open
+  Value-Sets), and an `openehrCondition` reading that node with an empty tail
+  compares its text; the run refused the entry with a decode error before.
+  At a node whose value set is closed the entry is refused at load with the
+  new `fc-closed-value-set`. `fhirconnect` moves to 0.2: a consumer that
+  matches `ResolveCode` exhaustively adds an arm for
+  `ResolveCode::ClosedValueSet`; `eehrxf` moves to 0.5 and
+  `ferrobridge-hl7v2` to 0.7 with it. `ResolvedNode::list_open` in
+  `openehr-mapping-core` reads the Web Template's `listOpen` (#1861).
+- `fhirconnect` evaluates an `openehrCondition` with `operator: type` against
+  the class of the data value its attribute holds, the value of an
+  `ELEMENT` included, as `basics/Conditions.adoc` §openehrCondition writes
+  it. It tested the node's declared class, so an `onsetDateTime` of the
+  library's adverse reaction risk model went into openEHR and was lost
+  coming out (#1864).
+- `eehrxf`: a mapping compiled from files (`Mapping::compile`,
+  `Mapping::compile_template`) now declares what the shipped project that
+  compiles its contexts declares, as `Mapping::compile_project` does. A
+  gateway that writes the shipped `IMAGING` files to disk and compiles them
+  now tells the sender that a received report's performing organization
+  (`DiagnosticReport.performer`) is not carried; before, such a mapping
+  declared none of the project's elements. `Mapping::accounting` still
+  replaces the list (#1875).
+- `ferrobridge config check` no longer prints the password of an issuer written with userinfo (`https://user:password@…`), in `[[auth.issuer]]` or in an onward table: it renders as `https://***@…`, as every endpoint URL already did. `ferrohealth-smart` 0.18 holds every configured issuer identifier as a `SecretUrl` (#1880).
+- `fhirconnect` unfolds a slot that re-enters an archetype its chain
+  already holds as deep as the template instantiates it: at the first level
+  the template does not nest the archetype, the method is left out with no
+  refusal, where it refused `fc-unknown-template-node` and `fc-slot-depth`.
+  A node the template lacks at a level it does instantiate is still refused.
+  FHIRconnect v1.0.0 is silent on recursive slots (#1882), so this is
+  FerroBRIDGE's own rule. The EEHRxF lab analyte extension of the
+  FHIRconnect mapping library now runs verbatim (#1883).
+- `ferrobridge-console config check` and every other rendering of the console's configuration
+  show an `[oidc]` issuer, `redirect_uri` or `post_logout_redirect_uri`
+  written with userinfo as `https://***@…`, never its password. The console
+  moves to `ferrohealth-session` 0.13, which holds the three URLs as
+  `SecretUrl` (#1891).
+
 ## [0.0.23] - 2026-11-10
 
 The request under its person, and the family endpoint. Each facade caller
@@ -6692,7 +6831,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.23...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.24...HEAD
+[0.0.24]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.23...v0.0.24
 [0.0.23]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.22...v0.0.23
 [0.0.22]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.21...v0.0.22
 [0.0.21]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.20...v0.0.21
