@@ -729,6 +729,13 @@ is silent:**
   below the one the model was entered at can never end, and a chain that
   enters one model more than `SLOT_DEPTH_LIMIT` (8) times is refused
   (`fc-slot-depth`); the engine holds the same limit as a backstop.
+  The template, never the mapping, sets the depth (coordinator ruling,
+  2026-11-11): a method that slots an archetype the chain already holds is
+  a recursion too, so the library's EEHRxF `eehrxf_lab_analyte`, which slots
+  the analyte cluster into itself through `hasMember`, is left out at the
+  first level a template such as `KDS_Laborbericht` does not nest the
+  analyte, with no refusal. A path the template lacks at a level it does
+  instantiate is still refused (`fc-unknown-template-node`).
   FHIRconnect v1.0.0 is silent on a recursive slot (`SlotArchetypes.adoc`):
   our own design.
 - The version selectors the specification lacks (which `metadata.version` of a

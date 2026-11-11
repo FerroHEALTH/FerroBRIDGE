@@ -70,17 +70,20 @@ impl<'a> Compiler<'a> {
     /// A slot chain may enter a model already on it
     /// ([`crate::resolve::program::SLOT_DEPTH_LIMIT`]), and the recursion
     /// descends while the template carries a node. Inside a chain that has
-    /// entered an archetype again (two models of one archetype, as a
-    /// medication and its substance are, count once each), a method whose
-    /// place lies where the template
-    /// stops nesting an archetype of the chain is where no composition can
-    /// hold a value, so it is left out with everything under it; any other
+    /// entered an archetype again, or at a method that slots an archetype the
+    /// chain already holds (two models of one archetype, as a medication and
+    /// its substance are, count once each), a method whose place lies where
+    /// the template stops nesting an archetype of the chain is where no
+    /// composition can hold a value, so it is left out with everything under
+    /// it: the template, never the mapping, sets the depth. Any other
     /// place the template does not carry is refused where it stands. No
     /// specification governs a recursive slot: our own design.
     fn ends_recursion(&self, node: &Node<'a>, scope: &Scope) -> bool {
+        let slotted = node.mapping.slot_archetype.as_ref().map(Located::value);
         let archetypes: Vec<&str> = scope
             .chain
             .iter()
+            .chain(slotted)
             .filter_map(|model| self.set.model(model))
             .filter_map(archetype_of)
             .map(ArchetypeId::as_str)

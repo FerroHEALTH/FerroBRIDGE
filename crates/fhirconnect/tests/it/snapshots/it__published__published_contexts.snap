@@ -134,8 +134,6 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
   left out model/evaluation/org.openehr/device_summary.v0.yml (error fc-reference-without-reference-variable)
   refused
     model/cluster/org.openehr/case_identification.v0.yml:16 error fc-unpaired-types
-    model/cluster/org.openehr/medication.v2.substance.yml:19 error fc-unknown-template-node
-    model/cluster/org.openehr/medication.v2.substance.yml:74 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.substance.yml:74 warning fc-excluded-template-node
     model/cluster/org.openehr/medication.v2.yml:102 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:108 error fc-unknown-template-node
@@ -155,8 +153,6 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
     model/cluster/org.openehr/medication.v2.yml:70 error fc-unknown-template-node
     model/cluster/org.openehr/medication.v2.yml:70 warning fc-excluded-template-node
     model/cluster/org.openehr/medication.v2.yml:83 error fc-slot-depth
-    model/cluster/org.openehr/medication.v2.yml:96 error fc-unknown-template-node
-    model/cluster/org.openehr/medication.v2.yml:97 error fc-archetype-mismatch
     model/cluster/org.openehr/timing_daily.v1.yml:26 error fc-unknown-fhir-element
     model/cluster/org.openehr/timing_daily.v1.yml:29 error fc-unpaired-types
     model/cluster/org.openehr/timing_non_daily.yml:29 error fc-unpaired-types
@@ -166,10 +162,6 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
     model/observation/org.openehr/medication_statement.v0.yml:44 warning fc-anchor-without-children
     model/observation/org.openehr/medication_statement.v0.yml:76 error fc-unknown-template-node
     projects/org.highmed/KDS/medikationseintrag/KDS_composition.yml:40 error fc-unpaired-types
-    projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:132 error fc-unknown-template-node
-    projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:133 error fc-slot-depth
-    projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:144 error fc-unknown-template-node
-    projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:145 error fc-archetype-mismatch
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:169 error fc-unknown-template-node
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:24 error fc-unpaired-types
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:28 error fc-unknown-template-node

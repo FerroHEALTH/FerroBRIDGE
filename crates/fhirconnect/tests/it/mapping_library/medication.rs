@@ -12,8 +12,9 @@
 //!
 //! `medication.v2.yml` does not count as reached (#101): its line 25 maps the
 //! `Ratio` `Medication.amount` onto a `DV_QUANTITY`, which
-//! `types-of-mappings/data-type/DV_QUANTITY.adoc` does not pair, and `:96`
-//! slots the substance one constituent too deep. Its `:72` and `:85`, and
+//! `types-of-mappings/data-type/DV_QUANTITY.adoc` does not pair. `:96` slots
+//! the substance one constituent too deep, which a template that does not
+//! nest that level leaves out (#1883). Its `:72` and `:85`, and
 //! `medication.v2.substance.yml:43`, write a `reference` into a choice
 //! (`Medication.ingredient.item[x]`, `Substance.ingredient.substance[x]`),
 //! which writes the one `Reference` alternative the choice admits. The recursion is pinned
@@ -263,22 +264,23 @@ fn the_recursion_ends_where_the_template_stops_nesting() -> Result<(), Box<dyn E
     Ok(())
 }
 
-/// `medication.v2.yml:96` slots the substance at the constituent's
-/// constituent, where its sibling at `:83` names the constituent itself (#101),
-/// so a template that nests one constituent carries no node there.
+/// `medication.v2.yml:96` slots the substance, a second model of the
+/// medication archetype, at the constituent's constituent, where its sibling
+/// at `:83` names the constituent itself (#101). A template that nests one
+/// constituent does not instantiate that level, so the slot ends the
+/// recursion there with no refusal: the template, never the mapping, sets
+/// the depth (#1883).
 #[test]
-fn one_constituent_refuses_the_substance_two_levels_down() -> Result<(), Box<dyn Error>> {
-    let mut expected: Vec<&str> = LIBRARY_REFUSALS.to_vec();
-    expected.push("medication.v2.yml:96 fc-unknown-template-node");
-    expected.sort_unstable();
-    assert_eq!(refused(1)?, expected);
+fn one_constituent_leaves_the_substance_two_levels_down_out() -> Result<(), Box<dyn Error>> {
+    assert_eq!(refused(1)?, LIBRARY_REFUSALS);
     Ok(())
 }
 
 #[test]
 fn a_template_with_no_constituent_refuses_the_constituent_path() -> Result<(), Box<dyn Error>> {
-    // A cluster entered once is no recursion, so a path the template does not
-    // carry there is refused as every other unknown node is.
+    // A path the template does not carry below the one cluster it holds,
+    // and that slots no archetype of the chain, is refused as every other
+    // unknown node is (#1883).
     let Err(diagnostics) = compiled(0)? else {
         return Err("the cluster compiled with no constituent in the template".into());
     };

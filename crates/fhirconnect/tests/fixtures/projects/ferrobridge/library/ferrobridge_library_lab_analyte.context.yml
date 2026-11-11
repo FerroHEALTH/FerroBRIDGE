@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's EEHRxF lab analyte extension
+# (#1546): the shipped HL7 Europe laboratory context over the published
+# KDS_Laborbericht template, with eehrxf_lab_analyte applied after its
+# extensions. The library's own lab.context.yml names a composition model the
+# library does not hold (#101).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_lab_analyte.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
+    version: "2.0.0"
+  template:
+    id: "KDS_Laborbericht"
+  archetypes:
+    - "OBSERVATION.laboratory_test_result.v1"
+    - "CLUSTER.laboratory_test_analyte.v1"
+    - "CLUSTER.specimen.v1"
+  extensions:
+    - "ferrobridge_eu_laboratory_result"
+    - "ferrobridge_eu_laboratory_analyte"
+    - "ferrobridge_eu_laboratory_specimen"
+    - "eehrxf_lab_analyte"
+  start: "OBSERVATION.laboratory_test_result.v1"
