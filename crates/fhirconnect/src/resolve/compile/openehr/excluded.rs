@@ -41,16 +41,7 @@ impl<'a> Compiler<'a> {
         path: &RmPath,
         taken: usize,
     ) -> Option<(String, &'a ResolvedNode)> {
-        let end = (taken..path.segments.len()).find(|&end| {
-            let prefix = RmPath {
-                absolute: path.absolute,
-                segments: path.segments.get(..=end).unwrap_or_default().to_vec(),
-            };
-            !self
-                .interior
-                .iter()
-                .any(|interior| names_same_place(&prefix, interior))
-        })?;
+        let end = self.first_uncarried(path, taken)?;
         let code = path
             .segments
             .get(end)?
@@ -67,6 +58,21 @@ impl<'a> Compiler<'a> {
         (self.template.archetype_defines(root, code) == Some(true)).then(|| (code.to_owned(), root))
     }
 
+    /// Returns the index of the first segment of `path` at or past `taken`
+    /// whose prefix names no interior node of the template.
+    fn first_uncarried(&self, path: &RmPath, taken: usize) -> Option<usize> {
+        (taken..path.segments.len()).find(|&end| {
+            let prefix = RmPath {
+                absolute: path.absolute,
+                segments: path.segments.get(..=end).unwrap_or_default().to_vec(),
+            };
+            !self
+                .interior
+                .iter()
+                .any(|interior| names_same_place(&prefix, interior))
+        })
+    }
+
     /// Returns the archetype id of the first segment of `path` past its
     /// deepest template node, with the path of the attribute holding it, when
     /// the template keeps an open slot there that admits the archetype and
@@ -79,16 +85,7 @@ impl<'a> Compiler<'a> {
     /// §Mapping 0..0 fields). A slot that does not admit the archetype leaves
     /// the path refused, so a mistyped archetype id is still reported.
     pub(super) fn unfilled_slot(&self, path: &RmPath, taken: usize) -> Option<(String, RmPath)> {
-        let end = (taken..path.segments.len()).find(|&end| {
-            let prefix = RmPath {
-                absolute: path.absolute,
-                segments: path.segments.get(..=end).unwrap_or_default().to_vec(),
-            };
-            !self
-                .interior
-                .iter()
-                .any(|interior| names_same_place(&prefix, interior))
-        })?;
+        let end = self.first_uncarried(path, taken)?;
         let segment = path.segments.get(end)?;
         let archetype = segment.predicate.archetype_node_id.as_deref()?;
         if !archetype.starts_with(ARCHETYPE_ID_PREFIX) {
