@@ -205,7 +205,8 @@ pub(crate) fn library_chains() -> Result<Vec<crate::support::Chain>, Box<dyn Err
     chains.extend(clusters::chains()?);
     chains.extend(compositions::chains()?);
     chains.push(ips::chain()?);
-    chains.push(ips_entries::chain()?);
+    chains.extend(ips_entries::chains()?);
+    chains.push(medication::chain()?);
     Ok(chains)
 }
 

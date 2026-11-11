@@ -2,8 +2,10 @@ model/admin_entry/org.highmed/versicherungsinformationen.v0.yml
 model/cluster/org.highmed/diagnoseTyp.yml
 model/cluster/org.highmed/entry_category.v0.yml
 model/cluster/org.highmed/identifier_fhir.v0.yml
+model/cluster/org.openehr/clinical_evidence.v1.yml
 model/cluster/org.openehr/death_details.v1.yml
 model/cluster/org.openehr/dosage.v2.BackboneElement.yml
+model/cluster/org.openehr/medication.v2.substance.yml
 model/cluster/org.openehr/organisation.v1.yml
 model/cluster/org.openehr/person_birth_data_iso.v0.yml
 model/composition/org.openehr/health_summary.v1.Composition.yml

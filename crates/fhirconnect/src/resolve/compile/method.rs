@@ -28,6 +28,7 @@ use crate::resolve::program::manual::ManualPath;
 use crate::resolve::program::manual::ManualValue;
 use crate::resolve::program::mapping::Method;
 use crate::resolve::program::target::Target;
+use crate::tree::path::FhirPath;
 
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Enclosing;
@@ -83,6 +84,7 @@ impl<'a> Compiler<'a> {
                 resource: resource.clone(),
                 fhir: root_expression(),
                 enclosing,
+                element_root: None,
                 ..scope.clone()
             };
             return Method::Reference {
@@ -138,10 +140,12 @@ impl<'a> Compiler<'a> {
     ///
     /// The slot names the openEHR path the slotted mapping is transformed at
     /// (`docs/specs/fhirconnect/modules/ROOT/pages/types-of-mappings/concept-type/SlotArchetypes.adoc`),
-    /// so `$archetype` inside it is that path. The specification says nothing
-    /// about the FHIR side of the hand-over, so the slotted mapping keeps the
-    /// caller's `$fhirRoot` and `$resource` stays the enclosing resource. No
-    /// specification governs this: our own design.
+    /// so `$archetype` inside it is that path. The slotted mapping keeps the
+    /// caller's `$fhirRoot`, and `$resource` names the root of the model's
+    /// own `fhirConfig` type (`basics/Variables.adoc`, "Path of the root
+    /// resource"), as `$archetype` names the root of its own archetype: the
+    /// element the slot hands over where that type is no resource
+    /// ([`Self::element_root`]), the enclosing resource otherwise.
     fn slot(
         &mut self,
         file: &'a ModelMappingFile,
@@ -215,6 +219,7 @@ impl<'a> Compiler<'a> {
             prefix: String::new(),
             chain,
             entered_at,
+            element_root: self.element_root(slotted, scope),
             ..scope.clone()
         };
         let merged = self.merge(slotted);
@@ -642,4 +647,21 @@ pub(super) fn slots_composition(mapping: &Mapping) -> bool {
                 Variable::from_str(openehr.value())
                     .is_ok_and(|variable| variable == Variable::Composition)
             })
+}
+
+impl Compiler<'_> {
+    /// Returns the element `$resource` names inside `slotted`, entered at
+    /// `scope`: the slot's FHIR element when the model's
+    /// `fhirConfig.structureDefinition` names no resource (a `BackboneElement`
+    /// or a data type), `None` when it names one or none.
+    ///
+    /// `basics/Variables.adoc` defines `$resource` as the "Path of the root
+    /// resource" of the model, so a model of an element is rooted at that
+    /// element, as `$archetype` is rooted at the slotted archetype.
+    fn element_root(&self, slotted: &ModelMappingFile, scope: &Scope) -> Option<FhirPath> {
+        let definition = slotted.spec().structure_definition.as_ref()?;
+        let text = definition.value();
+        let named = text.rsplit('/').next().unwrap_or(text.as_str());
+        (!self.table.is_resource(named)).then(|| scope.fhir.clone())
+    }
 }

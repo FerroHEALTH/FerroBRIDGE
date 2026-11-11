@@ -5,6 +5,7 @@ expression: declared
 {
   "first_leg": [
     "DV_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
     "the engine filled /composer",
     "the engine filled /context/start_time",
     "the engine filled /context/setting",
@@ -13,13 +14,11 @@ expression: declared
   ],
   "second_leg": [],
   "lost": [
-    "evidence[0].code[0].coding[0].code = \"271649006\"",
-    "evidence[0].code[0].coding[0].display = \"Systolic blood pressure\"",
-    "evidence[0].code[0].coding[0].system = \"http://snomed.info/sct\"",
     "subject.reference = \"Patient/synthetic-1\""
   ],
   "added": [
-    "code.text = \"Hypertensive disorder\""
+    "code.text = \"Hypertensive disorder\"",
+    "evidence[0].code[0].text = \"Systolic blood pressure\""
   ],
   "changed": []
 }
