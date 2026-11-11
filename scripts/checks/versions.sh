@@ -959,10 +959,15 @@ if [[ -f LICENSE ]]; then
   # literal (the emitter that writes that crate's header) is not.
   # The KDS project fixtures (FHIRconnect and OMOCL) are modified copies of Apache-2.0 mapping-library files, so they keep that licence.
   # So do the EU profile fixtures that copy library methods; a file there of FerroBRIDGE's own design names BUSL-1.1.
-  # The eehrxf shipped laboratory project holds three such copies, recorded in its PROVENANCE.md.
+  # A shipped eehrxf project may hold such copies too, each named Apache-2.0 in the PROVENANCE.md beside it.
   # The omop-cdm era scripts are the PostgreSQL form of OHDSI's Apache-2.0 SQL, so they keep it too.
   while IFS= read -r hit; do
     [[ -n "$hit" ]] || continue
+    file="${hit%%:*}"
+    if [[ "$file" == crates/eehrxf/mappings/* ]] &&
+      grep -F "| \`$(basename "$file")\` |" "$(dirname "$file")/PROVENANCE.md" 2>/dev/null | grep -q '| Apache-2.0 |$'; then
+      continue
+    fi
     bad "stale licence claim at $hit"
     stale=1
   done < <(git grep -n -E '^[[:space:]]*([/#*]+|<!--)?[[:space:]]*SPDX-License-Identifier: (MIT|Apache-2\.0)|License-MIT|License-Apache|^license = "(MIT|Apache-2\.0)"|^license: (MIT|Apache-2\.0)|image\.licenses="?(MIT|Apache)' \
@@ -970,10 +975,9 @@ if [[ -f LICENSE ]]; then
     ':(glob,exclude)docs/specs/**' ':(glob,exclude)crates/fhir-types/**' ':(glob,exclude)crates/hl7v2-types/**' \
     ':(glob,exclude)crates/fhirconnect/tests/fixtures/projects/ferrobridge/kds_*/**' \
     ':(glob,exclude)crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_*/**' \
-    ':(glob,exclude)crates/eehrxf/mappings/laboratory/**' \
     ':(glob,exclude)crates/omocl/tests/fixtures/projects/ferrobridge/kds_*/**' \
     ':(glob,exclude)crates/omop-cdm/sql/*.sql' || true)
-  [[ "$stale" -eq 0 ]] && note "OK: every first-party file names BUSL-1.1 (crates/fhir-types, crates/hl7v2-types, the KDS and EU project fixtures and the eehrxf laboratory project that copy library files and the omop-cdm era scripts excepted, Apache-2.0)"
+  [[ "$stale" -eq 0 ]] && note "OK: every first-party file names BUSL-1.1 (crates/fhir-types, crates/hl7v2-types, the KDS and EU project fixtures and the eehrxf project files their PROVENANCE.md lists as library copies and the omop-cdm era scripts excepted, Apache-2.0)"
 else
   note "no LICENSE yet, skipped"
 fi
