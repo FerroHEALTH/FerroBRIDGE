@@ -492,7 +492,13 @@ container images, pinned by tag and by digest. The `sqlx-offline` job installs
 `sqlx` crate's version, because the CLI writes the query metadata the crate's
 macros read.
 The performance gate installs `ferrohealth-perf` from crates.io at its exact
-version (`cargo install --locked`), as every FerroHEALTH product does.
+version (`cargo install --locked`), as every FerroHEALTH product does. 0.9.0
+judges an A/B pair steady on the head's drift over the base's. It measures up
+to two more pairs in place of one that cannot be judged. Under a plan that
+names no `max_lag_ms`, as `perf/plan.toml` does not, it bounds the
+generator's lag at half the interval between two arrivals, 25 ms at the
+plan's 20 a second. A runner whose speed moves under both arms then no longer
+ends an attempt with exit 2 (FerroHEALTH/FerroSYS#357, #358; #1885).
 
 | Item | Pin | Repeated in |
 |---|---|---|
@@ -502,7 +508,7 @@ version (`cargo install --locked`), as every FerroHEALTH product does.
 | `hadolint` | 2.15.1 | `.github/workflows/ci.yml` |
 | `sqlx-cli` | 0.9.0 | `.github/workflows/ci.yml` (the `sqlx-offline` job) |
 | `cargo-semver-checks` | 0.51.0 | read by `scripts/checks/semver.sh --pin` for the `crate-version-guard` job of `.github/workflows/ci.yml` and the `plan` job of `.github/workflows/release.yml` |
-| `ferrohealth-perf` | 0.8.0 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
+| `ferrohealth-perf` | 0.9.0 | `.github/workflows/perf.yml` (`FERROHEALTH_PERF_VERSION`, the performance gate) |
 
 The clone detector of `scripts/checks/duplication.sh` (#1359) also runs on a
 developer machine, so its pins live here and the guard reads them from this
