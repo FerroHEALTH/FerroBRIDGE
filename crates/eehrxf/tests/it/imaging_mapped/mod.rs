@@ -35,6 +35,7 @@ use fhir_types::r4::device::{Device, DeviceDeviceName};
 use fhir_types::r4::human_name::HumanName;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
+use fhir_types::r4::practitioner::Practitioner;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
@@ -47,6 +48,8 @@ use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
 use super::support::{emit, imaging};
+
+mod accounted;
 
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
@@ -229,15 +232,26 @@ fn received_text() -> Result<String, Box<dyn Error>> {
 
 /// The received document of [`received_text`], its report `report`.
 fn received_text_of(report: &Value) -> Result<String, Box<dyn Error>> {
+    received_text_with(report, None)
+}
+
+/// The received document of [`received_text_of`], holding `practitioner`
+/// beside the performing organization when one is given.
+fn received_text_with(
+    report: &Value,
+    practitioner: Option<Practitioner>,
+) -> Result<String, Box<dyn Error>> {
     let (mut document, _, _) = imaging_document("urn:uuid:5b0c3f7e-0000-4000-8000-00000000d001")?;
-    let urls = document.add(&[
+    let mut added = vec![
         Resource::Organization(Box::new(Organization {
             id: Some(String::from("synthetic-radiology")),
             name: Some("Synthetic radiology".into()),
             ..Organization::default()
         })),
         resource("ImagingStudy", &study())?,
-    ])?;
+    ];
+    added.extend(practitioner.map(|held| Resource::Practitioner(Box::new(held))));
+    let urls = document.add(&added)?;
     let study_url = urls.get(1).ok_or("the study's fullUrl")?.clone();
     with_sections(&mut document, &study_url)?;
     let Resource::DiagnosticReport(report) = resource("DiagnosticReport", report)? else {
@@ -420,6 +434,18 @@ fn a_received_imaging_report_maps_into_one_composition_that_keeps_it() -> Result
         Some(text.as_str()),
         "the document is kept byte for byte"
     );
+    let mut structured = canonical.clone();
+    structured
+        .as_object_mut()
+        .ok_or("the composition is a JSON object")?
+        .remove("feeder_audit");
+    let structured = structured.to_string();
+    for value in ["Synthetic radiology", "openEHR-EHR-CLUSTER.organisation.v1"] {
+        assert!(
+            structured.contains(value),
+            "the performing organization is in the imaging service slot: {structured}"
+        );
+    }
     Ok(())
 }
 
@@ -530,6 +556,36 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
     Ok(())
 }
 
+// NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer:organization
+// is an organization-eu-core, whose name is 1..1; the imaging service slot holds the name.
+#[test]
+fn the_imaging_service_is_served_as_the_performing_organization() -> Result<(), Box<dyn Error>> {
+    let (_, written) = round_trip()?;
+    let output: Value = serde_json::from_str(&written)?;
+    let performer = only(&output, "DiagnosticReport")?["performer"][0]["reference"]
+        .as_str()
+        .ok_or("the served report names a performer")?
+        .to_owned();
+    let organization = of_type(&output, "Organization")
+        .into_iter()
+        .find(|resource| {
+            resource["id"]
+                .as_str()
+                .is_some_and(|id| performer.ends_with(&format!("Organization/{id}")))
+        })
+        .ok_or_else(|| format!("the organization {performer} names"))?;
+    assert_eq!(
+        organization["name"], "Synthetic radiology",
+        "{organization}"
+    );
+    assert_eq!(
+        organization["meta"]["profile"][0],
+        "http://hl7.eu/fhir/base/StructureDefinition/organization-eu-core",
+        "{organization}"
+    );
+    Ok(())
+}
+
 #[test]
 fn the_study_section_lists_the_study_entry_the_document_holds() -> Result<(), Box<dyn Error>> {
     let (_, written) = round_trip()?;
@@ -571,6 +627,21 @@ fn one_provenance_covers_the_mapped_composition() -> Result<(), Box<dyn Error>> 
                 })
         })
         .collect();
+    let performer = only(&output, "DiagnosticReport")?["performer"][0]["reference"]
+        .as_str()
+        .ok_or("the mapped report names its performing organization")?;
+    let organization = of_type(&output, "Organization")
+        .into_iter()
+        .find(|resource| {
+            resource["id"]
+                .as_str()
+                .is_some_and(|id| performer.ends_with(&format!("Organization/{id}")))
+        })
+        .ok_or_else(|| format!("the organization {performer} the report names"))?;
+    mapped.push(format!(
+        "Organization/{}",
+        organization["id"].as_str().ok_or("the organization's id")?
+    ));
     mapped.sort_unstable();
     assert_eq!(
         targets, mapped,
@@ -763,179 +834,5 @@ fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), 
         Some(6),
         "the run's outcome names each: {outcome}"
     );
-    Ok(())
-}
-
-/// The expressions of the issues the run over the received `text` declares
-/// not carried, in the order the run declares them.
-fn not_carried(text: &str) -> Result<Vec<String>, Box<dyn Error>> {
-    not_carried_by(&mapping()?, text)
-}
-
-/// The expressions of [`not_carried`], the run made by `mapping`.
-fn not_carried_by(mapping: &Mapping, text: &str) -> Result<Vec<String>, Box<dyn Error>> {
-    expressions_by(mapping, text, |issue| {
-        issue["details"]["text"]
-            .as_str()
-            .is_some_and(|text| text.contains("no structured element"))
-    })
-}
-
-// NOTE: no specification governs this: our own design; a gateway that compiles the shipped files
-// from disk, as FerroFED's receive path does, declares what the compiled project declares.
-#[test]
-fn a_report_mapped_by_the_shipped_files_declares_its_performing_organization()
--> Result<(), Box<dyn Error>> {
-    let directory = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("eehrxf-imaging-files");
-    std::fs::create_dir_all(&directory)?;
-    let files = IMAGING.write_to(&directory)?;
-    let from_files = Mapping::compile_template(&template()?, &files, &[CONTEXT])?;
-    let text = received_text()?;
-    let document: Value = serde_json::from_str(&text)?;
-    let report = only(&document, "DiagnosticReport")?;
-    assert_eq!(
-        report["performer"][0]["reference"], "Organization/synthetic-radiology",
-        "{report}"
-    );
-    assert!(
-        of_type(&document, "Organization").iter().any(
-            |held| held["id"] == "synthetic-radiology" && held["name"] == "Synthetic radiology"
-        ),
-        "the document holds the performing organization"
-    );
-    let declared = not_carried_by(&from_files, &text)?;
-    assert!(
-        declared.contains(&String::from("DiagnosticReport.performer[0]")),
-        "the performing organization is declared not carried: {declared:?}"
-    );
-    assert_eq!(
-        declared,
-        not_carried(&text)?,
-        "the files declare what the compiled project declares, and nothing the composition carries"
-    );
-    Ok(())
-}
-
-/// The path of the section of the received `document` coded `code`.
-fn section_at(document: &Value, code: &str) -> Result<String, Box<dyn Error>> {
-    let index = only(document, "Composition")?["section"]
-        .as_array()
-        .ok_or("the sections")?
-        .iter()
-        .position(|section| section["code"]["coding"][0]["code"] == code)
-        .ok_or_else(|| format!("the section {code}"))?;
-    Ok(format!("Composition.section[{index}]"))
-}
-
-/// The path of the element of the received report's `member` list whose
-/// `field` is `value`.
-fn report_member_at(
-    document: &Value,
-    member: &str,
-    field: &str,
-    value: &str,
-) -> Result<String, Box<dyn Error>> {
-    let index = only(document, "DiagnosticReport")?[member]
-        .as_array()
-        .ok_or_else(|| format!("the report's {member}"))?
-        .iter()
-        .position(|held| held.pointer(field).and_then(Value::as_str) == Some(value))
-        .ok_or_else(|| format!("the report's {member} {value}"))?;
-    Ok(format!("DiagnosticReport.{member}[{index}]"))
-}
-
-// NOTE: CompositionEuImaging requires the order, history and procedure sections, which the
-// template holds no section for, and DiagnosticReportEuImaging the composition link and two categories.
-#[test]
-fn a_received_report_declares_each_section_and_element_it_does_not_carry()
--> Result<(), Box<dyn Error>> {
-    let text = received_text()?;
-    let document: Value = serde_json::from_str(&text)?;
-    let declared = not_carried(&text)?;
-    assert_eq!(
-        declared,
-        [
-            section_at(&document, "55115-0")?,
-            section_at(&document, "11329-0")?,
-            section_at(&document, "55111-9")?,
-            report_member_at(
-                &document,
-                "extension",
-                "/url",
-                "http://hl7.org/fhir/5.0/StructureDefinition/extension-DiagnosticReport.composition",
-            )?,
-            report_member_at(&document, "category", "/coding/0/code", "85430-7")?,
-            report_member_at(&document, "category", "/coding/0/code", "Medical-Imaging")?,
-            String::from("DiagnosticReport.performer[0]"),
-        ],
-        "each required section with no entry, the report's link, categories and performing \
-         organization, and nothing the template carries"
-    );
-    assert!(
-        !declared.contains(&section_at(&document, "18726-0")?),
-        "the imaging study section lists the carried study"
-    );
-    Ok(())
-}
-
-#[test]
-fn each_report_and_study_element_and_narrative_section_is_declared() -> Result<(), Box<dyn Error>> {
-    let mut document: Value = serde_json::from_str(&received_text()?)?;
-    let entries = document["entry"].as_array_mut().ok_or("the entries")?;
-    for entry in entries.iter_mut() {
-        let resource = &mut entry["resource"];
-        match resource["resourceType"].as_str() {
-            Some("Composition") => resource["section"]
-                .as_array_mut()
-                .ok_or("the sections")?
-                .push(serde_json::json!({
-                    "title": "Findings",
-                    "code": {"coding": [{"system": "http://loinc.org", "code": "59776-5"}]},
-                    "text": {
-                        "status": "generated",
-                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Synthetic findings.</div>"
-                    }
-                })),
-            Some("DiagnosticReport") => {
-                resource["issued"] = serde_json::json!("2026-03-02T09:00:00+01:00");
-                resource["resultsInterpreter"] =
-                    serde_json::json!([{"reference": "Organization/synthetic-radiology"}]);
-            }
-            Some("ImagingStudy") => {
-                resource["numberOfSeries"] = serde_json::json!(1);
-                resource["note"] = serde_json::json!([{"text": "A synthetic study note."}]);
-            }
-            _ => {}
-        }
-    }
-    let findings = section_at(&document, "59776-5")?;
-    let declared = not_carried(&serde_json::to_string(&document)?)?;
-    for expression in [
-        findings.as_str(),
-        "DiagnosticReport.issued",
-        "DiagnosticReport.resultsInterpreter[0]",
-        "ImagingStudy.numberOfSeries",
-        "ImagingStudy.note[0]",
-    ] {
-        assert!(
-            declared.iter().any(|held| held == expression),
-            "{expression} is declared: {declared:?}"
-        );
-    }
-    for carried in [
-        "DiagnosticReport.status",
-        "DiagnosticReport.code",
-        "DiagnosticReport.conclusion",
-        "ImagingStudy.identifier",
-        "ImagingStudy.status",
-        "ImagingStudy.modality",
-        "ImagingStudy.started",
-        "ImagingStudy.description",
-    ] {
-        assert!(
-            !declared.iter().any(|held| held.starts_with(carried)),
-            "{carried} is carried, not declared: {declared:?}"
-        );
-    }
     Ok(())
 }

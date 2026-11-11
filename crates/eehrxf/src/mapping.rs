@@ -55,6 +55,7 @@ pub struct Mapping {
     programs: ProgramSet,
     files: Vec<String>,
     accounted: &'static [&'static str],
+    followed: &'static [&'static str],
 }
 
 impl Mapping {
@@ -170,10 +171,12 @@ impl Mapping {
                 .insert_program(program)
                 .map_err(|source| MappingError::Program { source })?;
         }
+        let shipped = crate::mappings::shipped_for(contexts);
         Ok(Self {
             programs,
             files,
-            accounted: crate::mappings::accounted_for(contexts),
+            accounted: shipped.map_or(&[], Project::accounted),
+            followed: shipped.map_or(&[], Project::followed),
         })
     }
 
@@ -196,6 +199,12 @@ impl Mapping {
     /// Returns the received elements the mapping accounts for.
     pub(crate) const fn accounted(&self) -> &'static [&'static str] {
         self.accounted
+    }
+
+    /// Returns the accounted elements whose references the shipped project
+    /// follows ([`Project::followed`]).
+    pub(crate) const fn followed(&self) -> &'static [&'static str] {
+        self.followed
     }
 
     /// Returns how many compiled context mappings the mapping holds.

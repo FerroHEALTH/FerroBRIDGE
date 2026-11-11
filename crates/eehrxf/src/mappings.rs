@@ -26,6 +26,7 @@ pub struct Project {
     contexts: &'static [&'static str],
     files: &'static [File],
     accounted: &'static [&'static str],
+    followed: &'static [&'static str],
 }
 
 /// A context mapping a project does not compile, named to
@@ -105,6 +106,13 @@ impl Project {
         self.accounted
     }
 
+    /// Returns the accounted elements whose references the project follows
+    /// into the resource each names: an instance that resolves to a resource
+    /// the run read is carried, and any other is declared.
+    pub(crate) const fn followed(&self) -> &'static [&'static str] {
+        self.followed
+    }
+
     /// Writes every file of the project into `directory`, which must exist,
     /// and answers the paths written, in loading order, the `files` a
     /// [`crate::mapping::Mapping`] compiles from.
@@ -172,6 +180,7 @@ pub const MPD: Project = Project {
         shipped!("mpd", "ferrobridge_eu_mpd_dispense.yml"),
     ],
     accounted: &[],
+    followed: &[],
 };
 
 /// The HL7 Europe Imaging Report 1.0.0-ballot project.
@@ -179,10 +188,12 @@ pub const MPD: Project = Project {
 /// It maps over FerroBRIDGE's imaging report template: the imaging
 /// examination result to the `DiagnosticReportEuImaging` the document holds
 /// beside its composition, and the study it reports to the
-/// `ImagingStudyEuImaging` the report references. A received report
-/// declares each section none of whose entries it carries, and each element
-/// of the report and of its studies it carries into no structured element,
-/// such as the performing organization ([`Project::accounted`]).
+/// `ImagingStudyEuImaging` the report references, and the organisation in
+/// the imaging service slot to the report's performer `Organization`. A
+/// received report declares each section none of whose entries it carries,
+/// and each element of the report and of its studies it carries into no
+/// structured element, such as a performer that is no `Organization`
+/// ([`Project::accounted`]).
 #[cfg(feature = "imaging")]
 pub const IMAGING: Project = Project {
     directory: "imaging",
@@ -191,6 +202,7 @@ pub const IMAGING: Project = Project {
         shipped!("imaging", "ferrobridge_eu_imaging.context.yml"),
         shipped!("imaging", "ferrobridge_imaging_exam_result.v1.yml"),
         shipped!("imaging", "ferrobridge_eu_imaging_report.yml"),
+        shipped!("imaging", "ferrobridge_organisation.v1.yml"),
     ],
     // NOTE: no specification governs this: our own design; every section and every element of the report and
     // its study but identity, subject, choice elements and `imagingStudy` (whose studies declare their own) is accounted.
@@ -235,6 +247,9 @@ pub const IMAGING: Project = Project {
         "ImagingStudy.description",
         "ImagingStudy.series",
     ],
+    // NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer:organization; the
+    // project maps the Organization a performer names, so a performer that resolves to one it read is carried.
+    followed: &["DiagnosticReport.performer"],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
@@ -277,6 +292,7 @@ pub const LABORATORY: Project = Project {
         "Observation.basedOn",
         "Observation.referenceRange",
     ],
+    followed: &[],
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.
@@ -316,6 +332,7 @@ pub const EPS: Project = Project {
         shipped!("eps", "ferrobridge_medication.v1.Immunization.yml"),
     ],
     accounted: &[],
+    followed: &[],
 };
 
 /// The HL7 Europe Hospital Discharge Report 1.0.0 project.
@@ -420,6 +437,7 @@ pub const HDR: Project = Project {
         "MedicationRequest.detectedIssue",
         "MedicationRequest.eventHistory",
     ],
+    followed: &[],
 };
 
 /// Every project the enabled features ship.
@@ -436,15 +454,13 @@ const SHIPPED: &[Project] = &[
     HDR,
 ];
 
-/// Returns the received elements the shipped project that compiles a
-/// context mapping `contexts` names accounts for: none when no shipped
-/// project compiles one of them.
+/// Returns the shipped project that compiles a context mapping `contexts`
+/// names, if one does.
 ///
 /// Every context of one [`crate::mapping::Mapping`] maps its one template,
 /// and no two shipped projects map the same template, so one project answers.
-pub(crate) fn accounted_for(contexts: &[&str]) -> &'static [&'static str] {
+pub(crate) fn shipped_for(contexts: &[&str]) -> Option<&'static Project> {
     SHIPPED
         .iter()
         .find(|project| project.contexts.iter().any(|held| contexts.contains(held)))
-        .map_or(&[], |project| project.accounted)
 }

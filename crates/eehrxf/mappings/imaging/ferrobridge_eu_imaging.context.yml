@@ -4,7 +4,8 @@
 # DiagnosticReportEuImaging profile over FerroBRIDGE's imaging report
 # template, whose archetypes are CKM's. The imaging examination result
 # becomes the report, and the study it reports an ImagingStudyEuImaging the
-# report references.
+# report references, and the organisation that performed it the report's
+# performer.
 grammar: FHIRConnect/v1.0.0
 type: context
 metadata:
@@ -21,6 +22,7 @@ context:
     id: "openEHR-EHR-COMPOSITION.ferrobridge_imaging_report.v1.0.0"
   archetypes:
     - "OBSERVATION.imaging_exam_result.v1"
+    - "CLUSTER.organisation.v1"
   extensions:
     - "ferrobridge_eu_imaging_report"
   start: "OBSERVATION.imaging_exam_result.v1"

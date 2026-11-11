@@ -50,6 +50,7 @@ paths=(
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.case_identification.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.clinical_evidence.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.organisation.v1.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"

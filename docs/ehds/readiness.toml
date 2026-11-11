@@ -110,7 +110,7 @@ package = "hl7.fhir.eu.imaging 1.0.0-ballot"
 template = "FerroBRIDGE imaging report template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_imaging_report.adlt"
 context = "crates/eehrxf/mappings/imaging/ferrobridge_eu_imaging.context.yml"
-test = "crates/eehrxf/tests/it/imaging_mapped.rs::the_report_mapped_back_out_is_a_document_the_profiles_constrain"
+test = "crates/eehrxf/tests/it/imaging_mapped/mod.rs::the_report_mapped_back_out_is_a_document_the_profiles_constrain"
 
 [[category.row]]
 target = "ImagingStudyEuImaging"
@@ -119,7 +119,7 @@ package = "hl7.fhir.eu.imaging 1.0.0-ballot"
 template = "FerroBRIDGE imaging report template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_imaging_report.adlt"
 context = "crates/eehrxf/mappings/imaging/ferrobridge_eu_imaging.context.yml"
-test = "crates/eehrxf/tests/it/imaging_mapped.rs::the_report_mapped_back_out_is_a_document_the_profiles_constrain"
+test = "crates/eehrxf/tests/it/imaging_mapped/mod.rs::the_report_mapped_back_out_is_a_document_the_profiles_constrain"
 
 [[category]]
 article = "14(1)(e)"
