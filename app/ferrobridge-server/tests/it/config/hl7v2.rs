@@ -334,3 +334,331 @@ fn tls_material_that_makes_no_listener_refuses_to_boot() -> Result<(), Box<dyn s
     );
     Ok(())
 }
+
+/// A plain device sender on `network`, as a `senders` entry.
+fn plain_device(network: &str) -> String {
+    format!(
+        "{{ namespace_id = \"ANALYSER\", origin = \"device\", device_identifier_issuer = \"urn:example:devices\", transport = \"plain\", source_addresses = [\"{network}\"] }}"
+    )
+}
+
+/// The face with the default TLS sender and `plain` beside it, then `table`.
+fn with_plain(plain: &str, table: &str) -> String {
+    format!(
+        "{}senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}, {plain}]\n{}{table}",
+        bare_face("listen = \"0.0.0.0:2575\"\n"),
+        tls_table(),
+    )
+}
+
+/// The `[hl7v2.plain]` table binding `bind`.
+fn plain_table(bind: &str) -> String {
+    format!("\n[hl7v2.plain]\nbind = \"{bind}\"\n")
+}
+
+#[test]
+fn a_plain_device_resolves_on_its_own_listener() -> Result<(), Box<dyn std::error::Error>> {
+    let text = with_plain(
+        &plain_device("10.20.0.0/24"),
+        &plain_table("10.20.0.5:2576"),
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let face = settings.hl7v2.ok_or("the face is on")?;
+    let plain = face.plain.ok_or("the plain listener is configured")?;
+    assert_eq!("10.20.0.5:2576", plain.bind.to_string());
+    assert_eq!(
+        vec![ferrobridge_server::config::hl7v2::PlainSender {
+            sender: ferrobridge_server::config::hl7v2::Sender::Namespace(String::from("ANALYSER")),
+            sources: vec!["10.20.0.0/24".parse()?],
+        }],
+        plain.senders
+    );
+    assert_eq!(
+        1,
+        face.subjects.len(),
+        "the plain device carries no certificate subject"
+    );
+    assert_eq!(2, face.senders.len(), "the device is a listed sender too");
+    Ok(())
+}
+
+#[test]
+fn the_face_serves_tls_alone_unless_a_sender_asks_for_plain()
+-> Result<(), Box<dyn std::error::Error>> {
+    let settings =
+        Config::from_sources(Some(&with_face("")), &BTreeMap::new())?.resolve(Process::Server)?;
+    let face = settings.hl7v2.ok_or("the face is on")?;
+    assert!(face.plain.is_none(), "transport defaults to tls");
+    Ok(())
+}
+
+#[test]
+fn a_plain_sender_that_is_no_device_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    let sender = "{ namespace_id = \"ANALYSER\", transport = \"plain\", source_addresses = [\"10.20.0.21/32\"] }";
+    match &refusal(&with_plain(sender, &plain_table("10.20.0.5:2576")))? {
+        Error::SenderTransport { key, reason } => {
+            assert_eq!("hl7v2.senders", key);
+            assert!(reason.contains("origin = \"device\""), "{reason}");
+        }
+        other => return Err(format!("expected a transport refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_sender_without_source_addresses_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
+    let sender = "{ namespace_id = \"ANALYSER\", origin = \"device\", device_identifier_issuer = \"urn:example:devices\", transport = \"plain\" }";
+    match &refusal(&with_plain(sender, &plain_table("10.20.0.5:2576")))? {
+        Error::SenderTransport { key, reason } => {
+            assert_eq!("hl7v2.senders", key);
+            assert!(reason.contains("source_addresses"), "{reason}");
+        }
+        other => return Err(format!("expected a transport refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_sender_naming_a_certificate_subject_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
+    let sender = "{ namespace_id = \"ANALYSER\", origin = \"device\", device_identifier_issuer = \"urn:example:devices\", transport = \"plain\", source_addresses = [\"10.20.0.21/32\"], certificate_subject = \"analyser.example.org\" }";
+    assert!(
+        matches!(
+            refusal(&with_plain(sender, &plain_table("10.20.0.5:2576")))?,
+            Error::SenderTransport { .. }
+        ),
+        "a plain sender has no client certificate"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_tls_sender_naming_source_addresses_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
+    let text = with_face(
+        "senders = [{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\", source_addresses = [\"10.20.0.21/32\"] }]\n",
+    );
+    assert!(
+        matches!(refusal(&text)?, Error::SenderTransport { .. }),
+        "source_addresses binds a plain sender alone"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_unknown_transport_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    let text = with_face(
+        "senders = [{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\", transport = \"udp\" }]\n",
+    );
+    match &refusal(&text)? {
+        Error::Transport { key, value } => {
+            assert_eq!("hl7v2.senders", key);
+            assert_eq!("udp", value);
+        }
+        other => return Err(format!("expected a transport refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_source_address_that_is_no_network_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    for network in [
+        "",
+        "10.20.0.21",
+        "10.20.0.256/32",
+        "10.20.0.0/33",
+        "lab-vlan",
+    ] {
+        let text = with_plain(&plain_device(network), &plain_table("10.20.0.5:2576"));
+        match &refusal(&text)? {
+            Error::SourceAddress { key, value, .. } => {
+                assert_eq!("hl7v2.senders.source_addresses", key);
+                assert_eq!(network, value);
+            }
+            other => return Err(format!("{network}: unexpected refusal {other:?}").into()),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_source_address_with_host_bits_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    let text = with_plain(
+        &plain_device("10.20.0.21/24"),
+        &plain_table("10.20.0.5:2576"),
+    );
+    match &refusal(&text)? {
+        Error::SourceNetwork { network, .. } => assert_eq!("10.20.0.0/24", network),
+        other => return Err(format!("expected a network refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_sender_without_the_plain_listener_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
+    match &refusal(&with_plain(&plain_device("10.20.0.21/32"), ""))? {
+        Error::Needs { key, needs } => {
+            assert_eq!("hl7v2.senders", key);
+            assert_eq!("hl7v2.plain.bind", needs);
+        }
+        other => return Err(format!("expected a needs error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_listener_with_no_plain_sender_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
+    let text = format!("{}{}", with_face(""), plain_table("10.20.0.5:2576"));
+    match &refusal(&text)? {
+        Error::PlainUnused { key } => assert_eq!("hl7v2.plain", key),
+        other => return Err(format!("expected an unused refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_listener_on_the_tls_address_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    // The TLS listener binds 0.0.0.0:2575, which holds port 2575 on every address.
+    for bind in ["0.0.0.0:2575", "10.20.0.5:2575", "[::]:2575"] {
+        let text = with_plain(&plain_device("10.20.0.21/32"), &plain_table(bind));
+        match &refusal(&text)? {
+            Error::SharedListener { key, .. } => assert_eq!("hl7v2.plain.bind", key),
+            other => return Err(format!("{bind}: unexpected refusal {other:?}").into()),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_bind_that_is_no_socket_address_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
+    match &refusal(&with_plain(
+        &plain_device("10.20.0.21/32"),
+        &plain_table("lab:2576"),
+    ))? {
+        Error::Listen { key, .. } => assert_eq!("hl7v2.plain.bind", key),
+        other => return Err(format!("expected a listen refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn the_running_configuration_names_each_sender_s_transport_and_the_plain_bind()
+-> Result<(), Box<dyn std::error::Error>> {
+    use ferrobridge_operator_api::configuration::Value;
+
+    let text = with_plain(
+        &plain_device("10.20.0.21/32"),
+        &plain_table("10.20.0.5:2576"),
+    );
+    let config = Config::from_sources(Some(&text), &BTreeMap::new())?;
+    let document = ferrobridge_server::config::document::document(&config, jiff::Timestamp::now())?;
+    let bind = document.entry("hl7v2.plain.bind").ok_or("the plain bind")?;
+    assert_eq!(Value::String(String::from("10.20.0.5:2576")), bind.value);
+    let senders = document.entry("hl7v2.senders").ok_or("the senders")?;
+    let Value::List(senders) = &senders.value else {
+        return Err(format!("a list of senders, got {:?}", senders.value).into());
+    };
+    let transports: Vec<_> = senders
+        .iter()
+        .map(|sender| match sender {
+            Value::Table(table) => table.get("transport").cloned(),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        vec![
+            Some(Value::String(String::from("tls"))),
+            Some(Value::String(String::from("plain"))),
+        ],
+        transports
+    );
+    let Some(Value::Table(device)) = senders.get(1) else {
+        return Err("the plain device's table".into());
+    };
+    assert_eq!(
+        Some(&Value::List(vec![Value::String(String::from(
+            "10.20.0.21/32"
+        ))])),
+        device.get("source_addresses")
+    );
+    Ok(())
+}
+
+/// A face whose one sender is the plain device on `network`, with
+/// `[hl7v2.plain]` and then `table`.
+fn all_plain(network: &str, table: &str) -> String {
+    format!(
+        "{}senders = [{}]\n{}{table}",
+        bare_face(""),
+        plain_device(network),
+        plain_table("10.20.0.5:2576"),
+    )
+}
+
+#[test]
+fn a_face_of_plain_devices_alone_needs_no_tls() -> Result<(), Box<dyn std::error::Error>> {
+    let text = all_plain("10.20.0.21/32", "");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let face = settings.hl7v2.ok_or("the face is on")?;
+    assert!(face.tls.is_none(), "no TLS listener without a TLS sender");
+    assert_eq!(
+        0,
+        face.subjects.len(),
+        "no sender carries a certificate subject"
+    );
+    assert_eq!(
+        "10.20.0.5:2576",
+        face.plain.ok_or("the plain listener")?.bind.to_string()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_tls_table_with_no_tls_sender_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    match &refusal(&all_plain("10.20.0.21/32", &tls_table()))? {
+        Error::TlsUnused { key } => assert_eq!("hl7v2.tls", key),
+        other => return Err(format!("expected an unused refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_tls_sender_still_needs_its_tls_files() -> Result<(), Box<dyn std::error::Error>> {
+    let text = format!(
+        "{}senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}, {}]\n{}",
+        bare_face(""),
+        plain_device("10.20.0.21/32"),
+        plain_table("10.20.0.5:2576"),
+    );
+    match &refusal(&text)? {
+        Error::Needs { key, needs } => {
+            assert_eq!("hl7v2.enabled", key);
+            assert_eq!("hl7v2.tls.certificate_file", needs);
+        }
+        other => return Err(format!("expected a needs error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_bind_on_the_default_listen_address_is_taken_without_tls()
+-> Result<(), Box<dyn std::error::Error>> {
+    // With no TLS listener, `listen` binds nothing, so the plain listener may take its port.
+    let text = format!(
+        "{}senders = [{}]\n{}",
+        bare_face(""),
+        plain_device("10.20.0.21/32"),
+        plain_table("127.0.0.1:2575"),
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let face = settings.hl7v2.ok_or("the face is on")?;
+    assert_eq!(
+        "127.0.0.1:2575",
+        face.plain.ok_or("the plain listener")?.bind.to_string()
+    );
+    Ok(())
+}

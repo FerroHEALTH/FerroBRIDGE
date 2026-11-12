@@ -45,6 +45,8 @@ fhirconnect = { workspace = true, features = ["mapping"] }
 # The health and operator documents, shared with the operator console.
 ferrobridge-operator-api.workspace = true
 http.workspace = true
+# The networks `[[hl7v2.senders]] source_addresses` names.
+ipnet.workspace = true
 # The one clock: the instant every composition default of one ingest is taken
 # from.
 jiff.workspace = true

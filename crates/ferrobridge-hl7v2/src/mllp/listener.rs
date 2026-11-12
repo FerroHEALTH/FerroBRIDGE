@@ -8,7 +8,7 @@ use core::future::Future;
 use core::time::Duration;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use bytes::BytesMut;
 use rustls::pki_types::CertificateDer;
@@ -32,6 +32,7 @@ use super::{Codec, FrameError, Malformed, READ_CHUNK};
 #[derive(Debug, Default)]
 pub struct Connection {
     refused: AtomicUsize,
+    closing: AtomicBool,
     peer: Option<SocketAddr>,
     certificate: Option<CertificateDer<'static>>,
 }
@@ -42,6 +43,7 @@ impl Connection {
     pub fn with_peer(peer: Option<SocketAddr>) -> Self {
         Self {
             refused: AtomicUsize::new(0),
+            closing: AtomicBool::new(false),
             peer,
             certificate: None,
         }
@@ -79,6 +81,19 @@ impl Connection {
     pub fn refused(&self) -> usize {
         self.refused.load(Ordering::Relaxed)
     }
+
+    /// Asks the listener to close the connection once the answer to the
+    /// frame being handled is written.
+    pub fn close(&self) {
+        self.closing.store(true, Ordering::Release);
+    }
+
+    /// Returns whether the handler asked for the connection to close after
+    /// its answer.
+    #[must_use]
+    pub fn closing(&self) -> bool {
+        self.closing.load(Ordering::Acquire)
+    }
 }
 
 /// What the listener hands each frame to.
@@ -103,6 +118,15 @@ pub trait Handler: Send + Sync + 'static {
     fn malformed(&self, kind: Malformed, partial: &[u8]) -> Option<Vec<u8>> {
         let (_, _) = (kind, partial);
         None
+    }
+
+    /// Returns whether a connection from `peer` is served at all.
+    ///
+    /// A peer the handler does not admit is closed as soon as it is
+    /// accepted, before any byte is read from it or written to it. The
+    /// default admits every peer.
+    fn admits(&self, _peer: SocketAddr) -> bool {
+        true
     }
 }
 
@@ -244,6 +268,11 @@ where
             () = &mut shutdown => break,
             accepted = listener.accept() => {
                 let (stream, peer) = accepted?;
+                if !handler.admits(peer) {
+                    tracing::warn!(peer = %peer, "MLLP connection refused: the peer address is not admitted");
+                    drop(stream);
+                    continue;
+                }
                 tracing::debug!(peer = %peer, "MLLP connection accepted");
                 let upgraded = upgrade(stream);
                 let handler = Arc::clone(&handler);
@@ -325,6 +354,11 @@ async fn connection<H: Handler, S: AsyncRead + AsyncWrite + Unpin>(
             let mut out = BytesMut::new();
             codec.encode(reply.as_slice(), &mut out)?;
             stream.write_all(&out).await?;
+            if counts.closing() {
+                tracing::debug!("MLLP connection closed after the answer, as the handler asked");
+                stream.shutdown().await?;
+                return Ok(());
+            }
             if *stopped.borrow() {
                 return Ok(());
             }

@@ -208,6 +208,8 @@ jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 unicode-normalization = "0.1.26"
 url = "2.5.8"
 http = "1.5.0"
+# The CIDR networks a plain MLLP sender of the HL7 v2 face connects from.
+ipnet = "2.12.2"
 # The `serde` feature reads a configured secret straight into a `SecretString`.
 secrecy = { version = "0.10.3", features = ["serde"] }
 tracing = "0.1.44"
