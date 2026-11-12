@@ -476,7 +476,7 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
             } else {
                 facade::capability::Operations::Absent
             },
-            hl7v2: if state.hl7v2().is_some() {
+            hl7v2: if state.hl7v2_runs() {
                 facade::capability::Hl7v2::Configured
             } else {
                 facade::capability::Hl7v2::Absent

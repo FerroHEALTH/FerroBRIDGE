@@ -162,19 +162,33 @@ impl HealthIndicator for IdentityStore {
 pub struct Hl7v2Listener {
     /// Whether the listener accepts.
     listening: crate::hl7v2::Listening,
+    /// The indicator's name.
+    name: &'static str,
 }
 
 impl Hl7v2Listener {
-    /// Returns a probe over `listening`.
+    /// Returns a probe over `listening`, the TLS listener's.
     #[must_use]
     pub const fn new(listening: crate::hl7v2::Listening) -> Self {
-        Self { listening }
+        Self {
+            listening,
+            name: "hl7v2-listener",
+        }
+    }
+
+    /// Returns a probe over `listening`, the plain listener's.
+    #[must_use]
+    pub const fn plain(listening: crate::hl7v2::Listening) -> Self {
+        Self {
+            listening,
+            name: "hl7v2-plain-listener",
+        }
     }
 }
 
 impl HealthIndicator for Hl7v2Listener {
     fn name(&self) -> &'static str {
-        "hl7v2-listener"
+        self.name
     }
 
     fn check(&self) -> Check<'_> {

@@ -251,14 +251,15 @@ pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
             sender: Sender::Namespace(String::from("NORTHLAB")),
             name: String::from(NORTHLAB_SUBJECT),
         }],
-        tls: Tls {
+        tls: Some(Tls {
             acceptor: ferrobridge_hl7v2::mllp::tls::acceptor(
                 PKI.server_certificate().as_bytes(),
                 PKI.server_key().as_bytes(),
                 PKI.ca().as_bytes(),
             )
             .expect("the acceptor builds"),
-        },
+        }),
+        plain: None,
     }
 }
 
@@ -290,11 +291,16 @@ impl Serving {
     ) -> Result<Self, Box<dyn Error>> {
         let (terminology_server, terminology) = terminology_stub().await;
         let usage = Arc::new(ferrobridge_server::usage_report::window());
-        let face = Arc::new(
-            Face::new(facade, Some(terminology), &lane)
-                .with_usage(Arc::clone(&usage))
-                .with_access_log(log, lane.listen),
-        );
+        let face = Face::new(facade, Some(terminology), &lane)
+            .with_usage(Arc::clone(&usage))
+            .with_access_log(log, lane.listen);
+        // A configured plain listener is the one the case drives.
+        let face = Arc::new(match lane.plain.as_ref() {
+            Some(plain) => face
+                .on_plain(plain.bind)
+                .ok_or("a face on the plain lane")?,
+            None => face,
+        });
         let directory = Arc::clone(face.directory());
         let socket = TcpListener::bind("127.0.0.1:0").await?;
         let address = socket.local_addr()?;
@@ -487,4 +493,5 @@ mod certificate;
 mod clinician;
 mod facility;
 mod feeder_audit;
+mod plain;
 mod relay;

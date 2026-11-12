@@ -48,6 +48,9 @@ pub enum Settled {
     /// The message's import record could not be stored, so its commit is not
     /// acknowledged.
     Unrecorded,
+    /// On the plain listener, MSH-4 names no plain sender whose networks hold
+    /// the connection's peer address.
+    Address,
 }
 
 /// What one settled message produced, for the log.
@@ -91,6 +94,14 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
             ErrorCode::Application,
             String::from(
                 "the connection's client certificate does not name the sender MSH-4 names",
+            ),
+        ),
+        Settled::Address => one(
+            Code::Reject,
+            Some(("MSH", 4)),
+            ErrorCode::Application,
+            String::from(
+                "MSH-4 names no plain sender this connection's network address belongs to",
             ),
         ),
         Settled::Sender => one(

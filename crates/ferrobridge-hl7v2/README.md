@@ -33,7 +33,9 @@ you use; the range is the same caret range.
   handler and drains on a shutdown signal. A frame with no start block, a
   start block inside it, an end block without its carriage return, or a size
   past the ceiling is refused, and the handler may answer it with `AR` before
-  the connection closes.
+  the connection closes. A handler may refuse a peer by its address, which
+  closes the connection before any byte is read, and may ask for a
+  connection to close once its answer is written.
   `send` is the other side: it connects within a connect timeout, writes one
   frame and returns the reply frame within a reply timeout, with a typed error
   for each way the exchange fails.

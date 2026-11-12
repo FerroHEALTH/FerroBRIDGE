@@ -14,6 +14,7 @@
     reason = "test assertions"
 )]
 
+mod admission;
 mod condition;
 mod corpus;
 mod decode;
