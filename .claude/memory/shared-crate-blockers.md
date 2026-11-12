@@ -5,9 +5,6 @@ metadata:
   type: feedback
 ---
 
-<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
-<!-- SPDX-License-Identifier: BUSL-1.1 -->
-
 Every issue filed in any family repo gets its milestone at filing time. If the
 right milestone does not exist yet, for example the next `ferrohealth-smart-vX.Y.Z`
 in FerroAUTH, create it with a due date and a description first. A defect in a
