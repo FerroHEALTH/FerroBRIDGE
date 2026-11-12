@@ -33,6 +33,16 @@ pub enum BuildError {
     },
 }
 
+/// Whether each HL7 v2 listener accepts: the TLS one, and the plain one when
+/// it runs.
+#[derive(Debug, Clone)]
+struct Hl7v2Listeners {
+    /// The TLS listener.
+    tls: crate::hl7v2::Listening,
+    /// The plain listener, when one is configured.
+    plain: Option<crate::hl7v2::Listening>,
+}
+
 /// The state the router is built over.
 #[derive(Debug)]
 pub struct AppState {
@@ -54,10 +64,8 @@ pub struct AppState {
     operations_off: OperationsOff,
     /// The lanes the boot summary reported, for `GET /health/info`.
     lanes: Vec<crate::startup::Lane>,
-    /// Whether the HL7 v2 listener accepts, when the face runs.
-    hl7v2: Option<crate::hl7v2::Listening>,
-    /// Whether the HL7 v2 face's plain listener accepts, when it runs.
-    hl7v2_plain: Option<crate::hl7v2::Listening>,
+    /// Whether the HL7 v2 listeners accept, when the face runs.
+    hl7v2: Option<Hl7v2Listeners>,
     /// The OMOP ETL run history the operator API reads, when `[cdm]` is set.
     etl_history: Option<Arc<crate::etl::history::Store>>,
     /// The HL7 v2 face's `ConceptMap` directory, when the face runs.
@@ -162,7 +170,6 @@ impl AppState {
             },
             lanes: Vec::new(),
             hl7v2: None,
-            hl7v2_plain: None,
             etl_history: None,
             concept_maps: None,
             auth: None,
@@ -187,7 +194,6 @@ impl AppState {
             operations_off: OperationsOff::default(),
             lanes: Vec::new(),
             hl7v2: None,
-            hl7v2_plain: None,
             etl_history: None,
             concept_maps: None,
             auth: None,
@@ -255,7 +261,10 @@ impl AppState {
         self.health = self
             .health
             .and(Arc::new(indicators::Hl7v2Listener::new(listening.clone())));
-        self.hl7v2 = Some(listening);
+        self.hl7v2 = Some(Hl7v2Listeners {
+            tls: listening,
+            plain: None,
+        });
         self
     }
 
@@ -266,7 +275,9 @@ impl AppState {
         self.health = self.health.and(Arc::new(indicators::Hl7v2Listener::plain(
             listening.clone(),
         )));
-        self.hl7v2_plain = Some(listening);
+        if let Some(listeners) = self.hl7v2.as_mut() {
+            listeners.plain = Some(listening);
+        }
         self
     }
 
@@ -327,8 +338,8 @@ impl AppState {
 
     /// Returns whether the HL7 v2 listener accepts, when the face runs.
     #[must_use]
-    pub const fn hl7v2(&self) -> Option<&crate::hl7v2::Listening> {
-        self.hl7v2.as_ref()
+    pub fn hl7v2(&self) -> Option<&crate::hl7v2::Listening> {
+        self.hl7v2.as_ref().map(|listeners| &listeners.tls)
     }
 
     /// Returns this state with `lanes` as the lanes `GET /health/info`
@@ -351,17 +362,17 @@ impl AppState {
                 name: lane.name.to_owned(),
                 enabled: lane.enabled,
                 listen: lane.listen.clone(),
-                up: lane.listen.as_ref().map(|_| {
-                    self.hl7v2
-                        .as_ref()
-                        .is_some_and(crate::hl7v2::Listening::is_up)
-                }),
+                up: lane
+                    .listen
+                    .as_ref()
+                    .map(|_| self.hl7v2().is_some_and(crate::hl7v2::Listening::is_up)),
                 plain: lane.plain_listen.as_ref().map(|listen| {
                     ferrobridge_operator_api::health::PlainListener {
                         listen: listen.clone(),
                         up: self
-                            .hl7v2_plain
+                            .hl7v2
                             .as_ref()
+                            .and_then(|listeners| listeners.plain.as_ref())
                             .is_some_and(crate::hl7v2::Listening::is_up),
                     }
                 }),
