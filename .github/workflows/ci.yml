@@ -77,7 +77,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: zizmor@1.31.1
       - name: Audit .github
@@ -137,7 +137,7 @@ jobs:
       # The upstream release binary, pinned by version, rather than the
       # runner's distro package, which moves at every runner-image refresh.
       # Fetched by the same SHA-pinned installer, which verifies the checksum.
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: shellcheck@0.11.0
       - name: Every tracked shell program is clean at severity=style
@@ -663,7 +663,7 @@ jobs:
           components: clippy
           cache-shared-key: clippy-${{ matrix.shard }}
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-hack
       # One package at a time, the way the msrv job compiles and passes: a
@@ -765,7 +765,7 @@ jobs:
         with:
           cache-shared-key: test-${{ matrix.shard }}
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-nextest,cargo-hack
       # The fhir-codegen tests read the HL7 v2 definitions, which are fetched
@@ -927,7 +927,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: "21"
@@ -1013,7 +1013,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-nextest
       - name: Read the pinned HL7 v2 sample sets
@@ -1078,7 +1078,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-nextest
       # The facade examples round trip reads the R4 examples package, and
@@ -1145,7 +1145,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: sqlx-cli@0.9.0
       - run: scripts/checks/sqlx-offline.sh --check
@@ -1187,7 +1187,7 @@ jobs:
         if: github.event_name != 'merge_group'
         with:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         if: github.event_name != 'merge_group'
         with:
           tool: cargo-nextest
@@ -1299,7 +1299,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache: "false"
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-deny
       # Reads the same RustSec advisory database as cargo-audit and adds
@@ -1339,7 +1339,7 @@ jobs:
         with:
           cache-shared-key: msrv-${{ matrix.shard }}
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-hack
       # The Cargo book's named tool for verifying the declared rust-version,
@@ -1371,7 +1371,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-hack
       # `--no-dev-deps` rewrites the workspace manifests, which `--locked`
@@ -1488,7 +1488,7 @@ jobs:
           key: hl7-v2-legacy-${{ steps.v2-legacy.outputs.commit }}
       - name: Fetch and verify the HL7 v2 legacy tables
         run: bash scripts/vendor/v2-legacy.sh
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-nextest
       - run: cargo nextest run --locked --cargo-profile emit -p fhir-codegen --no-tests=fail
@@ -1628,7 +1628,7 @@ jobs:
         name: Read the cargo-semver-checks pin
         if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
         run: echo "version=$(bash scripts/checks/semver.sh --pin)" >> "$GITHUB_OUTPUT"
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
         with:
           tool: cargo-semver-checks@${{ steps.semver-pin.outputs.version }}
