@@ -117,12 +117,13 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     }
     let mut face = None;
     if let Some(lane) = settings.hl7v2.as_ref() {
-        let (started, listening) = start_hl7v2(settings, lane, &state)
+        let started = start_hl7v2(settings, lane, &state)
             .await
             .context("starting the HL7 v2 face")?;
-        state = state
-            .with_hl7v2(listening)
-            .with_concept_maps(Arc::clone(started.face.directory()));
+        state = state.with_concept_maps(Arc::clone(started.face.directory()));
+        if let Some((_, listening)) = started.tls.as_ref() {
+            state = state.with_hl7v2(listening.clone());
+        }
         if let Some(plain) = started.plain.as_ref() {
             state = state.with_hl7v2_plain(plain.listening.clone());
         }
@@ -365,27 +366,27 @@ async fn follower(
 
 /// The HL7 v2 face, bound and ready to serve.
 pub(crate) struct StartedFace {
-    /// The bound MLLP socket.
-    socket: TcpListener,
+    /// The bound TLS socket and whether it accepts, for the readiness probe,
+    /// when a sender sends over TLS.
+    tls: Option<(TcpListener, hl7v2::Listening)>,
     /// The face its frames are answered by.
     face: Arc<hl7v2::Face>,
-    /// How the listener runs.
+    /// How the listeners run.
     listener: hl7v2::Listener,
-    /// Whether the listener accepts, for the readiness probe.
-    listening: hl7v2::Listening,
     /// The plain listener for the devices that cannot speak TLS, when one is
     /// configured.
     plain: Option<hl7v2::plain::StartedPlain>,
 }
 
-/// Binds the HL7 v2 face's listener.
+/// Binds the HL7 v2 face's listeners: the TLS one when a sender sends over
+/// TLS, and the plain one when it is configured.
 ///
 /// A port that cannot be bound refuses the start.
 async fn start_hl7v2(
     settings: &Settings,
     lane: &config::Hl7v2Settings,
     state: &AppState,
-) -> anyhow::Result<(StartedFace, hl7v2::Listening)> {
+) -> anyhow::Result<StartedFace> {
     use anyhow::Context;
 
     let facade = state
@@ -396,17 +397,22 @@ async fn start_hl7v2(
         .maps()
         .count();
     let terminology = state.terminology().cloned();
-    let socket = TcpListener::bind(lane.listen)
-        .await
-        .with_context(|| format!("binding {}", lane.listen))?;
-    tracing::info!(
-        lane = "hl7v2",
-        listen = %lane.listen,
-        concept_maps = maps,
-        profiles = lane.profiles.len(),
-        "the HL7 v2 face listens for MLLP"
-    );
-    let listening = hl7v2::Listening::default();
+    let tls = match lane.tls.as_ref() {
+        Some(_) => {
+            let socket = TcpListener::bind(lane.listen)
+                .await
+                .with_context(|| format!("binding {}", lane.listen))?;
+            tracing::info!(
+                lane = "hl7v2",
+                listen = %lane.listen,
+                concept_maps = maps,
+                profiles = lane.profiles.len(),
+                "the HL7 v2 face listens for MLLP over TLS"
+            );
+            Some((socket, hl7v2::Listening::default()))
+        }
+        None => None,
+    };
     let face = hl7v2::Face::new(facade, terminology, lane)
         .with_usage(Arc::clone(state.usage_window()))
         .with_access_log(state.access_log().cloned(), lane.listen);
@@ -414,14 +420,12 @@ async fn start_hl7v2(
         Some(plain) => Some(hl7v2::plain::bind(plain, &face).await?),
         None => None,
     };
-    let face = StartedFace {
-        socket,
+    Ok(StartedFace {
+        tls,
         face: Arc::new(face),
         listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout.get()),
-        listening: listening.clone(),
         plain,
-    };
-    Ok((face, listening))
+    })
 }
 
 /// Serves HTTP and the HL7 v2 face, with its plain listener when one is
@@ -445,14 +449,16 @@ pub(crate) async fn serve_with_face(
         ended
     };
     let StartedFace {
-        socket,
+        tls,
         face,
         listener: mllp_listener,
-        listening,
         plain,
     } = face;
     let plain_listener = mllp_listener.clone();
     let mllp = async {
+        let Some((socket, listening)) = tls else {
+            return Ok(());
+        };
         let ended = hl7v2::serve_until(socket, face, mllp_listener, listening, stopped(stop)).await;
         stop.send_replace(true);
         ended

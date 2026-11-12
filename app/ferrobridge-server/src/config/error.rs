@@ -453,6 +453,12 @@ pub enum Error {
         /// The key that holds it.
         key: String,
     },
+    /// The TLS listener is configured with no sender to serve.
+    #[error("{key} is set and no sender names transport = \"tls\"")]
+    TlsUnused {
+        /// The key that holds it.
+        key: String,
+    },
     /// The plain listener would bind the TLS listener's address.
     #[error(
         "{key} is {value}, the address the TLS listener binds; the plain listener takes its own"

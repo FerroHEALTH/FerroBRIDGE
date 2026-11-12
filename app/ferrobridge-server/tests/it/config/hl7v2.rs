@@ -587,3 +587,78 @@ fn the_running_configuration_names_each_sender_s_transport_and_the_plain_bind()
     );
     Ok(())
 }
+
+/// A face whose one sender is the plain device on `network`, with
+/// `[hl7v2.plain]` and then `table`.
+fn all_plain(network: &str, table: &str) -> String {
+    format!(
+        "{}senders = [{}]\n{}{table}",
+        bare_face(""),
+        plain_device(network),
+        plain_table("10.20.0.5:2576"),
+    )
+}
+
+#[test]
+fn a_face_of_plain_devices_alone_needs_no_tls() -> Result<(), Box<dyn std::error::Error>> {
+    let text = all_plain("10.20.0.21/32", "");
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let face = settings.hl7v2.ok_or("the face is on")?;
+    assert!(face.tls.is_none(), "no TLS listener without a TLS sender");
+    assert_eq!(
+        0,
+        face.subjects.len(),
+        "no sender carries a certificate subject"
+    );
+    assert_eq!(
+        "10.20.0.5:2576",
+        face.plain.ok_or("the plain listener")?.bind.to_string()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_tls_table_with_no_tls_sender_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    match &refusal(&all_plain("10.20.0.21/32", &tls_table()))? {
+        Error::TlsUnused { key } => assert_eq!("hl7v2.tls", key),
+        other => return Err(format!("expected an unused refusal, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_tls_sender_still_needs_its_tls_files() -> Result<(), Box<dyn std::error::Error>> {
+    let text = format!(
+        "{}senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}, {}]\n{}",
+        bare_face(""),
+        plain_device("10.20.0.21/32"),
+        plain_table("10.20.0.5:2576"),
+    );
+    match &refusal(&text)? {
+        Error::Needs { key, needs } => {
+            assert_eq!("hl7v2.enabled", key);
+            assert_eq!("hl7v2.tls.certificate_file", needs);
+        }
+        other => return Err(format!("expected a needs error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_plain_bind_on_the_default_listen_address_is_taken_without_tls()
+-> Result<(), Box<dyn std::error::Error>> {
+    // With no TLS listener, `listen` binds nothing, so the plain listener may take its port.
+    let text = format!(
+        "{}senders = [{}]\n{}",
+        bare_face(""),
+        plain_device("10.20.0.21/32"),
+        plain_table("127.0.0.1:2575"),
+    );
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let face = settings.hl7v2.ok_or("the face is on")?;
+    assert_eq!(
+        "127.0.0.1:2575",
+        face.plain.ok_or("the plain listener")?.bind.to_string()
+    );
+    Ok(())
+}

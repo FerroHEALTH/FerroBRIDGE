@@ -103,7 +103,9 @@ pub fn lanes(settings: &Settings) -> Vec<Lane> {
             name: "hl7v2",
             enabled: hl7v2.is_some(),
             identifiable: hl7v2.is_some(),
-            listen: hl7v2.map(|face| face.listen.to_string()),
+            listen: hl7v2
+                .filter(|face| face.tls.is_some())
+                .map(|face| face.listen.to_string()),
             plain_listen: hl7v2
                 .and_then(|face| face.plain.as_ref())
                 .map(|plain| plain.bind.to_string()),

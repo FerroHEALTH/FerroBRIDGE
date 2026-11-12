@@ -251,14 +251,14 @@ pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
             sender: Sender::Namespace(String::from("NORTHLAB")),
             name: String::from(NORTHLAB_SUBJECT),
         }],
-        tls: Tls {
+        tls: Some(Tls {
             acceptor: ferrobridge_hl7v2::mllp::tls::acceptor(
                 PKI.server_certificate().as_bytes(),
                 PKI.server_key().as_bytes(),
                 PKI.ca().as_bytes(),
             )
             .expect("the acceptor builds"),
-        },
+        }),
         plain: None,
     }
 }

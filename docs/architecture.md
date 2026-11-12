@@ -2370,7 +2370,10 @@ networks before reading a byte (`Handler::admits`), and a message whose MSH-4
 names no plain sender whose networks hold the peer address (#1220) is
 answered `AR` and its connection closed (`Connection::close`); a TLS
 sender's facility is refused there the same way. OBX-18 stays under the
-sender's `device_identifier_issuer`. The plain listener shares the face, the
+sender's `device_identifier_issuer`. The TLS listener and its `[hl7v2.tls]`
+files are required only while a sender has `transport = "tls"`, so a lab of
+plain devices alone runs no TLS listener, and a `[hl7v2.tls]` with no TLS
+sender is refused at boot. The plain listener shares the face, the
 drain, the timeouts and the frame limit with the TLS one; boot warns once per
 plain sender, and `/health/info` and the operator API's running
 configuration show the lane and each sender's transport.

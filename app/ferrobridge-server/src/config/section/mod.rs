@@ -56,7 +56,8 @@ pub struct Mappings {
 pub struct Hl7v2 {
     /// Whether the MLLP listener runs.
     pub enabled: bool,
-    /// The socket address the MLLP listener binds.
+    /// The socket address the TLS listener binds, when a sender sends over
+    /// TLS.
     pub listen: String,
     /// The HL7 table 0211 code a message with an empty MSH-18 is read in.
     pub default_charset: String,
@@ -87,7 +88,7 @@ pub struct Hl7v2 {
     /// The sending facilities (MSH-4) the face accepts, at least one.
     pub senders: Vec<Hl7v2Sender>,
     /// The TLS the MLLP listener serves, with the client certificates it
-    /// requires.
+    /// requires; set only while a sender has `transport = "tls"`.
     pub tls: Hl7v2Tls,
     /// The plain MLLP listener for the senders declared `transport =
     /// "plain"`; absent, the face serves TLS alone.

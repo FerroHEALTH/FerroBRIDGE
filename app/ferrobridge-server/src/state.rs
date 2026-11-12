@@ -33,12 +33,12 @@ pub enum BuildError {
     },
 }
 
-/// Whether each HL7 v2 listener accepts: the TLS one, and the plain one when
-/// it runs.
-#[derive(Debug, Clone)]
+/// Whether each HL7 v2 listener accepts: the TLS one and the plain one, each
+/// when it runs.
+#[derive(Debug, Clone, Default)]
 struct Hl7v2Listeners {
-    /// The TLS listener.
-    tls: crate::hl7v2::Listening,
+    /// The TLS listener, when a sender sends over TLS.
+    tls: Option<crate::hl7v2::Listening>,
     /// The plain listener, when one is configured.
     plain: Option<crate::hl7v2::Listening>,
 }
@@ -261,10 +261,7 @@ impl AppState {
         self.health = self
             .health
             .and(Arc::new(indicators::Hl7v2Listener::new(listening.clone())));
-        self.hl7v2 = Some(Hl7v2Listeners {
-            tls: listening,
-            plain: None,
-        });
+        self.hl7v2.get_or_insert_default().tls = Some(listening);
         self
     }
 
@@ -275,9 +272,7 @@ impl AppState {
         self.health = self.health.and(Arc::new(indicators::Hl7v2Listener::plain(
             listening.clone(),
         )));
-        if let Some(listeners) = self.hl7v2.as_mut() {
-            listeners.plain = Some(listening);
-        }
+        self.hl7v2.get_or_insert_default().plain = Some(listening);
         self
     }
 
@@ -336,10 +331,18 @@ impl AppState {
         self.auth.as_ref()
     }
 
-    /// Returns whether the HL7 v2 listener accepts, when the face runs.
+    /// Returns whether the HL7 v2 face runs, on either listener.
+    #[must_use]
+    pub const fn hl7v2_runs(&self) -> bool {
+        self.hl7v2.is_some()
+    }
+
+    /// Returns whether the HL7 v2 TLS listener accepts, when it runs.
     #[must_use]
     pub fn hl7v2(&self) -> Option<&crate::hl7v2::Listening> {
-        self.hl7v2.as_ref().map(|listeners| &listeners.tls)
+        self.hl7v2
+            .as_ref()
+            .and_then(|listeners| listeners.tls.as_ref())
     }
 
     /// Returns this state with `lanes` as the lanes `GET /health/info`
@@ -559,5 +562,36 @@ mod tests {
         assert_eq!(Some("tls"), lane["senders"][0]["transport"].as_str());
         assert_eq!(Some("ANALYSER"), lane["senders"][1]["facility"].as_str());
         assert_eq!(Some("plain"), lane["senders"][1]["transport"].as_str());
+    }
+
+    #[tokio::test]
+    async fn a_face_of_plain_devices_alone_shows_only_its_plain_listener() {
+        let plain = Listening::default();
+        let state = AppState::with_health(Registry::default())
+            .with_hl7v2_plain(plain.clone())
+            .with_lanes(vec![Lane {
+                name: "hl7v2",
+                enabled: true,
+                plain_listen: Some(String::from("10.20.0.5:2576")),
+                ..Lane::default()
+            }]);
+        plain.set(true);
+        assert!(state.hl7v2_runs(), "the face runs");
+        assert!(state.hl7v2().is_none(), "no TLS listener runs");
+        let document = serde_json::to_value(state.info()).expect("the info serializes");
+        let lane = &document["lanes"][0];
+        assert!(lane.get("listen").is_none(), "no TLS address: {lane}");
+        assert!(lane.get("up").is_none(), "no TLS state: {lane}");
+        assert_eq!(Some(true), lane["plain"]["up"].as_bool());
+        let readiness = state
+            .health()
+            .readiness(&ferrohealth_health::lifecycle::Lifecycle::default())
+            .await;
+        let names: Vec<&str> = readiness
+            .indicators
+            .iter()
+            .map(|indicator| indicator.name.as_str())
+            .collect();
+        assert_eq!(vec!["hl7v2-plain-listener"], names);
     }
 }

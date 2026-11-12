@@ -385,7 +385,7 @@ pub struct FacadeSettings {
 /// The HL7 v2 face, resolved.
 #[derive(Debug, Clone)]
 pub struct Hl7v2Settings {
-    /// The socket address the MLLP listener binds.
+    /// The socket address the TLS listener binds, when one runs.
     pub listen: SocketAddr,
     /// The character set a message with an empty MSH-18 is read in.
     pub default_charset: ferrobridge_hl7v2::decode::Charset,
@@ -411,8 +411,9 @@ pub struct Hl7v2Settings {
     pub devices: Vec<hl7v2::Device>,
     /// The DNS name the client certificate of each sender carries.
     pub subjects: Vec<hl7v2::Subject>,
-    /// The TLS the listener serves, requiring a client certificate.
-    pub tls: hl7v2::Tls,
+    /// The TLS the listener serves, requiring a client certificate; `None`
+    /// when every sender is plain, and no TLS listener runs.
+    pub tls: Option<hl7v2::Tls>,
     /// The plain listener for the devices that cannot speak TLS, when one
     /// is configured.
     pub plain: Option<hl7v2::Plain>,

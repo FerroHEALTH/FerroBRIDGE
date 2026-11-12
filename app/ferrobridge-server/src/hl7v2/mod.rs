@@ -567,8 +567,9 @@ impl Listening {
 pub struct Listener {
     /// The frame codec, with its ceiling.
     pub codec: Codec,
-    /// The TLS the listener serves, requiring a client certificate.
-    pub tls: crate::config::hl7v2::Tls,
+    /// The TLS the listener serves, requiring a client certificate; `None`
+    /// when every sender is plain.
+    pub tls: Option<crate::config::hl7v2::Tls>,
     /// How long a connection and a frame may wait on the peer.
     pub timeouts: Timeouts,
     /// How long the drain may take after the stop signal.
@@ -600,7 +601,8 @@ impl Listener {
 ///
 /// # Errors
 ///
-/// Returns the I/O error of a failed `accept`.
+/// Returns the I/O error of a failed `accept`, and an `InvalidInput` error
+/// for a face on the TLS lane whose listener has no TLS.
 pub async fn serve_until<F>(
     socket: TcpListener,
     face: Arc<Face>,
@@ -611,26 +613,41 @@ pub async fn serve_until<F>(
 where
     F: Future<Output = ()> + Send + 'static,
 {
+    let acceptor = match face.lane() {
+        Lane::Tls => Some(
+            listener
+                .tls
+                .as_ref()
+                .map(|tls| tls.acceptor.clone())
+                .ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "the TLS listener has no TLS configured",
+                    )
+                })?,
+        ),
+        Lane::Plain => None,
+    };
     let signalled = Arc::new(tokio::sync::Notify::new());
     let inner = Arc::clone(&signalled);
     let flag = listening.clone();
     listening.set(true);
-    let lane = face.lane();
     let stopping = async move {
         shutdown.await;
         flag.set(false);
         inner.notify_one();
     };
-    let server: std::pin::Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>> = match lane {
-        Lane::Tls => Box::pin(listener::serve_tls(
+    let server: std::pin::Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>> = match acceptor
+    {
+        Some(acceptor) => Box::pin(listener::serve_tls(
             socket,
-            listener.tls.acceptor.clone(),
+            acceptor,
             face,
             listener.codec,
             listener.timeouts,
             stopping,
         )),
-        Lane::Plain => Box::pin(listener::serve_with(
+        None => Box::pin(listener::serve_with(
             socket,
             face,
             listener.codec,

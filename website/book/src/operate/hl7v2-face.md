@@ -59,7 +59,7 @@ from the file `tls.key_file` names.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the MLLP listener runs |
-| `listen` | `127.0.0.1:2575` | The socket address the listener binds |
+| `listen` | `127.0.0.1:2575` | The socket address the TLS listener binds, when a sender sends over TLS |
 | `default_charset` | `ASCII` | The HL7 table 0211 code a message with an empty MSH-18 is read in: `ASCII`, `UNICODE UTF-8`, `8859/1` to `8859/9` or `8859/15` |
 | `unmapped_entries` | `skip_and_count` | What an entry no program maps does: `skip_and_count` commits the others, `refuse` refuses the message |
 | `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
@@ -70,20 +70,20 @@ from the file `tls.key_file` names.
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes of the run, by kind, at debug level |
 | `facility_identifier_issuer` | none | The `DV_IDENTIFIER.issuer` a facility's namespace id (HD.1) is written under: the issuer the CDR client's declared facilities name it by. Unset, the identifier names no issuer, and a CDR that checks facilities refuses the commit |
 | `senders` | none, required | The sending facilities (MSH-4) the face accepts, at least one, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3) with `certificate_subject = "..."`, the DNS name its client certificate carries in its subject alternative name; a facility a composition names is one of them too. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
-| `tls.certificate_file` | none, required | The PEM certificate chain the listener serves |
-| `tls.key_file` | none, required | The PEM private key of that chain |
-| `tls.client_ca_file` | none, required | The PEM authorities a sender's client certificate must chain to |
+| `tls.certificate_file` | none, required with a TLS sender | The PEM certificate chain the listener serves |
+| `tls.key_file` | none, required with a TLS sender | The PEM private key of that chain |
+| `tls.client_ca_file` | none, required with a TLS sender | The PEM authorities a sender's client certificate must chain to |
 | `senders[].transport` | `tls` | How the sender reaches the face: `tls` on the TLS listener, or `plain` on `[hl7v2.plain]` for a device that cannot speak TLS ([Devices without TLS](#devices-without-tls)) |
 | `senders[].source_addresses` | none | The networks a `plain` sender connects from, in CIDR notation (`10.20.0.21/32`); required with `transport = "plain"` and refused otherwise |
 | `plain.bind` | none | The socket address the plain listener binds; required while a sender is `plain`, and never the TLS listener's address |
 
-The listener serves MLLP over TLS and requires a client certificate that
+The TLS listener serves MLLP over TLS and requires a client certificate that
 chains to `tls.client_ca_file`; a peer without one never completes the
 handshake. A message is accepted only on a connection whose certificate
 carries the `certificate_subject` of the sender its MSH-4 names, so a
-sender cannot send as another. The bridge refuses to start without the
-`[hl7v2.tls]` files, without a sender, or with a TLS sender that names no
-`certificate_subject`.
+sender cannot send as another. The bridge refuses to start without a
+sender, without the `[hl7v2.tls]` files while a sender sends over TLS, or
+with a TLS sender that names no `certificate_subject`.
 
 ## Devices without TLS
 
@@ -122,14 +122,33 @@ bind = "10.20.0.5:2576"
 - The device identifier in OBX-18 is written under the sender's
   `device_identifier_issuer`, as for a device on TLS.
 - The plain listener runs under the same `idle_timeout`, `frame_timeout`,
-  `frame_limit` and drain as the TLS listener. The TLS listener and its
-  `[hl7v2.tls]` files stay required.
+  `frame_limit` and drain as the TLS listener.
+- The TLS listener runs only while a sender has `transport = "tls"`, and
+  only then does it need `[hl7v2.tls]` and its files. A lab whose only
+  senders are plain devices sets no `[hl7v2.tls]` and gets no TLS listener;
+  `listen` then binds nothing.
+
+A lab with one analyser and nothing else:
+
+```toml
+[hl7v2]
+enabled = true
+senders = [
+  { namespace_id = "LAB-1", origin = "device", device_identifier_issuer = "urn:example:devices",
+    transport = "plain", source_addresses = ["10.20.0.21/32"] },
+]
+
+[hl7v2.plain]
+bind = "10.20.0.5:2575"
+```
 
 The bridge refuses to start with a plain sender that is no device, names no
 networks or names a `certificate_subject`; with a network that does not
 read; with `[hl7v2.plain]` and no plain sender, or a plain sender and no
-`[hl7v2.plain]`; and with a `plain.bind` on the TLS listener's port at the
-same address or at an unspecified address (`0.0.0.0`, `[::]`) on either side.
+`[hl7v2.plain]`; with a `[hl7v2.tls]` that names a file while no sender
+sends over TLS; and with a `plain.bind` on the running TLS listener's port at
+the same address or at an unspecified address (`0.0.0.0`, `[::]`) on either
+side.
 
 ### The residual risk
 
@@ -426,11 +445,12 @@ The boot banner has an `hl7v2` line naming the address the listener binds and
 the CDR and terminology hosts it reaches, and `/health/readiness` carries an
 `hl7v2-listener` indicator that is down from the stop signal on.
 `/health/info` lists every lane under `lanes`; the `hl7v2` lane carries its
-`listen` address and `up`, whether the listener accepts connections now,
+`listen` address and `up`, whether the TLS listener accepts connections now
+(both absent when no TLS listener runs),
 `plain` with the plain listener's `listen` and `up` when one is configured,
 and `senders`, each with its `facility` and its `transport` (`tls` or
 `plain`). Readiness carries an `hl7v2-plain-listener` indicator beside the
-TLS one. The operator API's running configuration names each sender's
+`hl7v2-listener` of the TLS one, each only while its listener is configured. The operator API's running configuration names each sender's
 `transport` and `source_addresses`. The
 facade's `CapabilityStatement` adds one sentence to `implementation.description`
 naming the HL7 v2 face as another inbound path under the same identity and

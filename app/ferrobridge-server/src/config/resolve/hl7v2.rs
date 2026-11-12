@@ -139,8 +139,9 @@ fn shared(one: SocketAddr, other: SocketAddr) -> bool {
 /// does not read, [`Error::Needs`] for a plain sender with no
 /// `[hl7v2.plain]`, [`Error::PlainUnused`] for a `[hl7v2.plain]` with no
 /// plain sender, [`Error::Listen`] for a `bind` that does not parse, and
-/// [`Error::SharedListener`] for a `bind` the TLS listener at `listen` takes.
-fn plain_of(hl7v2: &Hl7v2, listen: SocketAddr) -> Result<Option<hl7v2::Plain>, Error> {
+/// [`Error::SharedListener`] for a `bind` the TLS listener at `listen`, when
+/// one runs, takes.
+fn plain_of(hl7v2: &Hl7v2, listen: Option<SocketAddr>) -> Result<Option<hl7v2::Plain>, Error> {
     let refused = |reason| Error::SenderTransport {
         key: String::from(SENDERS),
         reason,
@@ -192,7 +193,7 @@ fn plain_of(hl7v2: &Hl7v2, listen: SocketAddr) -> Result<Option<hl7v2::Plain>, E
                     key: String::from("hl7v2.plain.bind"),
                     source,
                 })?;
-            if shared(bind, listen) {
+            if listen.is_some_and(|listen| shared(bind, listen)) {
                 return Err(Error::SharedListener {
                     key: String::from("hl7v2.plain.bind"),
                     value: bind.to_string(),
@@ -201,6 +202,27 @@ fn plain_of(hl7v2: &Hl7v2, listen: SocketAddr) -> Result<Option<hl7v2::Plain>, E
             Ok(Some(hl7v2::Plain { bind, senders }))
         }
     }
+}
+
+/// Returns the TLS listener's material when a sender of `subjects` sends
+/// over TLS, and `None` when every sender is plain.
+///
+/// No specification governs this: our own design; a lab whose senders are
+/// all plain devices provides no certificate it never uses.
+///
+/// # Errors
+/// Returns what [`tls_of`] returns, and [`Error::TlsUnused`] for a
+/// `[hl7v2.tls]` that names a file while no sender sends over TLS.
+fn tls_for(tls: &Hl7v2Tls, subjects: &[hl7v2::Subject]) -> Result<Option<hl7v2::Tls>, Error> {
+    if !subjects.is_empty() {
+        return tls_of(tls).map(Some);
+    }
+    if *tls != Hl7v2Tls::default() {
+        return Err(Error::TlsUnused {
+            key: String::from("hl7v2.tls"),
+        });
+    }
+    Ok(None)
 }
 
 /// Returns the TLS `tls` describes: its three PEM files read once and the
@@ -330,6 +352,15 @@ pub(in crate::config) fn resolve_hl7v2(
             key: String::from("hl7v2.frame_limit"),
         });
     }
+    let senders = hl7v2
+        .senders
+        .iter()
+        .map(|sender| sender_of("hl7v2.senders", sender))
+        .collect::<Result<Vec<_>, Error>>()?;
+    let devices = devices_of(&hl7v2.senders)?;
+    let subjects = subjects_of(&hl7v2.senders)?;
+    let tls = tls_for(&hl7v2.tls, &subjects)?;
+    let plain = plain_of(hl7v2, tls.as_ref().map(|_| listen))?;
     Ok(Hl7v2Settings {
         listen,
         default_charset,
@@ -344,14 +375,10 @@ pub(in crate::config) fn resolve_hl7v2(
         log_outcomes: hl7v2.log_outcomes,
         facility_issuer: Some(hl7v2.facility_identifier_issuer.clone())
             .filter(|issuer| !issuer.is_empty()),
-        senders: hl7v2
-            .senders
-            .iter()
-            .map(|sender| sender_of("hl7v2.senders", sender))
-            .collect::<Result<Vec<_>, Error>>()?,
-        devices: devices_of(&hl7v2.senders)?,
-        subjects: subjects_of(&hl7v2.senders)?,
-        tls: tls_of(&hl7v2.tls)?,
-        plain: plain_of(hl7v2, listen)?,
+        senders,
+        devices,
+        subjects,
+        tls,
+        plain,
     })
 }

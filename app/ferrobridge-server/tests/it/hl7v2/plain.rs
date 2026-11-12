@@ -199,3 +199,26 @@ async fn a_plain_device_s_identifier_is_still_its_issuer_s() -> Result<(), Box<d
     );
     running.stop().await
 }
+
+#[tokio::test]
+async fn a_face_of_plain_devices_alone_runs_with_no_tls() -> Result<(), Box<dyn Error>> {
+    let mut lane = plain_settings(vec![device("ANALYSER", &["127.0.0.1/32"])?])?;
+    lane.senders
+        .retain(|sender| *sender == Sender::Namespace(String::from("ANALYSER")));
+    lane.subjects.clear();
+    lane.tls = None;
+    let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
+    let running = Running::start_with(lane, lookup).await?;
+    let mut stream = TcpStream::connect(running.serving.address).await?;
+    stream
+        .write_all(&frame(&result_of("ANALYSER", "MSG-PLAIN-6")?))
+        .await?;
+    let ack = read_ack(&mut stream).await?;
+    assert_eq!(
+        vec!["MSA|AA|MSG-PLAIN-6"],
+        segments(&ack, "MSA"),
+        "a face with no TLS material takes its plain device: {ack}"
+    );
+    assert_eq!(1, running.contributions().await, "the message is committed");
+    running.stop().await
+}
