@@ -411,3 +411,31 @@ fn the_published_contexts_hold_their_pinned_verdicts() -> Result<(), Box<dyn Err
     insta::assert_snapshot!("published_contexts", render(&verdicts()?)?);
     Ok(())
 }
+
+/// A path that names a single `EVENT` the builder collapsed into its
+/// `OBSERVATION` names the event, a structure, never the `time` leaf the
+/// builder keeps at the event's path (Simplified Formats master04
+/// §"Conditionally Collapsed Wrapper Types"). `KDS_Medikationseintrag`
+/// holds `medication_statement.v0` with one `0..1` `EVENT`, and the model
+/// anchors `MedicationStatement` at that event and reaches `at0006` below it,
+/// which the template excludes.
+#[test]
+fn a_collapsed_single_event_is_named_as_a_structure() -> Result<(), Box<dyn Error>> {
+    let found = verdict(
+        "projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml",
+        Opt::Testkit("kds-medikationseintrag/KDS_Medikationseintrag.opt"),
+    )?;
+    let Err(rows) = found.outcome else {
+        return Err("the context was expected to keep its other refusals".into());
+    };
+    let model = "model/observation/org.openehr/medication_statement.v0.yml";
+    assert!(
+        !rows.contains(&format!("{model}:38 error fc-unpaired-types")),
+        "the event anchor was read as its time leaf: {rows:?}"
+    );
+    assert!(
+        rows.contains(&format!("{model}:107 warning fc-excluded-template-node")),
+        "the excluded node below the event was not reached through it: {rows:?}"
+    );
+    Ok(())
+}

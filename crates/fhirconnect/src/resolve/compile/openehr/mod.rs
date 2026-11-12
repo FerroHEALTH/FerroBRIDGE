@@ -343,11 +343,32 @@ pub(super) fn interior_paths(template: &WebTemplateIndex) -> Vec<RmPath> {
 /// binding the mapping to one of them would bind it to a node nothing named.
 /// A node below another indexed node in the compacted tail, such as the
 /// `lower` and `upper` parts of a `DV_INTERVAL` value, is reached through that
-/// node and compacts to nothing of its own.
+/// node and compacts to nothing of its own. A shortened path that holds a
+/// constrained node below it names a structure, such as the single `EVENT`
+/// the builder collapses into its `OBSERVATION` beside the event's `time`
+/// leaf, and compacts to none of its leaves.
 pub(super) fn compaction_map(template: &WebTemplateIndex) -> Vec<(RmPath, &ResolvedNode)> {
     let indexed: std::collections::BTreeSet<String> = template
         .nodes()
         .map(|node| node.rm_path().to_string())
+        .collect();
+    let structures: std::collections::BTreeSet<String> = template
+        .nodes()
+        .flat_map(|node| {
+            let path = node.rm_path();
+            path.segments
+                .iter()
+                .enumerate()
+                .filter(|&(_, segment)| constrains(segment))
+                .map(|(at, _)| {
+                    RmPath {
+                        absolute: path.absolute,
+                        segments: path.segments.get(..at).unwrap_or_default().to_vec(),
+                    }
+                    .to_string()
+                })
+                .collect::<Vec<_>>()
+        })
         .collect();
     let mut found: Vec<(RmPath, &ResolvedNode)> = Vec::new();
     for node in template.nodes() {
@@ -374,6 +395,9 @@ pub(super) fn compaction_map(template: &WebTemplateIndex) -> Vec<(RmPath, &Resol
             absolute: path.absolute,
             segments: path.segments.get(..kept).unwrap_or_default().to_vec(),
         };
+        if structures.contains(&shortened.to_string()) {
+            continue;
+        }
         found.push((shortened, node));
     }
     found
