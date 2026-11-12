@@ -2352,6 +2352,29 @@ WHATWG label decodes as windows-1252), and `logos` 0.16.1 with `chumsky`
 the pair `openehr-query` builds its AQL parser on. `hl7-mllp-codec` and the
 other v2 crates stay out.
 
+The plain MLLP lane for devices without TLS (#1918) takes `ipnet` 2.12.2,
+verified against crates.io on 2026-11-12 and already in the lock through
+`ferrohealth-server` and `hyper-util`, for the CIDR networks a plain sender
+connects from. Its ground and its rules are our own design, since no
+specification governs them. HL7
+MLLP Release 2 defines no security layer, and IHE ITI ATNA (ITI TF-2, ITI-19)
+adds TLS for a node that supports it, so TLS with a client certificate per
+sender (#1638) stays the default and plain MLLP is an explicit per-sender
+exception for `origin = "device"` alone. A plain sender is served on its own
+`[hl7v2.plain] bind`, which boot refuses on the TLS listener's port at the
+same or an unspecified address, and names its `source_addresses`; boot
+refuses a plain sender that is no device or names no network, a network with
+host bits set, and one side of the listener-and-sender pair without the
+other. The listener closes a connection from outside every plain sender's
+networks before reading a byte (`Handler::admits`), and a message whose MSH-4
+names no plain sender whose networks hold the peer address (#1220) is
+answered `AR` and its connection closed (`Connection::close`); a TLS
+sender's facility is refused there the same way. OBX-18 stays under the
+sender's `device_identifier_issuer`. The plain listener shares the face, the
+drain, the timeouts and the frame limit with the TLS one; boot warns once per
+plain sender, and `/health/info` and the operator API's running
+configuration show the lane and each sender's transport.
+
 The profile validator (#437), verified against crates.io on 2026-10-15,
 takes `flate2` 1.1.10 on its pure-Rust `rust_backend` and `tar` 0.4.46
 without its default `xattr` feature for the `.tgz` form of a FHIR package,

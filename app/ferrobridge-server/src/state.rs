@@ -56,6 +56,8 @@ pub struct AppState {
     lanes: Vec<crate::startup::Lane>,
     /// Whether the HL7 v2 listener accepts, when the face runs.
     hl7v2: Option<crate::hl7v2::Listening>,
+    /// Whether the HL7 v2 face's plain listener accepts, when it runs.
+    hl7v2_plain: Option<crate::hl7v2::Listening>,
     /// The OMOP ETL run history the operator API reads, when `[cdm]` is set.
     etl_history: Option<Arc<crate::etl::history::Store>>,
     /// The HL7 v2 face's `ConceptMap` directory, when the face runs.
@@ -160,6 +162,7 @@ impl AppState {
             },
             lanes: Vec::new(),
             hl7v2: None,
+            hl7v2_plain: None,
             etl_history: None,
             concept_maps: None,
             auth: None,
@@ -184,6 +187,7 @@ impl AppState {
             operations_off: OperationsOff::default(),
             lanes: Vec::new(),
             hl7v2: None,
+            hl7v2_plain: None,
             etl_history: None,
             concept_maps: None,
             auth: None,
@@ -252,6 +256,17 @@ impl AppState {
             .health
             .and(Arc::new(indicators::Hl7v2Listener::new(listening.clone())));
         self.hl7v2 = Some(listening);
+        self
+    }
+
+    /// Returns this state with the HL7 v2 face's plain listener probed and
+    /// reported.
+    #[must_use]
+    pub fn with_hl7v2_plain(mut self, listening: crate::hl7v2::Listening) -> Self {
+        self.health = self.health.and(Arc::new(indicators::Hl7v2Listener::plain(
+            listening.clone(),
+        )));
+        self.hl7v2_plain = Some(listening);
         self
     }
 
@@ -325,8 +340,8 @@ impl AppState {
     }
 
     /// Returns the document `GET /health/info` answers: the build facts, the
-    /// pins and every lane, the HL7 v2 lane with its listen address and
-    /// whether its listener accepts now.
+    /// pins and every lane, the HL7 v2 lane with its listen address, whether
+    /// its listener accepts now, its plain listener and its senders.
     #[must_use]
     pub fn info(&self) -> ferrobridge_operator_api::health::Info {
         let lanes = self
@@ -341,6 +356,16 @@ impl AppState {
                         .as_ref()
                         .is_some_and(crate::hl7v2::Listening::is_up)
                 }),
+                plain: lane.plain_listen.as_ref().map(|listen| {
+                    ferrobridge_operator_api::health::PlainListener {
+                        listen: listen.clone(),
+                        up: self
+                            .hl7v2_plain
+                            .as_ref()
+                            .is_some_and(crate::hl7v2::Listening::is_up),
+                    }
+                }),
+                senders: lane.senders.clone(),
             })
             .collect();
         crate::build_info::info(lanes)
@@ -488,5 +513,40 @@ mod tests {
         let info = state.info();
         let lane = info.lanes.iter().find(|lane| lane.name == "hl7v2");
         assert_eq!(Some(Some(true)), lane.map(|lane| lane.up));
+    }
+
+    #[test]
+    fn the_info_shows_the_plain_listener_and_each_sender_s_transport() {
+        use ferrobridge_operator_api::health::{Sender, Transport};
+
+        let plain = Listening::default();
+        let state = AppState::with_health(Registry::default())
+            .with_hl7v2(Listening::default())
+            .with_hl7v2_plain(plain.clone())
+            .with_lanes(vec![Lane {
+                name: "hl7v2",
+                enabled: true,
+                listen: Some(String::from("127.0.0.1:2575")),
+                plain_listen: Some(String::from("10.20.0.5:2576")),
+                senders: vec![
+                    Sender {
+                        facility: String::from("NORTHLAB"),
+                        transport: Transport::Tls,
+                    },
+                    Sender {
+                        facility: String::from("ANALYSER"),
+                        transport: Transport::Plain,
+                    },
+                ],
+                ..Lane::default()
+            }]);
+        plain.set(true);
+        let document = serde_json::to_value(state.info()).expect("the info serializes");
+        let lane = &document["lanes"][0];
+        assert_eq!(Some("10.20.0.5:2576"), lane["plain"]["listen"].as_str());
+        assert_eq!(Some(true), lane["plain"]["up"].as_bool());
+        assert_eq!(Some("tls"), lane["senders"][0]["transport"].as_str());
+        assert_eq!(Some("ANALYSER"), lane["senders"][1]["facility"].as_str());
+        assert_eq!(Some("plain"), lane["senders"][1]["transport"].as_str());
     }
 }

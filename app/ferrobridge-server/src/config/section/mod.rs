@@ -89,6 +89,19 @@ pub struct Hl7v2 {
     /// The TLS the MLLP listener serves, with the client certificates it
     /// requires.
     pub tls: Hl7v2Tls,
+    /// The plain MLLP listener for the senders declared `transport =
+    /// "plain"`; absent, the face serves TLS alone.
+    pub plain: Option<Hl7v2Plain>,
+}
+
+/// The `[hl7v2.plain]` table: a second MLLP listener with no TLS, for the
+/// devices that cannot speak it, each bound to its network addresses.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Hl7v2Plain {
+    /// The socket address the plain listener binds, never the TLS
+    /// listener's.
+    pub bind: String,
 }
 
 /// The `[hl7v2.tls]` table: MLLP over TLS with client certificates.
@@ -123,13 +136,14 @@ impl Default for Hl7v2 {
             facility_identifier_issuer: String::new(),
             senders: Vec::new(),
             tls: Hl7v2Tls::default(),
+            plain: None,
         }
     }
 }
 
 /// One sending facility the HL7 v2 face accepts: a namespace id alone, or a
 /// universal id with its type.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Hl7v2Sender {
     /// HD.1 of MSH-4.
@@ -146,8 +160,29 @@ pub struct Hl7v2Sender {
     /// required with `origin = "device"`.
     pub device_identifier_issuer: String,
     /// The DNS name the sender's client certificate carries in its subject
-    /// alternative name; required.
+    /// alternative name; required with `transport = "tls"`.
     pub certificate_subject: String,
+    /// How the sender reaches the face: `tls` on the TLS listener, or
+    /// `plain` on `[hl7v2.plain]`, for a device alone.
+    pub transport: String,
+    /// The networks a plain sender connects from, in CIDR notation
+    /// (`10.20.0.21/32`); required with `transport = "plain"`.
+    pub source_addresses: Vec<String>,
+}
+
+impl Default for Hl7v2Sender {
+    fn default() -> Self {
+        Self {
+            namespace_id: String::new(),
+            universal_id: String::new(),
+            universal_id_type: String::new(),
+            origin: String::new(),
+            device_identifier_issuer: String::new(),
+            certificate_subject: String::new(),
+            transport: String::from("tls"),
+            source_addresses: Vec::new(),
+        }
+    }
 }
 
 /// The profile one resource type of a mapped message claims.

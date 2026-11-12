@@ -123,6 +123,9 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state
             .with_hl7v2(listening)
             .with_concept_maps(Arc::clone(started.face.directory()));
+        if let Some(plain) = started.plain.as_ref() {
+            state = state.with_hl7v2_plain(plain.listening.clone());
+        }
         face = Some(started);
     }
     let mut feeds = Vec::new();
@@ -370,6 +373,9 @@ pub(crate) struct StartedFace {
     listener: hl7v2::Listener,
     /// Whether the listener accepts, for the readiness probe.
     listening: hl7v2::Listening,
+    /// The plain listener for the devices that cannot speak TLS, when one is
+    /// configured.
+    plain: Option<hl7v2::plain::StartedPlain>,
 }
 
 /// Binds the HL7 v2 face's listener.
@@ -401,23 +407,27 @@ async fn start_hl7v2(
         "the HL7 v2 face listens for MLLP"
     );
     let listening = hl7v2::Listening::default();
+    let face = hl7v2::Face::new(facade, terminology, lane)
+        .with_usage(Arc::clone(state.usage_window()))
+        .with_access_log(state.access_log().cloned(), lane.listen);
+    let plain = match lane.plain.as_ref() {
+        Some(plain) => Some(hl7v2::plain::bind(plain, &face).await?),
+        None => None,
+    };
     let face = StartedFace {
         socket,
-        face: Arc::new(
-            hl7v2::Face::new(facade, terminology, lane)
-                .with_usage(Arc::clone(state.usage_window()))
-                .with_access_log(state.access_log().cloned(), lane.listen),
-        ),
+        face: Arc::new(face),
         listener: hl7v2::Listener::of(lane, settings.server.shutdown_timeout.get()),
         listening: listening.clone(),
+        plain,
     };
     Ok((face, listening))
 }
 
-/// Serves HTTP and the HL7 v2 face until `stop` reads `true`, each draining
-/// within the same bound.
+/// Serves HTTP and the HL7 v2 face, with its plain listener when one is
+/// configured, until `stop` reads `true`, each draining within the same bound.
 ///
-/// The one signal stops both, and a listener that fails stops the other, so
+/// The one signal stops them all, and a listener that fails stops the others, so
 /// the process never keeps half its surface.
 pub(crate) async fn serve_with_face(
     listener: TcpListener,
@@ -434,21 +444,38 @@ pub(crate) async fn serve_with_face(
         stop.send_replace(true);
         ended
     };
+    let StartedFace {
+        socket,
+        face,
+        listener: mllp_listener,
+        listening,
+        plain,
+    } = face;
+    let plain_listener = mllp_listener.clone();
     let mllp = async {
+        let ended = hl7v2::serve_until(socket, face, mllp_listener, listening, stopped(stop)).await;
+        stop.send_replace(true);
+        ended
+    };
+    let plain = async {
+        let Some(plain) = plain else {
+            return Ok(());
+        };
         let ended = hl7v2::serve_until(
-            face.socket,
-            face.face,
-            face.listener,
-            face.listening,
+            plain.socket,
+            plain.face,
+            plain_listener,
+            plain.listening,
             stopped(stop),
         )
         .await;
         stop.send_replace(true);
         ended
     };
-    let (http, mllp) = tokio::join!(http, mllp);
+    let (http, mllp, plain) = tokio::join!(http, mllp, plain);
     http.context("serving HTTP")?;
     mllp.context("serving MLLP")?;
+    plain.context("serving plain MLLP")?;
     Ok(())
 }
 

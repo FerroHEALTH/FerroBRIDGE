@@ -407,6 +407,62 @@ pub enum Error {
         /// The key that holds it.
         key: String,
     },
+    /// A sender names a transport other than `tls` and `plain`.
+    #[error("{key}: transport is `{value}`; it is \"tls\" or \"plain\"")]
+    Transport {
+        /// The key that holds it.
+        key: String,
+        /// The transport it names.
+        value: String,
+    },
+    /// A sender's keys do not fit its transport.
+    #[error("{key}: {reason}")]
+    SenderTransport {
+        /// The key that holds it.
+        key: String,
+        /// What the transport requires or forbids.
+        reason: &'static str,
+    },
+    /// A source address is not a network in CIDR notation.
+    #[error("{key}: `{value}` is not a network in CIDR notation, such as 10.20.0.21/32")]
+    SourceAddress {
+        /// The key that holds it.
+        key: String,
+        /// The address as written.
+        value: String,
+        /// What the network parser reported.
+        #[source]
+        source: ipnet::AddrParseError,
+    },
+    /// A source address sets bits past its prefix, so the network it means
+    /// is unclear.
+    #[error(
+        "{key}: `{value}` sets host bits past its prefix; write the network, such as {network}"
+    )]
+    SourceNetwork {
+        /// The key that holds it.
+        key: String,
+        /// The address as written.
+        value: String,
+        /// The network its prefix names.
+        network: String,
+    },
+    /// The plain listener is configured with no sender to serve.
+    #[error("{key} is set and no sender names transport = \"plain\"")]
+    PlainUnused {
+        /// The key that holds it.
+        key: String,
+    },
+    /// The plain listener would bind the TLS listener's address.
+    #[error(
+        "{key} is {value}, the address the TLS listener binds; the plain listener takes its own"
+    )]
+    SharedListener {
+        /// The key that holds it.
+        key: String,
+        /// The address both name.
+        value: String,
+    },
     /// A size that would refuse every message.
     #[error("{key} is 0; a frame carries at least one byte")]
     FrameLimit {

@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1800,6 +1800,7 @@ dependencies = [
  "http",
  "ihe-atna",
  "insta",
+ "ipnet",
  "jiff",
  "jsonschema",
  "jsonwebtoken",

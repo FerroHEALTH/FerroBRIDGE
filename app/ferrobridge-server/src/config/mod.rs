@@ -45,11 +45,11 @@ use omop_cdm::derived;
 use omop_cdm::writer::input::VisitConcepts;
 
 use error::Error;
+use resolve::hl7v2::resolve_hl7v2;
 use resolve::resolve_cdm;
 use resolve::resolve_cdr;
 use resolve::resolve_etl;
 use resolve::resolve_facade;
-use resolve::resolve_hl7v2;
 use resolve::resolve_mappings;
 use resolve::resolve_terminology;
 use section::Cdm;
@@ -413,6 +413,9 @@ pub struct Hl7v2Settings {
     pub subjects: Vec<hl7v2::Subject>,
     /// The TLS the listener serves, requiring a client certificate.
     pub tls: hl7v2::Tls,
+    /// The plain listener for the devices that cannot speak TLS, when one
+    /// is configured.
+    pub plain: Option<hl7v2::Plain>,
 }
 
 /// The settings the run path holds, with every secret already read.

@@ -25,6 +25,7 @@ pub mod directory;
 pub mod edit;
 mod envelope;
 pub mod origin;
+pub mod plain;
 mod stamped;
 
 use std::collections::BTreeMap;
@@ -52,11 +53,12 @@ use crate::config::hl7v2::Sender;
 use crate::facade::Facade;
 use crate::facade::ingest::{Provenance, UnmappedEntries};
 use crate::hl7v2::answer::{Settled, Tally};
+use crate::hl7v2::plain::Lane;
 use crate::hl7v2::stamped::Stamped;
 use ferrohealth_usage_report::window::Window;
 
 /// The face: what one frame's answer is built from.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Face {
     /// The facade whose ingest service the messages enter.
     facade: Arc<Facade>,
@@ -82,6 +84,10 @@ pub struct Face {
     facility_issuer: Option<String>,
     /// The DNS name each sender's client certificate carries.
     subjects: Vec<crate::config::hl7v2::Subject>,
+    /// The plain listener and its device senders, when one is configured.
+    plain: Option<crate::config::hl7v2::Plain>,
+    /// The listener this face answers on.
+    lane: Lane,
     /// The usage report's window each message and acknowledgment is counted
     /// in.
     usage: Arc<Window>,
@@ -180,6 +186,8 @@ impl Face {
             devices: settings.devices.clone(),
             facility_issuer: settings.facility_issuer.clone(),
             subjects: settings.subjects.clone(),
+            plain: settings.plain.clone(),
+            lane: Lane::Tls,
             usage: Arc::new(crate::usage_report::window()),
             access_log: None,
         }
@@ -255,14 +263,9 @@ impl Face {
                             &stamped,
                         );
                     }
-                    if !certified(&self.subjects, inbound.parsed().message(), connection) {
+                    if let Some(settled) = self.unbound(inbound.parsed().message(), connection) {
                         connection.refuse();
-                        return self.acknowledge(
-                            &inbound,
-                            &Settled::Certificate,
-                            &Tally::default(),
-                            &stamped,
-                        );
+                        return self.acknowledge(&inbound, &settled, &Tally::default(), &stamped);
                     }
                     self.settle(&inbound, &stamped, connection.peer()).await
                 }
@@ -508,6 +511,16 @@ impl Handler for Face {
         self.answer(&message, connection).await
     }
 
+    fn admits(&self, peer: SocketAddr) -> bool {
+        match self.lane {
+            Lane::Tls => true,
+            Lane::Plain => self
+                .plain
+                .as_ref()
+                .is_some_and(|plain| plain.admits(peer.ip())),
+        }
+    }
+
     fn malformed(&self, kind: Malformed, partial: &[u8]) -> Option<Vec<u8>> {
         let stamped = Stamped::now();
         let reply = ack::reject_frame(partial, &kind.to_string(), stamped.stamp());
@@ -575,7 +588,8 @@ impl Listener {
     }
 }
 
-/// Serves `face` on an already-bound listener until `shutdown` completes,
+/// Serves `face` on an already-bound listener, over TLS or plain as its
+/// [`Lane`] says, until `shutdown` completes,
 /// then lets every connection finish the message it is answering within the
 /// drain.
 ///
@@ -601,18 +615,29 @@ where
     let inner = Arc::clone(&signalled);
     let flag = listening.clone();
     listening.set(true);
-    let server = listener::serve_tls(
-        socket,
-        listener.tls.acceptor.clone(),
-        face,
-        listener.codec,
-        listener.timeouts,
-        async move {
-            shutdown.await;
-            flag.set(false);
-            inner.notify_one();
-        },
-    );
+    let lane = face.lane();
+    let stopping = async move {
+        shutdown.await;
+        flag.set(false);
+        inner.notify_one();
+    };
+    let server: std::pin::Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>> = match lane {
+        Lane::Tls => Box::pin(listener::serve_tls(
+            socket,
+            listener.tls.acceptor.clone(),
+            face,
+            listener.codec,
+            listener.timeouts,
+            stopping,
+        )),
+        Lane::Plain => Box::pin(listener::serve_with(
+            socket,
+            face,
+            listener.codec,
+            listener.timeouts,
+            stopping,
+        )),
+    };
     let mut server = std::pin::pin!(server);
     let result = tokio::select! {
         result = &mut server => Some(result),
