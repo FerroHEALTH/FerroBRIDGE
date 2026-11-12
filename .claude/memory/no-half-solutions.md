@@ -5,9 +5,6 @@ metadata:
   type: feedback
 ---
 
-<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
-<!-- SPDX-License-Identifier: BUSL-1.1 -->
-
 Build what the issue asks for, the proper way. If the proper design adds a
 field to a public struct or changes a signature, that is a breaking change:
 bump the minor version (0.x to 0.(x+1)), rename the milestone, and write the

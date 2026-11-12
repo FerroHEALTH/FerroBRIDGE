@@ -64,7 +64,7 @@
   `FERROBRIDGE_E2E=1` through the testkit harness; images pinned by digest and
   checked by the versions guard; 2026-09-12
 - [Merge queue and signed commits](merge-queue-signed.md): main merges through the merge queue since 2026-10-17; arm with gh pr merge --auto, never update-branch --rebase
-- [Release tag is mine](release-tag-is-mine.md): the session merges every release PR (auto-merge), pushes every tag after checking the merge commit (FerroEHR preflight since 2026-11-02), and approves every `crates-io` environment; nothing in a cut waits on the owner
+- [Release tag is mine](release-tag-is-mine.md): the session merges every release PR (auto-merge), pushes every tag without a local preflight, and approves every `crates-io` environment; nothing in a cut waits on the owner
 - [Upstream reports carry no milestone](upstream-reports-no-milestone.md): an upstream-report issue is never in a milestone; the in-repo decision it forces is a separate, milestoned issue
 - [Upstream reports stay here](upstream-reports-stay-here.md): the issue is the record; nothing is filed on external trackers and no owner-action issue for filing is created
 - [Dependency sweep to latest](deps-latest-sweep.md): every session compares the workspace pins with crates.io and the sibling's crate list (openehr-sdt split off openehr-its on 2026-09-24); the family lands together by hand; owner 2026-09-24
@@ -96,7 +96,7 @@
 - [No workflows for workers](no-workflows-for-workers.md): start workers with the Agent tool only, since a workflow agent cannot be messaged; owner 2026-11-01
 - [No compatibility shims](no-compat-shims.md): refactors break APIs freely, leave no deprecated/alias/re-export/stub, and run bottom-up; a removal refusal lives ONE release, then is deleted (owner 2026-11-01, 2026-11-09)
 - [Check open PRs proactively](check-open-prs-proactively.md): list every open PR for conflicts and failing checks after each merge and hand-back, fix a red main first, keep a watcher running, and work the issue list autonomously; owner 2026-11-01
-- [Product focus](focus-ferroehr-refactor.md): from 2026-11-02 every product is open; keep every worker slot busy across them (ten since 2026-11-03)
+- [Product focus](focus-ferroehr-refactor.md): from 2026-11-02 every product is open; keep all five worker slots busy across them
 - [FerroEHR has no production installs](ferroehr-no-production-installs.md): as of 2026-11-01 nobody runs FerroEHR in production; skip data-preserving upgrade work for old data unless the owner says otherwise
 - [Ratchet PR without a token](ratchet-pr-no-token.md): close and reopen FerroEHR's daily ratchet PR so CI runs; no PAT secret
 - [Preflight the merge commit before tagging](preflight-merge-commit-before-tag.md): run preflight.sh on the release merge commit before any FerroEHR tag; rc8 and rc9 burnt on 2026-11-02
@@ -109,8 +109,26 @@
 - [Shared-crate blockers](shared-crate-blockers.md): every filed issue gets a milestone (create it if missing); a shared-crate issue that blocks the current release gets its milestone and a worker at once; owner 2026-11-07
 - [EHR crates publish approved](ehr-crates-publish-approved.md): run FerroEHR publish-crates.yml (publish=true) and approve its crates-io gate yourself when an openehr-* fix has a waiting consumer; owner 2026-11-08
 - [No half solutions](no-half-solutions.md): build what the issue asks the proper way; a breaking change moves the minor version, never shape a design to dodge semver; owner 2026-11-08
-- [EHDS above openEHR](ehds-above-openehr.md): never revert EHDS behaviour to pass a conformance row; record a regulatory deviation; owner 2026-11-09
-- [Terminology via the server](terminology-via-server.md): production code translation always through the terminology server; embedded maps are test-only; owner 2026-11-09
-- [Merge queue runs functional gates only](merge-queue-functional-only.md):
-  perf and the browser journeys pass with a note in merge_group and run on
-  the PR and on main; owner 2026-11-09, #1790
+- [EHDS above openEHR](ehds-above-openehr.md) — never revert EHDS behaviour to pass a conformance row; record a regulatory deviation
+- [Terminology via the server](terminology-via-server.md) — production code translation always through the terminology server; embedded maps are test-only
+- [FerroUI paused](ferroui-paused.md): no FerroUI work, PR, merge or
+  release until the owner lifts it; owner 2026-11-10
+- [Cargo SemVer everywhere](cargo-semver-everywhere.md): every crate-publishing
+  repo checks with cargo-semver-checks against the Cargo SemVer chapter;
+  owner 2026-11-10
+- [Orchestrator files cross-repo gaps](orchestrator-files-cross-repo-gaps.md):
+  file every gap a worker finds in another repo without asking; owner 2026-11-10
+- [Publish dispatch approved](publish-dispatch-approved.md): dispatch publish-crates
+  and publish-chart myself when ready; owner 2026-11-10
+- [Best code over SemVer bumps](best-code-over-semver-bumps.md): take the breaking
+  change and its bump, never shape an API to stay a patch; owner 2026-11-10
+- [FerroPULSE private, no public logs](ferropulse-private-no-public-logs.md): L1
+  in-index provenance only, nothing to Rekor; owner 2026-11-10
+- [Focus on the current cut](focus-on-the-current-cut.md): current milestone and its patch line
+  first; no later-milestone merges before a pending tag; owner 2026-11-10
+- [FerroHEALTH umbrella on hold](ferrohealth-umbrella-hold.md): no work there; main
+  products first; owner 2026-11-10
+- [Watcher always on](watcher-always-on.md): restart the PR watcher first after any
+  shell cleanup; it also flags unarmed PRs; owner 2026-11-10
+- [Websites consistency pass](websites-consistency-pass.md) — after FerroPIX #594, one worker aligns every product website
+- [Quick start from the release download](quickstart-from-release-download.md) — one self-contained compose.yaml per product, curled from the latest release; no clone, no bundle

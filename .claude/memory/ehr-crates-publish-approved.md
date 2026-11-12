@@ -5,9 +5,6 @@ metadata:
   type: feedback
 ---
 
-<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
-<!-- SPDX-License-Identifier: BUSL-1.1 -->
-
 The orchestrator may run FerroEHR's `publish-crates.yml` with `publish=true`
 itself, between releases, and approve its `crates-io` environment. Do this
 whenever a fix in an `openehr-*` crate is merged on FerroEHR `main` and a
