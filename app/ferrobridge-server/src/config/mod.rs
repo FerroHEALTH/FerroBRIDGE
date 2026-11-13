@@ -125,6 +125,10 @@ pub struct Config {
     /// Inbound authentication, on unless its section turns it off: the
     /// section `ferrohealth-smart` defines, with `deny_unknown_fields`.
     pub auth: ferrohealth_smart::config::AuthSection,
+    /// The scopes and roles each Basic user of `[[auth.basic.users]]` is
+    /// granted, by user-id: the table `ferrohealth-smart` defines for a
+    /// product to compose into its own tree.
+    pub basic_grants: ferrohealth_smart::config::BasicGrants,
     /// The FHIRconnect operations.
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
@@ -247,15 +251,18 @@ impl Config {
     /// Every `_file` sibling is read here, so a secret reaches the process
     /// once, at boot, and never sits in the configuration tree. A
     /// [`Process::Job`] holds no resource server, so `[auth]` is neither read
-    /// nor required and [`Error::Auth`] is never returned.
+    /// nor required and neither [`Error::Auth`] nor [`Error::BasicGrants`] is
+    /// ever returned.
     ///
     /// # Errors
     /// Returns [`Error::Conflict`] when a value and its `_file` sibling are
     /// both set, [`Error::Secret`] when a `_file` cannot be read, the value
     /// errors ([`Error::Listen`], [`Error::Url`], [`Error::WireVersion`],
     /// [`Error::Missing`], [`Error::Client`]) each naming the key that carries
-    /// the fault, and [`Error::Auth`] and [`Error::Credentials`] naming the rule
-    /// of `ferrohealth-smart` a section breaks. Returns [`Error::Mappings`]
+    /// the fault, [`Error::Auth`] and [`Error::Credentials`] naming the rule
+    /// of `ferrohealth-smart` a section breaks, and [`Error::BasicGrants`]
+    /// when `[basic_grants]` names a user `[[auth.basic.users]]` does not
+    /// list or grants a Basic user a `system/` scope. Returns [`Error::Mappings`]
     /// over [`error::NoTemplateSource`] when the operations
     /// are enabled and `[mappings] directory` is set with neither
     /// `[mappings] templates` nor `[cdr]`, so the refusal comes before any
@@ -301,7 +308,7 @@ impl Config {
                 None
             },
             auth: if serves && self.guards_a_surface() {
-                auth::resolve_auth(&self.auth)?
+                auth::resolve_auth(&self.auth, &self.basic_grants)?
             } else {
                 None
             },

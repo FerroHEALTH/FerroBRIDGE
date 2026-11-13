@@ -137,6 +137,14 @@ pub enum Error {
         #[source]
         source: Box<ferrohealth_smart::config::ConfigError>,
     },
+    /// A `[basic_grants]` table names a user `[[auth.basic.users]]` does
+    /// not list, or grants a scope or a role a Basic user may not hold.
+    #[error("[basic_grants] is refused")]
+    BasicGrants {
+        /// The rule, naming the user.
+        #[source]
+        source: ferrohealth_smart::basic::StoreError,
+    },
     /// A `[<lane>.credentials]` table breaks a rule of `ferrohealth-smart`.
     #[error("[{section}] is refused")]
     Credentials {
