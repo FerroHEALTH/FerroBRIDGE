@@ -65,11 +65,11 @@ async fn app_granting(scope: &str) -> Result<axum::Router, Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let mut settings = issuer.settings();
-    settings.basic = Some(Arc::new(PasswordStore::new().with_user(
-        USER,
-        hash(&PASSWORD)?,
-        scope,
-    )?));
+    settings.basic = Some(Arc::new(
+        PasswordStore::new()
+            .with_user(USER, hash(&PASSWORD)?)?
+            .with_scope(USER, scope)?,
+    ));
     let harness = harness().await;
     Ok(secured(&harness, &authority(settings).await))
 }
@@ -154,7 +154,8 @@ fn a_basic_caller_is_audited_as_a_person_never_a_system() -> Result<(), Box<dyn 
         ("user/Condition.r system/*.read", "system/*.read"),
     ] {
         let error = PasswordStore::new()
-            .with_user(USER, hash(&PASSWORD)?, scopes)
+            .with_user(USER, hash(&PASSWORD)?)?
+            .with_scope(USER, scopes)
             .err()
             .ok_or("a Basic user with a system scope is refused")?;
         assert!(

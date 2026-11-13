@@ -966,12 +966,11 @@ role_claims = []
 
 `[[auth.basic.users]]` tables admit HTTP Basic callers (RFC 7617) beside the
 tokens. A Basic credential is always a person's, never a machine's: each
-table names one person, takes `user`, the Argon2id PHC string of the password
-as `password_hash` or in the file `password_hash_file`, and `scopes`, the
-SMART `user/` scopes and the operator scope the person is granted, which the
-facade checks as it checks a token's. A user listing a `system/` scope
-refuses the start, naming the user and the scope. A user's `roles` list is
-accepted and, as with `role_claims`, grants nothing on the bridge. `[auth.basic]
+table names one person and holds the credential alone, `user` and the
+Argon2id PHC string of the password as `password_hash` or in the file
+`password_hash_file`. A `scopes` or `roles` key in the table is refused as
+unknown: what the person is granted is set in
+[`[basic_grants]`](#basic_grants). `[auth.basic]
 cache_ttl` (default `"5min"`) is how long a password that verified is
 remembered, so a repeat request skips the Argon2id derivation; `"0s"`
 remembers none.
@@ -980,6 +979,8 @@ remembers none.
 [[auth.basic.users]]
 user = "operator"
 password_hash_file = "/run/secrets/operator.phc"
+
+[basic_grants.operator]
 scopes = ["__ferrobridge.operator"]
 ```
 
@@ -1046,6 +1047,27 @@ since `issuer` is a list of tables. The section's own keys read from the environ
 Apart from the Basic users' hashes and the introspection credential the
 section holds no secret: the resource server checks signatures with the
 issuer's public keys.
+
+### `[basic_grants]`
+
+What each Basic user of `[[auth.basic.users]]` is granted, one table per
+user named by its user-id, `[basic_grants.<user-id>]`. The facade and the
+operator API check the scopes as they check a token's. A user with no table
+is granted nothing.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `scopes` | `[]` | The SMART `user/` scopes and the operator scope the user is granted. A `system/` scope refuses the start, naming the user and the scope: a Basic credential is a person's |
+| `roles` | `[]` | The roles the user is granted, one word each. As with `role_claims`, a role grants nothing on the bridge |
+
+A table naming a user `[[auth.basic.users]]` does not list refuses the start,
+naming the user, so a misspelt user-id never grants anything. The section
+holds no secret.
+
+```toml
+[basic_grants.clinician]
+scopes = ["user/Condition.rs", "user/Observation.rs"]
+```
 
 ### `[hl7v2]`
 
@@ -1316,6 +1338,8 @@ are refused:
   does not define that is no full URI, a `scopes_supported` value that is
   not one scope token, and a `product_scope` outside the two SMART
   extension forms;
+- a `[basic_grants]` table naming a user `[[auth.basic.users]]` does not
+  list, or granting a `system/` scope;
 - a `[cdm] url` that names no `sslmode`, or one that falls back to plaintext
   or is not a libpq mode, a `[cdm]` CA that holds no PEM certificate, and a
   `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` in the environment;

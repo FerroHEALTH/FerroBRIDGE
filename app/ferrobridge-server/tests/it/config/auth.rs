@@ -3,23 +3,30 @@
 
 //! The `[auth]` section `ferrohealth-smart` defines and the operator scope:
 //! the resource server's issuers with their kinds and profiles, audiences and
-//! algorithms, the Basic users, each a person, and every refusal of them,
+//! algorithms, the Basic users, each a person, with the scopes and roles
+//! `[basic_grants]` grants them, and every refusal of them,
 //! the shapes the section no longer takes included.
 
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+use argon2::Argon2;
+use argon2::password_hash::PasswordHasher;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrobridge_server::smart::OPERATOR_SCOPE;
 use ferrobridge_server::smart::SmartSettings;
+use ferrohealth_smart::basic::Credential;
 use ferrohealth_smart::basic::StoreError;
 use ferrohealth_smart::config::ConfigError;
 use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_smart::metadata::DiscoveryError;
 use ferrohealth_smart::resource::ResourceError;
 use jsonwebtoken::Algorithm;
+use secrecy::SecretString;
+
+use crate::support::random_secret;
 
 /// A surface `[auth]` guards: the FHIRconnect operations over a mapping set.
 const GUARDED: &str =
@@ -423,7 +430,7 @@ fn a_basic_user_needs_exactly_one_hash_form() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-fn a_basic_user_holding_a_system_scope_is_refused_naming_the_user()
+fn a_basic_grant_of_a_system_scope_is_refused_naming_the_user()
 -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: RFC 6749 §4.4, a machine authenticates with the client credentials
     // grant, and every Basic credential is a person's, never a system's.
@@ -432,14 +439,14 @@ fn a_basic_user_holding_a_system_scope_is_refused_naming_the_user()
         ("[\"user/Condition.r\", \"system/*.read\"]", "system/*.read"),
     ] {
         let error = refusal(&format!(
-            "{MINIMAL}[[auth.basic.users]]\nuser = \"etl\"\npassword_hash = \"{PHC}\"\nscopes = {scopes}\n"
+            "{MINIMAL}[[auth.basic.users]]\nuser = \"etl\"\npassword_hash = \"{PHC}\"\n\n[basic_grants.etl]\nscopes = {scopes}\n"
         ))?;
         assert!(
             matches!(
-                rule(&error),
-                Some(ConfigError::Basic {
+                &error,
+                Error::BasicGrants {
                     source: StoreError::SystemScope { username, scope },
-                }) if username == "etl" && scope == refused
+                } if username == "etl" && scope == refused
             ),
             "{scopes}: {error:?}"
         );
@@ -448,6 +455,45 @@ fn a_basic_user_holding_a_system_scope_is_refused_naming_the_user()
             chain.contains("\"etl\"") && chain.contains(&format!("\"{refused}\"")),
             "the refusal names the user and the scope: {chain}"
         );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_basic_grant_naming_an_unlisted_user_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    // NOTE: no specification governs this: our own design; a grant names a
+    // user `[[auth.basic.users]]` lists, so a misspelt user-id never grants.
+    for users in [
+        format!("[[auth.basic.users]]\nuser = \"operator\"\npassword_hash = \"{PHC}\"\n\n"),
+        String::new(),
+    ] {
+        let error = refusal(&format!(
+            "{MINIMAL}{users}[basic_grants.operater]\nscopes = [\"__ferrobridge.operator\"]\n"
+        ))?;
+        assert!(
+            matches!(
+                &error,
+                Error::BasicGrants {
+                    source: StoreError::UnknownUser { username },
+                } if username == "operater"
+            ),
+            "{users}: {error:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_basic_users_scopes_or_roles_key_is_refused_as_unknown()
+-> Result<(), Box<dyn std::error::Error>> {
+    for line in [
+        "scopes = [\"user/Condition.r\"]\n",
+        "roles = [\"auditor\"]\n",
+    ] {
+        let error = refusal(&format!(
+            "{MINIMAL}[[auth.basic.users]]\nuser = \"operator\"\npassword_hash = \"{PHC}\"\n{line}"
+        ))?;
+        assert!(matches!(error, Error::Parse { .. }), "{line}: {error:?}");
     }
     Ok(())
 }
@@ -465,18 +511,35 @@ fn chain(error: &Error) -> String {
 }
 
 #[test]
-fn a_basic_person_with_user_and_operator_scopes_is_admitted()
+fn a_basic_person_is_granted_the_scopes_and_roles_of_basic_grants()
 -> Result<(), Box<dyn std::error::Error>> {
+    let password = random_secret();
+    let hash = Argon2::default()
+        .hash_password_with_salt(password.as_bytes(), b"synthetic-salt-16")
+        .map_err(|error| error.to_string())?
+        .to_string();
     let auth = settings(&format!(
         concat!(
             "{}",
-            "[[auth.basic.users]]\nuser = \"operator\"\npassword_hash = \"{}\"\n",
+            "[[auth.basic.users]]\nuser = \"operator\"\npassword_hash = \"{}\"\n\n",
+            "[[auth.basic.users]]\nuser = \"clinician\"\npassword_hash = \"{}\"\n\n",
+            "[basic_grants.operator]\n",
             "scopes = [\"user/Condition.r\", \"__ferrobridge.operator\"]\n",
+            "roles = [\"auditor\"]\n",
         ),
-        MINIMAL, PHC
+        MINIMAL, hash, hash
     ))?
     .ok_or("auth is on")?;
-    assert!(auth.basic.is_some(), "the Basic user is read");
+    let store = auth.basic.ok_or("the Basic users are read")?;
+    let header = |user: &str| {
+        Credential::new(user, SecretString::from(password.clone())).map(|c| c.header_value())
+    };
+    let operator = store.verify(&header("operator")?)?;
+    assert_eq!("user/Condition.r __ferrobridge.operator", operator.scope);
+    assert_eq!(vec![String::from("auditor")], operator.roles);
+    let clinician = store.verify(&header("clinician")?)?;
+    assert_eq!("", clinician.scope, "a user with no grant holds no scope");
+    assert!(clinician.roles.is_empty(), "{:?}", clinician.roles);
     Ok(())
 }
 

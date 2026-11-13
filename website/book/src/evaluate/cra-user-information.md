@@ -247,8 +247,8 @@ lifetime of the product with digital elements to ensure its secure use;"
 data;"
 
 - **Configuration.** `[auth] enabled = false` removes the credential check
-  from the facade and the operations. Adding a user to `[[auth.basic.users]]`
-  or a subject to `scopeless_subjects` grants access to patient data.
+  from the facade and the operations. Granting a user of `[[auth.basic.users]]` scopes in `[basic_grants]`
+  or adding a subject to `scopeless_subjects` grants access to patient data.
   `[operator] mapping_dir` lets an operator-scope token change the mappings.
   `[hl7v2] enabled` opens an MLLP listener that writes into the CDR. A name in
   `[telemetry] logged_query_parameters` lets that parameter's value reach the
