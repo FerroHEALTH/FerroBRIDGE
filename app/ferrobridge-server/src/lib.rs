@@ -22,6 +22,7 @@ pub mod change_feed;
 pub mod check;
 pub mod cli;
 pub mod config;
+pub mod consent;
 pub mod credentials;
 pub mod etl;
 pub mod events;

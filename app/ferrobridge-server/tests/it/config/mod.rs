@@ -7,6 +7,7 @@
 mod audit;
 mod auth;
 mod change_feed;
+mod consent;
 mod environment;
 mod etl;
 mod events;

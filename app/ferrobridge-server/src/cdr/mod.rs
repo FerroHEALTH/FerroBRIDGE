@@ -21,6 +21,7 @@ pub mod config;
 mod contribution;
 pub mod demographic;
 mod ehr;
+pub mod ehr_access;
 pub mod error;
 pub mod ids;
 pub mod onward;

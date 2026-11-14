@@ -786,6 +786,34 @@ Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
 A base that is no `http` or `https` URL, or that carries a query or a
 fragment, is a boot error naming `facade.references.fetch_bases`.
 
+### `[facade.consent]`
+
+The exchange of a patient's access directives as FHIR `Consent`, IHE BPPC and
+IHE APPC (the Integrate page, [Consent and access directives](../integrate/fhir-facade.md#consent-and-access-directives)).
+Off, `Consent` is no resource type of the facade and the `CapabilityStatement`
+lists none. On, the facade reads and writes the `EHR_ACCESS` of the patient's
+EHR on the CDR, through the CDR's `EHR_ACCESS` read and a CONTRIBUTION, always
+under the token the onward lane exchanges for the facade's caller, so the CDR
+decides for the patient or the gate-keeper who asked. An enabled exchange
+needs `[cdr.endpoint.credentials.onward]` or a `[[cdr.onward]]` table, and the
+bridge refuses to start without one (`facade.consent.enabled` needs
+`cdr.endpoint.credentials.onward`): it never reads or writes a patient's
+directives under its own credential. Only the controller's `ACCESS_POLICY`,
+which the CDR serves to its administrators, is read under the bridge's own
+token.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Consent`, `Consent/$bppc` and `Consent/$appc` are served |
+| `extensions_url` | none, required | The root the CDR serves its extensions under, `https://<cdr>/ferroehr/rest/extensions/v1` on FerroEHR: the `EHR_ACCESS` read is `GET /ehr/{ehr_id}/ehr_access` and the controller's `ACCESS_POLICY` `GET /admin/access_policy` under it |
+| `default_access` | none, required | The `default_access` of the first `ACCESS_DIRECTIVE_SETTINGS` the exchange writes into an EHR whose `EHR_ACCESS` carries none: `open`, `restricted` or `consent_required` |
+
+Each key is settable as `FERROBRIDGE__FACADE__CONSENT__<KEY>`. The access
+default has no default value, because it decides who reaches an EHR the
+exchange writes first; an enabled exchange without it, or with another value,
+is a boot error naming `facade.consent.default_access`. This is FerroBRIDGE's
+own design.
+
 ### `[facade.identifier_search]`
 
 The chained search through a patient's identifier:

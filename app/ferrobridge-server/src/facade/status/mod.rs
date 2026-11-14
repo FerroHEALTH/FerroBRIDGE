@@ -31,6 +31,7 @@
 //! The Demographic API rows, ITS-REST 1.1.0 DEVELOPMENT, are [`demographic`].
 
 mod client;
+pub mod consent;
 pub mod demographic;
 pub mod onward;
 

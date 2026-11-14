@@ -237,6 +237,12 @@ classify() {
     scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh | scripts/vendor/ckm-highmed.sh)
       echo "packages ferrobridge-testkit fhirconnect"
       ;;
+    # The corpora only the server's access directive exchange reads, and the
+    # script that writes them.
+    docs/specs/fhir-consent-r4/* | docs/specs/fhir-consent-r5/* | docs/specs/ihe-consents/* | docs/specs/xacml/*)
+      echo "packages ferrobridge-server"
+      ;;
+    scripts/vendor/consent.sh) echo "packages ferrobridge-server" ;;
     # The corpora only the eehrxf tests read, and the script that writes them.
     docs/specs/eu-xtehr-models/* | docs/specs/eu-hl7-*/* | docs/specs/fhir-r4/*) echo "only eehrxf" ;;
     docs/specs/ehdsi-mvc/* | docs/specs/fr-ans/*) echo "only eehrxf" ;;
@@ -610,6 +616,8 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the toolchain reaches everything" "rust-toolchain.toml" false ALL
   check "the pin matrix reaches every member testing with the testkit" "docs/VERSIONS.md" false \
     "+ferrobridge-testkit +fhirconnect +omocl +omop-cdm +ferrobridge-server -fhir-codegen"
+  check "the consent corpora reach the server" "docs/specs/xacml/PROVENANCE.md" false \
+    "+ferrobridge-server -fhirconnect -eehrxf"
   check "a vendored corpus reaches everything" "docs/specs/omocl/x.yml" false ALL
   check "a vendor script reaches everything" "scripts/vendor/v2ig.sh" false ALL
   check "an unknown root file reaches everything" "something-new.toml" false ALL
