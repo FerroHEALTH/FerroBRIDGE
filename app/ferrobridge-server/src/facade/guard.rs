@@ -158,7 +158,7 @@ impl Interaction {
 /// [`Interaction::Unclassified`], which a guarded deployment refuses, so a
 /// route mounted without a classification fails closed (no specification
 /// governs the table: our own design).
-pub const CLASSIFIED: [(Method, &str, Interaction); 18] = [
+pub const CLASSIFIED: [(Method, &str, Interaction); 22] = [
     (Method::GET, "/metadata", Interaction::Capabilities),
     (Method::GET, SMART_CONFIGURATION, Interaction::Discovery),
     (Method::POST, "", Interaction::Transaction),
@@ -184,6 +184,10 @@ pub const CLASSIFIED: [(Method, &str, Interaction); 18] = [
         "/{resource_type}/{id}/$document",
         Interaction::Document,
     ),
+    (Method::POST, "/{resource_type}/$bppc", Interaction::Create),
+    (Method::GET, "/{resource_type}/$bppc", Interaction::Search),
+    (Method::POST, "/{resource_type}/$appc", Interaction::Create),
+    (Method::GET, "/{resource_type}/$appc", Interaction::Search),
     (Method::GET, "/{resource_type}/{id}", Interaction::Read),
     (Method::PUT, "/{resource_type}/{id}", Interaction::Update),
     (Method::DELETE, "/{resource_type}/{id}", Interaction::Delete),

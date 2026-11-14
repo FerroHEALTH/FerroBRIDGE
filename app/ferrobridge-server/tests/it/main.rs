@@ -21,6 +21,7 @@ mod cdr;
 mod change_feed;
 mod commands;
 mod config;
+mod consent;
 mod console;
 mod etl;
 mod events;

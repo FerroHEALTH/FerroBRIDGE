@@ -61,6 +61,9 @@ pub struct Facade {
     /// to; a party carrying one is provisioned through SCIM and the facade
     /// refuses to write it. Empty refuses none.
     pub binding_identifier_issuers: Vec<String>,
+    /// The exchange of access directives as FHIR `Consent`, IHE BPPC and
+    /// IHE APPC.
+    pub consent: FacadeConsent,
 }
 
 impl Default for Facade {
@@ -83,6 +86,7 @@ impl Default for Facade {
             identifier_search: FacadeIdentifierSearch::default(),
             party_search: FacadePartySearch::default(),
             binding_identifier_issuers: Vec::new(),
+            consent: FacadeConsent::default(),
         }
     }
 }
@@ -179,4 +183,24 @@ impl Default for FacadeIdentifierSearch {
             system_query: String::new(),
         }
     }
+}
+
+/// The exchange of a patient's access directives as FHIR `Consent`, IHE BPPC
+/// and IHE APPC, through the CDR's `EHR_ACCESS`.
+///
+/// Off, `Consent` is no resource type of the facade. The access default has
+/// no default: it decides who reaches an EHR whose `EHR_ACCESS` the
+/// exchange writes first, so the deployment states it (no specification
+/// governs this: our own design).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeConsent {
+    /// Whether `Consent` is served.
+    pub enabled: bool,
+    /// The root the CDR serves its administrative extension under, where the
+    /// controller's `ACCESS_POLICY` is read; empty reads no catalogue.
+    pub admin_url: String,
+    /// The `default_access` of the first settings the exchange writes:
+    /// `open`, `restricted` or `consent_required`.
+    pub default_access: String,
 }

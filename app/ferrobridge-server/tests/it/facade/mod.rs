@@ -14,6 +14,7 @@ pub(crate) mod batch;
 mod bound;
 mod capability;
 mod conditional;
+mod consent;
 mod created;
 mod credentials;
 mod demographic;

@@ -89,6 +89,13 @@ impl Translator {
         self
     }
 
+    /// Returns the client of the `[terminology]` server, `None` when none is
+    /// configured.
+    #[must_use]
+    pub const fn client(&self) -> Option<&Client> {
+        self.client.as_ref()
+    }
+
     /// Returns whether a terminology server is configured.
     #[must_use]
     pub const fn is_configured(&self) -> bool {

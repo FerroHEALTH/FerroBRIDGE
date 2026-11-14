@@ -95,6 +95,14 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
+    /// The access default names none of the three values.
+    #[error("{key} is `{value}`; the access defaults are open, restricted and consent_required")]
+    AccessDefault {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+    },
     /// The identity store could not be opened at boot.
     #[error("the identity store at {} could not be opened", path.display())]
     IdentityStore {

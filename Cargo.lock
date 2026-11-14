@@ -1815,6 +1815,7 @@ dependencies = [
  "openehr-rm",
  "openehr-sdt",
  "openehr-term",
+ "quick-xml",
  "rcgen",
  "redb",
  "reqwest",

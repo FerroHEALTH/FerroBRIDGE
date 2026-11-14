@@ -21,6 +21,7 @@ pub mod audit;
 pub mod capability;
 pub mod commit;
 pub mod compartment;
+pub mod consent;
 pub mod document;
 pub mod edge;
 pub mod ehr;
@@ -151,6 +152,8 @@ pub struct Facade {
     /// The demographics endpoint every run resolves a party reference
     /// through: the ids of this FHIR server.
     demographics: Arc<dyn Demographics>,
+    /// The access directive exchange, when `Consent` is served.
+    consent: Option<crate::consent::exchange::Settings>,
 }
 
 /// Returns the demographics endpoint of a facade at `settings.base_url`: the
@@ -191,7 +194,22 @@ impl Facade {
             translator: Translator::default(),
             references: references::Policy::default(),
             usage: Arc::new(crate::usage_report::window()),
+            consent: None,
         }
+    }
+
+    /// Returns this facade serving `Consent` over the CDR's `EHR_ACCESS`
+    /// under `consent`, `None` serving no `Consent`.
+    #[must_use]
+    pub fn with_consent(mut self, consent: Option<crate::consent::exchange::Settings>) -> Self {
+        self.consent = consent;
+        self
+    }
+
+    /// Returns the access directive exchange, when `Consent` is served.
+    #[must_use]
+    pub const fn consent(&self) -> Option<&crate::consent::exchange::Settings> {
+        self.consent.as_ref()
     }
 
     /// Returns this facade counting every unit its programs refuse to map,
@@ -501,6 +519,14 @@ pub fn routes(
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/$document"),
             get(handlers::document_type_route),
+        )
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/$bppc"),
+            post(handlers::exchange_import_route).get(handlers::exchange_export_route),
+        )
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/$appc"),
+            post(handlers::exchange_import_route).get(handlers::exchange_export_route),
         )
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/$document"),

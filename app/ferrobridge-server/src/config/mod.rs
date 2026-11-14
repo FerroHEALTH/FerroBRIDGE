@@ -387,6 +387,8 @@ pub struct FacadeSettings {
     /// The issuers of the binding keys a party the facade never writes
     /// carries.
     pub binding_issuers: Vec<String>,
+    /// The access directive exchange, when `Consent` is served.
+    pub consent: Option<crate::consent::exchange::Settings>,
 }
 
 /// The HL7 v2 face, resolved.

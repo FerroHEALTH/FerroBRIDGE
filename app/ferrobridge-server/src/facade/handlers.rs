@@ -46,6 +46,7 @@ use http::Uri;
 use crate::facade::Facade;
 use crate::facade::capability;
 use crate::facade::compartment;
+use crate::facade::consent;
 use crate::facade::guard::OperatorScope;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -78,6 +79,11 @@ pub async fn create_route(
     uri: Uri,
     body: Bytes,
 ) -> Response {
+    if resource_type == consent::CONSENT {
+        return consent::fhir::create(&facade, &access, &headers, &body)
+            .await
+            .unwrap_or_else(Refusal::into_response);
+    }
     if let Some(loaded) = facade.programs().party(&resource_type) {
         return crate::facade::party::write::create(
             &facade,
@@ -104,6 +110,11 @@ pub async fn search_route(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
+    if resource_type == consent::CONSENT {
+        return consent::fhir::search(&facade, &access, &headers, &uri)
+            .await
+            .unwrap_or_else(Refusal::into_response);
+    }
     search::search_get(&facade, &access, &resource_type, &headers, &uri)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -132,6 +143,11 @@ pub async fn read_route(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
+    if resource_type == consent::CONSENT {
+        return consent::fhir::read(&facade, &access, &id, &headers)
+            .await
+            .unwrap_or_else(Refusal::into_response);
+    }
     read(&facade, &access, (&resource_type, &id), &headers, &uri)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -518,6 +534,53 @@ fn admit_existing(
     compartment::admit_ehr(facade, access, permission, resource_type, &ehr)
 }
 
+/// Returns the IHE operation `uri` ends in on `resource_type`, or the
+/// `404` of any other type.
+fn exchange_profile(resource_type: &str, uri: &Uri) -> Result<consent::ihe::Profile, Refusal> {
+    let operation = uri.path().rsplit('/').next().unwrap_or_default();
+    match consent::ihe::Profile::of(operation) {
+        Some(profile) if resource_type == consent::CONSENT => Ok(profile),
+        _ => Err(reply::refusal(
+            StatusCode::NOT_FOUND,
+            Issue::error(IssueType::NotSupported)
+                .diagnosing(format!("{resource_type} defines no operation {operation}")),
+        )),
+    }
+}
+
+/// `POST [base]/Consent/$bppc` and `POST [base]/Consent/$appc`: imports one
+/// IHE document ([`consent::ihe`]).
+pub async fn exchange_import_route(
+    State(facade): State<Arc<Facade>>,
+    access: Access,
+    Path(resource_type): Path<String>,
+    headers: HeaderMap,
+    uri: Uri,
+    body: Bytes,
+) -> Response {
+    let imported = match exchange_profile(&resource_type, &uri) {
+        Ok(profile) => consent::ihe::import(&facade, &access, profile, &headers, &uri, &body).await,
+        Err(refusal) => Err(refusal),
+    };
+    imported.unwrap_or_else(Refusal::into_response)
+}
+
+/// `GET [base]/Consent/$bppc` and `GET [base]/Consent/$appc`: exports the
+/// patient's directives as IHE documents ([`consent::ihe`]).
+pub async fn exchange_export_route(
+    State(facade): State<Arc<Facade>>,
+    access: Access,
+    Path(resource_type): Path<String>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    let exported = match exchange_profile(&resource_type, &uri) {
+        Ok(profile) => consent::ihe::export(&facade, &access, profile, &headers, &uri).await,
+        Err(refusal) => Err(refusal),
+    };
+    exported.unwrap_or_else(Refusal::into_response)
+}
+
 /// Answers the `CapabilityStatement`.
 fn metadata(
     facade: &Facade,
@@ -539,6 +602,15 @@ fn metadata(
         },
         facade.party_search(),
     );
+    let mut statement = statement;
+    if facade.consent().is_some()
+        && let Some(rest) = statement.rest.first_mut()
+    {
+        let at = rest
+            .resource
+            .partition_point(|entry| entry.r#type.value.as_deref() < Some(consent::CONSENT));
+        rest.resource.insert(at, consent::capability());
+    }
     let encoded = statement.to_json().map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
