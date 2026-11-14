@@ -8,13 +8,11 @@
 //! provision `type` and `class`; the actor's `role` and `reference` are both
 //! required (`consent-definitions.html`, `Consent.provision.actor`).
 
-use fhir_types::codec::{Json as _, Object, Path};
-use fhir_types::r4::consent::{
-    Consent, ConsentPolicy, ConsentProvisionActor, ConsentSource, ConsentVerification,
-};
+use fhir_types::codec::Object;
+use fhir_types::r4::consent::{ConsentPolicy, ConsentSource};
 
 use crate::consent::Format;
-use crate::consent::fhir::model::{Actor, Document, line};
+use crate::consent::fhir::model::{Document, line};
 
 super::codec::release_codec!(r4, Format::FhirR4);
 
@@ -27,23 +25,7 @@ const FORMAT: Format = Format::FhirR4;
 /// [`Refused`] for a body that is no R4 `Consent`, an element with no field in
 /// [`Document`], or one a reader must not ignore.
 pub(super) fn read(object: &Object) -> Result<Document, Refused> {
-    let consent = Consent::from_json(object, &mut Path::root("Consent"))
-        .map_err(|error| Refused::new(FORMAT, "Consent", Loss::Malformed(error.to_string())))?;
-    unmodified(&consent.modifier_extension, "Consent")?;
-    if consent.implicit_rules.is_some() {
-        return Err(Refused::new(
-            FORMAT,
-            "Consent.implicitRules",
-            Loss::NoDirectiveForm,
-        ));
-    }
-    if !consent.contained.is_empty() {
-        return Err(Refused::new(
-            FORMAT,
-            "Consent.contained",
-            Loss::NoDirectiveForm,
-        ));
-    }
+    let consent = consent_in(object)?;
     let mut kept = Vec::new();
     let mut evidence = Vec::new();
     match &consent.source {
@@ -98,12 +80,7 @@ pub(super) fn write(document: &Document) -> Result<Object, Refused> {
         ));
     }
     let consent = Consent {
-        status: primitives::Code {
-            value: Some(document.status.clone()),
-            ..Default::default()
-        },
         scope: document.scope.as_ref().map(concept_out).unwrap_or_default(),
-        category: document.categories.iter().map(concept_out).collect(),
         patient: document.subject.as_ref().map(ref_out),
         date_time: prim!(DateTime, document.stated.clone()),
         performer: document.instructed_by.iter().map(ref_out).collect(),
@@ -112,33 +89,23 @@ pub(super) fn write(document: &Document) -> Result<Object, Refused> {
             .evidence
             .first()
             .map(|evidence| ConsentSource::Reference(Box::new(ref_out(evidence)))),
-        identifier: document.identifiers.iter().map(ident_out).collect(),
         policy_rule: document.policy_rule.as_ref().map(concept_out),
         provision: document.rules.first().map(rule_out),
-        extension: document.extensions.iter().map(ext_out).collect(),
         ..Default::default()
     };
-    consent
-        .to_json()
-        .map_err(|error| Refused::new(FORMAT, "Consent", Loss::Malformed(error.to_string())))
+    consent_out(consent, document)
 }
 
-fn actor_in(actor: &ConsentProvisionActor, element: &str) -> Result<Actor, Refused> {
-    unmodified(&actor.modifier_extension, element)?;
-    Ok(Actor {
-        role: Some(concept_in(&actor.role)),
-        reference: Some(ref_in(&actor.reference)),
-        extensions: actor.extension.iter().map(ext_in).collect(),
-    })
+fn actor_parts_in(actor: &ConsentProvisionActor) -> (Option<Concept>, Option<Ref>) {
+    (
+        Some(concept_in(&actor.role)),
+        Some(ref_in(&actor.reference)),
+    )
 }
 
-fn actor_out(actor: &Actor) -> ConsentProvisionActor {
-    ConsentProvisionActor {
-        role: actor.role.as_ref().map(concept_out).unwrap_or_default(),
-        reference: actor.reference.as_ref().map(ref_out).unwrap_or_default(),
-        extension: actor.extensions.iter().map(ext_out).collect(),
-        ..Default::default()
-    }
+fn actor_parts_out(actor: &Actor, written: &mut ConsentProvisionActor) {
+    written.role = actor.role.as_ref().map(concept_out).unwrap_or_default();
+    written.reference = actor.reference.as_ref().map(ref_out).unwrap_or_default();
 }
 
 fn rule_extra_in(provision: &ConsentProvision, rule: &mut Rule) {
@@ -157,15 +124,12 @@ fn policy_kept(policy: &ConsentPolicy) -> Result<(String, String), Refused> {
     Ok(("Consent.policy".to_owned(), rendering))
 }
 
-fn verification_kept(verification: &ConsentVerification) -> Result<(String, String), Refused> {
-    unmodified(&verification.modifier_extension, "Consent.verification")?;
-    let rendering = line([
-        verification.verified.value.map(|v| format!("verified {v}")),
+fn verification_parts(verification: &ConsentVerification) -> Vec<Option<String>> {
+    vec![
         verification
             .verified_with
             .as_ref()
             .map(|r| ref_in(r).render()),
         text!(verification.verification_date),
-    ]);
-    Ok(("Consent.verification".to_owned(), rendering))
+    ]
 }

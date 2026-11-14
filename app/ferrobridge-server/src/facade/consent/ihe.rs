@@ -35,11 +35,16 @@ use crate::consent::Refused;
 use crate::consent::exchange;
 use crate::facade::Facade;
 use crate::facade::consent::CONSENT;
+use crate::facade::consent::Committed;
 use crate::facade::consent::PATIENT;
+use crate::facade::consent::State;
 use crate::facade::consent::Subject;
+use crate::facade::consent::admit;
+use crate::facade::consent::commit;
 use crate::facade::consent::logical_id;
-use crate::facade::consent::settings;
+use crate::facade::consent::state;
 use crate::facade::consent::subject;
+use crate::facade::handlers::Body;
 use crate::facade::handlers::write::refuse;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -47,7 +52,6 @@ use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::status::consent::of_document_refusal;
-use crate::facade::status::consent::of_exchange_error;
 use crate::facade::status::consent::of_unstatable;
 
 /// The name of the BPPC operation.
@@ -130,7 +134,7 @@ pub async fn import(
     uri: &Uri,
     body: &Bytes,
 ) -> Result<axum::response::Response, Refusal> {
-    let settings = settings(facade)?;
+    let settings = crate::facade::consent::settings(facade)?;
     let xml = headers
         .get(http::header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
@@ -157,12 +161,7 @@ pub async fn import(
     let patient = one(&pairs, PATIENT)?;
     let client = facade.client_for(headers, access).await?;
     let reached = subject(facade, &client, access, Permission::Create, Some(patient)).await?;
-    let current = exchange::current(&client, &reached.ehr)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let policy = exchange::policy(&client, settings)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
     let catalogue = exchange::catalogue(policy.as_ref());
     let directives = match profile {
         Profile::Bppc => crate::consent::bppc::import(
@@ -177,22 +176,12 @@ pub async fn import(
         }
     }
     .map_err(|why| refuse(&of_document_refusal(&why)))?;
-    let committer =
-        crate::facade::commit::Committer::of(access, &client, &facade.settings().system_id);
-    let (_contribution, added) = exchange::append(
-        &client,
-        &reached.ehr,
-        &current,
-        directives,
-        settings,
-        &committer,
-        &facade.settings().system_id,
+    let Committed { added: _, ids } = commit(
+        facade, &client, access, &reached, &current, directives, settings,
     )
-    .await
-    .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let ids = added
-        .iter()
-        .filter_map(|directive| logical_id(&reached.ehr, exchange::key(directive)))
+    .await?;
+    let ids = ids
+        .into_iter()
         .map(|id| format!("{CONSENT}/{id}"))
         .collect::<Vec<_>>();
     Ok(reply::issues(
@@ -221,18 +210,12 @@ pub async fn export(
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    let settings = settings(facade)?;
-    crate::facade::handlers::guard(headers, uri, crate::facade::handlers::Body::Absent)?;
+    let settings = admit(facade, headers, uri, Body::Absent)?;
     let pairs = parameters(uri, &[PATIENT])?;
     let patient = one(&pairs, PATIENT)?;
     let client = facade.client_for(headers, access).await?;
     let reached = subject(facade, &client, access, Permission::Search, Some(patient)).await?;
-    let current = exchange::current(&client, &reached.ehr)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let policy = exchange::policy(&client, settings)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
     let directives = current.directives();
     let (documents, refused) = match profile {
         Profile::Bppc => bppc(&reached, directives, policy.as_ref()),

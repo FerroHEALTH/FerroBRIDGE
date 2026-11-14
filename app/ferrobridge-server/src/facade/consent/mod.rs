@@ -26,10 +26,12 @@ use fhir_types::r4::capability_statement::CapabilityStatementRestResourceOperati
 use fhir_types::r4::capability_statement::CapabilityStatementRestResourceSearchParam;
 use http::HeaderMap;
 use http::StatusCode;
+use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
 use openehr_rm::draft::access_control::access_control::access_policy::AccessPolicy;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
+use crate::consent::exchange::Current;
 use crate::consent::exchange::Settings;
 use crate::consent::fhir::Release;
 use crate::consent::fhir::export::ExportContext;
@@ -37,11 +39,13 @@ use crate::consent::fhir::model::Ref;
 use crate::facade::Facade;
 use crate::facade::compartment;
 use crate::facade::ehr;
+use crate::facade::handlers::write::refuse;
 use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
+use crate::facade::status::consent::of_exchange_error;
 
 /// The resource type this module serves.
 pub const CONSENT: &str = "Consent";
@@ -163,6 +167,90 @@ pub fn answer(
         );
     }
     response
+}
+
+/// Returns the exchange settings of a request the media guard of the facade
+/// admits.
+///
+/// # Errors
+/// Returns the `404` of a facade that serves no `Consent`, and the refusals
+/// of the media types and the page size.
+pub(crate) fn admit<'f>(
+    facade: &'f Facade,
+    headers: &HeaderMap,
+    uri: &http::Uri,
+    body: crate::facade::handlers::Body,
+) -> Result<&'f Settings, Refusal> {
+    let settings = settings(facade)?;
+    crate::facade::handlers::guard(headers, uri, body)?;
+    Ok(settings)
+}
+
+/// What the CDR holds for one EHR: its `EHR_ACCESS` and the controller's
+/// `ACCESS_POLICY`.
+#[derive(Debug, Clone)]
+pub struct State {
+    /// The current `EHR_ACCESS`.
+    pub current: Current,
+    /// The policy in force, `None` when none is read.
+    pub policy: Option<AccessPolicy>,
+}
+
+/// Reads the [`State`] of `ehr`.
+///
+/// # Errors
+/// Returns every exchange failure through `facade::status::consent`.
+pub async fn state(client: &CdrClient, ehr: &EhrId, settings: &Settings) -> Result<State, Refusal> {
+    let current = crate::consent::exchange::current(client, ehr)
+        .await
+        .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    let policy = crate::consent::exchange::policy(client, settings)
+        .await
+        .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    Ok(State { current, policy })
+}
+
+/// The directives one import committed, with their `Consent` ids.
+#[derive(Debug, Clone)]
+pub struct Committed {
+    /// The directives as committed.
+    pub added: Vec<AccessDirective>,
+    /// Their logical ids, in the same order.
+    pub ids: Vec<String>,
+}
+
+/// Commits `directives` into the EHR `reached` names, appended to the ones
+/// of `current`, under the caller of `access`.
+///
+/// # Errors
+/// Returns every exchange failure through `facade::status::consent`.
+pub async fn commit(
+    facade: &Facade,
+    client: &CdrClient,
+    access: &Access,
+    reached: &Subject,
+    current: &Current,
+    directives: Vec<AccessDirective>,
+    settings: &Settings,
+) -> Result<Committed, Refusal> {
+    let system_id = &facade.settings().system_id;
+    let committer = crate::facade::commit::Committer::of(access, client, system_id);
+    let (_contribution, added) = crate::consent::exchange::append(
+        client,
+        &reached.ehr,
+        current,
+        directives,
+        settings,
+        &committer,
+        system_id,
+    )
+    .await
+    .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    let ids = added
+        .iter()
+        .filter_map(|directive| logical_id(&reached.ehr, crate::consent::exchange::key(directive)))
+        .collect();
+    Ok(Committed { added, ids })
 }
 
 /// The EHR a request reaches and the person it was resolved from.

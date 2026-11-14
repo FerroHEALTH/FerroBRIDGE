@@ -6,7 +6,7 @@
 //!
 //! ITS-REST 1.1.0 publishes no `EHR_ACCESS` endpoint and its generated
 //! `Versionable` names no `EHR_ACCESS`, so these calls go out as raw requests
-//! through [`CdrClient::extension`]. The read is the CDR's extension shaped on
+//! through `CdrClient::extension`. The read is the CDR's extension shaped on
 //! `ehr_status_get_at_time` (`GET /ehr/{ehr_id}/ehr_access`, the version uid
 //! as the `ETag`), the commit the ITS-REST `contribution_create` operation
 //! carrying the `EHR_ACCESS` version (`ehr-codegen.openapi.yaml`,

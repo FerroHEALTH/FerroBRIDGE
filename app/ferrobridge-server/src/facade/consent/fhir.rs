@@ -27,13 +27,18 @@ use crate::consent::fhir::import::ImportContext;
 use crate::consent::fhir::model::Code;
 use crate::facade::Facade;
 use crate::facade::consent::CONSENT;
+use crate::facade::consent::Committed;
 use crate::facade::consent::PATIENT;
+use crate::facade::consent::State;
+use crate::facade::consent::admit;
 use crate::facade::consent::answer;
+use crate::facade::consent::commit;
 use crate::facade::consent::export_context;
 use crate::facade::consent::logical_id;
 use crate::facade::consent::parse_id;
-use crate::facade::consent::settings;
+use crate::facade::consent::state;
 use crate::facade::consent::subject;
+use crate::facade::handlers::Body;
 use crate::facade::handlers::write::refuse;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -61,12 +66,7 @@ pub async fn create(
     headers: &HeaderMap,
     body: &Bytes,
 ) -> Result<axum::response::Response, Refusal> {
-    let settings = settings(facade)?;
-    crate::facade::handlers::guard(
-        headers,
-        &Uri::from_static("/"),
-        crate::facade::handlers::Body::Present,
-    )?;
+    let settings = admit(facade, headers, &Uri::from_static("/"), Body::Present)?;
     let release = crate::facade::consent::release_of(
         headers,
         &header::CONTENT_TYPE,
@@ -89,12 +89,7 @@ pub async fn create(
     let translated = exchange::operations(facade.translator().client(), &document)
         .await
         .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let current = exchange::current(&client, &reached.ehr)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let policy = exchange::policy(&client, settings)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
     let operations = |coding: &Code| {
         translated
             .iter()
@@ -111,23 +106,10 @@ pub async fn create(
         },
     )
     .map_err(|why| refuse(&of_document_refusal(&why)))?;
-    let committer =
-        crate::facade::commit::Committer::of(access, &client, &facade.settings().system_id);
-    let (_contribution, added) = exchange::append(
-        &client,
-        &reached.ehr,
-        &current,
-        directives,
-        settings,
-        &committer,
-        &facade.settings().system_id,
+    let Committed { added, ids } = commit(
+        facade, &client, access, &reached, &current, directives, settings,
     )
-    .await
-    .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let ids = added
-        .iter()
-        .filter_map(|directive| logical_id(&reached.ehr, exchange::key(directive)))
-        .collect::<Vec<_>>();
+    .await?;
     let base = facade.settings().base_url.trim_end_matches('/');
     let location = ids
         .first()
@@ -169,12 +151,7 @@ pub async fn read(
     id: &str,
     headers: &HeaderMap,
 ) -> Result<axum::response::Response, Refusal> {
-    let settings = settings(facade)?;
-    crate::facade::handlers::guard(
-        headers,
-        &Uri::from_static("/"),
-        crate::facade::handlers::Body::Absent,
-    )?;
+    let settings = admit(facade, headers, &Uri::from_static("/"), Body::Absent)?;
     let release =
         crate::facade::consent::release_of(headers, &header::ACCEPT, StatusCode::NOT_ACCEPTABLE)?;
     let not_found = || {
@@ -186,17 +163,12 @@ pub async fn read(
     let (ehr, key) = parse_id(id).ok_or_else(not_found)?;
     crate::facade::compartment::admit_ehr(facade, access, Permission::Read, CONSENT, &ehr)?;
     let client = facade.client_for(headers, access).await?;
-    let current = exchange::current(&client, &ehr)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    let State { current, policy } = state(&client, &ehr, settings).await?;
     let directive = current
         .directives()
         .iter()
         .find(|directive| exchange::key(directive) == key)
         .ok_or_else(not_found)?;
-    let policy = exchange::policy(&client, settings)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
     let context = export_context(facade, &ehr, policy.as_ref(), now())?;
     let body = render(release, directive, &context, Some(id))?;
     Ok(answer(StatusCode::OK, release, &body, &[]))
@@ -216,8 +188,7 @@ pub async fn search(
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    let settings = settings(facade)?;
-    crate::facade::handlers::guard(headers, uri, crate::facade::handlers::Body::Absent)?;
+    let settings = admit(facade, headers, uri, Body::Absent)?;
     let release =
         crate::facade::consent::release_of(headers, &header::ACCEPT, StatusCode::NOT_ACCEPTABLE)?;
     let pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
@@ -242,12 +213,7 @@ pub async fn search(
     };
     let client = facade.client_for(headers, access).await?;
     let reached = subject(facade, &client, access, Permission::Search, Some(&patient)).await?;
-    let current = exchange::current(&client, &reached.ehr)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let policy = exchange::policy(&client, settings)
-        .await
-        .map_err(|error| refuse(&of_exchange_error(&error)))?;
+    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
     let context = export_context(facade, &reached.ehr, policy.as_ref(), now())?;
     let mut entries = Vec::with_capacity(current.directives().len());
     for directive in current.directives() {

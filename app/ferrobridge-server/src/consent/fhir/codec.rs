@@ -19,7 +19,10 @@ macro_rules! release_codec {
     ($v:ident, $format:expr) => {
         use fhir_types::$v::codeable_concept::CodeableConcept;
         use fhir_types::$v::coding::Coding;
-        use fhir_types::$v::consent::{ConsentProvision, ConsentProvisionData};
+        use fhir_types::$v::consent::{
+            Consent, ConsentProvision, ConsentProvisionActor, ConsentProvisionData,
+            ConsentVerification,
+        };
         use fhir_types::$v::extension::{Extension, ExtensionValue};
         use fhir_types::$v::identifier::Identifier;
         use fhir_types::$v::period::Period as FhirPeriod;
@@ -27,7 +30,7 @@ macro_rules! release_codec {
         use fhir_types::$v::reference::Reference;
 
         use crate::consent::fhir::model::{
-            Code, Concept, DataRef, Ext, ExtValue, Ident, Period, Ref, Rule,
+            Actor, Code, Concept, DataRef, Ext, ExtValue, Ident, Period, Ref, Rule,
         };
         use crate::consent::{Loss, Refused};
 
@@ -61,6 +64,93 @@ macro_rules! release_codec {
                     Loss::NoDirectiveForm,
                 ))
             }
+        }
+
+        /// Reads `object` as a `Consent` of the release, refusing what a
+        /// directive has no form for at the resource level: a modifier
+        /// extension, `implicitRules` and `contained`.
+        fn consent_in(object: &fhir_types::codec::Object) -> Result<Consent, Refused> {
+            use fhir_types::codec::Json as _;
+            let consent = Consent::from_json(object, &mut fhir_types::codec::Path::root("Consent"))
+                .map_err(|error| {
+                    Refused::new($format, "Consent", Loss::Malformed(error.to_string()))
+                })?;
+            unmodified(&consent.modifier_extension, "Consent")?;
+            if consent.implicit_rules.is_some() {
+                return Err(Refused::new(
+                    $format,
+                    "Consent.implicitRules",
+                    Loss::NoDirectiveForm,
+                ));
+            }
+            if !consent.contained.is_empty() {
+                return Err(Refused::new(
+                    $format,
+                    "Consent.contained",
+                    Loss::NoDirectiveForm,
+                ));
+            }
+            Ok(consent)
+        }
+
+        /// Writes `consent` as JSON with the elements both releases share
+        /// taken from `document`: `status`, `category`, `identifier` and
+        /// `extension`.
+        fn consent_out(
+            consent: Consent,
+            document: &crate::consent::fhir::model::Document,
+        ) -> Result<fhir_types::codec::Object, Refused> {
+            use fhir_types::codec::Json as _;
+            Consent {
+                status: primitives::Code {
+                    value: Some(document.status.clone()),
+                    ..Default::default()
+                },
+                category: document.categories.iter().map(concept_out).collect(),
+                identifier: document.identifiers.iter().map(ident_out).collect(),
+                extension: document.extensions.iter().map(ext_out).collect(),
+                ..consent
+            }
+            .to_json()
+            .map_err(|error| Refused::new($format, "Consent", Loss::Malformed(error.to_string())))
+        }
+
+        /// Reads `actor`, named `element`; its `role` and `reference` are the
+        /// release's (`actor_parts_in`).
+        fn actor_in(actor: &ConsentProvisionActor, element: &str) -> Result<Actor, Refused> {
+            unmodified(&actor.modifier_extension, element)?;
+            let (role, reference) = actor_parts_in(actor);
+            Ok(Actor {
+                role,
+                reference,
+                extensions: actor.extension.iter().map(ext_in).collect(),
+            })
+        }
+
+        /// Writes `actor`; its `role` and `reference` are the release's
+        /// (`actor_parts_out`).
+        fn actor_out(actor: &Actor) -> ConsentProvisionActor {
+            let mut written = ConsentProvisionActor {
+                extension: actor.extensions.iter().map(ext_out).collect(),
+                ..Default::default()
+            };
+            actor_parts_out(actor, &mut written);
+            written
+        }
+
+        /// `verification` as `details` keeps it, with the release's own
+        /// elements (`verification_parts`).
+        fn verification_kept(
+            verification: &ConsentVerification,
+        ) -> Result<(String, String), Refused> {
+            unmodified(&verification.modifier_extension, "Consent.verification")?;
+            let rendering =
+                std::iter::once(verification.verified.value.map(|v| format!("verified {v}")))
+                    .chain(verification_parts(verification))
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+            Ok(("Consent.verification".to_owned(), rendering))
         }
 
         fn code_in(coding: &Coding) -> Code {

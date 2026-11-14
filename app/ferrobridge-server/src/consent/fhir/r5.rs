@@ -9,11 +9,10 @@
 //! `documentType`, `resourceType` and `expression`; the actor's `role` and
 //! `reference` are optional (`consent-definitions.html`).
 
-use fhir_types::codec::{Json as _, Object, Path};
-use fhir_types::r5::consent::{Consent, ConsentProvisionActor, ConsentVerification};
+use fhir_types::codec::Object;
 
 use crate::consent::Format;
-use crate::consent::fhir::model::{Actor, Document, line};
+use crate::consent::fhir::model::Document;
 
 super::codec::release_codec!(r5, Format::FhirR5);
 
@@ -26,23 +25,7 @@ const FORMAT: Format = Format::FhirR5;
 /// [`Refused`] for a body that is no R5 `Consent`, an element with no field in
 /// [`Document`], or one a reader must not ignore.
 pub(super) fn read(object: &Object) -> Result<Document, Refused> {
-    let consent = Consent::from_json(object, &mut Path::root("Consent"))
-        .map_err(|error| Refused::new(FORMAT, "Consent", Loss::Malformed(error.to_string())))?;
-    unmodified(&consent.modifier_extension, "Consent")?;
-    if consent.implicit_rules.is_some() {
-        return Err(Refused::new(
-            FORMAT,
-            "Consent.implicitRules",
-            Loss::NoDirectiveForm,
-        ));
-    }
-    if !consent.contained.is_empty() {
-        return Err(Refused::new(
-            FORMAT,
-            "Consent.contained",
-            Loss::NoDirectiveForm,
-        ));
-    }
+    let consent = consent_in(object)?;
     let mut kept = Vec::new();
     for attachment in &consent.source_attachment {
         kept.push(attachment_kept(attachment, "Consent.sourceAttachment")?);
@@ -101,11 +84,6 @@ pub(super) fn read(object: &Object) -> Result<Document, Refused> {
 /// [`Refused`] when the resource does not encode.
 pub(super) fn write(document: &Document) -> Result<Object, Refused> {
     let consent = Consent {
-        status: primitives::Code {
-            value: Some(document.status.clone()),
-            ..Default::default()
-        },
-        category: document.categories.iter().map(concept_out).collect(),
         subject: document.subject.as_ref().map(ref_out),
         date: prim!(Date, document.stated.clone()),
         period: document.period.as_ref().map(period_out),
@@ -113,34 +91,24 @@ pub(super) fn write(document: &Document) -> Result<Object, Refused> {
         grantee: document.grantees.iter().map(ref_out).collect(),
         controller: document.controllers.iter().map(ref_out).collect(),
         source_reference: document.evidence.iter().map(ref_out).collect(),
-        identifier: document.identifiers.iter().map(ident_out).collect(),
         regulatory_basis: document.legal_grounds.iter().map(concept_out).collect(),
         decision: prim!(Code, document.decision.clone()),
         provision: document.rules.iter().map(rule_out).collect(),
-        extension: document.extensions.iter().map(ext_out).collect(),
         ..Default::default()
     };
-    consent
-        .to_json()
-        .map_err(|error| Refused::new(FORMAT, "Consent", Loss::Malformed(error.to_string())))
+    consent_out(consent, document)
 }
 
-fn actor_in(actor: &ConsentProvisionActor, element: &str) -> Result<Actor, Refused> {
-    unmodified(&actor.modifier_extension, element)?;
-    Ok(Actor {
-        role: actor.role.as_ref().map(concept_in),
-        reference: actor.reference.as_ref().map(ref_in),
-        extensions: actor.extension.iter().map(ext_in).collect(),
-    })
+fn actor_parts_in(actor: &ConsentProvisionActor) -> (Option<Concept>, Option<Ref>) {
+    (
+        actor.role.as_ref().map(concept_in),
+        actor.reference.as_ref().map(ref_in),
+    )
 }
 
-fn actor_out(actor: &Actor) -> ConsentProvisionActor {
-    ConsentProvisionActor {
-        role: actor.role.as_ref().map(concept_out),
-        reference: actor.reference.as_ref().map(ref_out),
-        extension: actor.extensions.iter().map(ext_out).collect(),
-        ..Default::default()
-    }
+fn actor_parts_out(actor: &Actor, written: &mut ConsentProvisionActor) {
+    written.role = actor.role.as_ref().map(concept_out);
+    written.reference = actor.reference.as_ref().map(ref_out);
 }
 
 fn rule_extra_in(provision: &ConsentProvision, rule: &mut Rule) {
@@ -153,10 +121,8 @@ fn rule_extra_out(rule: &Rule, provision: &mut ConsentProvision) {
     provision.document_type = rule.templates.iter().map(code_out).collect();
 }
 
-fn verification_kept(verification: &ConsentVerification) -> Result<(String, String), Refused> {
-    unmodified(&verification.modifier_extension, "Consent.verification")?;
-    let rendering = line([
-        verification.verified.value.map(|v| format!("verified {v}")),
+fn verification_parts(verification: &ConsentVerification) -> Vec<Option<String>> {
+    vec![
         verification
             .verification_type
             .as_ref()
@@ -178,6 +144,5 @@ fn verification_kept(verification: &ConsentVerification) -> Result<(String, Stri
                 .join(" "),
         )
         .filter(|dates| !dates.is_empty()),
-    ]);
-    Ok(("Consent.verification".to_owned(), rendering))
+    ]
 }

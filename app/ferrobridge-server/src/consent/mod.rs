@@ -9,20 +9,20 @@
 //! Privacy Consent Document ([`appc`]).
 //!
 //! Each format maps to and from the `ACCESS_DIRECTIVE`s of the draft access
-//! control package, the content the evaluator decides on
-//! ([`crate::access_eval`]). A round trip keeps every attribute the evaluator
-//! reads: the kind and effect, `applies_to`, `operations`, `purposes`, the
-//! data scope, `time_validity`, `emergency_override` and one level of
-//! `exceptions`. Whatever one side holds and the other cannot carry is
-//! refused whole with the element named ([`Refused`]), never dropped.
+//! control package, the content the CDR's access evaluator decides on. A
+//! round trip keeps every attribute the evaluator reads: the kind and
+//! effect, `applies_to`, `operations`, `purposes`, the data scope,
+//! `time_validity`, `emergency_override` and one level of `exceptions`.
+//! Whatever one side holds and the other cannot carry is refused whole with
+//! the element named ([`Refused`]), never dropped.
 //!
 //! The mappings are checked against the vendored texts:
-//! `docs/specs/fhir-consent-r4/` and `-r5/` (FHIR R4 4.0.1 and R5 5.0.0 `Consent`),
-//! `docs/specs/ihe-consents/` (BPPC, ITI TF-1 chapter 19 and ITI TF-3
-//! section 5.1; APPC, the supplement Rev. 1.4) and `docs/specs/xacml/` (XACML
-//! 2.0). Where those texts leave a choice open, the choice is FerroBRIDGE's own
-//! design and says so where it is made. No openEHR specification governs the
-//! exchange.
+//! `docs/specs/fhir-consent-r4/` and `fhir-consent-r5/` (FHIR R4 4.0.1 and
+//! R5 5.0.0 `Consent`), `docs/specs/ihe-consents/` (BPPC, ITI TF-1 chapter
+//! 19 and ITI TF-3 section 5.1; APPC, the supplement Rev. 1.4) and
+//! `docs/specs/xacml/` (XACML 2.0). Where those texts leave a choice open,
+//! the choice is FerroBRIDGE's own design and says so where it is made. No
+//! openEHR specification governs the exchange.
 
 use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
 
