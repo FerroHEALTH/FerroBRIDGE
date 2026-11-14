@@ -7,12 +7,13 @@
 //! ITS-REST 1.1.0 publishes no `EHR_ACCESS` endpoint and its generated
 //! `Versionable` names no `EHR_ACCESS`, so these calls go out as raw requests
 //! through `CdrClient::extension`. The read is the CDR's extension shaped on
-//! `ehr_status_get_at_time` (`GET /ehr/{ehr_id}/ehr_access`, the version uid
-//! as the `ETag`), the commit the ITS-REST `contribution_create` operation
-//! carrying the `EHR_ACCESS` version (`ehr-codegen.openapi.yaml`,
-//! `NewContribution`), and the policy read the CDR's administrative
-//! extension (`GET /admin/access_policy`). No specification governs the two
-//! extension reads: our own design, after the routes of the reference CDR.
+//! `ehr_status_get_at_time` (`GET /ehr/{ehr_id}/ehr_access` under the CDR's
+//! extensions root, the version uid as the `ETag`, JSON only), the commit the
+//! ITS-REST `contribution_create` operation carrying the `EHR_ACCESS` version
+//! (`ehr-codegen.openapi.yaml`, `NewContribution`), and the policy read the
+//! CDR's administrative extension (`GET /admin/access_policy` under the same
+//! root). No specification governs the two extension reads: our own design,
+//! after the routes of the reference CDR.
 //!
 //! openEHR is a registered trademark of the openEHR Foundation.
 
@@ -138,8 +139,12 @@ fn shared(upstream: Upstream) -> Result<Upstream, AccessError> {
 
 impl CdrClient {
     /// Reads the current `EHR_ACCESS` of the EHR `ehr_id` and the version
-    /// its `ETag` names (`GET /ehr/{ehr_id}/ehr_access`, the CDR's extension
-    /// shaped on ITS-REST `ehr_status_get_at_time`).
+    /// its `ETag` names (`GET /ehr/{ehr_id}/ehr_access` under
+    /// `extensions_root`, the CDR's extension shaped on ITS-REST
+    /// `ehr_status_get_at_time`).
+    ///
+    /// The CDR answers `404` to a caller it does not admit, which reads as
+    /// [`AccessError::NotFound`] and never as an empty `EHR_ACCESS`.
     ///
     /// # Errors
     /// Returns [`AccessError::NotFound`] for a `404`, [`AccessError::Denied`]
@@ -147,13 +152,17 @@ impl CdrClient {
     /// `ETag`, [`AccessError::Body`] for a body the bridge cannot read, [`AccessError::Undocumented`] for
     /// any other status, and [`AccessError::Cdr`] when the call never reached
     /// the CDR.
-    pub async fn ehr_access(&self, ehr_id: &EhrId) -> Result<CurrentAccess, AccessError> {
+    pub async fn ehr_access(
+        &self,
+        extensions_root: &url::Url,
+        ehr_id: &EhrId,
+    ) -> Result<CurrentAccess, AccessError> {
         const OPERATION: &str = "ehr_access_get";
         let request = Request::new(
             Method::GET,
             format!("/ehr/{}/ehr_access", path_segment(&ehr_id.as_str())),
         );
-        let upstream = shared(self.extension(self.base_url(), request).await?)?;
+        let upstream = shared(self.extension(extensions_root, request).await?)?;
         if upstream.status() != StatusCode::OK {
             return Err(AccessError::Undocumented {
                 upstream: Box::new(upstream),
@@ -244,7 +253,7 @@ impl CdrClient {
         )?)
     }
 
-    /// Reads the controller's `ACCESS_POLICY` in force under `admin_root`
+    /// Reads the controller's `ACCESS_POLICY` in force under `extensions_root`
     /// (`GET /admin/access_policy`, the CDR's administrative extension), or
     /// `None` when the CDR holds none.
     ///
@@ -255,10 +264,10 @@ impl CdrClient {
     /// [`AccessError::Cdr`] when the call never reached the CDR.
     pub async fn access_policy(
         &self,
-        admin_root: &url::Url,
+        extensions_root: &url::Url,
     ) -> Result<Option<AccessPolicy>, AccessError> {
         let request = Request::new(Method::GET, String::from("/admin/access_policy"));
-        let upstream = match shared(self.extension(admin_root, request).await?) {
+        let upstream = match shared(self.extension(extensions_root, request).await?) {
             Err(AccessError::NotFound { .. }) => return Ok(None),
             answered => answered?,
         };

@@ -117,13 +117,9 @@ fn consent(facade: &Facade) -> Result<Option<crate::consent::exchange::Settings>
                 value: section.default_access.clone(),
             },
         )?;
-    let admin_root = if section.admin_url.is_empty() {
-        None
-    } else {
-        Some(url_of("facade.consent.admin_url", &section.admin_url)?)
-    };
+    let extensions_root = url_of("facade.consent.extensions_url", &section.extensions_url)?;
     Ok(Some(crate::consent::exchange::Settings {
-        admin_root,
+        extensions_root,
         default_access,
     }))
 }

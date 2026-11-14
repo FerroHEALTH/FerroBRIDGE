@@ -64,6 +64,7 @@ use crate::facade::transaction_of;
 use crate::support::random_secret;
 use ferrobridge_server::smart::SmartSettings;
 
+mod consent;
 mod kinds;
 
 /// The bridge's client id at the authorization server.
@@ -147,6 +148,8 @@ struct World {
     trusted: SmartSettings,
     /// The bridge's client assertion key, kept on disk for the case.
     _assertion_key: tempfile::NamedTempFile,
+    /// The CDR lane the world resolved, for a facade a case builds itself.
+    cdr_config: ferrobridge_server::cdr::config::CdrConfig,
 }
 
 impl World {
@@ -205,12 +208,14 @@ impl World {
             CdrClient::new(&config)?,
             settings(),
         ));
+        let cdr_config = config.clone();
         Ok(Self {
             trusted: issuer.settings(),
             issuer,
             key,
             harness: Harness { cdr, store, facade },
             _assertion_key: assertion_key,
+            cdr_config,
         })
     }
 

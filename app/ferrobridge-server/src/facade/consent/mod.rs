@@ -196,15 +196,28 @@ pub struct State {
     pub policy: Option<AccessPolicy>,
 }
 
-/// Reads the [`State`] of `ehr`.
+/// Reads the [`State`] of `ehr`: the `EHR_ACCESS` through `client`, the one
+/// a request calls the CDR through under its caller's exchanged token, and
+/// the policy through the facade's own client.
+///
+/// The catalogue is the controller's policy, which every caller of the
+/// exchange reads alike, and the CDR serves it to its administrators only;
+/// a patient's directives are never read under the bridge's credential. No
+/// specification governs this: our own design.
 ///
 /// # Errors
-/// Returns every exchange failure through `facade::status::consent`.
-pub async fn state(client: &CdrClient, ehr: &EhrId, settings: &Settings) -> Result<State, Refusal> {
-    let current = crate::consent::exchange::current(client, ehr)
+/// Returns every exchange failure through `facade::status::consent`: a CDR
+/// `404` or `403` for the caller is that answer, never an empty result.
+pub async fn state(
+    facade: &Facade,
+    client: &CdrClient,
+    ehr: &EhrId,
+    settings: &Settings,
+) -> Result<State, Refusal> {
+    let current = crate::consent::exchange::current(client, settings, ehr)
         .await
         .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let policy = crate::consent::exchange::policy(client, settings)
+    let policy = crate::consent::exchange::policy(facade.client(), settings)
         .await
         .map_err(|error| refuse(&of_exchange_error(&error)))?;
     Ok(State { current, policy })

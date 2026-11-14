@@ -45,6 +45,9 @@ use super::handle;
 use super::settings;
 use super::stub::mount_ehr;
 
+/// The CDR's extensions root, under the stub, as the reference CDR serves it.
+const EXTENSIONS: &str = "/ferroehr/rest/extensions/v1";
+
 /// The first `EHR_ACCESS` version the stub serves.
 const VERSION_1: &str = "0a1b2c3d-0000-4000-8000-00000000000b::ferrobridge.test::1";
 
@@ -108,7 +111,7 @@ impl Exchange {
             settings(),
         )
         .with_consent(Some(ExchangeSettings {
-            admin_root: Some(url::Url::parse(&cdr.uri())?),
+            extensions_root: url::Url::parse(&format!("{}{EXTENSIONS}", cdr.uri()))?,
             default_access: AccessDefault::Restricted,
         }));
         let exchange = Self {
@@ -128,7 +131,9 @@ impl Exchange {
         self.cdr.reset().await;
         mount_ehr(&self.cdr).await;
         Mock::given(matchers::method("GET"))
-            .and(matchers::path(format!("/ehr/{EHR_ID}/ehr_access")))
+            .and(matchers::path(format!(
+                "{EXTENSIONS}/ehr/{EHR_ID}/ehr_access"
+            )))
             .respond_with(
                 ResponseTemplate::new(200)
                     .insert_header("ETag", format!("\"{version}\"").as_str())
@@ -137,7 +142,7 @@ impl Exchange {
             .mount(&self.cdr)
             .await;
         Mock::given(matchers::method("GET"))
-            .and(matchers::path("/admin/access_policy"))
+            .and(matchers::path(format!("{EXTENSIONS}/admin/access_policy")))
             .respond_with(
                 ResponseTemplate::new(200)
                     .set_body_raw(policy(&self.catalogue)?.to_string(), "application/json"),
@@ -395,7 +400,9 @@ async fn a_stale_ehr_access_is_a_conflict() -> Result<(), Box<dyn Error>> {
     exchange.cdr.reset().await;
     mount_ehr(&exchange.cdr).await;
     Mock::given(matchers::method("GET"))
-        .and(matchers::path(format!("/ehr/{EHR_ID}/ehr_access")))
+        .and(matchers::path(format!(
+            "{EXTENSIONS}/ehr/{EHR_ID}/ehr_access"
+        )))
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("ETag", format!("\"{VERSION_1}\"").as_str())
@@ -404,7 +411,7 @@ async fn a_stale_ehr_access_is_a_conflict() -> Result<(), Box<dyn Error>> {
         .mount(&exchange.cdr)
         .await;
     Mock::given(matchers::method("GET"))
-        .and(matchers::path("/admin/access_policy"))
+        .and(matchers::path(format!("{EXTENSIONS}/admin/access_policy")))
         .respond_with(ResponseTemplate::new(404))
         .mount(&exchange.cdr)
         .await;
@@ -608,5 +615,57 @@ async fn the_capability_statement_lists_consent_only_when_it_is_served()
         .as_array()
         .is_some_and(|all| all.iter().any(|entry| entry["type"] == "Consent"));
     assert!(!listed, "a facade without the exchange lists no Consent");
+    Ok(())
+}
+
+/// Returns a case whose CDR answers the `EHR_ACCESS` read with `status`.
+async fn refusing(status: u16) -> Result<Exchange, Box<dyn Error>> {
+    let exchange = Exchange::new(Vec::new()).await?;
+    exchange.cdr.reset().await;
+    mount_ehr(&exchange.cdr).await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(format!(
+            "{EXTENSIONS}/ehr/{EHR_ID}/ehr_access"
+        )))
+        .respond_with(ResponseTemplate::new(status))
+        .mount(&exchange.cdr)
+        .await;
+    Ok(exchange)
+}
+
+#[tokio::test]
+async fn a_cdr_404_for_the_caller_is_a_404_and_never_an_empty_searchset()
+-> Result<(), Box<dyn Error>> {
+    let exchange = refusing(404).await?;
+    let (status, answer) = exchange
+        .send(Request::get("/fhir/Consent?patient=Patient/f001").body(Body::empty())?)
+        .await?;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{answer}");
+    assert_eq!(answer["resourceType"], Value::from("OperationOutcome"));
+    let (status, _) = exchange
+        .send(Request::get("/fhir/Consent/$bppc?patient=Patient/f001").body(Body::empty())?)
+        .await?;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_cdr_403_for_the_caller_is_a_403() -> Result<(), Box<dyn Error>> {
+    let exchange = refusing(403).await?;
+    let (status, answer) = exchange
+        .send(Request::get("/fhir/Consent?patient=Patient/f001").body(Body::empty())?)
+        .await?;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{answer}");
+    let (status, _) = exchange
+        .send(
+            Request::post("/fhir/Consent")
+                .header(header::CONTENT_TYPE, "application/fhir+json")
+                .body(Body::from(crate::consent::fhir::vendored(
+                    Release::R4,
+                    "consent-example-notTime.json",
+                )))?,
+        )
+        .await?;
+    assert_eq!(status, StatusCode::FORBIDDEN);
     Ok(())
 }

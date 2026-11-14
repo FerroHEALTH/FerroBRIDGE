@@ -89,7 +89,7 @@ pub async fn create(
     let translated = exchange::operations(facade.translator().client(), &document)
         .await
         .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
+    let State { current, policy } = state(facade, &client, &reached.ehr, settings).await?;
     let operations = |coding: &Code| {
         translated
             .iter()
@@ -163,7 +163,7 @@ pub async fn read(
     let (ehr, key) = parse_id(id).ok_or_else(not_found)?;
     crate::facade::compartment::admit_ehr(facade, access, Permission::Read, CONSENT, &ehr)?;
     let client = facade.client_for(headers, access).await?;
-    let State { current, policy } = state(&client, &ehr, settings).await?;
+    let State { current, policy } = state(facade, &client, &ehr, settings).await?;
     let directive = current
         .directives()
         .iter()
@@ -213,7 +213,7 @@ pub async fn search(
     };
     let client = facade.client_for(headers, access).await?;
     let reached = subject(facade, &client, access, Permission::Search, Some(&patient)).await?;
-    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
+    let State { current, policy } = state(facade, &client, &reached.ehr, settings).await?;
     let context = export_context(facade, &reached.ehr, policy.as_ref(), now())?;
     let mut entries = Vec::with_capacity(current.directives().len());
     for directive in current.directives() {

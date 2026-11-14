@@ -45,10 +45,9 @@ const KEY_NAMESPACE: uuid::Uuid = uuid::Uuid::from_u128(0x95a5_6637_776a_53a1_b2
 /// What a deployment configures for the exchange.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
-    /// The root the CDR serves its administrative extension under, where the
-    /// controller's `ACCESS_POLICY` is read; `None` reads no catalogue, so a
-    /// document naming a catalogue entry is refused.
-    pub admin_root: Option<url::Url>,
+    /// The root the CDR serves its extensions under, where the `EHR_ACCESS`
+    /// reads and the controller's `ACCESS_POLICY` are.
+    pub extensions_root: url::Url,
     /// The `default_access` the first `ACCESS_DIRECTIVE_SETTINGS` of an EHR
     /// whose `EHR_ACCESS` carries none is written with.
     pub default_access: AccessDefault,
@@ -101,13 +100,18 @@ impl Current {
     }
 }
 
-/// Reads the current `EHR_ACCESS` of `ehr_id`.
+/// Reads the current `EHR_ACCESS` of `ehr_id` under the extensions root of
+/// `settings`.
 ///
 /// # Errors
 /// Returns [`ExchangeError::Access`] for a read the CDR refused and
 /// [`ExchangeError::Scheme`] for settings of another scheme.
-pub async fn current(client: &CdrClient, ehr_id: &EhrId) -> Result<Current, ExchangeError> {
-    let read = client.ehr_access(ehr_id).await?;
+pub async fn current(
+    client: &CdrClient,
+    settings: &Settings,
+    ehr_id: &EhrId,
+) -> Result<Current, ExchangeError> {
+    let read = client.ehr_access(&settings.extensions_root, ehr_id).await?;
     let settings = read
         .access
         .settings
@@ -122,8 +126,8 @@ pub async fn current(client: &CdrClient, ehr_id: &EhrId) -> Result<Current, Exch
     })
 }
 
-/// Reads the controller's `ACCESS_POLICY` under `settings.admin_root`, `None`
-/// when no root is configured or the CDR holds no policy.
+/// Reads the controller's `ACCESS_POLICY` under `settings.extensions_root`,
+/// `None` when the CDR holds no policy.
 ///
 /// # Errors
 /// Returns [`ExchangeError::Access`] for a read the CDR refused.
@@ -131,10 +135,7 @@ pub async fn policy(
     client: &CdrClient,
     settings: &Settings,
 ) -> Result<Option<AccessPolicy>, ExchangeError> {
-    match settings.admin_root.as_ref() {
-        Some(root) => Ok(client.access_policy(root).await?),
-        None => Ok(None),
-    }
+    Ok(client.access_policy(&settings.extensions_root).await?)
 }
 
 /// Returns the catalogue of `policy`, empty when there is none.

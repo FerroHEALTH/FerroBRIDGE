@@ -197,9 +197,10 @@ impl Default for FacadeIdentifierSearch {
 pub struct FacadeConsent {
     /// Whether `Consent` is served.
     pub enabled: bool,
-    /// The root the CDR serves its administrative extension under, where the
-    /// controller's `ACCESS_POLICY` is read; empty reads no catalogue.
-    pub admin_url: String,
+    /// The root the CDR serves its extensions under: the `EHR_ACCESS` reads
+    /// (`/ehr/{ehr_id}/ehr_access`) and the controller's `ACCESS_POLICY`
+    /// (`/admin/access_policy`).
+    pub extensions_url: String,
     /// The `default_access` of the first settings the exchange writes:
     /// `open`, `restricted` or `consent_required`.
     pub default_access: String,

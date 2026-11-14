@@ -792,12 +792,20 @@ The exchange of a patient's access directives as FHIR `Consent`, IHE BPPC and
 IHE APPC (the Integrate page, [Consent and access directives](../integrate/fhir-facade.md#consent-and-access-directives)).
 Off, `Consent` is no resource type of the facade and the `CapabilityStatement`
 lists none. On, the facade reads and writes the `EHR_ACCESS` of the patient's
-EHR on the CDR, through the CDR's `EHR_ACCESS` read and a CONTRIBUTION.
+EHR on the CDR, through the CDR's `EHR_ACCESS` read and a CONTRIBUTION, always
+under the token the onward lane exchanges for the facade's caller, so the CDR
+decides for the patient or the gate-keeper who asked. An enabled exchange
+needs `[cdr.endpoint.credentials.onward]` or a `[[cdr.onward]]` table, and the
+bridge refuses to start without one (`facade.consent.enabled` needs
+`cdr.endpoint.credentials.onward`): it never reads or writes a patient's
+directives under its own credential. Only the controller's `ACCESS_POLICY`,
+which the CDR serves to its administrators, is read under the bridge's own
+token.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Consent`, `Consent/$bppc` and `Consent/$appc` are served |
-| `admin_url` | none | The root the CDR serves its administrative extension under, where `GET /admin/access_policy` reads the controller's `ACCESS_POLICY`; empty reads no catalogue, so a BPPC acknowledgement, an APPC policy reference or an R4 `policyRule` naming a catalogue entry is refused |
+| `extensions_url` | none, required | The root the CDR serves its extensions under, `https://<cdr>/ferroehr/rest/extensions/v1` on FerroEHR: the `EHR_ACCESS` read is `GET /ehr/{ehr_id}/ehr_access` and the controller's `ACCESS_POLICY` `GET /admin/access_policy` under it |
 | `default_access` | none, required | The `default_access` of the first `ACCESS_DIRECTIVE_SETTINGS` the exchange writes into an EHR whose `EHR_ACCESS` carries none: `open`, `restricted` or `consent_required` |
 
 Each key is settable as `FERROBRIDGE__FACADE__CONSENT__<KEY>`. The access

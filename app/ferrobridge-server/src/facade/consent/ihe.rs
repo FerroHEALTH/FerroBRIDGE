@@ -161,7 +161,7 @@ pub async fn import(
     let patient = one(&pairs, PATIENT)?;
     let client = facade.client_for(headers, access).await?;
     let reached = subject(facade, &client, access, Permission::Create, Some(patient)).await?;
-    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
+    let State { current, policy } = state(facade, &client, &reached.ehr, settings).await?;
     let catalogue = exchange::catalogue(policy.as_ref());
     let directives = match profile {
         Profile::Bppc => crate::consent::bppc::import(
@@ -215,7 +215,7 @@ pub async fn export(
     let patient = one(&pairs, PATIENT)?;
     let client = facade.client_for(headers, access).await?;
     let reached = subject(facade, &client, access, Permission::Search, Some(patient)).await?;
-    let State { current, policy } = state(&client, &reached.ehr, settings).await?;
+    let State { current, policy } = state(facade, &client, &reached.ehr, settings).await?;
     let directives = current.directives();
     let (documents, refused) = match profile {
         Profile::Bppc => bppc(&reached, directives, policy.as_ref()),

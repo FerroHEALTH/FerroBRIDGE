@@ -601,12 +601,18 @@ directives, the draft `ACCESS_DIRECTIVE_SETTINGS` of the EHR's `EHR_ACCESS`,
 as HL7 FHIR `Consent`, as IHE BPPC acknowledgements and as IHE APPC Privacy
 Consent Documents. The CDR commits and checks the directives; the bridge
 translates. It reads the current `EHR_ACCESS` with the CDR's extension
-`GET /ehr/{ehr_id}/ehr_access` (its `ETag` names the version), appends the
+`GET /ehr/{ehr_id}/ehr_access` under `extensions_url` (its `ETag` names the
+version), appends the
 imported directives to the ones in force, and commits the whole settings as
 the next version in a CONTRIBUTION whose `preceding_version_uid` is the
 version it read, so the CDR refuses a stale write with `409`, which the
-facade answers as `409 Conflict`. The catalogue of the controller's
-`ACCESS_POLICY` is read under `admin_url` with `GET /admin/access_policy`.
+facade answers as `409 Conflict`. Both calls go out under the token the
+onward lane exchanges for the caller, so the CDR decides for the patient or
+the gate-keeper who asked: a `404` or `403` the CDR answers that caller is
+the facade's answer, never an empty result, and a directive naming a party
+the CDR's demographic store does not hold is refused with `422`. The catalogue
+of the controller's `ACCESS_POLICY` is read under the bridge's own token with
+`GET /admin/access_policy` under `extensions_url`.
 
 | Interaction | Route | Answer |
 |---|---|---|

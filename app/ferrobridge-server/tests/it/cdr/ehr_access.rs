@@ -56,9 +56,17 @@ pub(crate) const EHR_ACCESS_JSON: &str = r#"{
   }
 }"#;
 
+/// The CDR's extensions root, under the stub, as the reference CDR serves it.
+const EXTENSIONS: &str = "/ferroehr/rest/extensions/v1";
+
 /// The path of the synthetic EHR's `EHR_ACCESS`.
 fn access_path() -> String {
-    format!("/v1/ehr/{EHR}/ehr_access")
+    format!("{EXTENSIONS}/ehr/{EHR}/ehr_access")
+}
+
+/// The extensions root of `server`.
+fn extensions(server: &MockServer) -> Result<url::Url, Box<dyn Error>> {
+    Ok(url::Url::parse(&format!("{}{EXTENSIONS}", server.uri()))?)
 }
 
 /// Mounts the read answering `response`.
@@ -75,7 +83,9 @@ async fn read(
     server: &MockServer,
 ) -> Result<Result<ferrobridge_server::cdr::ehr_access::CurrentAccess, AccessError>, Box<dyn Error>>
 {
-    Ok(support::client(server)?.ehr_access(&EhrId::new(EHR)?).await)
+    Ok(support::client(server)?
+        .ehr_access(&extensions(server)?, &EhrId::new(EHR)?)
+        .await)
 }
 
 #[tokio::test]
@@ -138,6 +148,23 @@ async fn a_404_on_the_read_is_not_found() -> Result<(), Box<dyn Error>> {
         read(&server).await?,
         Err(AccessError::NotFound { .. })
     ));
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_read_asks_for_json_under_the_extensions_root() -> Result<(), Box<dyn Error>> {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(access_path()))
+        .and(header("accept", "application/json"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("ETag", format!("\"{VERSION_1}\"").as_str())
+                .set_body_raw(EHR_ACCESS_JSON, "application/json"),
+        )
+        .mount(&server)
+        .await;
+    read(&server).await??;
     Ok(())
 }
 
@@ -297,23 +324,24 @@ const POLICY_JSON: &str = r#"{
 }"#;
 
 #[tokio::test]
-async fn the_policy_is_read_under_the_admin_root_and_a_404_is_none() -> Result<(), Box<dyn Error>> {
+async fn the_policy_is_read_under_the_extensions_root_and_a_404_is_none()
+-> Result<(), Box<dyn Error>> {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/admin/access_policy"))
+        .and(path(format!("{EXTENSIONS}/admin/access_policy")))
         .respond_with(ResponseTemplate::new(200).set_body_raw(POLICY_JSON, "application/json"))
         .mount(&server)
         .await;
-    let root = url::Url::parse(&server.uri())?;
+    let root = extensions(&server)?;
     let policy = support::client(&server)?.access_policy(&root).await?;
     assert!(policy.is_some_and(|policy| !policy.purpose_required));
     let empty = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/admin/access_policy"))
+        .and(path(format!("{EXTENSIONS}/admin/access_policy")))
         .respond_with(ResponseTemplate::new(404))
         .mount(&empty)
         .await;
-    let root = url::Url::parse(&empty.uri())?;
+    let root = extensions(&empty)?;
     assert!(
         support::client(&empty)?
             .access_policy(&root)

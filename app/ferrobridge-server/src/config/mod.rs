@@ -246,6 +246,26 @@ impl Config {
         Ok(())
     }
 
+    /// Refuses the access directive exchange without an onward lane: the
+    /// directives are read and written for the facade's caller, under the
+    /// token exchanged for it, so the CDR decides for the patient or the
+    /// gate-keeper and never for a standing credential of the bridge.
+    fn consent_onward(&self) -> Result<(), Error> {
+        // NOTE: no specification governs this: our own design; a bridge credential would read
+        // and write every patient's directives whoever called.
+        let onward = self
+            .cdr
+            .as_ref()
+            .is_some_and(|cdr| cdr.endpoint.credentials.onward.is_some() || !cdr.onward.is_empty());
+        if self.facade.enabled && self.facade.consent.enabled && !onward {
+            return Err(Error::Needs {
+                key: String::from("facade.consent.enabled"),
+                needs: String::from("cdr.endpoint.credentials.onward"),
+            });
+        }
+        Ok(())
+    }
+
     /// Resolves this tree into the settings `process` holds.
     ///
     /// Every `_file` sibling is read here, so a secret reaches the process
@@ -284,6 +304,7 @@ impl Config {
             return Err(Error::CallerRate);
         }
         self.onward_guarded(serves)?;
+        self.consent_onward()?;
         Ok(Settings {
             server: self.server.clone(),
             telemetry: self.telemetry.clone(),
