@@ -156,7 +156,7 @@ ferrohealth-secret = "=0.2.1"
 # The family's configuration loader (FerroSYS): the file, the `FERROBRIDGE__`
 # environment and its aliases, `--set`, strict with the closest known key, the
 # provenance of every key and the `config check` rendering.
-ferrohealth-config = "=0.4.4"
+ferrohealth-config = "=0.4.5"
 # The family's health document, indicator registry and process lifecycle
 # (FerroSYS). The default build is the document alone, which the operator
 # console reads; the server takes `registry`.
