@@ -142,7 +142,7 @@ on Linux. It needs Docker, `curl`, `git`, `jq` and `openssl`, or Podman with
 `PERF_ENGINE=podman`:
 
 ```sh
-cargo install ferrohealth-perf --version =0.5.2 --locked
+cargo install ferrohealth-perf --version =0.11.0 --locked
 bash scripts/perf/gate.sh build origin/main
 bash scripts/perf/gate.sh run
 ```
