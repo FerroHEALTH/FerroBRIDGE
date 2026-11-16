@@ -19,10 +19,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-validator = "0.10"
+ferrobridge-validator = "0.11"
 ```
 
-Name a patch (`"0.10.N"`) when you need the first release that carries what
+Name a patch (`"0.11.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
