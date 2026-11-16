@@ -9,6 +9,7 @@ use std::error::Error;
 
 use ferrobridge_server::smart::Smart;
 use ferrobridge_server::smart::SmartError;
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::metadata::DiscoveryError;
 use ferrohealth_smart::resource::ResourceError;
 use http::StatusCode;
@@ -27,7 +28,7 @@ use crate::facade::raw;
 
 /// Reads `path` through `app` without a token, returning the status, the
 /// media type and the body.
-async fn read_open(
+pub(super) async fn read_open(
     app: axum::Router,
     path: &str,
 ) -> Result<(StatusCode, Option<String>, serde_json::Value), Box<dyn Error>> {
@@ -319,6 +320,7 @@ async fn a_second_trusted_issuer_is_admitted_beside_the_first() -> Result<(), Bo
     let harness = harness().await;
     let mut settings = first.settings();
     settings.issuers.push(second.issuer_settings());
+    settings.described_issuer = Some(SecretUrl::new(second.uri()));
     settings.options.capabilities = vec![String::from("sso-openid-connect")];
     let authority = authority(settings).await;
     for (issuer, key) in [(&first, &first_key), (&second, &second_key)] {
@@ -338,14 +340,14 @@ async fn a_second_trusted_issuer_is_admitted_beside_the_first() -> Result<(), Bo
     let path = "/fhir/.well-known/smart-configuration";
     let (_, _, body) = read_open(secured(&harness, &authority), path).await?;
     assert_eq!(
-        Some(first.uri().as_str()),
+        Some(second.uri().as_str()),
         body["issuer"].as_str(),
-        "the first issuer is the one the document names"
+        "the named issuer, never the first in table order, is the one the document names"
     );
     assert_eq!(
-        Some(format!("{}/token", first.uri()).as_str()),
+        Some(format!("{}/token", second.uri()).as_str()),
         body["token_endpoint"].as_str(),
-        "the first issuer's token endpoint"
+        "the named issuer's token endpoint"
     );
     Ok(())
 }

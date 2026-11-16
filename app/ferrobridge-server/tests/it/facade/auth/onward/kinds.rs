@@ -9,6 +9,7 @@
 
 use std::error::Error;
 
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::kind::IssuerKind;
 use jsonwebtoken::Algorithm;
 use wiremock::Mock;
@@ -70,6 +71,7 @@ impl Sides {
         let mut trusted = patients.issuer_settings();
         trusted.kind = IssuerKind::Patients;
         world.trusted.issuers.push(trusted);
+        world.trusted.described_issuer = Some(SecretUrl::new(world.issuer.uri()));
         Ok(Self {
             world,
             patients,

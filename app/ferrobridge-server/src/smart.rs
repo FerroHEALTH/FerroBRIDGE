@@ -8,10 +8,11 @@
 //! every access token, or for an issuer with `mode = "introspection"` asks
 //! its introspection endpoint (RFC 7662), classifies every caller by its
 //! issuer's `kind`, checks the Basic users of `[[auth.basic.users]]`, each a
-//! person, and builds the SMART discovery document; this
-//! module holds what is the
-//! bridge's own: the R4 resource types a clinical scope may name, the
-//! operator scope, and the token endpoint the `CapabilityStatement` names.
+//! person, picks the issuer the SMART discovery document describes
+//! (`resource::described::describe`) and builds that document; this module
+//! holds what is the bridge's own: the R4 resource types a clinical scope
+//! may name, the operator scope, and the token endpoint the
+//! `CapabilityStatement` names.
 //! The facade's route table and its `OperationOutcome` refusals are
 //! `crate::facade::guard`'s, and the operator API's are
 //! `crate::operator::routes`'s.
@@ -29,6 +30,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::response::IntoResponse;
 use axum::routing::get;
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::basic::PasswordStore;
 use ferrohealth_smart::guard::Gate;
 use ferrohealth_smart::metadata::ServerMetadata;
@@ -39,8 +41,12 @@ use ferrohealth_smart::resource::Settings;
 use ferrohealth_smart::resource::Verifier;
 use ferrohealth_smart::resource::configuration::OpenIdConnect;
 use ferrohealth_smart::resource::configuration::PermissionCapability;
+use ferrohealth_smart::resource::configuration::Purpose;
 use ferrohealth_smart::resource::configuration::SMART_CONFIGURATION;
 use ferrohealth_smart::resource::configuration::SmartOptions;
+use ferrohealth_smart::resource::described::Candidate;
+use ferrohealth_smart::resource::described::DescribeError;
+use ferrohealth_smart::resource::described::describe;
 use ferrohealth_smart::resource::introspection::IntrospectionError;
 use ferrohealth_smart::resource::introspection::IntrospectionSettings;
 use ferrohealth_smart::resource::introspection::Introspector;
@@ -62,13 +68,15 @@ const SSO_OPENID_CONNECT: &str = "sso-openid-connect";
 #[derive(Debug, Clone)]
 pub struct SmartSettings {
     /// The resource-server settings of each trusted issuer whose JWT access
-    /// tokens are checked against its key set, the first of which the
-    /// discovery document and the `CapabilityStatement` name.
+    /// tokens are checked against its key set.
     pub issuers: Vec<Settings>,
     /// The introspection check of each issuer with `mode =
-    /// "introspection"`, the first of which the two documents name when no
-    /// issuer is checked by its key set.
+    /// "introspection"`.
     pub introspection: Vec<IntrospectionSettings>,
+    /// The issuer the discovery document and the `CapabilityStatement`
+    /// name, `[auth] described_issuer`; without it `describe` picks the one
+    /// issuer its rule allows.
+    pub described_issuer: Option<SecretUrl>,
     /// The Basic users, when the surface admits Basic.
     pub basic: Option<Arc<PasswordStore>>,
     /// The realm every challenge names, when one is set.
@@ -90,6 +98,7 @@ impl SmartSettings {
         Self {
             issuers: vec![issuer],
             introspection: Vec::new(),
+            described_issuer: None,
             basic: None,
             realm: None,
             options: SmartOptions::default(),
@@ -124,6 +133,14 @@ pub enum SmartError {
         #[source]
         source: Box<IntrospectionError>,
     },
+    /// No issuer can be described: `[auth] described_issuer` names an issuer
+    /// the rule refuses, or without it no single issuer is eligible.
+    #[error("the SMART discovery document can describe no issuer (auth.described_issuer)")]
+    Described {
+        /// Why `describe` refused.
+        #[source]
+        source: DescribeError,
+    },
     /// The issuer the discovery document names publishes no token endpoint,
     /// which the document requires (SMART App Launch 2.2.0, Conformance,
     /// §Metadata, `token_endpoint`: REQUIRED).
@@ -137,8 +154,7 @@ pub enum SmartError {
 /// The check whose authorization server the two discovery documents name.
 #[derive(Debug)]
 enum Primary {
-    /// The first issuer whose JWT access tokens are checked against its key
-    /// set.
+    /// An issuer whose JWT access tokens are checked against its key set.
     Jwt(Arc<ResourceServer>),
     /// The issuer whose tokens its introspection endpoint checks.
     Introspection(Arc<Introspector>),
@@ -171,6 +187,8 @@ pub struct Smart {
     /// The check whose issuer the discovery document and the
     /// `CapabilityStatement` name.
     primary: Primary,
+    /// What the two documents describe that issuer for.
+    purpose: Purpose,
     /// The token endpoint that issuer's metadata names.
     token_endpoint: String,
     /// What the discovery document adds.
@@ -190,11 +208,16 @@ impl Smart {
     /// Returns [`SmartError::NoIssuer`] for settings without an issuer,
     /// [`SmartError::Issuer`] for an issuer whose metadata or key set could
     /// not be read or that breaks a rule, [`SmartError::Introspection`] when
-    /// an introspection check cannot start, and
+    /// an introspection check cannot start, [`SmartError::Described`] when no
+    /// issuer can be described, and
     /// [`SmartError::NoTokenEndpoint`] when the issuer the documents name
     /// names no token endpoint.
     pub async fn discover(settings: SmartSettings) -> Result<Self, SmartError> {
-        let (issuers, primary) = Self::issuers(settings.issuers, settings.introspection).await?;
+        let (issuers, candidates) = Self::issuers(settings.issuers, settings.introspection).await?;
+        let described = describe(candidates, settings.described_issuer.as_ref())
+            .map_err(|source| SmartError::Described { source })?;
+        let purpose = described.purpose();
+        let primary = described.into_check();
         let bearer: Arc<dyn Verifier> = Arc::new(issuers);
         let token_endpoint = primary.metadata().token_endpoint.clone().ok_or_else(|| {
             SmartError::NoTokenEndpoint {
@@ -211,6 +234,7 @@ impl Smart {
         Ok(Self {
             gate,
             primary,
+            purpose,
             token_endpoint,
             options: settings.options,
             operator_scope: settings.operator_scope,
@@ -219,14 +243,16 @@ impl Smart {
 
     /// Reads the metadata and the key set of every issuer of `jwt`, and the
     /// metadata of every issuer of `introspected`, and returns the set of
-    /// them and the issuer the documents name: the first of `jwt`, or the
-    /// first of `introspected` when `jwt` is empty.
+    /// them with each offered to the documents as a candidate.
     async fn issuers(
         jwt: Vec<Settings>,
         introspected: Vec<IntrospectionSettings>,
-    ) -> Result<(IssuerSet, Primary), SmartError> {
+    ) -> Result<(IssuerSet, Vec<Candidate<Primary>>), SmartError> {
+        if jwt.is_empty() && introspected.is_empty() {
+            return Err(SmartError::NoIssuer);
+        }
         let mut issuers = IssuerSet::new();
-        let mut primary = None;
+        let mut candidates = Vec::new();
         for issuer in jwt {
             let name = issuer.issuer.clone();
             let server = ResourceServer::discover(issuer)
@@ -237,7 +263,10 @@ impl Smart {
                 })?
                 .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
             let server = Arc::new(server);
-            primary.get_or_insert_with(|| Primary::Jwt(Arc::clone(&server)));
+            candidates.push(Candidate::of_server(
+                &server,
+                Primary::Jwt(Arc::clone(&server)),
+            ));
             issuers = issuers.with(server);
         }
         for introspection in introspected {
@@ -250,11 +279,13 @@ impl Smart {
                 })?
                 .with_resource_types(|resource_type| SCHEMAS.is_resource(resource_type));
             let introspector = Arc::new(introspector);
-            primary.get_or_insert_with(|| Primary::Introspection(Arc::clone(&introspector)));
+            candidates.push(Candidate::of_introspector(
+                &introspector,
+                Primary::Introspection(Arc::clone(&introspector)),
+            ));
             issuers = issuers.with_introspector(introspector);
         }
-        let primary = primary.ok_or(SmartError::NoIssuer)?;
-        Ok((issuers, primary))
+        Ok((issuers, candidates))
     }
 
     /// Returns the credentials every guarded route admits.
@@ -278,7 +309,10 @@ impl Smart {
     /// the v1 syntax beside v2 (Conformance, §Permissions). The bridge
     /// evaluates no granular scope, so it claims no `permission-v2`. It
     /// advertises `sso-openid-connect`, and writes the `issuer` that
-    /// capability requires, only when `[auth] capabilities` names it.
+    /// capability requires, only when `[auth] capabilities` names it. A
+    /// `machines` issuer is described for SMART Backend Services alone, with
+    /// no app-launch member (SMART App Launch 2.2.0, Backend Services,
+    /// §Retrieve `.well-known/smart-configuration`).
     #[must_use]
     pub fn configuration(&self) -> serde_json::Value {
         let sign_on = self
@@ -287,6 +321,7 @@ impl Smart {
             .iter()
             .any(|capability| capability == SSO_OPENID_CONNECT);
         self.primary.smart_configuration(&SmartOptions {
+            purpose: self.purpose,
             permissions: BTreeSet::from([
                 PermissionCapability::V1,
                 PermissionCapability::Patient,
@@ -301,12 +336,18 @@ impl Smart {
         })
     }
 
-    /// Returns the `rest.security` endpoints of the `CapabilityStatement`.
+    /// Returns the `rest.security` endpoints of the `CapabilityStatement`,
+    /// with no `authorize` for an issuer described for Backend Services
+    /// alone, where no user launch starts.
     #[must_use]
     pub fn security(&self) -> Security {
         let metadata = self.primary.metadata();
+        let launch = self.purpose == Purpose::AppLaunch;
         Security {
-            authorize: metadata.authorization_endpoint.clone(),
+            authorize: metadata
+                .authorization_endpoint
+                .clone()
+                .filter(|_endpoint| launch),
             token: self.token_endpoint.clone(),
             register: metadata.registration_endpoint.clone(),
             introspect: metadata.introspection_endpoint.clone(),

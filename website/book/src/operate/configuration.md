@@ -937,6 +937,7 @@ sends and what each refusal looks like.
 | `scopeless_subjects` | `[]` | The machines whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope, each a table `{ issuer, sub }` naming its `[[auth.issuer]]` table and its `sub`. Only a token the issuer's profile classifies as a machine is admitted this way; any other scopeless token is refused with `403`. An entry naming an issuer the section does not trust refuses the start |
 | `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient`; each is one SMART App Launch 2.2.0 (Conformance, Capabilities) defines, or a full URI. `sso-openid-connect` also writes the issuer's `issuer`, which the document omits otherwise (Conformance, Metadata) |
 | `scopes_supported` | `[]` | The scopes the discovery document lists as `scopes_supported`; list only scopes the bridge honours, because "the server SHALL support all scopes listed here" (SMART App Launch 2.2.0, Conformance, Metadata). Empty omits the member |
+| `described_issuer` | none | The `[[auth.issuer]]` the discovery document and the `CapabilityStatement` describe, when the bridge trusts several. Unset, the bridge describes the one issuer of kind `persons`, `patients` or `federation` whose metadata it holds, and with only `machines` issuers trusted the one `machines` issuer, for SMART Backend Services alone. The [rule](#the-described-issuer) says which issuers it may name |
 | `product_scope` | `__ferrobridge.operator` | The operator scope: it guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
 | `tls.trust_roots_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and for an issuer with `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start. `tls.client_identity_file` and `tls.min_version` (`"1.3"` unless lowered to `"1.2"`) complete the table |
 
@@ -968,9 +969,36 @@ admitted only through a client the table lists in `first_party_clients` or
 `delegates`. The `keycloak` preset names no machine: its table lists the
 `sub` of each service account in `app_only = [{ subjects = [...] }]`, and
 without one refuses the start. A valid token that fits none of the issuer's kind is refused
-with `401`. A token is checked by the issuer its `iss` names, and the
-discovery document and the `CapabilityStatement` name the first issuer
-checked by its key set.
+with `401`. A token is checked by the issuer its `iss` names.
+
+#### The described issuer
+
+The discovery document and the `CapabilityStatement` describe one
+authorization server: a user launch starts at its authorization endpoint,
+and a backend client takes its tokens from its token endpoint (SMART App
+Launch 2.2.0, Conformance, Metadata, and Backend Services, Retrieve
+`.well-known/smart-configuration`). SMART does not say which of several
+trusted issuers that is, so `ferrohealth-smart` fixes one rule for the
+FerroHEALTH servers, and the order of the `[[auth.issuer]]` tables never
+decides:
+
+- With `described_issuer`, the bridge describes that issuer once it is a
+  trusted issuer whose metadata it holds. A `machines` issuer is described
+  for SMART Backend Services alone, and refused while another issuer serves
+  a user launch.
+- Otherwise, when the bridge trusts an issuer of kind `persons`, `patients`
+  or `federation`, it describes the one such issuer whose metadata it holds,
+  for SMART App Launch. Several refuse the start, naming them and the key,
+  and so does none: an issuer read from a `jwks_file` names no
+  authorization endpoint.
+- Otherwise it describes the one `machines` issuer for SMART Backend
+  Services: the token endpoint, `private_key_jwt`, the client credentials
+  grant and the `system/` scopes of `scopes_supported`, with no
+  authorization endpoint and no launch capability. Several refuse the start
+  the same way.
+
+A `machines` issuer signs client credentials tokens only, so no user launch
+works there.
 
 ```toml
 [auth]

@@ -55,6 +55,7 @@ pub(super) fn resolve_auth(
     Ok(Some(SmartSettings {
         issuers: resolved.issuers,
         introspection: resolved.introspection,
+        described_issuer: resolved.described_issuer,
         basic: granted(resolved.basic, grants)?.map(Arc::new),
         realm: resolved.realm,
         options,
