@@ -148,7 +148,7 @@ backon = "1.6.0"
 # The server adds `axum` for its guard and `server-tls`, the family's reader
 # of every outbound `tls` table;
 # ferrobridge-term's `smart` feature takes the token client alone.
-ferrohealth-smart = { version = "0.24.0", default-features = false, features = ["fetch"] }
+ferrohealth-smart = { version = "0.26.0", default-features = false, features = ["fetch"] }
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
 # `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
 # query masked. Pinned exactly, as a product pins every shared crate.
@@ -166,7 +166,7 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body.
-ferrohealth-server = { version = "=0.9.0", default-features = false }
+ferrohealth-server = { version = "=0.10.0", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
 # the request log and the panic line; 0.5 installs its own bridge from the
 # `log` crate beside the subscriber.
@@ -180,8 +180,8 @@ ferrohealth-usage-report = { version = "=0.5.0", default-features = false }
 # Feed (`balp`) with a client credentials bearer (`smart`, on the 0.24 line of
 # ferrohealth-smart). Pinned exactly, as a product pins every shared crate;
 # only the server links them.
-ehds-logging = { version = "=0.18.0", default-features = false }
-ihe-atna = { version = "=0.18.0", default-features = false }
+ehds-logging = { version = "=0.20.0", default-features = false }
+ihe-atna = { version = "=0.20.0", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
@@ -255,7 +255,7 @@ zip = { version = "=9.3.0", default-features = false, features = ["deflate-flate
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script
 # modules with the router that serves them, shared by every FerroHEALTH
 # console. Pinned exactly, so the console moves to a new version deliberately.
-ferrohealth-ui = "=0.6.8"
+ferrohealth-ui = "=0.6.9"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -268,7 +268,7 @@ base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # with its idle and absolute lifetimes, the refresh, and the four routes with
 # the session watch FerroUI's pages ask. Pinned exactly, as a product pins
 # every shared crate; the console adds `axum`.
-ferrohealth-session = { version = "=0.19.0", default-features = false }
+ferrohealth-session = { version = "=0.20.0", default-features = false }
 # Test-only.
 wiremock = "0.6.5"
 # The operator console's browser journeys (#602): a WebDriver client in Rust
