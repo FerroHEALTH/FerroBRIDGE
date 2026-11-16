@@ -26,6 +26,27 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.26] - 2026-11-16
+
+The SMART discovery document described by the family's shared rule, on
+`ferrohealth-smart` 0.28. The discovery document and the facade's
+`CapabilityStatement` no longer name the first `[[auth.issuer]]` table:
+`[auth] described_issuer` names the issuer, and without it the bridge
+describes its one user-launch issuer, or, when it trusts only `machines`
+issuers, its one `machines` issuer for SMART Backend Services alone. The
+crates move to smart 0.28 with `ferrobridge-term` and
+`ferrobridge-validator` 0.12.0, `ferrobridge-hl7v2` 0.17.0 and `eehrxf`
+0.15.0, and the server to `ihe-atna` and `ehds-logging` 0.22.0. Each
+breaking change below names what an operator or a crate user changes.
+
+### Changed
+
+- The crates move to `ferrohealth-smart` 0.28, whose `describe` picks the issuer of the discovery document and whose client assertion takes its `aud` and `typ` from the grant's security profile. `ferrobridge-term` 0.12.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.28 line in `Client::from_endpoint`, so a dependant on smart 0.28 passes its own types. `ferrobridge-validator` 0.12.0, `ferrobridge-hl7v2` 0.17.0 and `eehrxf` 0.15.0 follow `ferrobridge-term` 0.12. The operator console takes `ferrohealth-session` 0.23.0, and the server takes `ihe-atna` and `ehds-logging` 0.22.0, the releases on the same smart line, so one smart links (#1922).
+
+### Fixed
+
+- The SMART discovery document and the facade's `CapabilityStatement` name the issuer `ferrohealth-smart`'s shared rule describes, never the first `[[auth.issuer]]` table. `[auth] described_issuer` names it; without the key the bridge describes the one issuer of kind `persons`, `patients` or `federation` whose metadata it holds, and a bridge that trusts only `machines` issuers describes its one `machines` issuer for SMART Backend Services alone: the token endpoint, the client credentials grant and `private_key_jwt`, with no authorization endpoint. Breaking: a bridge that trusts several such issuers and sets no `described_issuer` refuses the start, naming them and the key, and so does a `described_issuer` that names an unknown issuer, an issuer without metadata, or a `machines` issuer beside one that serves a user launch (#1922).
+
 ## [0.0.25] - 2026-11-16
 
 The family on `ferrohealth-smart` 0.26 and `ferrohealth-server` 0.10,
@@ -6903,7 +6924,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.25...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.26...HEAD
+[0.0.26]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.25...v0.0.26
 [0.0.25]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.24...v0.0.25
 [0.0.24]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.23...v0.0.24
 [0.0.23]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.22...v0.0.23
