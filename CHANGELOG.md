@@ -26,6 +26,78 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.25] - 2026-11-16
+
+The family on `ferrohealth-smart` 0.26 and `ferrohealth-server` 0.10,
+and access directives exchanged as FHIR `Consent`. The bridge and its crates
+move across the smart lines 0.19 to 0.26 to one smart, one server and one
+telemetry in the lock: `ferrobridge-term` and `ferrobridge-validator` 0.11.0,
+`ferrobridge-hl7v2` 0.16.0 and `eehrxf` 0.14.0. A Basic user's scopes and
+roles move into `[basic_grants]`, and the server now always bounds the
+requests it serves at once, 256 by default. The facade exchanges a patient's
+openEHR access directives as FHIR `Consent`, IHE BPPC and IHE APPC behind
+`[facade.consent]`, on the `openehr-*` crates 0.2. The HL7 v2 face accepts
+plain MLLP from a declared device network, and `fhirconnect` reads an event
+the template collapsed into its observation as that event. Each breaking
+change below names what an operator or a crate user changes.
+
+### Added
+
+- The HL7 v2 face accepts plain MLLP from a device that cannot speak TLS,
+  such as a point-of-care analyser. A sender declared `origin = "device"`
+  with `transport = "plain"` and its `source_addresses` (CIDR networks) is
+  served on its own `[hl7v2.plain] bind` listener: a connection from outside
+  every plain sender's networks is closed before any byte is read, and a
+  message whose MSH-4 names no plain sender of the peer's network is answered
+  `AR` and its connection closed. The bridge refuses to start with a plain
+  sender that is no device or names no networks, a network that is not in
+  CIDR notation, a plain listener on the TLS listener's address, or one side
+  of the pair without the other. `[hl7v2.tls]` and its files are required
+  only while a sender has `transport = "tls"`: a lab of plain devices alone
+  runs no TLS listener, and a `[hl7v2.tls]` with no TLS sender is refused.
+  Each plain sender is logged as a warning at boot, `/health/info` shows the
+  plain listener and each sender's transport,
+  and the operator API's running configuration names each sender's
+  `transport` and `source_addresses`. TLS stays the default, and nothing
+  changes for an existing configuration. `ferrobridge-hl7v2` 0.10.1 adds
+  `Handler::admits`, which closes a peer before its first byte, and
+  `Connection::close`, which ends a connection after its answer (#1918).
+- The facade exchanges a patient's openEHR access directives as HL7 FHIR
+  `Consent` (R4, and R5 under `fhirVersion=5.0`), IHE BPPC acknowledgements
+  and IHE APPC Privacy Consent Documents, behind the new `[facade.consent]`
+  table (`enabled`, `extensions_url`, `default_access`), which needs the
+  onward lane: the directives are read and written under the token exchanged
+  for the facade's caller, never under the bridge's own credential. `POST`, `GET
+  [base]/Consent/{id}` and `GET [base]/Consent?patient=` are served and listed
+  in the `CapabilityStatement`, beside the type-level operations
+  `Consent/$bppc` and `Consent/$appc`. An import reads the CDR's `EHR_ACCESS`
+  through its `GET /ehr/{ehr_id}/ehr_access` extension and commits the
+  directives as the next version in a CONTRIBUTION; the catalogue of the
+  controller's `ACCESS_POLICY` is read under `extensions_url`. A construct with no
+  openEHR form is refused with `422` naming the element, and every attribute
+  with no core FHIR element travels in an extension under
+  `https://ferrobridge.eu/fhir/StructureDefinition/` (#1933).
+
+### Changed
+
+- The crates move to `ferrohealth-smart` 0.19. `ferrobridge-term` 0.6.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.19 line in `Client::from_endpoint`, so a dependant on smart 0.19 passes its own types. `ferrobridge-validator` 0.6.0, `ferrobridge-hl7v2` 0.9.0 and `eehrxf` 0.7.0 follow `ferrobridge-term` 0.6. The server takes `ihe-atna` and `ehds-logging` 0.13.0, and the operator console takes `ferrohealth-session` 0.14.0, the releases on the same smart line (#1897).
+- A model mapping that slots an archetype into an `ARCHETYPE_SLOT` the template keeps open and fills with no such archetype is now ignored with the `fc-excluded-template-node` warning, as FHIRconnect `model-mappings.adoc` §Mapping 0..0 fields ignores a mapping that is not part of the template. It was refused as `fc-unknown-template-node`. A path whose archetype no open slot there admits is still refused. `openehr-mapping-core` exposes the template's open slots as `WebTemplateIndex::open_slots` (#1907).
+- The crates move to `ferrohealth-smart` 0.20, which takes the issuers `check_role_issuers` reads as `SecretUrl` and masks the issuer `ConfigError::RoleIssuer` names. `ferrobridge-term` 0.7.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.20 line in `Client::from_endpoint`, so a dependant on smart 0.20 passes its own types. `ferrobridge-validator` 0.7.0, `ferrobridge-hl7v2` 0.10.0 and `eehrxf` 0.8.0 follow `ferrobridge-term` 0.7. The server takes `ihe-atna` and `ehds-logging` 0.14.0, and the operator console takes `ferrohealth-session` 0.15.0, the releases on the same smart line (#1914).
+- The workspace moves to the `openehr-*` crates 0.1.1, on the first line FerroEHR publishes under the Cargo SemVer rules. The published crates whose public API names openEHR types move to their next minor: `openehr-mapping-core` 0.2.0, `fhirconnect` 0.3.0 and `eehrxf` 0.9.0 take `openehr-base`, `openehr-rm`, `openehr-its`, `openehr-sdt`, `openehr-am` and `openehr-term` from the 0.1 line, and `ferrobridge-hl7v2` 0.11.0 follows `fhirconnect` 0.3. A dependant moves its own `openehr-*` requirements to `"0.1"` with them, so its lockfile holds one copy of each and passes its own openEHR types to these crates (#1919).
+- The crates move to `ferrohealth-smart` 0.21, which chooses the issuer a SMART discovery document describes by one shared rule and adds the optional `described_issuer` key to `AuthSection`. `ferrobridge-term` 0.8.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.21 line in `Client::from_endpoint`, so a dependant on smart 0.21 passes its own types. `ferrobridge-validator` 0.8.0, `ferrobridge-hl7v2` 0.12.0 and `eehrxf` 0.10.0 follow `ferrobridge-term` 0.8. The server takes `ihe-atna` and `ehds-logging` 0.15.0, and the operator console takes `ferrohealth-session` 0.16.0, the releases on the same smart line (#1925).
+- The crates move to `ferrohealth-smart` 0.22, where `DpopSection` no longer carries `external_url` and a product builds its DPoP proof check from its own public URL; the bridge sets no `[auth.dpop]`, so no configuration key changes. `ferrobridge-term` 0.9.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.22 line in `Client::from_endpoint`, so a dependant on smart 0.22 passes its own types. `ferrobridge-validator` 0.9.0, `ferrobridge-hl7v2` 0.13.0 and `eehrxf` 0.11.0 follow `ferrobridge-term` 0.9. The server takes `ihe-atna` and `ehds-logging` 0.16.0, and the operator console takes `ferrohealth-session` 0.17.0, the releases on the same smart line (#1927).
+- Breaking: a Basic user's scopes and roles move out of `[[auth.basic.users]]`, which holds the credential alone (`user`, `password_hash`, `password_hash_file`), into the bridge's own `[basic_grants.<user-id>]` table with `scopes` and `roles`. A `scopes` or `roles` key in `[[auth.basic.users]]` now refuses the start as an unknown key, and so does a `[basic_grants]` table naming a user `[[auth.basic.users]]` does not list. Upgrade: move each user's `scopes` and `roles` lines into a `[basic_grants.<user>]` table named by its `user` (#1929).
+- The crates move to `ferrohealth-smart` 0.24, where the caller classification asks each issuer's standing source; the bridge keeps its client lists in `[auth]`, the default source, so no further configuration key changes. `ferrobridge-term` 0.10.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.24 line in `Client::from_endpoint`, so a dependant on smart 0.24 passes its own types. `ferrobridge-validator` 0.10.0, `ferrobridge-hl7v2` 0.14.0 and `eehrxf` 0.12.0 follow `ferrobridge-term` 0.10. The server takes `ihe-atna` and `ehds-logging` 0.18.0, and the operator console takes `ferrohealth-session` 0.19.0, the releases on the same smart line (#1929).
+- The workspace moves to the `openehr-*` crates 0.2.0, whose `openehr-rm` carries the draft access control package behind its `draft` feature, which the access directive exchange reads. The published crates whose public API names openEHR types move to their next minor: `openehr-mapping-core` 0.3.0, `fhirconnect` 0.4.0 and `eehrxf` 0.13.0 take the `openehr-*` crates from the 0.2 line, and `ferrobridge-hl7v2` 0.15.0 follows `fhirconnect` 0.4. A dependant moves its own `openehr-*` requirements to `"0.2"` with them, so its lockfile holds one copy of each and passes its own openEHR types to these crates (#1933).
+- Breaking: the server keeps an overload bound always: `[server] max_concurrent_requests` is 256 by default, where unset left the server unbounded, so past 256 requests in flight a request is answered `503` with `Retry-After` and the health routes are never refused. A deployment that relied on no bound sets the ceiling it wants (FerroHEALTH/FerroEHR#5743) (#1939).
+- The crates move to `ferrohealth-smart` 0.26 and `ferrohealth-server` 0.10. `ferrobridge-term` 0.11.0 takes smart's `EndpointSection` and `OutboundClient` from the 0.26 line in `Client::from_endpoint`, so a dependant on smart 0.26 passes its own types. `ferrobridge-validator` 0.11.0, `ferrobridge-hl7v2` 0.16.0 and `eehrxf` 0.14.0 follow `ferrobridge-term` 0.11. The server takes `ihe-atna` and `ehds-logging` 0.21.0, and the operator console takes `ferrohealth-session` 0.21.0, the releases on the same smart line, so one smart, one server and one telemetry link (#1939).
+
+### Fixed
+
+- `ferrobridge config check` no longer prints the password of an issuer written with userinfo (`https://user:password@…`) in `[[auth.attributes]]`, `[[auth.federation]]`, `[[auth.party]]` or `auth.scopeless_subjects`: it renders as `https://***@…`, as `[[auth.issuer]]` already did. `ferrohealth-smart` 0.19 holds the issuer of every configuration table as a `SecretUrl` (#1897).
+- `fhirconnect` reads a path that names a single `EVENT` the Web Template collapsed into its `OBSERVATION` as that event, a structure, now that `openehr-sdt` 0.1.1 keeps the event's `time` leaf at the event's path. Before, such a path resolved to the `DV_DATE_TIME` leaf, so a mapping anchored at the event was refused as `fc-unpaired-types` and its children below the event as `fc-unknown-template-node` (#1919).
+- The server and the operator console move to ferrohealth-telemetry 0.5, ferrohealth-server 0.9 and ferrohealth-usage-report 0.5, whose subscriber installs its own bridge from the `log` crate in place of `tracing-log`'s `LogTracer`. Under a console filter that lets a target through above its default level, such as `info,ferrohealth_smart=debug`, a dependency's `log::log_enabled!` check no longer drops the next event on its thread, which lost the request line of a request that ran such a check (FerroHEALTH/FerroSYS#388). `ferrobridge-term` 0.10.1 takes ferrohealth-config 0.4.5, and `ferrobridge-validator` 0.10.1, `ferrobridge-hl7v2` 0.15.1 and `eehrxf` 0.13.1 follow it (#1936).
+
 ## [0.0.24] - 2026-11-11
 
 The family on `ferrohealth-smart` 0.18, and the EU documents. The bridge and
@@ -6831,7 +6903,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.24...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.25...HEAD
+[0.0.25]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.24...v0.0.25
 [0.0.24]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.23...v0.0.24
 [0.0.23]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.22...v0.0.23
 [0.0.22]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.21...v0.0.22
