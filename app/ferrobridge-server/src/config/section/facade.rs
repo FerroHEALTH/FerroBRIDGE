@@ -64,6 +64,8 @@ pub struct Facade {
     /// The exchange of access directives as FHIR `Consent`, IHE BPPC and
     /// IHE APPC.
     pub consent: FacadeConsent,
+    /// Cross-origin resource sharing on the REST routes.
+    pub cors: FacadeCors,
 }
 
 impl Default for Facade {
@@ -87,6 +89,7 @@ impl Default for Facade {
             party_search: FacadePartySearch::default(),
             binding_identifier_issuers: Vec::new(),
             consent: FacadeConsent::default(),
+            cors: FacadeCors::default(),
         }
     }
 }
@@ -204,4 +207,20 @@ pub struct FacadeConsent {
     /// The `default_access` of the first settings the exchange writes:
     /// `open`, `restricted` or `consent_required`.
     pub default_access: String,
+}
+
+/// Cross-origin resource sharing on the facade's REST routes.
+///
+/// The discovery document and the `CapabilityStatement` answer any origin
+/// whatever this says; the REST routes answer only the origins listed here,
+/// the "client's registered origin(s)" of SMART App Launch 2.2.0, App Launch,
+/// §Considerations for Cross-Origin Resource Sharing (CORS) support, which a
+/// resource server holding no client registry takes from its deployment (no
+/// specification governs the list's home: our own design).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeCors {
+    /// The origins a browser app may call the REST routes from, each an
+    /// `http` or `https` origin; empty admits none.
+    pub allowed_origins: Vec<String>,
 }

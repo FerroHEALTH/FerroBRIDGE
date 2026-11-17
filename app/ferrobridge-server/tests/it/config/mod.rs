@@ -8,6 +8,7 @@ mod audit;
 mod auth;
 mod change_feed;
 mod consent;
+mod cors;
 mod environment;
 mod etl;
 mod events;

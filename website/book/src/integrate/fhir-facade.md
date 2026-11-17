@@ -203,6 +203,41 @@ on-behalf-of grant), so the CDR records the clinician too; a machine keeps the
 bridge's own token, and a caller the exchange cannot carry is refused. The
 audit line still names the caller.
 
+### Browser apps (CORS)
+
+A purely browser-based SMART app calls the facade from another origin, so the
+browser asks the facade, through cross-origin resource sharing (CORS), whether
+the page may read each answer. SMART App Launch 2.2.0 (App Launch,
+Considerations for Cross-Origin Resource Sharing support) says a server that
+supports such apps "SHALL enable" CORS for any origin on the public discovery
+endpoints and for a client's registered origins on the FHIR REST API, and FHIR
+R4 (Security, Communications) asks the same of a server with browser clients.
+The facade answers both:
+
+| Route | Origins | `Access-Control-Allow-Origin` |
+|---|---|---|
+| `GET /fhir/metadata`, `GET /fhir/.well-known/smart-configuration`, `GET /.well-known/smart-configuration` | Any | `*` |
+| Every other route under `/fhir` | Those [`[facade.cors] allowed_origins`](../operate/configuration.md#facadecors) lists | The request's `Origin`, with `Vary: Origin` |
+
+The facade holds no client registry, so the registered origins are the list
+you configure. With the list empty, the default, the REST routes answer no
+origin and a browser withholds every answer from a page on another origin.
+No answer ever carries `Access-Control-Allow-Credentials`: an app sends its
+token in the `Authorization` header, never in a cookie.
+
+The facade answers the preflight (`OPTIONS` with
+`Access-Control-Request-Method`) of an admitted origin itself, before the
+token check, because a browser sends a preflight without the token. The
+answer is `204` with the methods the facade mounts (`GET` on the discovery
+endpoints; `GET`, `POST`, `PUT` and `DELETE` on the REST routes), the request
+headers it reads (`Authorization`, `Content-Type`, `Accept`, `Prefer`, the
+conditional headers and `X-Request-Id`) and a ten-minute `Access-Control-Max-Age`.
+A preflight from an origin the list does not name runs as any `OPTIONS` does:
+the guard refuses it with `403`, and the browser blocks the request it
+announced. An admitted origin also reads a refusal, such as the `401` of a
+missing token, with `Location`, `ETag`, `Last-Modified`, `Content-Location`,
+`WWW-Authenticate` and `X-Request-Id` exposed to the page.
+
 ## Media types and bodies
 
 The facade reads `application/fhir+json` and `application/json`, which R4 names

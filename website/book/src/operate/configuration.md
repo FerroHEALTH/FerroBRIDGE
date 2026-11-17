@@ -786,6 +786,30 @@ Each key is settable as `FERROBRIDGE__FACADE__REFERENCES__<KEY>`, and
 A base that is no `http` or `https` URL, or that carries a query or a
 fragment, is a boot error naming `facade.references.fetch_bases`.
 
+### `[facade.cors]`
+
+The origins a browser app may call the facade's REST routes from, through
+cross-origin resource sharing (the Integrate page,
+[Browser apps](../integrate/fhir-facade.md#browser-apps-cors)). SMART App
+Launch 2.2.0 asks a server that supports purely browser-based apps to admit
+a client's registered origins on its FHIR REST API; the facade holds no
+client registry, so this list is that registration. The
+`CapabilityStatement` and the SMART discovery document answer any origin
+with `Access-Control-Allow-Origin: *` whatever the list holds, and with
+`[facade]` off the discovery document still does.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `allowed_origins` | `[]` | The origins the REST routes under `/fhir` admit, each an `http` or `https` origin (scheme, host and an optional port, with nothing after but an optional `/`); empty admits none |
+
+The key is settable as `FERROBRIDGE__FACADE__CORS__ALLOWED_ORIGINS` and takes
+a TOML array: `FERROBRIDGE__FACADE__CORS__ALLOWED_ORIGINS='["https://app.example"]'`.
+An origin is compared in its serialized form, so `https://App.Example/` admits
+the browser's `https://app.example`. A value that is no `http` or `https`
+origin, a wildcard `*`, `null`, or a URL with a path, a query or a user, is a
+boot error naming `facade.cors.allowed_origins`: the REST routes carry the
+caller's token, so they answer only an origin you name.
+
 ### `[facade.consent]`
 
 The exchange of a patient's access directives as FHIR `Consent`, IHE BPPC and

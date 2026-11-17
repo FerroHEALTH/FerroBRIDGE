@@ -91,7 +91,7 @@ fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
 }
 
 /// The smallest enabled facade section.
-const ENABLED: &str = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n";
+pub(super) const ENABLED: &str = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n";
 
 #[test]
 fn the_search_page_sizes_default_and_resolve_as_configured()

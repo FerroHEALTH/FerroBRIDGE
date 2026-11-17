@@ -13,6 +13,7 @@ mod basic;
 mod batch;
 mod committer;
 mod compartment;
+mod cors;
 mod described;
 mod discovery;
 mod forwarding;

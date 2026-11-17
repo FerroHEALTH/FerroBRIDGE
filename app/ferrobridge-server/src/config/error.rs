@@ -178,6 +178,17 @@ pub enum Error {
         /// The value it holds.
         value: String,
     },
+    /// A configured CORS origin is no `http` or `https` origin.
+    #[error("{key} holds `{value}`, which is no http or https origin")]
+    CorsOrigin {
+        /// The key that holds it.
+        key: String,
+        /// The value it holds.
+        value: String,
+        /// Why it is no origin.
+        #[source]
+        source: crate::facade::cors::OriginError,
+    },
     /// An upstream client refused the configuration it was handed.
     #[error("the {upstream} client refused its configuration")]
     Client {

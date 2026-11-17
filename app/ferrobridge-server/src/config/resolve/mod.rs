@@ -95,7 +95,27 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         party_search: party_search(facade)?,
         binding_issuers: facade.binding_identifier_issuers.clone(),
         consent: consent(facade)?,
+        cors: cors(facade)?,
     })
+}
+
+/// Returns the CORS policy `facade` configures: every listed origin read in
+/// its ASCII serialization (RFC 6454 §6.2), so `*` and `null` are refused.
+fn cors(facade: &Facade) -> Result<crate::facade::cors::Cors, Error> {
+    const KEY: &str = "facade.cors.allowed_origins";
+    let origins = facade
+        .cors
+        .allowed_origins
+        .iter()
+        .map(|value| {
+            crate::facade::cors::Origin::parse(value).map_err(|source| Error::CorsOrigin {
+                key: String::from(KEY),
+                value: value.clone(),
+                source,
+            })
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    Ok(crate::facade::cors::Cors::new(origins))
 }
 
 /// Returns the access directive exchange `facade` configures, `None` when it
