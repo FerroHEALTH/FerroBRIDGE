@@ -24,7 +24,7 @@ use openehr_rm::draft::access_control::access_control::access_directive::AccessD
 use openehr_rm::draft::access_control::access_control::access_directive_settings::AccessDirectiveSettings;
 use openehr_rm::draft::access_control::access_control::access_policy::AccessPolicy;
 use openehr_rm::draft::access_control::terminology::{
-    AccessDefault, OperationClass, TERMINOLOGY_ID_ACCESS_CONTROL, Term,
+    AccessDefault, OperationClass, TERMINOLOGY_ID_ACCESS, Term,
 };
 use openehr_rm::v1_2::ehr::ehr_access::EhrAccess;
 use openehr_term::codes::VersionLifecycleState;
@@ -34,7 +34,6 @@ use crate::cdr::ehr_access::AccessError;
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
 use crate::consent::fhir::model::{Code, Document};
-use crate::consent::rm::coded;
 use crate::facade::commit::Change;
 use crate::facade::commit::Committer;
 
@@ -169,11 +168,7 @@ pub async fn append(
         .settings
         .clone()
         .unwrap_or_else(|| AccessDirectiveSettings {
-            default_access: coded(
-                TERMINOLOGY_ID_ACCESS_CONTROL,
-                settings.default_access.code(),
-                settings.default_access.code(),
-            ),
+            default_access: settings.default_access.coded(),
             gate_keepers: None,
             directives: None,
             labels: None,
@@ -252,7 +247,7 @@ pub async fn operations(
             continue;
         };
         let request = ferrobridge_term::request::Translation::new(system, code)
-            .with_target_system(TERMINOLOGY_ID_ACCESS_CONTROL);
+            .with_target_system(TERMINOLOGY_ID_ACCESS);
         let outcome = client
             .translate(&request)
             .await
@@ -264,12 +259,12 @@ pub async fn operations(
                 concept
                     .system
                     .as_deref()
-                    .is_none_or(|found| found == TERMINOLOGY_ID_ACCESS_CONTROL)
+                    .is_none_or(|found| found == TERMINOLOGY_ID_ACCESS)
             })
             .find_map(|concept| {
                 // NOTE: no specification governs this: our own design, a target that is no
                 // operation class is no translation, which the import refuses naming the coding.
-                OperationClass::read(TERMINOLOGY_ID_ACCESS_CONTROL, concept.code.as_deref()?).ok()
+                OperationClass::read(TERMINOLOGY_ID_ACCESS, concept.code.as_deref()?).ok()
             });
         if let Some(class) = class {
             translated.push((coding.clone(), class));

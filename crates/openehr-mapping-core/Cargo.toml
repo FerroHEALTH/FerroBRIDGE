@@ -33,7 +33,6 @@ openehr-am.workspace = true
 openehr-base.workspace = true
 openehr-its.workspace = true
 openehr-sdt.workspace = true
-regex.workspace = true
 openehr-rm.workspace = true
 serde.workspace = true
 serde-saphyr.workspace = true

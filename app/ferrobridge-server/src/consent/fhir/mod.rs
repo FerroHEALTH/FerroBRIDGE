@@ -62,6 +62,8 @@ pub const EXT_TIME_VALIDITY: &str = extension!("time-validity");
 pub const EXT_ROLE: &str = extension!("role");
 /// `ACCESS_ACTOR_SCOPE.relationship`, `valueCoding`.
 pub const EXT_RELATIONSHIP: &str = extension!("relationship");
+/// `ACCESS_ACTOR_SCOPE.organisation_type`, `valueCoding`.
+pub const EXT_ORGANISATION_TYPE: &str = extension!("organisation-type");
 /// `ACCESS_ACTOR_SCOPE.caller_kind`, `valueCoding`.
 pub const EXT_CALLER_KIND: &str = extension!("caller-kind");
 /// One of `ACCESS_DATA_SCOPE.archetypes`, `valueString`.

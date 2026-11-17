@@ -113,6 +113,7 @@ fn the_example_reads_as_the_referenced_policy_narrowed_to_the_facility_and_round
         }),
         role: None,
         relationship: None,
+        organisation_type: None,
         caller_kind: None,
     }]);
     assert_eq!(imported, vec![expected]);
@@ -142,6 +143,7 @@ fn directives_round_trip_through_a_privacy_consent_document() {
         party: None,
         role: Some(coded("2.16.840.1.113883.6.96", "46255001", "pharmacist")),
         relationship: None,
+        organisation_type: None,
         caller_kind: None,
     }]);
     permit.purposes = list(vec![coded("1.0.14265.1", "1", "clinical care")]);
@@ -265,6 +267,7 @@ fn export_refuses_a_scope_appc_has_no_attribute_for() {
         party: None,
         role: None,
         relationship: None,
+        organisation_type: None,
         caller_kind: Some(term(CallerKind::Professional)),
     }]);
     let mut templated = directive(DirectiveKind::Consent, Effect::Deny);

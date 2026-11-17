@@ -22,8 +22,8 @@ use ferrobridge_server::consent::fhir::import::{ImportContext, foreign_actions, 
 use ferrobridge_server::consent::fhir::model::{Code, Document, Ref, Rule};
 use ferrobridge_server::consent::fhir::{
     CONFIDENTIALITY, EXT_ARCHETYPE, EXT_CALLER_KIND, EXT_DIRECTIVE, EXT_EMERGENCY_OVERRIDE,
-    EXT_OBJECT_REF, EXT_ORIGIN, EXT_RELATIONSHIP, EXT_ROLE, EXT_TIME_VALIDITY, Release, bundle,
-    read,
+    EXT_OBJECT_REF, EXT_ORGANISATION_TYPE, EXT_ORIGIN, EXT_RELATIONSHIP, EXT_ROLE,
+    EXT_TIME_VALIDITY, Release, bundle, read,
 };
 use ferrobridge_server::consent::rm::coded;
 use ferrobridge_server::consent::rm::dv_date_time_text;
@@ -191,6 +191,7 @@ fn exception() -> AccessDirective {
         party: Some(party(DOCTOR, "PERSON")),
         role: None,
         relationship: None,
+        organisation_type: None,
         caller_kind: None,
     }]);
     x.operations = list(vec![term(OperationClass::Read)]);
@@ -249,18 +250,21 @@ fn full(kind: DirectiveKind, effect: Effect) -> AccessDirective {
             party: Some(party(DOCTOR, "PERSON")),
             role: Some(coded("local-roles", "GP", "general practitioner")),
             relationship: None,
+            organisation_type: None,
             caller_kind: None,
         },
         AccessActorScope {
             party: None,
             role: None,
             relationship: Some(term(Relationship::Care)),
+            organisation_type: Some(coded("local-organisation-types", "HOSP", "hospital")),
             caller_kind: Some(term(CallerKind::Professional)),
         },
         AccessActorScope {
             party: None,
             role: Some(coded("local-roles", "NURSE", "nurse")),
             relationship: None,
+            organisation_type: None,
             caller_kind: None,
         },
     ]);
@@ -353,6 +357,7 @@ fn export_writes_the_extension_of_every_attribute_with_no_core_element() {
             EXT_EMERGENCY_OVERRIDE,
             EXT_ROLE,
             EXT_RELATIONSHIP,
+            EXT_ORGANISATION_TYPE,
             EXT_CALLER_KIND,
             EXT_ARCHETYPE,
             EXT_ORIGIN,
