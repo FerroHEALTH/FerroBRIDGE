@@ -336,7 +336,7 @@ impl<'a> Compiler<'a> {
         if let (Some(_), Some(target)) = (&fhir, &openehr)
             && plain
             && data_type != Some(DataType::None)
-            && derived != Some(Derived::Anchor)
+            && !matches!(derived, Some(Derived::Anchor | Derived::Event(_)))
         {
             self.carried_tail(
                 file,
