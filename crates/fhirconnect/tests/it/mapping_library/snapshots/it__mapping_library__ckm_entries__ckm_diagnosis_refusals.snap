@@ -1,0 +1,17 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused_with(DIAGNOSIS, \"ferrobridge_library_diagnosis.context\",\nDIAGNOSIS_FILES, &[\"ferrobridge_problem_diagnosis_clusters.yml\"])?"
+---
+[
+  "multiple_coding_icd10gm.v1.yml:23 fc-uncarried-tail",
+  "multiple_coding_icd10gm.v1.yml:30 fc-unknown-fhir-element",
+  "multiple_coding_icd10gm.v1.yml:49 fc-uncarried-tail",
+  "multiple_coding_icd10gm.v1.yml:56 fc-unknown-fhir-element",
+  "multiple_coding_icd10gm.v1.yml:88 fc-uncarried-tail",
+  "multiple_coding_icd10gm.v1.yml:95 fc-unknown-fhir-element",
+  "problem_qualifier.v2.yml:109 fc-uncarried-tail",
+  "problem_qualifier.v2.yml:136 fc-uncarried-tail",
+  "problem_qualifier.v2.yml:28 fc-uncarried-tail",
+  "problem_qualifier.v2.yml:55 fc-uncarried-tail",
+  "problem_qualifier.v2.yml:82 fc-uncarried-tail"
+]

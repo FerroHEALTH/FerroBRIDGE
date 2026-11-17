@@ -366,9 +366,13 @@ macro_rules! library_template {
 /// daily timing cluster; the patient template holds the person cluster with
 /// its name, address and organisation clusters, the death details and birth
 /// data clusters and the insurance entry, and the case template the local
-/// institution episode with its location cluster. A suite builds the ADL 2
-/// operational templates at test time.
-pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 12] = [
+/// institution episode with its location cluster; the diagnosis template
+/// holds the problem diagnosis with its body site, status and multiple
+/// coding clusters, and the laboratory template the laboratory result with
+/// its specimen and analyte clusters, the service request, the vital status
+/// and the informed consent. A suite builds the ADL 2 operational templates
+/// at test time.
+pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 14] = [
     library_template!("report"),
     library_template!("report_result"),
     library_template!("medication_list"),
@@ -381,15 +385,19 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 12] = [
     library_template!("medication_statement"),
     library_template!("patient"),
     library_template!("case"),
+    library_template!("diagnosis"),
+    library_template!("laboratory"),
 ];
 
-/// The seventeen international CKM archetypes of the library templates.
+/// The twenty-four international CKM archetypes of the library templates.
 ///
 /// They are the report, report result and medication list compositions, the
 /// absence, global exclusion, gender and adverse reaction risk evaluations,
-/// the medication statement observation, and the device, case
-/// identification, adverse reaction event, clinical evidence, non-daily
-/// timing, person, address and structured name clusters of
+/// the medication statement and laboratory test result observations, the
+/// service request instruction, the informed consent action, and the device,
+/// case identification, adverse reaction event, clinical evidence, non-daily
+/// timing, person, address, structured name, anatomical location, problem
+/// qualifier, laboratory analyte and specimen clusters of
 /// [`FERROBRIDGE_LIBRARY_TEMPLATES`], and the
 /// organisation cluster the imaging service slot of
 /// [`FERROBRIDGE_IMAGING_TEMPLATE`] holds.
@@ -397,7 +405,7 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 12] = [
 /// `scripts/vendor/ckm-library.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 17] = [
+pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 24] = [
     ckm_library!("openEHR-EHR-COMPOSITION.report.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.report-result.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.medication_list.v1.adl"),
@@ -415,20 +423,28 @@ pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 17] = [
     ckm_library!("openEHR-EHR-CLUSTER.person.v1.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.address.v1.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.structured_name.v1.adl"),
+    ckm_library!("openEHR-EHR-CLUSTER.anatomical_location.v1.adl"),
+    ckm_library!("openEHR-EHR-CLUSTER.problem_qualifier.v2.adl"),
+    ckm_library!("openEHR-EHR-CLUSTER.laboratory_test_analyte.v1.adl"),
+    ckm_library!("openEHR-EHR-CLUSTER.specimen.v1.adl"),
+    ckm_library!("openEHR-EHR-INSTRUCTION.service_request.v1.adl"),
+    ckm_library!("openEHR-EHR-OBSERVATION.laboratory_test_result.v1.adl"),
+    ckm_library!("openEHR-EHR-ACTION.informed_consent.v0.adl"),
 ];
 
-/// The twelve published `HiGHmed` CKM archetypes of the library templates.
+/// The fourteen published `HiGHmed` CKM archetypes of the library templates.
 ///
 /// They are the encounter (`fall`) and person compositions, the insurance
-/// and local institution episode entries, and the entry category, FHIR
-/// identifier, medication status, observation status, organization, death
-/// details, birth data and location clusters of
+/// and local institution episode entries, the vital status evaluation, and
+/// the entry category, FHIR identifier, medication status, observation
+/// status, organization, death details, birth data, location and ICD-10-GM
+/// multiple coding clusters of
 /// [`FERROBRIDGE_LIBRARY_TEMPLATES`].
 ///
 /// `scripts/vendor/ckm-highmed.sh` fetches them at the German CKM mirror
 /// commit `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records
 /// their source and each archetype's own licence.
-pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 12] = [
+pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 14] = [
     (
         "openEHR-EHR-COMPOSITION.fall.v1.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.fall.v1.adl"),
@@ -480,6 +496,14 @@ pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 12] = [
     (
         "openEHR-EHR-CLUSTER.location.v1.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-CLUSTER.location.v1.adl"),
+    ),
+    (
+        "openEHR-EHR-CLUSTER.multiple_coding_icd10gm.v1.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-CLUSTER.multiple_coding_icd10gm.v1.adl"),
+    ),
+    (
+        "openEHR-EHR-EVALUATION.vital_status.v1.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-EVALUATION.vital_status.v1.adl"),
     ),
 ];
 

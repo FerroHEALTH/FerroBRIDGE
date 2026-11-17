@@ -1,0 +1,8 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused(LABORATORY, \"ferrobridge_library_service_request.context\",\nSERVICE_REQUEST)?"
+---
+[
+  "service_request.v1.yml:34 fc-unknown-template-node",
+  "service_request.v1.yml:62 fc-excluded-template-node"
+]

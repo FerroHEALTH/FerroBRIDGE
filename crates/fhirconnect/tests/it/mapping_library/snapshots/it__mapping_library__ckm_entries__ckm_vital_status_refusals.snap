@@ -1,0 +1,15 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused(LABORATORY, \"ferrobridge_library_vital_status.context\", VITAL_STATUS)?"
+---
+[
+  "vital_status.v1.yml:105 fc-duplicate-method-name",
+  "vital_status.v1.yml:113 fc-duplicate-method-name",
+  "vital_status.v1.yml:121 fc-duplicate-method-name",
+  "vital_status.v1.yml:36 fc-uncarried-tail",
+  "vital_status.v1.yml:38 fc-uncarried-tail",
+  "vital_status.v1.yml:51 fc-unknown-template-node",
+  "vital_status.v1.yml:67 fc-uncarried-tail",
+  "vital_status.v1.yml:69 fc-uncarried-tail",
+  "vital_status.v1.yml:97 fc-duplicate-method-name"
+]

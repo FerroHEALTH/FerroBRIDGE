@@ -3,7 +3,7 @@
 
 # Provenance: the HiGHmed CKM archetypes of the FHIRconnect mapping library
 
-12 published archetypes of the HiGHmed Clinical Knowledge Manager,
+14 published archetypes of the HiGHmed Clinical Knowledge Manager,
 vendored verbatim by `scripts/vendor/ckm-highmed.sh`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -11,7 +11,7 @@ docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/openEHR-de/CKM-mirror>, the mirror of the German CKM
 - Pin: commit `adc22deddb96d5e557186fe595f52ef287510633`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `63cd90f0a9dbb7b3eb46f678c390dd09344774ed26231844c49f1c328fa4b4c8`
+  `PROVENANCE.md` excluded): `2bf7b26e52cb8543b9a98431353b995cb4d2d2dfe2231cfcb50aba9067f732e7`
 - Fetched: 2026-11-17
 - Upstream licence: Creative Commons Attribution-ShareAlike, 3.0 or 4.0 as
   each archetype states in its `description` `licence`; the mirror
@@ -37,3 +37,5 @@ Files:
 - `openEHR-EHR-CLUSTER.death_details.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.death_details.v1.adl`, sha256 `38c6b9a946ab76d288c02a1ae26002666444343afa68e4209b91055716a59b67`
 - `openEHR-EHR-CLUSTER.person_birth_data_iso.v0.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.person_birth_data_iso.v0.adl`, sha256 `0157a657583dfc939058d321d69a967cd137e203a6daba9ec9bbc671c170f311`
 - `openEHR-EHR-CLUSTER.location.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.location.v1.adl`, sha256 `2b031a9cb605b59c192b3ea235e62591acb8a60ec586dc116560ae9f1de5297f`
+- `openEHR-EHR-CLUSTER.multiple_coding_icd10gm.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.multiple_coding_icd10gm.v1.adl`, sha256 `d6459e23b0a377817af5f315b24d4fac75d31740ec135816ede9712adbbbbd75`
+- `openEHR-EHR-EVALUATION.vital_status.v1.adl` from `local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.vital_status.v1.adl`, sha256 `7998bd197e80553e1b32fa8e23e316ca53d4c5e2f3e4c44678e0ddebebe4f259`

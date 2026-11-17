@@ -56,6 +56,13 @@ paths=(
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.person.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.address.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.structured_name.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.anatomical_location.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.problem_qualifier.v2.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.laboratory_test_analyte.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.specimen.v1.adl"
+  "local/archetypes/entry/instruction/openEHR-EHR-INSTRUCTION.service_request.v1.adl"
+  "local/archetypes/entry/observation/openEHR-EHR-OBSERVATION.laboratory_test_result.v1.adl"
+  "local/archetypes/entry/action/openEHR-EHR-ACTION.informed_consent.v0.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"

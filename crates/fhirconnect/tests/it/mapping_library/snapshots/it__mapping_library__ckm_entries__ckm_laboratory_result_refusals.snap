@@ -1,0 +1,37 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused_with(LABORATORY, \"ferrobridge_library_laboratory_result.context\",\nLABORATORY_FILES, &[\"ferrobridge_laboratory_result_analyte.yml\"])?"
+---
+[
+  "laboratory_test_analyte.v1.yml:109 fc-uncarried-tail",
+  "laboratory_test_analyte.v1.yml:131 fc-uncarried-tail",
+  "laboratory_test_analyte.v1.yml:153 fc-uncarried-tail",
+  "laboratory_test_analyte.v1.yml:175 fc-uncarried-tail",
+  "laboratory_test_analyte.v1.yml:197 fc-uncarried-tail",
+  "laboratory_test_analyte.v1.yml:33 fc-uncarried-tail",
+  "laboratory_test_analyte.v1.yml:65 fc-uncarried-tail",
+  "laboratory_test_analyte.v1.yml:87 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:142 fc-unknown-fhir-element",
+  "laboratory_test_result.v1.yml:156 fc-unknown-fhir-element",
+  "laboratory_test_result.v1.yml:190 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:211 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:233 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:255 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:277 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:299 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:321 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:343 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:365 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:383 fc-unknown-template-node",
+  "laboratory_test_result.v1.yml:388 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:390 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:392 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:47 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:49 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:61 fc-unknown-template-node",
+  "laboratory_test_result.v1.yml:77 fc-uncarried-tail",
+  "laboratory_test_result.v1.yml:79 fc-uncarried-tail",
+  "specimen.v1.yml:156 fc-uncarried-tail",
+  "specimen.v1.yml:178 fc-uncarried-tail",
+  "specimen.v1.yml:200 fc-uncarried-tail"
+]

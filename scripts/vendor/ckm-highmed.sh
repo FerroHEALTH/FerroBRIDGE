@@ -50,6 +50,8 @@ paths=(
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.death_details.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.person_birth_data_iso.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.location.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.multiple_coding_icd10gm.v1.adl"
+  "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.vital_status.v1.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"

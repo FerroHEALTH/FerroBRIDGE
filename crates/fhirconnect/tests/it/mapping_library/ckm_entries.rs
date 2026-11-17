@@ -15,12 +15,22 @@
 //! slotted by a FerroBRIDGE Patient model because the openEHR-de mirror
 //! publishes `ADMIN_ENTRY.person_data.v0`, which slots them in the library,
 //! with no licence, and the local institution episode with its location
-//! cluster against the library case template. Each is refused
+//! cluster against the library case template. The diagnosis clusters
+//! compile against the library diagnosis template, slotted by a FerroBRIDGE
+//! Condition model, and the laboratory result with its specimen and analyte
+//! clusters, the service request and the vital status against the library
+//! laboratory template; the informed consent is refused before it compiles.
+//! Each is refused
 //! at load, and the suite pins every refusal by file and line; each site is
 //! recorded on #101. `dosage.v2.BackboneElement.yml` raises none of them.
 
 use core::error::Error;
 
+use fhirconnect::engine::library::Library;
+use fhirconnect::model::load::load_set;
+
+use super::CORPUS;
+use super::PROJECT;
 use super::compiled;
 use super::rows;
 
@@ -85,6 +95,42 @@ const PATIENT_FILES: &[&str] = &[
 const CASE_FILES: &[&str] = &[
     "model/admin_entry/org.highmed/episode_institution_local.v0.yml",
     "model/cluster/org.openehr/location.v1.yml",
+];
+
+/// The library diagnosis template.
+const DIAGNOSIS: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_diagnosis.v1.0.0";
+
+/// The library laboratory template.
+const LABORATORY: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_laboratory.v1.0.0";
+
+/// The diagnosis clusters, which FerroBRIDGE's Condition model slots.
+const DIAGNOSIS_FILES: &[&str] = &[
+    "model/cluster/org.openehr/anatomical_location.v1.yml",
+    "model/cluster/org.openehr/problem_qualifier.v2.yml",
+    "model/cluster/org.highmed/multiple_coding_icd10gm.v1.yml",
+];
+
+/// The laboratory result and its specimen and analyte clusters.
+const LABORATORY_FILES: &[&str] = &[
+    "model/observation/org.openehr/laboratory_test_result.v1.yml",
+    "model/cluster/org.openehr/specimen.v1.yml",
+    "model/cluster/org.openehr/laboratory_test_analyte.v1.yml",
+];
+
+/// The service request and the organisation cluster it slots.
+const SERVICE_REQUEST: &[&str] = &[
+    "model/instruction/org.openehr/service_request.v1.yml",
+    "model/cluster/org.openehr/organisation.v1.yml",
+];
+
+/// The vital status evaluation.
+const VITAL_STATUS: &[&str] = &["model/evaluation/org.openehr/vital_status.v1.yml"];
+
+/// The informed consent and the study clusters it slots.
+const CONSENT: &[&str] = &[
+    "model/action/org.openehr/informed_consent.v0.yml",
+    "model/cluster/org.highmed/study_participation.v1.yml",
+    "model/cluster/org.highmed/study_details.v1.yml",
 ];
 
 /// The medication action and the clusters it slots.
@@ -242,5 +288,95 @@ fn the_case_entry_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
         "ckm_case_refusals",
         refused(CASE, "ferrobridge_library_case.context", CASE_FILES)?
     );
+    Ok(())
+}
+
+/// `problem_qualifier.v2.yml` and `multiple_coding_icd10gm.v1.yml` write
+/// `defining_code/terminology_id` in their `manual` rows, and the multiple
+/// coding cluster reads `value` on a `Coding` (`:30`, `:56`, `:95`);
+/// `anatomical_location.v1.yml` raises none slotted on `Condition.bodySite`.
+#[test]
+fn the_diagnosis_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "ckm_diagnosis_refusals",
+        refused_with(
+            DIAGNOSIS,
+            "ferrobridge_library_diagnosis.context",
+            DIAGNOSIS_FILES,
+            &["ferrobridge_problem_diagnosis_clusters.yml"]
+        )?
+    );
+    Ok(())
+}
+
+/// The laboratory result maps participations through raw paths, names
+/// `perfomer`, reads `text` on a `Coding`, writes
+/// `defining_code/terminology_id`, and walks `null_flavour` below the
+/// `DV_CODED_TEXT` value of `items[at0073]` (`:383` to `:392`); the specimen
+/// and analyte clusters write `defining_code/terminology_id` too. The
+/// analyte cluster is slotted by FerroBRIDGE's extension, the append the KDS
+/// laboratory report extension makes.
+#[test]
+fn the_laboratory_result_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "ckm_laboratory_result_refusals",
+        refused_with(
+            LABORATORY,
+            "ferrobridge_library_laboratory_result.context",
+            LABORATORY_FILES,
+            &["ferrobridge_laboratory_result_analyte.yml"]
+        )?
+    );
+    Ok(())
+}
+
+/// `service_request.v1.yml:34` maps `$composition/provider`, which a
+/// `COMPOSITION` does not have; its requester organisation at `:62` sits in
+/// a protocol slot whose CKM requester admits only `CLUSTER.person.v1`, so
+/// the template leaves it out and the method is ignored with a warning.
+#[test]
+fn the_service_request_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "ckm_service_request_refusals",
+        refused(
+            LABORATORY,
+            "ferrobridge_library_service_request.context",
+            SERVICE_REQUEST
+        )?
+    );
+    Ok(())
+}
+
+/// `vital_status.v1.yml` maps participations through raw paths and names
+/// `perfomer` at `:51`.
+#[test]
+fn the_vital_status_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "ckm_vital_status_refusals",
+        refused(
+            LABORATORY,
+            "ferrobridge_library_vital_status.context",
+            VITAL_STATUS
+        )?
+    );
+    Ok(())
+}
+
+/// `informed_consent.v0.yml:170` slots `CLUSTER.study_participation.v1`,
+/// which slots `CLUSTER.study_details.v1`, whose `mappings` is `null`
+/// (#101), so the set refuses before anything compiles.
+#[test]
+fn the_informed_consent_is_refused_at_load() -> Result<(), Box<dyn Error>> {
+    let paths: Vec<String> = CONSENT
+        .iter()
+        .map(|file| format!("{CORPUS}/{file}"))
+        .chain([format!(
+            "{PROJECT}/ferrobridge_library_informed_consent.context.yml"
+        )])
+        .collect();
+    let Err(diagnostics) = load_set(paths, &Library) else {
+        return Err("the informed consent set loads".into());
+    };
+    insta::assert_json_snapshot!("ckm_informed_consent_refusals", rows(&diagnostics));
     Ok(())
 }
