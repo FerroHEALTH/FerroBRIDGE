@@ -688,7 +688,8 @@ async fn build_facade(
             .with_identifier_search(lane.identifier.clone())
             .with_party_search(lane.party_search.clone())
             .with_binding_issuers(lane.binding_issuers.clone())
-            .with_consent(lane.consent.clone()),
+            .with_consent(lane.consent.clone())
+            .with_cors(lane.cors.clone()),
         counts,
     ))
 }

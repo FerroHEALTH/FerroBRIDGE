@@ -452,6 +452,10 @@ async fn serve_command(settings: Settings) -> anyhow::Result<()> {
 /// With `[audit]` on, every facade access an authenticated caller makes
 /// passes the layer of [`facade::audit::record`] inside the guard, which
 /// records it and refuses it when its record has no place.
+///
+/// Outside the guard, [`facade::cors::apply`] answers the CORS of the FHIR
+/// base: any origin on the discovery document and the `CapabilityStatement`,
+/// the origins `[facade.cors]` lists on the REST routes.
 pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
@@ -497,6 +501,15 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
         ));
     }
     let routes = routes.layer(facade::guard::layer(state.auth().map(AsRef::as_ref)));
+    let cors = state
+        .facade()
+        .map_or_else(facade::cors::Cors::default, |mounted| {
+            mounted.cors().clone()
+        });
+    let routes = routes.layer(axum::middleware::from_fn_with_state(
+        cors,
+        facade::cors::apply,
+    ));
     with_middleware(routes, state, server)
 }
 

@@ -410,6 +410,8 @@ pub struct FacadeSettings {
     pub binding_issuers: Vec<String>,
     /// The access directive exchange, when `Consent` is served.
     pub consent: Option<crate::consent::exchange::Settings>,
+    /// The CORS policy of the FHIR base.
+    pub cors: crate::facade::cors::Cors,
 }
 
 /// The HL7 v2 face, resolved.

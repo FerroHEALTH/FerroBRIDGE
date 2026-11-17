@@ -252,8 +252,10 @@ data;"
   `[operator] mapping_dir` lets an operator-scope token change the mappings.
   `[hl7v2] enabled` opens an MLLP listener that writes into the CDR. A name in
   `[telemetry] logged_query_parameters` lets that parameter's value reach the
-  log, and `[facade.references] fetch_bases` lets the facade fetch from the
-  bases it lists ([configuring the server](../operate/configuration.md)).
+  log, `[facade.references] fetch_bases` lets the facade fetch from the
+  bases it lists, and `[facade.cors] allowed_origins` lets a page on each
+  origin it lists read the facade's answers in a browser
+  ([configuring the server](../operate/configuration.md)).
 - **Mappings.** A mapping decides which data crosses between the CDR and the
   target, so a changed mapping changes what the facade serves and writes and
   what the ETL copies into the CDM database.

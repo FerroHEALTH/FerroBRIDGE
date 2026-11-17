@@ -22,6 +22,7 @@ pub mod capability;
 pub mod commit;
 pub mod compartment;
 pub mod consent;
+pub mod cors;
 pub mod document;
 pub mod edge;
 pub mod ehr;
@@ -154,6 +155,8 @@ pub struct Facade {
     demographics: Arc<dyn Demographics>,
     /// The access directive exchange, when `Consent` is served.
     consent: Option<crate::consent::exchange::Settings>,
+    /// The CORS policy of the FHIR base.
+    cors: cors::Cors,
 }
 
 /// Returns the demographics endpoint of a facade at `settings.base_url`: the
@@ -195,6 +198,7 @@ impl Facade {
             references: references::Policy::default(),
             usage: Arc::new(crate::usage_report::window()),
             consent: None,
+            cors: cors::Cors::default(),
         }
     }
 
@@ -204,6 +208,19 @@ impl Facade {
     pub fn with_consent(mut self, consent: Option<crate::consent::exchange::Settings>) -> Self {
         self.consent = consent;
         self
+    }
+
+    /// Returns this facade admitting the origins of `cors` on its REST routes.
+    #[must_use]
+    pub fn with_cors(mut self, cors: cors::Cors) -> Self {
+        self.cors = cors;
+        self
+    }
+
+    /// Returns the CORS policy of the FHIR base.
+    #[must_use]
+    pub const fn cors(&self) -> &cors::Cors {
+        &self.cors
     }
 
     /// Returns the access directive exchange, when `Consent` is served.
