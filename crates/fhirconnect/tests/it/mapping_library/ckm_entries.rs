@@ -10,12 +10,11 @@
 //! template, and the medication action with its dosage and medication
 //! clusters against the library medication action template, and the
 //! medication statement with its dosage, timing and medication clusters
-//! against the library medication statement template. The patient clusters
-//! and the insurance entry compile against the library patient template,
-//! slotted by a FerroBRIDGE Patient model because the openEHR-de mirror
-//! publishes `ADMIN_ENTRY.person_data.v0`, which slots them in the library,
-//! with no licence, and the local institution episode with its location
-//! cluster against the library case template. The diagnosis clusters
+//! against the library medication statement template. The person data entry
+//! and its clusters compile against the library patient template, the
+//! insurance entry slotted by a FerroBRIDGE extension, and the local
+//! institution episode with its location cluster against the library case
+//! template. The diagnosis clusters
 //! compile against the library diagnosis template, slotted by a FerroBRIDGE
 //! Condition model, and the laboratory result with its specimen and analyte
 //! clusters, the service request and the vital status against the library

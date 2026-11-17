@@ -3,7 +3,7 @@
 
 # Provenance: the HiGHmed CKM archetypes of the FHIRconnect mapping library
 
-14 published archetypes of the HiGHmed Clinical Knowledge Manager,
+15 published archetypes of the HiGHmed Clinical Knowledge Manager,
 vendored verbatim by `scripts/vendor/ckm-highmed.sh`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -11,7 +11,7 @@ docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/openEHR-de/CKM-mirror>, the mirror of the German CKM
 - Pin: commit `adc22deddb96d5e557186fe595f52ef287510633`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `2bf7b26e52cb8543b9a98431353b995cb4d2d2dfe2231cfcb50aba9067f732e7`
+  `PROVENANCE.md` excluded): `68cdc0829dcf9dc6bfc30a8f2b03fa67625c955b663f1bfded953a58ef644d0a`
 - Fetched: 2026-11-17
 - Upstream licence: Creative Commons Attribution-ShareAlike, 3.0 or 4.0 as
   each archetype states in its `description` `licence`; the mirror

@@ -363,9 +363,10 @@ macro_rules! library_template {
 /// medication cluster and the dosage cluster in its slots, and the
 /// medication statement template holds the medication statement with the
 /// medication, dosage and non-daily timing clusters, the dosage holding the
-/// daily timing cluster; the patient template holds the person cluster with
-/// its name, address and organisation clusters, the death details and birth
-/// data clusters and the insurance entry, and the case template the local
+/// daily timing cluster; the patient template holds the person data entry
+/// with the person cluster (and its name, address and organisation
+/// clusters), the death details and birth data clusters, and the insurance
+/// entry, and the case template the local
 /// institution episode with its location cluster; the diagnosis template
 /// holds the problem diagnosis with its body site, status and multiple
 /// coding clusters, and the laboratory template the laboratory result with
@@ -432,10 +433,10 @@ pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 24] = [
     ckm_library!("openEHR-EHR-ACTION.informed_consent.v0.adl"),
 ];
 
-/// The fourteen published `HiGHmed` CKM archetypes of the library templates.
+/// The fifteen published `HiGHmed` CKM archetypes of the library templates.
 ///
-/// They are the encounter (`fall`) and person compositions, the insurance
-/// and local institution episode entries, the vital status evaluation, and
+/// They are the encounter (`fall`) and person compositions, the person data,
+/// insurance and local institution episode entries, the vital status evaluation, and
 /// the entry category, FHIR identifier, medication status, observation
 /// status, organization, death details, birth data, location and ICD-10-GM
 /// multiple coding clusters of
@@ -443,8 +444,9 @@ pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 24] = [
 ///
 /// `scripts/vendor/ckm-highmed.sh` fetches them at the German CKM mirror
 /// commit `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records
-/// their source and each archetype's own licence.
-pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 14] = [
+/// their source and each archetype's own licence, and the licence the person
+/// data entry, which states none, is vendored under.
+pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 15] = [
     (
         "openEHR-EHR-COMPOSITION.fall.v1.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-COMPOSITION.fall.v1.adl"),
@@ -504,6 +506,10 @@ pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 14] = [
     (
         "openEHR-EHR-EVALUATION.vital_status.v1.adl",
         include_str!("../fixtures/ckm/highmed/openEHR-EHR-EVALUATION.vital_status.v1.adl"),
+    ),
+    (
+        "openEHR-EHR-ADMIN_ENTRY.person_data.v0.adl",
+        include_str!("../fixtures/ckm/highmed/openEHR-EHR-ADMIN_ENTRY.person_data.v0.adl"),
     ),
 ];
 
