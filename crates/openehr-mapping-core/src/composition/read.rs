@@ -231,13 +231,7 @@ impl WebTemplateIndex {
         node: &ResolvedNode,
         occurrences: &[RmPosition],
     ) -> Result<Option<Value>, PathError> {
-        if composition.document_template_id() != self.template_id() {
-            return Err(PathError::TemplateMismatch {
-                expected: self.template_id().to_owned(),
-                found: composition.document_template_id().to_owned(),
-            });
-        }
-        let path = self.instance_path(node, occurrences)?;
+        let path = self.instance_in(composition.document_template_id(), node, occurrences)?;
         Ok(self.walk(composition.document(), &path.segments))
     }
 
@@ -261,13 +255,7 @@ impl WebTemplateIndex {
         node: &ResolvedNode,
         occurrences: &[RmPosition],
     ) -> Result<Option<Value>, PathError> {
-        if composition.document_template_id() != self.template_id() {
-            return Err(PathError::TemplateMismatch {
-                expected: self.template_id().to_owned(),
-                found: composition.document_template_id().to_owned(),
-            });
-        }
-        let path = self.instance_path(node, occurrences)?;
+        let path = self.instance_in(composition.document_template_id(), node, occurrences)?;
         let element = match path.segments.split_last() {
             Some((last, element))
                 if last.attribute == "value" && last.predicate.archetype_node_id.is_none() =>
@@ -281,6 +269,32 @@ impl WebTemplateIndex {
             }
         };
         Ok(self.walk(composition.document(), element))
+    }
+
+    /// Reads the object that holds one instance of a node out of a
+    /// composition, one attribute above it.
+    ///
+    /// The Web Template keeps the mandatory `time` of a single `EVENT` it
+    /// collapses into its `OBSERVATION` and no node of the event itself
+    /// (Simplified Formats master04 §"Conditionally Collapsed Wrapper
+    /// Types"), so the event's class and attributes sit in the object that
+    /// holds that leaf. The root of a composition has no holder, and reads as
+    /// `None`.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`WebTemplateIndex::read`], less the untyped value.
+    pub fn read_holder<D: CanonicalDocument + ?Sized>(
+        &self,
+        composition: &D,
+        node: &ResolvedNode,
+        occurrences: &[RmPosition],
+    ) -> Result<Option<Value>, PathError> {
+        let path = self.instance_in(composition.document_template_id(), node, occurrences)?;
+        let Some((_, holder)) = path.segments.split_last() else {
+            return Ok(None);
+        };
+        Ok(self.walk(composition.document(), holder))
     }
 
     /// Returns the path that names one instance of `node` in a composition,
@@ -305,13 +319,7 @@ impl WebTemplateIndex {
         node: &ResolvedNode,
         occurrences: &[RmPosition],
     ) -> Result<Option<RmPath>, PathError> {
-        if composition.document_template_id() != self.template_id() {
-            return Err(PathError::TemplateMismatch {
-                expected: self.template_id().to_owned(),
-                found: composition.document_template_id().to_owned(),
-            });
-        }
-        let path = self.instance_path(node, occurrences)?;
+        let path = self.instance_in(composition.document_template_id(), node, occurrences)?;
         let found = self.navigator().instances(composition.document(), &path);
         let Some(instance) = found.first() else {
             return Ok(None);
@@ -422,6 +430,23 @@ impl WebTemplateIndex {
             });
         }
         Ok(key)
+    }
+
+    /// Returns the path of one instance of `node` in a composition built
+    /// against the template `template_id`, with its positions set.
+    pub(crate) fn instance_in(
+        &self,
+        template_id: &str,
+        node: &ResolvedNode,
+        occurrences: &[RmPosition],
+    ) -> Result<RmPath, PathError> {
+        if template_id != self.template_id() {
+            return Err(PathError::TemplateMismatch {
+                expected: self.template_id().to_owned(),
+                found: template_id.to_owned(),
+            });
+        }
+        self.instance_path(node, occurrences)
     }
 
     /// Returns the path of one instance of `node`, with its positions set.

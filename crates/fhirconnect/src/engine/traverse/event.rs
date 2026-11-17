@@ -31,6 +31,7 @@ use crate::engine::outcome::Warning;
 use crate::engine::rm::RmValue;
 use crate::resolve::program::mapping::EventTime;
 use crate::resolve::program::mapping::Mapping;
+use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::Occurrence;
 use crate::tree::element::Table;
 use crate::tree::read::read;
@@ -39,6 +40,7 @@ use crate::engine::traverse::Binding;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::error::EngineError;
 use crate::engine::traverse::error::EventRefusal;
+use crate::engine::traverse::unread;
 
 /// The `_type` of an interval event (RM data structures, `INTERVAL_EVENT`).
 const INTERVAL_EVENT: &str = "INTERVAL_EVENT";
@@ -62,8 +64,11 @@ const DATE_TIME_INTERVAL: &str = "DV_INTERVAL<DV_DATE_TIME>";
 pub(super) struct Interval {
     /// The mapping that wrote it, for a refusal.
     mapping: String,
-    /// The event node.
+    /// The event node, or the `time` node of an event folded into its
+    /// `OBSERVATION`.
     node: FlatId,
+    /// Whether the event is the object holding [`Self::node`].
+    folded: bool,
     /// The instance of each repeating node down to the event.
     positions: Vec<RmPosition>,
     /// The width, an ISO 8601 duration.
@@ -164,13 +169,18 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 })
                 .filter(|width| !width.value.starts_with('-'))
                 .ok_or_else(|| refuse(EventRefusal::NoWidth))?;
-                let node = mapping
-                    .openehr()
-                    .ok_or_else(|| refuse(EventRefusal::Type))?
-                    .node();
+                let node = if event.is_folded() {
+                    event.time().node()
+                } else {
+                    mapping
+                        .openehr()
+                        .ok_or_else(|| refuse(EventRefusal::Type))?
+                        .node()
+                };
                 self.intervals.push(Interval {
                     mapping: String::from(mapping.name()),
                     node: node.flat_id().clone(),
+                    folded: event.is_folded(),
                     positions: binding.openehr.clone(),
                     width: width.value,
                 });
@@ -188,11 +198,21 @@ impl<T: Table + ?Sized> Run<'_, T> {
         input: &Occurrence,
         binding: &Binding,
     ) -> Result<(), EngineError> {
-        let Some(node) = mapping.openehr() else {
+        let Some(mapped) = mapping.openehr() else {
             return Ok(());
         };
+        let node = if event.is_folded() {
+            event.time()
+        } else {
+            mapped
+        };
         let positions = Self::positions_of(mapping, input, node)?;
-        let Some(held) = self.node_value(mapping.name(), node, &positions)? else {
+        let held = if event.is_folded() {
+            self.folded_event(mapping.name(), node, &positions)?
+        } else {
+            self.node_value(mapping.name(), node, &positions)?
+        };
+        let Some(held) = held else {
             return Ok(());
         };
         let element = event.read().resolved().leaf();
@@ -298,30 +318,62 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 source: Box::new(source),
             };
             let node = self.index.node_by_flat_id(&interval.node).map_err(refuse)?;
-            built = self
-                .index
-                .amend(built, node, &interval.positions, |event| {
-                    event.insert(String::from("_type"), json!(INTERVAL_EVENT));
-                    event.insert(
-                        String::from("width"),
-                        json!({"_type": "DV_DURATION", "value": interval.width}),
-                    );
-                    event.insert(
-                        String::from("math_function"),
-                        json!({
-                            "_type": "DV_CODED_TEXT",
-                            "value": ACTUAL_RUBRIC,
-                            "defining_code": {
-                                "_type": "CODE_PHRASE",
-                                "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "openehr"},
-                                "code_string": ACTUAL
-                            }
-                        }),
-                    );
-                })
-                .map_err(refuse)?;
+            let edit = |event: &mut serde_json::Map<String, serde_json::Value>| {
+                event.insert(String::from("_type"), json!(INTERVAL_EVENT));
+                event.insert(
+                    String::from("width"),
+                    json!({"_type": "DV_DURATION", "value": interval.width}),
+                );
+                event.insert(
+                    String::from("math_function"),
+                    json!({
+                        "_type": "DV_CODED_TEXT",
+                        "value": ACTUAL_RUBRIC,
+                        "defining_code": {
+                            "_type": "CODE_PHRASE",
+                            "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "openehr"},
+                            "code_string": ACTUAL
+                        }
+                    }),
+                );
+            };
+            built = if interval.folded {
+                self.index
+                    .amend_holder(built, node, &interval.positions, edit)
+            } else {
+                self.index.amend(built, node, &interval.positions, edit)
+            }
+            .map_err(refuse)?;
         }
         Ok(built)
+    }
+
+    /// Returns the event one instance of the `time` node of a folded event
+    /// sits in, the object that holds that leaf.
+    fn folded_event(
+        &self,
+        name: &str,
+        time: &OpenehrTarget,
+        positions: &[RmPosition],
+    ) -> Result<Option<serde_json::Value>, EngineError> {
+        let Some(composition) = self.composition else {
+            return Ok(None);
+        };
+        let node = time.node();
+        let held = self
+            .index
+            .read_holder(composition, node, positions)
+            .map_err(|source| EngineError::Template {
+                mapping: String::from(name),
+                node: String::from(node.aql_path().as_str()),
+                source: Box::new(source),
+            })?;
+        if held.is_some() {
+            self.carried
+                .borrow_mut()
+                .insert(unread::instance_of(node.flat_id(), positions));
+        }
+        Ok(held)
     }
 
     /// Reads a FHIR value as `kind`.

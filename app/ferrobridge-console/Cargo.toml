@@ -62,7 +62,7 @@ ferrohealth-telemetry.workspace = true
 # `OperationOutcome` and `Parameters` of a run, in the terminology root set
 # of the generated model.
 fhir-types = { workspace = true, features = ["r4", "terminology"] }
-# The operators' sign-in and their session (FerroAUTH): the `[oidc]` and
+# The operators' sign-in and their session (FerroSMART): the `[oidc]` and
 # `[session]` sections, the store, the refresh before an access token
 # expires, and with `axum` the routes `/login`, `/auth/callback`, `/logout`
 # and `/session` and the middleware every page sits behind.
