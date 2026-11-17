@@ -35,6 +35,7 @@
 
 - [What FerroBRIDGE runs beside](operate/deployment-shape.md)
 - [Configuring the server](operate/configuration.md)
+  - [Running behind FerroSMART](operate/behind-ferrosmart.md)
 - [The HL7 v2 face](operate/hl7v2-face.md)
 - [The access record](operate/access-record.md)
 - [The operator API](operate/operator-api.md)
