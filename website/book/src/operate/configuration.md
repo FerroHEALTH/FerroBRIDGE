@@ -75,7 +75,9 @@ The section is the FerroHEALTH family's (`ferrohealth-server`).
 | `body_limit` | `"1MiB"` | The largest request body read before the server answers `413` |
 | `drain_delay` | `"0s"` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
 | `shutdown_timeout` | `"10s"` | How long the requests in flight may take once the listener closed |
-| `max_concurrent_requests` | `256` | How many requests the server serves at once, always bounded; past it a request is answered `503` with `Retry-After`, and the health routes are never refused |
+| `max_concurrent_requests` | `256` | How many requests the server serves at once, always bounded; past it a request waits for a slot in the queue below and is answered `503` with `Retry-After` when the queue is full or the wait expires, and the health routes are never refused or queued |
+| `max_waiting_requests` | `256` | How many requests past `max_concurrent_requests` may wait for a slot at once, first come first served; `0` keeps no queue |
+| `admission_wait` | 100 milliseconds | How long a request past `max_concurrent_requests` waits for a slot before it is refused, written with the `ms` or `s` unit; `"0s"` keeps no queue |
 | `retry_after` | `"1s"` | The seconds a refused request is told to wait |
 | `trusted_proxies` | `[]` | The reverse proxies, each an address or a CIDR block, whose forwarded client address is believed |
 | `forwarded_header` | `forwarded` | The header a trusted proxy names the client in: `forwarded` or `x-forwarded-for` |
