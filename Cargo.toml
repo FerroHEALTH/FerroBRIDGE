@@ -263,7 +263,7 @@ fluent-templates = { version = "0.15.1", default-features = false, features = ["
 # The base64 encoding the workspace crates and the testkit read and write.
 base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # The operator console's OpenID Connect sign-in and its session (#1434), the
-# family's one crate for both (FerroAUTH): the authorization code flow with
+# family's one crate for both (FerroSMART): the authorization code flow with
 # PKCE over ferrohealth-smart, the `[oidc]` and `[session]` sections, the store
 # with its idle and absolute lifetimes, the refresh, and the four routes with
 # the session watch FerroUI's pages ask. Pinned exactly, as a product pins
