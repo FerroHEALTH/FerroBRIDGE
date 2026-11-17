@@ -18,13 +18,33 @@ use crate::resolve::program::target::OpenehrTarget;
 pub struct Port {
     name: &'static str,
     values: Vec<(String, OpenehrTarget)>,
+    repeats: bool,
 }
 
 impl Port {
     /// Creates a port with the value node of each class it admits.
     #[must_use]
     pub const fn new(name: &'static str, values: Vec<(String, OpenehrTarget)>) -> Self {
-        Self { name, values }
+        Self {
+            name,
+            values,
+            repeats: false,
+        }
+    }
+
+    /// Returns this port as one whose node repeats directly below the
+    /// mapping's `with.openehr`, so the function reads and writes one value
+    /// per instance of it.
+    #[must_use]
+    pub const fn repeating(mut self) -> Self {
+        self.repeats = true;
+        self
+    }
+
+    /// Returns whether the port's node repeats, one value per instance.
+    #[must_use]
+    pub const fn repeats(&self) -> bool {
+        self.repeats
     }
 
     /// Returns the name the function's signature gives the port.

@@ -90,6 +90,15 @@ impl<'a> Compiler<'a> {
                 ));
                 continue;
             }
+            // NOTE: no specification governs a function's interface: our own design, a port the
+            // function declares repeating may be a node that repeats directly below the anchor.
+            let repeats = self.codes.repeating(&code, name)
+                && target.occurrences().len() == anchor.occurrences().len().saturating_add(1)
+                && target.occurrences().last() == Some(target.node().flat_id());
+            if repeats {
+                ports.push(Port::new(name, self.port_values(&target)).repeating());
+                continue;
+            }
             if target.occurrences().len() != anchor.occurrences().len() {
                 self.diagnostics.push(diagnostic(
                     file.file(),

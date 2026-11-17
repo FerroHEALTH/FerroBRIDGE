@@ -65,6 +65,8 @@ struct Function {
     code: &'static str,
     /// The openEHR ports, relative to the mapping's `with.openehr`.
     ports: &'static [&'static str],
+    /// The ports the function reads and writes one value per instance at.
+    repeating: &'static [&'static str],
     /// The direction out of openEHR.
     to_fhir: fn(&Ports) -> Result<Option<Value>, MappingCodeError>,
     /// The direction into openEHR.
@@ -79,6 +81,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: dosage::ADMINISTRATION_DURATION,
         ports: dosage::ADMINISTRATION_DURATION_PORTS,
+        repeating: &[],
         to_fhir: dosage::administration_duration_to_fhir,
         to_openehr: dosage::administration_duration_to_openehr,
         subject: None,
@@ -86,6 +89,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: timing::NON_DAILY,
         ports: timing::NON_DAILY_PORTS,
+        repeating: &[],
         to_fhir: timing::non_daily_to_fhir,
         to_openehr: timing::non_daily_to_openehr,
         subject: None,
@@ -93,6 +97,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: daily::DAILY,
         ports: daily::PORTS,
+        repeating: daily::REPEATING_PORTS,
         to_fhir: daily::to_fhir,
         to_openehr: daily::to_openehr,
         subject: None,
@@ -100,6 +105,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: range::DOSE_RANGE,
         ports: range::PORTS,
+        repeating: &[],
         to_fhir: range::dose_range_to_fhir,
         to_openehr: range::dose_range_to_openehr,
         subject: None,
@@ -107,6 +113,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: range::RANGE_TEXT,
         ports: range::PORTS,
+        repeating: &[],
         to_fhir: range::range_text_to_fhir,
         to_openehr: range::range_text_to_openehr,
         subject: None,
@@ -114,6 +121,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: ratio::DOSAGE_RATE,
         ports: ratio::PORTS,
+        repeating: &[],
         to_fhir: |ports| ratio::to_fhir(ratio::DOSAGE_RATE, ports),
         to_openehr: |element| ratio::to_openehr(ratio::DOSAGE_RATE, element),
         subject: None,
@@ -121,6 +129,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: ratio::ACTION_RATE,
         ports: ratio::PORTS,
+        repeating: &[],
         to_fhir: |ports| ratio::to_fhir(ratio::ACTION_RATE, ports),
         to_openehr: |element| ratio::to_openehr(ratio::ACTION_RATE, element),
         subject: None,
@@ -128,6 +137,7 @@ const FUNCTIONS: &[Function] = &[
     Function {
         code: ehr_status::EXTERNAL_REF,
         ports: &[],
+        repeating: &[],
         to_fhir: ehr_status::to_fhir,
         to_openehr: ehr_status::to_openehr,
         subject: Some(ehr_status::to_subject),
@@ -170,6 +180,10 @@ impl MappingCodeRegistry for Library {
 
     fn ports(&self, code: &str) -> Option<&'static [&'static str]> {
         function(code).ok().map(|function| function.ports)
+    }
+
+    fn repeating(&self, code: &str, port: &str) -> bool {
+        function(code).is_ok_and(|function| function.repeating.contains(&port))
     }
 }
 
@@ -270,14 +284,21 @@ fn port_value<T: DeserializeOwned>(
     let Some(datum) = ports.get(port) else {
         return Ok(None);
     };
-    from_canonical_value(datum.value())
-        .map(Some)
-        .map_err(|source| MappingCodeError::RmDecode {
-            code: String::from(code),
-            port: String::from(port),
-            class: String::from(datum.class()),
-            source: Box::new(source),
-        })
+    datum_value(code, port, datum).map(Some)
+}
+
+/// Decodes one value read at `port` as the `openehr-rm` type `T`.
+fn datum_value<T: DeserializeOwned>(
+    code: &str,
+    port: &str,
+    datum: &Datum,
+) -> Result<T, MappingCodeError> {
+    from_canonical_value(datum.value()).map_err(|source| MappingCodeError::RmDecode {
+        code: String::from(code),
+        port: String::from(port),
+        class: String::from(datum.class()),
+        source: Box::new(source),
+    })
 }
 
 /// Returns the datum of a value of `class`, as its canonical JSON.

@@ -18,6 +18,7 @@ use fhirconnect::model::semantic::MappingCodeRegistry;
 use proptest::prelude::*;
 
 mod daily;
+mod daily_ports;
 mod ehr_status;
 mod range;
 mod ratio;

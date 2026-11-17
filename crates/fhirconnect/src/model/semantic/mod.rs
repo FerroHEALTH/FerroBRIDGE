@@ -61,6 +61,14 @@ pub trait MappingCodeRegistry: fmt::Debug {
     fn ports(&self, _code: &str) -> Option<&'static [&'static str]> {
         None
     }
+
+    /// Returns whether the function `code` reads and writes one value per
+    /// instance at `port`, so the port's node may repeat directly below the
+    /// mapping's `with.openehr`. A function takes one value at a port it does
+    /// not name here.
+    fn repeating(&self, _code: &str, _port: &str) -> bool {
+        false
+    }
 }
 
 /// A registry over a fixed set of names.

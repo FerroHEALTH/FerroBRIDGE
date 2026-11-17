@@ -62,8 +62,12 @@ impl Datum {
 
 /// The openEHR values of one call, by the port each was read from or is
 /// written to.
+///
+/// A port holds one value, or one per instance of its node when the function
+/// declares it repeating ([`crate::model::semantic::MappingCodeRegistry::repeating`]),
+/// in instance order.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Ports(BTreeMap<String, Datum>);
+pub struct Ports(BTreeMap<String, Vec<Datum>>);
 
 impl Ports {
     /// Creates a call with no value at any port.
@@ -75,14 +79,35 @@ impl Ports {
     /// Returns these ports with `datum` at `port`, replacing what it held.
     #[must_use]
     pub fn with(mut self, port: impl Into<String>, datum: Datum) -> Self {
-        self.0.insert(port.into(), datum);
+        self.0.insert(port.into(), vec![datum]);
         self
     }
 
-    /// Returns the value at `port`, `None` when the composition holds none.
+    /// Returns these ports with `data` at `port`, one per instance in order,
+    /// replacing what it held; no value at all leaves the port empty.
+    #[must_use]
+    pub fn with_each(mut self, port: impl Into<String>, data: Vec<Datum>) -> Self {
+        let port = port.into();
+        if data.is_empty() {
+            self.0.remove(&port);
+        } else {
+            self.0.insert(port, data);
+        }
+        self
+    }
+
+    /// Returns the first value at `port`, `None` when the composition holds
+    /// none.
     #[must_use]
     pub fn get(&self, port: &str) -> Option<&Datum> {
-        self.0.get(port)
+        self.0.get(port).and_then(|data| data.first())
+    }
+
+    /// Returns every value at `port`, in instance order, empty when the
+    /// composition holds none.
+    #[must_use]
+    pub fn all(&self, port: &str) -> &[Datum] {
+        self.0.get(port).map_or(&[], Vec::as_slice)
     }
 
     /// Returns whether no port holds a value.
@@ -91,9 +116,19 @@ impl Ports {
         self.0.is_empty()
     }
 
-    /// Returns every port and its value, in port order.
+    /// Returns every port and its value, in port order and each port's
+    /// values in instance order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Datum)> {
-        self.0.iter().map(|(port, datum)| (port.as_str(), datum))
+        self.0
+            .iter()
+            .flat_map(|(port, data)| data.iter().map(move |datum| (port.as_str(), datum)))
+    }
+
+    /// Returns every port with its values in instance order, in port order.
+    pub fn ports(&self) -> impl Iterator<Item = (&str, &[Datum])> {
+        self.0
+            .iter()
+            .map(|(port, data)| (port.as_str(), data.as_slice()))
     }
 }
 
@@ -256,5 +291,15 @@ pub enum MappingCodeError {
         port: String,
         /// The class the function wrote.
         class: String,
+    },
+    /// The function wrote more than one value at a port whose node holds one.
+    #[error("the function {code} wrote {count} values at the port `{port}`, whose node holds one")]
+    RepeatedPort {
+        /// The name the mapping wrote.
+        code: String,
+        /// The port the function wrote.
+        port: String,
+        /// How many values it wrote there.
+        count: usize,
     },
 }

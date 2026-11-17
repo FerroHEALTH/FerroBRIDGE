@@ -8,8 +8,9 @@
 //! (<https://hl7.org/fhir/R4/datatypes-definitions.html#Timing.repeat.frequency>).
 //! The archetype holds a frequency as a quantity per unit of time (`at0003`,
 //! `1/s`, `1/min`, `1/h` or `1/d`, or an interval of them), an interval
-//! between doses (`at0014`, a `DV_DURATION`), and a time of day (`at0004`, a
-//! `DV_TIME`). A frequency per one unit is the frequency; one event per
+//! between doses (`at0014`, a `DV_DURATION`), and times of day (`at0004`, a
+//! `DV_TIME` that repeats, as R4 `Timing.repeat.timeOfDay` does). A frequency
+//! per one unit is the frequency; one event per
 //! period of more than one unit is the interval; anything else has no place
 //! in the archetype and is refused. No specification defines the function:
 //! our own design.
@@ -31,6 +32,7 @@ use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 
 use crate::engine::library::class_at;
 use crate::engine::library::datum;
+use crate::engine::library::datum_value;
 use crate::engine::library::decode;
 use crate::engine::library::duration;
 use crate::engine::library::duration::TimeUnit;
@@ -62,6 +64,10 @@ const TIME_OF_DAY: &str = "items[at0004]";
 /// The ports of the function.
 pub const PORTS: &[&str] = &[FREQUENCY, INTERVAL, TIME_OF_DAY];
 
+/// The ports the function reads and writes one value per instance at: the
+/// archetype gives `at0004` `0..*` occurrences.
+pub const REPEATING_PORTS: &[&str] = &[TIME_OF_DAY];
+
 /// The class of a frequency held as one quantity.
 const DV_QUANTITY: &str = "DV_QUANTITY";
 
@@ -85,21 +91,21 @@ const DAILY_UNITS: [TimeUnit; 4] = [
 /// The one period a frequency per unit of time is counted over.
 const ONE: &str = "1";
 
-/// Writes a daily `Timing.repeat` as its frequency or interval and its time
+/// Writes a daily `Timing.repeat` as its frequency or interval and its times
 /// of day.
 ///
 /// Reads `frequency`, `frequencyMax`, `period`, `periodMax`, `periodUnit`
 /// and `timeOfDay`; writes the frequency (`period` of one unit), or the
-/// interval (one event per `period` of more than one unit), and the time of
-/// day.
+/// interval (one event per `period` of more than one unit), and one time of
+/// day per `timeOfDay`, in order.
 ///
 /// # Errors
 ///
 /// Returns [`MappingCodeError`] when the element is no `Timing.repeat`, when
 /// it carries a `periodMax`, a frequency with no period, a period with no
 /// unit (R4 `tim-2`) or in a unit longer than a day, more than one event
-/// over a period of more than one unit, or more than one time of day (the
-/// archetype holds one).
+/// over a period of more than one unit, or a time of day that is no
+/// `DV_TIME`.
 pub fn to_openehr(element: &Value) -> Result<Ports, MappingCodeError> {
     let code = DAILY;
     let repeat: TimingRepeat = decode(code, "Timing.repeat", element)?;
@@ -130,36 +136,29 @@ pub fn to_openehr(element: &Value) -> Result<Ports, MappingCodeError> {
         }
         None => Ports::new(),
     };
-    match repeat.time_of_day.as_slice() {
-        [] => {}
-        [time] => {
-            let value = primitive(
-                code,
-                "timeOfDay",
-                time.id.as_ref(),
-                &time.extension,
-                time.value.as_ref(),
-            )?;
-            let held = DvTime {
-                normal_status: None,
-                normal_range: None,
-                other_reference_ranges: present_nonempty(Vec::new()),
-                magnitude_status: None,
-                accuracy: None,
-                value: String::from(value),
-            };
-            if !held.invariants().is_empty() {
-                return Err(refused(code, format!("`{value}` is no DV_TIME")));
-            }
-            ports = ports.with(TIME_OF_DAY, datum(DV_TIME, &held));
+    let mut times = Vec::with_capacity(repeat.time_of_day.len());
+    for time in &repeat.time_of_day {
+        let value = primitive(
+            code,
+            "timeOfDay",
+            time.id.as_ref(),
+            &time.extension,
+            time.value.as_ref(),
+        )?;
+        let held = DvTime {
+            normal_status: None,
+            normal_range: None,
+            other_reference_ranges: present_nonempty(Vec::new()),
+            magnitude_status: None,
+            accuracy: None,
+            value: String::from(value),
+        };
+        if !held.invariants().is_empty() {
+            return Err(refused(code, format!("`{value}` is no DV_TIME")));
         }
-        _ => {
-            return Err(refused(
-                code,
-                "the timing names more than one time of day, and the archetype holds one",
-            ));
-        }
+        times.push(datum(DV_TIME, &held));
     }
+    ports = ports.with_each(TIME_OF_DAY, times);
     Ok(ports)
 }
 
@@ -227,8 +226,8 @@ fn frequency_ports(
 ///
 /// A frequency of `n` per unit `u` reads as `frequency` `n` per `period` 1
 /// `u`, a range of them adds `frequencyMax`, an interval of `p` units reads
-/// as `frequency` 1 per `period` `p`, and the time of day as `timeOfDay`.
-/// Reads the three ports; writes those members.
+/// as `frequency` 1 per `period` `p`, and each time of day as one
+/// `timeOfDay`, in order. Reads the three ports; writes those members.
 ///
 /// # Errors
 ///
@@ -298,7 +297,8 @@ pub fn to_fhir(ports: &Ports) -> Result<Option<Value>, MappingCodeError> {
         }
         (None, None) => {}
     }
-    if let Some(held) = port_value::<DvTime>(code, ports, TIME_OF_DAY)? {
+    for at in ports.all(TIME_OF_DAY) {
+        let held: DvTime = datum_value(code, TIME_OF_DAY, at)?;
         if held.normal_status.is_some()
             || held.normal_range.is_some()
             || held.other_reference_ranges.is_some()
@@ -316,7 +316,7 @@ pub fn to_fhir(ports: &Ports) -> Result<Option<Value>, MappingCodeError> {
         }
         Time::check(&held.value)
             .map_err(|error| refused(code, format!("`{}` is no R4 `time`: {error}", held.value)))?;
-        repeat.time_of_day = vec![Time::from(held.value)];
+        repeat.time_of_day.push(Time::from(held.value));
     }
     if repeat == TimingRepeat::default() {
         return Ok(None);
