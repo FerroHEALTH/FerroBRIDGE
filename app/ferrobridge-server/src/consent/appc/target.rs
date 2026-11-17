@@ -19,9 +19,7 @@ use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_rm::draft::access_control::access_control::access_actor_scope::AccessActorScope;
 use openehr_rm::draft::access_control::access_control::access_data_scope::AccessDataScope;
 use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
-use openehr_rm::draft::access_control::terminology::{
-    OperationClass, TERMINOLOGY_ID_ACCESS_CONTROL, Term,
-};
+use openehr_rm::draft::access_control::terminology::{OperationClass, TERMINOLOGY_ID_ACCESS, Term};
 use openehr_rm::v1_2::data_types::quantity::date_time::dv_date_time::DvDateTime;
 use openehr_rm::v1_2::data_types::quantity::dv_interval::DvInterval;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
@@ -257,6 +255,7 @@ pub(super) fn read(target: Option<&Node>, element: &str) -> Result<Scope, Refuse
             party: None,
             role: None,
             relationship: None,
+            organisation_type: None,
             caller_kind: None,
         };
         for Match { attribute, value } in matches(subject, "Subject", &at)? {
@@ -529,7 +528,7 @@ fn party_match(party: &PartyRef) -> Result<Node, Refused> {
 ///
 /// # Errors
 /// [`Refused`] naming a scope attribute APPC has no attribute for:
-/// `relationship`, `caller_kind`, `objects`, `templates`, `archetypes`,
+/// `relationship`, `organisation_type`, `caller_kind`, `objects`, `templates`, `archetypes`,
 /// `recorded`, the `export` operation, or purposes beside more than one
 /// actor scope.
 pub(super) fn write(directive: &AccessDirective) -> Result<Option<Node>, Refused> {
@@ -542,6 +541,9 @@ pub(super) fn write(directive: &AccessDirective) -> Result<Option<Node>, Refused
     for actor in actors {
         if actor.relationship.is_some() {
             return Err(not_stated("applies_to.relationship"));
+        }
+        if actor.organisation_type.is_some() {
+            return Err(not_stated("applies_to.organisation_type"));
         }
         if actor.caller_kind.is_some() {
             return Err(not_stated("applies_to.caller_kind"));
@@ -591,17 +593,15 @@ pub(super) fn write(directive: &AccessDirective) -> Result<Option<Node>, Refused
     }
     let mut actions = Vec::new();
     for operation in members(directive.operations.as_ref()) {
-        let class = OperationClass::read(
-            TERMINOLOGY_ID_ACCESS_CONTROL,
-            &operation.defining_code.code_string,
-        )
-        .map_err(|error| {
-            Refused::new(
-                Format::Directive,
-                "operations",
-                Loss::Code(error.to_string()),
-            )
-        })?;
+        let class =
+            OperationClass::read(TERMINOLOGY_ID_ACCESS, &operation.defining_code.code_string)
+                .map_err(|error| {
+                    Refused::new(
+                        Format::Directive,
+                        "operations",
+                        Loss::Code(error.to_string()),
+                    )
+                })?;
         let uri = ACTIONS
             .iter()
             .find(|(_, known)| *known == class)
