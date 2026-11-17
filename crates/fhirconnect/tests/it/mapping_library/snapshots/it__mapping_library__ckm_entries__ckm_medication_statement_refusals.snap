@@ -1,0 +1,18 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused(MEDICATION_STATEMENT,\n\"ferrobridge_library_medication_statement.context\", STATEMENT)?"
+---
+[
+  "dosage.v2.yml:97 fc-unknown-template-node",
+  "dosage.v2.yml:98 fc-archetype-mismatch",
+  "medication.v2.yml:25 fc-unpaired-types",
+  "medication.v2.yml:50 fc-excluded-template-node",
+  "medication_statement.v0.yml:121 fc-duplicate-method-name",
+  "medication_statement.v0.yml:76 fc-unknown-template-node",
+  "timing_daily.v1.yml:21 fc-repeating-function-port",
+  "timing_daily.v1.yml:26 fc-unknown-fhir-element",
+  "timing_daily.v1.yml:29 fc-unpaired-types",
+  "timing_non_daily.yml:21 fc-unknown-template-node",
+  "timing_non_daily.yml:27 fc-unknown-template-node",
+  "timing_non_daily.yml:32 fc-unknown-template-node"
+]
