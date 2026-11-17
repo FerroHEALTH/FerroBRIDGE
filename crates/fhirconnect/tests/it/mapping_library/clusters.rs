@@ -33,6 +33,7 @@ use openehr_mapping_core::template::TemplateSource;
 use super::compiled;
 use super::models;
 use super::program;
+use super::rows;
 use super::set;
 use crate::laws;
 use crate::resolve::render;
@@ -104,26 +105,7 @@ fn refused(context: &str, files: &[&str], model: &str) -> Result<Vec<String>, Bo
     let Err(diagnostics) = compiled(CLUSTERS, context, files, &[model])? else {
         return Err(format!("{context} compiles").into());
     };
-    let mut rows: Vec<String> = diagnostics
-        .iter()
-        .map(|diagnostic| {
-            format!(
-                "{}:{} {}",
-                diagnostic
-                    .file()
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-                diagnostic
-                    .position()
-                    .map_or_else(String::new, |position| position.line().to_string()),
-                diagnostic.code()
-            )
-        })
-        .collect();
-    rows.sort();
-    rows.dedup();
-    Ok(rows)
+    Ok(rows(&diagnostics))
 }
 
 /// Compiles the report entry context against the library clusters

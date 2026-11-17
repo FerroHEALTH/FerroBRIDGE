@@ -11,6 +11,7 @@
 //! archetypes its source specialises, is carried into the index, because
 //! `create_opt` writes an OPT that states no parent.
 
+mod ckm_entries;
 mod clusters;
 mod compositions;
 mod ips;
@@ -186,6 +187,31 @@ fn program(
     compiled(id, context, files, fixtures)?.map_err(|diagnostics| render(&diagnostics).into())
 }
 
+/// Renders refusals as sorted, distinct `file:line code` rows, the file
+/// named by its file name.
+fn rows(diagnostics: &[Diagnostic]) -> Vec<String> {
+    let mut rows: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            format!(
+                "{}:{} {}",
+                diagnostic
+                    .file()
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                diagnostic
+                    .position()
+                    .map_or_else(String::new, |position| position.line().to_string()),
+                diagnostic.code()
+            )
+        })
+        .collect();
+    rows.sort();
+    rows.dedup();
+    rows
+}
+
 /// Returns the names of the model mappings `program` compiled, in order.
 fn models(program: &Program) -> Vec<&str> {
     program
@@ -246,27 +272,8 @@ fn the_device_cluster_is_refused_at_load() -> Result<(), Box<dyn Error>> {
     else {
         return Err("the device cluster compiles".into());
     };
-    let mut rows: Vec<String> = diagnostics
-        .iter()
-        .map(|diagnostic| {
-            format!(
-                "{}:{} {}",
-                diagnostic
-                    .file()
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-                diagnostic
-                    .position()
-                    .map_or_else(String::new, |position| position.line().to_string()),
-                diagnostic.code()
-            )
-        })
-        .collect();
-    rows.sort();
-    rows.dedup();
     assert_eq!(
-        rows,
+        rows(&diagnostics),
         [
             "device.v1.yml:32 fc-unpaired-types",
             "device.v1.yml:77 fc-unpaired-types"

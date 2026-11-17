@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's problem diagnosis model as
+# published (#1963), against the library IPS entries template built from
+# the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_problem_diagnosis.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Condition"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_ips_entries.v1.0.0"
+  archetypes:
+    - "EVALUATION.problem_diagnosis.v1"
+  start: "EVALUATION.problem_diagnosis.v1"

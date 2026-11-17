@@ -1,0 +1,99 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's medication
+-- action model, over four published CKM archetypes (fixtures/ckm/library,
+-- fixtures/ckm/medication): a report COMPOSITION whose content holds
+-- ACTION.medication.v1 with CLUSTER.medication.v2 in its medication details
+-- slot and CLUSTER.dosage.v2 in its amount slot. No specification governs
+-- this template: our own design, carrying the archetypes the mappings name.
+-- Node identifiers are at-coded, the ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_medication_action.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library medication action model FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype ACTION[at0000.2, openEHR-EHR-ACTION.medication-ferrobridge.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library medication action">
+                description = <"Library medication action">
+            >
+            ["at0000.2"] = <
+                text = <"Medication management">
+                description = <"Medication management">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-ACTION.medication-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-ACTION.medication.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library medication action model FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    ACTION[at0000.1] matches {
+        /description[at0017]/items matches {
+            use_archetype CLUSTER[at0104.1, openEHR-EHR-CLUSTER.medication.v2]
+            use_archetype CLUSTER[at0131.1, openEHR-EHR-CLUSTER.dosage.v2]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Medication management">
+                description = <"Medication management">
+            >
+            ["at0104.1"] = <
+                text = <"Medication details">
+                description = <"Medication details">
+            >
+            ["at0131.1"] = <
+                text = <"Amount">
+                description = <"Amount">
+            >
+        >
+    >
