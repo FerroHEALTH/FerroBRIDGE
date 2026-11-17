@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The party context of the reference CDR's professional PERSON: a Practitioner over
+# the id-coded ADL 2 template FerroEHR serves only on the adl2 route.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferroehr_professional_practitioner.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Practitioner"
+  template:
+    id: "openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0"
+  archetypes:
+    - "ferroehr_professional_practitioner"
+  start: "ferroehr_professional_practitioner"

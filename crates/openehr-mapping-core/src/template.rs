@@ -18,7 +18,6 @@
 //! differently.
 
 use openehr_am::v2_4::aom2::archetype::operational_template::OperationalTemplate;
-use openehr_am::v2_4::aom2::definitions::adl_code_definitions::AdlCodeDefinitionsData;
 use openehr_sdt::flat::error::FlatError;
 use openehr_sdt::flat::webtemplate::model::WebTemplate;
 
@@ -152,21 +151,6 @@ pub fn web_template(source: &TemplateSource) -> Result<WebTemplate, PathError> {
         generation: source.generation(),
         source: Box::new(source_error),
     })
-}
-
-/// Whether `node_id` is an ADL 2 id-code.
-///
-/// ADL 2.4 admits at-codes and id-codes as node identifiers and states that
-/// "the at-code coding system must be used for systems that need to be
-/// conformant to the openEHR Reference Model"
-/// (<https://specifications.openehr.org/releases/AM/Release-2.4.0/ADL2.html>,
-/// §ADL 2.4). An archetype root carries an archetype id rather than a local
-/// code, so a node id is an id-code when it carries the id-code leader and
-/// reads as a valid ADL code (AM Release 2.4.0, `ADL_CODE_DEFINITIONS`
-/// §Functions, `is_id_code` and `is_valid_code`).
-#[must_use]
-pub(crate) fn is_id_code(node_id: &str) -> bool {
-    AdlCodeDefinitionsData::is_id_code(node_id) && AdlCodeDefinitionsData::is_valid_code(node_id)
 }
 
 /// What a coded value a term binding names is.
@@ -314,17 +298,6 @@ pub enum PathError {
         /// Why the builder refused it.
         #[source]
         source: Box<FlatError>,
-    },
-    /// The template identifies its nodes with ADL 2 id-codes.
-    #[error(
-        "the template `{template_id}` is id-coded (`{example_node_id}`), and mapping paths are \
-         written with at-codes"
-    )]
-    IdCodedTemplate {
-        /// The template that was refused.
-        template_id: String,
-        /// One id-code the template carries, as evidence.
-        example_node_id: String,
     },
     /// A node of the built Web Template carries occurrences no RM multiplicity
     /// can hold.
@@ -497,7 +470,6 @@ impl PathError {
             Self::TemplateParse { .. } | Self::TemplateBuild { .. } => {
                 DiagnosticCode::TemplateBuild
             }
-            Self::IdCodedTemplate { .. } => DiagnosticCode::IdCodedTemplate,
             Self::MalformedOccurrences { .. }
             | Self::MalformedAqlPath { .. }
             | Self::AmbiguousPath { .. } => DiagnosticCode::MalformedTemplate,
@@ -529,18 +501,6 @@ impl PathError {
 #[cfg(test)]
 mod tests {
     use super::Generation;
-    use super::is_id_code;
-
-    #[test]
-    fn an_id_code_is_the_leader_followed_by_a_digit() {
-        assert!(is_id_code("id1"));
-        assert!(is_id_code("id2.1"));
-        assert!(!is_id_code("at0001"));
-        assert!(!is_id_code("ac0001"));
-        assert!(!is_id_code("identifier"));
-        assert!(!is_id_code("openEHR-EHR-EVALUATION.ferrobridge_note.v1"));
-        assert!(!is_id_code(""));
-    }
 
     #[test]
     fn a_generation_renders_its_route_name() {

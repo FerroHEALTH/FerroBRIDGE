@@ -27,6 +27,7 @@ mod outbound;
 mod party;
 mod patient_ehr;
 mod person;
+mod professional;
 mod read;
 mod reconcile;
 mod references;

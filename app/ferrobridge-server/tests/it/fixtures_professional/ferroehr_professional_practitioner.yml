@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The model mapping of the reference CDR's professional PERSON onto Practitioner. The
+# archetype is id-coded (ADL 2.4, section 4.2.5), so every path names its id-codes; the
+# header names the archetype's interface id and pins its release as the revision.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferroehr_professional_practitioner
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1
+    revision: 1.0.0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Practitioner
+
+mappings:
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$archetype/details[id2]/items[id3]"
+  - name: "fullName"
+    with:
+      fhir: "$resource.name.text"
+      openehr: "$archetype/identities[id4]/details[id5]/items[id6]"
