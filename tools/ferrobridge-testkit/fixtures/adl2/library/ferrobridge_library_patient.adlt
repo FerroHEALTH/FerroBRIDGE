@@ -1,0 +1,209 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's person data
+-- entry, its clusters and the insurance entry, over nine published CKM
+-- archetypes (fixtures/ckm/library, fixtures/ckm/highmed): a report
+-- COMPOSITION whose content holds ADMIN_ENTRY.person_data.v0, with
+-- CLUSTER.person.v1 (holding CLUSTER.structured_name.v1, CLUSTER.address.v1
+-- and CLUSTER.organisation.v1 in its slots) in its extension slot,
+-- CLUSTER.person_birth_data_iso.v0 in its birth details slot and
+-- CLUSTER.death_details.v1 in the death details slot of its death cluster,
+-- and ADMIN_ENTRY.versicherungsinformationen.v0, its insurance number
+-- element constrained to a DV_IDENTIFIER, which the CKM source leaves
+-- unconstrained. No specification governs this template: our own design,
+-- carrying the archetypes the mappings name. Node identifiers are at-coded,
+-- the ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_patient.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library patient models FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype ADMIN_ENTRY[at0000.2, openEHR-EHR-ADMIN_ENTRY.person_data-ferrobridge.v0]
+            use_archetype ADMIN_ENTRY[at0000.3, openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen-ferrobridge.v0]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library patient">
+                description = <"Library patient">
+            >
+            ["at0000.2"] = <
+                text = <"Person data">
+                description = <"Person data">
+            >
+            ["at0000.3"] = <
+                text = <"Insurance">
+                description = <"Insurance">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-ADMIN_ENTRY.person_data-ferrobridge.v0.0.0
+
+specialize
+    openEHR-EHR-ADMIN_ENTRY.person_data.v0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library patient models FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    ADMIN_ENTRY[at0000.1] matches {
+        /data[at0001]/items matches {
+            use_archetype CLUSTER[at0007.1, openEHR-EHR-CLUSTER.person-ferrobridge.v1]
+            use_archetype CLUSTER[at0028.1, openEHR-EHR-CLUSTER.person_birth_data_iso.v0]
+        }
+        /data[at0001]/items[at0024]/items matches {
+            use_archetype CLUSTER[at0013.1, openEHR-EHR-CLUSTER.death_details.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Person data">
+                description = <"Person data">
+            >
+            ["at0007.1"] = <
+                text = <"Person">
+                description = <"Person">
+            >
+            ["at0028.1"] = <
+                text = <"Birth data">
+                description = <"Birth data">
+            >
+            ["at0013.1"] = <
+                text = <"Death details">
+                description = <"Death details">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-CLUSTER.person-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-CLUSTER.person.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library patient models FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    CLUSTER[at0000.1] matches {
+        /items matches {
+            use_archetype CLUSTER[at0002.1, openEHR-EHR-CLUSTER.structured_name.v1]
+            use_archetype CLUSTER[at0005.1, openEHR-EHR-CLUSTER.address.v1]
+            use_archetype CLUSTER[at0007.1, openEHR-EHR-CLUSTER.organisation.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Person">
+                description = <"Person">
+            >
+            ["at0002.1"] = <
+                text = <"Structured name">
+                description = <"Structured name">
+            >
+            ["at0005.1"] = <
+                text = <"Address">
+                description = <"Address">
+            >
+            ["at0007.1"] = <
+                text = <"Organisation">
+                description = <"Organisation">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen-ferrobridge.v0.0.0
+
+specialize
+    openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library patient models FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    ADMIN_ENTRY[at0000.1] matches {
+        /data[at0001]/items[at0006]/value matches {
+            DV_IDENTIFIER matches {*}
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Insurance">
+                description = <"Insurance">
+            >
+        >
+    >

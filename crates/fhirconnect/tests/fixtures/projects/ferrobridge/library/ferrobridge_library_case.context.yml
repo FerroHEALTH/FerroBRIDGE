@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's local institution episode model
+# and its location cluster as published (#1963), against the library case
+# template built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_case.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Encounter"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_case.v1.0.0"
+  archetypes:
+    - "ADMIN_ENTRY.episode_institution_local.v0"
+    - "CLUSTER.location.v1"
+  start: "ADMIN_ENTRY.episode_institution_local.v0"

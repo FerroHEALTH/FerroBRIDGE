@@ -1,0 +1,16 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused_with(PATIENT, \"ferrobridge_library_patient.context\", PATIENT_FILES,\n&[\"ferrobridge_person_insurance.yml\"])?"
+---
+[
+  "address.v1.yml:107 fc-unknown-fhir-element",
+  "address.v1.yml:111 fc-unknown-fhir-element",
+  "address.v1.yml:54 fc-uncarried-tail",
+  "address.v1.yml:62 fc-unknown-fhir-element",
+  "address.v1.yml:67 fc-unknown-fhir-element",
+  "address.v1.yml:77 fc-uncarried-tail",
+  "address.v1.yml:85 fc-unknown-fhir-element",
+  "address.v1.yml:89 fc-unknown-fhir-element",
+  "address.v1.yml:99 fc-uncarried-tail",
+  "person_data.v0.yml:75 fc-unknown-fhir-element"
+]

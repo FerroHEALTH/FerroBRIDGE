@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of the library's person data model that slots the
+# library's insurance entry in the composition (#1963), the
+# versicherungsInformationen method of the KDS person composition
+# extension, whose context does not compile, with nothing else.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_person_insurance
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: ADMIN_ENTRY.person_data.v0
+mappings:
+  - name: versicherungsInformationen
+    extension: add
+    with:
+      fhir: $resource.identifier
+      openehr: $composition/content[openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0]
+    fhirCondition:
+      targetRoot: $resource.identifier
+      targetAttribute: system
+      operator: one of
+      criteria: http://fhir.de/sid/gkv/kvid-10
+    slotArchetype: ADMIN_ENTRY.versicherungsinformationen.v0

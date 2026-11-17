@@ -1,0 +1,14 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused(CASE, \"ferrobridge_library_case.context\", CASE_FILES)?"
+---
+[
+  "episode_institution_local.v0.yml:63 fc-unknown-fhir-element",
+  "episode_institution_local.v0.yml:64 fc-unknown-template-node",
+  "episode_institution_local.v0.yml:67 fc-unknown-fhir-element",
+  "episode_institution_local.v0.yml:73 fc-unknown-fhir-element",
+  "episode_institution_local.v0.yml:74 fc-unknown-template-node",
+  "location.v1.yml:110 fc-unpaired-types",
+  "location.v1.yml:29 fc-unpaired-types",
+  "location.v1.yml:69 fc-unpaired-types"
+]

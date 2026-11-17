@@ -1,0 +1,95 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's local
+-- institution episode and its location cluster, over three published CKM
+-- archetypes (fixtures/ckm/library, fixtures/ckm/highmed): a report
+-- COMPOSITION whose content holds ADMIN_ENTRY.episode_institution_local.v0
+-- with CLUSTER.location.v1 in its additional details slot, the one slot
+-- directly under the entry's items that admits it. No specification governs
+-- this template: our own design, carrying the archetypes the mappings name.
+-- Node identifiers are at-coded, the ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_case.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library case entry FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype ADMIN_ENTRY[at0000.2, openEHR-EHR-ADMIN_ENTRY.episode_institution_local-ferrobridge.v0]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library case">
+                description = <"Library case">
+            >
+            ["at0000.2"] = <
+                text = <"Episode">
+                description = <"Episode">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-ADMIN_ENTRY.episode_institution_local-ferrobridge.v0.0.0
+
+specialize
+    openEHR-EHR-ADMIN_ENTRY.episode_institution_local.v0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library case entry FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    ADMIN_ENTRY[at0000.1] matches {
+        /data[at0001]/items matches {
+            use_archetype CLUSTER[at0011.1, openEHR-EHR-CLUSTER.location.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Episode">
+                description = <"Episode">
+            >
+            ["at0011.1"] = <
+                text = <"Location">
+                description = <"Location">
+            >
+        >
+    >
