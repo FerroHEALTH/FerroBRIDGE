@@ -1,0 +1,25 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused(IPS_ENTRIES, \"ferrobridge_library_adverse_reaction_risk.context\",\nADVERSE_REACTION)?"
+---
+[
+  "adverse_reaction_event.v1.yml:46 fc-uncarried-tail",
+  "adverse_reaction_event.v1.yml:68 fc-uncarried-tail",
+  "adverse_reaction_event.v1.yml:90 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:106 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:113 fc-unknown-fhir-element",
+  "adverse_reaction_risk.v2.yml:132 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:139 fc-unknown-fhir-element",
+  "adverse_reaction_risk.v2.yml:158 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:165 fc-unknown-fhir-element",
+  "adverse_reaction_risk.v2.yml:190 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:212 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:234 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:254 fc-unpaired-types",
+  "adverse_reaction_risk.v2.yml:274 fc-anchor-without-children",
+  "adverse_reaction_risk.v2.yml:294 fc-anchor-without-children",
+  "adverse_reaction_risk.v2.yml:42 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:49 fc-unknown-fhir-element",
+  "adverse_reaction_risk.v2.yml:68 fc-uncarried-tail",
+  "adverse_reaction_risk.v2.yml:75 fc-unknown-fhir-element"
+]

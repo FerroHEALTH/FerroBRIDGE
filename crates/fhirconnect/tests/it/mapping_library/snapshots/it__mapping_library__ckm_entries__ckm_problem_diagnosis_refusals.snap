@@ -1,0 +1,11 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused(IPS_ENTRIES, \"ferrobridge_library_problem_diagnosis.context\",\nPROBLEM_DIAGNOSIS)?"
+---
+[
+  "problem_diagnosis.v1.yml:108 fc-excluded-template-node",
+  "problem_diagnosis.v1.yml:45 fc-uncarried-tail",
+  "problem_diagnosis.v1.yml:47 fc-uncarried-tail",
+  "problem_diagnosis.v1.yml:71 fc-uncarried-tail",
+  "problem_diagnosis.v1.yml:73 fc-uncarried-tail"
+]

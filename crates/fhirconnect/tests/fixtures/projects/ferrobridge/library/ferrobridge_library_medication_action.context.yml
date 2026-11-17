@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's medication action model with its
+# dosage and medication clusters as published (#1963), against the library
+# medication action template built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_medication_action.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/MedicationAdministration"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_medication_action.v1.0.0"
+  archetypes:
+    - "ACTION.medication.v1"
+    - "CLUSTER.dosage.v2.BackboneElement"
+    - "CLUSTER.medication.v2"
+    - "CLUSTER.medication.v2.substance"
+  start: "ACTION.medication.v1"

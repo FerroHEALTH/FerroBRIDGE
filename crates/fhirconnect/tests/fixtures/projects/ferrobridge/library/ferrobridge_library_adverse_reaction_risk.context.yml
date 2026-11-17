@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's adverse reaction risk model and
+# its reaction event cluster as published (#1963), against the library IPS
+# entries template built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_adverse_reaction_risk.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/AllergyIntolerance"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_ips_entries.v1.0.0"
+  archetypes:
+    - "EVALUATION.adverse_reaction_risk.v2"
+    - "CLUSTER.adverse_reaction_event.v1"
+  start: "EVALUATION.adverse_reaction_risk.v2"

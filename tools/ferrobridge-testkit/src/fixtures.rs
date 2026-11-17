@@ -358,9 +358,11 @@ macro_rules! library_template {
 /// clusters template holds the clusters that FerroBRIDGE models slot, and
 /// the IPS entries template holds the adverse reaction risk evaluation with
 /// its reaction event cluster and the problem diagnosis evaluation with the
-/// clinical evidence cluster, from [`CKM_DISCHARGE_ARCHETYPES`] too. A
-/// suite builds the ADL 2 operational templates at test time.
-pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 8] = [
+/// clinical evidence cluster, from [`CKM_DISCHARGE_ARCHETYPES`] too, and
+/// the medication action template holds the medication action with the
+/// medication cluster and the dosage cluster in its slots. A suite builds
+/// the ADL 2 operational templates at test time.
+pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 9] = [
     library_template!("report"),
     library_template!("report_result"),
     library_template!("medication_list"),
@@ -369,6 +371,7 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 8] = [
     library_template!("health_summary"),
     library_template!("clusters"),
     library_template!("ips_entries"),
+    library_template!("medication_action"),
 ];
 
 /// The twelve international CKM archetypes of the library templates.

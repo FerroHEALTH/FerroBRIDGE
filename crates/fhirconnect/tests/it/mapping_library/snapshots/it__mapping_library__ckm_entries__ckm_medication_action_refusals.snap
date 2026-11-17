@@ -1,0 +1,34 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: "refused(MEDICATION_ACTION, \"ferrobridge_library_medication_action.context\",\nMEDICATION)?"
+---
+[
+  "medication.v1.yml:100 fc-unknown-template-node",
+  "medication.v1.yml:101 fc-unknown-template-node",
+  "medication.v1.yml:102 fc-unknown-template-node",
+  "medication.v1.yml:108 fc-unknown-template-node",
+  "medication.v1.yml:113 fc-unknown-template-node",
+  "medication.v1.yml:19 fc-unknown-template-node",
+  "medication.v1.yml:197 fc-uncarried-tail",
+  "medication.v1.yml:214 fc-uncarried-tail",
+  "medication.v1.yml:231 fc-uncarried-tail",
+  "medication.v1.yml:24 fc-unknown-template-node",
+  "medication.v1.yml:248 fc-uncarried-tail",
+  "medication.v1.yml:265 fc-uncarried-tail",
+  "medication.v1.yml:27 fc-unknown-template-node",
+  "medication.v1.yml:282 fc-uncarried-tail",
+  "medication.v1.yml:30 fc-unknown-fhir-element",
+  "medication.v1.yml:335 fc-uncarried-tail",
+  "medication.v1.yml:357 fc-uncarried-tail",
+  "medication.v1.yml:379 fc-uncarried-tail",
+  "medication.v1.yml:401 fc-uncarried-tail",
+  "medication.v1.yml:423 fc-uncarried-tail",
+  "medication.v1.yml:445 fc-uncarried-tail",
+  "medication.v1.yml:467 fc-uncarried-tail",
+  "medication.v1.yml:47 fc-unknown-fhir-element",
+  "medication.v1.yml:489 fc-uncarried-tail",
+  "medication.v1.yml:511 fc-uncarried-tail",
+  "medication.v1.yml:533 fc-uncarried-tail",
+  "medication.v2.yml:25 fc-unpaired-types",
+  "medication.v2.yml:50 fc-excluded-template-node"
+]
