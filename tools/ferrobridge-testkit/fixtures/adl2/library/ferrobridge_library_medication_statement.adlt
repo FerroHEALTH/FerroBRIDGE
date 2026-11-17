@@ -1,0 +1,150 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's medication
+-- statement model and its dosage and timing clusters, over six published
+-- CKM archetypes (fixtures/ckm/library, fixtures/ckm/medication): a report
+-- COMPOSITION whose content holds OBSERVATION.medication_statement.v0 with
+-- CLUSTER.medication.v2 in its medication details slot, and
+-- CLUSTER.dosage.v2, holding CLUSTER.timing_daily.v1 in its daily timing
+-- slot, and CLUSTER.timing_nondaily.v1 in its structured dose and timing
+-- slot. No specification governs this template: our own design, carrying
+-- the archetypes the mappings name. Node identifiers are at-coded, the ADL
+-- 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_medication_statement.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library medication statement model FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype OBSERVATION[at0000.2, openEHR-EHR-OBSERVATION.medication_statement-ferrobridge.v0]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library medication statement">
+                description = <"Library medication statement">
+            >
+            ["at0000.2"] = <
+                text = <"Medication statement">
+                description = <"Medication statement">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-OBSERVATION.medication_statement-ferrobridge.v0.0.0
+
+specialize
+    openEHR-EHR-OBSERVATION.medication_statement.v0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library medication statement model FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    OBSERVATION[at0000.1] matches {
+        /data[at0001]/events[at0002]/data[at0003]/items matches {
+            use_archetype CLUSTER[at0046.1, openEHR-EHR-CLUSTER.medication.v2]
+            use_archetype CLUSTER[at0045.1, openEHR-EHR-CLUSTER.dosage-ferrobridge.v2]
+            use_archetype CLUSTER[at0045.2, openEHR-EHR-CLUSTER.timing_nondaily.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Medication statement">
+                description = <"Medication statement">
+            >
+            ["at0046.1"] = <
+                text = <"Medication details">
+                description = <"Medication details">
+            >
+            ["at0045.1"] = <
+                text = <"Dosage">
+                description = <"Dosage">
+            >
+            ["at0045.2"] = <
+                text = <"Non-daily timing">
+                description = <"Non-daily timing">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-CLUSTER.dosage-ferrobridge.v2.0.0
+
+specialize
+    openEHR-EHR-CLUSTER.dosage.v2
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library medication statement model FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    CLUSTER[at0000.1] matches {
+        /items matches {
+            use_archetype CLUSTER[at0037.1, openEHR-EHR-CLUSTER.timing_daily.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Dosage">
+                description = <"Dosage">
+            >
+            ["at0037.1"] = <
+                text = <"Daily timing">
+                description = <"Daily timing">
+            >
+        >
+    >

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's medication statement model with
+# its dosage, timing and medication clusters as published (#1963), against
+# the library medication statement template built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_medication_statement.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/MedicationStatement"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_medication_statement.v1.0.0"
+  archetypes:
+    - "OBSERVATION.medication_statement.v0"
+    - "CLUSTER.dosage.v2"
+    - "CLUSTER.timing_daily.v1"
+    - "CLUSTER.timing_nondaily.v1"
+    - "CLUSTER.medication.v2"
+    - "CLUSTER.medication.v2.substance"
+  start: "OBSERVATION.medication_statement.v0"

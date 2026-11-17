@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its medication statement timing model and the
+# library's non-daily timing cluster as published (#1963), against the
+# library medication statement template built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_medication_timing.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/MedicationStatement"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_medication_statement.v1.0.0"
+  archetypes:
+    - "ferrobridge_medication_statement_timing"
+    - "CLUSTER.timing_nondaily.v1"
+  start: "ferrobridge_medication_statement_timing"
