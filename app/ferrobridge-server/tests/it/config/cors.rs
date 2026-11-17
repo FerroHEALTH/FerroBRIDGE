@@ -30,7 +30,7 @@ fn the_listed_origins_resolve_in_their_serialization() -> Result<(), Box<dyn std
     let origins: Vec<&str> = facade
         .cors
         .origins()
-        .map(|origin| origin.as_str())
+        .map(ferrobridge_server::facade::cors::Origin::as_str)
         .collect();
     assert_eq!(
         vec!["http://localhost:4567", "https://app.example"],
