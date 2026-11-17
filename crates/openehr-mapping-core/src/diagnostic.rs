@@ -149,8 +149,6 @@ pub enum DiagnosticCode {
     PositionalPredicateInPath,
     /// An operational template does not build a Web Template.
     TemplateBuild,
-    /// An ADL 2 template identifies its nodes with id-codes.
-    IdCodedTemplate,
     /// A built Web Template carries a node the index cannot read.
     MalformedTemplate,
     /// A mapping path names no node of the template it resolves against.
@@ -184,7 +182,6 @@ impl DiagnosticCode {
             Self::PathAboveAnchorRoot => "path-above-anchor-root",
             Self::PositionalPredicateInPath => "positional-predicate-in-path",
             Self::TemplateBuild => "template-build",
-            Self::IdCodedTemplate => "id-coded-template",
             Self::MalformedTemplate => "malformed-template",
             Self::UnknownTemplatePath => "unknown-template-path",
             Self::InvalidComposition => "invalid-composition",
@@ -209,7 +206,7 @@ impl DiagnosticCode {
     }
 
     /// Every code this crate owns, in declaration order.
-    const BUILT_IN: [Self; 21] = [
+    const BUILT_IN: [Self; 20] = [
         Self::Unreadable,
         Self::YamlSyntax,
         Self::YamlDuplicateKey,
@@ -227,7 +224,6 @@ impl DiagnosticCode {
         Self::PathAboveAnchorRoot,
         Self::PositionalPredicateInPath,
         Self::TemplateBuild,
-        Self::IdCodedTemplate,
         Self::MalformedTemplate,
         Self::UnknownTemplatePath,
         Self::InvalidComposition,

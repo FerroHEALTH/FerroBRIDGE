@@ -30,6 +30,7 @@ mod facade_demographic_e2e;
 mod facade_e2e;
 mod facade_party_search_e2e;
 mod facade_person_e2e;
+mod facade_professional_e2e;
 mod hl7v2;
 mod http;
 mod ingest;

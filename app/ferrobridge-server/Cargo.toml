@@ -137,6 +137,9 @@ argon2.workspace = true
 # The inbound token cases sign with key pairs generated at test time.
 aws-lc-rs.workspace = true
 ferrobridge-testkit.workspace = true
+# The id-coded party cases compile the reference CDR's ADL 2 PERSON into the
+# operational template its `adl2` route serves.
+openehr-adl.workspace = true
 # The inbound token cases mint their tokens with those key pairs.
 jsonwebtoken.workspace = true
 # The OMOP round trip pins its rows as a reviewed snapshot.

@@ -46,7 +46,6 @@ use crate::template::ConstraintBinding;
 use crate::template::Generation;
 use crate::template::PathError;
 use crate::template::TemplateSource;
-use crate::template::is_id_code;
 use crate::template::web_template;
 
 /// The upper occurrence bound the Web Template writes for an unbounded node
@@ -232,16 +231,15 @@ pub struct WebTemplateIndex {
 impl WebTemplateIndex {
     /// Builds the Web Template of `source` and indexes every node of it.
     ///
-    /// The node-id code space is checked here, before any path resolves: a
-    /// template that identifies its nodes with ADL 2 id-codes is refused,
-    /// because mapping paths are written with at-codes and the ADL 2 builder
-    /// copies node ids verbatim. No specification governs the reconciliation
-    /// of the two code spaces: this is FerroBRIDGE's own rule.
+    /// A node keeps the node identifier its template gives it, an at-code or an
+    /// ADL 2 id-code (AM ADL 2.4, §4.2.5 Node Identifier and Coding Systems),
+    /// so a path addresses the nodes of an id-coded template by their id-codes,
+    /// the `archetype_node_id` its data carries (BASE Release 1.2.0,
+    /// Architecture Overview, §Paths and Locators).
     ///
     /// # Errors
     ///
-    /// Returns [`PathError::TemplateBuild`] when the template does not build,
-    /// [`PathError::IdCodedTemplate`] when it is id-coded, and
+    /// Returns [`PathError::TemplateBuild`] when the template does not build, and
     /// [`PathError::MalformedOccurrences`] or [`PathError::MalformedAqlPath`]
     /// when a built node carries occurrences or an `aqlPath` this crate cannot
     /// read.
@@ -271,15 +269,6 @@ impl WebTemplateIndex {
             vec![(&web_template.tree, None, web_template.tree.id.clone())];
         while let Some((node, parent, flat_id)) = stack.pop() {
             let index = entries.len();
-            if let Some(node_id) = node.node_id.as_deref()
-                && parent.is_some()
-                && is_id_code(node_id)
-            {
-                return Err(PathError::IdCodedTemplate {
-                    template_id: web_template.template_id.clone(),
-                    example_node_id: node_id.to_owned(),
-                });
-            }
             let children: Vec<FlatId> = node
                 .children
                 .iter()

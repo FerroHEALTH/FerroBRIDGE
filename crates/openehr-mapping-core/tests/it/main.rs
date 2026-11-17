@@ -15,6 +15,7 @@ mod diagnostic;
 mod embedded;
 mod example;
 mod header;
+mod id_coded;
 mod malformed;
 mod named_sections;
 mod ordinals;

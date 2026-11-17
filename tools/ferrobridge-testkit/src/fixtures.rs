@@ -168,6 +168,24 @@ pub const KDS_PERSON_OPT: &str = include_str!("../fixtures/opt/kds-person/KDS_Pe
 /// The template identifier [`KDS_PERSON_OPT`] declares.
 pub const KDS_PERSON_TEMPLATE_ID: &str = "KDS_Person";
 
+/// The reference CDR's professional `PERSON`, an id-coded ADL 2 archetype,
+/// vendored verbatim.
+///
+/// The definition the reference CDR (v5.7.0) loads for its healthcare professionals and
+/// serves only on the `adl2` template route: the person's identifiers in
+/// `details`, the name in `identities` and a work email in `contacts`, every
+/// node named by an id-code (ADL 2.4 §4.2.5). `scripts/vendor/ferroehr-professional.sh`
+/// fetches it at the commit `docs/VERSIONS.md` pins, and `PROVENANCE.md`
+/// beside it records its source and licence.
+pub const FERROEHR_PROFESSIONAL_PERSON_ADL2: &str = include_str!(
+    "../fixtures/adl2/ferroehr-professional/openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0.adls"
+);
+
+/// The archetype id, and the template id the reference CDR serves it under,
+/// of [`FERROEHR_PROFESSIONAL_PERSON_ADL2`].
+pub const FERROEHR_PROFESSIONAL_PERSON_ID: &str =
+    "openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0";
+
 /// The published `KDS_Prozedur` operational template, vendored verbatim.
 ///
 /// One `COMPOSITION.report.v1` holding `ACTION.procedure.v1` with its

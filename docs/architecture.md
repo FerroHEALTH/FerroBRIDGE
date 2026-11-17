@@ -346,18 +346,20 @@ generation-blind. The rules around the seam, each with its ground:
   namespace), and `semVer` is the release version for ADL 2 and absent for
   ADL 1.4; the generation is decided by which fetch succeeded, never by that
   field. Mapping files that key on `$archetype` use the interface form.
-- **The node-id code space is checked before any path resolves.** ADL 2.4
-  admits at-codes and id-codes, and states that "the at-code coding system
-  must be used for systems that need to be conformant to the openEHR
-  Reference Model" (<https://specifications.openehr.org/releases/AM/Release-2.4.0/ADL2.html>,
-  §ADL 2.4); the reference corpus and the reference CDR's 1.4-to-2 converter
-  produce id-codes all the same. FHIRconnect and OMOCL paths are written with
-  at-codes, and the ADL 2 builder copies node ids verbatim and reads no
-  `alternative_ids`, so an at-coded path does not resolve against an id-coded
-  template. The bridge inspects the built Web Template and refuses an
-  id-coded template with a diagnostic naming the template and the code space.
-  An at-to-id translation from `C_OBJECT.alternative_ids` is a later,
-  separately decided unit, never a silent fallback.
+- **A path names the node identifiers of its template.** ADL 2.4 admits two
+  node identifier coding systems, at-codes and id-codes
+  (<https://specifications.openehr.org/releases/AM/latest/ADL2.html>,
+  §4.2.5 Node Identifier and Coding Systems), and asks openEHR RM systems for
+  the at-code one; the reference CDR still serves id-coded definitions, its
+  professional `PERSON` among them, on the `adl2` route alone. An archetype
+  path predicate is a shortcut for `[@archetype_node_id = …]` (BASE Release
+  1.2.0, Architecture Overview, §Paths and Locators), and FHIRconnect writes
+  its paths as openEHR paths (`basics/body.adoc`), so a mapping over an
+  id-coded template names its id-codes and one over an at-coded template its
+  at-codes. The ADL 2 builder copies node ids verbatim, so the index keys each
+  node by the code its template gives it and translates nothing: an at-coded
+  path over an id-coded template names no node and the load refuses it as an
+  unknown path (#1951).
 - **Two deltas the engines must not trip over.** A term binding's `value` is
   a code for ADL 1.4 and a URI for ADL 2, and constraint (`ac`) bindings exist
   only on the 1.4 side, so the lens that reads bindings switches on the
@@ -3160,7 +3162,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Composition start on an OPT2 | the template root carries the archetypes its lineage names, kept on the index from the OPT2's `parent_archetype_id` or passed by a caller holding the template source; ids are never rewritten (section 4.3, #1550) | a template and its OPT are specialised (AM Release-2.3.0 AOM2 §3.6.4, §3.6.6); FHIRconnect v1.0.0 is silent: our own design | rewriting the root node id to the parent archetype; refusing composition models against every OPT2 |
 | Template generations | both ADL 1.4 and ADL 2, resolved `adl1.4` then `adl2` on one id, decoded into two OPT types, built into one `WebTemplate` (section 3) | owner requirement 2026-09-12; the Simplified Formats seam is generation-neutral; ITS-REST 1.1.0 serves both | ADL 1.4 only; a second pipeline per generation |
 | ADL 2 fetch form | `Accept: application/json`, AOM2 canonical JSON into `openehr-am`'s `OperationalTemplate` | the server already compiled the OPT2; ADL 2 source would cost the parser, the flattener and a repository | `text/plain` source through `openehr-adl` |
-| Node-id code space | at-coded templates only; an id-coded ADL 2 template is refused naming the code space | mapping paths are at-coded; ADL 2.4 requires at-codes for openEHR-RM systems; the builder reads no `alternative_ids` | silent non-resolution; a speculative at-to-id translation |
+| Node-id code space | a path names the codes its template carries, at-codes or id-codes, with no translation between them (#1951) | ADL 2.4 §4.2.5 admits both systems; a path predicate is the node's `archetype_node_id` (BASE 1.2.0 Architecture Overview, Paths and Locators); the reference CDR serves id-coded definitions | refusing id-coded templates, which left a CDR's own professional `PERSON` unmappable; a speculative at-to-id translation |
 | FHIR identity | the entry `uid` when present, else SHA-256 over (`versioned_object_uid`, path, split occurrence), base32, plus a recorded map that wins once written | FHIR id grammar and immutability; the version id changes per update; the upstream revision (PR #94) names `LOCATABLE.uid`, which is optional in the RM | hash of the full version id; random ids; `uid` only |
 | Create semantics | conditional and idempotent by source `id` and `meta.versionId` through the identity map | R4 conditional create; the retired connector duplicated on every `POST` | a new composition per `POST` |
 | OMOP identity | sequences plus a bridge-owned natural-key side table | every CDM 5.4 key is a 32-bit integer | content-hash surrogate keys (collide near 65k rows) |

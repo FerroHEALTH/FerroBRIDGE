@@ -607,7 +607,22 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
   one. When the EHR call fails after the party committed, the answer is the
   EHR refusal with a warning that names the stored `Patient`.
 - **Template.** A party built against another template than the context's
-  answers `404`.
+  answers `404`. The template may be an ADL 1.4 OPT or an ADL 2 operational
+  template, the one a CDR serves only on its `adl2` route included. ADL 2.4
+  admits two node identifier coding systems (§4.2.5): an at-coded template
+  names its nodes `[at0001]`, an id-coded one `[id3]`, and the paths of the
+  model mapping name the codes the template and its data carry, because a
+  path predicate is a shortcut for `[@archetype_node_id = …]` (BASE 1.2.0,
+  Architecture Overview, Paths and Locators). FerroEHR's professional
+  `PERSON`, `openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0`, is
+  id-coded: its identifier is `details[id2]/items[id3]` and its full name
+  `identities[id4]/details[id5]/items[id6]`. The header names the
+  archetype's interface id and pins its release as the revision
+  (`archetype: openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1`,
+  `revision: 1.0.0`), as the FHIRconnect header does for any archetype; the
+  context names the full template id. An at-coded path names no node of an
+  id-coded template, and the load refuses it as a path the template does not
+  have.
 - **Status.** A Demographic API `400` is a `500`; `404`, `409`, `412` and
   `422` reach the caller as themselves, with the CDR's words in
   `issue.diagnostics`.
