@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's MedicationStatement model over the CKM medication statement,
+# slotting the library's non-daily timing cluster at the structured dose
+# and timing slot the CKM archetype gives it (#1963). The library slots it
+# only under CLUSTER.dosage.v2, which the CKM dosage archetype admits no
+# such cluster in; this model slots it at the Dosage its fhirConfig names.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_medication_statement_timing
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.medication_statement.v0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationStatement
+mappings:
+  - name: dosageTimingNonDaily
+    with:
+      fhir: $resource.dosage
+      openehr: $archetype/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.timing_nondaily.v1]
+    slotArchetype: CLUSTER.timing_nondaily.v1
