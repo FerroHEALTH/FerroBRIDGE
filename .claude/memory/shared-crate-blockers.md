@@ -7,13 +7,13 @@ metadata:
 
 Every issue filed in any family repo gets its milestone at filing time. If the
 right milestone does not exist yet, for example the next `ferrohealth-smart-vX.Y.Z`
-in FerroAUTH, create it with a due date and a description first. A defect in a
+in FerroSMART, create it with a due date and a description first. A defect in a
 shared crate that another product hits or works around goes in the CURRENT
 release milestone, never a later one, even when the consumer has a workaround.
 I put two in FerroEHR v5.9.0, and the owner had to move both to v5.7.0: #5147
 (blocks FerroBRIDGE #1689) and #5148 (FerroFED patches around it).
 
-Keep checking what the shared crates block. The shared crates are FerroAUTH
+Keep checking what the shared crates block. The shared crates are FerroSMART
 `ferrohealth-smart`, the FerroSYS `ferrohealth-*` crates, and FerroEHR's
 `openehr-*` crates that FerroBRIDGE and FerroFED consume. When a worker
 reports or files an issue in one of them, find which product issues wait on
@@ -28,7 +28,7 @@ to it. It never patches around the defect in the consumer. If the consumer's
 work must wait for that release, the consumer issue waits. A workaround
 already in the tree gets a removal issue in the current milestone.
 
-**Why:** owner, 2026-11-07. FerroAUTH #291, the IdA NameID that FerroEHR #5144
+**Why:** owner, 2026-11-07. FerroSMART #291, the IdA NameID that FerroEHR #5144
 needs for v5.7.0, was filed with no milestone and no worker. The owner had to
 point it out: "we need to make sure that things keep moving".
 
