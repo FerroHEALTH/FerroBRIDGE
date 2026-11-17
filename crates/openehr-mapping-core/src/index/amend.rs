@@ -11,6 +11,7 @@
 //! validated against the template like any composition that reaches the
 //! bridge. No specification governs the edit: our own design.
 
+use openehr_rm::v1_2::paths::RmPath;
 use openehr_sdt::flat::navigate::Instance;
 use serde_json::Map;
 use serde_json::Value;
@@ -43,20 +44,55 @@ impl WebTemplateIndex {
         occurrences: &[RmPosition],
         edit: impl FnOnce(&mut Map<String, Value>),
     ) -> Result<CanonicalComposition, PathError> {
-        if composition.template_id() != self.template_id() {
-            return Err(PathError::TemplateMismatch {
-                expected: self.template_id().to_owned(),
-                found: composition.template_id().to_owned(),
+        let path = self.instance_in(composition.template_id(), node, occurrences)?;
+        self.amend_at(composition, node, &path, edit)
+    }
+
+    /// Returns `composition` with the object that holds one instance of
+    /// `node`, one attribute above it, edited by `edit`, validated against
+    /// this template.
+    ///
+    /// The Web Template keeps the `time` of a single `EVENT` it collapses
+    /// into its `OBSERVATION` and no node of the event
+    /// ([`WebTemplateIndex::read_holder`]), so an interval event there is
+    /// written through the object that holds that leaf.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`WebTemplateIndex::amend`], with
+    /// [`PathError::AbsentInstance`] also for a node at the root, which has no
+    /// holder.
+    pub fn amend_holder(
+        &self,
+        composition: CanonicalComposition,
+        node: &ResolvedNode,
+        occurrences: &[RmPosition],
+        edit: impl FnOnce(&mut Map<String, Value>),
+    ) -> Result<CanonicalComposition, PathError> {
+        let mut path = self.instance_in(composition.template_id(), node, occurrences)?;
+        if path.segments.pop().is_none() {
+            return Err(PathError::AbsentInstance {
+                aql_path: node.aql_path().as_str().to_owned(),
             });
         }
-        let path = self.instance_path(node, occurrences)?;
+        self.amend_at(composition, node, &path, edit)
+    }
+
+    /// Edits the object at `path` of `composition` and validates the result.
+    fn amend_at(
+        &self,
+        composition: CanonicalComposition,
+        node: &ResolvedNode,
+        path: &RmPath,
+        edit: impl FnOnce(&mut Map<String, Value>),
+    ) -> Result<CanonicalComposition, PathError> {
         let absent = || PathError::AbsentInstance {
             aql_path: node.aql_path().as_str().to_owned(),
         };
         let mut value = composition.into_value();
         let pointer = self
             .navigator()
-            .instances(&value, &path)
+            .instances(&value, path)
             .first()
             .map(Instance::pointer)
             .ok_or_else(absent)?;

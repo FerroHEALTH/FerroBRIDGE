@@ -228,6 +228,7 @@ pub struct EventTime {
     time: OpenehrTarget,
     point: Option<FhirTarget>,
     interval: Option<FhirTarget>,
+    folded: bool,
 }
 
 impl EventTime {
@@ -246,7 +247,26 @@ impl EventTime {
             time,
             point,
             interval,
+            folded: false,
         }
+    }
+
+    /// Returns this event time for a single `EVENT` the Web Template
+    /// collapses into its `OBSERVATION`, which carries the event's `time` leaf
+    /// and no node of the event itself (Simplified Formats master04
+    /// §"Conditionally Collapsed Wrapper Types").
+    #[must_use]
+    pub const fn in_folded_event(mut self) -> Self {
+        self.folded = true;
+        self
+    }
+
+    /// Returns whether the event is folded into its `OBSERVATION`, so its
+    /// class and attributes are read and written through the object that
+    /// holds the [`Self::time`] node.
+    #[must_use]
+    pub const fn is_folded(&self) -> bool {
+        self.folded
     }
 
     /// Returns the FHIR element the time is read at going into openEHR.
@@ -368,6 +388,9 @@ impl fmt::Display for Derived {
             }
             Self::Event(ref event) => {
                 write!(f, "event time read {} into {}", event.read, event.time)?;
+                if event.folded {
+                    write!(f, " folded")?;
+                }
                 if let Some(ref point) = event.point {
                     write!(f, " point as {point}")?;
                 }

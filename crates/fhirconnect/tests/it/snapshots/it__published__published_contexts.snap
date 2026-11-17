@@ -158,8 +158,6 @@ projects/org.highmed/KDS/medikationseintrag/KDS_medikationseintrag.context.yaml
     model/cluster/org.openehr/timing_non_daily.yml:29 error fc-unpaired-types
     model/observation/org.openehr/medication_statement.v0.yml:107 warning fc-excluded-template-node
     model/observation/org.openehr/medication_statement.v0.yml:121 warning fc-duplicate-method-name
-    model/observation/org.openehr/medication_statement.v0.yml:44 error fc-uncarried-tail
-    model/observation/org.openehr/medication_statement.v0.yml:44 warning fc-anchor-without-children
     model/observation/org.openehr/medication_statement.v0.yml:76 error fc-unknown-template-node
     projects/org.highmed/KDS/medikationseintrag/KDS_composition.yml:40 error fc-unpaired-types
     projects/org.highmed/KDS/medikationseintrag/KDS_medication.yml:169 error fc-unknown-template-node

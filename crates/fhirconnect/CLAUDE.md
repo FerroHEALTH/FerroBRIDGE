@@ -134,7 +134,12 @@ FHIR time onto an `EVENT` node itself is `Derived::Event` (`EVENT.adoc`):
 going in the type picks a `POINT_EVENT` time or an `INTERVAL_EVENT`
 (`engine::traverse::event`), whose `_type`, `width` and `math_function` the
 builder cannot spell on an `EVENT` node, so the engine sets them on the
-built composition (`WebTemplateIndex::amend`). Any other untyped mapping
+built composition (`WebTemplateIndex::amend`). A single `EVENT` the Web
+Template folds into its `OBSERVATION` has no node, only its `time` leaf at
+the event's path (master04 §"Conditionally Collapsed Wrapper Types"), so
+the mapping names it as the `OBSERVATION` with a tail and the engine writes
+and reads it through that leaf and the object holding it
+(`EventTime::is_folded`, `WebTemplateIndex::read_holder`, `amend_holder`). Any other untyped mapping
 onto a structural (`PATHABLE`) node anchors its children, and one with no
 child is a warning, never a silent nothing. Every
 pair in `PAIRS` must name a `FhirKind`; `engine::fhir` tests that.

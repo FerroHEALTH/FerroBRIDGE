@@ -21,6 +21,7 @@ mod eu_test_result;
 mod event_time;
 mod events;
 mod fall;
+mod folded_event_time;
 mod kds_coding;
 mod laborauftrag;
 mod laws;

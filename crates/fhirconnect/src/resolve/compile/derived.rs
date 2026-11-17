@@ -12,6 +12,9 @@ use openehr_mapping_core::diagnostic::ModelPath;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::position::Position;
 use openehr_rm::v1_2::model;
+use openehr_rm::v1_2::paths::PathSegment;
+use openehr_rm::v1_2::paths::Predicate;
+use openehr_rm::v1_2::paths::RmPath;
 
 use crate::model::ast::ModelMappingFile;
 use crate::model::ast::keyword::Direction;
@@ -31,6 +34,7 @@ use crate::tree::path::FhirPath;
 
 use crate::resolve::compile::Compiler;
 use crate::resolve::compile::Derivation;
+use crate::resolve::compile::openehr::occurrences;
 
 /// The two resolved sides of a mapping with no `type` key, as its conversion
 /// is derived from them.
@@ -64,6 +68,9 @@ const INTERVAL_EVENT: &str = "INTERVAL_EVENT";
 
 /// The attribute of an event that carries its time (RM `EVENT.time`).
 const TIME: &str = "time";
+
+/// The class of the value an event's `time` holds (RM `EVENT.time`).
+const DV_DATE_TIME: &str = "DV_DATE_TIME";
 
 /// The FHIR type a `POINT_EVENT` is written as.
 const DATE_TIME: &str = "dateTime";
@@ -359,7 +366,11 @@ impl<'a> Compiler<'a> {
     /// `POINT_EVENT` is written as `dateTime` and an `INTERVAL_EVENT` as
     /// `Period`, and a node the template narrows to one class takes only its
     /// own (no specification governs which alternative is written: our own
-    /// design).
+    /// design). A single `EVENT` the Web Template collapses into its
+    /// `OBSERVATION` is named as the `OBSERVATION` node with the tail down to
+    /// the event, and its `time` is the leaf the template keeps at the event's
+    /// path (Simplified Formats master04 §"Conditionally Collapsed Wrapper
+    /// Types").
     fn event_time(
         &mut self,
         file: &'a ModelMappingFile,
@@ -368,13 +379,22 @@ impl<'a> Compiler<'a> {
         position: Position,
         path: &ModelPath,
     ) -> Option<Derived> {
-        let class = openehr.node().rm_type();
-        if !model::is_a(class, EVENT) || !openehr.tail().segments.is_empty() {
+        let folded = !openehr.tail().segments.is_empty();
+        let class = if folded {
+            openehr.leaf_class()?
+        } else {
+            openehr.node().rm_type()
+        };
+        if !model::is_a(class, EVENT) {
             return None;
         }
         let points = model::is_a(POINT_EVENT, class);
         let intervals = model::is_a(INTERVAL_EVENT, class);
-        let time = self.event_time_node(openehr)?;
+        let time = if folded {
+            self.folded_event_time_node(openehr)?
+        } else {
+            self.event_time_node(openehr)?
+        };
         let (point, interval) = match *fhir.resolved().location() {
             Location::Choice(_) => {
                 let variants = match fhir.resolved().moves().last() {
@@ -408,12 +428,35 @@ impl<'a> Compiler<'a> {
             | Location::Resource
             | Location::Deferred => return None,
         };
-        Some(Derived::Event(Box::new(EventTime::new(
-            fhir.clone(),
-            time,
-            point,
-            interval,
-        ))))
+        let event = EventTime::new(fhir.clone(), time, point, interval);
+        Some(Derived::Event(Box::new(if folded {
+            event.in_folded_event()
+        } else {
+            event
+        })))
+    }
+
+    /// Returns the `time` leaf the template keeps at the path of a single
+    /// `EVENT` it collapses into its `OBSERVATION`, with the leaf's axes.
+    fn folded_event_time_node(&self, openehr: &OpenehrTarget) -> Option<OpenehrTarget> {
+        let mut path = openehr.path().clone();
+        path.segments.push(PathSegment {
+            attribute: String::from(TIME),
+            predicate: Predicate::default(),
+            descendant: false,
+        });
+        // NOTE: a path the template does not carry names no folded event, so the mapping
+        // keeps the anchor diagnostics of a structure.
+        let reached = self.locate(&path).ok()?;
+        if !reached.tail.segments.is_empty() || reached.node.rm_type() != DV_DATE_TIME {
+            return None;
+        }
+        let axes = occurrences(self.template, reached.node).ok()?;
+        let tail = RmPath {
+            absolute: false,
+            segments: Vec::new(),
+        };
+        Some(OpenehrTarget::new(path, reached.node.clone(), tail, axes))
     }
 
     /// Returns the `time` node of an `EVENT` node, with the event's axes.
