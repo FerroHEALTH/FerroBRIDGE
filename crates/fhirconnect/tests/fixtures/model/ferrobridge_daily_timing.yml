@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping that carries the timing of a dosage
+# instruction into the CKM daily timing cluster through timingToDaily, whose
+# time of day repeats as the archetype and R4 Timing.repeat.timeOfDay allow
+# (#1972).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_daily_timing
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-INSTRUCTION.medication_order.v3
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationRequest
+mappings:
+  - name: dailyTiming
+    with:
+      fhir: $resource.dosageInstruction.timing.repeat
+      openehr: $archetype/activities[at0001]/description[at0002]/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[openEHR-EHR-CLUSTER.dosage.v2]/items[openEHR-EHR-CLUSTER.timing_daily.v1]
+    mappingCode: timingToDaily

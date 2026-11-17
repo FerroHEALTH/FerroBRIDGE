@@ -179,9 +179,8 @@ fn the_medication_action_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
 /// template cannot fill; `timing_daily.v1.yml:26`
 /// reads `when` as an `Enumeration`, and `:29` and `timing_non_daily.yml:29`
 /// map the `unsignedInt` offset onto a `DV_DURATION`, which
-/// `DV_DURATION.adoc` pairs with `Duration` only. `timing_daily.v1.yml:21`
-/// is FerroBRIDGE's `timingToDaily`, whose time of day port holds one value
-/// while the CKM cluster repeats it (#1972).
+/// `DV_DURATION.adoc` pairs with `Duration` only. The repeating time of day
+/// port of `timingToDaily` at `timing_daily.v1.yml:21` raises none.
 #[test]
 fn the_medication_statement_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
     insta::assert_json_snapshot!(

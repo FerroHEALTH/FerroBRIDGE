@@ -12,6 +12,8 @@
 //! the engine writes what it returns where the binding places it.
 
 use fhir_types::codec::Value;
+use openehr_mapping_core::composition::PositionError;
+use openehr_mapping_core::composition::RmPosition;
 
 use crate::engine::outcome::Loss;
 use crate::engine::outcome::SkipReason;
@@ -34,6 +36,7 @@ use crate::engine::traverse::Held;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::Written;
 use crate::engine::traverse::error::EngineError;
+use crate::engine::traverse::place::rm_positions;
 
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Runs the registered function a `mappingCode` names over every
@@ -90,7 +93,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             .functions()
             .to_openehr(code, &element)
             .map_err(|source| refusal(mapping, code, source))?;
-        for (name, datum) in produced.iter() {
+        for (name, data) in produced.ports() {
             let port = ports
                 .iter()
                 .find(|port| port.name() == name)
@@ -104,22 +107,39 @@ impl<T: Table + ?Sized> Run<'_, T> {
                         },
                     )
                 })?;
-            let node = port.value_of(datum.class()).ok_or_else(|| {
-                refusal(
+            if !port.repeats() && data.len() > 1 {
+                return Err(refusal(
                     mapping,
                     code,
-                    MappingCodeError::UnadmittedClass {
+                    MappingCodeError::RepeatedPort {
                         code: String::from(code),
                         port: String::from(name),
-                        class: String::from(datum.class()),
+                        count: data.len(),
                     },
-                )
-            })?;
-            self.store(Written {
-                flat_id: node.node().flat_id().clone(),
-                positions: binding.openehr.clone(),
-                value: Held::Canonical(datum.value().clone()),
-            });
+                ));
+            }
+            for (index, datum) in data.iter().enumerate() {
+                let node = port.value_of(datum.class()).ok_or_else(|| {
+                    refusal(
+                        mapping,
+                        code,
+                        MappingCodeError::UnadmittedClass {
+                            code: String::from(code),
+                            port: String::from(name),
+                            class: String::from(datum.class()),
+                        },
+                    )
+                })?;
+                let mut positions = binding.openehr.clone();
+                if port.repeats() {
+                    positions.push(instance(mapping, index)?);
+                }
+                self.store(Written {
+                    flat_id: node.node().flat_id().clone(),
+                    positions,
+                    value: Held::Canonical(datum.value().clone()),
+                });
+            }
         }
         Ok(())
     }
@@ -151,12 +171,27 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if let Some(anchor) = mapping.openehr() {
             let positions = Self::positions_of(mapping, input, anchor)?;
             for port in ports {
-                for (class, node) in port.values() {
-                    if let Some(value) = self.node_value(mapping.name(), node, &positions)? {
-                        values = values.with(port.name(), Datum::new(class, value));
+                let mut data = Vec::new();
+                for index in 0.. {
+                    let mut at = positions.clone();
+                    if port.repeats() {
+                        at.push(instance(mapping, index)?);
+                    } else if index > 0 {
                         break;
                     }
+                    let mut found = None;
+                    for (class, node) in port.values() {
+                        if let Some(value) = self.node_value(mapping.name(), node, &at)? {
+                            found = Some(Datum::new(class, value));
+                            break;
+                        }
+                    }
+                    let Some(datum) = found else {
+                        break;
+                    };
+                    data.push(datum);
                 }
+                values = values.with_each(port.name(), data);
             }
         }
         let produced = self
@@ -229,6 +264,20 @@ impl<T: Table + ?Sized> Run<'_, T> {
             source: Box::new(source),
         })
     }
+}
+
+/// Returns the position of the `index`th instance, counted from zero, of a
+/// repeating port's node.
+fn instance(mapping: &Mapping, index: usize) -> Result<RmPosition, EngineError> {
+    let ordinal = index.checked_add(1).ok_or(EngineError::Position {
+        mapping: String::from(mapping.name()),
+        source: PositionError::Overflow,
+    })?;
+    let positions = rm_positions(mapping.name(), &[ordinal])?;
+    positions.into_iter().next().ok_or(EngineError::Position {
+        mapping: String::from(mapping.name()),
+        source: PositionError::Overflow,
+    })
 }
 
 /// Wraps a function's refusal with the mapping that called it.

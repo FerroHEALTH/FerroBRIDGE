@@ -206,8 +206,11 @@ the name and the openEHR ports a function declares) and the run
 `with.fhir` names and the canonical JSON at its ports; the compiler resolves
 every port against the template at load (`resolve::compile::port`), so the
 engine never parses a path for one, and a polymorphic `ELEMENT` port holds
-one value node per class, which the class a function writes selects. A
-function is typed over the generated FHIR struct and the `openehr-rm` class,
+one value node per class, which the class a function writes selects. A port
+holds one value unless the function declares it repeating
+(`MappingCodeRegistry::repeating`, `timingToDaily`'s time of day): such a
+port may repeat directly below the anchor, and the engine reads and writes
+one value per instance in order. A function is typed over the generated FHIR struct and the `openehr-rm` class,
 and refuses whatever it cannot carry; a new one is a row of
 `engine::library::FUNCTIONS` with tests both ways and both lens laws. One
 function writes no template node: `ehrStatusAddExternalREF`
