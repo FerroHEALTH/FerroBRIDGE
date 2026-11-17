@@ -8,8 +8,8 @@ logs a person in at any OpenID Connect provider upstream, for login only, and
 issues plain RFC 9068 access tokens for the FerroHEALTH products. FerroBRIDGE
 then runs as a resource server: an app takes its token from FerroSMART and
 calls the facade with it, and the bridge never sees the provider's tokens.
-FerroAUTH's architecture describes the whole deployment in
-[§13.21 A product behind FerroSMART](https://github.com/FerroHEALTH/FerroAUTH/blob/main/docs/architecture.md#1321-a-product-behind-ferrosmart);
+FerroSMART's architecture describes the whole deployment in
+[§13.21 A product behind FerroSMART](https://github.com/FerroHEALTH/FerroSMART/blob/main/docs/architecture.md#1321-a-product-behind-ferrosmart);
 this page is FerroBRIDGE's side of it.
 
 ```text

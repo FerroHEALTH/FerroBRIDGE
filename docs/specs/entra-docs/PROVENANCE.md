@@ -8,7 +8,7 @@ here: change the pin in docs/VERSIONS.md and re-run the script.
 
 - Source: <https://github.com/MicrosoftDocs/entra-docs>, rendered under
   <https://learn.microsoft.com/en-us/entra/identity-platform/>
-- Pin: commit `219d8d57b01779e72e6d5449dc9341334c1fb906` (2026-11-05T13:36:57Z), the commit FerroHEALTH/FerroAUTH
+- Pin: commit `219d8d57b01779e72e6d5449dc9341334c1fb906` (2026-11-05T13:36:57Z), the commit FerroHEALTH/FerroSMART
   vendors
 - Fetched: 2026-11-05, each file from raw.githubusercontent.com at the commit
   and checked against the git blob id the commit records

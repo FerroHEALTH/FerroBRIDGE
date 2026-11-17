@@ -9,7 +9,7 @@ here: change the pin in docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/keycloak/keycloak>, rendered as the Keycloak 26.8.2
   guides at <https://www.keycloak.org/documentation>
 - Pin: tag `26.8.2`, which resolves to commit `e514445f9dcdabc5bdcf67cab56c1e49655de067` (2026-11-05T15:27:24Z), the
-  release FerroHEALTH/FerroAUTH vendors
+  release FerroHEALTH/FerroSMART vendors
 - Fetched: 2026-11-05, each file from raw.githubusercontent.com at the commit
   and checked against the git blob id the commit records
 - Upstream licence: the repository's `LICENSE.txt`, the Apache License,

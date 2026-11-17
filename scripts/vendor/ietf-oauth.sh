@@ -54,7 +54,7 @@ and Authorization Grants), RFC 8693 (OAuth 2.0 Token Exchange) and RFC 8707
 (Resource Indicators for OAuth 2.0), each the whole document as the RFC
 Editor publishes it, with every legend and notice it carries, which is what
 the IETF Trust's grant covers. The files are the ones
-FerroHEALTH/FerroAUTH vendors, identified by the same sha256." "" \
+FerroHEALTH/FerroSMART vendors, identified by the same sha256." "" \
   "FerroHEALTH/FerroBRIDGE#1582 (the onward exchange of the facade's caller token)"
 
 say "done"
