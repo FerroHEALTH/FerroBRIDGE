@@ -162,6 +162,13 @@ pub enum Error {
         #[source]
         source: Box<ferrohealth_smart::config::ConfigError>,
     },
+    /// A `[<lane>.credentials]` table resolves to a credential form this
+    /// bridge cannot send.
+    #[error("[{section}] names a credential form the bridge does not send")]
+    CredentialForm {
+        /// The table, such as `cdr.endpoint.credentials`.
+        section: String,
+    },
     /// A `[<lane>.credentials.onward]` table names a lane other than the CDR's.
     #[error(
         "[{section}.onward] is set; only the CDR lane reaches its upstream on a caller's behalf, under [cdr.endpoint.credentials.onward]"

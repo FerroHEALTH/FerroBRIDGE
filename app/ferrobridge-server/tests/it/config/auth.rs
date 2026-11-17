@@ -800,3 +800,17 @@ fn introspection_mode_without_its_table_is_refused() -> Result<(), Box<dyn std::
     );
     Ok(())
 }
+
+#[test]
+fn two_tables_naming_one_issuer_refuse_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    // NOTE: no specification governs this: our own design, the crate's; one issuer is
+    // trusted in one table, so a later table never replaces an earlier one unseen.
+    let error = refusal(&format!(
+        "{MINIMAL}\n[[auth.issuer]]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"machines\"\naudience = [\"https://bridge.example.org/fhir\"]\n"
+    ))?;
+    assert!(
+        matches!(rule(&error), Some(ConfigError::DuplicateIssuer { .. })),
+        "{error:?}"
+    );
+    Ok(())
+}

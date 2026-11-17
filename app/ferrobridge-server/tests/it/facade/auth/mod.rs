@@ -16,6 +16,7 @@ mod compartment;
 mod cors;
 mod described;
 mod discovery;
+mod ferrosmart;
 mod forwarding;
 mod grants;
 mod introspection;

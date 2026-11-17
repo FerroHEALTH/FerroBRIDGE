@@ -55,13 +55,20 @@ pub(super) fn resolve_credentials(
             section: section.to_owned(),
             source: Box::new(source),
         })?;
-    Ok(outbound.map(|outbound| match outbound {
-        Outbound::Basic(credential) => Upstream::Basic {
-            user: credential.username().to_owned(),
-            password: credential.password().clone(),
-        },
-        Outbound::Oauth(grant) => Upstream::OAuth(grant),
-    }))
+    outbound
+        .map(|outbound| match outbound {
+            Outbound::Basic(credential) => Ok(Upstream::Basic {
+                user: credential.username().to_owned(),
+                password: credential.password().clone(),
+            }),
+            Outbound::Oauth(grant) => Ok(Upstream::OAuth(grant)),
+            // NOTE: no specification governs this: our own design; a form a later
+            // ferrohealth-smart adds refuses the start rather than reach the upstream bare.
+            _ => Err(Error::CredentialForm {
+                section: section.to_owned(),
+            }),
+        })
+        .transpose()
 }
 
 /// Returns the key whose value `error` refuses: the CA's for a CA fault, the
