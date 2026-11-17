@@ -3,7 +3,7 @@
 
 # Provenance: the CKM archetypes of the FHIRconnect mapping library
 
-14 published archetypes of the openEHR Clinical Knowledge Manager,
+17 published archetypes of the openEHR Clinical Knowledge Manager,
 vendored verbatim by `scripts/vendor/ckm-library.sh`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -11,7 +11,7 @@ docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/openEHR/CKM-mirror>, the mirror of the international CKM
 - Pin: commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `f9618f5a2a94cf718b63d76fadc4b61b494d3bd19281bbf3248f24f52cd5b610`
+  `PROVENANCE.md` excluded): `d3289ba21cf65b8cee51fe655a668e712e904c1bc402ca552c181da201f55672`
 - Fetched: 2026-11-17
 - Upstream licence: Creative Commons Attribution-ShareAlike 3.0 Unported, the
   mirror's `LICENSE` file at the same commit, vendored beside this file
@@ -38,3 +38,6 @@ Files:
 - `openEHR-EHR-CLUSTER.organisation.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.organisation.v1.adl`, sha256 `ed947e4085b72940e10aab3bc19d68ff8e677bd9494667a3732e4966db8cab8e`
 - `openEHR-EHR-OBSERVATION.medication_statement.v0.adl` from `local/archetypes/entry/observation/openEHR-EHR-OBSERVATION.medication_statement.v0.adl`, sha256 `f02f5f3f126f1cfd2a888889056459d5f07292a3811b77dc6afd39c0d0b611cc`
 - `openEHR-EHR-CLUSTER.timing_nondaily.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.timing_nondaily.v1.adl`, sha256 `a5631cb0beffa4a1383c4923a16be9dab36782936b3300d0651590d24cf58cb8`
+- `openEHR-EHR-CLUSTER.person.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.person.v1.adl`, sha256 `69cc7845b3f4491102d32750c884bdda2593c42c869c14afeed17cd2e5c3b056`
+- `openEHR-EHR-CLUSTER.address.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.address.v1.adl`, sha256 `f3b7a6f8a96f98be8ea7f09e47359ec14d7b35fce07ed78225aa26738ce27bcc`
+- `openEHR-EHR-CLUSTER.structured_name.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.structured_name.v1.adl`, sha256 `9fcae353fa335726679dd8374a7fd5b5916d3f266ce41d3bea315db75e7e80d2`

@@ -10,7 +10,12 @@
 //! template, and the medication action with its dosage and medication
 //! clusters against the library medication action template, and the
 //! medication statement with its dosage, timing and medication clusters
-//! against the library medication statement template. Each is refused
+//! against the library medication statement template. The patient clusters
+//! and the insurance entry compile against the library patient template,
+//! slotted by a FerroBRIDGE Patient model because the openEHR-de mirror
+//! publishes `ADMIN_ENTRY.person_data.v0`, which slots them in the library,
+//! with no licence, and the local institution episode with its location
+//! cluster against the library case template. Each is refused
 //! at load, and the suite pins every refusal by file and line; each site is
 //! recorded on #101. `dosage.v2.BackboneElement.yml` raises none of them.
 
@@ -57,6 +62,30 @@ const STATEMENT: &[&str] = &[
 /// The non-daily timing cluster, which FerroBRIDGE's medication statement
 /// timing model slots where the CKM medication statement admits it.
 const NON_DAILY: &[&str] = &["model/cluster/org.openehr/timing_non_daily.yml"];
+
+/// The library patient template.
+const PATIENT: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_patient.v1.0.0";
+
+/// The library case template.
+const CASE: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_case.v1.0.0";
+
+/// The patient clusters and the insurance entry, which FerroBRIDGE's
+/// Patient report model slots.
+const PATIENT_FILES: &[&str] = &[
+    "model/cluster/org.openehr/person.v1.yml",
+    "model/cluster/org.openehr/structured_name.v1.yml",
+    "model/cluster/org.openehr/address.v1.yml",
+    "model/cluster/org.openehr/organisation.v1.yml",
+    "model/cluster/org.openehr/death_details.v1.yml",
+    "model/cluster/org.openehr/person_birth_data_iso.v0.yml",
+    "model/admin_entry/org.highmed/versicherungsinformationen.v0.yml",
+];
+
+/// The local institution episode and the location cluster it slots.
+const CASE_FILES: &[&str] = &[
+    "model/admin_entry/org.highmed/episode_institution_local.v0.yml",
+    "model/cluster/org.openehr/location.v1.yml",
+];
 
 /// The medication action and the clusters it slots.
 const MEDICATION: &[&str] = &[
@@ -178,6 +207,40 @@ fn the_non_daily_timing_is_refused_on_its_offset() -> Result<(), Box<dyn Error>>
             &["ferrobridge_medication_statement_timing.yml"]
         )?,
         ["timing_non_daily.yml:29 fc-unpaired-types"]
+    );
+    Ok(())
+}
+
+/// `address.v1.yml` writes `defining_code/terminology_id` in its `manual`
+/// rows (`:54`, `:77`, `:99`) and reads `code` on the `code`
+/// `Address.type` (`:62`, `:67`, `:85`, `:89`, `:107`, `:111`); the person,
+/// name, organisation, death details, birth data and insurance models raise
+/// none of their own.
+#[test]
+fn the_patient_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "ckm_patient_refusals",
+        refused_with(
+            PATIENT,
+            "ferrobridge_library_patient.context",
+            PATIENT_FILES,
+            &["ferrobridge_report_patient.yml"]
+        )?
+    );
+    Ok(())
+}
+
+/// `episode_institution_local.v0.yml:63`, `:67` and `:73` name `location`,
+/// `physicalType` and `status` below an `Encounter.period`, and `:64` and
+/// `:74` name nodes the archetype does not have at the entry's root;
+/// `location.v1.yml:29`, `:69` and `:110` map the `Identifier` of the
+/// referenced `Location` onto a `DV_TEXT`, which `DV_TEXT.adoc` pairs with
+/// `String`, `Coding` and `CodeableConcept` only.
+#[test]
+fn the_case_entry_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
+    insta::assert_json_snapshot!(
+        "ckm_case_refusals",
+        refused(CASE, "ferrobridge_library_case.context", CASE_FILES)?
     );
     Ok(())
 }

@@ -45,6 +45,11 @@ paths=(
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.medication_status_fhir.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.observation_status_fhir.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.organization.v0.adl"
+  "local/archetypes/entry/admin_entry/openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0.adl"
+  "local/archetypes/entry/admin_entry/openEHR-EHR-ADMIN_ENTRY.episode_institution_local.v0.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.death_details.v1.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.person_birth_data_iso.v0.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.location.v1.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"
