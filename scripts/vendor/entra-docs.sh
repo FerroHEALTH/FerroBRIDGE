@@ -9,7 +9,7 @@
 # the access token claims reference (the v2.0 `aud` claim), and the repository's README, LICENSE and LICENSE-CODE,
 # from MicrosoftDocs/entra-docs at the commit the "Microsoft Entra
 # documentation" row of docs/VERSIONS.md pins, the commit FerroHEALTH/
-# FerroAUTH vendors. The repository is large, so each file is fetched on its
+# FerroSMART vendors. The repository is large, so each file is fetched on its
 # own and checked against the commit's git blob id.
 #
 # Redistribution: the README grants the documentation under Creative Commons
@@ -95,7 +95,7 @@ here: change the pin in docs/VERSIONS.md and re-run the script.
 
 - Source: <https://github.com/$repo>, rendered under
   <https://learn.microsoft.com/en-us/entra/identity-platform/>
-- Pin: commit \`$commit\` ($committed), the commit FerroHEALTH/FerroAUTH
+- Pin: commit \`$commit\` ($committed), the commit FerroHEALTH/FerroSMART
   vendors
 - Fetched: $fetched, each file from raw.githubusercontent.com at the commit
   and checked against the git blob id the commit records

@@ -27,7 +27,7 @@ beside it on the owner's machine:
   index and the IHE profiles) are the other two products. FerroBRIDGE does
   no federation and no patient identity of its own; when it needs either,
   it calls that server over its protocol.
-- The shared-crate repositories (FerroAUTH, FerroAUDIT, FerroUI) carry the
+- The shared-crate repositories (FerroSMART, FerroAUDIT, FerroUI) carry the
   cross-cutting work the bridge consumes as pinned crates.
 
 **How to apply:**

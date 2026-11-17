@@ -20,9 +20,9 @@ one, and record the check on the issue. If the issue asks for the wrong
 thing, correct the issue first; don't build it as written. Put the same
 instruction in every worker brief.
 
-**Why:** owner, 2026-11-08, on FerroAUTH #300; and the owner's follow-up the
+**Why:** owner, 2026-11-08, on FerroSMART #300; and the owner's follow-up the
 same day: "you should always check and validate if what we should build is
-also what we need to build". FerroAUTH #299 asked for a
+also what we need to build". FerroSMART #299 asked for a
 `[<lane>.credentials.onward]` key to switch the onward token cache off. I had
 told the worker to keep `ferrohealth-smart` 0.9.5 additive, so it built a
 method on the client instead of the key. The owner called it a half solution:

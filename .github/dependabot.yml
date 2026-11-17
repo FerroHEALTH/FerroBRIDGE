@@ -71,7 +71,7 @@ updates:
     open-pull-requests-limit: 10
     groups:
       # The crates of the FerroHEALTH family, which the products pin exactly:
-      # ferrohealth-* (FerroSYS, FerroAUTH, FerroUI), openehr-* (FerroEHR's
+      # ferrohealth-* (FerroSYS, FerroSMART, FerroUI), openehr-* (FerroEHR's
       # lockstep 0.0.x line, where every bump counts as a major) and ihe-*
       # and ehds-* (FerroAUDIT). ONE PR moves the family together, since a
       # family crate often requires another's new version. It stands first

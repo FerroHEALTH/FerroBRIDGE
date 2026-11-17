@@ -8,7 +8,7 @@
 # chapter of the securing applications guide, the template its preview
 # notices are rendered from, and the repository's LICENSE.txt, from
 # keycloak/keycloak at the release tag the "Keycloak documentation" row of
-# docs/VERSIONS.md pins, the release FerroHEALTH/FerroAUTH vendors. A tag is
+# docs/VERSIONS.md pins, the release FerroHEALTH/FerroSMART vendors. A tag is
 # mutable, so the script resolves it to a commit and checks the commit the
 # row records. The repository is large, so each file is fetched on its own
 # and checked against the commit's git blob id.
@@ -85,7 +85,7 @@ here: change the pin in docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/$repo>, rendered as the Keycloak $tag
   guides at <https://www.keycloak.org/documentation>
 - Pin: tag \`$tag\`, which resolves to commit \`$commit\` ($committed), the
-  release FerroHEALTH/FerroAUTH vendors
+  release FerroHEALTH/FerroSMART vendors
 - Fetched: $fetched, each file from raw.githubusercontent.com at the commit
   and checked against the git blob id the commit records
 - Upstream licence: the repository's \`LICENSE.txt\`, the Apache License,
