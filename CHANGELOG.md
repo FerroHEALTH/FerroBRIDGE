@@ -26,6 +26,63 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.27] - 2026-11-17
+
+Browser apps and FerroSMART. The facade answers CORS: the SMART discovery
+document and the `CapabilityStatement` for any origin, the REST routes for
+the origins `[facade.cors] allowed_origins` lists. The bridge runs behind
+FerroSMART under the `ferrosmart` issuer preset of `ferrohealth-smart`
+0.29.1, which also refuses two `[[auth.issuer]]` tables naming one issuer.
+A party context loads over an id-coded ADL 2 template such as FerroEHR's
+professional `PERSON`, and a plain `DV_IDENTIFIER.type` reads as a coding
+code instead of failing the read. The crates move to
+`openehr-mapping-core` 0.4.0, `fhirconnect` 0.5.1, `ferrobridge-term` and
+`ferrobridge-validator` 0.13.0, `ferrobridge-hl7v2` 0.19.0 and `eehrxf`
+0.17.0, and the server to `ihe-atna` and `ehds-logging` 0.23.0 and
+`ferrohealth-session` 0.24.0. Each breaking change below names what an
+operator or a crate user changes.
+
+### Added
+
+- The FHIR facade answers cross-origin requests, as SMART App Launch 2.2.0
+  asks of a server that supports browser apps: `GET /fhir/metadata` and the
+  SMART discovery document answer any origin with
+  `Access-Control-Allow-Origin: *`, and the REST routes under `/fhir` answer
+  the origins the new `[facade.cors] allowed_origins` lists, by name with
+  `Vary: Origin`, preflight included, and never with a wildcard or
+  `Access-Control-Allow-Credentials`. A refusal of the guard, such as the
+  `401` of a missing token, is readable by an admitted origin (#1950).
+- The bridge runs behind FerroSMART, the FerroHEALTH SMART App Launch 2.x
+  authorization server: an `[[auth.issuer]]` takes `profile = "ferrosmart"`
+  from `ferrohealth-smart` 0.29.1, which reads FerroSMART's RFC 9068 tokens
+  with `typ` `at+jwt` alone and `scope` required, admits a person through a
+  SMART app the table lists in `delegates` and a Backend Services client as
+  a machine. The Operate section has a page for the deployment, with
+  FerroSMART's resource table, the bridge's issuer table and the discovery
+  document. The server and the operator console move to
+  `ferrohealth-smart` 0.29.1 and `ferrohealth-session` 0.24, and two
+  `[[auth.issuer]]` tables naming one issuer now refuse the start (#1952).
+
+### Fixed
+
+- A party context loads over an id-coded ADL 2 template, such as FerroEHR's
+  professional `PERSON` (`openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0`),
+  which the CDR serves only on its `adl2` route: the model mapping's paths name
+  the template's id-codes (`details[id2]/items[id3]`), as ADL 2.4 §4.2.5 admits
+  both node identifier coding systems and a path predicate is the node's
+  `archetype_node_id` (BASE 1.2.0, Architecture Overview, Paths and Locators).
+  The load no longer refuses such a template, and `openehr-mapping-core` drops
+  `PathError::IdCodedTemplate` and the `id-coded-template` diagnostic code; an
+  at-coded path over an id-coded template is refused as a path the template
+  does not have (#1951).
+- A `DV_IDENTIFIER` whose `type` is a plain string, such as the `login` of a
+  SCIM-provisioned professional, reads as `Identifier.type.coding[0].code`
+  with no system instead of failing the read with `500`, as FHIRconnect's
+  `String.adoc` §Coding maps an openEHR string without `::` (the RM types
+  `DV_IDENTIFIER.type` as a free `String`). A coding with a `code` and no
+  `system` now writes the bare code into `DV_IDENTIFIER.type` instead of
+  being dropped; one with both still writes `system::code` (#1955).
+
 ## [0.0.26] - 2026-11-16
 
 The SMART discovery document described by the family's shared rule, on
@@ -6924,7 +6981,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.26...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.27...HEAD
+[0.0.27]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.26...v0.0.27
 [0.0.26]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.25...v0.0.26
 [0.0.25]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.24...v0.0.25
 [0.0.24]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.23...v0.0.24
