@@ -9,7 +9,6 @@ expression: "refused(MEDICATION_STATEMENT,\n\"ferrobridge_library_medication_sta
   "medication.v2.yml:50 fc-excluded-template-node",
   "medication_statement.v0.yml:121 fc-duplicate-method-name",
   "medication_statement.v0.yml:76 fc-unknown-template-node",
-  "timing_daily.v1.yml:21 fc-repeating-function-port",
   "timing_daily.v1.yml:26 fc-unknown-fhir-element",
   "timing_daily.v1.yml:29 fc-unpaired-types",
   "timing_non_daily.yml:21 fc-unknown-template-node",
