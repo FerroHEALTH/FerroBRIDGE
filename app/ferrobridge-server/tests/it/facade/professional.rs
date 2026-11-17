@@ -120,7 +120,7 @@ fn professional() -> serde_json::Value {
                 "_type": "ELEMENT",
                 "name": {"_type": "DV_TEXT", "value": "Identifier main data"},
                 "archetype_node_id": "id3",
-                "value": {"_type": "DV_IDENTIFIER", "issuer": "http://example.org/fhir/sid/login", "assigner": "Synthetic assigner", "id": "SYN-PRO-0001"}
+                "value": {"_type": "DV_IDENTIFIER", "issuer": "http://example.org/fhir/sid/login", "assigner": "Synthetic assigner", "id": "SYN-PRO-0001", "type": "login"}
             }]
         },
         "identities": [{
@@ -213,5 +213,12 @@ async fn a_practitioner_reads_from_an_id_coded_person() -> Result<(), Box<dyn Er
     assert_eq!(UID, body["id"]);
     assert_eq!("Synthetic Professional", body["name"][0]["text"], "{body}");
     assert_eq!("SYN-PRO-0001", body["identifier"][0]["value"], "{body}");
+    // RM 1.1.0 types DV_IDENTIFIER.type as a free String, the plain `login` a SCIM-provisioned
+    // professional carries; FHIRconnect String.adoc §Coding reads it as the code, with no system.
+    assert_eq!(
+        serde_json::json!([{"code": "login"}]),
+        body["identifier"][0]["type"]["coding"],
+        "{body}"
+    );
     Ok(())
 }

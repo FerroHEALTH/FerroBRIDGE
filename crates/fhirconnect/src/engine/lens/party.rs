@@ -132,11 +132,7 @@ impl Lens<DvIdentifier, Identifier> for IdentifierLens {
         Ok(Identifier {
             system: source.issuer.clone().map(Uri::from),
             value: Some(primitives::String::from(source.id.clone())),
-            r#type: source
-                .r#type
-                .as_deref()
-                .map(|coded| concept_of(coded, IDENTIFIER_CELL))
-                .transpose()?,
+            r#type: source.r#type.as_deref().map(concept_of),
             assigner: source.assigner.as_deref().map(reference_of).map(Box::new),
             ..Identifier::default()
         })
@@ -173,37 +169,41 @@ impl Lens<DvIdentifier, Identifier> for IdentifierLens {
     }
 }
 
-/// Returns the `CodeableConcept` a `system::code` string stands for.
-fn concept_of(
-    coded: &str,
-    cell: &'static str,
-) -> Result<fhir_types::r4::codeable_concept::CodeableConcept, LensError> {
-    let (system, code) = coded.split_once(SEPARATOR).ok_or(LensError::Shape {
-        cell,
-        attribute: "DV_IDENTIFIER.type",
-        found: String::from(coded),
-        reason: "a coded identifier type is written `system::code`",
-        direction: Direction::OpenehrToFhir,
-    })?;
-    Ok(fhir_types::r4::codeable_concept::CodeableConcept {
+/// Returns the `CodeableConcept` a `DV_IDENTIFIER.type` string stands for.
+///
+/// The RM types `type` as a free `String` (RM Release 1.1.0, Data Types,
+/// `DV_IDENTIFIER`), and `String.adoc` §Coding maps the string to `code`,
+/// reading `system` and `code` only when it contains `::`, so a plain type
+/// such as `login` is a coding with a code and no system.
+fn concept_of(kind: &str) -> fhir_types::r4::codeable_concept::CodeableConcept {
+    let (system, code) = match kind.split_once(SEPARATOR) {
+        Some((system, code)) => (Some(Uri::from(system)), code),
+        None => (None, kind),
+    };
+    fhir_types::r4::codeable_concept::CodeableConcept {
         coding: vec![fhir_types::r4::coding::Coding {
-            system: Some(Uri::from(system)),
+            system,
             code: Some(primitives::Code::from(code)),
             ..fhir_types::r4::coding::Coding::default()
         }],
         ..fhir_types::r4::codeable_concept::CodeableConcept::default()
-    })
+    }
 }
 
-/// Returns the `system::code` string a `CodeableConcept` stands for.
+/// Returns the `DV_IDENTIFIER.type` string a `CodeableConcept` stands for.
 ///
-/// `String.adoc` §Coding takes the first coding, and a concept with none has
-/// nothing to encode.
+/// `String.adoc` §Coding takes the first coding and writes `system::code`, or
+/// the bare `code` when the coding names no system; a concept with no coded
+/// code has nothing to encode.
 fn coded_of(concept: &fhir_types::r4::codeable_concept::CodeableConcept) -> Option<String> {
     let coding = concept.coding.first()?;
-    let system = text_of(coding.system.as_ref().map(|system| &system.value))?;
     let code = text_of(coding.code.as_ref().map(|code| &code.value))?;
-    Some(format!("{system}{SEPARATOR}{code}"))
+    Some(
+        match text_of(coding.system.as_ref().map(|system| &system.value)) {
+            Some(system) => format!("{system}{SEPARATOR}{code}"),
+            None => String::from(code),
+        },
+    )
 }
 
 /// Returns the `Reference` an assigner string stands for.
@@ -266,7 +266,7 @@ mod tests {
         fn identifier()(
             id in "[A-Za-z0-9-]{1,12}",
             issuer in proptest::option::of("[a-z]{1,6}://[a-z.]{1,10}"),
-            kind in proptest::option::of("[a-z]{1,6}://[a-z.]{1,8}::[A-Z]{1,4}"),
+            kind in proptest::option::of("([a-z]{1,6}://[a-z.]{1,8}::)?[A-Za-z]{1,8}"),
             assigner in proptest::option::of("[a-z]{1,6}://[a-z.]{1,8}::[A-Za-z0-9]{1,6}"),
         ) -> DvIdentifier {
             DvIdentifier { issuer, assigner, id, r#type: kind }
@@ -418,6 +418,45 @@ mod tests {
             Some("http://example.org/ids"),
             "the issuer becomes the identifier system"
         );
+    }
+
+    #[test]
+    fn a_plain_type_reads_as_a_code_with_no_system() {
+        // String.adoc §Coding: the openEHR string is the `code`, and a system only when it holds `::`.
+        let source = DvIdentifier {
+            issuer: Some(String::from("http://example.org/ids")),
+            assigner: None,
+            id: String::from("SYN-0001"),
+            r#type: Some(String::from("login")),
+        };
+        let view: Identifier = IdentifierLens.get(&source).expect("a plain type is legal");
+        let coding = view
+            .r#type
+            .as_ref()
+            .and_then(|kind| kind.coding.first())
+            .expect("the type becomes a coding");
+        assert_eq!(
+            coding.code.as_ref().and_then(|code| code.value.as_deref()),
+            Some("login")
+        );
+        assert_eq!(coding.system, None, "a plain type names no system");
+    }
+
+    #[test]
+    fn a_coding_without_a_system_writes_its_bare_code() {
+        let view = Identifier {
+            value: Some(primitives::String::from("SYN-0001")),
+            r#type: Some(fhir_types::r4::codeable_concept::CodeableConcept {
+                coding: vec![fhir_types::r4::coding::Coding {
+                    code: Some(primitives::Code::from("login")),
+                    ..fhir_types::r4::coding::Coding::default()
+                }],
+                ..fhir_types::r4::codeable_concept::CodeableConcept::default()
+            }),
+            ..Identifier::default()
+        };
+        let written = IdentifierLens.put(&view, None).expect("a value is present");
+        assert_eq!(written.r#type.as_deref(), Some("login"));
     }
 
     #[test]
