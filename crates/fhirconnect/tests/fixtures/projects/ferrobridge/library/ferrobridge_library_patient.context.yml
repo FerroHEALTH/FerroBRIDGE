@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# FerroBRIDGE's context over its Patient report model and the library's
-# patient clusters and insurance entry as published (#1963), against the
-# library patient template built from the CKM archetypes.
+# FerroBRIDGE's context over the library's person data model, its patient
+# clusters and, through FerroBRIDGE's extension, the insurance entry as
+# published (#1963), against the library patient template built from the
+# CKM archetypes.
 grammar: FHIRConnect/v1.0.0
 type: context
 metadata:
@@ -17,7 +18,7 @@ context:
   template:
     id: "openEHR-EHR-COMPOSITION.ferrobridge_library_patient.v1.0.0"
   archetypes:
-    - "ferrobridge_report_patient"
+    - "ADMIN_ENTRY.person_data.v0"
     - "CLUSTER.person.v1"
     - "CLUSTER.structured_name.v1"
     - "CLUSTER.address.v1"
@@ -25,4 +26,6 @@ context:
     - "CLUSTER.death_details.v1"
     - "CLUSTER.person_birth_data_iso.v0"
     - "ADMIN_ENTRY.versicherungsinformationen.v0"
-  start: "ferrobridge_report_patient"
+  extensions:
+    - "ferrobridge_person_insurance"
+  start: "ADMIN_ENTRY.person_data.v0"

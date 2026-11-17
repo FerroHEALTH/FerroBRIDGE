@@ -164,7 +164,10 @@ fn config_check_reports_a_refusal_the_resolution_finds() {
 
 #[test]
 fn healthcheck_fails_when_no_server_answers() -> Result<(), Box<dyn Error>> {
-    let address = std::net::TcpListener::bind("127.0.0.1:0")?.local_addr()?;
+    // NOTE: no specification governs this: our own design, the listener stays bound and
+    // never accepts, so no other process can take the port and answer the probe (#1973).
+    let silent = std::net::TcpListener::bind("127.0.0.1:0")?;
+    let address = silent.local_addr()?;
     let output = binary(
         &["healthcheck"],
         &[("FERROBRIDGE__SERVER__LISTEN", &address.to_string())],

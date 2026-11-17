@@ -79,9 +79,10 @@ const PATIENT: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_patient.v1.0.
 /// The library case template.
 const CASE: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_case.v1.0.0";
 
-/// The patient clusters and the insurance entry, which FerroBRIDGE's
-/// Patient report model slots.
+/// The person data entry, its clusters and the insurance entry, which
+/// FerroBRIDGE's extension slots.
 const PATIENT_FILES: &[&str] = &[
+    "model/admin_entry/org.highmed/person_data.v0.yml",
     "model/cluster/org.openehr/person.v1.yml",
     "model/cluster/org.openehr/structured_name.v1.yml",
     "model/cluster/org.openehr/address.v1.yml",
@@ -259,7 +260,8 @@ fn the_non_daily_timing_is_refused_on_its_offset() -> Result<(), Box<dyn Error>>
 
 /// `address.v1.yml` writes `defining_code/terminology_id` in its `manual`
 /// rows (`:54`, `:77`, `:99`) and reads `code` on the `code`
-/// `Address.type` (`:62`, `:67`, `:85`, `:89`, `:107`, `:111`); the person,
+/// `Address.type` (`:62`, `:67`, `:85`, `:89`, `:107`, `:111`), and
+/// `person_data.v0.yml:75` writes a `link` below a `Reference`; the person,
 /// name, organisation, death details, birth data and insurance models raise
 /// none of their own.
 #[test]
@@ -270,7 +272,7 @@ fn the_patient_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
             PATIENT,
             "ferrobridge_library_patient.context",
             PATIENT_FILES,
-            &["ferrobridge_report_patient.yml"]
+            &["ferrobridge_person_insurance.yml"]
         )?
     );
     Ok(())

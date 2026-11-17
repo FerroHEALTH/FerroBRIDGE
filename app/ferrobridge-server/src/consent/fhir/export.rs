@@ -17,8 +17,8 @@
 //! `Consent.category`, both extensible).
 //!
 //! Each attribute with no core element goes in a FerroBRIDGE extension:
-//! `emergency_override`, an actor scope's `role`, `relationship` and
-//! `caller_kind`, a data scope's `archetypes`, `origins` and the
+//! `emergency_override`, an actor scope's `role`, `relationship`,
+//! `organisation_type` and `caller_kind`, a data scope's `archetypes`, `origins` and the
 //! `OBJECT_REF` of each object, R4's `time_validity` of an unscoped
 //! directive, and, as [`super::EXT_DIRECTIVE`], every attribute no evaluator
 //! reads. What neither a core element nor an extension can state is refused
@@ -45,8 +45,9 @@ use crate::consent::fhir::model::{
 };
 use crate::consent::fhir::{
     ACT_CODE, CONFIDENTIALITY, CONSENT_SCOPE, EXT_ARCHETYPE, EXT_BASE_UNDECIDED, EXT_CALLER_KIND,
-    EXT_DIRECTIVE, EXT_EMERGENCY_OVERRIDE, EXT_OBJECT_REF, EXT_ORIGIN, EXT_RELATIONSHIP, EXT_ROLE,
-    EXT_TIME_VALIDITY, LOINC, PARTICIPATION_TYPE, Release, TEMPLATE_SYSTEM, URI_SYSTEM,
+    EXT_DIRECTIVE, EXT_EMERGENCY_OVERRIDE, EXT_OBJECT_REF, EXT_ORGANISATION_TYPE, EXT_ORIGIN,
+    EXT_RELATIONSHIP, EXT_ROLE, EXT_TIME_VALIDITY, LOINC, PARTICIPATION_TYPE, Release,
+    TEMPLATE_SYSTEM, URI_SYSTEM,
 };
 use crate::consent::rm::{bounds, members, opposite};
 use crate::consent::{Format, Loss, Refused};
@@ -342,6 +343,7 @@ impl Writer<'_> {
         for (url, coded) in [
             (EXT_ROLE, &scope.role),
             (EXT_RELATIONSHIP, &scope.relationship),
+            (EXT_ORGANISATION_TYPE, &scope.organisation_type),
             (EXT_CALLER_KIND, &scope.caller_kind),
         ] {
             if let Some(coded) = coded {
@@ -357,12 +359,16 @@ impl Writer<'_> {
             },
             (None, None) => Ref {
                 display: Some(
-                    [&scope.caller_kind, &scope.relationship]
-                        .into_iter()
-                        .flatten()
-                        .map(|c| c.value.clone())
-                        .collect::<Vec<_>>()
-                        .join(" "),
+                    [
+                        &scope.caller_kind,
+                        &scope.organisation_type,
+                        &scope.relationship,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .map(|c| c.value.clone())
+                    .collect::<Vec<_>>()
+                    .join(" "),
                 ),
                 ..Ref::default()
             },

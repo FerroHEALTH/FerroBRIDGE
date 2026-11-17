@@ -24,7 +24,7 @@ use super::section::Operator;
 use super::section::Terminology;
 use super::section::facade::Facade;
 use openehr_rm::draft::access_control::terminology::AccessDefault;
-use openehr_rm::draft::access_control::terminology::TERMINOLOGY_ID_ACCESS_CONTROL;
+use openehr_rm::draft::access_control::terminology::TERMINOLOGY_ID_ACCESS;
 use openehr_rm::draft::access_control::terminology::Term;
 
 pub(super) mod hl7v2;
@@ -130,13 +130,11 @@ fn consent(facade: &Facade) -> Result<Option<crate::consent::exchange::Settings>
             key: String::from("facade.consent.default_access"),
         });
     }
-    let default_access =
-        AccessDefault::read(TERMINOLOGY_ID_ACCESS_CONTROL, &section.default_access).map_err(
-            |_outside| Error::AccessDefault {
-                key: String::from("facade.consent.default_access"),
-                value: section.default_access.clone(),
-            },
-        )?;
+    let default_access = AccessDefault::read(TERMINOLOGY_ID_ACCESS, &section.default_access)
+        .map_err(|_outside| Error::AccessDefault {
+            key: String::from("facade.consent.default_access"),
+            value: section.default_access.clone(),
+        })?;
     let extensions_root = url_of("facade.consent.extensions_url", &section.extensions_url)?;
     Ok(Some(crate::consent::exchange::Settings {
         extensions_root,

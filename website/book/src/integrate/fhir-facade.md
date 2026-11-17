@@ -700,7 +700,7 @@ class through the `[terminology]` server with `ConceptMap/$translate`; with
 no server, or no translation, the `Consent` is refused naming the coding.
 Attributes with no core element are written in extensions under
 `https://ferrobridge.eu/fhir/StructureDefinition/`: `emergency-override`,
-`role`, `relationship`, `caller-kind`, `archetype`, `origin`, `object-ref`,
+`role`, `relationship`, `organisation-type`, `caller-kind`, `archetype`, `origin`, `object-ref`,
 `time-validity`, `base-undecided` and `access-directive`.
 
 **BPPC** maps an acknowledgement of a policy the domain publishes by OID to
