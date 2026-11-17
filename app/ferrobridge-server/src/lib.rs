@@ -530,6 +530,7 @@ pub fn with_middleware(product: Router, state: Arc<AppState>, server: &ServerSec
         refusal_body: facade::edge::body(server.body_limit_bytes(), server.request_timeout.get()),
         request_log: RequestLog::new(state.logged_query_parameters())
             .with_recorder(state.usage_window().clone()),
+        meter: None,
     };
     stack::app(product, health(state), server, policy)
 }
