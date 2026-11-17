@@ -92,8 +92,10 @@ fn policy(catalogue: &[AccessDirective]) -> Result<Value, Box<dyn Error>> {
         care_relationship_required: false,
         relationship_grace: None,
         purpose_required: false,
+        rules: None,
         catalogue: ferrobridge_server::consent::rm::list(catalogue.to_vec()),
         log_restrictions: None,
+        log_retention: None,
         details: None,
     };
     Ok(openehr_its::json::to_canonical_value(&policy))

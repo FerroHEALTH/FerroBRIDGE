@@ -38,15 +38,15 @@ use openehr_rm::draft::access_control::access_control::access_data_scope::Access
 use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
 use openehr_rm::draft::access_control::terminology::{
     AccessDefault, CallerKind, DirectiveKind, Effect, OperationClass, Relationship,
-    TERMINOLOGY_ID_ACCESS_CONTROL, Term,
+    TERMINOLOGY_ID_ACCESS, Term,
 };
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 
 use crate::consent::fhir::model::{Code, Concept, DataRef, Document, Ext, ExtValue, Rule};
 use crate::consent::fhir::{
     ACT_CODE, CONFIDENTIALITY, EXT_ARCHETYPE, EXT_BASE_UNDECIDED, EXT_CALLER_KIND, EXT_DIRECTIVE,
-    EXT_EMERGENCY_OVERRIDE, EXT_OBJECT_REF, EXT_ORIGIN, EXT_RELATIONSHIP, EXT_ROLE,
-    EXT_TIME_VALIDITY, PARTICIPATION_TYPE, Release, TEMPLATE_SYSTEM, URI_SYSTEM,
+    EXT_EMERGENCY_OVERRIDE, EXT_OBJECT_REF, EXT_ORGANISATION_TYPE, EXT_ORIGIN, EXT_RELATIONSHIP,
+    EXT_ROLE, EXT_TIME_VALIDITY, PARTICIPATION_TYPE, Release, TEMPLATE_SYSTEM, URI_SYSTEM,
 };
 use crate::consent::rm::coded;
 use crate::consent::rm::{directive, interval, list, opposite, term};
@@ -106,7 +106,7 @@ pub fn foreign_actions(document: &Document) -> Vec<Code> {
                 if !action
                     .codings
                     .iter()
-                    .any(|c| c.system.as_deref() == Some(TERMINOLOGY_ID_ACCESS_CONTROL))
+                    .any(|c| c.system.as_deref() == Some(TERMINOLOGY_ID_ACCESS))
                 {
                     out.extend(action.codings.iter().cloned());
                 }
@@ -405,6 +405,7 @@ impl Reader<'_> {
         };
         let role = coding(EXT_ROLE).transpose()?;
         let relationship = coding(EXT_RELATIONSHIP).transpose()?;
+        let organisation_type = coding(EXT_ORGANISATION_TYPE).transpose()?;
         let caller_kind = coding(EXT_CALLER_KIND).transpose()?;
         for (coded, holds) in [
             (
@@ -428,13 +429,19 @@ impl Reader<'_> {
             }
         }
         let party = actor.reference.as_ref().and_then(meta::party_of);
-        if party.is_none() && role.is_none() && relationship.is_none() && caller_kind.is_none() {
+        if party.is_none()
+            && role.is_none()
+            && relationship.is_none()
+            && organisation_type.is_none()
+            && caller_kind.is_none()
+        {
             return Err(self.refused(format!("{element}.reference"), Loss::Unresolved));
         }
         Ok(AccessActorScope {
             party,
             role,
             relationship,
+            organisation_type,
             caller_kind,
         })
     }
@@ -445,10 +452,10 @@ impl Reader<'_> {
         if let Some(own) = action
             .codings
             .iter()
-            .find(|c| c.system.as_deref() == Some(TERMINOLOGY_ID_ACCESS_CONTROL))
+            .find(|c| c.system.as_deref() == Some(TERMINOLOGY_ID_ACCESS))
         {
             let code = own.code.as_deref().unwrap_or_default();
-            return OperationClass::read(TERMINOLOGY_ID_ACCESS_CONTROL, code)
+            return OperationClass::read(TERMINOLOGY_ID_ACCESS, code)
                 .map(term)
                 .map_err(|error| self.refused(element, Loss::Code(error.to_string())));
         }

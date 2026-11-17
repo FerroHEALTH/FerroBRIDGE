@@ -9,9 +9,7 @@
 
 use openehr_base::containers::NonEmptyVec;
 use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
-use openehr_rm::draft::access_control::terminology::{
-    DirectiveKind, Effect, TERMINOLOGY_ID_ACCESS_CONTROL, Term,
-};
+use openehr_rm::draft::access_control::terminology::{DirectiveKind, Effect, Term};
 use openehr_rm::v1_2::data_structures::item_structure::item_structure::ItemStructure;
 use openehr_rm::v1_2::data_structures::item_structure::item_tree::ItemTree;
 use openehr_rm::v1_2::data_structures::representation::element::Element;
@@ -93,9 +91,10 @@ pub fn members<T>(values: Option<&NonEmptyVec<T>>) -> &[T] {
     values.map_or(&[], |values| values)
 }
 
-/// `term` of the access control terminology as a `DV_CODED_TEXT`.
+/// `term` of the draft access terminology as a `DV_CODED_TEXT`, in the
+/// terminology the term is of.
 pub fn term<T: Term>(term: T) -> DvCodedText {
-    coded(TERMINOLOGY_ID_ACCESS_CONTROL, term.code(), term.code())
+    term.coded()
 }
 
 /// The text of `text`, plain or coded.

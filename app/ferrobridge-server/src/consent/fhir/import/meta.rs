@@ -10,9 +10,7 @@ use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId
 use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
 use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
-use openehr_rm::draft::access_control::terminology::{
-    DirectiveKind, TERMINOLOGY_ID_ACCESS_CONTROL, Term,
-};
+use openehr_rm::draft::access_control::terminology::{DirectiveKind, TERMINOLOGY_ID_ACCESS, Term};
 use openehr_rm::v1_2::common::generic::party_identified::{PartyIdentified, PartyIdentifiedData};
 use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
@@ -24,21 +22,22 @@ use super::Reader;
 use crate::consent::fhir::model::{Code, Ref, Rule};
 use crate::consent::fhir::{
     CONSENT_SCOPE, EXT_ARCHETYPE, EXT_BASE_UNDECIDED, EXT_CALLER_KIND, EXT_DIRECTIVE,
-    EXT_EMERGENCY_OVERRIDE, EXT_OBJECT_REF, EXT_ORIGIN, EXT_RELATIONSHIP, EXT_ROLE,
-    EXT_TIME_VALIDITY, LOINC, Release, URI_SYSTEM,
+    EXT_EMERGENCY_OVERRIDE, EXT_OBJECT_REF, EXT_ORGANISATION_TYPE, EXT_ORIGIN, EXT_RELATIONSHIP,
+    EXT_ROLE, EXT_TIME_VALIDITY, LOINC, Release, URI_SYSTEM,
 };
 use crate::consent::rm::dv_date_time_text;
 use crate::consent::rm::{details, list, members};
 use crate::consent::{Loss, Refused, catalogue_entry};
 
 /// Every FerroBRIDGE extension the mapping reads.
-pub(super) const KNOWN: [&str; 10] = [
+pub(super) const KNOWN: [&str; 11] = [
     EXT_DIRECTIVE,
     EXT_EMERGENCY_OVERRIDE,
     EXT_BASE_UNDECIDED,
     EXT_TIME_VALIDITY,
     EXT_ROLE,
     EXT_RELATIONSHIP,
+    EXT_ORGANISATION_TYPE,
     EXT_CALLER_KIND,
     EXT_ARCHETYPE,
     EXT_ORIGIN,
@@ -253,9 +252,9 @@ impl Reader<'_> {
     fn categories(&self, shared: &mut Shared) -> Result<(), Refused> {
         for category in &self.document.categories {
             for code in &category.codings {
-                if code.system.as_deref() == Some(TERMINOLOGY_ID_ACCESS_CONTROL) {
+                if code.system.as_deref() == Some(TERMINOLOGY_ID_ACCESS) {
                     shared.kind = DirectiveKind::read(
-                        TERMINOLOGY_ID_ACCESS_CONTROL,
+                        TERMINOLOGY_ID_ACCESS,
                         code.code.as_deref().unwrap_or_default(),
                     )
                     .map_err(|error| {
