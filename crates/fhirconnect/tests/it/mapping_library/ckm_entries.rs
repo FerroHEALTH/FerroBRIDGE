@@ -10,11 +10,10 @@
 //! template, and the medication action with its dosage and medication
 //! clusters against the library medication action template, and the
 //! medication statement with its dosage, timing and medication clusters
-//! against the library medication statement template. The patient clusters
-//! and the insurance entry compile against the library patient template,
-//! slotted by a FerroBRIDGE Patient model because the openEHR-de mirror
-//! publishes `ADMIN_ENTRY.person_data.v0`, which slots them in the library,
-//! with no licence, and the local institution episode with its location
+//! against the library medication statement template. The person data entry
+//! and its clusters compile against the library
+//! patient template, the insurance entry slotted by a FerroBRIDGE
+//! extension, and the local institution episode with its location
 //! cluster against the library case template. Each is refused
 //! at load, and the suite pins every refusal by file and line; each site is
 //! recorded on #101. `dosage.v2.BackboneElement.yml` raises none of them.
@@ -69,9 +68,10 @@ const PATIENT: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_patient.v1.0.
 /// The library case template.
 const CASE: &str = "openEHR-EHR-COMPOSITION.ferrobridge_library_case.v1.0.0";
 
-/// The patient clusters and the insurance entry, which FerroBRIDGE's
-/// Patient report model slots.
+/// The person data entry, its clusters and the insurance entry, which
+/// FerroBRIDGE's extension slots.
 const PATIENT_FILES: &[&str] = &[
+    "model/admin_entry/org.highmed/person_data.v0.yml",
     "model/cluster/org.openehr/person.v1.yml",
     "model/cluster/org.openehr/structured_name.v1.yml",
     "model/cluster/org.openehr/address.v1.yml",
@@ -213,7 +213,8 @@ fn the_non_daily_timing_is_refused_on_its_offset() -> Result<(), Box<dyn Error>>
 
 /// `address.v1.yml` writes `defining_code/terminology_id` in its `manual`
 /// rows (`:54`, `:77`, `:99`) and reads `code` on the `code`
-/// `Address.type` (`:62`, `:67`, `:85`, `:89`, `:107`, `:111`); the person,
+/// `Address.type` (`:62`, `:67`, `:85`, `:89`, `:107`, `:111`), and
+/// `person_data.v0.yml:75` writes a `link` below a `Reference`; the person,
 /// name, organisation, death details, birth data and insurance models raise
 /// none of their own.
 #[test]
@@ -224,7 +225,7 @@ fn the_patient_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
             PATIENT,
             "ferrobridge_library_patient.context",
             PATIENT_FILES,
-            &["ferrobridge_report_patient.yml"]
+            &["ferrobridge_person_insurance.yml"]
         )?
     );
     Ok(())

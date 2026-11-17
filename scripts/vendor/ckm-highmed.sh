@@ -12,7 +12,10 @@
 # sha256 is the tree digest of the files written here, so a moved file fails
 # the fetch. The mirror carries no LICENSE file: each archetype states its own
 # licence in its description, and the fetch refuses one that names no
-# Creative Commons Attribution-ShareAlike licence there.
+# Creative Commons Attribution-ShareAlike licence there. The one exception is
+# the archetype named in `unlicensed_by_decision` below, which states no
+# licence at all and is vendored by the owner's decision of 2026-11-17 under
+# the CKM default licence, as the PROVENANCE.md written here records.
 #
 # The archetypes are ADL 1.4 sources. The test suites read them with the
 # FerroBRIDGE-authored templates beside them and build the ADL 2 operational
@@ -45,12 +48,19 @@ paths=(
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.medication_status_fhir.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.observation_status_fhir.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.organization.v0.adl"
+  "local/archetypes/entry/admin_entry/openEHR-EHR-ADMIN_ENTRY.person_data.v0.adl"
   "local/archetypes/entry/admin_entry/openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0.adl"
   "local/archetypes/entry/admin_entry/openEHR-EHR-ADMIN_ENTRY.episode_institution_local.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.death_details.v1.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.person_birth_data_iso.v0.adl"
   "local/archetypes/cluster/openEHR-EHR-CLUSTER.location.v1.adl"
 )
+
+# The one archetype that states no licence, vendored by the owner's decision
+# of 2026-11-17 under the CKM default licence (PROVENANCE.md, "Licence of
+# ADMIN_ENTRY.person_data.v0"). The fetch still refuses it the day it states a
+# licence that is not CC BY-SA, and refuses any other archetype with none.
+readonly unlicensed_by_decision="openEHR-EHR-ADMIN_ENTRY.person_data.v0.adl"
 
 pin="$(corpus_pin_cell "$item")"
 repo="$(corpus_pin_repo "$pin")"
@@ -74,6 +84,9 @@ for path in "${paths[@]}"; do
 done
 for path in "${paths[@]}"; do
   name="$(basename "$path")"
+  if [ "$name" = "$unlicensed_by_decision" ] && ! grep -q '\["licence"\]' "$tmp/out/$name"; then
+    continue
+  fi
   grep -q '\["licence"\] = <"This work is licensed under the Creative Commons Attribution-ShareAlike' "$tmp/out/$name" ||
     die "$name names no Creative Commons Attribution-ShareAlike licence"
 done
@@ -105,13 +118,32 @@ docs/VERSIONS.md and re-run the script.
 - Fetched: $fetched
 - Upstream licence: Creative Commons Attribution-ShareAlike, 3.0 or 4.0 as
   each archetype states in its \`description\` \`licence\`; the mirror
-  carries no \`LICENSE\` file
+  carries no \`LICENSE\` file. One exception follows.
 - Use: the archetypes the FHIRconnect mapping library's model mappings
   declare, which the templates FerroBRIDGE authors under
   \`tools/ferrobridge-testkit/fixtures/adl2/library/\` specialise or fill
   their slots with so each mapping compiles in full (#1546), read by the
   FerroBRIDGE test suites and never shipped in a crate (the testkit crate is
   \`publish = false\`)
+
+## Licence of ADMIN_ENTRY.person_data.v0
+
+\`openEHR-EHR-ADMIN_ENTRY.person_data.v0.adl\` states no \`licence\` in its
+\`description\` \`other_details\`, and the mirror carries no licence file.
+The HiGHmed CKM the mirror copies (<https://ckm.highmed.org>, read on
+2026-11-17) publishes no licence statement of its own either. By the owner's
+decision of 2026-11-17 (#1963) it is vendored under the default licence of
+the international openEHR CKM, Creative Commons Attribution-ShareAlike 4.0
+International (<https://creativecommons.org/licenses/by-sa/4.0/>): the
+openEHR CKM Terms of Use publish its clinical artefacts "under the Creative
+Commons Attribution-ShareAlike license (CC-BY-SA)"
+(<https://openehr.atlassian.net/wiki/spaces/healthmod/pages/2949216/Terms+of+Use+of+the+openEHR+Clinical+Knowledge+Manager>),
+and the international CKM's current archetypes state version 4.0 in their own
+\`licence\` (\`openEHR-EHR-CLUSTER.person.v1\` at the pinned
+\`openEHR/CKM-mirror\` commit, \`fixtures/ckm/library\`). Attribution, as
+CC BY-SA requires: Alina Rehberg, Medizinische Hochschule Hannover (the
+archetype's \`original_author\`), with HiGHmed as custodian and original
+publisher. The file is vendored unmodified.
 
 Files:
 $listing
