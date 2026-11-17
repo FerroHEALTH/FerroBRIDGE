@@ -20,7 +20,6 @@ use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::client::outbound::OutboundClient;
 use ferrohealth_smart::config::ServerTls;
 use ferrohealth_smart::config::endpoint::{EndpointSection, RetrySection};
-use ihe_atna::atna::feed::FeedRepository;
 use ihe_atna::atna::spool::Bounds;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -67,7 +66,7 @@ pub(crate) fn access_log(
         &ServerTls,
     )?;
     let settings = Settings {
-        feed: FeedRepository::cleartext(client)?,
+        feed: ferrobridge_server::audit::feed::repository(client, true)?,
         spool: directory.join("spool"),
         bounds: Bounds {
             max_messages: 100,
