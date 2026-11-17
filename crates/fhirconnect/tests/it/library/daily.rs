@@ -98,6 +98,28 @@ fn the_time_of_day_is_the_time() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// The CKM daily timing cluster repeats its time of day (`at0004`, `0..*`), as
+/// R4 `Timing.repeat.timeOfDay` does, so every time goes in, in order (#1972).
+#[test]
+fn every_time_of_day_is_a_time() -> Result<(), Box<dyn Error>> {
+    let repeat = serde_json::json!({"timeOfDay": ["08:00:00", "20:00:00"]});
+    let ports = Library.to_openehr(DAILY, &element(repeat.clone()))?;
+    let times: Vec<&serde_json::Value> = ports
+        .all(TIME_OF_DAY)
+        .iter()
+        .filter_map(|datum| datum.value().get("value"))
+        .collect();
+    assert_eq!(
+        times,
+        [
+            &serde_json::json!("08:00:00"),
+            &serde_json::json!("20:00:00")
+        ]
+    );
+    assert_eq!(written(Library.to_fhir(DAILY, &ports)?)?, repeat);
+    Ok(())
+}
+
 #[test]
 fn a_frequency_with_no_frequency_counts_once_per_period() -> Result<(), Box<dyn Error>> {
     // R4 Timing.repeat.frequency.meaningWhenMissing: "once per period".
@@ -121,7 +143,6 @@ fn a_timing_the_daily_cluster_has_no_place_for_is_refused() {
         serde_json::json!({"frequency": 1, "period": 1, "periodUnit": "wk"}),
         serde_json::json!({"frequency": 2, "period": 8, "periodUnit": "h"}),
         serde_json::json!({"frequency": 1, "frequencyMax": 2, "period": 8, "periodUnit": "h"}),
-        serde_json::json!({"timeOfDay": ["08:00:00", "20:00:00"]}),
     ] {
         let error = Library
             .to_openehr(DAILY, &element(repeat.clone()))
