@@ -9,7 +9,6 @@ use ehds_logging::map::CategoryMap;
 use ehds_logging::map::Matching;
 use ferrohealth_smart::client::outbound::OutboundClient;
 use ferrohealth_smart::config::ServerTls;
-use ihe_atna::atna::feed::FeedRepository;
 use ihe_atna::atna::spool::Bounds;
 
 use super::error::Error;
@@ -49,14 +48,11 @@ pub(super) fn resolve_audit(
                 source: Box::new(source),
             }
         })?;
-    let feed = if audit.cleartext {
-        FeedRepository::cleartext(client)
-    } else {
-        FeedRepository::new(client)
-    }
-    .map_err(|source| Error::AuditBase {
-        key: String::from("audit.endpoint.url"),
-        source,
+    let feed = crate::audit::feed::repository(client, audit.cleartext).map_err(|source| {
+        Error::AuditBase {
+            key: String::from("audit.endpoint.url"),
+            source,
+        }
     })?;
     let spool = audit.spool_dir.clone().ok_or(Error::Missing {
         key: String::from("audit.spool_dir"),

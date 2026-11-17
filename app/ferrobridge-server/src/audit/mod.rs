@@ -18,6 +18,7 @@
 //! `ihe-atna` (no specification governs this: our own design). The OMOP ETL
 //! and the operator API record nothing of their own.
 
+pub mod feed;
 pub mod hl7v2;
 mod spool;
 

@@ -67,7 +67,7 @@ ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
 # The facade's access record (EHDS Annex II 3.2) and its BALP `AuditEvent`,
 # spooled and sent over the ITI-20 ATX: FHIR Feed. Only this crate links them.
 ehds-logging = { workspace = true, features = ["balp"] }
-ihe-atna = { workspace = true, features = ["balp", "smart"] }
+ihe-atna = { workspace = true, features = ["balp", "feed"] }
 # The AMQP publisher of the events lane.
 lapin.workspace = true
 # The AOM2 operational template the adl2 route serves, and the HRID parser an
