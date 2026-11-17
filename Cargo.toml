@@ -255,7 +255,7 @@ zip = { version = "=9.5.0", default-features = false, features = ["deflate-flate
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script
 # modules with the router that serves them, shared by every FerroHEALTH
 # console. Pinned exactly, so the console moves to a new version deliberately.
-ferrohealth-ui = "=0.6.10"
+ferrohealth-ui = "=0.6.11"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
