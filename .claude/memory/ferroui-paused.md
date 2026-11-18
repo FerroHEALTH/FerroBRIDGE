@@ -9,7 +9,10 @@ metadata:
 ---
 
 FerroUI (FerroHEALTH/FerroUI) is paused by owner decision on 2026-11-10: no
-work, no new pull request, no auto-merge, no release there.
+work, no new pull request, no auto-merge, no release there. Exception (owner,
+2026-11-16): whatever FerroSMART's screens need (components, patterns,
+locales) is built in FerroUI as general components and released; all other
+FerroUI work stays paused, except where the owner asks for it explicitly (2026-11-17: issues #645, #649, #659, #672, #684 and #685 in one PR, then the v0.6.11 release).
 
 **Why:** the owner stopped it explicitly ("stop working on FerroUI that is
 paused"); the focus is the products' releases on the newest family crates.
