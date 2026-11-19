@@ -622,11 +622,12 @@ pub fn routes(
         router
             .route(
                 &format!("{BASE_PATH}/Basic"),
-                post(app_state::interactions::create).get(app_state::interactions::search),
+                post(app_state::interactions::create)
+                    .get(owned::answer::search(app_state::interactions::searched)),
             )
             .route(
                 &format!("{BASE_PATH}/Basic/_search"),
-                post(app_state::interactions::search_form),
+                post(owned::answer::search(app_state::interactions::searched)),
             )
             .route(
                 &format!("{BASE_PATH}/Basic/{{id}}"),
@@ -639,11 +640,12 @@ pub fn routes(
         router
             .route(
                 &format!("{BASE_PATH}/Task"),
-                post(launch_task::interactions::create).get(launch_task::interactions::search),
+                post(launch_task::interactions::create)
+                    .get(owned::answer::search(launch_task::interactions::searched)),
             )
             .route(
                 &format!("{BASE_PATH}/Task/_search"),
-                post(launch_task::interactions::search_form),
+                post(owned::answer::search(launch_task::interactions::searched)),
             )
             .route(
                 &format!("{BASE_PATH}/Task/{{id}}"),

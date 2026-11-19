@@ -16,6 +16,7 @@ use crate::facade::app_state::MAX_BODY;
 use crate::facade::app_state::StateCode;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
+use crate::facade::owned::answer::invalid;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 
@@ -48,14 +49,6 @@ pub struct State {
     pub code: StateCode,
     /// `Basic.subject.reference`, `None` for global state.
     pub subject: Option<String>,
-}
-
-/// Returns the `400` naming `element`.
-fn invalid(kind: IssueType, element: &str, text: impl Into<String>) -> Refusal {
-    reply::refusal(
-        StatusCode::BAD_REQUEST,
-        Issue::error(kind).diagnosing(text).at(element.to_owned()),
-    )
 }
 
 /// Reads `body` as App State for `intent`, the subject checked to be an

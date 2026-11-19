@@ -24,6 +24,7 @@ use crate::facade::launch_task::STANDALONE_LAUNCH;
 use crate::facade::launch_task::TASK;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
+use crate::facade::owned::answer::invalid;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 
@@ -73,14 +74,6 @@ pub struct LaunchTask {
     pub launch: Launch,
     /// `Task.for.reference`, when the `Task` names one.
     pub patient: Option<String>,
-}
-
-/// Returns the `400` naming `element`.
-fn invalid(kind: IssueType, element: &str, text: impl Into<String>) -> Refusal {
-    reply::refusal(
-        StatusCode::BAD_REQUEST,
-        Issue::error(kind).diagnosing(text).at(element.to_owned()),
-    )
 }
 
 /// Returns the refusal of a `Task` that conforms to neither profile, naming

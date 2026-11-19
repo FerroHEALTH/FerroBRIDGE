@@ -4,7 +4,14 @@
 //! The FHIR answers of the resources the facade keeps itself: a created or
 //! updated resource with its `ETag` and `Location`, and a `searchset`.
 
+use std::future::Ready;
+use std::future::ready;
+use std::sync::Arc;
+
+use axum::body::Bytes;
+use axum::extract::State;
 use axum::response::Response;
+use ferrohealth_smart::resource::Access;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
 use http::HeaderMap;
@@ -12,10 +19,13 @@ use http::StatusCode;
 use http::Uri;
 
 use crate::facade::Facade;
+use crate::facade::handlers::Body;
+use crate::facade::handlers::guard;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::owned::OwnedError;
+use crate::facade::owned::OwnedStore;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 
@@ -146,4 +156,80 @@ pub fn searchset(
         )
     })?;
     Ok(reply::resource(StatusCode::OK, &object, &[]))
+}
+
+/// The search one endpoint answers over the parameters of a request.
+pub type Searched = fn(&Search<'_>) -> Result<Response, Refusal>;
+
+/// One search request, its media types already checked.
+#[derive(Debug, Clone, Copy)]
+pub struct Search<'a> {
+    /// The facade.
+    pub facade: &'a Facade,
+    /// The caller.
+    pub access: &'a Access,
+    /// The request URI.
+    pub uri: &'a Uri,
+    /// The parameters, from the query and a form body.
+    pub parameters: &'a [(String, String)],
+}
+
+/// What the search handler answers with.
+pub type SearchAnswer = Ready<Result<Response, Refusal>>;
+
+/// Returns the search handler of one endpoint over `searched`.
+///
+/// It serves `GET [base]/[type]` and `POST [base]/[type]/_search`, its media
+/// types checked and its parameters the query and, for the `POST`, the form
+/// body beside it (<https://hl7.org/fhir/R4/http.html#search>).
+pub fn search(
+    searched: Searched,
+) -> impl Fn(State<Arc<Facade>>, Access, HeaderMap, Uri, Bytes) -> SearchAnswer
++ Clone
++ Send
++ Sync
++ 'static {
+    move |State(facade), access, headers, uri, body| {
+        let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+        parameters.extend(media::query_pairs(&body));
+        ready(guard(&headers, &uri, Body::Absent).and_then(|()| {
+            searched(&Search {
+                facade: &facade,
+                access: &access,
+                uri: &uri,
+                parameters: &parameters,
+            })
+        }))
+    }
+}
+
+/// Returns every live resource of `resource_type` in `store` beside what
+/// `read` makes of it, for a search that checks each one again.
+///
+/// # Errors
+/// Returns a `500` when the store fails, and the refusal of `read`.
+pub fn scanned<T>(
+    store: &OwnedStore,
+    resource_type: &str,
+    read: impl Fn(&Object, &[u8]) -> Result<T, Refusal>,
+) -> Result<Vec<(Object, T)>, Refusal> {
+    store
+        .scan(resource_type)
+        .map_err(|error| store_refusal(&error))?
+        .into_iter()
+        .map(|resource| {
+            let bytes = encoded(&resource)?;
+            let held = read(&resource, &bytes)?;
+            Ok((resource, held))
+        })
+        .collect()
+}
+
+/// Returns the `400` of a body refused at `element`.
+#[must_use]
+pub fn invalid(kind: IssueType, element: &str, text: impl Into<String>) -> Refusal {
+    reply::refusal(
+        StatusCode::BAD_REQUEST,
+        Issue::error(kind).diagnosing(text).at(element.to_owned()),
+    )
 }

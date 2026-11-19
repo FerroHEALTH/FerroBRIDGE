@@ -21,7 +21,6 @@ use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::resource::Compartment;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
-use fhir_types::r4::capability_statement::CapabilityStatementRestResourceSearchParam;
 use http::StatusCode;
 
 use crate::facade::Facade;
@@ -68,7 +67,7 @@ pub fn capability() -> CapabilityStatementRestResource {
         interaction: crate::facade::capability::interactions(INTERACTIONS),
         versioning: Some("versioned".into()),
         update_create: Some(false.into()),
-        search_param: [
+        search_param: crate::facade::capability::declared_params(&[
             (
                 PATIENT,
                 "http://hl7.org/fhir/SearchParameter/Task-patient",
@@ -84,17 +83,7 @@ pub fn capability() -> CapabilityStatementRestResource {
                 "http://hl7.org/fhir/SearchParameter/Task-code",
                 "token",
             ),
-        ]
-        .into_iter()
-        .map(
-            |(name, definition, kind)| CapabilityStatementRestResourceSearchParam {
-                name: name.into(),
-                definition: Some(definition.into()),
-                r#type: kind.into(),
-                ..CapabilityStatementRestResourceSearchParam::default()
-            },
-        )
-        .collect(),
+        ]),
         ..CapabilityStatementRestResource::default()
     }
 }

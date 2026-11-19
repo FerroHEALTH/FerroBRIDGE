@@ -27,7 +27,6 @@ use ferrohealth_smart::resource::Compartment;
 use ferrohealth_smart::scope::Constraint;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
-use fhir_types::r4::capability_statement::CapabilityStatementRestResourceSearchParam;
 use http::StatusCode;
 
 use crate::facade::Facade;
@@ -97,7 +96,7 @@ pub fn capability() -> CapabilityStatementRestResource {
         interaction: crate::facade::capability::interactions(INTERACTIONS),
         versioning: Some("versioned-update".into()),
         update_create: Some(false.into()),
-        search_param: [
+        search_param: crate::facade::capability::declared_params(&[
             (
                 CODE,
                 "http://hl7.org/fhir/SearchParameter/Basic-code",
@@ -108,17 +107,7 @@ pub fn capability() -> CapabilityStatementRestResource {
                 "http://hl7.org/fhir/SearchParameter/Basic-subject",
                 "reference",
             ),
-        ]
-        .into_iter()
-        .map(
-            |(name, definition, kind)| CapabilityStatementRestResourceSearchParam {
-                name: name.into(),
-                definition: Some(definition.into()),
-                r#type: kind.into(),
-                ..CapabilityStatementRestResourceSearchParam::default()
-            },
-        )
-        .collect(),
+        ]),
         ..CapabilityStatementRestResource::default()
     }
 }

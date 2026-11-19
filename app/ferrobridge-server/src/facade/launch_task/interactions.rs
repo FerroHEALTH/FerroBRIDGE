@@ -36,13 +36,14 @@ use crate::facade::launch_task::local;
 use crate::facade::launch_task::profile;
 use crate::facade::launch_task::profile::LaunchTask;
 use crate::facade::launch_task::store;
-use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::owned::Held;
+use crate::facade::owned::answer::Search;
 use crate::facade::owned::answer::Written;
 use crate::facade::owned::answer::answer;
 use crate::facade::owned::answer::encoded;
+use crate::facade::owned::answer::scanned;
 use crate::facade::owned::answer::searchset;
 use crate::facade::owned::answer::store_refusal;
 use crate::facade::reply;
@@ -130,37 +131,6 @@ pub async fn read(
     ))
 }
 
-/// `GET [base]/Task?…`: the launch `Task`s the parameters match.
-///
-/// # Errors
-/// Returns the refusals of the search the parameters ask for.
-pub async fn search(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Result<Response, Refusal> {
-    let parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    searched(&facade, &access, &headers, &uri, &parameters)
-}
-
-/// `POST [base]/Task/_search`: the same search, its parameters in a form
-/// body beside the query (<https://hl7.org/fhir/R4/http.html#search>).
-///
-/// # Errors
-/// Returns the refusals of the search the parameters ask for.
-pub async fn search_form(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    headers: HeaderMap,
-    uri: Uri,
-    body: Bytes,
-) -> Result<Response, Refusal> {
-    let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    parameters.extend(media::query_pairs(&body));
-    searched(&facade, &access, &headers, &uri, &parameters)
-}
-
 /// What one search asks for: each parameter a set of values any of which
 /// matches, and every parameter given matching (R4 `search.html` §3.1.1.4.3
 /// and §3.1.1.4.4).
@@ -181,22 +151,20 @@ struct Criteria {
 /// Returns `400` for a parameter the endpoint does not take or a value it
 /// cannot read, the `403` of a token with no `Task` search, and a `500` when
 /// the store fails.
-fn searched(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    uri: &Uri,
-    parameters: &[(String, String)],
-) -> Result<Response, Refusal> {
+pub fn searched(search: &Search<'_>) -> Result<Response, Refusal> {
+    let Search {
+        facade,
+        access,
+        uri,
+        parameters,
+    } = *search;
     let store = store(facade)?;
-    guard(headers, uri, Body::Absent)?;
     let criteria = criteria(facade, parameters)?;
     let reach = access
         .reach(Permission::Search, TASK)
         .ok_or_else(crate::facade::guard::forbidden)?;
     let mut matched = Vec::new();
-    for resource in store.scan(TASK).map_err(|error| store_refusal(&error))? {
-        let task = profile::read(&encoded(&resource)?)?;
+    for (resource, task) in scanned(store, TASK, |_resource, bytes| profile::read(bytes))? {
         let reached = match &reach {
             Compartment::Any => true,
             Compartment::Patient(_) => {

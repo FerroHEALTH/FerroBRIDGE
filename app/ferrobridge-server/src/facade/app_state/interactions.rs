@@ -34,16 +34,17 @@ use crate::facade::app_state::reach;
 use crate::facade::app_state::store;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::guard;
-use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::owned::Change;
 use crate::facade::owned::Held;
 use crate::facade::owned::OwnedStore;
+use crate::facade::owned::answer::Search;
 use crate::facade::owned::answer::Written;
 use crate::facade::owned::answer::answer;
 use crate::facade::owned::answer::encoded;
 use crate::facade::owned::answer::id_of;
+use crate::facade::owned::answer::scanned;
 use crate::facade::owned::answer::searchset;
 use crate::facade::owned::answer::store_refusal;
 use crate::facade::reply;
@@ -178,38 +179,6 @@ enum Subject {
     Present,
 }
 
-/// `GET [base]/Basic?code={}&subject={}`: the App State of one state code
-/// (§Querying app state), as a `searchset` Bundle.
-///
-/// # Errors
-/// Returns the refusals of the search the parameters ask for.
-pub async fn search(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Result<Response, Refusal> {
-    let parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    searched(&facade, &access, &headers, &uri, &parameters)
-}
-
-/// `POST [base]/Basic/_search`: the same search, its parameters in a form
-/// body beside the query (<https://hl7.org/fhir/R4/http.html#search>).
-///
-/// # Errors
-/// Returns the refusals of the search the parameters ask for.
-pub async fn search_form(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    headers: HeaderMap,
-    uri: Uri,
-    body: Bytes,
-) -> Result<Response, Refusal> {
-    let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    parameters.extend(media::query_pairs(&body));
-    searched(&facade, &access, &headers, &uri, &parameters)
-}
-
 /// Answers the search `parameters` ask for.
 ///
 /// # Errors
@@ -217,15 +186,14 @@ pub async fn search_form(
 /// `system|code`, or with a parameter the endpoint does not take; the `403`
 /// of a token that does not reach the subject named; and a `500` when the
 /// store fails.
-fn searched(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    uri: &Uri,
-    parameters: &[(String, String)],
-) -> Result<Response, Refusal> {
+pub fn searched(search: &Search<'_>) -> Result<Response, Refusal> {
+    let Search {
+        facade,
+        access,
+        uri,
+        parameters,
+    } = *search;
     let store = store(facade)?;
-    guard(headers, uri, Body::Absent)?;
     let (code, subject) = criteria(parameters)?;
     match &subject {
         Subject::Is(reference) => {
@@ -240,12 +208,10 @@ fn searched(
     }
     let base = facade.settings().base_url.clone();
     let mut matched = Vec::new();
-    for resource in store.scan(BASIC).map_err(|error| store_refusal(&error))? {
-        let persisted = profile::read(
-            &encoded(&resource)?,
-            Intent::Update(id_of(&resource)),
-            &base,
-        )?;
+    let held = scanned(store, BASIC, |resource, bytes| {
+        profile::read(bytes, Intent::Update(id_of(resource)), &base)
+    })?;
+    for (resource, persisted) in held {
         let fits = persisted.code == code
             && match &subject {
                 Subject::Is(reference) => persisted.subject.as_ref() == Some(reference),
