@@ -659,8 +659,15 @@ async fn build_facade(
         .context("checking the party contexts against [cdr] demographic")?;
     facade::programs::check_party_search(&programs, lane.party_search.as_ref())
         .context("checking [facade.party_search] against the party contexts")?;
-    facade::programs::check_app_state(&programs, lane.app_state.is_some())
-        .context("checking the contexts against [facade.app_state]")?;
+    let owned: Vec<&str> = [
+        (lane.app_state.is_some(), facade::app_state::BASIC),
+        (lane.launch_task.is_some(), facade::launch_task::TASK),
+    ]
+    .into_iter()
+    .filter_map(|(on, resource_type)| on.then_some(resource_type))
+    .collect();
+    facade::programs::check_owned(&programs, &owned)
+        .context("checking the contexts against [facade.app_state] and [facade.launch_task]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -679,15 +686,16 @@ async fn build_facade(
     let search = facade::search::load(directory, &programs).context("reading the searches")?;
     let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
         .with_context(|| format!("opening {}", lane.identity_store.display()))?;
-    let app_state = lane
-        .app_state
-        .as_ref()
-        .map(|path| {
+    let owned_store = |path: Option<&std::path::PathBuf>| {
+        path.map(|path| {
             facade::owned::OwnedStore::open(path)
                 .map(Arc::new)
                 .with_context(|| format!("opening {}", path.display()))
         })
-        .transpose()?;
+        .transpose()
+    };
+    let app_state = owned_store(lane.app_state.as_ref())?;
+    let launch_tasks = owned_store(lane.launch_task.as_ref())?;
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
         .with_translator(
             Translator::new(terminology).with_display_fallback(settings.display_fallback),
@@ -701,6 +709,7 @@ async fn build_facade(
             .with_binding_issuers(lane.binding_issuers.clone())
             .with_consent(lane.consent.clone())
             .with_app_state(app_state)
+            .with_launch_tasks(launch_tasks)
             .with_cors(lane.cors.clone()),
         counts,
     ))

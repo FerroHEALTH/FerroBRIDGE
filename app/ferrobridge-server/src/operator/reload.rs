@@ -197,7 +197,7 @@ impl Reloader {
                     facade.client().demographic().is_some(),
                 )
                 .map_err(ReloadError::Facade)?;
-                crate::facade::programs::check_app_state(&programs, facade.app_state().is_some())
+                crate::facade::programs::check_owned(&programs, &facade.owned_types())
                     .map_err(ReloadError::Facade)?;
                 let catalog = bind(&report, declarations, &programs)?;
                 Some((programs, catalog))

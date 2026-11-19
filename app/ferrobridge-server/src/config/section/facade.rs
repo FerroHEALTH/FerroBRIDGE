@@ -66,6 +66,8 @@ pub struct Facade {
     pub consent: FacadeConsent,
     /// SMART App State, served as `Basic`.
     pub app_state: FacadeAppState,
+    /// SMART launch `Task`s, served as `Task`.
+    pub launch_task: FacadeLaunchTask,
     /// Cross-origin resource sharing on the REST routes.
     pub cors: FacadeCors,
 }
@@ -92,6 +94,7 @@ impl Default for Facade {
             binding_identifier_issuers: Vec::new(),
             consent: FacadeConsent::default(),
             app_state: FacadeAppState::default(),
+            launch_task: FacadeLaunchTask::default(),
             cors: FacadeCors::default(),
         }
     }
@@ -249,6 +252,31 @@ impl Default for FacadeAppState {
         Self {
             enabled: false,
             store: PathBuf::from("app-state.redb"),
+        }
+    }
+}
+
+/// SMART launch `Task`s (SMART App Launch 2.2.0, Task profile for requesting
+/// a SMART launch), served as `Task` at the facade's base.
+///
+/// Off, `Task` is an ordinary resource type a program may map. On, it serves
+/// the `task-ehr-launch` and `task-standalone-launch` profiles, its resources
+/// kept in `store` apart from the identity map (no specification governs the
+/// store: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeLaunchTask {
+    /// Whether `Task` is the launch endpoint.
+    pub enabled: bool,
+    /// The file the launch `Task`s are kept in.
+    pub store: PathBuf,
+}
+
+impl Default for FacadeLaunchTask {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            store: PathBuf::from("launch-tasks.redb"),
         }
     }
 }

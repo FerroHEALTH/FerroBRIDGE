@@ -34,7 +34,6 @@ use crate::facade::Facade;
 use crate::facade::guard;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::owned::OwnedError;
 use crate::facade::owned::OwnedStore;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
@@ -175,18 +174,6 @@ pub fn admit(
         }
         None => Err(guard::forbidden()),
     }
-}
-
-/// Returns the refusal a store failure renders as.
-pub(crate) fn store_refusal(error: &OwnedError) -> Refusal {
-    tracing::error!(
-        error = ferrohealth_server::run::chain(error),
-        "the App State store did not answer"
-    );
-    reply::refusal(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Issue::error(IssueType::Exception).diagnosing("the App State store did not answer"),
-    )
 }
 
 /// Returns how far `permission` on App State of `code` reaches, a granular

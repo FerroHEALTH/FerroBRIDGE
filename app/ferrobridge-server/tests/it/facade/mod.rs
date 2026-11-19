@@ -22,6 +22,7 @@ mod demographic;
 mod document;
 mod ehr_status;
 mod examples;
+mod launch_task;
 mod linked;
 mod losses;
 mod outbound;

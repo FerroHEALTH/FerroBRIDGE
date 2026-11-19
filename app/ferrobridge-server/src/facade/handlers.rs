@@ -49,6 +49,7 @@ use crate::facade::capability;
 use crate::facade::compartment;
 use crate::facade::consent;
 use crate::facade::guard::OperatorScope;
+use crate::facade::launch_task;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -624,6 +625,16 @@ fn metadata(
                 .partition_point(|entry| entry.r#type.value.as_deref() < Some(app_state::BASIC));
             rest.resource.insert(at, app_state::capability());
         }
+    }
+    if facade.launch_tasks().is_some()
+        && let Some(rest) = statement.rest.first_mut()
+    {
+        rest.resource
+            .retain(|entry| entry.r#type.value.as_deref() != Some(launch_task::TASK));
+        let at = rest
+            .resource
+            .partition_point(|entry| entry.r#type.value.as_deref() < Some(launch_task::TASK));
+        rest.resource.insert(at, launch_task::capability());
     }
     let encoded = statement.to_json().map_err(|error| {
         reply::refusal(

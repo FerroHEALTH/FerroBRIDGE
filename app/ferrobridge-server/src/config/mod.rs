@@ -413,6 +413,9 @@ pub struct FacadeSettings {
     /// The file SMART App State is kept in, when `Basic` is the App State
     /// endpoint.
     pub app_state: Option<PathBuf>,
+    /// The file the SMART launch `Task`s are kept in, when `Task` is the launch
+    /// endpoint.
+    pub launch_task: Option<PathBuf>,
     /// The CORS policy of the FHIR base.
     pub cors: crate::facade::cors::Cors,
 }

@@ -859,6 +859,23 @@ Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. App State can
 hold an app's keys, so keep the file on storage you protect as you protect the
 CDR's. The store and its file are FerroBRIDGE's own design.
 
+### `[facade.launch_task]`
+
+SMART launch `Task`s (SMART App Launch 2.2.0, Task profile for requesting a
+SMART launch), served as `Task` at the facade's base (the Integrate page,
+[SMART launch Tasks](../integrate/fhir-facade.md#smart-launch-tasks)). Off,
+`Task` is an ordinary resource type a program may map. On, `Task` serves the
+`task-ehr-launch` and `task-standalone-launch` profiles; a context that maps
+`Task` is then a boot error, and a reload that adds one is refused.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Task` is the launch endpoint |
+| `store` | `launch-tasks.redb` | The file the launch `Task`s are kept in, apart from the identity map |
+
+Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
+and its file are FerroBRIDGE's own design.
+
 ### `[facade.identifier_search]`
 
 The chained search through a patient's identifier:

@@ -12,6 +12,8 @@
 //! transaction (<https://docs.rs/redb/4.3.0/redb/>), so two writers racing
 //! on one version cannot both win.
 
+pub mod answer;
+
 use std::path::Path;
 use std::path::PathBuf;
 
