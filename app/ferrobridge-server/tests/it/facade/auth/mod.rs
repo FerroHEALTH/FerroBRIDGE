@@ -21,6 +21,7 @@ mod ferrosmart;
 mod forwarding;
 mod grants;
 mod introspection;
+mod launch_task;
 mod onward;
 mod routes;
 mod scope;

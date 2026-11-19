@@ -166,6 +166,16 @@ pub const APP_STATE: [(Method, &str, Interaction); 5] = [
     (Method::DELETE, "/Basic/{id}", Interaction::Delete),
 ];
 
+/// The routes of the SMART launch `Task` endpoint, mounted only with
+/// `[facade.launch_task]` on ([`crate::facade::launch_task`]); each needs the
+/// `Task` permission of its interaction.
+pub const LAUNCH_TASK: [(Method, &str, Interaction); 4] = [
+    (Method::POST, "/Task", Interaction::Create),
+    (Method::GET, "/Task", Interaction::Search),
+    (Method::POST, "/Task/_search", Interaction::Search),
+    (Method::GET, "/Task/{id}", Interaction::Read),
+];
+
 /// Every route under the FHIR base the guard admits: the method, the route
 /// template relative to the base, and the interaction it is.
 ///
@@ -246,6 +256,7 @@ pub fn classify(method: &Method, template: &str, path: &str) -> Option<Classifie
     let interaction = CLASSIFIED
         .iter()
         .chain(APP_STATE.iter())
+        .chain(LAUNCH_TASK.iter())
         .find(|(listed, listed_template, _)| listed == method && *listed_template == relative)
         .map_or(Interaction::Unclassified, |(_, _, interaction)| {
             *interaction

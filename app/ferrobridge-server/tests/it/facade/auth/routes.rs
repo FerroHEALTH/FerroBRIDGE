@@ -18,6 +18,7 @@ use axum::body::Body;
 use axum::routing::post;
 use ferrobridge_server::facade::guard::APP_STATE;
 use ferrobridge_server::facade::guard::CLASSIFIED;
+use ferrobridge_server::facade::guard::LAUNCH_TASK;
 use ferrobridge_server::facade::guard::layer;
 use ferrobridge_server::smart::Smart;
 use ferrohealth_smart::resource::configuration::SMART_CONFIGURATION;
@@ -146,6 +147,7 @@ fn every_route_mounted_under_the_fhir_base_is_classified() -> Result<(), Box<dyn
     let classified: BTreeSet<(String, String)> = CLASSIFIED
         .iter()
         .chain(APP_STATE.iter())
+        .chain(LAUNCH_TASK.iter())
         .map(|(method, template, _)| (method.to_string(), format!("{BASE}{template}")))
         .collect();
     assert!(

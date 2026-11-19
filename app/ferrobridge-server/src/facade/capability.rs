@@ -519,6 +519,25 @@ pub fn interactions<'a>(
         .collect()
 }
 
+/// Returns the `rest.resource.searchParam` entries of `parameters`, each a
+/// name, the canonical of its definition and its type, in order.
+#[must_use]
+pub fn declared_params(
+    parameters: &[(&str, &str, &str)],
+) -> Vec<CapabilityStatementRestResourceSearchParam> {
+    parameters
+        .iter()
+        .map(
+            |(name, definition, kind)| CapabilityStatementRestResourceSearchParam {
+                name: (*name).into(),
+                definition: Some((*definition).into()),
+                r#type: (*kind).into(),
+                ..CapabilityStatementRestResourceSearchParam::default()
+            },
+        )
+        .collect()
+}
+
 /// Returns the `rest.resource` entry of one supported type.
 fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatementRestResource {
     let surface = search.surface(name);

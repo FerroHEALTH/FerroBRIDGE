@@ -99,6 +99,10 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
             .app_state
             .enabled
             .then(|| facade.app_state.store.clone()),
+        launch_task: facade
+            .launch_task
+            .enabled
+            .then(|| facade.launch_task.store.clone()),
         cors: cors(facade)?,
     })
 }

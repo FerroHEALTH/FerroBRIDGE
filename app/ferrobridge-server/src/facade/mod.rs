@@ -32,6 +32,7 @@ pub mod guard;
 pub mod handlers;
 pub mod identity;
 pub mod ingest;
+pub mod launch_task;
 pub mod media;
 pub mod outcome;
 pub mod owned;
@@ -160,6 +161,8 @@ pub struct Facade {
     consent: Option<crate::consent::exchange::Settings>,
     /// The SMART App State store, when `Basic` is the App State endpoint.
     app_state: Option<Arc<owned::OwnedStore>>,
+    /// The launch `Task` store, when `Task` is the launch endpoint.
+    launch_tasks: Option<Arc<owned::OwnedStore>>,
     /// The CORS policy of the FHIR base.
     cors: cors::Cors,
 }
@@ -204,6 +207,7 @@ impl Facade {
             usage: Arc::new(crate::usage_report::window()),
             consent: None,
             app_state: None,
+            launch_tasks: None,
             cors: cors::Cors::default(),
         }
     }
@@ -229,6 +233,33 @@ impl Facade {
     #[must_use]
     pub fn app_state(&self) -> Option<&owned::OwnedStore> {
         self.app_state.as_deref()
+    }
+
+    /// Returns this facade serving SMART launch `Task`s over `store`, `None`
+    /// serving none.
+    #[must_use]
+    pub fn with_launch_tasks(mut self, store: Option<Arc<owned::OwnedStore>>) -> Self {
+        self.launch_tasks = store;
+        self
+    }
+
+    /// Returns the launch `Task` store, when `Task` is the launch endpoint.
+    #[must_use]
+    pub fn launch_tasks(&self) -> Option<&owned::OwnedStore> {
+        self.launch_tasks.as_deref()
+    }
+
+    /// Returns the resource types the facade serves itself rather than
+    /// through a program.
+    #[must_use]
+    pub fn owned_types(&self) -> Vec<&'static str> {
+        [
+            (self.app_state.is_some(), app_state::BASIC),
+            (self.launch_tasks.is_some(), launch_task::TASK),
+        ]
+        .into_iter()
+        .filter_map(|(on, resource_type)| on.then_some(resource_type))
+        .collect()
     }
 
     /// Returns this facade admitting the origins of `cors` on its REST routes.
@@ -523,7 +554,8 @@ impl Facade {
 /// the HL7 v2 face runs and which authorization server guards the facade,
 /// which the conformance statement declares only then, and `operator` is the
 /// operator scope `$validate` admits. With App State on, `Basic` is mounted as its endpoint
-/// ([`app_state`]) ahead of the generic routes.
+/// ([`app_state`]) ahead of the generic routes, and with launch `Task`s on,
+/// `Task` ([`launch_task`]).
 pub fn routes(
     facade: Arc<Facade>,
     shape: capability::Shape,
@@ -590,15 +622,34 @@ pub fn routes(
         router
             .route(
                 &format!("{BASE_PATH}/Basic"),
-                post(app_state::interactions::create).get(app_state::interactions::search),
+                post(app_state::interactions::create)
+                    .get(owned::answer::search(app_state::interactions::searched)),
             )
             .route(
                 &format!("{BASE_PATH}/Basic/_search"),
-                post(app_state::interactions::search_form),
+                post(owned::answer::search(app_state::interactions::searched)),
             )
             .route(
                 &format!("{BASE_PATH}/Basic/{{id}}"),
                 put(app_state::interactions::update).delete(app_state::interactions::delete),
+            )
+    } else {
+        router
+    };
+    let router = if facade.launch_tasks().is_some() {
+        router
+            .route(
+                &format!("{BASE_PATH}/Task"),
+                post(launch_task::interactions::create)
+                    .get(owned::answer::search(launch_task::interactions::searched)),
+            )
+            .route(
+                &format!("{BASE_PATH}/Task/_search"),
+                post(owned::answer::search(launch_task::interactions::searched)),
+            )
+            .route(
+                &format!("{BASE_PATH}/Task/{{id}}"),
+                get(launch_task::interactions::read),
             )
     } else {
         router

@@ -47,6 +47,7 @@ for `spec.version`. The service base is `/fhir`.
 | `DELETE /fhir/{type}/{id}` | Delete a party resource |
 | `GET /fhir/.well-known/smart-configuration` | The SMART discovery document, with `[auth]` on |
 | `POST`, `PUT`, `DELETE` and `GET /fhir/Basic` | SMART App State, with `[facade.app_state]` on ([SMART App State](#smart-app-state)) |
+| `POST` and `GET /fhir/Task`, `GET /fhir/Task/{id}` | SMART launch `Task`s, with `[facade.launch_task]` on ([SMART launch Tasks](#smart-launch-tasks)) |
 
 A type no loaded program maps is absent from the `CapabilityStatement` and
 answers `404` with a `not-supported` `OperationOutcome` on the wire. A search on a type no search
@@ -757,6 +758,39 @@ state; a `user/` or `system/` scope reaches every subject and global state. A
 search with no subject answers the state the token reaches. The store and
 these access rules are FerroBRIDGE's own design within the page's
 §Security and Access controls.
+
+## SMART launch Tasks
+
+With `[facade.launch_task]` on, `Task` at the facade's base serves the two
+launch profiles of SMART App Launch 2.2.0, Task profile for requesting a SMART
+launch: `task-ehr-launch` asks the EHR to launch an app with an optional
+`appContext`, and `task-standalone-launch` asks for a standalone launch. An
+EHR viewer lists the `Task`s for the patient in view and acts on one; for an
+EHR launch it registers the launch at the authorization server's launch API
+with the `Task`'s `for`, `encounter` and `appContext`. The CDR holds no
+`Task`, so the facade keeps them in a store of its own.
+
+| Interaction | Route | Answer |
+|---|---|---|
+| create | `POST [base]/Task` | `201` with `Location`, `ETag: W/"1"` and the `Task` under a new id |
+| read | `GET [base]/Task/{id}` | the `Task` |
+| search | `GET [base]/Task?patient=…&status=…&code=…` | a `searchset` of the matching `Task`s |
+
+A `Task` conforms to one profile or is refused with `422` naming the element:
+`Task.code` carries `launch-app-ehr` or `launch-app-standalone` of
+`http://hl7.org/fhir/smart-app-launch/CodeSystem/smart-codes`, exactly one
+input of type `smartonfhir-application` carries the app's URL as `valueUrl`,
+and at most one input of type `smartonfhir-appcontext` carries a
+`valueString`; other inputs stand. A body that is no R4 `Task`, or carries a
+modifier extension, is a `400`, and the `id` a create carries is ignored, as
+FHIR R4 `http.html` says. `patient` takes `Patient/{id}`, a bare id, or an
+absolute reference, matched against `Task.for` with this server's base taken
+as relative; `status` and `code` are tokens; each takes a comma-separated
+list, and another parameter is a `400`. The `CapabilityStatement` lists `Task`
+with both profiles. Under the guard each interaction needs its `Task`
+permission, and a `patient/` scope reaches only the `Task`s whose `for` is the
+patient of its launch context. The store and these rules are FerroBRIDGE's own
+design.
 
 ## `Composition/$document` assembles a document
 

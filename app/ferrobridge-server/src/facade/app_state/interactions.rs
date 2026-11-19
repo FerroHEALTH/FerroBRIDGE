@@ -17,7 +17,6 @@ use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_search::token::Token;
 use fhir_types::codec::Object;
-use fhir_types::codec::Value;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -33,15 +32,21 @@ use crate::facade::app_state::profile;
 use crate::facade::app_state::profile::Intent;
 use crate::facade::app_state::reach;
 use crate::facade::app_state::store;
-use crate::facade::app_state::store_refusal;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::guard;
-use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::owned::Change;
 use crate::facade::owned::Held;
 use crate::facade::owned::OwnedStore;
+use crate::facade::owned::answer::Search;
+use crate::facade::owned::answer::Written;
+use crate::facade::owned::answer::answer;
+use crate::facade::owned::answer::encoded;
+use crate::facade::owned::answer::id_of;
+use crate::facade::owned::answer::scanned;
+use crate::facade::owned::answer::searchset;
+use crate::facade::owned::answer::store_refusal;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 
@@ -67,9 +72,12 @@ pub async fn create(
         facade,
         StatusCode::CREATED,
         &headers,
-        &created,
-        1,
-        true,
+        Written {
+            resource_type: BASIC,
+            resource: &created,
+            version: 1,
+            created: true,
+        },
     ))
 }
 
@@ -110,9 +118,12 @@ pub async fn update(
             facade,
             StatusCode::OK,
             &headers,
-            &resource,
-            version,
-            false,
+            Written {
+                resource_type: BASIC,
+                resource: &resource,
+                version,
+                created: false,
+            },
         )),
         Held::Deleted { .. } => Err(precondition("the App State was deleted")),
     }
@@ -168,38 +179,6 @@ enum Subject {
     Present,
 }
 
-/// `GET [base]/Basic?code={}&subject={}`: the App State of one state code
-/// (§Querying app state), as a `searchset` Bundle.
-///
-/// # Errors
-/// Returns the refusals of the search the parameters ask for.
-pub async fn search(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Result<Response, Refusal> {
-    let parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    searched(&facade, &access, &headers, &uri, &parameters)
-}
-
-/// `POST [base]/Basic/_search`: the same search, its parameters in a form
-/// body beside the query (<https://hl7.org/fhir/R4/http.html#search>).
-///
-/// # Errors
-/// Returns the refusals of the search the parameters ask for.
-pub async fn search_form(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    headers: HeaderMap,
-    uri: Uri,
-    body: Bytes,
-) -> Result<Response, Refusal> {
-    let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    parameters.extend(media::query_pairs(&body));
-    searched(&facade, &access, &headers, &uri, &parameters)
-}
-
 /// Answers the search `parameters` ask for.
 ///
 /// # Errors
@@ -207,15 +186,14 @@ pub async fn search_form(
 /// `system|code`, or with a parameter the endpoint does not take; the `403`
 /// of a token that does not reach the subject named; and a `500` when the
 /// store fails.
-fn searched(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    uri: &Uri,
-    parameters: &[(String, String)],
-) -> Result<Response, Refusal> {
+pub fn searched(search: &Search<'_>) -> Result<Response, Refusal> {
+    let Search {
+        facade,
+        access,
+        uri,
+        parameters,
+    } = *search;
     let store = store(facade)?;
-    guard(headers, uri, Body::Absent)?;
     let (code, subject) = criteria(parameters)?;
     match &subject {
         Subject::Is(reference) => {
@@ -228,22 +206,20 @@ fn searched(
             }
         }
     }
-    let base = facade.settings().base_url.trim_end_matches('/').to_owned();
-    let mut entries = Vec::new();
-    for resource in store.scan(BASIC).map_err(|error| store_refusal(&error))? {
-        let persisted = profile::read(
-            &encoded(&resource)?,
-            Intent::Update(id_of(&resource)),
-            &base,
-        )?;
-        let matches = persisted.code == code
+    let base = facade.settings().base_url.clone();
+    let mut matched = Vec::new();
+    let held = scanned(store, BASIC, |resource, bytes| {
+        profile::read(bytes, Intent::Update(id_of(resource)), &base)
+    })?;
+    for (resource, persisted) in held {
+        let fits = persisted.code == code
             && match &subject {
                 Subject::Is(reference) => persisted.subject.as_ref() == Some(reference),
                 Subject::Missing => persisted.subject.is_none(),
                 Subject::Present => persisted.subject.is_some(),
                 Subject::Unnamed => true,
             };
-        let reached = matches
+        let reached = fits
             && admit(
                 facade,
                 access,
@@ -253,29 +229,10 @@ fn searched(
             )
             .is_ok();
         if reached {
-            entries.push(serde_json::json!({
-                "fullUrl": format!("{base}/{BASIC}/{}", id_of(&resource)),
-                "resource": resource,
-                "search": {"mode": "match"},
-            }));
+            matched.push(resource);
         }
     }
-    let total = entries.len();
-    let bundle = serde_json::json!({
-        "resourceType": "Bundle",
-        "type": "searchset",
-        "total": total,
-        "link": [{"relation": "self", "url": format!("{base}/{BASIC}?{}", uri.query().unwrap_or_default())}],
-        "entry": entries,
-    });
-    let object: Object = serde_json::from_value(bundle).map_err(|error| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception)
-                .diagnosing(format!("the searchset could not be written: {error}")),
-        )
-    })?;
-    Ok(reply::resource(StatusCode::OK, &object, &[]))
+    searchset(facade, BASIC, uri, matched)
 }
 
 /// Returns the store and the App State a create or an update carries, checked
@@ -404,59 +361,4 @@ fn precondition(text: &str) -> Refusal {
         StatusCode::PRECONDITION_FAILED,
         Issue::error(IssueType::Conflict).diagnosing(text.to_owned()),
     )
-}
-
-/// Returns the stored `resource` as bytes, for the profile reader.
-fn encoded(resource: &Object) -> Result<Vec<u8>, Refusal> {
-    serde_json::to_vec(resource).map_err(|error| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception)
-                .diagnosing(format!("a stored App State could not be read: {error}")),
-        )
-    })
-}
-
-/// Returns the `id` the store wrote into `resource`.
-fn id_of(resource: &Object) -> &str {
-    match resource.get("id") {
-        Some(Value::String(id)) => id,
-        _ => "",
-    }
-}
-
-/// Returns the answer of a create or an update: the `ETag` of `version`, the
-/// `Location` of a create, and the body `Prefer` asks for
-/// (<https://hl7.org/fhir/R4/http.html#create>).
-fn answer(
-    facade: &Facade,
-    status: StatusCode,
-    headers: &HeaderMap,
-    resource: &Object,
-    version: u64,
-    created: bool,
-) -> Response {
-    let version = version.to_string();
-    let mut out = vec![reply::Header::entity_tag(&version)];
-    if created {
-        out.push(reply::Header::location(&format!(
-            "{}/{BASIC}/{}/_history/{version}",
-            facade.settings().base_url.trim_end_matches('/'),
-            id_of(resource)
-        )));
-    }
-    match media::Prefer::of(headers) {
-        media::Prefer::Minimal => reply::minimal(status, &out),
-        media::Prefer::Outcome => reply::issues(
-            status,
-            &[
-                Issue::information(IssueType::Informational).diagnosing(format!(
-                    "{BASIC}/{} is at version {version}",
-                    id_of(resource)
-                )),
-            ],
-            &out,
-        ),
-        media::Prefer::Representation => reply::resource(status, resource, &out),
-    }
 }
