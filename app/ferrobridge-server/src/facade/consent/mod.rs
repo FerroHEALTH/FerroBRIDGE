@@ -21,7 +21,6 @@ pub mod ihe;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
-use fhir_types::r4::capability_statement::CapabilityStatementRestResourceInteraction;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResourceOperation;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResourceSearchParam;
 use http::HeaderMap;
@@ -72,13 +71,7 @@ pub fn capability() -> CapabilityStatementRestResource {
     CapabilityStatementRestResource {
         r#type: CONSENT.into(),
         documentation: Some(DOCUMENTATION.into()),
-        interaction: INTERACTIONS
-            .iter()
-            .map(|code| CapabilityStatementRestResourceInteraction {
-                code: (*code).into(),
-                ..CapabilityStatementRestResourceInteraction::default()
-            })
-            .collect(),
+        interaction: crate::facade::capability::interactions(INTERACTIONS),
         search_param: vec![CapabilityStatementRestResourceSearchParam {
             name: PATIENT.into(),
             definition: Some(PATIENT_DEFINITION.into()),

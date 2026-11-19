@@ -8,6 +8,7 @@
 //! guard, the program selection, the engine, the identity map and the status
 //! table.
 
+mod app_state;
 mod attestation;
 pub(crate) mod auth;
 pub(crate) mod batch;

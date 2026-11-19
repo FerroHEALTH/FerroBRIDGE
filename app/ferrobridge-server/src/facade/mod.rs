@@ -17,6 +17,7 @@
 //! A disabled facade mounts no route, so a request answers `404` rather than
 //! `403`: capability is not authorisation.
 
+pub mod app_state;
 pub mod audit;
 pub mod capability;
 pub mod commit;
@@ -33,6 +34,7 @@ pub mod identity;
 pub mod ingest;
 pub mod media;
 pub mod outcome;
+pub mod owned;
 pub mod party;
 pub mod programs;
 pub mod references;
@@ -51,6 +53,7 @@ use fhirconnect::engine::demographics::NoDemographics;
 use axum::Router;
 use axum::routing::get;
 use axum::routing::post;
+use axum::routing::put;
 
 use crate::cdr::CdrClient;
 use crate::facade::identity::claims::Claims;
@@ -155,6 +158,8 @@ pub struct Facade {
     demographics: Arc<dyn Demographics>,
     /// The access directive exchange, when `Consent` is served.
     consent: Option<crate::consent::exchange::Settings>,
+    /// The SMART App State store, when `Basic` is the App State endpoint.
+    app_state: Option<Arc<owned::OwnedStore>>,
     /// The CORS policy of the FHIR base.
     cors: cors::Cors,
 }
@@ -198,6 +203,7 @@ impl Facade {
             references: references::Policy::default(),
             usage: Arc::new(crate::usage_report::window()),
             consent: None,
+            app_state: None,
             cors: cors::Cors::default(),
         }
     }
@@ -208,6 +214,21 @@ impl Facade {
     pub fn with_consent(mut self, consent: Option<crate::consent::exchange::Settings>) -> Self {
         self.consent = consent;
         self
+    }
+
+    /// Returns this facade serving SMART App State as `Basic` over `store`,
+    /// `None` serving none.
+    #[must_use]
+    pub fn with_app_state(mut self, store: Option<Arc<owned::OwnedStore>>) -> Self {
+        self.app_state = store;
+        self
+    }
+
+    /// Returns the SMART App State store, when `Basic` is the App State
+    /// endpoint.
+    #[must_use]
+    pub fn app_state(&self) -> Option<&owned::OwnedStore> {
+        self.app_state.as_deref()
     }
 
     /// Returns this facade admitting the origins of `cors` on its REST routes.
@@ -501,7 +522,8 @@ impl Facade {
 /// says whether the same router serves the FHIRconnect operations, whether
 /// the HL7 v2 face runs and which authorization server guards the facade,
 /// which the conformance statement declares only then, and `operator` is the
-/// operator scope `$validate` admits.
+/// operator scope `$validate` admits. With App State on, `Basic` is mounted as its endpoint
+/// ([`app_state`]) ahead of the generic routes.
 pub fn routes(
     facade: Arc<Facade>,
     shape: capability::Shape,
@@ -564,5 +586,22 @@ pub fn routes(
             get(handlers::history_route),
         )
         .layer(axum::Extension(operator));
+    let router = if facade.app_state().is_some() {
+        router
+            .route(
+                &format!("{BASE_PATH}/Basic"),
+                post(app_state::interactions::create).get(app_state::interactions::search),
+            )
+            .route(
+                &format!("{BASE_PATH}/Basic/_search"),
+                post(app_state::interactions::search_form),
+            )
+            .route(
+                &format!("{BASE_PATH}/Basic/{{id}}"),
+                put(app_state::interactions::update).delete(app_state::interactions::delete),
+            )
+    } else {
+        router
+    };
     router.with_state(facade)
 }

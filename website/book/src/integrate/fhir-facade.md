@@ -46,6 +46,7 @@ for `spec.version`. The service base is `/fhir`.
 | `GET /fhir/{type}/{id}/_history` | The history of a party resource |
 | `DELETE /fhir/{type}/{id}` | Delete a party resource |
 | `GET /fhir/.well-known/smart-configuration` | The SMART discovery document, with `[auth]` on |
+| `POST`, `PUT`, `DELETE` and `GET /fhir/Basic` | SMART App State, with `[facade.app_state]` on ([SMART App State](#smart-app-state)) |
 
 A type no loaded program maps is absent from the `CapabilityStatement` and
 answers `404` with a `not-supported` `OperationOutcome` on the wire. A search on a type no search
@@ -713,6 +714,49 @@ another combining algorithm, or a condition over another attribute, is
 refused with the element named. The routes, the id and the extension set
 are FerroBRIDGE's own design: no specification defines a FHIR operation for
 BPPC or APPC, or how a `Consent` maps onto openEHR access directives.
+
+## SMART App State
+
+With `[facade.app_state]` on, `Basic` at the facade's base is the SMART App
+State endpoint of SMART App Launch 2.2.0, Persisting App State: an app keeps
+a small amount of its own state at the EHR, such as display preferences or
+the keys to an external data set. The CDR holds no `Basic`, so the facade
+keeps these resources in a store of its own, apart from the identity map. The
+discovery document lists `smart-app-state`, and the `CapabilityStatement`
+instantiates `smart-app-state-server` and lists `Basic` with the
+`smart-app-state-basic` profile.
+
+| Interaction | Route | Answer |
+|---|---|---|
+| create | `POST [base]/Basic` | `201` with `Location`, `ETag: W/"1"` and the resource with its `id` and `meta.versionId` |
+| update | `PUT [base]/Basic/{id}` with `If-Match` | `200` with the next `ETag` |
+| delete | `DELETE [base]/Basic/{id}` with `If-Match` | `204` |
+| search | `GET [base]/Basic?code={system}\|{code}&subject={reference}` | a `searchset` of the matching state |
+| search, global | `GET [base]/Basic?code={system}\|{code}&subject:missing=true` | a `searchset` of the state with no subject |
+
+The facade refuses with `400` a body that breaks the profile or the page's
+rules: an `id` or `meta.versionId` on a create, a `Basic.code` with other than
+exactly one coding naming a system and a code, an extension with a value other
+than `valueString` or with nested extensions, a modifier extension, and a
+subject that is no absolute reference under the facade's base to a `Patient`,
+`Practitioner`, `PractitionerRole`, `RelatedPerson` or `Person`. A body over
+256 KiB is a `413`. An update or a delete without `If-Match`, with a stale
+version, for an id already deleted, or an update that changes `subject` or
+`code`, is a `412`; an id never issued is a `404`. A search takes `code`
+once, as `system|code`, and `subject` or `subject:missing` once; another
+parameter is a `400`.
+
+Under the guard every App State request needs a token, and the facade decides
+the `Basic` permission against the state itself: `c` to create, `u` to update,
+`d` to delete, `s` to search. A granular scope counts when it names only
+`code` with this state's `system|code`, so
+`patient/Basic.cuds?code=https://myapp.example.org|encrypted-phr-access-keys`
+reaches that one state code. A `patient/` scope reaches only state whose
+subject is `[base]/Patient/{patient}` of the launch context, and never global
+state; a `user/` or `system/` scope reaches every subject and global state. A
+search with no subject answers the state the token reaches. The store and
+these access rules are FerroBRIDGE's own design within the page's
+§Security and Access controls.
 
 ## `Composition/$document` assembles a document
 

@@ -24,6 +24,9 @@ pub mod store;
 
 use core::fmt;
 
+use fhir_types::codec::Object;
+use fhir_types::codec::Value;
+
 /// Why a value cannot be one of this module's identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
@@ -71,6 +74,29 @@ pub fn is_fhir_id(text: &str) -> bool {
         && text
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
+}
+
+/// Writes `id` and `meta.versionId`, and `meta.lastUpdated` when given, into
+/// `resource`, keeping the rest of `meta`.
+///
+/// All three are server-maintained (<https://hl7.org/fhir/R4/resource.html>).
+pub fn stamp(resource: &mut Object, id: &str, version_id: &str, last_updated: Option<&str>) {
+    resource.insert(String::from("id"), Value::String(id.to_owned()));
+    let mut meta = match resource.remove("meta") {
+        Some(Value::Object(meta)) => meta,
+        _ => Object::new(),
+    };
+    meta.insert(
+        String::from("versionId"),
+        Value::String(version_id.to_owned()),
+    );
+    if let Some(instant) = last_updated {
+        meta.insert(
+            String::from("lastUpdated"),
+            Value::String(instant.to_owned()),
+        );
+    }
+    resource.insert(String::from("meta"), Value::Object(meta));
 }
 
 /// The logical id of a FHIR resource this bridge serves.

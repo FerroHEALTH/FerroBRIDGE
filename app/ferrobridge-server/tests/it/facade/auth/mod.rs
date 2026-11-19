@@ -8,6 +8,7 @@
 //! memory: no key, real or synthetic, is committed.
 
 mod access_record;
+mod app_state;
 mod audit;
 mod basic;
 mod batch;

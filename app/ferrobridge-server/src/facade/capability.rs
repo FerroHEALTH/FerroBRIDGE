@@ -451,15 +451,12 @@ fn party_resource(name: &str, parties: Option<&PartySearch>) -> CapabilityStatem
     CapabilityStatementRestResource {
         r#type: name.into(),
         documentation: Some(documentation.into()),
-        interaction: PARTY_INTERACTIONS
-            .iter()
-            .copied()
-            .chain(searched.then_some(SEARCH_INTERACTION))
-            .map(|code| CapabilityStatementRestResourceInteraction {
-                code: code.into(),
-                ..CapabilityStatementRestResourceInteraction::default()
-            })
-            .collect(),
+        interaction: interactions(
+            PARTY_INTERACTIONS
+                .iter()
+                .copied()
+                .chain(searched.then_some(SEARCH_INTERACTION)),
+        ),
         search_param,
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),
@@ -501,17 +498,25 @@ fn created_resource(name: &str) -> CapabilityStatementRestResource {
     CapabilityStatementRestResource {
         r#type: name.into(),
         documentation: Some(CREATED_DOCUMENTATION.into()),
-        interaction: CREATED_INTERACTIONS
-            .iter()
-            .map(|code| CapabilityStatementRestResourceInteraction {
-                code: (*code).into(),
-                ..CapabilityStatementRestResourceInteraction::default()
-            })
-            .collect(),
+        interaction: interactions(CREATED_INTERACTIONS),
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),
         ..CapabilityStatementRestResource::default()
     }
+}
+
+/// Returns the `rest.resource.interaction` entries of `codes`, in order.
+#[must_use]
+pub fn interactions<'a>(
+    codes: impl IntoIterator<Item = &'a str>,
+) -> Vec<CapabilityStatementRestResourceInteraction> {
+    codes
+        .into_iter()
+        .map(|code| CapabilityStatementRestResourceInteraction {
+            code: code.into(),
+            ..CapabilityStatementRestResourceInteraction::default()
+        })
+        .collect()
 }
 
 /// Returns the `rest.resource` entry of one supported type.
@@ -520,15 +525,7 @@ fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatement
     let searched = surface.as_ref().map(|_surface| SEARCH_INTERACTION);
     CapabilityStatementRestResource {
         r#type: name.into(),
-        interaction: RESOURCE_INTERACTIONS
-            .iter()
-            .copied()
-            .chain(searched)
-            .map(|code| CapabilityStatementRestResourceInteraction {
-                code: code.into(),
-                ..CapabilityStatementRestResourceInteraction::default()
-            })
-            .collect(),
+        interaction: interactions(RESOURCE_INTERACTIONS.iter().copied().chain(searched)),
         search_param: surface
             .map(|surface| search_params(name, &surface, chains))
             .unwrap_or_default(),

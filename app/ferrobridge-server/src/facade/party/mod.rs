@@ -320,19 +320,12 @@ pub(crate) async fn render(
 
 /// Writes the id and `meta.versionId` a party version gives its resource.
 pub(crate) fn stamp(resource: &mut Object, version: &ObjectVersionId) {
-    resource.insert(
-        String::from("id"),
-        Value::String(String::from(version.versioned_object_id().value())),
+    crate::facade::identity::stamp(
+        resource,
+        version.versioned_object_id().value(),
+        version.version_tree_id().value(),
+        None,
     );
-    let mut meta = match resource.remove("meta") {
-        Some(Value::Object(meta)) => meta,
-        _ => Object::new(),
-    };
-    meta.insert(
-        String::from("versionId"),
-        Value::String(String::from(version.version_tree_id().value())),
-    );
-    resource.insert(String::from("meta"), Value::Object(meta));
 }
 
 /// Returns the `[base]/[type]/[id]/_history/[vid]` of a party version.

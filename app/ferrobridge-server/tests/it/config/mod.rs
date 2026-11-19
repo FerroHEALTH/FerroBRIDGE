@@ -4,6 +4,7 @@
 //! The configuration contract: the file, the environment over it, the `_file`
 //! secrets, and every refusal.
 
+mod app_state;
 mod audit;
 mod auth;
 mod change_feed;

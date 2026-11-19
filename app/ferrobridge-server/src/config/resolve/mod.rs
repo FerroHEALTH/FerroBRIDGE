@@ -95,6 +95,10 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         party_search: party_search(facade)?,
         binding_issuers: facade.binding_identifier_issuers.clone(),
         consent: consent(facade)?,
+        app_state: facade
+            .app_state
+            .enabled
+            .then(|| facade.app_state.store.clone()),
         cors: cors(facade)?,
     })
 }
