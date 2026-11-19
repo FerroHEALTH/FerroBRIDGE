@@ -151,6 +151,21 @@ impl Interaction {
     }
 }
 
+/// The routes of the SMART App State endpoint, mounted only with
+/// `[facade.app_state]` on ([`crate::facade::app_state`]).
+///
+/// The layer admits any caller on them and the handler decides the `Basic`
+/// permission against the state, because a granular `?code=` scope is a
+/// property of the state (SMART App Launch 2.2.0, Persisting App State,
+/// §Security and Access controls).
+pub const APP_STATE: [(Method, &str, Interaction); 5] = [
+    (Method::POST, "/Basic", Interaction::Create),
+    (Method::GET, "/Basic", Interaction::Search),
+    (Method::POST, "/Basic/_search", Interaction::Search),
+    (Method::PUT, "/Basic/{id}", Interaction::Update),
+    (Method::DELETE, "/Basic/{id}", Interaction::Delete),
+];
+
 /// Every route under the FHIR base the guard admits: the method, the route
 /// template relative to the base, and the interaction it is.
 ///
@@ -230,6 +245,7 @@ pub fn classify(method: &Method, template: &str, path: &str) -> Option<Classifie
     }
     let interaction = CLASSIFIED
         .iter()
+        .chain(APP_STATE.iter())
         .find(|(listed, listed_template, _)| listed == method && *listed_template == relative)
         .map_or(Interaction::Unclassified, |(_, _, interaction)| {
             *interaction
@@ -297,6 +313,13 @@ impl ferrohealth_smart::guard::Classify for Classifier {
         // table cannot classify needs no permission it could check, so it fails closed.
         let requirement = if classified.interaction == Interaction::Unclassified && self.guarded {
             Requirement::Refused
+        } else if APP_STATE
+            .iter()
+            .any(|(_, template, _)| classified.template.strip_prefix(BASE_PATH) == Some(*template))
+        {
+            // NOTE: SMART App Launch 2.2.0, Persisting App State, §Security and Access controls;
+            // a `?code=` scope is decided against the state, so the handler checks the permission.
+            Requirement::Caller
         } else {
             classified.interaction.requirement(
                 classified.resource_type.as_deref(),

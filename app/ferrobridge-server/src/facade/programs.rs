@@ -121,6 +121,15 @@ pub enum LoadError {
         /// The resource type.
         resource_type: String,
     },
+    /// A context maps `Basic` while `Basic` is the SMART App State endpoint.
+    #[error(
+        "the context {context} maps Basic, which [facade.app_state] serves as the SMART App \
+         State endpoint"
+    )]
+    AppStateBasic {
+        /// The context that maps `Basic`.
+        context: String,
+    },
 }
 
 /// One compiled context, with the template index it runs against.
@@ -422,6 +431,29 @@ pub fn check_parties(programs: &Programs, demographic: bool) -> Result<(), LoadE
         }
     }
     Ok(())
+}
+
+/// Checks that no program maps `Basic` while `app_state` says `Basic` is the
+/// SMART App State endpoint, which would leave the program unreachable (no
+/// specification governs this: our own design).
+///
+/// # Errors
+///
+/// Returns [`LoadError::AppStateBasic`] naming the first such context.
+pub fn check_app_state(programs: &Programs, app_state: bool) -> Result<(), LoadError> {
+    if !app_state {
+        return Ok(());
+    }
+    programs
+        .loaded()
+        .iter()
+        .chain(programs.parties())
+        .find(|entry| entry.program.resource().as_str() == crate::facade::app_state::BASIC)
+        .map_or(Ok(()), |entry| {
+            Err(LoadError::AppStateBasic {
+                context: entry.program.context().as_str().to_owned(),
+            })
+        })
 }
 
 /// Checks that every type `[facade.party_search]` configures is served by a

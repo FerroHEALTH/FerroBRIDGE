@@ -64,6 +64,8 @@ pub struct Facade {
     /// The exchange of access directives as FHIR `Consent`, IHE BPPC and
     /// IHE APPC.
     pub consent: FacadeConsent,
+    /// SMART App State, served as `Basic`.
+    pub app_state: FacadeAppState,
     /// Cross-origin resource sharing on the REST routes.
     pub cors: FacadeCors,
 }
@@ -89,6 +91,7 @@ impl Default for Facade {
             party_search: FacadePartySearch::default(),
             binding_identifier_issuers: Vec::new(),
             consent: FacadeConsent::default(),
+            app_state: FacadeAppState::default(),
             cors: FacadeCors::default(),
         }
     }
@@ -223,4 +226,29 @@ pub struct FacadeCors {
     /// The origins a browser app may call the REST routes from, each an
     /// `http` or `https` origin; empty admits none.
     pub allowed_origins: Vec<String>,
+}
+
+/// SMART App State (SMART App Launch 2.2.0, Persisting App State), served as
+/// `Basic` at the facade's base.
+///
+/// Off, `Basic` is an ordinary resource type a program may map. On, it is the
+/// App State endpoint, its resources kept in `store` apart from the identity
+/// map, and the discovery document lists `smart-app-state` (no specification
+/// governs the store: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeAppState {
+    /// Whether `Basic` is the App State endpoint.
+    pub enabled: bool,
+    /// The file the App State resources are kept in.
+    pub store: PathBuf,
+}
+
+impl Default for FacadeAppState {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            store: PathBuf::from("app-state.redb"),
+        }
+    }
 }

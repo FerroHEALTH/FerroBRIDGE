@@ -840,6 +840,25 @@ exchange writes first; an enabled exchange without it, or with another value,
 is a boot error naming `facade.consent.default_access`. This is FerroBRIDGE's
 own design.
 
+### `[facade.app_state]`
+
+SMART App State (SMART App Launch 2.2.0, Persisting App State), served as
+`Basic` at the facade's base (the Integrate page,
+[SMART App State](../integrate/fhir-facade.md#smart-app-state)). Off, `Basic`
+is an ordinary resource type a program may map. On, `Basic` is the App State
+endpoint, the discovery document lists `smart-app-state`, and the
+`CapabilityStatement` instantiates `smart-app-state-server`; a context that
+maps `Basic` is then a boot error, and a reload that adds one is refused.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Basic` is the SMART App State endpoint |
+| `store` | `app-state.redb` | The file the App State resources are kept in, apart from the identity map |
+
+Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. App State can
+hold an app's keys, so keep the file on storage you protect as you protect the
+CDR's. The store and its file are FerroBRIDGE's own design.
+
 ### `[facade.identifier_search]`
 
 The chained search through a patient's identifier:

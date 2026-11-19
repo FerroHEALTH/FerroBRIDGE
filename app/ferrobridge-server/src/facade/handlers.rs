@@ -44,6 +44,7 @@ use http::StatusCode;
 use http::Uri;
 
 use crate::facade::Facade;
+use crate::facade::app_state;
 use crate::facade::capability;
 use crate::facade::compartment;
 use crate::facade::consent;
@@ -610,6 +611,19 @@ fn metadata(
             .resource
             .partition_point(|entry| entry.r#type.value.as_deref() < Some(consent::CONSENT));
         rest.resource.insert(at, consent::capability());
+    }
+    if facade.app_state().is_some() {
+        statement
+            .instantiates
+            .push(app_state::SERVER_CAPABILITY.into());
+        if let Some(rest) = statement.rest.first_mut() {
+            rest.resource
+                .retain(|entry| entry.r#type.value.as_deref() != Some(app_state::BASIC));
+            let at = rest
+                .resource
+                .partition_point(|entry| entry.r#type.value.as_deref() < Some(app_state::BASIC));
+            rest.resource.insert(at, app_state::capability());
+        }
     }
     let encoded = statement.to_json().map_err(|error| {
         reply::refusal(

@@ -457,11 +457,14 @@ async fn serve_command(settings: Settings) -> anyhow::Result<()> {
 /// base: any origin on the discovery document and the `CapabilityStatement`,
 /// the origins `[facade.cors]` lists on the REST routes.
 pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
+    let app_state = state
+        .facade()
+        .is_some_and(|mounted| mounted.app_state().is_some());
     let mut routes = Router::new()
         .route("/", get(root))
         .merge(operations::router(state.served_operations()));
     if let Some(smart) = state.auth() {
-        routes = routes.merge(smart::routes(smart));
+        routes = routes.merge(smart::routes(smart, app_state));
         if let Some(operator) = state.operator() {
             routes = routes.merge(operator::routes(
                 Arc::clone(operator),

@@ -410,6 +410,9 @@ pub struct FacadeSettings {
     pub binding_issuers: Vec<String>,
     /// The access directive exchange, when `Consent` is served.
     pub consent: Option<crate::consent::exchange::Settings>,
+    /// The file SMART App State is kept in, when `Basic` is the App State
+    /// endpoint.
+    pub app_state: Option<PathBuf>,
     /// The CORS policy of the FHIR base.
     pub cors: crate::facade::cors::Cors,
 }
