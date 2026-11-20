@@ -402,7 +402,7 @@ async fn a_machine_s_access_is_recorded_naming_its_client() -> Result<(), Box<dy
     // Regulation (EU) 2025/327 Annex II 3.2(a): the record names who accessed,
     // here the inbound client the bridge names as the originating system.
     assert!(
-        record.to_string().contains(super::CLIENT),
+        record.to_string().contains(CLIENT),
         "the record names the machine's client: {record}"
     );
     Ok(())
