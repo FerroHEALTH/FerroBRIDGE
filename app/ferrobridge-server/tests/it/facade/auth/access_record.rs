@@ -19,7 +19,10 @@ use ehds_logging::map::CategoryMap;
 use ehds_logging::map::Declared;
 use ehds_logging::map::Matching;
 use ferrobridge_server::audit::AccessLog;
+use ferrobridge_server::config::Config;
+use ferrobridge_server::config::Process;
 use ferrobridge_server::smart::Smart;
+use ferrobridge_server::smart::SmartSettings;
 use ferrobridge_server::state::AppState;
 use ferrohealth_health::registry::Registry;
 use http::Request;
@@ -31,10 +34,13 @@ use wiremock::MockServer;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
 
+use super::AUDIENCE;
+use super::CLIENT;
 use super::Issuer;
 use super::SigningKey;
 use super::authority;
 use super::bearing;
+use super::condition_of;
 use super::ec_key;
 use super::get;
 use super::mint;
@@ -78,9 +84,19 @@ struct Recorded {
 
 /// Returns a case over `harness` whose spool holds at most `max_bytes`.
 async fn recorded(harness: Harness, max_bytes: u64) -> Result<Recorded, Box<dyn Error>> {
+    recorded_under(harness, max_bytes, |issuer| Ok(issuer.settings())).await
+}
+
+/// Returns a case over `harness` whose spool holds at most `max_bytes`, its
+/// resource server reading the issuer as `settings` describe it.
+async fn recorded_under(
+    harness: Harness,
+    max_bytes: u64,
+    settings: fn(&Issuer) -> Result<SmartSettings, Box<dyn Error>>,
+) -> Result<Recorded, Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
-    let authority = authority(issuer.settings()).await;
+    let authority = authority(settings(&issuer)?).await;
     let arr = crate::audit::repository().await;
     let template = harness.composition()["archetype_details"]["template_id"]["value"]
         .as_str()
@@ -386,8 +402,90 @@ async fn a_machine_s_access_is_recorded_naming_its_client() -> Result<(), Box<dy
     // Regulation (EU) 2025/327 Annex II 3.2(a): the record names who accessed,
     // here the inbound client the bridge names as the originating system.
     assert!(
-        record.to_string().contains(super::CLIENT),
+        record.to_string().contains(CLIENT),
         "the record names the machine's client: {record}"
     );
+    Ok(())
+}
+
+/// Returns the resource-server settings of a bridge behind the `FerroSMART` at
+/// `issuer`, one `persons` issuer under the `ferrosmart` preset that admits
+/// the cases' client, as `[auth]` reads them.
+fn behind_ferrosmart(issuer: &Issuer) -> Result<SmartSettings, Box<dyn Error>> {
+    let text = format!(
+        concat!(
+            "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
+            "[auth]\nenabled = true\n\n",
+            "[[auth.issuer]]\nissuer = \"{issuer}\"\nkind = \"persons\"\nprofile = \"ferrosmart\"\n",
+            "audience = [\"{audience}\"]\ndelegates = [{{ client = \"{client}\" }}]\n",
+            "jwks_refresh_interval = \"0s\"\n",
+        ),
+        issuer = issuer.uri(),
+        audience = AUDIENCE,
+        client = CLIENT,
+    );
+    Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve(Process::Server)?
+        .auth
+        .ok_or_else(|| "auth is on".into())
+}
+
+/// Returns the `valueString` of every `entity.detail` of `record` whose
+/// `type` is `kind`.
+fn details(record: &serde_json::Value, kind: &str) -> Vec<String> {
+    record["entity"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entity| entity["detail"].as_array())
+        .flatten()
+        .filter(|detail| detail["type"].as_str() == Some(kind))
+        .filter_map(|detail| detail["valueString"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// Creates the Condition of `p-1` behind `FerroSMART` under a `patient/`
+/// token naming `fhir_user`, and returns the one record of the access.
+async fn created_behind_ferrosmart(fhir_user: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+    let case = recorded_under(harness().await, 64 << 20, behind_ferrosmart).await?;
+    let own = condition_of("p-1");
+    mount_ehr(&case.harness.cdr).await;
+    mount_create(
+        &case.harness.cdr,
+        VERSION_ONE,
+        &case.harness.composition_of(&own),
+    )
+    .await;
+    let mut claims = case.issuer.claims("patient/Condition.c");
+    claims["patient"] = serde_json::json!("p-1");
+    claims["fhirUser"] = serde_json::json!(fhir_user);
+    let response = raw(
+        case.app(),
+        bearing(post_condition(&own), &mint(&case.key, &claims)),
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, response.status(), "the create");
+    let records = case.records(1).await?;
+    Ok(records.first().ok_or("one record")?.clone())
+}
+
+#[tokio::test]
+async fn a_ferrosmart_patient_s_own_access_is_recorded_as_the_person_s_own()
+-> Result<(), Box<dyn Error>> {
+    // Regulation (EU) 2025/327 Art 9: the access record names the patient's own access.
+    let record = created_behind_ferrosmart("Patient/p-1").await?;
+    assert_eq!(
+        vec![String::from("self")],
+        details(&record, "binding"),
+        "{record}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_professional_with_patient_scopes_is_not_the_person_s_own() -> Result<(), Box<dyn Error>>
+{
+    let record = created_behind_ferrosmart("Practitioner/pr-1").await?;
+    assert!(details(&record, "binding").is_empty(), "{record}");
     Ok(())
 }

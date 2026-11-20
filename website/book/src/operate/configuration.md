@@ -391,7 +391,7 @@ Who reaches the CDR how:
 | A machine (a client credentials token) | Under the bridge's own token of `[cdr.endpoint.credentials.oauth]`, never exchanged; its composition names the machine's client in `originating_system_audit.system_id` |
 | A person, a delegated or representing person, under `kind = "persons"` | Under the exchanged token |
 | A professional of another party, under `kind = "federation"` | Under the exchanged token |
-| A patient, under `kind = "patients"` | Under the exchanged token |
+| A patient, under `kind = "patients"`, or a patient's own token a `persons` issuer reads (the `ferrosmart` preset) | Under the exchanged token, at the `patients` issuer when one is declared and otherwise at the `persons` issuer |
 | A caller no issuer's kind carries, another party's organisation, a guest, a Basic user | Refused with `403` |
 
 A failed exchange fails the request, and the bridge's own token is never sent
@@ -434,7 +434,8 @@ Each `[[cdr.onward]]` table adds one more onward issuer beside
 `[cdr.endpoint.credentials.onward]`, with the same keys. The bridge then carries
 each caller through the issuer whose `kind` carries it: a person to the
 `persons` issuer, a professional of another party to the `federation`
-issuer, and a patient to the `patients` issuer. Every table authenticates
+issuer, and a patient to the `patients` issuer, or to the `persons` issuer
+when no `patients` issuer is declared. Every table authenticates
 with the client of `[cdr.endpoint.credentials.oauth]`, which it requires. Two issuers
 of one kind refuse the start, across `[cdr.endpoint.credentials.onward]` and the
 array, and so does the array on a server whose `[auth]` is off. Either form

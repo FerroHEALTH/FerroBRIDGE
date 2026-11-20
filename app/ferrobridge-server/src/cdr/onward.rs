@@ -165,9 +165,12 @@ impl CdrOnward {
         if matches!(kind, CallerKind::System) {
             return (Route::Own, None);
         }
+        // NOTE: no specification governs this: our own design; a patient goes to the
+        // `patients` issuer when the lane has one, the realm that carries patients.
         self.lanes
             .iter()
-            .find(|lane| route(kind, lane.kind) == Route::Exchanged)
+            .filter(|lane| route(kind, lane.kind) == Route::Exchanged)
+            .min_by_key(|lane| lane.kind != IssuerKind::Patients)
             .map_or((Route::Refused, None), |lane| {
                 (Route::Exchanged, Some(lane))
             })
@@ -259,8 +262,9 @@ impl Lane {
 /// flow"). A person of this organisation, acting alone, through a client or
 /// for another, is exchanged at a `persons` issuer, a professional of another
 /// party at a `federation` issuer, and a patient at the deployment's
-/// `patients` issuer. Another party's organisation and a guest are carried by
-/// none, so they are refused.
+/// `patients` issuer or at a `persons` issuer, which reads a patient's own
+/// token under the `ferrosmart` preset (`Caller::is_the_person`). Another
+/// party's organisation and a guest are carried by none, so they are refused.
 #[must_use]
 pub const fn route(caller: &CallerKind, issuer: IssuerKind) -> Route {
     match (caller, issuer) {
@@ -270,7 +274,7 @@ pub const fn route(caller: &CallerKind, issuer: IssuerKind) -> Route {
             IssuerKind::Persons,
         )
         | (CallerKind::ExternalPerson(_), IssuerKind::Federation)
-        | (CallerKind::Patient, IssuerKind::Patients) => Route::Exchanged,
+        | (CallerKind::Patient, IssuerKind::Patients | IssuerKind::Persons) => Route::Exchanged,
         _ => Route::Refused,
     }
 }
@@ -345,13 +349,14 @@ mod tests {
     }
 
     #[test]
-    fn a_patient_is_exchanged_at_a_patients_issuer_alone() {
+    fn a_patient_is_exchanged_at_a_patients_or_a_persons_issuer() {
         assert_eq!(
             Route::Exchanged,
             route(&CallerKind::Patient, IssuerKind::Patients)
         );
+        // A persons issuer under the ferrosmart preset reads a patient's own token.
         assert_eq!(
-            Route::Refused,
+            Route::Exchanged,
             route(&CallerKind::Patient, IssuerKind::Persons)
         );
         assert_eq!(

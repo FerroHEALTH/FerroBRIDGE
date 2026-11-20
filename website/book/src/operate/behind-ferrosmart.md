@@ -61,6 +61,7 @@ FerroSMART writes the granted scopes into every token. What it admits:
 | Token | Read as | Admitted when |
 |---|---|---|
 | A person's token through a SMART app (`sub` is FerroSMART's identifier of the person, `client_id` the app) | the person, acting through the app | the app's `client_id` is in `delegates` |
+| A patient's own token through a SMART app: `fhirUser` is `Patient/<x>` (relative, or an absolute URL ending in `/Patient/<x>`), the `patient` claim is `x`, its scopes are `patient/` grants with no `user/` or `system/` one, and it carries no `act` | the patient, the person's own access | the app's `client_id` is in `delegates` |
 | A SMART Backend Services token (`sub` equals `client_id`, RFC 9068 §2.2) | a machine | always, with the `system/` scopes it carries |
 | A person's token through any other app | | never: `401` |
 | A token with no `scope`, or a `typ` other than `at+jwt` | | never: `401` |
@@ -75,6 +76,16 @@ The launch context FerroSMART puts in the token (`patient`, `encounter` and
 `fhirUser`) needs no key. A `patient/` scope holds the caller to the patient
 its `patient` claim names, as the [facade's Security section](../integrate/fhir-facade.md#security)
 describes for any issuer.
+
+A patient's own token is the person's own access (Regulation (EU) 2025/327
+Art 9). The bridge reads it as `ferrohealth-smart` 0.31 classifies it
+(`Caller::is_the_person`), so a professional who holds `patient/` scopes
+stays a professional held to the launch context. For the patient's own
+token, the facade's access record carries the binding `self`. With
+[`[cdr.endpoint.credentials.onward]`](configuration.md#cdrendpointcredentialsonward)
+naming FerroSMART, the bridge exchanges the patient's token there unless a
+`patients` issuer is declared. To read every FerroSMART token as before,
+set `fhir_user_patient = false` on the issuer table.
 
 ## The discovery document
 

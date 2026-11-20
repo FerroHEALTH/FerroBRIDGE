@@ -173,3 +173,31 @@ async fn a_person_beside_a_patients_issuer_is_exchanged_at_the_persons_issuer()
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_patient_s_own_token_of_a_persons_issuer_is_exchanged_there() -> Result<(), Box<dyn Error>>
+{
+    let mut world = World::start(Grant::Standard, "").await?;
+    // The `ferrosmart` preset sets this key; the case sets it on its own issuer.
+    for issuer in &mut world.trusted.issuers {
+        issuer.profile.fhir_user_patient = true;
+    }
+    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    world
+        .mount_token_endpoint(Grant::Standard, &issued, 300)
+        .await;
+    world.mount_cdr(&condition_of(PATIENT)).await;
+    let mut claims = world.issuer.claims(PATIENT_SCOPE);
+    claims["patient"] = serde_json::json!(PATIENT);
+    claims["fhirUser"] = serde_json::json!(format!("Patient/{PATIENT}"));
+    let token = mint(&world.key, &claims);
+
+    create_and_read(&world, &token).await?;
+
+    assert_every_call_under(&world.cdr_calls().await, &issued);
+    let exchanges = world.onward_requests().await;
+    assert_eq!(1, exchanges.len(), "one exchange serves both requests");
+    let body = exchanges.first().ok_or("an exchange")?;
+    assert!(body.contains(&format!("subject_token={token}")), "{body}");
+    Ok(())
+}
