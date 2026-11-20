@@ -26,6 +26,7 @@ use ehds_logging::classify::Evidence;
 use ehds_logging::record::AccessRecord;
 use ehds_logging::record::Accessor;
 use ehds_logging::record::Action;
+use ehds_logging::record::Binding;
 use ehds_logging::record::Coded;
 use ehds_logging::record::DataSubject;
 use ehds_logging::record::EhrAt;
@@ -178,6 +179,14 @@ fn asked(request: &Request) -> Option<Pending> {
     })
 }
 
+/// Returns the binding of `caller`: `self` for the patient's own token, as
+/// `Caller::is_the_person` reads it, and none for any other caller.
+fn own(caller: &Caller) -> Option<Binding> {
+    // NOTE: no specification governs this: our own design; the bridge binds no party, so
+    // a patient's own token is the one caller whose binding it can name.
+    caller.is_the_person().then_some(Binding::PartySelf)
+}
+
 /// Returns who accessed (Annex II 3.2(a), (b)) as the guard verified them:
 /// the token's issuer, subject, client and `jti`, or the Basic user.
 fn accessor(caller: &Caller) -> Accessor {
@@ -203,9 +212,9 @@ fn accessor(caller: &Caller) -> Accessor {
         purposes: Vec::new(),
         policies: Vec::new(),
         relayed: None,
-        // NOTE: no specification governs this: our own design; the bridge binds no party,
-        // relays no actor chain or representation and attributes no provider of its own.
-        binding: None,
+        binding: own(caller),
+        // NOTE: no specification governs this: our own design; the bridge relays no actor
+        // chain or representation and attributes no provider of its own.
         actors: Vec::new(),
         represents: None,
         acts_for: None,
