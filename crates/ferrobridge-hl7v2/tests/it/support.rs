@@ -219,41 +219,13 @@ pub(crate) async fn mount_translate<R: Respond + Clone + 'static>(server: &MockS
         .await;
 }
 
-/// Answers `request` with `answer`: a `$translate` `Parameters` with its
-/// answer, and a `batch` `Bundle` with the answer to each entry's
-/// `Parameters`, in order (<https://hl7.org/fhir/R4/http.html#transaction>).
+/// Answers `request`, a `$translate` or a `batch` of them, with `answer`
+/// for each `Parameters`.
 pub(crate) fn answer_each(
     request: &Request,
     answer: impl Fn(&serde_json::Value) -> serde_json::Value,
 ) -> ResponseTemplate {
-    status_each(request, |body| ("200 OK", answer(body)))
-}
-
-/// Answers `request` as [`answer_each`] does, with the status line `answer`
-/// gives each `Parameters`.
-pub(crate) fn status_each(
-    request: &Request,
-    answer: impl Fn(&serde_json::Value) -> (&'static str, serde_json::Value),
-) -> ResponseTemplate {
-    let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
-    if body["resourceType"] != "Bundle" {
-        let (status, resource) = answer(&body);
-        let code: u16 = status
-            .split(' ')
-            .next()
-            .and_then(|code| code.parse().ok())
-            .expect("a status line opens with its code");
-        return ResponseTemplate::new(code)
-            .insert_header("Content-Type", "application/fhir+json")
-            .set_body_string(resource.to_string());
-    }
-    let entries: Vec<(&str, serde_json::Value)> = body["entry"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|entry| answer(&entry["resource"]))
-        .collect();
-    terminology::batch_response(&entries)
+    terminology::each_parameters(request, |body| (200, answer(body)))
 }
 
 /// The `$translate` `Parameters` of no match, with `message`.

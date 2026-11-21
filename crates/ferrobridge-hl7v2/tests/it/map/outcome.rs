@@ -26,7 +26,7 @@ struct Refusing {
 
 impl Respond for Refusing {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        support::status_each(request, |body| {
+        terminology::each_parameters(request, |body| {
             let refused = body["parameter"].as_array().is_some_and(|parameters| {
                 parameters.iter().any(|parameter| {
                     parameter["name"] == "targetsystem" && parameter["valueUri"] == self.target
@@ -34,11 +34,11 @@ impl Respond for Refusing {
             });
             if refused {
                 (
-                    "404 Not Found",
+                    404,
                     terminology::outcome_body("not-found", Some("not-found"), "no such map"),
                 )
             } else {
-                ("200 OK", self.tables.answer(body))
+                (200, self.tables.answer(body))
             }
         })
     }
