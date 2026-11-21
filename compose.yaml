@@ -27,16 +27,21 @@
 # INBOUND AUTHENTICATION is on by default. A lane that serves FHIR (the facade,
 # the operator API, or the FHIRconnect operations over a mapping directory)
 # refuses to start until you name the authorization server that issues your
-# callers' tokens, or say the network is trusted. Each trusted server is an
-# [[auth.issuer]] table with its kind, written in a configuration file in the
-# ./config directory beside this one, which FERROBRIDGE_CONFIG names:
+# callers' tokens, or say the network is trusted. Each trusted server is a
+# named [auth.issuer.<name>] table with its kind, written in a configuration
+# file in the ./config directory beside this one, which FERROBRIDGE_CONFIG
+# names. Its audience is the facade's base_url unless the table sets one:
 #
 #   mkdir -p config
 #   cat > config/ferrobridge.toml <<'TOML'
-#   [[auth.issuer]]
+#   [facade]
+#   base_url = "https://bridge.example.org/fhir"
+#
+#   [auth.issuer.clinic]
 #   issuer = "https://auth.example.org/realms/clinic"
 #   kind = "persons"
-#   audience = ["https://bridge.example.org/fhir"]
+#
+#   [auth.issuer.clinic.profile]
 #   first_party_clients = ["clinic-portal"]
 #   TOML
 #   FERROBRIDGE_CONFIG=/etc/ferrobridge/ferrobridge.toml
@@ -122,7 +127,7 @@ services:
       FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE:
       FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__AUDIENCE:
       FERROBRIDGE__CDM__URL_FILE:
-      # The configuration file under ./config that holds the [[auth.issuer]]
+      # The configuration file under ./config that holds the [auth.issuer.<name>]
       # tables, and the inbound authentication switch, passed through when set.
       FERROBRIDGE_CONFIG:
       FERROBRIDGE__AUTH__ENABLED:
@@ -289,8 +294,8 @@ services:
   # leave it unset so the session cookie carries Secure.
   #
   # The bridge refuses the console's calls unless it validates the operator's
-  # token: name the issuer in an [[auth.issuer]] table of its configuration
-  # file, list the console's client id in that table's first_party_clients,
+  # token: name the issuer in an [auth.issuer.<name>] table of its configuration
+  # file, list the console's client id in its profile table's first_party_clients,
   # and turn on [operator] for the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
   console:

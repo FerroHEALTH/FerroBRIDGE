@@ -329,7 +329,7 @@ impl Config {
                 None
             },
             auth: if serves && self.guards_a_surface() {
-                auth::resolve_auth(&self.auth, &self.basic_grants)?
+                auth::resolve_auth(&self.auth, &self.basic_grants, &self.facade.base_url)?
             } else {
                 None
             },

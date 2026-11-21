@@ -202,9 +202,12 @@ the operator API or the FHIRconnect operations refuses to start until it
 names the authorization server that issues its callers' tokens:
 
 ```sh
-FERROBRIDGE__AUTH__ISSUER=https://auth.example.org/realms/clinic
-FERROBRIDGE__AUTH__AUDIENCE='["https://bridge.example.org/fhir"]'
+FERROBRIDGE__AUTH__ISSUER__CLINIC__ISSUER=https://auth.example.org/realms/clinic
+FERROBRIDGE__AUTH__ISSUER__CLINIC__KIND=persons
 ```
+
+The issuer is named `clinic` here, and its audience is the facade's
+`base_url` (`FERROBRIDGE__FACADE__BASE_URL`).
 
 On a network only trusted callers reach, `FERROBRIDGE__AUTH__ENABLED=false`
 serves those routes open instead.

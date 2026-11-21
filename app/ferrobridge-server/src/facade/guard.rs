@@ -25,6 +25,7 @@ use ferrohealth_smart::guard::Gate;
 use ferrohealth_smart::guard::Render;
 use ferrohealth_smart::guard::Requirement;
 use ferrohealth_smart::guard::Target;
+use ferrohealth_smart::refusal::Denied;
 use ferrohealth_smart::refusal::Refusal;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::resource::Honoured;
@@ -364,14 +365,16 @@ pub struct Outcome {
 }
 
 impl Render for Outcome {
-    fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
-        self.respond(refusal)
+    fn render(&self, denied: &Denied, _parts: &Parts) -> Response {
+        self.respond(denied)
     }
 }
 
 impl Outcome {
-    /// Returns the `OperationOutcome` response of `refusal`.
-    fn respond(&self, refusal: &Refusal) -> Response {
+    /// Returns the `OperationOutcome` response of `denied`, whose challenge
+    /// carries the reason code as `error_description` (RFC 6750 §3).
+    fn respond(&self, denied: &Denied) -> Response {
+        let refusal = denied.refusal();
         let issue = match refusal {
             Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => {
                 Issue::error(IssueType::Login)
@@ -387,7 +390,7 @@ impl Outcome {
             _ => Issue::error(IssueType::Exception)
                 .diagnosing("the request was refused at the gate"),
         };
-        let headers: Vec<reply::Header> = refusal
+        let headers: Vec<reply::Header> = denied
             .challenge(self.realm.as_deref())
             .iter()
             .map(|challenge| reply::Header::challenge(challenge))
@@ -419,7 +422,7 @@ pub struct OperatorScope(pub Option<String>);
 /// Returns the `403` of a token that does not permit the request.
 #[must_use]
 pub fn forbidden() -> reply::Refusal {
-    reply::Refusal::new(Outcome::default().respond(&Refusal::Forbidden))
+    reply::Refusal::new(Outcome::default().respond(&Denied::from(Refusal::Forbidden)))
 }
 
 /// Checks that `access` grants a permission `interaction` needs on

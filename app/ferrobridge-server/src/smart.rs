@@ -7,9 +7,11 @@
 //! The crate reads each configured issuer's metadata and key set, validates
 //! every access token, or for an issuer with `mode = "introspection"` asks
 //! its introspection endpoint (RFC 7662), classifies every caller by its
-//! issuer's `kind`, checks the Basic users of `[[auth.basic.users]]`, each a
-//! person, picks the issuer the SMART discovery document describes
-//! (`resource::described::describe`) and builds that document; this module
+//! issuer's `kind`, reads the `patient` launch context only from an issuer
+//! whose profile sets `patient_context`, checks the Basic users of
+//! `[[auth.basic.users]]`, each a person, picks the issuer the SMART
+//! discovery document describes (`resource::described::describe`) and builds
+//! that document; this module
 //! holds what is the bridge's own: the R4 resource types a clinical scope
 //! may name, the operator scope, and the token endpoint the
 //! `CapabilityStatement` names.

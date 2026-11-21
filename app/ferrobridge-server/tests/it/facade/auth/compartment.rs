@@ -164,6 +164,23 @@ async fn a_patient_scope_without_a_patient_claim_reaches_nothing() -> Result<(),
     Ok(())
 }
 
+// NOTE: SMART App Launch 2.2.0, Scopes and Launch Context, `launch/patient`: the
+// authorization server sets the patient context, read only from an issuer trusted to.
+#[tokio::test]
+async fn a_patient_claim_of_an_issuer_not_trusted_with_the_context_reaches_nothing()
+-> Result<(), Box<dyn Error>> {
+    let mut case = Case::new().await;
+    let mut settings = case.issuer.issuer_settings();
+    settings.profile.patient_context = false;
+    case.authority = authority(ferrobridge_server::smart::SmartSettings::new(settings)).await;
+    let token = case.token("patient/Condition.c", Some("p-1"));
+    let (status, body) = case
+        .send(post_condition(&condition_of("p-1")), &token)
+        .await?;
+    assert_eq!(StatusCode::FORBIDDEN, status, "{body}");
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_patient_token_reads_its_own_patient_only() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await;

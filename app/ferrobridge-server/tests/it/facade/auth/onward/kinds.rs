@@ -61,7 +61,7 @@ impl Sides {
                 "token_endpoint = \"{issuer}/token\"\n",
                 "audiences = [\"{audience}\"]\n",
                 "indicators = [\"{audience}\"]\n",
-                "[cdr.onward.keys]\n",
+                "[cdr.onward.profile]\n",
                 "max_onward_lifetime = \"1h\"\n",
             ),
             issuer = patients.uri(),

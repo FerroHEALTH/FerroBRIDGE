@@ -38,7 +38,7 @@ async fn the_configuration_page_draws_each_tab_read_only_with_its_keys()
     assert!(core.contains("30 s"), "{core}");
     assert!(core.contains("1 MiB"), "{core}");
     // NOTE: no specification governs this: our own design, each trusted issuer
-    // is an `[[auth.issuer]]` table, which the Issuers row counts.
+    // is an `[auth.issuer.<name>]` table, which the Issuers row counts.
     assert!(core.contains("Issuers"), "{core}");
     assert!(core.contains("1 entry"), "{core}");
     assert!(

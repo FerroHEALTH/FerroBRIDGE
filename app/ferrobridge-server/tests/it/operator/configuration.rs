@@ -35,7 +35,7 @@ fn file_text(password_file: &std::path::Path) -> String {
         concat!(
             "[server]\nlisten = \"127.0.0.1:18080\"\n\n",
             "[auth]\nenabled = true\nproduct_scope = \"__ferrobridge.operator\"\n\n",
-            "[[auth.issuer]]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\n",
+            "[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\n",
             "audience = [\"https://bridge.example.org/fhir\"]\n\n",
             "[[auth.basic.users]]\nuser = \"operator\"\n",
             "password_hash = \"$argon2id$v=19$m=19456,t=2,p=1$c3ludGhldGljLXNhbHQtMTY$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n\n",
@@ -222,7 +222,7 @@ fn an_unset_operator_scope_is_answered_as_the_scope_the_bridge_runs_on()
 -> Result<(), Box<dyn Error>> {
     let text = concat!(
         "[auth]\nenabled = true\n\n",
-        "[[auth.issuer]]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\n",
+        "[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\n",
         "audience = [\"https://bridge.example.org/fhir\"]\n\n",
         "[operator]\nenabled = true\n",
     );
