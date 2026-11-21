@@ -149,11 +149,7 @@ impl Tables {
     /// Mounts the stub on a new server and returns a client of it.
     pub(crate) async fn serve(&self) -> (MockServer, Client) {
         let server = MockServer::start().await;
-        Mock::given(wiremock::matchers::method("POST"))
-            .and(wiremock::matchers::path("/r4/ConceptMap/$translate"))
-            .respond_with(self.clone())
-            .mount(&server)
-            .await;
+        mount_translate(&server, self.clone()).await;
         let base = format!("{}/r4", server.uri()).parse().expect("a base url");
         let config = Config::new(base, WireVersion::R4)
             .with_timeout(Duration::from_secs(5))
@@ -169,7 +165,14 @@ impl Tables {
 
 impl Respond for Tables {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
+        answer_each(request, |body| self.answer(body))
+    }
+}
+
+impl Tables {
+    /// Returns the `Parameters` answering the `$translate` `Parameters` `body`,
+    /// and records the question.
+    pub(crate) fn answer(&self, body: &serde_json::Value) -> serde_json::Value {
         let parameter = |name: &str, kind: &str| {
             body["parameter"]
                 .as_array()
@@ -189,9 +192,74 @@ impl Respond for Tables {
             .push(key.clone());
         match self.answers.get(&key) {
             Some((system, code, display)) => {
-                terminology::translate("equivalent", system, code, display)
+                terminology::parameters_resource(&terminology::translate_body(&[(
+                    "equivalent",
+                    system.as_str(),
+                    code.as_str(),
+                    display.as_str(),
+                )]))
             }
-            None => terminology::translate_no_match("no mapping for the code"),
+            None => no_match("no mapping for the code"),
         }
     }
+}
+
+/// Mounts `stub` on `server` for `ConceptMap/$translate` and for a `batch`
+/// at the R4 base.
+pub(crate) async fn mount_translate<R: Respond + Clone + 'static>(server: &MockServer, stub: R) {
+    Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path("/r4/ConceptMap/$translate"))
+        .respond_with(stub.clone())
+        .mount(server)
+        .await;
+    Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path("/r4"))
+        .respond_with(stub)
+        .mount(server)
+        .await;
+}
+
+/// Answers `request` with `answer`: a `$translate` `Parameters` with its
+/// answer, and a `batch` `Bundle` with the answer to each entry's
+/// `Parameters`, in order (<https://hl7.org/fhir/R4/http.html#transaction>).
+pub(crate) fn answer_each(
+    request: &Request,
+    answer: impl Fn(&serde_json::Value) -> serde_json::Value,
+) -> ResponseTemplate {
+    status_each(request, |body| ("200 OK", answer(body)))
+}
+
+/// Answers `request` as [`answer_each`] does, with the status line `answer`
+/// gives each `Parameters`.
+pub(crate) fn status_each(
+    request: &Request,
+    answer: impl Fn(&serde_json::Value) -> (&'static str, serde_json::Value),
+) -> ResponseTemplate {
+    let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
+    if body["resourceType"] != "Bundle" {
+        let (status, resource) = answer(&body);
+        let code: u16 = status
+            .split(' ')
+            .next()
+            .and_then(|code| code.parse().ok())
+            .expect("a status line opens with its code");
+        return ResponseTemplate::new(code)
+            .insert_header("Content-Type", "application/fhir+json")
+            .set_body_string(resource.to_string());
+    }
+    let entries: Vec<(&str, serde_json::Value)> = body["entry"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|entry| answer(&entry["resource"]))
+        .collect();
+    terminology::batch_response(&entries)
+}
+
+/// The `$translate` `Parameters` of no match, with `message`.
+pub(crate) fn no_match(message: &str) -> serde_json::Value {
+    terminology::parameters_resource(&[
+        serde_json::json!({"name": "result", "valueBoolean": false}),
+        serde_json::json!({"name": "message", "valueString": message}),
+    ])
 }

@@ -371,3 +371,96 @@ async fn a_batch_translation_carries_the_same_optional_parameters()
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn several_translations_go_as_one_batch_answered_by_position()
+-> Result<(), Box<dyn std::error::Error>> {
+    for &version in RELEASES {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(format!("/{}", release_path(version))))
+            .respond_with(terminology::batch_response(&[
+                (
+                    "200 OK",
+                    terminology::parameters_resource(&terminology::translate_body(&[(
+                        "equivalent",
+                        fixtures::TERM_TARGET_SYSTEM,
+                        fixtures::TERM_MEMBER_TARGET_CODE,
+                        "Target alpha",
+                    )])),
+                ),
+                (
+                    "404 Not Found",
+                    terminology::outcome_body("not-found", Some("not-found"), "no such map"),
+                ),
+            ]))
+            .mount(&server)
+            .await;
+        let translation =
+            Translation::new(fixtures::TERM_SOURCE_SYSTEM, fixtures::TERM_MEMBER_CODE)
+                .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL)
+                .with_target_system(fixtures::TERM_TARGET_SYSTEM);
+        let answers = client(&server, version)?
+            .translate_all(&[translation.clone(), translation])
+            .await?;
+        let [first, second] = answers.as_slice() else {
+            return Err(format!("expected two answers, got {answers:?}").into());
+        };
+        let Ok(found) = first else {
+            return Err(format!("{version:?}: the first entry is no answer: {first:?}").into());
+        };
+        let accepted: Vec<Option<&str>> = found
+            .accepted()
+            .map(|found| {
+                found
+                    .concept
+                    .as_ref()
+                    .and_then(|concept| concept.code.as_deref())
+            })
+            .collect();
+        assert_eq!(vec![Some(fixtures::TERM_MEMBER_TARGET_CODE)], accepted);
+        assert!(
+            matches!(second, Err(Error::Refused { .. })),
+            "{version:?}: {second:?}"
+        );
+        let body = request_body(&server, 0).await?;
+        assert_eq!(Some(&serde_json::json!("batch")), body.get("type"));
+        assert_eq!(
+            1,
+            server.received_requests().await.map_or(0, |all| all.len())
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn one_translation_of_several_forms_goes_as_a_plain_call()
+-> Result<(), Box<dyn std::error::Error>> {
+    for &version in RELEASES {
+        let server = MockServer::start().await;
+        mount(
+            &server,
+            version,
+            terminology::translate_no_match("no map for this code"),
+        )
+        .await;
+        let answers = client(&server, version)?
+            .translate_all(&[Translation::new(
+                fixtures::TERM_SOURCE_SYSTEM,
+                fixtures::TERM_MEMBER_CODE,
+            )
+            .with_concept_map(fixtures::TERM_CONCEPT_MAP_URL)])
+            .await?;
+        assert!(
+            matches!(answers.as_slice(), [Ok(TranslateOutcome::NoMatch { .. })]),
+            "{version:?}: {answers:?}"
+        );
+        assert!(
+            client(&server, version)?
+                .translate_all(&[])
+                .await?
+                .is_empty()
+        );
+    }
+    Ok(())
+}

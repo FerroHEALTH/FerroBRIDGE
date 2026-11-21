@@ -49,7 +49,8 @@ so a caller can tell an unserved code system from an unknown code.
 system, `systemVersion` and `display`, a code with the `context` that implies
 its system (`Coded::InContext`, R4 and R4B), a `Coding`, or a
 `CodeableConcept`, with an optional `valueSetVersion` (R4 and R4B). `validate_all` answers several validations
-by position, one call for one and one `batch` for several.
+by position, one call for one and one `batch` for several, and
+`translate_all` does the same for several translations.
 
 `batch` sends several of them as one `batch` `Bundle` and answers them by
 position; an entry the server refused is that entry's own typed error and
