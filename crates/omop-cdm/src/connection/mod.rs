@@ -33,6 +33,57 @@ mod relay;
 
 use relay::{Relay, Upstream};
 
+/// The oldest PostgreSQL the CDM clients run on, as a `server_version_num`.
+///
+/// The setting is described in PostgreSQL 19 docs, "Preset Options". No
+/// specification governs the minimum: our own design, the release every
+/// product of the family pins.
+pub const MINIMUM_SERVER_VERSION: i32 = 190_000;
+
+/// The statement both clients read the server's version with, once per
+/// connection they open at start.
+pub(crate) const SERVER_VERSION_QUERY: &str = "SELECT current_setting('server_version_num')::int";
+
+/// The CDM database runs a PostgreSQL older than [`MINIMUM_SERVER_VERSION`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "the CDM database runs PostgreSQL server_version_num {found}, and FerroBRIDGE needs {required} or newer"
+)]
+pub struct UnsupportedServer {
+    found: i32,
+    required: i32,
+}
+
+impl UnsupportedServer {
+    /// Returns the `server_version_num` the database reported.
+    #[must_use]
+    pub fn found(self) -> i32 {
+        self.found
+    }
+
+    /// Returns the `server_version_num` the clients need at least.
+    #[must_use]
+    pub fn required(self) -> i32 {
+        self.required
+    }
+}
+
+/// Refuses a `server_version_num` older than [`MINIMUM_SERVER_VERSION`].
+///
+/// # Errors
+///
+/// Returns [`UnsupportedServer`] naming the version found and the version
+/// required.
+pub fn supported(found: i32) -> Result<(), UnsupportedServer> {
+    if found < MINIMUM_SERVER_VERSION {
+        return Err(UnsupportedServer {
+            found,
+            required: MINIMUM_SERVER_VERSION,
+        });
+    }
+    Ok(())
+}
+
 /// How the connection is secured, after libpq's `sslmode`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SslMode {
@@ -591,6 +642,23 @@ impl ServerCertVerifier for AnyName {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_server_older_than_postgresql_19_is_refused_with_both_versions() {
+        let refused = super::supported(180_007).expect_err("PostgreSQL 18.7 is refused");
+        assert_eq!((180_007, 190_000), (refused.found(), refused.required()));
+        assert_eq!(
+            "the CDM database runs PostgreSQL server_version_num 180007, and FerroBRIDGE needs 190000 or newer",
+            refused.to_string()
+        );
+    }
+
+    #[test]
+    fn postgresql_19_and_newer_are_accepted() {
+        for found in [190_000, 190_003, 200_000] {
+            assert!(super::supported(found).is_ok(), "{found}");
+        }
+    }
+
     use super::{CdmConnection, ConnectionError, SslMode};
 
     const URL: &str = "postgres://bridge:secret@db.invalid:5432/cdm";

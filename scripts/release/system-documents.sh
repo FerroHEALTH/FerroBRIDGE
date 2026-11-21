@@ -325,14 +325,14 @@ self_test() {
     "| OMOCL | v1.0.0 | x |" \
     "| HL7 Europe Laboratory Report | package \`hl7.fhir.eu.laboratory\` 2.0.0, pin-set digest \`ab\` | x |" \
     "| UCUM essence | \`ucum-org/ucum\` tag \`v2.2\` commit \`d0\` | x |" \
-    "| PostgreSQL image | \`postgres:18.6@sha256:4e\` | x |" \
+    "| PostgreSQL image | \`postgres:19.0@sha256:4e\` | x |" \
     "| FerroEHR CDR image | \`ghcr.io/ferrohealth/ferroehr:5.5.0@sha256:e1\` | x |" >"$tmp/VERSIONS.md"
   VERSIONS="$tmp/VERSIONS.md"
   expect "a whole cell" "$(version cell:FHIR)" "R4 (4.0.1)"
   expect "a first word" "$(version first:OMOCL)" "v1.0.0"
   expect "a package version" "$(version 'package:HL7 Europe Laboratory Report')" "2.0.0"
   expect "a git tag" "$(version 'tag:UCUM essence')" "v2.2"
-  expect "an image tag" "$(version 'image:PostgreSQL image')" "18.6"
+  expect "an image tag" "$(version 'image:PostgreSQL image')" "19.0"
   expect "the FerroEHR release" "$(ehr_version)" "5.5.0"
   sed -i.bak 's/ferroehr:5\.5\.0@/ferroehr:5.6.0-rc10@/' "$tmp/VERSIONS.md"
   expect "a FerroEHR pre-release" "$(ehr_version)" "5.6.0-rc10"

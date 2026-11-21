@@ -8,7 +8,7 @@ use std::fmt;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::lexical::IdError;
 
-use crate::connection::ConnectionError;
+use crate::connection::{ConnectionError, UnsupportedServer};
 use crate::graph;
 use crate::graph::key::EmptyIdentifier;
 use crate::graph::key::RecordKey;
@@ -18,6 +18,8 @@ use crate::graph::key::VisitKey;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Step {
+    /// Reading the server's version after connecting.
+    ServerVersion,
     /// Creating the bridge schema and its tables.
     Init,
     /// Opening a transaction.
@@ -51,6 +53,7 @@ pub enum Step {
 impl fmt::Display for Step {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::ServerVersion => f.write_str("reading the server version"),
             Self::Init => f.write_str("creating the bridge schema"),
             Self::Begin => f.write_str("opening the transaction"),
             Self::Lock => f.write_str("locking the composition"),
@@ -88,6 +91,10 @@ pub enum WriteError {
         #[source]
         source: tokio_postgres::Error,
     },
+    /// The database runs a PostgreSQL older than
+    /// [`MINIMUM_SERVER_VERSION`](crate::connection::MINIMUM_SERVER_VERSION).
+    #[error("the CDM database runs an unsupported PostgreSQL")]
+    UnsupportedServer(#[from] UnsupportedServer),
     /// PostgreSQL refused a statement.
     #[error("PostgreSQL refused {step}")]
     Database {

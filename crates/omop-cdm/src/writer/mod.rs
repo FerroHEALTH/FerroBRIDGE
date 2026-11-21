@@ -53,6 +53,8 @@ use tokio_postgres::Transaction;
 use tokio_postgres::error::SqlState;
 
 use crate::connection::CdmConnection;
+use crate::connection::SERVER_VERSION_QUERY;
+use crate::connection::supported;
 use crate::ddl::SchemaName;
 use crate::graph;
 use crate::graph::RecordGraph;
@@ -186,7 +188,10 @@ impl CdmWriter {
     /// # Errors
     ///
     /// Returns [`WriteError::Connect`] when the database cannot be reached,
-    /// refuses the login, or fails the TLS handshake.
+    /// refuses the login, or fails the TLS handshake,
+    /// [`WriteError::Database`] when its version cannot be read, and
+    /// [`WriteError::UnsupportedServer`] when it runs a PostgreSQL older than
+    /// [`MINIMUM_SERVER_VERSION`](crate::connection::MINIMUM_SERVER_VERSION).
     pub async fn connect_with(
         connection: &CdmConnection,
         cdm: SchemaName,
@@ -199,6 +204,15 @@ impl CdmWriter {
             .await
             .map_err(|source| WriteError::Connect { source })?;
         let connection = tokio::spawn(connection);
+        let found: i32 = client
+            .query_one(SERVER_VERSION_QUERY, &[])
+            .await
+            .and_then(|row| row.try_get(0))
+            .map_err(|source| WriteError::Database {
+                step: Step::ServerVersion,
+                source,
+            })?;
+        supported(found)?;
         Ok(Self {
             client,
             connection,

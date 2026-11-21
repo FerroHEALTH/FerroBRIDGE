@@ -1,6 +1,6 @@
 ---
 name: e2e-gate
-description: Container-backed tests run only with FERROBRIDGE_E2E=1 through the testkit harness (PostgreSQL 18.6, the reference CDR, the reference terminology server, all pinned by digest); unset, they skip and the suite is offline
+description: Container-backed tests run only with FERROBRIDGE_E2E=1 through the testkit harness (PostgreSQL 19.0, the reference CDR, the reference terminology server, all pinned by digest); unset, they skip and the suite is offline
 metadata:
   type: project
 ---

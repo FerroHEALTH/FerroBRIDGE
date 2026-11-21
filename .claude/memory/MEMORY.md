@@ -57,9 +57,10 @@
   is killed with exit 143 when two generated giants compile together; lint
   per package with cargo hack, never the all-features union of fhir-types;
   2026-09-12
-- [PostgreSQL 18](postgresql-18.md): every PostgreSQL the project tests
-  against or documents is the latest release (18.6 on 2026-09-12), never 16;
-  owner ruling 2026-09-12
+- [PostgreSQL 19](postgresql-19.md): every PostgreSQL the project tests
+  against or documents is the latest release (19.0 since 2026-11-21), and 19
+  is the minimum the CDM clients start against; owner rulings 2026-09-12 and
+  2026-11-21
 - [End-to-end gate](e2e-gate.md): container tests run only with
   `FERROBRIDGE_E2E=1` through the testkit harness; images pinned by digest and
   checked by the versions guard; 2026-09-12
