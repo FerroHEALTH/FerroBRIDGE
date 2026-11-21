@@ -38,7 +38,7 @@ impl Respond for Refusing {
                     terminology::outcome_body("not-found", Some("not-found"), "no such map"),
                 )
             } else {
-                (200, self.tables.answer(body))
+                (200, self.tables.reply(body))
             }
         })
     }
@@ -148,7 +148,7 @@ async fn a_refused_translation_fails_the_run_with_the_upstream_status() {
     let corpus = support::corpus();
     let server = wiremock::MockServer::start().await;
     wiremock::Mock::given(wiremock::matchers::method("POST"))
-        .respond_with(wiremock::ResponseTemplate::new(500))
+        .respond_with(ResponseTemplate::new(500))
         .mount(&server)
         .await;
     let base = format!("{}/r4", server.uri()).parse().expect("a base url");

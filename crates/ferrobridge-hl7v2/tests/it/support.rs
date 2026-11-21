@@ -165,14 +165,14 @@ impl Tables {
 
 impl Respond for Tables {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        answer_each(request, |body| self.answer(body))
+        answer_each(request, |body| self.reply(body))
     }
 }
 
 impl Tables {
     /// Returns the `Parameters` answering the `$translate` `Parameters` `body`,
     /// and records the question.
-    pub(crate) fn answer(&self, body: &serde_json::Value) -> serde_json::Value {
+    pub(crate) fn reply(&self, body: &serde_json::Value) -> serde_json::Value {
         let parameter = |name: &str, kind: &str| {
             body["parameter"]
                 .as_array()

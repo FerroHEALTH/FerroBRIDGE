@@ -114,13 +114,13 @@ impl PackageTables {
 
 impl Respond for PackageTables {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        support::answer_each(request, |body| self.answer(body))
+        support::answer_each(request, |body| self.reply(body))
     }
 }
 
 impl PackageTables {
     /// Returns the `Parameters` answering the `$translate` `Parameters` `body`.
-    fn answer(&self, body: &serde_json::Value) -> serde_json::Value {
+    fn reply(&self, body: &serde_json::Value) -> serde_json::Value {
         let parameter = |name: &str| {
             body["parameter"]
                 .as_array()
