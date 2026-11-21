@@ -83,7 +83,9 @@ endpoints, for clients that discover SMART through the statement (see
 
 With [`[auth]`](../operate/configuration.md#auth) on, the default, the facade
 is a SMART App Launch 2.x resource server for the authorization servers the
-deployment trusts, each fixed by its issuer, and the audiences it configures.
+deployment trusts, each a named `[auth.issuer.<name>]` table fixed by its
+issuer. A token is for the facade when its `aud` names `[facade] base_url`, or
+one of the audiences the issuer table lists in its place.
 The check is `ferrohealth-smart`'s, the resource server every FerroHEALTH
 product runs. **With `[auth]` off, the
 facade authenticates nobody and serves every request it receives.**
@@ -94,10 +96,10 @@ or the Basic credential of a user `[[auth.basic.users]]` lists, except `GET /fhi
 `/.well-known/smart-configuration`), which a client reads before it holds a
 token. The health routes stay open too. The token is a JWT signed by a key
 in the issuer's key set, with an `iss` equal to the issuer, an `aud` naming
-the audience, and an `exp`, `nbf` and `iat` that hold within the configured
-clock skew. Under the default `rfc9068` profile it also carries `typ: at+jwt`,
+the facade, and an `exp`, `nbf` and `iat` that hold within the configured
+clock skew. Under the default `rfc9068` preset it also carries `typ: at+jwt`,
 `sub`, `client_id`, `iat` and `jti` (RFC 9068). The issuer's `kind` and
-profile decide who the caller is: a person through one of the deployment's
+profile (its `preset` with the keys of its `profile` table over it) decide who the caller is: a person through one of the deployment's
 own clients, a patient, a machine's client credentials token, or another
 party's person on a `federation` issuer. A Basic credential is always a
 person's; a machine never authenticates with one.
@@ -106,16 +108,21 @@ person's; a machine never authenticates with one.
 |---|---|---|
 | `401` | No credential, or one in a scheme the server does not admit | `Bearer`, and a `Basic realm="", charset="UTF-8"` challenge beside it when Basic users are configured |
 | `400` | Two credentials, or an `Authorization` value that is no credential | `Bearer error="invalid_request"` |
-| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience, and a valid token that names no caller its issuer's kind admits | `Bearer error="invalid_token"` |
+| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience, and a valid token that names no caller its issuer's kind admits | `Bearer error="invalid_token", error_description="<reason>"` |
 | `401` | A Basic credential that does not hold, whatever the reason | `Basic realm="", charset="UTF-8"` |
-| `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope"` |
+| `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope", error_description="scope-not-granted"` |
 | `403` | Any request to a route under `/fhir` the guard does not classify, before the token is read | none |
 | `503` | A token naming a key the server cannot fetch because the key set does not answer | none |
 
 Each refusal carries an `OperationOutcome`, `login` for a `401`, `invalid` for
 a `400` and `forbidden` for a `403`. A configured `realm` is named on every
-challenge. Neither names the claim that failed or the scope
-that was missing.
+challenge. A `Bearer` challenge with an error code carries the stable reason
+code of the check that refused the token as its `error_description` (RFC 6750
+§3), such as `expired`, `audience-mismatch`, `issuer-unknown`,
+`signature-invalid` or `scope-not-granted`; the `ferrohealth-smart` book lists
+every code. The bridge logs the code with the token's issuer, client and key
+id, never the token. Neither the challenge nor the body names the claim that
+failed or the scope that was missing.
 
 The guard classifies every route it admits by name: the interactions in the
 table below, the two FHIRconnect operations and their direct forms, the
@@ -152,7 +159,13 @@ because the facade has no per-user access model of its own, and so does a
 `system/` scope. A token with no clinical scope at all gets system-wide
 access only when its `sub` is in `scopeless_subjects`.
 
-A `patient/` scope reaches only the patient in the token's `patient` claim.
+A `patient/` scope reaches only the patient in the token's `patient` claim,
+which the facade reads as the launch context only from an issuer whose
+profile sets `patient_context` (SMART App Launch 2.2.0, Scopes and Launch
+Context, `launch/patient`: the authorization server sets it). The
+`ferrosmart` preset sets it; every other preset leaves it off, so a
+`patient` claim of such an issuer is ignored unless its
+`[auth.issuer.<name>.profile]` table sets `patient_context = true`. This is the rule FerroEHR reads too.
 The facade reads a patient's data as the EHR it resolves for the subject
 `Patient/<id>`: a create or update must name `subject` (or `patient`) as
 the literal reference `Patient/<id>`, and a read reaches a resource only

@@ -247,7 +247,9 @@ async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<
         let response = case.get(route, Some("system/*.cruds openid")).await?;
         assert_eq!(StatusCode::FORBIDDEN, response.status(), "{route}");
         assert_eq!(
-            Some(String::from("Bearer error=\"insufficient_scope\"")),
+            Some(String::from(
+                "Bearer error=\"insufficient_scope\", error_description=\"scope-not-granted\""
+            )),
             challenge(&response),
             "{route}"
         );

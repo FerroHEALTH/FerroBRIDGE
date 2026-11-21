@@ -32,7 +32,7 @@ const ONWARD: &str = concat!(
     "token_endpoint = \"https://as.example.org/token\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.endpoint.credentials.onward.keys]\n",
+    "[cdr.endpoint.credentials.onward.profile]\n",
     "max_onward_lifetime = \"5min\"\n",
 );
 
@@ -45,7 +45,7 @@ const PATIENTS: &str = concat!(
     "token_endpoint = \"https://as.example.org/patients/token\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.onward.keys]\n",
+    "[cdr.onward.profile]\n",
     "max_onward_lifetime = \"5min\"\n",
 );
 
@@ -56,7 +56,7 @@ const FEDERATION: &str = concat!(
     "issuer = \"https://sts.partner.example.org\"\n",
     "kind = \"federation\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.onward.keys]\n",
+    "[cdr.onward.profile]\n",
     "max_onward_lifetime = \"5min\"\n",
     "[cdr.onward.federation]\n",
     "contact_point = false\n",
@@ -123,8 +123,8 @@ fn an_onward_table_caches_its_tokens_by_default() -> Result<(), Box<dyn std::err
 #[test]
 fn an_onward_table_with_cache_off_holds_no_token() -> Result<(), Box<dyn std::error::Error>> {
     let table = ONWARD.replace(
-        "[cdr.endpoint.credentials.onward.keys]\n",
-        "cache = false\n[cdr.endpoint.credentials.onward.keys]\n",
+        "[cdr.endpoint.credentials.onward.profile]\n",
+        "cache = false\n[cdr.endpoint.credentials.onward.profile]\n",
     );
     let settings = Config::from_sources(Some(&cdr(&format!("{OAUTH}{table}"))), &BTreeMap::new())?
         .resolve(Process::Job)?;
@@ -287,8 +287,8 @@ fn two_issuers_of_one_kind_are_refused() -> Result<(), Box<dyn std::error::Error
     let twice = ONWARD
         .replace("[cdr.endpoint.credentials.onward]", "[[cdr.onward]]")
         .replace(
-            "[cdr.endpoint.credentials.onward.keys]",
-            "[cdr.onward.keys]",
+            "[cdr.endpoint.credentials.onward.profile]",
+            "[cdr.onward.profile]",
         );
     let error = refusal(&cdr(&format!("{OAUTH}{ONWARD}{twice}")), Process::Job)?;
     assert!(

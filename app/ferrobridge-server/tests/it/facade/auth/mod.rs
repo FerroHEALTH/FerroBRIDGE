@@ -210,10 +210,12 @@ impl Issuer {
 
     /// Returns the resource-server settings of this issuer alone, a
     /// `persons` issuer whose first-party client is the one the cases'
-    /// tokens name, reading the key set again on every unknown `kid`.
+    /// tokens name and whose `patient` claim is the launch context, reading
+    /// the key set again on every unknown `kid`.
     pub(crate) fn issuer_settings(&self) -> Settings {
         let mut settings = Settings::new(self.uri(), AUDIENCE, IssuerKind::Persons);
         settings.profile.first_party_clients = vec![String::from(CLIENT)];
+        settings.profile.patient_context = true;
         settings.jwks_refresh_interval = Duration::ZERO;
         settings
     }

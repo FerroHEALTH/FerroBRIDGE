@@ -17,6 +17,7 @@ use ferrohealth_smart::guard::Classify;
 use ferrohealth_smart::guard::Render;
 use ferrohealth_smart::guard::Requirement;
 use ferrohealth_smart::guard::Target;
+use ferrohealth_smart::refusal::Denied;
 use ferrohealth_smart::refusal::Refusal;
 use http::Extensions;
 use http::Method;
@@ -58,7 +59,8 @@ pub struct Body {
 }
 
 impl Render for Body {
-    fn render(&self, refused: &Refusal, _parts: &Parts) -> Response {
+    fn render(&self, denied: &Denied, _parts: &Parts) -> Response {
+        let refused = denied.refusal();
         let problem = match refused {
             Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => Kind::Unauthenticated
                 .problem("the request carries no valid access token for this server"),
@@ -72,7 +74,7 @@ impl Render for Body {
             _ => ferrohealth_server::problem::Problem::new(refused.status())
                 .with_detail("the request was refused at the gate"),
         };
-        respond(problem, refused.challenge(self.realm.as_deref()).as_deref())
+        respond(problem, denied.challenge(self.realm.as_deref()).as_deref())
     }
 }
 

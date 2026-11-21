@@ -24,7 +24,7 @@ const CDR: &str = concat!(
     "token_endpoint = \"https://as.example.org/token\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.endpoint.credentials.onward.keys]\n",
+    "[cdr.endpoint.credentials.onward.profile]\n",
     "max_onward_lifetime = \"5min\"\n\n",
 );
 

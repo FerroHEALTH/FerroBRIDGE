@@ -416,9 +416,10 @@ fn behind_ferrosmart(issuer: &Issuer) -> Result<SmartSettings, Box<dyn Error>> {
         concat!(
             "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
             "[auth]\nenabled = true\n\n",
-            "[[auth.issuer]]\nissuer = \"{issuer}\"\nkind = \"persons\"\nprofile = \"ferrosmart\"\n",
-            "audience = [\"{audience}\"]\ndelegates = [{{ client = \"{client}\" }}]\n",
-            "jwks_refresh_interval = \"0s\"\n",
+            "[facade]\nbase_url = \"{audience}\"\n\n",
+            "[auth.issuer.ferrosmart]\nissuer = \"{issuer}\"\npreset = \"ferrosmart\"\n",
+            "jwks_refresh_interval = \"0s\"\n\n",
+            "[auth.issuer.ferrosmart.profile]\ndelegates = [{{ client = \"{client}\" }}]\n",
         ),
         issuer = issuer.uri(),
         audience = AUDIENCE,

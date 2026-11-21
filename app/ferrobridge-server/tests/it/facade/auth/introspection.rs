@@ -139,9 +139,9 @@ async fn an_inactive_token_is_refused_as_invalid() -> Result<(), Box<dyn Error>>
     let (status, challenge) = read(app).await?;
     assert_eq!(StatusCode::UNAUTHORIZED, status);
     assert_eq!(
-        Some("Bearer error=\"invalid_token\""),
+        Some("Bearer error=\"invalid_token\", error_description=\"token-inactive\""),
         challenge.as_deref(),
-        "RFC 6750 §3.1 invalid_token"
+        "RFC 6750 §3.1 invalid_token, §3 the reason code"
     );
     Ok(())
 }

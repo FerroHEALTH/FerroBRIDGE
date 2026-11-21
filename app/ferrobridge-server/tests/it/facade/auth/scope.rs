@@ -119,9 +119,9 @@ impl Case {
 fn assert_forbidden((status, challenge, body): &(StatusCode, Option<String>, String)) {
     assert_eq!(StatusCode::FORBIDDEN, *status, "{body}");
     assert_eq!(
-        Some("Bearer error=\"insufficient_scope\""),
+        Some("Bearer error=\"insufficient_scope\", error_description=\"scope-not-granted\""),
         challenge.as_deref(),
-        "RFC 6750 §3.1 insufficient_scope, naming no scope"
+        "RFC 6750 §3.1 insufficient_scope, naming no scope, §3 the reason code"
     );
     assert!(body.contains("\"forbidden\""), "{body}");
     for named in ["Condition.", "system/", "scope", ".c", ".r"] {

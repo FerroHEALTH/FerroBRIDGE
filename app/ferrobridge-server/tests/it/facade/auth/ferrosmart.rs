@@ -41,19 +41,21 @@ const UNKNOWN: &str = "/fhir/Condition/never-written";
 const APP: &str = "growth-chart";
 
 /// Returns the resource-server settings of a bridge behind the `FerroSMART` at
-/// `issuer`, as `[auth]` reads them.
-fn behind_ferrosmart(issuer: &str) -> Result<SmartSettings, Box<dyn Error>> {
+/// `issuer` with `profile` added to its profile table, as `[auth]` reads them.
+fn behind_ferrosmart(issuer: &str, profile: &str) -> Result<SmartSettings, Box<dyn Error>> {
     let text = format!(
         concat!(
             "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
             "[auth]\nenabled = true\n\n",
-            "[[auth.issuer]]\nissuer = \"{issuer}\"\nkind = \"persons\"\nprofile = \"ferrosmart\"\n",
-            "audience = [\"{audience}\"]\ndelegates = [{{ client = \"{app}\" }}]\n",
-            "jwks_refresh_interval = \"0s\"\n",
+            "[facade]\nbase_url = \"{audience}\"\n\n",
+            "[auth.issuer.ferrosmart]\nissuer = \"{issuer}\"\npreset = \"ferrosmart\"\n",
+            "jwks_refresh_interval = \"0s\"\n\n",
+            "[auth.issuer.ferrosmart.profile]\ndelegates = [{{ client = \"{app}\" }}]\n{profile}",
         ),
         issuer = issuer,
         audience = AUDIENCE,
         app = APP,
+        profile = profile,
     );
     Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve(Process::Server)?
@@ -61,12 +63,17 @@ fn behind_ferrosmart(issuer: &str) -> Result<SmartSettings, Box<dyn Error>> {
         .ok_or_else(|| "auth is on".into())
 }
 
-/// Returns the status the guarded read answers under `token`.
-async fn status_under(issuer: &Issuer, token: &str) -> Result<StatusCode, Box<dyn Error>> {
+/// Returns the status the guarded read answers under `token`, behind an
+/// issuer whose profile table adds `profile`.
+async fn status_with(
+    issuer: &Issuer,
+    profile: &str,
+    token: &str,
+) -> Result<StatusCode, Box<dyn Error>> {
     let harness = harness().await;
     let app = secured(
         &harness,
-        &authority(behind_ferrosmart(&issuer.uri())?).await,
+        &authority(behind_ferrosmart(&issuer.uri(), profile)?).await,
     );
     Ok(raw(app, bearing(get(UNKNOWN), token)).await?.status())
 }
@@ -144,6 +151,50 @@ async fn the_long_form_type_is_refused() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         StatusCode::UNAUTHORIZED,
         status_under(&issuer, &mint_with(&key, &header, &claims)).await?
+    );
+    Ok(())
+}
+
+/// Returns the status the guarded read answers under `token`.
+async fn status_under(issuer: &Issuer, token: &str) -> Result<StatusCode, Box<dyn Error>> {
+    status_with(issuer, "", token).await
+}
+
+#[tokio::test]
+async fn a_person_through_the_issuers_own_picker_is_admitted_with_no_delegate()
+-> Result<(), Box<dyn Error>> {
+    // NOTE: no specification governs this: our own design, the `ferrosmart` preset
+    // reads a token whose client is the issuer itself as the person, with no app grant.
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let mut claims = issuer.claims("user/Condition.rs");
+    claims["client_id"] = serde_json::json!(issuer.uri());
+    claims["sub"] = serde_json::json!("pairwise-person-1");
+    claims["fhirUser"] = serde_json::json!("Practitioner/p-1");
+    assert_eq!(
+        StatusCode::NOT_FOUND,
+        status_under(&issuer, &mint(&key, &claims)).await?
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn audience_delegates_admits_an_app_registered_for_this_server() -> Result<(), Box<dyn Error>>
+{
+    let key = ec_key("k1", Algorithm::ES256);
+    let issuer = Issuer::start(&[&key]).await;
+    let mut claims = issuer.claims("user/Condition.rs");
+    claims["client_id"] = serde_json::json!("registered-app");
+    claims["sub"] = serde_json::json!("pairwise-person-1");
+    claims["fhirUser"] = serde_json::json!("Practitioner/p-1");
+    let token = mint(&key, &claims);
+    assert_eq!(
+        StatusCode::NOT_FOUND,
+        status_with(&issuer, "audience_delegates = true\n", &token).await?
+    );
+    assert_eq!(
+        StatusCode::UNAUTHORIZED,
+        status_under(&issuer, &token).await?
     );
     Ok(())
 }
