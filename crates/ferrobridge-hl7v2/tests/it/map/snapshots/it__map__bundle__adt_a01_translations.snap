@@ -12,8 +12,16 @@ expression: asked
         "L",
     ),
     (
+        "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70200-to-name-use",
+        "L",
+    ),
+    (
         "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70001-to-administrative-gender",
         "F",
+    ),
+    (
+        "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70004-to-v3-actcode",
+        "I",
     ),
     (
         "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70004-to-v3-actcode",

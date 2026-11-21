@@ -70,7 +70,7 @@ you use; the range is the same caret range.
   message map names a resource per segment, the segment map maps the fields,
   a data type map maps the components, and every table value is translated by
   `ConceptMap/$translate` on a terminology server through `ferrobridge-term`'s
-  client: load the guide's package and FerroBRIDGE's value package
+  client, every translation of a message asked in one `batch`: load the guide's package and FerroBRIDGE's value package
   (packed from `terminology/hl7v2-values/` in the repository by
   `scripts/terminology/pack-hl7v2-values.sh`) into it. `map::single` maps
   one segment to one resource, a PID to a `Patient`. `map::inverse` writes a

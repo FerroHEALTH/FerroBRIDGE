@@ -438,6 +438,31 @@ impl Client {
         crate::decode::translate(self.config.wire_version, &answer)
     }
 
+    /// Translates every one of `translations`, answering them by position:
+    /// one call for one translation, one `batch` `Bundle` for several.
+    ///
+    /// An entry the server refused is that entry's own typed error and leaves
+    /// the others alone, as in [`Client::batch`].
+    ///
+    /// # Errors
+    /// Returns [`Error::BatchArity`] when a batch answer holds a different
+    /// number of entries than were sent, and [`Error`] otherwise when the
+    /// batch itself did not reach an answer or its `Bundle` could not be
+    /// decoded. Returns [`Error::UnsupportedParameter`] when one of several
+    /// translations names a parameter the configured release does not
+    /// declare, and then no entry is sent.
+    pub async fn translate_all(
+        &self,
+        translations: &[Translation],
+    ) -> Result<Vec<Result<TranslateOutcome, Error>>, Error> {
+        let requests: Vec<Request> = translations
+            .iter()
+            .cloned()
+            .map(Request::Translate)
+            .collect();
+        self.answer_all(&requests, crate::decode::translate).await
+    }
+
     /// Validates that `code` from `system` is a member of `value_set_url`.
     ///
     /// # Errors
@@ -513,21 +538,13 @@ impl Client {
         &self,
         validations: &[Validation],
     ) -> Result<Vec<Result<ValidateOutcome, Error>>, Error> {
-        match validations {
-            [] => Ok(Vec::new()),
-            [one] => Ok(vec![self.validate(one).await]),
-            several => {
-                let requests: Vec<Request> =
-                    several.iter().cloned().map(Request::ValidateCode).collect();
-                let version = self.config.wire_version;
-                Ok(self
-                    .batch_answers(&requests)
-                    .await?
-                    .into_iter()
-                    .map(|answer| crate::decode::validate_code(version, &answer))
-                    .collect())
-            }
-        }
+        let requests: Vec<Request> = validations
+            .iter()
+            .cloned()
+            .map(Request::ValidateCode)
+            .collect();
+        self.answer_all(&requests, crate::decode::validate_code)
+            .await
     }
 
     /// Sends `requests` as one `batch` `Bundle` and answers them by position.
@@ -555,6 +572,31 @@ impl Client {
             .zip(self.batch_answers(requests).await?)
             .map(|(request, answer)| crate::decode::batch_entry(version, request, &answer))
             .collect())
+    }
+
+    /// Sends `requests` of one operation and decodes each answer with
+    /// `decode`, by position: one call for one request, one `batch` `Bundle`
+    /// for several.
+    async fn answer_all<O>(
+        &self,
+        requests: &[Request],
+        decode: fn(crate::config::WireVersion, &Answer) -> Result<O, Error>,
+    ) -> Result<Vec<Result<O, Error>>, Error> {
+        let version = self.config.wire_version;
+        match requests {
+            [] => Ok(Vec::new()),
+            [one] => Ok(vec![
+                self.operation(one)
+                    .await
+                    .and_then(|answer| decode(version, &answer)),
+            ]),
+            several => Ok(self
+                .batch_answers(several)
+                .await?
+                .into_iter()
+                .map(|answer| decode(version, &answer))
+                .collect()),
+        }
     }
 
     /// Sends `requests` as one `batch` `Bundle` and returns each entry's

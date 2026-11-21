@@ -5,10 +5,117 @@
 
 use ferrobridge_hl7v2::map::map;
 
-use crate::fixtures;
-use crate::support::{self};
+use ferrobridge_testkit::stubs::terminology;
+use wiremock::{Request, Respond, ResponseTemplate};
 
-use crate::map::{mapped, resources};
+use crate::fixtures;
+use crate::support::{self, Tables};
+
+use crate::map::{mapped, pretty, resources, tables};
+
+/// The table map the ADT^A01 fixture asks of two target systems.
+const ACT_CODE: &str = "http://hl7.org/fhir/uv/v2mappings/ConceptMap/table-hl70004-to-v3-actcode";
+
+/// A terminology server that refuses every translation to one target system
+/// and answers the rest as [`Tables`] does.
+#[derive(Debug, Clone)]
+struct Refusing {
+    tables: Tables,
+    target: &'static str,
+}
+
+impl Respond for Refusing {
+    fn respond(&self, request: &Request) -> ResponseTemplate {
+        terminology::each_parameters(request, |body| {
+            let refused = body["parameter"].as_array().is_some_and(|parameters| {
+                parameters.iter().any(|parameter| {
+                    parameter["name"] == "targetsystem" && parameter["valueUri"] == self.target
+                })
+            });
+            if refused {
+                (
+                    404,
+                    terminology::outcome_body("not-found", Some("not-found"), "no such map"),
+                )
+            } else {
+                (200, self.tables.reply(body))
+            }
+        })
+    }
+}
+
+/// Maps the ADT^A01 fixture against a server refusing `target`.
+async fn refusing(
+    target: &'static str,
+) -> Result<ferrobridge_hl7v2::map::Mapped, ferrobridge_hl7v2::map::MapError> {
+    let server = wiremock::MockServer::start().await;
+    support::mount_translate(
+        &server,
+        Refusing {
+            tables: tables(),
+            target,
+        },
+    )
+    .await;
+    let base = format!("{}/r4", server.uri()).parse().expect("a base url");
+    let config =
+        ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::R4)
+            .with_retry(ferrobridge_term::config::RetryPolicy {
+                max_attempts: 1,
+                initial_backoff: std::time::Duration::from_millis(1),
+                max_backoff: std::time::Duration::from_millis(1),
+            });
+    let client = ferrobridge_term::client::Client::new(config).expect("a client");
+    map(
+        &support::parsed(&fixtures::adt_a01()),
+        support::corpus(),
+        Some(&client),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn every_translation_of_a_message_goes_in_one_request() {
+    let parsed = support::parsed(&fixtures::adt_a01());
+    let tables = tables();
+    let (server, client) = tables.serve().await;
+    let mapped = map(&parsed, support::corpus(), Some(&client))
+        .await
+        .expect("the message maps");
+    let received = server.received_requests().await.unwrap_or_default();
+    assert_eq!(1, received.len(), "one batch");
+    assert_eq!(mapped.translations(), tables.asked().len());
+    assert!(mapped.translations() > 1);
+}
+
+#[tokio::test]
+async fn a_refusal_after_the_answering_system_is_never_read() {
+    let mapped = refusing("http://terminology.hl7.org/CodeSystem/v2-0004")
+        .await
+        .expect("the first system answers before the refused one");
+    let (expected, _) = crate::map::mapped(&fixtures::adt_a01()).await;
+    assert_eq!(pretty(expected.bundle()), pretty(mapped.bundle()));
+}
+
+#[tokio::test]
+async fn a_refusal_before_the_answering_system_fails_the_run_naming_its_map() {
+    let refused = refusing("http://terminology.hl7.org/CodeSystem/v3-ActCode").await;
+    let Err(ferrobridge_hl7v2::map::MapError::Terminology {
+        concept_map,
+        source,
+    }) = refused
+    else {
+        panic!("the refusal fails the run: {refused:?}");
+    };
+    assert_eq!(ACT_CODE, concept_map);
+    assert!(
+        matches!(
+            source.as_ref(),
+            ferrobridge_term::error::Error::Refused { .. }
+        ),
+        "{source:?}"
+    );
+}
 
 #[tokio::test]
 async fn a_z_segment_is_a_counted_outcome_of_the_mapping() {
@@ -41,7 +148,7 @@ async fn a_refused_translation_fails_the_run_with_the_upstream_status() {
     let corpus = support::corpus();
     let server = wiremock::MockServer::start().await;
     wiremock::Mock::given(wiremock::matchers::method("POST"))
-        .respond_with(wiremock::ResponseTemplate::new(500))
+        .respond_with(ResponseTemplate::new(500))
         .mount(&server)
         .await;
     let base = format!("{}/r4", server.uri()).parse().expect("a base url");

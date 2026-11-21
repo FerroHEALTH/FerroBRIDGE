@@ -590,6 +590,44 @@ pub mod terminology {
             .set_body_string(body.to_string())
     }
 
+    /// Answers an operation's `Parameters` or a `batch` of them.
+    ///
+    /// `answer` gives each `Parameters` its status and resource: on its own
+    /// as the operation's answer, in a `batch` as the entries of its
+    /// `batch-response`, in request order
+    /// (<https://hl7.org/fhir/R4/http.html#transaction>). An entry's status
+    /// is its three-digit code, which is all `Bundle.entry.response.status`
+    /// must start with.
+    #[must_use]
+    pub fn each_parameters(
+        request: &wiremock::Request,
+        answer: impl Fn(&serde_json::Value) -> (u16, serde_json::Value),
+    ) -> ResponseTemplate {
+        let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
+        if body.get("resourceType").and_then(serde_json::Value::as_str) != Some("Bundle") {
+            let (status, resource) = answer(&body);
+            return ResponseTemplate::new(status)
+                .insert_header("Content-Type", FHIR_JSON)
+                .set_body_string(resource.to_string());
+        }
+        let answered: Vec<(String, serde_json::Value)> = body
+            .get("entry")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .map(|entry| {
+                let resource = entry.get("resource").unwrap_or(&serde_json::Value::Null);
+                let (status, resource) = answer(resource);
+                (status.to_string(), resource)
+            })
+            .collect();
+        let entries: Vec<(&str, serde_json::Value)> = answered
+            .iter()
+            .map(|(status, resource)| (status.as_str(), resource.clone()))
+            .collect();
+        batch_response(&entries)
+    }
+
     /// Returns a `Parameters` resource carrying `parameters`, the body an
     /// operation answers with.
     #[must_use]
