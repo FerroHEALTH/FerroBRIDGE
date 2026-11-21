@@ -173,7 +173,7 @@ in code is the matching constant in
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| PostgreSQL image | `postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280` | the `POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, the `sqlx-offline` service in `.github/workflows/ci.yml` |
+| PostgreSQL image | `postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60` | the `POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, the `sqlx-offline` service in `.github/workflows/ci.yml` |
 | RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.7.0@sha256:44c9268cb8a154df118a10ffe84329633f22923ea2cc54261ff0cea57a2ee7e7` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.7.0@sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
@@ -200,7 +200,7 @@ The quickstart `compose.yaml` pulls `ghcr.io/ferrohealth/ferrobridge` and,
 under its `console` profile, `ghcr.io/ferrohealth/ferrobridge-console` at the
 release it shipped with, so both tags are the product version below rather
 than pins of their own, and the guard compares them. Its CDM service runs the same
-`postgres:18.6` image the row above pins for the end-to-end lane, so a
+`postgres:19.0` image the row above pins for the end-to-end lane, so a
 PostgreSQL bump moves one row and both readers follow it.
 
 The terminology server needs no database. It reads the synthetic `CodeSystem`,

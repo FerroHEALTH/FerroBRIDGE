@@ -149,8 +149,8 @@ impl PinnedImage {
 /// The PostgreSQL the CDM catalogue test applies the OHDSI DDL to.
 pub const POSTGRES: PinnedImage = PinnedImage {
     repository: "postgres",
-    tag: "18.6",
-    digest: "sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280",
+    tag: "19.0",
+    digest: "sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60",
 };
 
 /// The AMQP 0.9.1 broker the events lane publishes to.
