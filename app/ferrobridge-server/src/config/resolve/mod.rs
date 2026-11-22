@@ -363,7 +363,15 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
     };
     match resolve_credentials("cdr.endpoint.credentials", &own)? {
         Some(Upstream::Basic { user, password }) => {
-            config = config.with_basic(user, password);
+            config = config
+                .with_basic(user, password)
+                .with_committer_issuer(cdr.committer_issuer.clone());
+        }
+        Some(Upstream::OAuth(_)) | None if cdr.committer_issuer.is_some() => {
+            return Err(Error::Needs {
+                key: String::from("cdr.committer_issuer"),
+                needs: String::from("cdr.endpoint.credentials.user"),
+            });
         }
         Some(Upstream::OAuth(grant)) => {
             config = config.with_oauth(*grant);

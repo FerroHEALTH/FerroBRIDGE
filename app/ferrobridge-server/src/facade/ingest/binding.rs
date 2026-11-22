@@ -289,18 +289,14 @@ impl Ingest<'_> {
         change: commit::Change,
         composition: &CanonicalComposition,
     ) -> Result<crate::cdr::commit::CommitContext, Refused> {
-        commit::context(
-            change,
-            &self.settings.system_id,
-            &self.committer,
-            composition.template_id(),
+        commit::context(change, &self.settings.system_id, composition.template_id()).map_err(
+            |error| {
+                Refused::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Issue::error(IssueType::Exception).diagnosing(chain(&error)),
+                )
+            },
         )
-        .map_err(|error| {
-            Refused::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Issue::error(IssueType::Exception).diagnosing(chain(&error)),
-            )
-        })
     }
 
     /// Records the identity of a committed write, and returns what stands.

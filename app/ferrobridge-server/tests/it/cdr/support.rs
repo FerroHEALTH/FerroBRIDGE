@@ -8,16 +8,11 @@
 
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::commit::CommitContext;
+use ferrobridge_server::cdr::commit::HeaderAudit;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::template_id;
-use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
-use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
-use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_its::rest::client::RetryPolicy;
-use openehr_its::rest::generated::common::UpdateAuditData;
-use openehr_rm::v1_2::common::generic::party_identified::{PartyIdentified, PartyIdentifiedData};
-use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
 use openehr_rm::v1_2::composition::composition::Composition;
 use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
@@ -161,13 +156,9 @@ pub(crate) fn coded(code: &str) -> DvCodedText {
     }
 }
 
-/// Returns an audit with a named committer, an optional demographic
-/// reference and a description.
-pub(crate) fn audit(change_type: &str, external_ref: Option<PartyRef>) -> UpdateAuditData {
-    UpdateAuditData {
-        _type: Some("UPDATE_AUDIT".to_owned()),
-        system_id: None,
-        change_type: coded(change_type),
+/// Returns a header audit with `change_type` and a description.
+pub(crate) fn audit(change_type: &str) -> HeaderAudit {
+    HeaderAudit {
         description: Some(DvText::DvText(DvTextData {
             value: "A synthetic commit".to_owned(),
             hyperlink: None,
@@ -176,27 +167,15 @@ pub(crate) fn audit(change_type: &str, external_ref: Option<PartyRef>) -> Update
             language: None,
             encoding: None,
         })),
-        committer: PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(
-            PartyIdentifiedData {
-                external_ref,
-                name: Some("Synthetic Committer".to_owned()),
-                identifiers: None,
-            },
-        )),
-        additional_properties: std::collections::BTreeMap::new(),
+        ..HeaderAudit::new(coded(change_type))
     }
 }
 
 /// Returns a commit context with every member the 1.1.0 headers carry.
 pub(crate) fn commit_context() -> Result<CommitContext, Box<dyn Error>> {
-    let reference = PartyRef {
-        namespace: "demographic".to_owned(),
-        r#type: "PERSON".to_owned(),
-        id: ObjectId::HierObjectId(HierObjectId::new("bc8132ea-0000-4000-8000-000000000003")?),
-    };
     Ok(CommitContext {
         lifecycle_state: Some(coded("532")),
-        audit: Some(audit("251", Some(reference))),
+        audit: Some(audit("251")),
         template_id: Some(template_id("Synthetic vital signs")?),
     })
 }

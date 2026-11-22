@@ -176,10 +176,8 @@ pub async fn import(
         }
     }
     .map_err(|why| refuse(&of_document_refusal(&why)))?;
-    let Committed { added: _, ids } = commit(
-        facade, &client, access, &reached, &current, directives, settings,
-    )
-    .await?;
+    let Committed { added: _, ids } =
+        commit(facade, &client, &reached, &current, directives, settings).await?;
     let ids = ids
         .into_iter()
         .map(|id| format!("{CONSENT}/{id}"))

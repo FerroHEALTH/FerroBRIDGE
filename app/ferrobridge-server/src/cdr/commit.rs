@@ -11,14 +11,14 @@
 //! carried the attribute path in the header NAME) onto them, and the bridge
 //! sends only the 1.1.0 form. The generated parameters of the commit
 //! operations carry the three as fields, and this module renders their values.
+//!
+//! The audit header states no `committer`: the CDR writes who committed from
+//! the caller it authenticated, and a CDR that does so refuses a stated
+//! committer that says more than its own. The header leaves it out, which the
+//! same section allows ("None of these headers are mandatory").
 
 use http::HeaderValue;
-use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
-use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_base::v1_3::base_types::identification::template_id::TemplateId;
-use openehr_its::rest::generated::common::UpdateAuditData;
-use openehr_rm::v1_2::common::generic::party_identified::PartyIdentified;
-use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
 use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
 use openehr_rm::v1_2::data_types::text::dv_text::DvText;
 
@@ -98,22 +98,46 @@ pub struct CommitHeaders {
     pub template_id: Option<String>,
 }
 
+/// The `openehr-audit-details` members a header commit states: the
+/// `UpdateAudit` members of ITS-REST 1.1.0 apart from `committer`, which the
+/// CDR writes from the caller it authenticated.
+#[derive(Debug, Clone)]
+pub struct HeaderAudit {
+    /// `AUDIT_DETAILS.change_type`.
+    pub change_type: DvCodedText,
+    /// `AUDIT_DETAILS.description`.
+    pub description: Option<DvText>,
+    /// `AUDIT_DETAILS.system_id`.
+    pub system_id: Option<String>,
+}
+
+impl HeaderAudit {
+    /// Returns an audit stating `change_type` alone.
+    #[must_use]
+    pub const fn new(change_type: DvCodedText) -> Self {
+        Self {
+            change_type,
+            description: None,
+            system_id: None,
+        }
+    }
+}
+
 /// The committal metadata one commit carries.
 ///
 /// Every member is optional: "None of these headers are mandatory, but
 /// whatever is provided it MUST be merged with the default VERSION and
 /// `VERSION.audit_details` attributes on commit runtime" (ITS-REST 1.1.0
 /// §Requests and responses/HTTP headers/openehr-version and
-/// openehr-audit-details). The audit part is the ITS-REST `UpdateAudit`
-/// schema, the `AUDIT_DETAILS` a client may state, so `time_committed` is
-/// always the server's.
+/// openehr-audit-details). `time_committed` is always the server's, and so
+/// is `committer`.
 #[derive(Debug, Clone, Default)]
 pub struct CommitContext {
     /// `VERSION.lifecycle_state`, sent as `openehr-version`.
     pub lifecycle_state: Option<DvCodedText>,
-    /// `change_type`, `description`, `committer` and `system_id`, sent as
+    /// `change_type`, `description` and `system_id`, sent as
     /// `openehr-audit-details`.
-    pub audit: Option<UpdateAuditData>,
+    pub audit: Option<HeaderAudit>,
     /// The template the composition is built from, sent as
     /// `openehr-template-id`.
     pub template_id: Option<TemplateId>,
@@ -155,9 +179,6 @@ impl CommitContext {
                 let description = quoted(AUDIT_DETAILS_HEADER, "description", value)?;
                 lines.push(format!("description.value=\"{description}\""));
             }
-            if let Some(committer) = committer_value(&audit.committer)? {
-                lines.push(committer);
-            }
             if let Some(system_id) = audit.system_id.as_ref() {
                 let system_id = quoted(AUDIT_DETAILS_HEADER, "system_id", system_id)?;
                 lines.push(format!("system_id=\"{system_id}\""));
@@ -197,81 +218,14 @@ fn quoted(header: &'static str, kind: &'static str, text: &str) -> Result<String
     quotable(kind, text).map_err(|source| HeaderError::Attribute { header, source })
 }
 
-/// Returns the `committer` attribute list of an `openehr-audit-details` value,
-/// or `None` when the committer states neither a name nor an external
-/// reference.
-fn committer_value(committer: &PartyProxy) -> Result<Option<String>, HeaderError> {
-    let (name, external_ref) = match committer {
-        PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) => {
-            (party.name.as_deref(), party.external_ref.as_ref())
-        }
-        PartyProxy::PartyIdentified(PartyIdentified::PartyRelated(party)) => {
-            (party.name.as_deref(), party.external_ref.as_ref())
-        }
-        PartyProxy::PartySelf(party) => (None, party.external_ref.as_ref()),
-    };
-    let mut parts = Vec::new();
-    if let Some(name) = name {
-        let name = quoted(AUDIT_DETAILS_HEADER, "committer.name", name)?;
-        parts.push(format!("committer.name=\"{name}\""));
-    }
-    if let Some(reference) = external_ref {
-        parts.push(external_ref_value(reference)?);
-    }
-    Ok((!parts.is_empty()).then(|| parts.join(",")))
-}
-
-/// Returns the `committer.external_ref` attributes of a `PARTY_REF`.
-fn external_ref_value(reference: &PartyRef) -> Result<String, HeaderError> {
-    let id = quoted(
-        AUDIT_DETAILS_HEADER,
-        "committer.external_ref.id",
-        object_id_value(&reference.id),
-    )?;
-    let namespace = quoted(
-        AUDIT_DETAILS_HEADER,
-        "committer.external_ref.namespace",
-        &reference.namespace,
-    )?;
-    let party_type = quoted(
-        AUDIT_DETAILS_HEADER,
-        "committer.external_ref.type",
-        &reference.r#type,
-    )?;
-    Ok(format!(
-        "committer.external_ref.id=\"{id}\",committer.external_ref.namespace=\"{namespace}\",committer.external_ref.type=\"{party_type}\""
-    ))
-}
-
-/// Returns the `value` of whichever `OBJECT_ID` subtype `id` is.
-fn object_id_value(id: &ObjectId) -> &str {
-    match id {
-        ObjectId::ArchetypeId(id) => &id.value,
-        ObjectId::GenericId(id) => &id.value,
-        ObjectId::HierObjectId(id) => id.value(),
-        ObjectId::ObjectVersionId(id) => id.value(),
-        ObjectId::TemplateId(id) => &id.value,
-        ObjectId::TerminologyId(id) => &id.value,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use super::{
-        AUDIT_DETAILS_HEADER, CommitContext, HeaderError, TEMPLATE_ID_HEADER, VERSION_HEADER,
+        AUDIT_DETAILS_HEADER, CommitContext, HeaderAudit, HeaderError, TEMPLATE_ID_HEADER,
+        VERSION_HEADER,
     };
-    use openehr_base::v1_3::base_types::identification::generic_id::GenericId;
-    use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
-    use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
     use openehr_base::v1_3::base_types::identification::template_id::TemplateId;
     use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
-    use openehr_its::rest::generated::common::UpdateAuditData;
-    use openehr_rm::v1_2::common::generic::party_identified::{
-        PartyIdentified, PartyIdentifiedData,
-    };
-    use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
     use openehr_rm::v1_2::data_types::text::code_phrase::CodePhrase;
     use openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText;
     use openehr_rm::v1_2::data_types::text::dv_text::{DvText, DvTextData};
@@ -323,41 +277,18 @@ mod tests {
         })
     }
 
-    fn committer(name: &str, external_ref: Option<PartyRef>) -> PartyProxy {
-        PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(PartyIdentifiedData {
-            external_ref,
-            name: Some(String::from(name)),
-            identifiers: None,
-        }))
-    }
-
-    fn audit(change_type: &str, committer: PartyProxy) -> UpdateAuditData {
-        UpdateAuditData {
-            _type: Some(String::from("UPDATE_AUDIT")),
-            system_id: None,
-            change_type: coded(change_type),
-            description: None,
-            committer,
-            additional_properties: BTreeMap::new(),
-        }
+    fn audit(change_type: &str) -> HeaderAudit {
+        HeaderAudit::new(coded(change_type))
     }
 
     #[test]
-    fn the_headers_carry_the_1_1_0_value_form() {
-        let reference = PartyRef {
-            namespace: String::from("demographic"),
-            r#type: String::from("PERSON"),
-            id: ObjectId::GenericId(GenericId {
-                value: String::from("BC8132EA"),
-                scheme: String::from("local"),
-            }),
-        };
+    fn the_headers_carry_the_1_1_0_value_form_with_no_committer() {
         let context = CommitContext {
             lifecycle_state: Some(coded("532")),
-            audit: Some(UpdateAuditData {
+            audit: Some(HeaderAudit {
                 description: Some(text("An updated composition")),
                 system_id: Some(String::from("example.openehr.systemid")),
-                ..audit("251", committer("John Doe", Some(reference)))
+                ..audit("251")
             }),
             template_id: Some(TemplateId {
                 value: String::from("Vital Signs"),
@@ -365,14 +296,22 @@ mod tests {
         };
         assert_eq!(
             vec![
-                (VERSION_HEADER, "lifecycle_state.code_string=\"532\"".to_owned()),
-                (AUDIT_DETAILS_HEADER, "change_type.code_string=\"251\"".to_owned()),
-                (AUDIT_DETAILS_HEADER, "description.value=\"An updated composition\"".to_owned()),
+                (
+                    VERSION_HEADER,
+                    "lifecycle_state.code_string=\"532\"".to_owned()
+                ),
                 (
                     AUDIT_DETAILS_HEADER,
-                    "committer.name=\"John Doe\",committer.external_ref.id=\"BC8132EA\",committer.external_ref.namespace=\"demographic\",committer.external_ref.type=\"PERSON\"".to_owned()
+                    "change_type.code_string=\"251\"".to_owned()
                 ),
-                (AUDIT_DETAILS_HEADER, "system_id=\"example.openehr.systemid\"".to_owned()),
+                (
+                    AUDIT_DETAILS_HEADER,
+                    "description.value=\"An updated composition\"".to_owned()
+                ),
+                (
+                    AUDIT_DETAILS_HEADER,
+                    "system_id=\"example.openehr.systemid\"".to_owned()
+                ),
                 (TEMPLATE_ID_HEADER, "Vital Signs".to_owned()),
             ],
             rendered(&context)
@@ -390,7 +329,7 @@ mod tests {
     #[test]
     fn a_code_refuses_a_quote() {
         let context = CommitContext {
-            audit: Some(audit("2\"51", committer("John Doe", None))),
+            audit: Some(audit("2\"51")),
             ..CommitContext::default()
         };
         assert!(matches!(
@@ -410,9 +349,9 @@ mod tests {
     #[test]
     fn a_quote_in_a_free_text_part_is_refused_before_the_header_is_built() {
         let context = CommitContext {
-            audit: Some(UpdateAuditData {
+            audit: Some(HeaderAudit {
                 description: Some(text("first\", change_type.code_string=\"249")),
-                ..audit("251", committer("John Doe", None))
+                ..audit("251")
             }),
             ..CommitContext::default()
         };
@@ -424,7 +363,10 @@ mod tests {
             "expected a header attribute refusal, got {error:?}"
         );
         let context = CommitContext {
-            audit: Some(audit("251", committer("Dr \"Quote\"", None))),
+            audit: Some(HeaderAudit {
+                system_id: Some(String::from("sys\"tem")),
+                ..audit("251")
+            }),
             ..CommitContext::default()
         };
         assert!(matches!(
@@ -436,39 +378,15 @@ mod tests {
     #[test]
     fn a_description_that_is_not_a_header_value_is_a_typed_error() {
         let context = CommitContext {
-            audit: Some(UpdateAuditData {
+            audit: Some(HeaderAudit {
                 description: Some(text("first\nsecond")),
-                ..audit("251", committer("John Doe", None))
+                ..audit("251")
             }),
             ..CommitContext::default()
         };
         let error = context.headers().expect_err("a newline is refused");
         assert!(
             matches!(error, HeaderError::Attribute { header, .. } if header == AUDIT_DETAILS_HEADER)
-        );
-    }
-
-    #[test]
-    fn a_committer_with_neither_name_nor_reference_renders_no_attribute() {
-        let context = CommitContext {
-            audit: Some(audit(
-                "249",
-                PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(
-                    PartyIdentifiedData {
-                        external_ref: None,
-                        name: None,
-                        identifiers: None,
-                    },
-                )),
-            )),
-            ..CommitContext::default()
-        };
-        assert_eq!(
-            vec![(
-                AUDIT_DETAILS_HEADER,
-                "change_type.code_string=\"249\"".to_owned()
-            )],
-            rendered(&context)
         );
     }
 }

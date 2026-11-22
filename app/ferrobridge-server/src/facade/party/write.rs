@@ -32,7 +32,6 @@ use crate::cdr::commit::CommitContext;
 use crate::cdr::demographic::Demographic;
 use crate::facade::Facade;
 use crate::facade::commit::Change;
-use crate::facade::commit::Committer;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::read::parse;
 use crate::facade::handlers::write::same_id;
@@ -63,7 +62,7 @@ pub(crate) async fn create(
     party::unbound(facade, resource_type, built.value())?;
     let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
-    let commit = commit(facade, (access, &client), loaded, Change::Creation)?;
+    let commit = commit(facade, loaded, Change::Creation)?;
     let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
     party::provision::provision(facade, &client, resource_type, &version).await?;
     respond(
@@ -104,7 +103,7 @@ pub(crate) async fn update(
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
     let preceding = preceding(headers, &latest.version)?;
-    let commit = commit(facade, (access, &client), loaded, Change::Modification)?;
+    let commit = commit(facade, loaded, Change::Modification)?;
     let version = commit_party(
         demographic,
         class,
@@ -143,7 +142,7 @@ pub(crate) async fn delete(
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
-    let commit = commit(facade, (access, &client), loaded, Change::Deleted)?;
+    let commit = commit(facade, loaded, Change::Deleted)?;
     macro_rules! delete_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
@@ -189,25 +188,16 @@ async fn build(
 }
 
 /// Returns the commit headers one party write carries.
-fn commit(
-    facade: &Facade,
-    (access, client): (&Access, &crate::cdr::CdrClient),
-    loaded: &Loaded,
-    change: Change,
-) -> Result<CommitContext, Refusal> {
+fn commit(facade: &Facade, loaded: &Loaded, change: Change) -> Result<CommitContext, Refusal> {
     let system_id = &facade.settings().system_id;
-    crate::facade::commit::context(
-        change,
-        system_id,
-        &Committer::of(access, client, system_id),
-        loaded.program().template().id().as_str(),
-    )
-    .map_err(|error| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),
-        )
-    })
+    crate::facade::commit::context(change, system_id, loaded.program().template().id().as_str())
+        .map_err(|error| {
+            reply::refusal(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Issue::error(IssueType::Exception)
+                    .diagnosing(ferrohealth_server::run::chain(&error)),
+            )
+        })
 }
 
 /// Returns the version an update follows: the one `If-Match` names, under the

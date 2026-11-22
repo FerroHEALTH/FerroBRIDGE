@@ -46,6 +46,17 @@ fn placeholder(world: &World) -> serde_json::Value {
     })
 }
 
+/// The `openehr-audit-details` field lines `commit` carried.
+fn audit_lines(commit: &Request) -> Vec<String> {
+    commit
+        .headers
+        .get_all("openehr-audit-details")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .map(str::to_owned)
+        .collect()
+}
+
 #[tokio::test]
 async fn a_header_commit_under_an_onward_token_states_no_committer() -> Result<(), Box<dyn Error>> {
     let world = World::start(Grant::Standard, "").await?;
@@ -71,11 +82,16 @@ async fn a_header_commit_under_an_onward_token_states_no_committer() -> Result<(
         .collect();
     assert_eq!(1, commits.len(), "one composition commit");
     for commit in &commits {
-        // ITS-REST 1.1.0: "None of these headers are mandatory", and `committer` is a
-        // required member of `openehr-audit-details`, so the CDR derives it from the token.
+        // NOTE: ITS-REST 1.1.0 §openehr-audit-details: "None of these headers are mandatory",
+        // so the audit leaves `committer` out and the CDR derives it from the token.
+        let lines = audit_lines(commit);
         assert!(
-            commit.headers.get("openehr-audit-details").is_none(),
-            "a header commit under an onward token states no audit"
+            lines.iter().any(|line| line.starts_with("change_type.")),
+            "the change type still travels: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|line| line.contains("committer")),
+            "a header commit states no committer: {lines:?}"
         );
         assert!(
             commit.headers.get("openehr-version").is_some(),
