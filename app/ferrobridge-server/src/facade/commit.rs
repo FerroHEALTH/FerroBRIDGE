@@ -412,7 +412,7 @@ mod tests {
             },
             Committer::of(&client(&granted))
         );
-        let basic = base().with_basic("synthetic-user", "synthetic-password");
+        let basic = base().with_basic("synthetic-user", uuid::Uuid::new_v4().simple().to_string());
         assert_eq!(
             Committer::Bridge,
             Committer::of(&client(&basic)),

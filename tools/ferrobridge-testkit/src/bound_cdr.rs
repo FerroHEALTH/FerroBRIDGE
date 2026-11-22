@@ -28,12 +28,35 @@ const JWKS_PATH: &str = "/etc/ferroehr/bound.jwks.json";
 /// The Basic user the bridge reaches the CDR as.
 pub const BASIC_USER: &str = "ferrobridge";
 
-/// The password of [`BASIC_USER`].
-pub const BASIC_PASSWORD: &str = "ferroehr";
+/// A bound CDR and the password of [`BASIC_USER`] at it, drawn for the run.
+pub struct Bound {
+    /// The CDR.
+    cdr: Cdr,
+    /// The Basic user's password.
+    password: String,
+}
 
-/// The Argon2id PHC string of [`BASIC_PASSWORD`], the one the reference
-/// CDR's quickstart ships for its own Basic user.
-const BASIC_PASSWORD_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$ZmVycm9laHJEZXZTYWx0$be5nPwWjfUl1qvSrvkvqvdMOuCgM0VFcN/VN4MFLjT8";
+impl Bound {
+    /// Returns the CDR.
+    #[must_use]
+    pub const fn cdr(&self) -> &Cdr {
+        &self.cdr
+    }
+
+    /// Returns the password of [`BASIC_USER`].
+    #[must_use]
+    pub fn password(&self) -> &str {
+        &self.password
+    }
+}
+
+impl std::fmt::Debug for Bound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bound")
+            .field("cdr", &self.cdr)
+            .finish_non_exhaustive()
+    }
+}
 
 /// The issuer the reference CDR names a Basic user under in the committer
 /// placeholder it accepts, which `[cdr] committer_issuer` states.
@@ -95,13 +118,19 @@ pub enum BoundError {
         /// The body it answered.
         body: String,
     },
+    /// The Basic user's password could not be drawn.
+    #[error("the Basic user's password could not be drawn")]
+    Random(#[source] aws_lc_rs::error::Unspecified),
+    /// The Basic user's password could not be hashed.
+    #[error("the Basic user's password could not be hashed")]
+    Hash(#[source] argon2::password_hash::Error),
     /// The first boot's server could not be removed.
     #[error("the first boot's CDR could not be removed")]
     Remove(#[source] testcontainers::TestcontainersError),
 }
 
 /// Returns the configuration of the second boot.
-fn configuration(public_base_url: &str) -> String {
+fn configuration(public_base_url: &str, password_hash: &str) -> String {
     let (client, scope) = SCIM_CLIENT;
     let person =
         format!("{{ \"{PERSON_TEMPLATE}\" = \"/identities[id4]/details[id5]/items[id6]\" }}");
@@ -129,7 +158,7 @@ identifier_type = "login"
 
 [[auth.basic.users]]
 user = "{BASIC_USER}"
-password_hash = "{BASIC_PASSWORD_HASH}"
+password_hash = "{password_hash}"
 scopes = ["user/composition-*.cruds", "user/template-*.cruds", "user/aql-*.cruds", "user/ehr-*.cruds", "__ferroehr.platform"]
 roles = ["ADMIN", "USER"]
 
@@ -181,7 +210,8 @@ enabled = false
 ///
 /// Returns [`BoundError`] when a container cannot be started, a definition
 /// or the provisioning is refused, or a request cannot be sent.
-pub async fn bound(provider: &Provider, templates: &[(&str, &str)]) -> Result<Cdr, BoundError> {
+pub async fn bound(provider: &Provider, templates: &[(&str, &str)]) -> Result<Bound, BoundError> {
+    let (password, password_hash) = password()?;
     let keys = serde_json::to_vec(&provider.jwks()).map_err(BoundError::Keys)?;
     let (database, placement) = database().await?;
     let first = serve(
@@ -222,12 +252,35 @@ pub async fn bound(provider: &Provider, templates: &[(&str, &str)]) -> Result<Cd
         .with_env_var("FERROEHR_CONFIG", CONFIG_PATH)
         .with_copy_to(
             CONFIG_PATH,
-            configuration("http://localhost:8080").into_bytes(),
+            configuration("http://localhost:8080", &password_hash).into_bytes(),
         )
         .with_copy_to(JWKS_PATH, keys);
     let cdr = serve(database, request).await?;
     provision(&http, provider, cdr.base_url()).await?;
-    Ok(cdr)
+    Ok(Bound { cdr, password })
+}
+
+/// Draws a password for the run and returns it with its Argon2id PHC string.
+fn password() -> Result<(String, String), BoundError> {
+    use aws_lc_rs::rand::SecureRandom as _;
+    use base64::Engine as _;
+    let mut bytes = [0_u8; 24];
+    aws_lc_rs::rand::SystemRandom::new()
+        .fill(&mut bytes)
+        .map_err(BoundError::Random)?;
+    let password = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
+    let mut salt = [0_u8; 16];
+    aws_lc_rs::rand::SystemRandom::new()
+        .fill(&mut salt)
+        .map_err(BoundError::Random)?;
+    let hash = argon2::password_hash::PasswordHasher::hash_password_with_salt(
+        &argon2::Argon2::default(),
+        password.as_bytes(),
+        &salt,
+    )
+    .map_err(BoundError::Hash)?
+    .to_string();
+    Ok((password, hash))
 }
 
 /// Provisions the professional `PERSON` [`BASIC_USER`] binds to through the
@@ -315,7 +368,11 @@ mod tests {
 
     #[test]
     fn the_configuration_binds_the_basic_user_to_a_scim_provisioned_person() {
-        let written: toml::Table = toml::from_str(&configuration("http://localhost:8080")).unwrap();
+        let written: toml::Table = toml::from_str(&configuration(
+            "http://localhost:8080",
+            "$argon2id$synthetic",
+        ))
+        .unwrap();
         assert_eq!(
             BASIC_USER,
             written["authz"]["party_binding"]["basic_user"][0]["user"]

@@ -23,9 +23,7 @@ use ferrobridge_server::facade::Settings;
 use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
-use ferrobridge_testkit::bound_cdr::{
-    BASIC_PASSWORD, BASIC_USER, COMMITTER_ISSUER, PERSON_NAME, bound,
-};
+use ferrobridge_testkit::bound_cdr::{BASIC_USER, COMMITTER_ISSUER, PERSON_NAME, bound};
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures;
 use ferrobridge_testkit::oidc::Provider;
@@ -40,10 +38,10 @@ const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures")
 
 /// Returns the committer name of every composition version the CDR holds,
 /// read as the Basic user over AQL.
-async fn committers(base_url: &str) -> Result<Vec<String>, Box<dyn Error>> {
+async fn committers(base_url: &str, password: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let answer: serde_json::Value = reqwest::Client::new()
         .post(format!("{base_url}/query/aql"))
-        .basic_auth(BASIC_USER, Some(BASIC_PASSWORD))
+        .basic_auth(BASIC_USER, Some(password))
         .json(&serde_json::json!({
             "q": "SELECT v/commit_audit/committer FROM EHR e CONTAINS VERSION v CONTAINS COMPOSITION c"
         }))
@@ -72,14 +70,15 @@ async fn a_facade_write_and_a_transaction_commit_under_the_committer_the_cdr_wri
         return Ok(());
     }
     let provider = Provider::start().await?;
-    let cdr = bound(
+    let bound = bound(
         &provider,
         &[(fixtures::DIAGNOSE_TEMPLATE_ID, fixtures::DIAGNOSE_OPT)],
     )
     .await?;
+    let cdr = bound.cdr();
     let client = CdrClient::new(
         &CdrConfig::new(cdr.base_url().parse()?)
-            .with_basic(BASIC_USER, BASIC_PASSWORD)
+            .with_basic(BASIC_USER, bound.password())
             .with_committer_issuer(Some(String::from(COMMITTER_ISSUER))),
     )?;
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
@@ -135,7 +134,7 @@ async fn a_facade_write_and_a_transaction_commit_under_the_committer_the_cdr_wri
 
     assert_eq!(
         vec![String::from(PERSON_NAME); 3],
-        committers(cdr.base_url()).await?,
+        committers(cdr.base_url(), bound.password()).await?,
         "every version names the professional the Basic user is bound to"
     );
     Ok(())
