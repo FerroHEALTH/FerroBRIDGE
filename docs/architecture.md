@@ -2579,30 +2579,27 @@ draft upstream change.
   those two: our own design.
 - **The caller at the CDR.** The bridge validates each caller's token and
   reaches the CDR with its own credential, never the caller's token, which
-  names the bridge as its audience (RFC 9068 §4). The caller still reaches
-  every write the CDR records: ITS-REST 1.1.0 (§openehr-version and
-  openehr-audit-details) has a service accept a client-supplied
-  `committer` and "merge" it into the version's `AUDIT_DETAILS`, and makes
-  it "RECOMMENDED to provision these headers based on authentication and
-  authorization runtime data". So a write the facade makes for an
-  authenticated caller, a single write as `openehr-audit-details` and a
-  transaction as each `UPDATE_AUDIT` of its CONTRIBUTION, states the caller
-  as a `PARTY_IDENTIFIED` named by the token's `sub` (or the Basic user-id),
-  with a `PARTY_REF` of type `PARTY` (openEHR BASE: "Abstract supertypes are
-  allowed", since a token does not say whether its subject is a person or a
-  client) and a `GENERIC_ID` of the subject in the namespace of the issuer
-  that vouched for it, or of the bridge's `system_id` for a Basic user the
-  bridge checked. A namespace outside the `OBJECT_REF.namespace` regex
-  leaves the name alone. `system_id` keeps naming the bridge, so each
-  version records who asked and which system committed. An HL7 v2 message
-  and a request on an open surface carry no caller and commit under the
-  bridge's name (#532). Reads carry no audit metadata in ITS-REST, so the
-  CDR's access log still names the bridge for them; carrying the caller there
-  needs a per-caller token the CDR accepts, such as an OAuth 2.0 Token
-  Exchange (RFC 8693) token with an `act` claim, which needs an
-  authorization server that issues it and a CDR that reads it, and stays
-  open until both exist. The mapping of a caller onto `committer` is no
-  specification's: our own design.
+  names the bridge as its audience (RFC 9068 §4), or, under the onward lane
+  below, with a token exchanged for the caller. The CDR writes who committed
+  each version from the credential it authenticated (#2002): RM common
+  master04 §Audit Details makes `committer` the "identity ... of user who
+  committed the item", and a CDR that derives it, as the reference CDR does
+  under EHDS Art. 13(4), refuses a stated committer that says more than its
+  own. ITS-REST 1.1.0 (§openehr-version and openehr-audit-details) makes
+  every commit header optional ("None of these headers are mandatory"), so
+  a single write states `change_type` and `system_id` (the bridge) in
+  `openehr-audit-details` and no committer. A CONTRIBUTION's `UpdateAudit`
+  requires one (`schemas/common/UpdateAudit.yaml`), so each `UPDATE_AUDIT`
+  names the authenticated party and nothing more: the bridge's own client
+  credentials client as a `PARTY_IDENTIFIED` of its client id, a Basic user
+  as one `DV_IDENTIFIER` of `[cdr] committer_issuer` and the user, an
+  exchanged token as one `DV_IDENTIFIER` of its `iss` and `sub`, and the
+  bridge by `system_id` when the CDR authenticates no credential of the
+  bridge's. The facade caller reaches the record through the access record
+  below and, for a machine, as the originating system. This replaces the
+  earlier design (#532), which stated the facade caller as the committer and
+  which such a CDR refuses. Which form names the authenticated party is our
+  own design.
 - **The access record** (the owner's decision on #1301; implementation
   #1377). The facade records every access an authenticated caller makes
   itself. ITS-REST 1.1.0 carries no end-user identity on a read
@@ -2657,11 +2654,10 @@ draft upstream change.
     `403`, and a failed exchange fails the request, never falling back to the
     bridge's credential. Which caller is exchanged, and the status of each
     refusal, is our own design (`cdr::onward`, `facade::status::onward`).
-    Under an onward token a header commit states no committer, and a
-    CONTRIBUTION states the placeholder FerroEHR discards (a
-    `PARTY_IDENTIFIED` with one `DV_IDENTIFIER` of the token's `iss` and
-    `sub`), since the CDR derives the committer from the token; the facade
-    sends no attestation. A machine keeps the bridge's own token, which the
+    Under an onward token a CONTRIBUTION states the placeholder the CDR
+    discards (a `PARTY_IDENTIFIED` with one `DV_IDENTIFIER` of the token's
+    `iss` and `sub`), since the CDR derives the committer from the token, as
+    every header commit leaves it out; the facade sends no attestation. A machine keeps the bridge's own token, which the
     onward lane requires to be asked for the CDR alone (`resource`, RFC 8707
     §2, or `scope`); its composition names its client as the originating
     system (`FEEDER_AUDIT.originating_system_audit.system_id`) and the bridge

@@ -215,6 +215,7 @@ server says so once at start-up, naming the section and never a value.
 | `endpoint.connect_timeout` | unset | | How long opening the connection may take; unset, only `timeout` bounds it |
 | `endpoint.tls` | the platform's roots | | `trust_roots_file`, `client_identity_file` or `client_identity` (secret), and `min_version` (`"1.3"`): the TLS of the CDR's connection, for a CDR behind a private root or one that asks for a client certificate |
 | `demographic` | `false` | | Whether the bridge reaches the CDR's ITS-REST 1.1.0 Demographic API, which the release marks `x-status: DEVELOPMENT` |
+| `committer_issuer` | unset | | The issuer the CDR names the Basic user of `endpoint.credentials` under, so a transaction's CONTRIBUTION states the committer placeholder of that issuer and the user; needs a Basic `endpoint.credentials.user`. Unset, a CONTRIBUTION under a Basic user names the bridge by `system_id` |
 
 ### `[cdr.endpoint.retry]` and `[terminology.endpoint.retry]`
 

@@ -186,6 +186,20 @@ pub const FERROEHR_PROFESSIONAL_PERSON_ADL2: &str = include_str!(
 pub const FERROEHR_PROFESSIONAL_PERSON_ID: &str =
     "openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0";
 
+/// The reference CDR's professional `ROLE`, an id-coded ADL 2 archetype,
+/// vendored verbatim beside [`FERROEHR_PROFESSIONAL_PERSON_ADL2`].
+///
+/// The role the reference CDR's party binding writes for a provisioned
+/// professional, which a `PERSON` must perform to bind a login.
+pub const FERROEHR_PROFESSIONAL_ROLE_ADL2: &str = include_str!(
+    "../fixtures/adl2/ferroehr-professional/openEHR-DEMOGRAPHIC-ROLE.healthcare_professional.v1.0.0.adls"
+);
+
+/// The archetype id, and the template id the reference CDR serves it under,
+/// of [`FERROEHR_PROFESSIONAL_ROLE_ADL2`].
+pub const FERROEHR_PROFESSIONAL_ROLE_ID: &str =
+    "openEHR-DEMOGRAPHIC-ROLE.healthcare_professional.v1.0.0";
+
 /// The published `KDS_Prozedur` operational template, vendored verbatim.
 ///
 /// One `COMPOSITION.report.v1` holding `ACTION.procedure.v1` with its

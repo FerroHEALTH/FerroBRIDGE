@@ -388,8 +388,8 @@ mod tests {
         assert_eq!(None, party.identifiers);
     }
 
-    fn client(config: crate::cdr::config::CdrConfig) -> crate::cdr::CdrClient {
-        crate::cdr::CdrClient::new(&config).expect("a client")
+    fn client(config: &crate::cdr::config::CdrConfig) -> crate::cdr::CdrClient {
+        crate::cdr::CdrClient::new(config).expect("a client")
     }
 
     fn base() -> crate::cdr::config::CdrConfig {
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn the_committer_is_the_party_the_cdr_authenticates() {
-        assert_eq!(Committer::Bridge, Committer::of(&client(base())));
+        assert_eq!(Committer::Bridge, Committer::of(&client(&base())));
         let granted = base().with_oauth(ferrohealth_smart::client::ClientCredentials::new(
             ferrohealth_smart::client::Endpoint::Token(
                 "http://as.example.org/token".parse().expect("a token URL"),
@@ -410,12 +410,12 @@ mod tests {
             Committer::Client {
                 client_id: String::from("ferrobridge"),
             },
-            Committer::of(&client(granted))
+            Committer::of(&client(&granted))
         );
         let basic = base().with_basic("synthetic-user", "synthetic-password");
         assert_eq!(
             Committer::Bridge,
-            Committer::of(&client(basic.clone())),
+            Committer::of(&client(&basic)),
             "a Basic user with no issuer has no placeholder"
         );
         assert_eq!(
@@ -424,7 +424,7 @@ mod tests {
                 subject: String::from("synthetic-user"),
             },
             Committer::of(&client(
-                basic.with_committer_issuer(Some(String::from("urn:example:cdr")))
+                &basic.with_committer_issuer(Some(String::from("urn:example:cdr")))
             ))
         );
     }
