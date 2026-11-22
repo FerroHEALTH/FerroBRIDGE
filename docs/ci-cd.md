@@ -363,6 +363,7 @@ mechanism here.
 | the analyzer versions in `ci.yml` and the documentation toolchain in `.github/actions/docs-toolchain` | `pin-freshness.yml`, weekly |
 | the commit-pinned corpora, the version-pinned FHIR packages and the Chrome for Testing release of `docs/VERSIONS.md` | `pin-freshness.yml`, weekly |
 | the container image tags in `compose.yaml` and the harness constants | `scripts/checks/versions.sh` against `docs/VERSIONS.md` |
+| the `ghcr.io/ferrohealth/*` images of the other products in `docs/VERSIONS.md` | `pin-freshness.yml` (`family` job), weekly |
 
 All three Dependabot ecosystems resolve something today. The `cargo` and
 `docker` entries were inert until their manifests landed, and inert meant
@@ -404,6 +405,17 @@ priority and Low effort. The job's default token may not read the
 organisation's issue types; then the issue lands with its `ci` label alone,
 and whoever picks it up sets the type, the priority and the effort. A pin it
 could not read fails the job, so a network failure never reads as a fresh pin.
+
+The `family` job runs `scripts/checks/pin-freshness.sh --family`, which reads
+every `ghcr.io/ferrohealth/*` image another product publishes, pinned by tag
+and digest in `docs/VERSIONS.md`, against the newest stable GitHub release of
+that product and the digest of the image index GHCR serves for its tag. A pin
+behind either opens one issue per image, titled `Pin behind the product's
+latest release: <image>`, which names the pin, the release and the release
+notes to read for the configuration the pin moves with; while that issue is
+open, each run rewrites its body and opens no second one. A release whose
+image is not published yet is PENDING and opens nothing. It runs as its own
+job, so a tool release that could not be read never hides a product pin.
 
 It opens an issue rather than failing red. A weekly red job on a lint version
 teaches a maintainer to ignore red jobs, which is the habit #41 identified as
