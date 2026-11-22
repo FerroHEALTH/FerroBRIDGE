@@ -177,7 +177,7 @@ in code is the matching constant in
 | RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.7.0@sha256:44c9268cb8a154df118a10ffe84329633f22923ea2cc54261ff0cea57a2ee7e7` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.7.0@sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
-| FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.2@sha256:1853486ae6f85a66424561cbf90f9905027c38d506bdeb24a9e1a831b4b97424` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.7@sha256:52411e76ea664f9470fda0a7a08202a0ad6f7c39069322f42a754d971cf37a82` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 
 The CDR runs against its own published database image rather than the plain
 PostgreSQL above: that image is built from `postgres:18.6` and carries the
