@@ -189,8 +189,8 @@ pub const CDR_POSTGRES: PinnedImage = PinnedImage {
 /// `/r5`, `/r6`), which is why [`Terminology::base_url`] takes the release.
 pub const TERMINOLOGY: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroterm",
-    tag: "0.4.2",
-    digest: "sha256:1853486ae6f85a66424561cbf90f9905027c38d506bdeb24a9e1a831b4b97424",
+    tag: "0.4.7",
+    digest: "sha256:52411e76ea664f9470fda0a7a08202a0ad6f7c39069322f42a754d971cf37a82",
 };
 
 /// A container could not be started, or did not become usable.

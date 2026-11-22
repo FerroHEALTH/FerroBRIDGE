@@ -85,7 +85,10 @@ Fourteen workflows:
   upstream release, through `scripts/gh/fields.sh new` (its default token may
   not set the issue type and fields, and the issue then lands with its label
   alone, `issue-workflow.md` §Type, priority and labels), and fails only when
-  a release could not be read (`docs/ci-cd.md`).
+  a release could not be read (`docs/ci-cd.md`). Its `family` job reads the
+  other products' `ghcr.io/ferrohealth/*` images in `docs/VERSIONS.md` against
+  each product's latest release and image index digest, and opens or rewrites
+  one issue per image behind.
 - `.github/workflows/ratchet-tighten.yml`: the daily and dispatched lane
   that runs the ratchet guards' `--update` on `main` and pushes one branch,
   `chore/ratchet-tighten`, holding only the lowered baselines, from which a
