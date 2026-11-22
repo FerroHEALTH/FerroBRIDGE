@@ -226,21 +226,20 @@ pub struct Committed {
 }
 
 /// Commits `directives` into the EHR `reached` names, appended to the ones
-/// of `current`, under the caller of `access`.
+/// of `current`, through `client`.
 ///
 /// # Errors
 /// Returns every exchange failure through `facade::status::consent`.
 pub async fn commit(
     facade: &Facade,
     client: &CdrClient,
-    access: &Access,
     reached: &Subject,
     current: &Current,
     directives: Vec<AccessDirective>,
     settings: &Settings,
 ) -> Result<Committed, Refusal> {
     let system_id = &facade.settings().system_id;
-    let committer = crate::facade::commit::Committer::of(access, client, system_id);
+    let committer = crate::facade::commit::Committer::of(client);
     let (_contribution, added) = crate::consent::exchange::append(
         client,
         &reached.ehr,

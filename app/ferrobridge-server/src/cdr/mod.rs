@@ -149,9 +149,29 @@ pub struct CdrClient {
     /// The person the client calls the CDR as, when it carries an onward
     /// token.
     on_behalf: Option<onward::OnwardSubject>,
-    /// The client id of the bridge's own client credentials grant, when the
-    /// client authenticates with one.
-    client_id: Option<String>,
+    /// The party the CDR authenticates the bridge's own credential as, when
+    /// it presents one.
+    principal: Option<Principal>,
+}
+
+/// The party the CDR authenticates the bridge's own credential as, which a
+/// CDR that writes the committer itself names in every version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Principal {
+    /// An RFC 7617 Basic user.
+    Basic {
+        /// The user name.
+        user: String,
+        /// The issuer the CDR names its Basic users under, from
+        /// `[cdr] committer_issuer`, when the deployment states one.
+        issuer: Option<String>,
+    },
+    /// The client of the bridge's own client credentials grant.
+    Client {
+        /// The client id the grant authenticates as.
+        client_id: String,
+    },
 }
 
 impl CdrClient {
@@ -172,10 +192,18 @@ impl CdrClient {
         }
         let transport = ReqwestTransport::with_builder_timeout(builder, config.timeout)
             .map_err(|source| CdrError::Build { source })?;
-        let client_id = match config.credentials.as_ref() {
-            Some(CdrCredentials::OAuth(oauth)) => Some(oauth.client_id.clone()),
-            _ => None,
-        };
+        let principal = config
+            .credentials
+            .as_ref()
+            .map(|credentials| match credentials {
+                CdrCredentials::Basic { user, .. } => Principal::Basic {
+                    user: user.clone(),
+                    issuer: config.committer_issuer.clone(),
+                },
+                CdrCredentials::OAuth(oauth) => Principal::Client {
+                    client_id: oauth.client_id.clone(),
+                },
+            });
         let auth = match config.credentials.clone() {
             None => None,
             Some(CdrCredentials::Basic { user, password }) => {
@@ -195,7 +223,7 @@ impl CdrClient {
             demographic: config.demographic,
             onward: config.onward.clone(),
             on_behalf: None,
-            client_id,
+            principal,
         })
     }
 
@@ -209,7 +237,7 @@ impl CdrClient {
             demographic: self.demographic,
             onward: self.onward.clone(),
             on_behalf: self.on_behalf.clone(),
-            client_id: self.client_id.clone(),
+            principal: self.principal.clone(),
         }
     }
 
@@ -245,7 +273,7 @@ impl CdrClient {
             demographic: self.demographic,
             onward: None,
             on_behalf: Some(exchanged.subject),
-            client_id: self.client_id.clone(),
+            principal: self.principal.clone(),
         })
     }
 
@@ -256,11 +284,11 @@ impl CdrClient {
         self.on_behalf.as_ref()
     }
 
-    /// Returns the client id the client authenticates as with its own client
-    /// credentials grant, when it has one.
+    /// Returns the party the CDR authenticates the bridge's own credential
+    /// as, when the client presents one.
     #[must_use]
-    pub fn client_id(&self) -> Option<&str> {
-        self.client_id.as_deref()
+    pub const fn principal(&self) -> Option<&Principal> {
+        self.principal.as_ref()
     }
 
     /// Returns the openEHR REST API root every call is resolved under.

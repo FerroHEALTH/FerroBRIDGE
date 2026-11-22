@@ -401,23 +401,30 @@ feeder "different from the originating system". A source resource that carries n
 recorded as unknown, never given one. So a reader of the CDR can tell which
 FHIR resource a composition came from without asking the bridge.
 
-Each version also names who asked for it. The committer the facade states
-in `AUDIT_DETAILS` is the caller the request authenticated: the token's
-`sub`, or the Basic user-id, with a reference into the namespace of the
-issuer that vouched for it. `system_id` keeps naming the bridge. A write no
-caller made, such as an HL7 v2 message or a request while `[auth]` is off,
-commits under the bridge's name. Reads reach the CDR under the bridge's own
-credential, so the CDR's access log names the bridge for them.
+The CDR writes who committed each version, from the credential it
+authenticated. A single write states the change type and `system_id`, which
+names the bridge, in `openehr-audit-details`, and no committer: ITS-REST
+1.1.0 leaves every member of the header optional, and a CDR that writes the
+committer itself refuses one that says more than its own. A transaction's
+CONTRIBUTION must carry a committer in its `audit` and in every version's
+`commit_audit`, so there the facade names the party the CDR authenticated,
+and nothing more:
 
-Under [`[cdr.endpoint.credentials.onward]`](../operate/configuration.md#cdrendpointcredentialsonward)
-the request reaches the CDR under the token the caller's was exchanged for,
-and the CDR derives the committer from that token. A single write then sends
-no `openehr-audit-details` header, which ITS-REST 1.1.0 leaves optional. A
-transaction's CONTRIBUTION must carry a committer in its `audit` and in every
-version's `commit_audit`, so there the facade sends the placeholder the CDR
-discards: `{"_type": "PARTY_IDENTIFIED", "identifiers": [{"_type":
-"DV_IDENTIFIER", "issuer": "<token iss>", "id": "<token sub>"}]}`, read from
-the exchanged token. The facade sends no attestation.
+- under the bridge's own client credentials grant, a `PARTY_IDENTIFIED`
+  named by its client id;
+- as a Basic user with [`[cdr] committer_issuer`](../operate/configuration.md#cdr)
+  set, the placeholder `{"_type": "PARTY_IDENTIFIED", "identifiers":
+  [{"_type": "DV_IDENTIFIER", "issuer": "<committer_issuer>", "id":
+  "<user>"}]}`;
+- under [`[cdr.endpoint.credentials.onward]`](../operate/configuration.md#cdrendpointcredentialsonward),
+  where the request reaches the CDR under the token the caller's was
+  exchanged for, the same placeholder with the exchanged token's `iss` and
+  `sub`;
+- otherwise, a `PARTY_IDENTIFIED` named by `system_id`.
+
+The caller the facade authenticated is recorded in the bridge's own
+[access record](../operate/access-record.md), and a machine caller as the
+originating system above. The facade sends no attestation.
 
 ## Writes
 

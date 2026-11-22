@@ -8,6 +8,7 @@ mod app_state;
 mod audit;
 mod auth;
 mod change_feed;
+mod committer;
 mod consent;
 mod cors;
 mod environment;

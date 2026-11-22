@@ -158,7 +158,7 @@ async fn an_anonymous_ehr_status_takes_the_subject_before_the_composition()
         requests
             .get(put)
             .is_some_and(|request| request.headers.contains_key("openehr-audit-details")),
-        "the update states its committer"
+        "the update states its audit"
     );
     Ok(())
 }

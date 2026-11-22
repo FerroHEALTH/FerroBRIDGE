@@ -453,7 +453,8 @@ pub struct Ingest<'a> {
     usage: Option<&'a Window>,
     /// The demographics endpoint every party reference resolves through.
     demographics: &'a dyn Demographics,
-    /// Who every commit of this ingest is attributed to.
+    /// Who every CONTRIBUTION of this ingest names as its committer: the
+    /// party its client authenticates as.
     committer: Committer,
     /// The system the content originated in, when it is named apart from
     /// the bridge.
@@ -489,7 +490,7 @@ impl<'a> Ingest<'a> {
         client: CdrClient,
         settings: &'a Settings,
     ) -> Self {
-        let committer = Committer::unattended(&client);
+        let committer = Committer::of(&client);
         Self {
             programs,
             store,
@@ -548,16 +549,6 @@ impl<'a> Ingest<'a> {
     #[must_use]
     pub fn with_composer(mut self, composer: Composer) -> Self {
         self.composer = Some(composer);
-        self
-    }
-
-    /// Returns this ingest attributing every commit to `committer`, the
-    /// caller of the request it serves.
-    ///
-    /// The default is the bridge, for a face no caller authenticates.
-    #[must_use]
-    pub fn with_committer(mut self, committer: Committer) -> Self {
-        self.committer = committer;
         self
     }
 

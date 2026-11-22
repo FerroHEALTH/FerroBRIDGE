@@ -421,7 +421,7 @@ async fn delete_and_read_the_deleted_outcome(
 fn commit_context(change_type: &str, template_id: &TemplateId) -> CommitContext {
     CommitContext {
         lifecycle_state: Some(support::coded(COMPLETE)),
-        audit: Some(support::audit(change_type, None)),
+        audit: Some(support::audit(change_type)),
         template_id: Some(template_id.clone()),
     }
 }

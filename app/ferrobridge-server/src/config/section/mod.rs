@@ -263,6 +263,11 @@ pub struct Cdr {
     /// The onward issuers beside `endpoint.credentials.onward`, one per kind,
     /// each authenticated with `endpoint.credentials.oauth`.
     pub onward: Vec<OnwardSection>,
+    /// The issuer the CDR names a Basic user of `endpoint.credentials` under,
+    /// so a CONTRIBUTION states the committer placeholder that CDR accepts: a
+    /// `PARTY_IDENTIFIED` whose one `DV_IDENTIFIER` is this issuer and the
+    /// user.
+    pub committer_issuer: Option<String>,
 }
 
 impl Default for Cdr {
@@ -274,6 +279,7 @@ impl Default for Cdr {
             },
             demographic: false,
             onward: Vec::new(),
+            committer_issuer: None,
         }
     }
 }
