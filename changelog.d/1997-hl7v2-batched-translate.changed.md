@@ -1,1 +1,0 @@
-- The HL7 v2 face asks every `ConceptMap/$translate` of a message in one FHIR `batch` Bundle, where it sent one request per table value and target system; each value still takes the first target system that answers. `ferrobridge-term` adds `Client::translate_all`, one call for one translation and one `batch` for several.
