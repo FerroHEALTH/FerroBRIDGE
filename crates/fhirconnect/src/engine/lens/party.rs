@@ -209,8 +209,11 @@ fn coded_of(concept: &fhir_types::r4::codeable_concept::CodeableConcept) -> Opti
 /// Returns the `Reference` an assigner string stands for.
 ///
 /// `String.adoc` §References makes the identifier form the default, so a
-/// string carrying `::` becomes an identifier and anything else the reference
-/// string the page allows as the weaker form.
+/// string carrying `::` becomes an identifier, a literal reference stays the
+/// reference string the page allows, and any other text is the reference's
+/// `display`.
+// NOTE: FHIRconnect 1.0.0 `String.adoc` is silent on free text; R4 references.html#literal admits
+// only a URL in `Reference.reference`, so text goes to `display`: our own design (#2021).
 fn reference_of(assigner: &str) -> Reference {
     match assigner.split_once(SEPARATOR) {
         Some((system, value)) => Reference {
@@ -221,14 +224,40 @@ fn reference_of(assigner: &str) -> Reference {
             })),
             ..Reference::default()
         },
-        None => Reference {
+        None if literal(assigner) => Reference {
             reference: Some(primitives::String::from(assigner)),
+            ..Reference::default()
+        },
+        None => Reference {
+            display: Some(primitives::String::from(assigner)),
             ..Reference::default()
         },
     }
 }
 
-/// Returns the assigner string a `Reference` stands for.
+/// Whether `text` is a literal reference: a relative `[type]/[id]`, an
+/// absolute URL or a URN (<https://hl7.org/fhir/R4/references.html#literal>).
+fn literal(text: &str) -> bool {
+    if text.starts_with("urn:") || text.contains("://") {
+        return !text.chars().any(char::is_whitespace);
+    }
+    let Some((kind, id)) = text.split_once('/') else {
+        return false;
+    };
+    kind.chars()
+        .next()
+        .is_some_and(|first| first.is_ascii_uppercase())
+        && kind
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
+        && (1..=64).contains(&id.len())
+        && id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '.'))
+}
+
+/// Returns the assigner string a `Reference` stands for: its identifier, its
+/// reference or its display, in that order.
 fn assigner_of(assigner: &Reference) -> Option<String> {
     if let Some(identifier) = assigner.identifier.as_deref() {
         let system = text_of(identifier.system.as_ref().map(|system| &system.value));
@@ -243,6 +272,7 @@ fn assigner_of(assigner: &Reference) -> Option<String> {
             .as_ref()
             .map(|reference| &reference.value),
     )
+    .or_else(|| text_of(assigner.display.as_ref().map(|display| &display.value)))
     .map(String::from)
 }
 
@@ -267,7 +297,9 @@ mod tests {
             id in "[A-Za-z0-9-]{1,12}",
             issuer in proptest::option::of("[a-z]{1,6}://[a-z.]{1,10}"),
             kind in proptest::option::of("([a-z]{1,6}://[a-z.]{1,8}::)?[A-Za-z]{1,8}"),
-            assigner in proptest::option::of("[a-z]{1,6}://[a-z.]{1,8}::[A-Za-z0-9]{1,6}"),
+            assigner in proptest::option::of(
+                "[a-z]{1,6}://[a-z.]{1,8}::[A-Za-z0-9]{1,6}|Organization/[a-z0-9]{1,8}|[A-Za-z][a-z ]{0,12}[a-z]",
+            ),
         ) -> DvIdentifier {
             DvIdentifier { issuer, assigner, id, r#type: kind }
         }
@@ -342,6 +374,41 @@ mod tests {
             source,
             "the display fills the name"
         );
+    }
+
+    #[test]
+    fn a_free_text_assigner_is_the_display_and_a_literal_one_the_reference() {
+        let assigner = |text: &str| {
+            IdentifierLens
+                .get(&DvIdentifier {
+                    issuer: None,
+                    assigner: Some(String::from(text)),
+                    id: String::from("SYN-1"),
+                    r#type: None,
+                })
+                .expect("an id is present")
+                .assigner
+                .map(|assigner| *assigner)
+                .unwrap_or_default()
+        };
+        let text = |value: Option<&primitives::String>| value.and_then(|value| value.value.clone());
+        let free = assigner("Synthetic assigner");
+        assert_eq!(
+            text(free.display.as_ref()).as_deref(),
+            Some("Synthetic assigner")
+        );
+        assert_eq!(free.reference, None, "free text is no literal reference");
+        for literal in [
+            "Organization/org-1",
+            "https://fhir.example.org/Organization/org-1",
+            "urn:uuid:5a1c3e20-0000-4000-8000-000000002021",
+        ] {
+            let held = assigner(literal);
+            assert_eq!(text(held.reference.as_ref()).as_deref(), Some(literal));
+            assert_eq!(held.display, None, "{literal}");
+        }
+        assert!(assigner("Organization/").reference.is_none());
+        assert!(assigner("organization/org-1").reference.is_none());
     }
 
     #[test]

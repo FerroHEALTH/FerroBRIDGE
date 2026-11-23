@@ -232,7 +232,7 @@ pub(crate) fn person(sex: &str) -> serde_json::Value {
             "name": text("Details"),
             "archetype_node_id": "id2",
             "items": [
-                element("id3", "Patient identifier", serde_json::json!({"_type": "DV_IDENTIFIER", "issuer": "http://example.org/fhir/sid/patients", "assigner": "http://example.org/fhir/sid/assigners::SYN-ORG-1", "id": "SYN-PAT-2014", "type": "patient"})),
+                element("id3", "Patient identifier", serde_json::json!({"_type": "DV_IDENTIFIER", "issuer": "http://example.org/fhir/sid/patients", "assigner": "Synthetic assigner", "id": "SYN-PAT-2014", "type": "patient"})),
                 element("id4", "Date of birth", serde_json::json!({"_type": "DV_DATE", "value": "1970-01-01"})),
                 element("id5", "Sex", serde_json::json!({"_type": "DV_CODED_TEXT", "value": "Female", "defining_code": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "local"}, "code_string": sex}}))
             ]
@@ -388,6 +388,10 @@ async fn a_patient_s_summary_is_an_ips_document_with_coded_entries() -> Result<(
     };
     assert_eq!(patient["id"], UID);
     assert_eq!(patient["identifier"][0]["value"], "SYN-PAT-2014");
+    assert_eq!(
+        patient["identifier"][0]["assigner"]["display"],
+        "Synthetic assigner"
+    );
     assert_eq!(patient["name"][0]["family"], "Subject", "{patient}");
     assert_eq!(patient["birthDate"], "1970-01-01");
     assert_eq!(patient["gender"], "female");
