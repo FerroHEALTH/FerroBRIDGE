@@ -548,15 +548,18 @@ async fn neither_the_store_nor_the_log_holds_the_key_the_document_or_the_passcod
     let key = created["payload"]["key"].as_str().ok_or("the key")?;
     let held = std::fs::read(case.dir.path().join("links.redb"))?;
     let text = String::from_utf8_lossy(&held);
-    for secret in [
-        key,
-        "correct horse",
-        "SYN-PAT-2014",
-        "Synthetic Subject",
-        "Bundle",
+    let logged = logs.text();
+    assert!(logged.contains("/shl"), "the log of the request is read");
+    for (what, secret) in [
+        ("the key", key),
+        ("the passcode", "correct horse"),
+        ("the identifier", "SYN-PAT-2014"),
+        ("the name", "Synthetic Subject"),
     ] {
-        assert!(!text.contains(secret), "the store holds {secret}");
+        assert!(!text.contains(secret), "the store holds {what}");
+        assert!(!logged.contains(secret), "the log holds {what}");
     }
+    assert!(!text.contains("\"resourceType\""), "the store holds a document");
     assert!(
         text.contains("$argon2id$"),
         "the passcode is held as its hash"

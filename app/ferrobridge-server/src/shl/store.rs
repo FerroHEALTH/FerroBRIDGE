@@ -46,10 +46,10 @@ const LOCATIONS: TableDefinition<'static, &str, &str> = TableDefinition::new("lo
 #[non_exhaustive]
 pub enum StoreError {
     /// The store file could not be opened or created.
-    #[error("the link store at {path} could not be opened")]
+    #[error("the link store at {} could not be opened", path.display())]
     Open {
         /// The path that was tried.
-        path: String,
+        path: std::path::PathBuf,
         /// What the storage layer reported.
         #[source]
         source: Box<redb::DatabaseError>,
@@ -262,8 +262,8 @@ impl LinkStore {
     /// created.
     pub fn open(path: &Path) -> Result<Self, StoreError> {
         let database = Database::create(path).map_err(|source| StoreError::Open {
-            path: path.display().to_string(),
             source: Box::new(source),
+            path: path.to_path_buf(),
         })?;
         let write = database.begin_write().map_err(transaction)?;
         {
@@ -574,19 +574,7 @@ impl LinkStore {
         for (id, link) in &expired {
             ended.push(remove(&write, id, link, Ending::Expired)?);
         }
-        let lapsed: Vec<(String, Location)> = {
-            let locations = write.open_table(LOCATIONS).map_err(transaction)?;
-            let mut lapsed = Vec::new();
-            for row in locations.iter().map_err(transaction)? {
-                let (token, text) = row.map_err(transaction)?;
-                let location: Location =
-                    serde_json::from_str(text.value()).map_err(StoreError::Record)?;
-                if now >= location.lapses {
-                    lapsed.push((token.value().to_owned(), location));
-                }
-            }
-            lapsed
-        };
+        let lapsed = locations_where(&write, |location| now >= location.lapses)?;
         for (token, location) in lapsed {
             write
                 .open_table(LOCATIONS)
@@ -688,19 +676,28 @@ fn remove(
         }
     }
     if link.outstanding > 0 {
+        let owned = locations_where(write, |location| location.link == id)?;
         let mut locations = write.open_table(LOCATIONS).map_err(transaction)?;
-        let mut owned = Vec::new();
-        for row in locations.iter().map_err(transaction)? {
-            let (token, text) = row.map_err(transaction)?;
-            let location: Location =
-                serde_json::from_str(text.value()).map_err(StoreError::Record)?;
-            if location.link == id {
-                owned.push(token.value().to_owned());
-            }
-        }
-        for token in owned {
+        for (token, _location) in owned {
             locations.remove(token.as_str()).map_err(transaction)?;
         }
     }
     Ok(gone(link, ending))
+}
+
+/// Returns every location `keep` selects, with its token.
+fn locations_where(
+    write: &WriteTransaction,
+    keep: impl Fn(&Location) -> bool,
+) -> Result<Vec<(String, Location)>, StoreError> {
+    let locations = write.open_table(LOCATIONS).map_err(transaction)?;
+    let mut selected = Vec::new();
+    for row in locations.iter().map_err(transaction)? {
+        let (token, text) = row.map_err(transaction)?;
+        let location: Location = serde_json::from_str(text.value()).map_err(StoreError::Record)?;
+        if keep(&location) {
+            selected.push((token.value().to_owned(), location));
+        }
+    }
+    Ok(selected)
 }
