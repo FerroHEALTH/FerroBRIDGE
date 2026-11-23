@@ -43,6 +43,9 @@ mod document;
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod eps_mapped;
 #[cfg(test)]
+#[cfg(all(feature = "openehr", feature = "patient-summary"))]
+mod eps_sections;
+#[cfg(test)]
 #[cfg(feature = "imaging")]
 mod imaging;
 #[cfg(test)]

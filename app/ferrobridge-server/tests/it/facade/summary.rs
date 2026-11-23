@@ -28,6 +28,7 @@ use ferrobridge_server::facade::subject::SubjectLink;
 use ferrobridge_server::facade::summary::Summary;
 use ferrobridge_server::terminology::Translator;
 use ferrobridge_testkit::fixtures::CKM_MEDICATION_ARCHETYPES;
+use ferrobridge_testkit::fixtures::CKM_PATIENT_SUMMARY_ARCHETYPES;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_COMPOSITION;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID;
@@ -110,7 +111,10 @@ fn packages() -> Result<Option<PackageSet>, Box<dyn Error>> {
 /// The ADL 2 operational template of the patient summary template.
 fn summary_template() -> Result<TemplateSource, Box<dyn Error>> {
     let mut repository = ArchetypeRepository::default();
-    for (file, source) in CKM_MEDICATION_ARCHETYPES {
+    for (file, source) in CKM_MEDICATION_ARCHETYPES
+        .iter()
+        .chain(CKM_PATIENT_SUMMARY_ARCHETYPES.iter())
+    {
         let archetype = parse_artefact(source, Dialect::Adl14)
             .map_err(|errors| format!("{file}: {errors:?}"))?;
         repository.insert(archetype);
@@ -413,12 +417,19 @@ async fn a_patient_s_summary_is_an_ips_document_with_coded_entries() -> Result<(
     assert_eq!(1, of_kind(&body, "Immunization").len());
     let medications = section(&body, "10160-0").ok_or("the medication summary")?;
     assert_eq!(1, medications["entry"].as_array().map_or(0, Vec::len));
-    for code in ["11450-4", "48765-2"] {
-        let empty = section(&body, code).ok_or(code)?;
-        assert_eq!(
-            empty["emptyReason"]["coding"][0]["code"], "unavailable",
-            "{code} is fed by no openEHR content: {empty}"
-        );
+    for (code, kind, snomed) in [
+        ("11450-4", "Condition", "38341003"),
+        ("48765-2", "AllergyIntolerance", "764146007"),
+        ("47519-4", "Procedure", "80146002"),
+    ] {
+        let held = section(&body, code).ok_or(code)?;
+        assert_eq!(1, held["entry"].as_array().map_or(0, Vec::len), "{held}");
+        let entries = of_kind(&body, kind);
+        let [entry] = entries.as_slice() else {
+            return Err(format!("{} {kind} entries", entries.len()).into());
+        };
+        assert_eq!(entry["code"]["coding"][0]["system"], "http://snomed.info/sct");
+        assert_eq!(entry["code"]["coding"][0]["code"], snomed, "{entry}");
     }
     Ok(())
 }
@@ -472,9 +483,10 @@ async fn an_empty_record_answers_every_required_section_with_its_empty_reason()
     assert_eq!(medications["emptyReason"]["coding"][0]["code"], "nilknown");
     assert!(medications.get("entry").is_none(), "{medications}");
     for code in ["11450-4", "48765-2"] {
-        assert!(
-            section(&body, code).is_some_and(|section| section.get("emptyReason").is_some()),
-            "{code}"
+        let empty = section(&body, code).ok_or(code)?;
+        assert_eq!(
+            empty["emptyReason"]["coding"][0]["code"], "nilknown",
+            "{code} is fed by the project and empty in the record: {empty}"
         );
     }
     assert_eq!(0, of_kind(&body, "MedicationStatement").len());
