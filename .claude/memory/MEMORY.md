@@ -149,3 +149,7 @@
 - [quiet-host-perf-runs](quiet-host-perf-runs.md) — A baseline capacity run of FerroEHR runs on a quiet host, with every worker stopped and Podman empty, and perf fixes come only after it
 - [spec-over-test-suites](spec-over-test-suites.md) — External conformance suites (Cadasto aql-conformance etc.) are regression signals, never the oracle; the spec decides
 - [verify-before-implementing-old-issues](verify-before-implementing-old-issues.md) — Before assigning or building an older issue, check it against current main and the current spec; close what is done or obsolete with evidence, implement only what is still open (owner, 2026-11-16)
+- [FerroHEALTH not in production](ferrohealth-not-in-production.md) — no product runs in production (2026-11-19): fix designs by full refactor, no compat layer
+- [hosted-ops-approved](hosted-ops-approved.md) — The orchestrator may operate the hosted sandbox and its database server over SSH when work needs it, plan and rollback first (owner, 2026-11-22)
+- [Lean comments, no history](lean-comments-no-history.md) — comments rare and short, describe only the current code, rewrite whole on change; never the old way (owner hard rule 2026-11-23)
+- [Family memories in every repo](family-memories-every-repo.md) — a family-wide owner rule goes into every FerroHEALTH repo's .claude/memory through a merged PR (owner 2026-11-23)
