@@ -464,7 +464,8 @@ done <<< "$WATCHED_COMMITS"
 # or, for a package with ballot versions only and no `latest` tag, against its
 # highest version. Of the profile set only the two roots with a `latest` tag
 # are read: every other row is pinned at the version a dependent names. The
-# corpora the eehrxf crate reads are read by their package rows (#1335).
+# corpora the eehrxf crate reads are read by their package rows (#1335), and
+# the xShare Yellow Button guide by a watch row until 0.3.0 is published (#2029).
 readonly WATCHED_PACKAGES="\
 hl7.fhir.r3.core	https://packages.fhir.org/hl7.fhir.r3.core
 hl7.fhir.r4.core	https://packages.fhir.org/hl7.fhir.r4.core
@@ -488,7 +489,8 @@ HL7 Europe Laboratory Report	https://packages.fhir.org/hl7.fhir.eu.laboratory
 HL7 Europe Imaging Report	https://packages.fhir.org/hl7.fhir.eu.imaging
 HL7 Europe Hospital Discharge Report	https://packages.fhir.org/hl7.fhir.eu.hdr
 MyHealth@EU Master Value Sets Catalogue	https://packages.fhir.org/myhealth.eu.fhir.mvc-package
-HL7 France FR Core	https://packages.fhir.org/hl7.fhir.fr.core"
+HL7 France FR Core	https://packages.fhir.org/hl7.fhir.fr.core
+HL7 Europe xShare Yellow Button	https://packages.fhir.org/hl7.eu.fhir.xshare-yb"
 
 
 while IFS=$'\t' read -r label url; do
