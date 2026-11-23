@@ -35,6 +35,7 @@ mod reconcile;
 mod references;
 mod replay;
 mod search;
+mod shl;
 pub(crate) mod stub;
 mod sub_context;
 pub(crate) mod summary;

@@ -377,6 +377,12 @@ impl Render for Outcome {
 }
 
 impl Outcome {
+    /// Returns the renderer whose challenges name `realm`.
+    #[must_use]
+    pub const fn new(realm: Option<String>) -> Self {
+        Self { realm }
+    }
+
     /// Returns the `OperationOutcome` response of `denied`, whose challenge
     /// carries the reason code as `error_description` (RFC 6750 §3).
     fn respond(&self, denied: &Denied) -> Response {

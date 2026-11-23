@@ -96,6 +96,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         );
         state = state.with_access_log(Arc::new(log));
     }
+    state = start_links(settings, state)?;
     if let Some(operator) = settings.operator.as_ref() {
         let operator = build_operator(
             settings,
@@ -767,6 +768,26 @@ async fn build_summary(
             .context("reading the profile packages of [facade.summary] packages")?;
     facade::summary::Summary::new(&template, packages, summary.operator.clone())
         .with_context(|| format!("compiling the patient summary project against {id}"))
+}
+
+/// Returns `state` serving the person's SMART Health Links when `[shl]` is
+/// on, with the sweep of its store started.
+fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState> {
+    use anyhow::Context;
+
+    let (Some(shl), Some(mounted)) = (settings.shl.as_ref(), state.facade()) else {
+        return Ok(state);
+    };
+    let links = crate::shl::Links::open(
+        shl.clone(),
+        Arc::clone(mounted),
+        state.access_log().cloned(),
+    )
+    .with_context(|| format!("opening the link store {}", shl.store.display()))?;
+    let links = Arc::new(links);
+    drop(links.spawn_sweeper());
+    tracing::info!(lane = "shl", "the person's SMART Health Links are served under /shl");
+    Ok(state.with_links(links))
 }
 
 /// Returns the names of the surfaces `[auth]` guards that run: the facade,

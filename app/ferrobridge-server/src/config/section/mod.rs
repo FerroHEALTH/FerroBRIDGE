@@ -20,6 +20,7 @@ pub mod events;
 pub mod facade;
 pub mod fhir_outbound;
 pub mod omop_incremental;
+pub mod shl;
 
 /// The mapping set this deployment runs.
 ///

@@ -39,6 +39,7 @@ pub mod outbound;
 pub mod panic;
 pub mod problem;
 pub mod quality;
+pub mod shl;
 pub mod smart;
 pub mod startup;
 pub mod state;
@@ -465,6 +466,9 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
         .merge(operations::router(state.served_operations()));
     if let Some(smart) = state.auth() {
         routes = routes.merge(smart::routes(smart, app_state));
+        if let Some(links) = state.links() {
+            routes = routes.merge(shl::routes(Arc::clone(links), smart));
+        }
         if let Some(operator) = state.operator() {
             routes = routes.merge(operator::routes(
                 Arc::clone(operator),
@@ -490,6 +494,9 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 facade::capability::Hl7v2::Absent
             },
             security: state.auth().map(|smart| smart.security()),
+            links: state
+                .links()
+                .map(|links| format!("{}{}", links.settings().base_url, shl::BASE)),
         };
         let operator = facade::guard::OperatorScope(
             state.auth().map(|smart| smart.operator_scope().to_owned()),

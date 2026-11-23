@@ -200,7 +200,7 @@ pub(crate) async fn summary_facade(
 /// Returns a harness over a stub CDR serving the patient summary, its codes
 /// translated through `term`; `None` when the profile packages are not
 /// fetched.
-async fn harness(term: &MockServer) -> Result<Option<Harness>, Box<dyn Error>> {
+pub(super) async fn harness(term: &MockServer) -> Result<Option<Harness>, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     let base = format!("{}/", cdr.uri()).parse()?;
     let client = CdrClient::new(&CdrConfig::new(base).with_demographic(true))?;
@@ -616,7 +616,7 @@ async fn guarded(
 }
 
 /// The claims of a patient's token launched for `patient`.
-fn patient_claims(issuer: &Issuer, patient: &str) -> serde_json::Value {
+pub(super) fn patient_claims(issuer: &Issuer, patient: &str) -> serde_json::Value {
     let mut claims = issuer.claims("patient/*.rs");
     claims["patient"] = serde_json::json!(patient);
     claims

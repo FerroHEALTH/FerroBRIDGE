@@ -24,6 +24,7 @@ mod fhir_outbound;
 pub mod hl7v2;
 mod omop_incremental;
 mod resolve;
+mod shl;
 pub mod section;
 
 use ferrohealth_config::loader::{Loaded, Loader};
@@ -66,6 +67,7 @@ use section::events::Events;
 use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
 use section::omop_incremental::OmopIncremental;
+use section::shl::Shl;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
 /// `[server] listen`, and `FERROBRIDGE_CONFIG` names the file.
@@ -149,6 +151,8 @@ pub struct Config {
     /// The access records of the facade and the HL7 v2 face, off until its
     /// section turns it on.
     pub audit: Audit,
+    /// The person's SMART Health Links, off until its section turns it on.
+    pub shl: Shl,
     /// Where each key came from, which the load records and no file states.
     #[serde(skip)]
     provenance: Provenance,
@@ -354,6 +358,7 @@ impl Config {
             },
             omop_incremental: omop_incremental::resolve(self)?,
             fhir_outbound: fhir_outbound::resolve(self)?,
+            shl: shl::resolve(self)?,
             hl7v2: if self.hl7v2.enabled {
                 Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
             } else {
@@ -512,6 +517,8 @@ pub struct Settings {
     pub omop_incremental: Option<OmopIncrementalSettings>,
     /// The outbound FHIR lane, when it is on.
     pub fhir_outbound: Option<crate::outbound::Settings>,
+    /// The person's SMART Health Links, when they are served.
+    pub shl: Option<crate::shl::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.
