@@ -30,6 +30,7 @@ use crate::facade::auth::condition_of;
 use crate::facade::auth::ec_key;
 use crate::facade::auth::mint;
 use crate::facade::auth::now;
+use crate::facade::summary;
 
 /// The patient the caller is launched for, and the subject of its record.
 const PATIENT: &str = "p-1";
@@ -89,6 +90,13 @@ impl Sides {
     /// Mounts the `patients` issuer's exchange, answering with a token for
     /// the CDR that names the same patient, and returns that token.
     async fn mount_patient_exchange(&self) -> String {
+        self.mount_patient_exchange_for(PATIENT, PATIENT_SCOPE)
+            .await
+    }
+
+    /// Mounts the `patients` issuer's exchange, answering with a token for
+    /// the CDR granting `scope` to `patient`, and returns that token.
+    async fn mount_patient_exchange_for(&self, patient: &str, scope: &str) -> String {
         let now = now();
         let issued = mint(
             &self.key,
@@ -97,8 +105,8 @@ impl Sides {
                 "aud": CDR_AUDIENCE,
                 "sub": "synthetic-client-sub",
                 "client_id": BRIDGE_CLIENT,
-                "scope": PATIENT_SCOPE,
-                "patient": PATIENT,
+                "scope": scope,
+                "patient": patient,
                 "iat": now,
                 "exp": now + 300,
                 "jti": "synthetic-patient-onward-jti",
@@ -199,5 +207,64 @@ async fn a_patient_s_own_token_of_a_persons_issuer_is_exchanged_there() -> Resul
     assert_eq!(1, exchanges.len(), "one exchange serves both requests");
     let body = exchanges.first().ok_or("an exchange")?;
     assert!(body.contains(&format!("subject_token={token}")), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
+-> Result<(), Box<dyn Error>> {
+    let sides = Sides::start().await?;
+    sides.world.mount_own_token().await;
+    let scope = "patient/*.rs";
+    let issued = sides.mount_patient_exchange_for(summary::UID, scope).await;
+    let term = wiremock::MockServer::start().await;
+    let client = ferrobridge_server::cdr::CdrClient::new(
+        &sides.world.cdr_config.clone().with_demographic(true),
+    )?;
+    let store =
+        std::sync::Arc::new(ferrobridge_server::facade::identity::store::MemoryStore::default());
+    let Some(facade) = summary::summary_facade(
+        &sides.world.harness.cdr,
+        client,
+        crate::support::translator(&term)?,
+        &store,
+    )
+    .await?
+    else {
+        return Ok(());
+    };
+    summary::mount_terminology(&term).await;
+    summary::mount_record(&sides.world.harness.cdr, &[summary::composition()?]).await;
+    let mut claims = sides.patients.claims(scope);
+    claims["patient"] = serde_json::json!(summary::UID);
+    let token = mint(&sides.key, &claims);
+    let state = ferrobridge_server::state::AppState::with_health(
+        ferrohealth_health::registry::Registry::default(),
+    )
+    .with_facade(facade)
+    .with_auth(crate::facade::auth::authority(sides.world.trusted.clone()).await);
+    let response = crate::facade::raw(
+        ferrobridge_server::router(
+            std::sync::Arc::new(state),
+            &crate::facade::server_settings(),
+        ),
+        crate::facade::auth::bearing(
+            http::Request::get(format!("/fhir/Patient/{}/$summary", summary::UID))
+                .body(axum::body::Body::empty())?,
+            &token,
+        ),
+    )
+    .await?;
+    assert_eq!(http::StatusCode::OK, response.status());
+
+    assert_every_call_under(&sides.world.cdr_calls().await, &issued);
+    let exchanges = sides.patient_exchanges().await;
+    assert_eq!(1, exchanges.len(), "one exchange serves the summary");
+    assert!(
+        exchanges
+            .first()
+            .is_some_and(|body| body.contains(&format!("subject_token={token}"))),
+        "{exchanges:?}"
+    );
     Ok(())
 }

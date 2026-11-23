@@ -5,9 +5,11 @@
 //! the companions and authorship each form names.
 
 #[cfg(feature = "patient-summary")]
-use super::{EPS_BUNDLE, EPS_PATIENT, LOINC, PATIENT_SUMMARY};
+use super::{
+    EPS_BUNDLE, EPS_PATIENT, IPS_BUNDLE, IPS_COMPOSITION, IPS_PATIENT, LOINC, PATIENT_SUMMARY,
+};
 
-/// One section slice of the `composition-eu-eps` profile.
+/// One section slice of a patient summary `Composition` profile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Slot {
     /// The slice name, such as `sectionAllergies`.
@@ -47,6 +49,28 @@ pub const SLOTS: [Slot; 17] = [
     Slot::new("sectionVitalSigns", "8716-3", "Vital Signs"),
     Slot::new("sectionTravelHx", "10182-4", "Travel History"),
     Slot::new("sectionPatientHx", "11329-0", "Patient History"),
+];
+
+/// Every section slice of the IPS 2.0.1 `Composition-uv-ips` profile, in the
+/// profile's order.
+#[cfg(feature = "patient-summary")]
+pub const IPS_SLOTS: [Slot; 16] = [
+    Slot::new("sectionProblems", "11450-4", "Problems"),
+    Slot::new("sectionAllergies", "48765-2", "Allergies and Intolerances"),
+    Slot::new("sectionMedications", "10160-0", "Medication Summary"),
+    Slot::new("sectionImmunizations", "11369-6", "Immunizations"),
+    Slot::new("sectionResults", "30954-2", "Results"),
+    Slot::new("sectionProceduresHx", "47519-4", "History of Procedures"),
+    Slot::new("sectionMedicalDevices", "46264-8", "Medical Devices"),
+    Slot::new("sectionAdvanceDirectives", "42348-3", "Advance Directives"),
+    Slot::new("sectionAlerts", "104605-1", "Alerts"),
+    Slot::new("sectionFunctionalStatus", "47420-5", "Functional Status"),
+    Slot::new("sectionPastProblems", "11348-0", "History of Past Illness"),
+    Slot::new("sectionPregnancyHx", "10162-6", "History of Pregnancy"),
+    Slot::new("sectionPatientStory", "81338-6", "Patient Story"),
+    Slot::new("sectionPlanOfCare", "18776-5", "Plan of Care"),
+    Slot::new("sectionSocialHistory", "29762-2", "Social History"),
+    Slot::new("sectionVitalSigns", "8716-3", "Vital Signs"),
 ];
 
 /// Returns the slot of the patient summary's section slice `slice`, or
@@ -200,6 +224,34 @@ pub const PATIENT_SUMMARY_FORM: Form = Form {
                 "sectionProceduresHx",
                 "sectionMedicalDevices",
             ],
+        },
+    ],
+};
+
+/// The patient summary in the HL7 International Patient Summary 2.0.1 form.
+#[cfg(feature = "patient-summary")]
+pub const IPS_PATIENT_SUMMARY_FORM: Form = Form {
+    bundle: IPS_BUNDLE,
+    composition: IPS_COMPOSITION,
+    patient: IPS_PATIENT,
+    kind: Kind::Fixed(Code {
+        system: LOINC,
+        code: PATIENT_SUMMARY,
+    }),
+    categories: &[],
+    authorship: Authorship::Gateway,
+    slots: &IPS_SLOTS,
+    report: None,
+    encounter: None,
+    language: false,
+    // NOTE: Composition-uv-ips 2.0.1 `ips-comp-1` (error) and `min` 1 on these three slices.
+    rules: &[
+        SectionRule::Reasoned {
+            invariant: "ips-comp-1",
+            slices: &["sectionProblems", "sectionAllergies", "sectionMedications"],
+        },
+        SectionRule::Required {
+            slices: &["sectionProblems", "sectionAllergies", "sectionMedications"],
         },
     ],
 };

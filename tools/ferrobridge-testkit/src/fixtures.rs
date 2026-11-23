@@ -200,6 +200,23 @@ pub const FERROEHR_PROFESSIONAL_ROLE_ADL2: &str = include_str!(
 pub const FERROEHR_PROFESSIONAL_ROLE_ID: &str =
     "openEHR-DEMOGRAPHIC-ROLE.healthcare_professional.v1.0.0";
 
+/// The reference CDR's patient `PERSON`, an id-coded ADL 2 archetype,
+/// vendored verbatim.
+///
+/// The definition the reference CDR loads for the subjects of its EHRs: the
+/// patient's identifiers, date of birth and sex in `details`, the name in
+/// `identities`, and contacts and relationships beside them.
+/// `scripts/vendor/ferroehr-patient.sh` fetches it at the commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside it records its source
+/// and licence.
+pub const FERROEHR_PATIENT_PERSON_ADL2: &str = include_str!(
+    "../fixtures/adl2/ferroehr-patient/openEHR-DEMOGRAPHIC-PERSON.patient.v1.0.0.adls"
+);
+
+/// The archetype id, and the template id the reference CDR serves it under,
+/// of [`FERROEHR_PATIENT_PERSON_ADL2`].
+pub const FERROEHR_PATIENT_PERSON_ID: &str = "openEHR-DEMOGRAPHIC-PERSON.patient.v1.0.0";
+
 /// The published `KDS_Prozedur` operational template, vendored verbatim.
 ///
 /// One `COMPOSITION.report.v1` holding `ACTION.procedure.v1` with its
@@ -507,6 +524,21 @@ pub const CKM_HIGHMED_ARCHETYPES: [(&str, &str); 13] = [
 /// name, the birth date `1984-03-17` and the administrative gender
 /// `SYN-GENDER-F` of the synthetic `FB-GENDER` code system.
 pub const KDS_PERSON_FLAT: &str = include_str!("../fixtures/composition/kds_person.flat.json");
+
+/// A synthetic canonical COMPOSITION of
+/// [`FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE`].
+///
+/// It holds one medicine ordered in its medication summary section and one
+/// vaccine administered in its immunisations section, coded
+/// `SYN-MEDICINE-0001` and `SYN-VACCINE-0001` in the synthetic products code
+/// system [`PATIENT_SUMMARY_PRODUCTS`].
+pub const FERROBRIDGE_PATIENT_SUMMARY_COMPOSITION: &str =
+    include_str!("../fixtures/composition/ferrobridge_patient_summary.json");
+
+/// The synthetic code system of the products
+/// [`FERROBRIDGE_PATIENT_SUMMARY_COMPOSITION`] codes.
+pub const PATIENT_SUMMARY_PRODUCTS: &str =
+    "http://example.org/fhir/CodeSystem/ferrobridge-products";
 
 /// A synthetic canonical COMPOSITION built against
 /// [`MINIMAL_EVALUATION_OPT`].

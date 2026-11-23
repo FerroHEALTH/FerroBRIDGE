@@ -1,0 +1,128 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The model mapping the patient summary suite reads its patient with: the
+# identifiers, the date of birth and the sex of the PERSON details, and the
+# name of its identity, each sex code paired with its administrative gender.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferroehr_patient
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-DEMOGRAPHIC-PERSON.patient.v1
+    revision: 1.0.0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Patient
+
+mappings:
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$archetype/details[id2]/items[id3]"
+  - name: "birthDate"
+    with:
+      fhir: "$resource.birthDate"
+      openehr: "$archetype/details[id2]/items[id4]"
+  - name: "gender"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/details[id2]/items[id5]/value"
+    manual:
+      - name: "male"
+        fhir:
+          - path: "gender"
+            value: "male"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at10"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at10"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "male"
+      - name: "female"
+        fhir:
+          - path: "gender"
+            value: "female"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at11"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at11"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "female"
+      - name: "other"
+        fhir:
+          - path: "gender"
+            value: "other"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at12"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at12"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "other"
+      - name: "unknown"
+        fhir:
+          - path: "gender"
+            value: "unknown"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at13"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at13"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "unknown"
+  - name: "name"
+    with:
+      fhir: "$resource.name"
+      openehr: "$archetype/identities[id6]/details[id7]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "fullName"
+          with:
+            fhir: "text"
+            openehr: "items[id8]"
+        - name: "givenName"
+          with:
+            fhir: "given"
+            openehr: "items[id9]"
+        - name: "familyName"
+          with:
+            fhir: "family"
+            openehr: "items[id10]"

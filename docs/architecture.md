@@ -1042,6 +1042,20 @@ expression is a load error: the reference CDR's connector let `where()` and
   (`facade::document`); `persist=true` and `graph` are refused, never
   ignored. A context whose start is a composition model binds the composition
   itself as its one entry, under the path `/`.
+- **`Patient/$summary` answers the patient summary, validated before it is
+  served.** `GET [base]/Patient/[id]/$summary` (HL7 IPS 2.0.1,
+  `OperationDefinition/summary`) reads the patient through the `Patient`
+  party context and every patient summary composition of the patient's EHR
+  as the caller (the onward exchange carries a patient's token to the CDR),
+  maps them through the `eehrxf` EPS project, translates each code in no
+  preferred system on the terminology server, and writes the IPS 2.0.1 form,
+  or the HL7 Europe Patient Summary form that `profile` names. The document
+  is validated in process by `ferrobridge-validator` over the configured
+  packages and an invalid one answers `422`, never served. A section the
+  project feeds and the record leaves empty is `nilknown`, a required section
+  no openEHR content feeds `unavailable`, and a `patient/` token launched for
+  another patient answers `404` with no CDR call. All of it is our own design
+  (`facade::summary`, decided for FerroHEALTH/FerroEHR#6419).
 - **`$validate` is a dry run that commits nothing.** `POST [base]/{type}/$validate`
   runs the full inbound path (program selection, mapping, composition build,
   the CDR's own template validation through a commit the bridge never

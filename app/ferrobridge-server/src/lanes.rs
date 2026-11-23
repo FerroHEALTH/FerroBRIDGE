@@ -696,6 +696,14 @@ async fn build_facade(
     };
     let app_state = owned_store(lane.app_state.as_ref())?;
     let launch_tasks = owned_store(lane.launch_task.as_ref())?;
+    let summary = match lane.summary.as_ref() {
+        Some(summary) => Some(
+            build_summary(summary, &programs, &client)
+                .await
+                .context("building the patient summary of [facade.summary]")?,
+        ),
+        None => None,
+    };
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
         .with_translator(
             Translator::new(terminology).with_display_fallback(settings.display_fallback),
@@ -710,9 +718,55 @@ async fn build_facade(
             .with_consent(lane.consent.clone())
             .with_app_state(app_state)
             .with_launch_tasks(launch_tasks)
+            .with_summary(summary)
             .with_cors(lane.cors.clone()),
         counts,
     ))
+}
+
+/// Builds the patient summary `summary` configures: the EPS project compiled
+/// against the patient summary template the CDR serves, over the profile
+/// packages read once at boot, so a template or a package set that cannot
+/// serve refuses the start.
+async fn build_summary(
+    summary: &config::SummarySettings,
+    programs: &facade::programs::Programs,
+    client: &cdr::CdrClient,
+) -> anyhow::Result<facade::summary::Summary> {
+    use anyhow::Context;
+
+    if programs.party(facade::summary::PATIENT).is_none() {
+        anyhow::bail!(
+            "the patient summary reads its patient through a Patient party context, and the mapping set loads none"
+        );
+    }
+    let id = facade::summary::Summary::template_id();
+    let template_id =
+        cdr::ids::template_id(id).with_context(|| format!("reading {id} as a template id"))?;
+    let template = match client
+        .template(&template_id)
+        .await
+        .with_context(|| format!("fetching the template {id}"))?
+    {
+        cdr::template::TemplateOutcome::Found(template) => template,
+        cdr::template::TemplateOutcome::UnknownTemplate => {
+            anyhow::bail!("the CDR holds no template {id}")
+        }
+        cdr::template::TemplateOutcome::BadRequest(upstream) => {
+            anyhow::bail!(
+                "the CDR refused the template {id} with {}",
+                upstream.status()
+            )
+        }
+    };
+    let paths = summary.packages.clone();
+    let packages =
+        tokio::task::spawn_blocking(move || ferrobridge_validator::set::PackageSet::load(paths))
+            .await
+            .context("reading the profile packages")?
+            .context("reading the profile packages of [facade.summary] packages")?;
+    facade::summary::Summary::new(&template, packages, summary.operator.clone())
+        .with_context(|| format!("compiling the patient summary project against {id}"))
 }
 
 /// Returns the names of the surfaces `[auth]` guards that run: the facade,

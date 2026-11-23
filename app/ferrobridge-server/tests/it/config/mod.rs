@@ -25,6 +25,7 @@ mod onward;
 mod operator;
 mod refusals;
 mod secrets;
+mod summary;
 mod usage_report;
 
 use ferrobridge_server::config::Config;
