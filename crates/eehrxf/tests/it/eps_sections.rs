@@ -263,4 +263,3 @@ fn the_summary_with_one_of_each_validates_in_both_forms() -> Result<(), Box<dyn 
     }
     Ok(())
 }
-

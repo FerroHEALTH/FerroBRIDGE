@@ -33,8 +33,8 @@ use eehrxf::mappings::EPS;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::conform::check_resource;
 use ferrobridge_testkit::fixtures::{
-    CKM_MEDICATION_ARCHETYPES, CKM_PATIENT_SUMMARY_ARCHETYPES, FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE,
-    FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID,
+    CKM_MEDICATION_ARCHETYPES, CKM_PATIENT_SUMMARY_ARCHETYPES,
+    FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE, FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID,
 };
 use fhir_types::codec::{Json, Value};
 use fhir_types::r4::device::{Device, DeviceDeviceName};
@@ -50,8 +50,8 @@ use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
 use openehr_mapping_core::template::TemplateSource;
 
-use super::support::{emit, eps, profile_set, vendored};
 use super::eps_sections;
+use super::support::{emit, eps, profile_set, vendored};
 
 /// The root context of the EPS project.
 const ROOT: &str = "ferrobridge_eu_eps.context";
@@ -599,11 +599,15 @@ fn every_source_feeds_its_row_from_its_section() -> Result<(), Box<dyn Error>> {
                     eps_sections::allergy(eps_sections::PENICILLIN),
                 )
             }
-            (section, "openEHR-EHR-ACTION.procedure.v1") if section == eps_sections::PROCEDURES.1 => (
-                eps_sections::PROCEDURES,
-                eps_sections::PROCEDURES_CODE,
-                eps_sections::procedure(eps_sections::APPENDECTOMY),
-            ),
+            (section, "openEHR-EHR-ACTION.procedure.v1")
+                if section == eps_sections::PROCEDURES.1 =>
+            {
+                (
+                    eps_sections::PROCEDURES,
+                    eps_sections::PROCEDURES_CODE,
+                    eps_sections::procedure(eps_sections::APPENDECTOMY),
+                )
+            }
             (section, other) => {
                 return Err(format!("{path}: no synthetic {other} in {section}").into());
             }

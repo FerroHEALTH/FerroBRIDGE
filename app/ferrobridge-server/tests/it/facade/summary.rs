@@ -448,7 +448,10 @@ async fn a_patient_s_summary_is_an_ips_document_with_coded_entries() -> Result<(
         let [entry] = entries.as_slice() else {
             return Err(format!("{} {kind} entries", entries.len()).into());
         };
-        assert_eq!(entry["code"]["coding"][0]["system"], "http://snomed.info/sct");
+        assert_eq!(
+            entry["code"]["coding"][0]["system"],
+            "http://snomed.info/sct"
+        );
         assert_eq!(entry["code"]["coding"][0]["code"], snomed, "{entry}");
     }
     Ok(())
