@@ -242,7 +242,7 @@ encoding_rs = "0.8.42"
 # The lexer and parser of the v2-to-FHIR condition and target grammars, the
 # pair openehr-query builds its AQL parser on and the lock already carries.
 logos = "0.16.1"
-chumsky = "0.13.0"
+chumsky = "0.14.1"
 # The `.tgz` form of a FHIR package the profile validator reads offline
 # (https://hl7.org/fhir/packages.html): flate2 on its pure-Rust backend and tar
 # without its extended-attribute feature, which reads nothing a package
