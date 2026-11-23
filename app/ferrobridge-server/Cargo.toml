@@ -22,8 +22,12 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+# The Argon2id hash of a SMART Health Link passcode.
+argon2.workspace = true
 # The per-call engine implements the openehr-its client runtime's Transport.
 async-trait.workspace = true
+# The AES-256-GCM seal and the random source of the SMART Health Links.
+aws-lc-rs.workspace = true
 # The Basic credential of an Audit Record Repository (RFC 7617 §2).
 base64.workspace = true
 axum.workspace = true
@@ -138,10 +142,6 @@ jiff.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
-# The inbound Basic cases hash their synthetic password at test time.
-argon2.workspace = true
-# The inbound token cases sign with key pairs generated at test time.
-aws-lc-rs.workspace = true
 ferrobridge-testkit.workspace = true
 # The id-coded party cases compile the reference CDR's ADL 2 PERSON into the
 # operational template its `adl2` route serves.

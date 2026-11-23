@@ -912,8 +912,10 @@ jobs:
 
   # HL7's FHIR Validator over the patient summary, laboratory and imaging report
   # documents the eehrxf suites write, and the patient summaries the server's
-  # Patient/$summary suites serve (#1318, #2015; no specification governs the
-  # lane: our own design), the evidence the component's page cites for the
+  # Patient/$summary and SMART Health Link suites serve (#1318, #2015; no
+  # specification governs the lane: our own design), each patient summary also
+  # with the xShare Yellow Button guide 0.3.0 loaded against the Patient Summary
+  # content it names (#2029), the evidence the component's page cites for the
   # exchange format. It runs offline, the jar and the packages pinned in the
   # "HL7 FHIR Validator" table of docs/VERSIONS.md, and fails on an error, a fatal issue or a
   # claimed profile it could not find (scripts/checks/fhir-validator.sh). Its

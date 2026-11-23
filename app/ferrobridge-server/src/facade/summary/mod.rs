@@ -165,13 +165,38 @@ async fn summarize(
             "$summary is an operation of Patient, not of {resource_type}"
         )));
     }
+    if facade.summary().is_none() {
+        return Err(unsupported(String::from(
+            "this server serves no patient summary; GET /fhir/metadata names its operations",
+        )));
+    }
+    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
+    let form = form_of(uri)?;
+    let object = document(facade, access, id, headers, form).await?;
+    Ok(reply::resource(StatusCode::OK, &object, &[]))
+}
+
+/// Returns the patient summary of the patient `id` in `form`, read as
+/// `access` with the credential `headers` carry, validated before it is
+/// returned.
+///
+/// # Errors
+///
+/// The [`Refusal`] the operation answers: an unknown or unreachable
+/// patient, a CDR or terminology failure, or a document that breaks its
+/// profile.
+pub(crate) async fn document(
+    facade: &Facade,
+    access: &Access,
+    id: &str,
+    headers: &HeaderMap,
+    form: &'static Form,
+) -> Result<fhir_types::codec::Object, Refusal> {
     let Some(summary) = facade.summary() else {
         return Err(unsupported(String::from(
             "this server serves no patient summary; GET /fhir/metadata names its operations",
         )));
     };
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    let form = form_of(uri)?;
     party::admit(access, Permission::Read, PATIENT, Some(id)).map_err(|_refused| unknown(id))?;
     let loaded = facade.programs().party(PATIENT).cloned().ok_or_else(|| {
         internal(String::from(
@@ -222,7 +247,7 @@ async fn summarize(
         compartment::admit_person(facade, access, Permission::Read, &kind, Some(&person))?;
     }
     validate(summary, facade, form, &object).await?;
-    Ok(reply::resource(StatusCode::OK, &object, &[]))
+    Ok(object)
 }
 
 /// Returns the patient `id` names, as the party context `loaded` renders
@@ -285,25 +310,7 @@ fn form_of(uri: &Uri) -> Result<&'static Form, Refusal> {
     let mut form = &IPS_PATIENT_SUMMARY_FORM;
     for (name, value) in media::query_pairs(uri.query().unwrap_or_default().as_bytes()) {
         match name.as_str() {
-            "profile" => {
-                let (url, version) = match value.split_once('|') {
-                    Some((url, version)) => (url, Some(version)),
-                    None => (value.as_str(), None),
-                };
-                form = match (url, version) {
-                    (IPS_COMPOSITION, None | Some(IPS_VERSION)) => &IPS_PATIENT_SUMMARY_FORM,
-                    (EPS_COMPOSITION, None | Some(EPS_VERSION)) => &PATIENT_SUMMARY_FORM,
-                    _ => {
-                        return Err(bad_request(
-                            IssueType::NotSupported,
-                            format!(
-                                "this server writes {IPS_COMPOSITION}|{IPS_VERSION} and \
-                                 {EPS_COMPOSITION}|{EPS_VERSION}, not {value}"
-                            ),
-                        ));
-                    }
-                };
-            }
+            "profile" => form = form_named(&value)?,
             "identifier" => {
                 return Err(bad_request(
                     IssueType::NotSupported,
@@ -322,6 +329,37 @@ fn form_of(uri: &Uri) -> Result<&'static Form, Refusal> {
         }
     }
     Ok(form)
+}
+
+/// Returns the form the `profile` canonical `value` names, with or without
+/// its version.
+///
+/// # Errors
+///
+/// The `400` of a profile this server does not write.
+pub(crate) fn form_named(value: &str) -> Result<&'static Form, Refusal> {
+    let (url, version) = match value.split_once('|') {
+        Some((url, version)) => (url, Some(version)),
+        None => (value, None),
+    };
+    match (url, version) {
+        (IPS_COMPOSITION, None | Some(IPS_VERSION)) => Ok(&IPS_PATIENT_SUMMARY_FORM),
+        (EPS_COMPOSITION, None | Some(EPS_VERSION)) => Ok(&PATIENT_SUMMARY_FORM),
+        _ => Err(bad_request(
+            IssueType::NotSupported,
+            format!(
+                "this server writes {IPS_COMPOSITION}|{IPS_VERSION} and \
+                 {EPS_COMPOSITION}|{EPS_VERSION}, not {value}"
+            ),
+        )),
+    }
+}
+
+/// Returns the form a patient summary is written in when none is named:
+/// IPS 2.0.1, the content specification the Yellow Button declares.
+#[must_use]
+pub(crate) const fn default_form() -> &'static Form {
+    &IPS_PATIENT_SUMMARY_FORM
 }
 
 /// Returns the canonical JSON of every patient summary composition the EHR

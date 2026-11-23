@@ -64,7 +64,13 @@ pub struct Source {
 
 /// The openEHR sources of the entry rows the component's EPS mappings feed.
 ///
-/// The medication summary takes the medication order (CKM
+/// The problems take the problem or diagnosis (CKM
+/// `openEHR-EHR-EVALUATION.problem_diagnosis.v1`), the allergies and
+/// intolerances the adverse reaction risk (CKM
+/// `openEHR-EHR-EVALUATION.adverse_reaction_risk.v2`) and the procedures the
+/// procedure action (CKM `openEHR-EHR-ACTION.procedure.v1`), each held by
+/// the ad hoc section named for it. The medication summary takes the
+/// medication order (CKM
 /// `openEHR-EHR-INSTRUCTION.medication_order.v3`, revision 3.2.1), in which a
 /// CDR often keeps the current medication list, and the medication action
 /// (CKM `openEHR-EHR-ACTION.medication.v1`, revision 1.6.0) recording a
@@ -79,6 +85,18 @@ pub struct Source {
 /// sections: our own design).
 pub const SOURCES: &[Source] = &[
     Source {
+        path: "EHDSPatientSummary.problems.problem",
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.adhoc.v1",
+        archetype: "openEHR-EHR-EVALUATION.problem_diagnosis.v1",
+    },
+    Source {
+        path: "EHDSPatientSummary.allergiesAndIntolerances.allergyIntolerance",
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.adhoc.v1",
+        archetype: "openEHR-EHR-EVALUATION.adverse_reaction_risk.v2",
+    },
+    Source {
         path: "EHDSPatientSummary.medicationSummary.medicationUse",
         template: PATIENT_SUMMARY_TEMPLATE,
         section: "openEHR-EHR-SECTION.adhoc.v1",
@@ -89,6 +107,12 @@ pub const SOURCES: &[Source] = &[
         template: PATIENT_SUMMARY_TEMPLATE,
         section: "openEHR-EHR-SECTION.adhoc.v1",
         archetype: "openEHR-EHR-ACTION.medication.v1",
+    },
+    Source {
+        path: "EHDSPatientSummary.procedures.procedure",
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.adhoc.v1",
+        archetype: "openEHR-EHR-ACTION.procedure.v1",
     },
     Source {
         path: "EHDSPatientSummary.immunisations.immunisation",

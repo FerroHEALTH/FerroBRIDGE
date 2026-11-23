@@ -8,8 +8,9 @@
 # `imaging_mapped`, `discharge_mapped`), and the one that maps a prescription and
 # a dispensation to the MPD resources (`medication::mapped`), also write it
 # to the directory EEHRXF_EMIT_DIR names, and so do the server's
-# Patient/$summary suites with each document they serve; this script runs HL7's
-# FHIR Validator over every one of them and fails on an error. Its results
+# Patient/$summary and SMART Health Link suites with each document they
+# serve; this script runs HL7's FHIR Validator over every one of them and
+# fails on an error. Its results
 # are the evidence the component's page cites for the exchange format
 # (Regulation (EU) 2025/327 Art 15, Annex II 2.2); the validator is never
 # shipped.
@@ -20,16 +21,21 @@
 # "HL7 FHIR Validator" table of docs/VERSIONS.md, each checked against its
 # sha256, over the profile packages scripts/vendor/profile-packages.sh
 # fetched (hl7.fhir.uv.ips 2.0.1, hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
-# hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0, hl7.fhir.eu.hdr 1.0.0
-# and hl7.fhir.eu.imaging 1.0.0-ballot with their dependency closure). This
+# hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0, hl7.fhir.eu.hdr 1.0.0,
+# hl7.fhir.eu.imaging 1.0.0-ballot and hl7.eu.fhir.xshare-yb 0.3.0 with their
+# dependency closure). This
 # script adds the vendored MyHealth@EU Master Value Sets Catalogue, whose
 # value sets the patient summary profiles bind, and the remaining-dispensations
 # extension eehrxf publishes. Each guide's documents run on their own, so no
 # closure reads another guide's documents: a discharge report with
 # hl7.fhir.eu.hdr 1.0.0 and the catalogue loaded, an imaging report with
 # hl7.fhir.eu.imaging 1.0.0-ballot loaded, and every other document with the
-# other four guides, IPS 2.0.1, the catalogue and the extension loaded. The runs'
-# outcomes are judged together.
+# other four guides, IPS 2.0.1, the catalogue and the extension loaded. Every
+# patient summary also runs once more with the xShare Yellow Button guide
+# 0.3.0 and the catalogue loaded, held to the profile the guide's provider
+# CapabilityStatement names for the Patient Summary content, Bundle-uv-ips of
+# IPS 2.0.1 (#2029). The runs' outcomes are judged together; a document's
+# second outcome is named `xshare-yb.<document>`.
 #
 # A run fails on an issue of severity error or fatal, on a document the
 # output names no outcome for, and on a claimed profile the validator could
@@ -122,6 +128,14 @@ readonly IMAGING_IG="hl7.fhir.eu.imaging#1.0.0-ballot"
 # Report guide.
 readonly HDR_BUNDLE="http://hl7.eu/fhir/hdr/StructureDefinition/bundle-eu-hdr"
 readonly HDR_IG="hl7.fhir.eu.hdr#1.0.0"
+
+# The patient summary documents, and the guide and profile the xShare Yellow
+# Button holds a Patient Summary to (xShare Yellow Button 0.3.0, Information
+# view; CapabilityStatement capabilityStatement-yb-provider).
+readonly IPS_BUNDLE="http://hl7.org/fhir/uv/ips/StructureDefinition/Bundle-uv-ips"
+readonly EPS_BUNDLE="http://hl7.eu/fhir/eps/StructureDefinition/bundle-eu-eps"
+readonly XSHARE_IG="hl7.eu.fhir.xshare-yb#0.3.0"
+readonly XSHARE_PROFILE="$IPS_BUNDLE|2.0.1"
 
 # The extension a validator outcome names its file in.
 readonly OUTCOME_FILE="http://hl7.org/fhir/StructureDefinition/operationoutcome-file"
@@ -216,7 +230,8 @@ judge() {
 }
 
 # validate OUT GROUP DOCUMENT... -- IG...: runs the validator offline over the
-# DOCUMENTs with the IGs loaded, writing OUT/GROUP.json, OUT/GROUP.html and
+# DOCUMENTs with the IGs loaded (an IG written `profile=<url>` is a profile
+# every DOCUMENT is held to), writing OUT/GROUP.json, OUT/GROUP.html and
 # OUT/GROUP.log, and answers its output as a Bundle of OperationOutcomes, each
 # naming its file. A single document's outcome may name none, so it takes the
 # document's name.
@@ -229,8 +244,14 @@ validate() {
     shift
   done
   shift
+  local ig
   while [[ $# -gt 0 ]]; do
-    igs+=(-ig "$1")
+    ig="$1"
+    if [[ "$ig" = profile=* ]]; then
+      igs+=(-profile "${ig#profile=}")
+    else
+      igs+=(-ig "$ig")
+    fi
     shift
   done
   local code=0
@@ -277,10 +298,17 @@ run() {
     mkdir -p "$CACHE/$name"
     tar -xzf "$MVC" -C "$CACHE/$name"
   fi
-  local docs=() general=() imaging=() discharge=() doc
+  mkdir -p "$out/xshare-yb"
+  local docs=() general=() imaging=() discharge=() summaries=() doc copies
+  copies="$(cd "$out/xshare-yb" && pwd)"
   for doc in "$documents"/*.json; do
     [[ -f "$doc" ]] || continue
     docs+=("$doc")
+    if jq -e --arg ips "$IPS_BUNDLE" --arg eps "$EPS_BUNDLE" \
+      'any((.meta.profile // [])[]; split("|")[0] == $ips or split("|")[0] == $eps)' "$doc" > /dev/null 2>&1; then
+      cp "$doc" "$copies/xshare-yb.${doc##*/}"
+      summaries+=("$copies/xshare-yb.${doc##*/}")
+    fi
     if jq -e --arg bundle "$IMAGING_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       imaging+=("$doc")
     elif jq -e --arg bundle "$HDR_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
@@ -293,7 +321,6 @@ run() {
     echo "::error::$documents holds no document: did the tests run with EEHRXF_EMIT_DIR set?" >&2
     return 1
   fi
-  mkdir -p "$out"
   local parts=()
   if [[ "${#general[@]}" -gt 0 ]]; then
     validate "$out" general "${general[@]}" -- \
@@ -309,6 +336,17 @@ run() {
   if [[ "${#discharge[@]}" -gt 0 ]]; then
     validate "$out" discharge "${discharge[@]}" -- "$HDR_IG" "$name" > "$out/discharge.bundle.json" || return 1
     parts+=("$out/discharge.bundle.json")
+  fi
+  if [[ "${#summaries[@]}" -gt 0 ]]; then
+    validate "$out" xshare-yb "${summaries[@]}" -- "$XSHARE_IG" 'hl7.fhir.eu.eps#1.0.0-ballot' "$name" \
+      "profile=$XSHARE_PROFILE" > "$out/xshare-yb.bundle.json" || return 1
+    for doc in "${summaries[@]}"; do
+      if ! outcome_files "$out/xshare-yb.bundle.json" | grep -qxF "${doc##*/}"; then
+        echo "::error::the xShare Yellow Button run names no outcome for ${doc##*/}" >&2
+        return 1
+      fi
+    done
+    parts+=("$out/xshare-yb.bundle.json")
   fi
   jq -s '{resourceType: "Bundle", type: "collection", entry: [.[].entry[]]}' "${parts[@]}" \
     > "$out/validation.json"

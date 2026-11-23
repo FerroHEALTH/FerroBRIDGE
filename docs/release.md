@@ -74,14 +74,23 @@ flowchart LR
   `ferrobridge-vX.Y.Z-vulnerability-record.json` and the raw reports
   (`ferrobridge-vX.Y.Z-trivy-reports.tar.gz`) to the draft, and keeps them as
   a run artifact when it refuses.
+- **validation-evidence** writes the exchange-format documents the `eehrxf`
+  suites map and the patient summaries the server serves, directly and
+  through a SMART Health Link, and judges each with the pinned HL7 FHIR
+  Validator (`scripts/checks/fhir-validator.sh`), as the `fhir-validator`
+  job of `ci.yml` does. It attaches the documents and the validator's results
+  as `ferrobridge-vX.Y.Z-fhir-validation.tar.gz` with its checksum, the
+  evidence the xShare Yellow Button self-assessment points at, and a
+  document the validator refuses stops the release.
 - **scan-and-tag** calls `scan-and-tag.yml` once the record passes. It scans
   each pushed digest against `trivy.yaml` (HIGH and CRITICAL, fixed findings
   only, `.trivyignore.yaml`) and only then applies the tags, so a refused
   image is never referencable by tag. `imagetools create` re-tags the same
   digest, so the attestations hold, and each tag is verified as a consumer
   would.
-- **finalize-release** waits for the vulnerability record, checks that the
-  draft carries every asset this version promises, the record included, then
+- **finalize-release** waits for the vulnerability record and the validation
+  evidence, checks that the draft carries every asset this version promises,
+  both included, then
   publishes. Publishing last means a half-assembled release is
   never visible. A pre-release publishes with `--latest=false`, so it never
   becomes the repository's latest release.

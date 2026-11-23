@@ -191,12 +191,12 @@ ihe-atna = { version = "=0.23.0", default-features = false }
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs"] }
-# The test-time key pairs the inbound token tests sign with, in the lock
-# already through rustls; 1.18.1 is the version the lock carries.
+# The AES-256-GCM seal and the random source of the SMART Health Links, and
+# the key pairs the inbound token tests sign with; in the lock through rustls.
 aws-lc-rs = { version = "1.18.1", default-features = false, features = ["aws-lc-sys"] }
-# The test-time Argon2id hash of the synthetic password an inbound Basic case
-# authenticates with, in the lock already through ferrohealth-smart; 0.6.0 is
-# the version the lock carries.
+# The Argon2id hash of a SMART Health Link passcode, and of the synthetic
+# password an inbound Basic case authenticates with; in the lock through
+# ferrohealth-smart.
 argon2 = { version = "0.6.0", default-features = false, features = ["password-hash", "alloc"] }
 # The openehr-its client runtime's Transport is an async-trait trait, so the
 # server's per-call engine implements it through the same macro, as does the
@@ -254,7 +254,7 @@ tar = { version = "0.4.46", default-features = false }
 similar = { version = "3.2.1", default-features = false, features = ["std", "text"] }
 # The mapping-set archive the operator API exports and imports (#610): a ZIP
 # written with fixed timestamps in sorted order, read with a ceiling. MIT.
-zip = { version = "=9.5.1", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "=9.6.0", default-features = false, features = ["deflate-flate2"] }
 # The FerroHEALTH components the operator console (app/ferrobridge-console,
 # #599) draws with: the server-rendered views, the shell, the table model, the
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script

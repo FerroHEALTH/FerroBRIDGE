@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension that makes the ad hoc section named "History of procedures"
+# the history of procedures section of the HL7 Europe Patient Summary 1.0.0-ballot
+# (Composition slice sectionProceduresHx, LOINC 47519-4), loaded by
+# ferrobridge_eu_eps_procedures.context alone. Each procedure the section holds
+# is one entry, the Procedure it maps to.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_eps_procedures_section
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: SECTION.adhoc.v1
+
+mappings:
+  - name: "title"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$fhirRoot"
+    manual:
+      - name: "title"
+        fhir:
+          - path: "title"
+            value: "History of procedures"
+
+  - name: "code"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "code.coding"
+    manual:
+      - name: "loinc"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "47519-4"
+
+  - name: "entries"
+    extension: "add"
+    with:
+      fhir: "entry"
+      openehr: "$archetype/items[openEHR-EHR-ACTION.procedure.v1]"
+    followedBy:
+      mappings:
+        - name: "entry"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$reference"
+          reference:
+            resourceType: "Procedure"
+            mappings:
+              - name: "proceduresEntry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$openehrRoot"
+                slotArchetype: "ACTION.procedure.v1"

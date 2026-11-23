@@ -24,6 +24,7 @@
 # Integrate
 
 - [The FHIR facade](integrate/fhir-facade.md)
+  - [The Yellow Button API](integrate/yellow-button.md)
 - [The FHIRconnect operations](integrate/operations.md)
 - [The OMOP ETL](integrate/omop-etl.md)
 - [The change feed](integrate/change-feed.md)

@@ -268,18 +268,23 @@ against the registry's `latest`.
 ## Profile packages (the profile validator's package set, build time, never committed)
 
 The R4 profile validator runs offline against the packages below, fetched
-verbatim from the FHIR package registry at build time by
+verbatim at build time, from the FHIR package registry or, for a row that
+names its `tarball` and `sha256`, from the guide's canonical site, by
 `scripts/vendor/profile-packages.sh` into the ignored
 `docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
 from this table (#435). At about 970 MB unpacked they are never committed;
 only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
-`scripts/vendor/profile-packages.sh --cache-key`. The seven roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
+`scripts/vendor/profile-packages.sh --cache-key`. The eight roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
 one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.1,
 the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
 2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
 held, `hl7.fhir.eu.imaging` 1.0.0-ballot, the guide a received imaging
-report is validated against (#1601), and `hl7.fhir.eu.hdr` 1.0.0, the
-discharge report a received document is validated against (#1600);
+report is validated against (#1601), `hl7.fhir.eu.hdr` 1.0.0, the
+discharge report a received document is validated against (#1600), and
+`hl7.eu.fhir.xshare-yb` 0.3.0, the xShare Yellow Button guide whose
+Patient Summary content the served summaries are held to (#2029), fetched
+from its canonical site's versioned path because the registry lists 0.2.0
+alone;
 every other row is in the set because a vendored package's `package.json`
 `dependencies` names it at that version. A package two dependents name at
 different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
@@ -334,6 +339,8 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.fhir.eu.laboratory` | 2.0.0 files `94` digest `f142bbdac038895d90841bb92b7865fdf0eb16b9b0b84a8db702998b36636263` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.mpd` | 1.0.0 files `51` digest `e44ea93f6506fc118287051120ae9bfa737cff3a2791cde5ea1f222bf43e88fa` | `docs/specs/fhir-packages/hl7.fhir.eu.mpd#1.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.hdr` | 1.0.0 files `120` digest `184630f1c3f11ac5b27b3d024347fc68cfc4aa55abcb545255a3fa5b4c9f3834` | `docs/specs/fhir-packages/hl7.fhir.eu.hdr#1.0.0/PROVENANCE.md` (a root) |
+| `hl7.eu.fhir.xshare-yb` | 0.3.0 files `13` digest `a411d731a3fa7a1f28f29083b4db10cc6f581c92f7b7b2bece8fee642ae4ae65` tarball `https://hl7.eu/fhir/ig/xshare-yb/0.3.0/package.tgz` sha256 `ba0ced94b5d4bdb463e46375404f805c433640d07604f518a434a58af3c18682` | `docs/specs/fhir-packages/hl7.eu.fhir.xshare-yb#0.3.0/PROVENANCE.md` (a root, from the guide's canonical site: the registry lists 0.2.0 alone) |
+| `hl7.fhir.uv.smart-health-cards-and-links` | 1.0.0 files `20` digest `bf73d0270cce9955a313b755df96a362b21d4faeac6c7a184fc174ff6cf2c480` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-health-cards-and-links#1.0.0/PROVENANCE.md` |
 | `xtehr.eu.ehds.models` | 1.0.0 files `131` digest `e973efecdf61b2ae646407cafbf27177f81c82630938e1f8f2b6b0d20185b184` | `docs/specs/fhir-packages/xtehr.eu.ehds.models#1.0.0/PROVENANCE.md` (FHIR 5.0.0, held and never read) |
 | `hl7.fhir.uv.ipa` | 1.1.0 files `53` digest `70a5f0881a37859ef7fefd5502c0db05c6ce6c2d6dfa1e71828785f523ba7021` | `docs/specs/fhir-packages/hl7.fhir.uv.ipa#1.1.0/PROVENANCE.md` |
 | `hl7.fhir.uv.smart-app-launch` | 2.0.0 files `8` digest `68fd66519d2ff373d8f9e58bfa62455f3e0aeb95a780f2218e5ffee5c4b49c3e` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-app-launch#2.0.0/PROVENANCE.md` (CC-BY-4.0) |

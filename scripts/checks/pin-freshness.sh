@@ -18,7 +18,9 @@
 # the installer both carry. A corpus pinned by commit on a repository with no
 # releases is read against the newest commit of the branch it follows, and a
 # FHIR package (a core package, THO, the v2-to-FHIR guide, an examples package
-# or a root of the profile set) against the registry's `latest` version, and
+# or a root of the profile set) against the registry's `latest` version, or
+# against the current release its guide's `package-list.json` names when the
+# pin comes from the guide's canonical site, and
 # the Chrome for Testing release against the newest Stable version its JSON
 # endpoint lists. Needs an authenticated `gh`, curl and jq. `--self-test` runs
 # the Chrome for Testing reader and the product image readers over fixtures
@@ -103,6 +105,13 @@ registry_newest() {
     return
   fi
   jq -er '.versions | keys[]' <<< "$document" | sort -V | tail -n 1 | grep .
+}
+
+# The release a guide's `package-list.json` on stdin marks `current`, the one
+# its canonical site publishes as the current version; fails unless exactly one
+# entry is marked.
+package_list_current() {
+  jq -er '[.list[]? | select(.current == true) | .version] | select(length == 1) | .[0]'
 }
 
 # The Chrome for Testing release the browser journeys run Chrome and
@@ -309,6 +318,10 @@ self_test() {
   expect "2.1.0" "$got" "the latest tag of a package"
   got="$(registry_newest <<< '{"versions":{"0.9.0-ballot":{},"1.0.0-ballot":{}}}')"
   expect "1.0.0-ballot" "$got" "the highest version of a ballot-only package"
+  got="$(package_list_current <<< '{"list":[{"version":"current"},{"version":"0.3.0","current":true},{"version":"0.2.0"}]}')"
+  expect "0.3.0" "$got" "the current release of a package list"
+  got="$(package_list_current <<< '{"list":[{"version":"0.2.0"}]}' || echo none)"
+  expect "none" "$got" "a package list that marks no current release"
   local fixture d1 d2
   fixture="$(mktemp)"
   d1="sha256:$(printf '1%.0s' {1..64})"
@@ -464,7 +477,9 @@ done <<< "$WATCHED_COMMITS"
 # or, for a package with ballot versions only and no `latest` tag, against its
 # highest version. Of the profile set only the two roots with a `latest` tag
 # are read: every other row is pinned at the version a dependent names. The
-# corpora the eehrxf crate reads are read by their package rows (#1335).
+# corpora the eehrxf crate reads are read by their package rows (#1335). A
+# guide no registry lists at its pinned version is read at its canonical
+# site's `package-list.json`, the source its pin is fetched from (#2029).
 readonly WATCHED_PACKAGES="\
 hl7.fhir.r3.core	https://packages.fhir.org/hl7.fhir.r3.core
 hl7.fhir.r4.core	https://packages.fhir.org/hl7.fhir.r4.core
@@ -488,7 +503,8 @@ HL7 Europe Laboratory Report	https://packages.fhir.org/hl7.fhir.eu.laboratory
 HL7 Europe Imaging Report	https://packages.fhir.org/hl7.fhir.eu.imaging
 HL7 Europe Hospital Discharge Report	https://packages.fhir.org/hl7.fhir.eu.hdr
 MyHealth@EU Master Value Sets Catalogue	https://packages.fhir.org/myhealth.eu.fhir.mvc-package
-HL7 France FR Core	https://packages.fhir.org/hl7.fhir.fr.core"
+HL7 France FR Core	https://packages.fhir.org/hl7.fhir.fr.core
+hl7.eu.fhir.xshare-yb	https://hl7.eu/fhir/ig/xshare-yb/package-list.json"
 
 
 while IFS=$'\t' read -r label url; do
@@ -501,7 +517,9 @@ while IFS=$'\t' read -r label url; do
     continue
   fi
 
-  if ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$url" | registry_newest 2>&1)"; then
+  reader=registry_newest
+  [[ "$url" != */package-list.json ]] || reader=package_list_current
+  if ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$url" | "$reader" 2>&1)"; then
     printf 'UNREADABLE %s: could not read the latest version at %s (%s)\n' "$label" "$url" "$latest"
     unreadable=1
     continue

@@ -43,17 +43,20 @@ product that writes the summary decides how it states them: the medical
 alert (A.2.1.2), which a producer must be able to populate, and the
 functional status (A.2.3.4).
 
-### The openEHR sources of the medication summary and the immunisations
+### The openEHR sources of the patient summary entries
 
-The crosswalk also names the openEHR content that feeds two entry rows, in
-`SOURCES`, each with the template section that holds it. Both are sections
-of the openEHR International Patient Summary template:
+The crosswalk also names the openEHR content that feeds five entry rows, in
+`SOURCES`, each with the section of FerroBRIDGE's patient summary template
+that holds it:
 
 | Entry row | Archetype | Template section |
 |---|---|---|
-| `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-INSTRUCTION.medication_order.v3` | IPS Medication Summary |
-| `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-ACTION.medication.v1` | IPS Medication Summary |
-| `EHDSPatientSummary.immunisations.immunisation` | `openEHR-EHR-ACTION.medication.v1` | IPS Immunizations |
+| `EHDSPatientSummary.problems.problem` | `openEHR-EHR-EVALUATION.problem_diagnosis.v1` | Problem list |
+| `EHDSPatientSummary.allergiesAndIntolerances.allergyIntolerance` | `openEHR-EHR-EVALUATION.adverse_reaction_risk.v2` | Allergies and intolerances |
+| `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-INSTRUCTION.medication_order.v3` | Medication summary |
+| `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-ACTION.medication.v1` | Medication summary |
+| `EHDSPatientSummary.procedures.procedure` | `openEHR-EHR-ACTION.procedure.v1` | History of procedures |
+| `EHDSPatientSummary.immunisations.immunisation` | `openEHR-EHR-ACTION.medication.v1` | Immunisations |
 
 The template section is the placement criterion. A CDR often keeps the
 current medication list as medication orders, and it may record a medicine
@@ -68,6 +71,16 @@ section through the sub-context its section path names, as FHIRconnect's
 sub-contexts do. Each sub-context writes its section and that section's
 entries:
 
+- `ferrobridge_eu_eps_problems.context` maps each problem or diagnosis of
+  the problem list to a `condition-eu-core`: its name, onset, severity,
+  resolution, certainty, body site and comment.
+- `ferrobridge_eu_eps_allergies.context` maps each adverse reaction risk to
+  an `allergyIntolerance-eu-core`: its substance, status, verification,
+  criticality, category (food or medication), onset and comment, after the
+  FHIRconnect mapping library's `adverse_reaction_risk.v2` model.
+- `ferrobridge_eu_eps_procedures.context` maps each procedure to a
+  `procedure-eu-eps`: its name, the time of its careflow step, its body
+  site, reasons, outcomes, complications and comment.
 - `ferrobridge_eu_eps_medication.context` maps each order and each action
   of the medication summary section to a `MedicationStatement-eu-eps`. An
   order's status is `unknown`, because no published crosswalk pairs an order

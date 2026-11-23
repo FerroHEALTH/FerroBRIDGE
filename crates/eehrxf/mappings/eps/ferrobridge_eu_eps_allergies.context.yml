@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's sub-context for the allergies and intolerances of the HL7 Europe Patient
+# Summary 1.0.0-ballot, entered from ferrobridge_eu_eps.context at the
+# template's ad hoc section named "Allergies and intolerances": each risk of an adverse reaction the section holds
+# becomes one AllergyIntolerance entry.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_eu_eps_allergies.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  scope: sub
+  profile:
+    url: "http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps"
+    version: "1.0.0-ballot"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "SECTION.adhoc.v1"
+    - "EVALUATION.adverse_reaction_risk.v2"
+  extensions:
+    - "ferrobridge_eu_eps_allergies_section"
+  start: "SECTION.adhoc.v1"
