@@ -1,6 +1,6 @@
 ---
 name: postgresql-19
-description: Every PostgreSQL the project tests against or documents is the latest release, PostgreSQL 19.0 since 2026-11-21, and 19 is the minimum the bridge starts against; owner rulings 2026-09-12 and 2026-11-21
+description: every FerroHEALTH product with a database runs, tests against and documents PostgreSQL 19; 18 and older are dropped (owner, 2026-11-21)
 metadata:
   type: project
 ---
@@ -8,18 +8,18 @@ metadata:
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-Owner ruling 2026-09-12: the CDM database in tests, the container harness, the
-quickstart `compose.yaml` and the documentation use the latest PostgreSQL
-release, pinned by tag and digest in `docs/VERSIONS.md`. The "PostgreSQL 16"
-the second research pass wrote into the architecture and into #73 and #91 had
-no decision behind it and is corrected.
+Every FerroHEALTH product with a database runs on, tests against and
+documents PostgreSQL 19, the latest major (owner, 2026-11-21). PostgreSQL 18
+and older are dropped with no upgrade path ([[ferrohealth-not-in-production]]).
+The image is pinned by tag and digest in the repository's pin matrix, and a
+new PostgreSQL release is taken as a pin change. A third-party system in a
+test harness keeps the image its vendor documents.
 
-Owner ruling 2026-11-21: every FerroHEALTH product moves to PostgreSQL 19 and
-drops 18, with no upgrade path (nothing is in production). The CDM clients of
-`omop-cdm` read `server_version_num` when they connect and refuse a server
-below `connection::MINIMUM_SERVER_VERSION` (190000).
+**Why:** one database major across the family, always the latest.
 
-**How to apply:** one pin row in `docs/VERSIONS.md`, one constant in the
-testkit that `versions.sh` checks, and every issue or page naming a PostgreSQL
-version names that row. Bump it when a new release ships, as a pin change; a
-new major also moves `MINIMUM_SERVER_VERSION`.
+**How to apply:** every compose file, test container, CI service and page
+that names a PostgreSQL version names the pin row. A product that checks the
+server version at connect refuses a server below 19: here the CDM clients
+of `omop-cdm` read `server_version_num` and refuse a server below
+`connection::MINIMUM_SERVER_VERSION` (190000). The pin is one row in
+`docs/VERSIONS.md` and one testkit constant that `versions.sh` checks.
