@@ -485,6 +485,51 @@ async fn the_eps_profile_answers_the_hl7_europe_form() -> Result<(), Box<dyn Err
             "the EPS form requires {code}"
         );
     }
+    let devices = section(&body, "46264-8").ok_or("the medical devices")?;
+    assert_eq!(
+        1,
+        devices["entry"].as_array().map_or(0, Vec::len),
+        "{devices}"
+    );
+    let statements = of_kind(&body, "DeviceUseStatement");
+    let [statement] = statements.as_slice() else {
+        return Err(format!("{} device use statements", statements.len()).into());
+    };
+    assert_eq!(statement["status"], "active", "{statement}");
+    let devices = of_kind(&body, "Device");
+    let device = devices
+        .iter()
+        .find(|device| device["type"]["coding"][0]["code"] == "14106009")
+        .ok_or("the pacemaker Device")?;
+    assert_eq!(
+        device["type"]["coding"][0]["system"], "http://snomed.info/sct",
+        "{device}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_empty_record_answers_the_eps_medical_devices_nilknown() -> Result<(), Box<dyn Error>> {
+    let term = MockServer::start().await;
+    let Some(harness) = harness(&term).await? else {
+        return Ok(());
+    };
+    mount_terminology(&term).await;
+    mount_record(&harness.cdr, &[]).await;
+    let (status, body) = call(
+        app_over(&harness.facade),
+        get(&format!(
+            "/fhir/Patient/{UID}/$summary?profile={EPS_COMPOSITION}"
+        ))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let devices = section(&body, "46264-8").ok_or("the medical devices")?;
+    assert_eq!(
+        devices["emptyReason"]["coding"][0]["code"], "nilknown",
+        "the medical devices are fed by the project and empty in the record: {devices}"
+    );
+    assert_eq!(0, of_kind(&body, "DeviceUseStatement").len());
     Ok(())
 }
 

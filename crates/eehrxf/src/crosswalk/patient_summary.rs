@@ -67,9 +67,11 @@ pub struct Source {
 /// The problems take the problem or diagnosis (CKM
 /// `openEHR-EHR-EVALUATION.problem_diagnosis.v1`), the allergies and
 /// intolerances the adverse reaction risk (CKM
-/// `openEHR-EHR-EVALUATION.adverse_reaction_risk.v2`) and the procedures the
-/// procedure action (CKM `openEHR-EHR-ACTION.procedure.v1`), each held by
-/// the ad hoc section named for it. The medication summary takes the
+/// `openEHR-EHR-EVALUATION.adverse_reaction_risk.v2`), the procedures the
+/// procedure action (CKM `openEHR-EHR-ACTION.procedure.v1`) and the medical
+/// devices the medical device summary (CKM
+/// `openEHR-EHR-EVALUATION.device_summary.v0`), each held by the ad hoc
+/// section named for it. The medication summary takes the
 /// medication order (CKM
 /// `openEHR-EHR-INSTRUCTION.medication_order.v3`, revision 3.2.1), in which a
 /// CDR often keeps the current medication list, and the medication action
@@ -107,6 +109,12 @@ pub const SOURCES: &[Source] = &[
         template: PATIENT_SUMMARY_TEMPLATE,
         section: "openEHR-EHR-SECTION.adhoc.v1",
         archetype: "openEHR-EHR-ACTION.medication.v1",
+    },
+    Source {
+        path: "EHDSPatientSummary.medicalDevicesAndImplants.deviceUse",
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.adhoc.v1",
+        archetype: "openEHR-EHR-EVALUATION.device_summary.v0",
     },
     Source {
         path: "EHDSPatientSummary.procedures.procedure",

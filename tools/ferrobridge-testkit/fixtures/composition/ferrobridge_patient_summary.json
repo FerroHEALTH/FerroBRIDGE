@@ -644,6 +644,143 @@
           }
         }
       ]
+    },
+    {
+      "_type": "SECTION",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Medical devices"
+      },
+      "archetype_node_id": "openEHR-EHR-SECTION.adhoc.v1",
+      "archetype_details": {
+        "_type": "ARCHETYPED",
+        "archetype_id": {
+          "_type": "ARCHETYPE_ID",
+          "value": "openEHR-EHR-SECTION.adhoc.v1"
+        },
+        "rm_version": "1.1.0"
+      },
+      "items": [
+        {
+          "_type": "EVALUATION",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "Medical device summary"
+          },
+          "archetype_node_id": "openEHR-EHR-EVALUATION.device_summary.v0",
+          "archetype_details": {
+            "_type": "ARCHETYPED",
+            "archetype_id": {
+              "_type": "ARCHETYPE_ID",
+              "value": "openEHR-EHR-EVALUATION.device_summary.v0"
+            },
+            "rm_version": "1.1.0"
+          },
+          "language": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": "ISO_639-1"
+            },
+            "code_string": "en"
+          },
+          "encoding": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": "IANA_character-sets"
+            },
+            "code_string": "UTF-8"
+          },
+          "subject": {
+            "_type": "PARTY_SELF"
+          },
+          "data": {
+            "_type": "ITEM_TREE",
+            "name": {
+              "_type": "DV_TEXT",
+              "value": "Tree"
+            },
+            "archetype_node_id": "at0001",
+            "items": [
+              {
+                "_type": "ELEMENT",
+                "name": {
+                  "_type": "DV_TEXT",
+                  "value": "Device type"
+                },
+                "archetype_node_id": "at0020",
+                "value": {
+                  "_type": "DV_CODED_TEXT",
+                  "value": "Cardiac pacemaker",
+                  "defining_code": {
+                    "_type": "CODE_PHRASE",
+                    "terminology_id": {
+                      "_type": "TERMINOLOGY_ID",
+                      "value": "http://snomed.info/sct"
+                    },
+                    "code_string": "14106009"
+                  }
+                }
+              },
+              {
+                "_type": "ELEMENT",
+                "name": {
+                  "_type": "DV_TEXT",
+                  "value": "Status"
+                },
+                "archetype_node_id": "at0002",
+                "value": {
+                  "_type": "DV_CODED_TEXT",
+                  "value": "Current",
+                  "defining_code": {
+                    "_type": "CODE_PHRASE",
+                    "terminology_id": {
+                      "_type": "TERMINOLOGY_ID",
+                      "value": "local"
+                    },
+                    "code_string": "at0004"
+                  }
+                }
+              },
+              {
+                "_type": "CLUSTER",
+                "name": {
+                  "_type": "DV_TEXT",
+                  "value": "Device details"
+                },
+                "archetype_node_id": "at0022",
+                "items": [
+                  {
+                    "_type": "ELEMENT",
+                    "name": {
+                      "_type": "DV_TEXT",
+                      "value": "Device name"
+                    },
+                    "archetype_node_id": "at0007",
+                    "value": {
+                      "_type": "DV_TEXT",
+                      "value": "Cardiac pacemaker"
+                    }
+                  },
+                  {
+                    "_type": "ELEMENT",
+                    "name": {
+                      "_type": "DV_TEXT",
+                      "value": "Start date"
+                    },
+                    "archetype_node_id": "at0008",
+                    "value": {
+                      "_type": "DV_DATE_TIME",
+                      "value": "2020-03-04T09:00:00Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }

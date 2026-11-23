@@ -310,7 +310,10 @@ pub const LABORATORY: Project = Project {
 /// `ferrobridge_eu_eps_medication.context` each medication order and each
 /// medication action of the medication summary section to a
 /// `MedicationStatement-eu-eps`, `ferrobridge_eu_eps_procedures.context`
-/// each procedure of the history of procedures to a `procedure-eu-eps`, and
+/// each procedure of the history of procedures to a `procedure-eu-eps`,
+/// `ferrobridge_eu_eps_devices.context` each medical device summary of the
+/// medical devices to a `deviceUseStatement-eu-eps` naming a
+/// `device-eu-eps`, and
 /// `ferrobridge_eu_eps_immunization.context` each medication action of the
 /// immunisations section to an `immunization-eu-core`. The section path
 /// is the placement criterion, so one archetype held in two sections is
@@ -347,6 +350,12 @@ pub const EPS: Project = Project {
         shipped!("eps", "ferrobridge_eu_eps_procedures.context.yml"),
         shipped!("eps", "ferrobridge_eu_eps_procedures_section.yml"),
         shipped!("eps", "ferrobridge_procedure.v1.Procedure.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_devices.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_devices_section.yml"),
+        shipped!(
+            "eps",
+            "ferrobridge_device_summary.v0.DeviceUseStatement.yml"
+        ),
     ],
     accounted: &[],
     followed: &[],

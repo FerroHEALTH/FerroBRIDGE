@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The problems, the allergies and intolerances and the history of
-//! procedures of the patient summary, mapped from the CKM
-//! `EVALUATION.problem_diagnosis.v1`, `EVALUATION.adverse_reaction_risk.v2`
-//! and `ACTION.procedure.v1` each held by the ad hoc section named for it,
-//! with their SNOMED CT codes kept (xShare Yellow Button Bronze statement 9).
+//! The problems, the allergies and intolerances, the history of procedures
+//! and the medical devices of the patient summary, mapped from the CKM
+//! `EVALUATION.problem_diagnosis.v1`, `EVALUATION.adverse_reaction_risk.v2`,
+//! `ACTION.procedure.v1` and `EVALUATION.device_summary.v0` each held by the
+//! ad hoc section named for it, with their SNOMED CT codes kept (xShare
+//! Yellow Button Bronze statement 9).
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -44,6 +45,9 @@ pub(crate) const ALLERGIES: (&str, &str) =
 pub(crate) const PROCEDURES: (&str, &str) =
     ("History of procedures", "openEHR-EHR-SECTION.adhoc.v1");
 
+/// The medical devices section of the template.
+pub(crate) const DEVICES: (&str, &str) = ("Medical devices", "openEHR-EHR-SECTION.adhoc.v1");
+
 /// The LOINC code of the problems section.
 pub(crate) const PROBLEMS_CODE: &str = "11450-4";
 
@@ -53,6 +57,9 @@ pub(crate) const ALLERGIES_CODE: &str = "48765-2";
 /// The LOINC code of the procedures section.
 pub(crate) const PROCEDURES_CODE: &str = "47519-4";
 
+/// The LOINC code of the medical devices section.
+pub(crate) const DEVICES_CODE: &str = "46264-8";
+
 /// SNOMED CT 38341003 |Hypertensive disorder, systemic arterial|.
 pub(crate) const HYPERTENSION: &str = "38341003";
 
@@ -61,6 +68,9 @@ pub(crate) const PENICILLIN: &str = "764146007";
 
 /// SNOMED CT 80146002 |Appendectomy|.
 pub(crate) const APPENDECTOMY: &str = "80146002";
+
+/// SNOMED CT 14106009 |Cardiac pacemaker|.
+pub(crate) const PACEMAKER: &str = "14106009";
 
 /// A SNOMED CT coded text.
 fn snomed(value: &str, code: &str) -> String {
@@ -141,13 +151,46 @@ pub(crate) fn procedure(code: &str) -> String {
     )
 }
 
-/// The composition holding one problem, one allergy and one procedure, each
-/// in its section.
+/// A current medical device summary of one device whose type is coded `code`.
+pub(crate) fn device(code: &str) -> String {
+    format!(
+        r#"{{
+  "_type": "EVALUATION",
+  "name": {{ "_type": "DV_TEXT", "value": "Medical device summary" }},
+  {details},
+  {ENTRY},
+  "data": {{ "_type": "ITEM_TREE", "name": {{ "_type": "DV_TEXT", "value": "Tree" }}, "archetype_node_id": "at0001", "items": [{kind}, {status}, {{
+    "_type": "CLUSTER", "name": {{ "_type": "DV_TEXT", "value": "Device details" }}, "archetype_node_id": "at0022", "items": [{name}, {start}]
+  }}] }}
+}}"#,
+        details = details("openEHR-EHR-EVALUATION.device_summary.v0"),
+        kind = element("at0020", "Device type", &snomed("Cardiac pacemaker", code)),
+        status = element(
+            "at0002",
+            "Status",
+            r#"{ "_type": "DV_CODED_TEXT", "value": "Current", "defining_code": { "_type": "CODE_PHRASE", "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "local" }, "code_string": "at0004" } }"#
+        ),
+        name = element(
+            "at0007",
+            "Device name",
+            r#"{ "_type": "DV_TEXT", "value": "Cardiac pacemaker" }"#
+        ),
+        start = element(
+            "at0008",
+            "Start date",
+            r#"{ "_type": "DV_DATE_TIME", "value": "2020-03-04T09:00:00Z" }"#
+        ),
+    )
+}
+
+/// The composition holding one problem, one allergy, one procedure and one
+/// medical device, each in its section.
 fn one_of_each() -> String {
     composition(&[
         section(PROBLEM_LIST, &[problem(HYPERTENSION)]),
         section(ALLERGIES, &[allergy(PENICILLIN)]),
         section(PROCEDURES, &[procedure(APPENDECTOMY)]),
+        section(DEVICES, &[device(PACEMAKER)]),
     ])
 }
 
@@ -185,6 +228,48 @@ fn each_section_maps_its_entry_with_its_snomed_ct_code() -> Result<(), Box<dyn E
     Ok(())
 }
 
+#[test]
+fn a_device_summary_is_a_device_use_statement_of_its_snomed_ct_device() -> Result<(), Box<dyn Error>>
+{
+    let resources = run(
+        &summary()?,
+        &one_of_each(),
+        call("Patient/synthetic-subject", "Device/gateway"),
+    )?;
+    let entries = section_entries(&resources, DEVICES_CODE)?;
+    let [entry] = entries.as_slice() else {
+        return Err(format!("{} device entries", entries.len()).into());
+    };
+    let statement = serde_json::to_value(entry)?;
+    assert_eq!(
+        "DeviceUseStatement", statement["resourceType"],
+        "{statement}"
+    );
+    assert_eq!("active", statement["status"], "{statement}");
+    assert_eq!(
+        "2020-03-04T09:00:00Z", statement["timingPeriod"]["start"],
+        "{statement}"
+    );
+    let reference = statement["device"]["reference"]
+        .as_str()
+        .ok_or("the statement names its device")?;
+    let device = resources
+        .iter()
+        .map(serde_json::to_value)
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .find(|resource| {
+            resource["resourceType"] == "Device"
+                && resource["id"]
+                    .as_str()
+                    .is_some_and(|id| reference.ends_with(id))
+        })
+        .ok_or_else(|| format!("no Device for {reference}"))?;
+    assert_eq!(SNOMED, device["type"]["coding"][0]["system"], "{device}");
+    assert_eq!(PACEMAKER, device["type"]["coding"][0]["code"], "{device}");
+    Ok(())
+}
+
 /// Returns the document of `form` over [`one_of_each`] and every other section the form requires
 /// `nilknown`.
 fn document_of(form: &'static Form) -> Result<String, Box<dyn Error>> {
@@ -208,7 +293,12 @@ fn document_of(form: &'static Form) -> Result<String, Box<dyn Error>> {
     }
     assert_eq!(
         placed,
-        ["sectionProblems", "sectionAllergies", "sectionProceduresHx"]
+        [
+            "sectionProblems",
+            "sectionAllergies",
+            "sectionProceduresHx",
+            "sectionMedicalDevices"
+        ]
     );
     let required: Vec<&str> = form
         .rules

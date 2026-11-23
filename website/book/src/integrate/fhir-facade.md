@@ -853,12 +853,12 @@ Bundle generated on demand from the latest information the CDR holds.
   terminology server's `ConceptMap/$translate`, and every `equivalent` or
   `equal` match is added beside the recorded code.
 - The project feeds the problems, the allergies and intolerances, the
-  medication summary, the history of procedures and the immunisations. A
-  section the project feeds and the record holds nothing for carries the
-  empty reason `nilknown`. A required section no openEHR content feeds (the
-  medical devices of the EPS form) carries `unavailable`, and its narrative
-  says this server does not supply it. A patient with no EHR has an empty
-  record.
+  medication summary, the history of procedures, the medical devices and the
+  immunisations, which covers every section either form requires. A section
+  the project feeds and the record holds nothing for carries the empty
+  reason `nilknown`. A required section no openEHR content feeds would carry
+  `unavailable`, with a narrative saying this server does not supply it. A
+  patient with no EHR has an empty record.
 - `profile` selects the `Composition` profile: the IPS
   `Composition-uv-ips` (2.0.1) by default, or the HL7 Europe Patient Summary
   `composition-eu-eps` (1.0.0-ballot). Any other profile, and the

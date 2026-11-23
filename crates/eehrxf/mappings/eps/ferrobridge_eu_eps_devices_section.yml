@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension that makes the ad hoc section named "Medical devices"
+# the medical devices section of the HL7 Europe Patient Summary 1.0.0-ballot
+# (Composition slice sectionMedicalDevices, LOINC 46264-8), loaded by
+# ferrobridge_eu_eps_devices.context alone. Each medical device summary the
+# section holds is one entry, the DeviceUseStatement it maps to.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_eps_devices_section
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: SECTION.adhoc.v1
+
+mappings:
+  - name: "title"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$fhirRoot"
+    manual:
+      - name: "title"
+        fhir:
+          - path: "title"
+            value: "Medical devices"
+
+  - name: "code"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "code.coding"
+    manual:
+      - name: "loinc"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "46264-8"
+
+  - name: "entries"
+    extension: "add"
+    with:
+      fhir: "entry"
+      openehr: "$archetype/items[openEHR-EHR-EVALUATION.device_summary.v0]"
+    followedBy:
+      mappings:
+        - name: "entry"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$reference"
+          reference:
+            resourceType: "DeviceUseStatement"
+            mappings:
+              - name: "devicesEntry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$openehrRoot"
+                slotArchetype: "EVALUATION.device_summary.v0"
