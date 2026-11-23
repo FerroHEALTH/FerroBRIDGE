@@ -848,9 +848,12 @@ jobs:
       # kills it with exit 143 (docs/ci-cd.md). nextest does not run doctests,
       # so they get their own compile, over the packages with a library
       # target: `cargo test --doc` refuses a binary-only one (tools/forwarders),
-      # the filter scripts/checks/fast.sh applies.
+      # the filter scripts/checks/fast.sh applies. The server's Patient/$summary
+      # suites write each document they serve under EEHRXF_EMIT_DIR too, for
+      # the fhir-validator job.
       - env:
           PACKAGES: ${{ matrix.packages }}
+          EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
           set -euo pipefail
           read -ra packages <<<"$PACKAGES"
@@ -899,16 +902,17 @@ jobs:
             cargo nextest run -p ferrobridge-term --no-default-features --features "$release" --locked --no-tests=pass
           done
       - name: Upload the emitted exchange-format documents
-        if: contains(matrix.packages, 'eehrxf')
+        if: contains(matrix.packages, 'eehrxf') || contains(matrix.packages, 'ferrobridge-server')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: eehrxf-documents
+          name: eehrxf-documents-${{ strategy.job-index }}
           path: ${{ runner.temp }}/eehrxf-documents/
           if-no-files-found: error
           retention-days: 7
 
   # HL7's FHIR Validator over the patient summary, laboratory and imaging report
-  # documents the eehrxf suites write (#1318; no specification governs the
+  # documents the eehrxf suites write, and the patient summaries the server's
+  # Patient/$summary suites serve (#1318, #2015; no specification governs the
   # lane: our own design), the evidence the component's page cites for the
   # exchange format. It runs offline, the jar and the packages pinned in the
   # "HL7 FHIR Validator" table of docs/VERSIONS.md, and fails on an error, a fatal issue or a
@@ -918,7 +922,7 @@ jobs:
   fhir-validator:
     name: fhir-validator (eehrxf documents)
     needs: [detect, test]
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && contains(needs.detect.outputs.test-matrix, 'eehrxf')
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && (contains(needs.detect.outputs.test-matrix, 'eehrxf') || contains(needs.detect.outputs.test-matrix, 'ferrobridge-server'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -934,7 +938,8 @@ jobs:
       - name: Download the emitted exchange-format documents
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: eehrxf-documents
+          pattern: eehrxf-documents-*
+          merge-multiple: true
           path: ${{ runner.temp }}/eehrxf-documents
       - name: Read the pinned profile packages
         id: profile-packages
