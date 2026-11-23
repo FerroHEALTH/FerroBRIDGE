@@ -25,9 +25,9 @@ use std::error::Error;
 use eehrxf::crosswalk::patient_summary::{
     PATIENT_SUMMARY, PATIENT_SUMMARY_TEMPLATE, SOURCES, Source,
 };
-use eehrxf::document::form::slot;
+use eehrxf::document::form::{IPS_PATIENT_SUMMARY_FORM, slot};
 use eehrxf::document::section::{EmptyReason, Section};
-use eehrxf::document::{Document, DocumentError, EPS_BUNDLE};
+use eehrxf::document::{Document, DocumentError, EPS_BUNDLE, IPS_BUNDLE};
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::EPS;
 use eehrxf::receive::ReceivedDocument;
@@ -50,7 +50,7 @@ use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
 use openehr_mapping_core::template::TemplateSource;
 
-use super::support::{emit, eps, vendored};
+use super::support::{emit, eps, profile_set, vendored};
 
 /// The root context of the EPS project.
 const ROOT: &str = "ferrobridge_eu_eps.context";
@@ -711,6 +711,60 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
             .all(|entry| entry.contains("Immunization"))
     );
     emit("eehrxf-summary-medicine-and-vaccine", &text)?;
+    Ok(())
+}
+
+#[test]
+fn the_summary_in_the_ips_form_validates_against_bundle_uv_ips() -> Result<(), Box<dyn Error>> {
+    let Some(set) = profile_set()? else {
+        return Ok(());
+    };
+    let mut document = Document::of(
+        &IPS_PATIENT_SUMMARY_FORM,
+        BASE,
+        String::from("urn:uuid:4f5c1d1e-0000-4000-8000-000000001326"),
+        String::from("2026-10-06T10:00:00Z"),
+        String::from("Patient Summary"),
+    );
+    let subject = document.with_patient(patient())?;
+    let device = document.with_author(&Resource::Device(Box::new(Device {
+        id: Some(String::from("gateway")),
+        ..Device::default()
+    })))?;
+    let answer = summary()?.to_fhir_with(
+        &medicine_and_vaccine(),
+        &settings(),
+        call(&subject, &device),
+    )?;
+    let mut placed = Vec::new();
+    for mapped in document.with_mapped_composition(answer.bundle())? {
+        placed.push(mapped.slot.slice);
+        document.with_section(mapped.into_section(vec![String::from("One synthetic entry.")]))?;
+    }
+    assert_eq!(placed, ["sectionMedications", "sectionImmunizations"]);
+    for slice in ["sectionProblems", "sectionAllergies"] {
+        let slot = IPS_PATIENT_SUMMARY_FORM
+            .slots
+            .iter()
+            .find(|slot| slot.slice == slice)
+            .ok_or(slice)?;
+        document.with_section(
+            Section::new(slot, vec![String::from("Nothing recorded.")])
+                .empty_because(EmptyReason::Unavailable),
+        )?;
+    }
+    let text = serde_json::to_string(&document.into_bundle()?)?;
+    let root: serde_json::Value = serde_json::from_str(&text)?;
+    assert_eq!(root["meta"]["profile"][0], IPS_BUNDLE);
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime
+        .block_on(ReceivedDocument::read(&text)?.validate(
+            set,
+            IPS_BUNDLE,
+            None::<&ferrobridge_term::client::Client>,
+        ))
+        .map_err(|error| format!("{error:?}"))?;
+    emit("eehrxf-ips-summary-medicine-and-vaccine", &text)?;
     Ok(())
 }
 

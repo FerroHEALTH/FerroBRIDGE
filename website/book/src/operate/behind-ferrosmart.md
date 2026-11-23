@@ -104,6 +104,41 @@ naming FerroSMART, the bridge exchanges the patient's token there unless a
 professional's, set `fhir_user_patient = false` in the issuer's `profile`
 table.
 
+## The patient summary reads FerroEHR as the patient
+
+`Patient/$summary` ([`[facade.summary]`](configuration.md#facadesummary))
+reads FerroEHR with the patient's own token, exchanged at FerroSMART
+(RFC 8693 §2.1), so FerroEHR applies the patient's own access rules and its
+access record names the person. FerroSMART is then also the CDR lane's
+`patients` issuer:
+
+```toml
+[[cdr.onward]]
+issuer = "https://smart.example.org"
+kind = "patients"
+token_endpoint = "https://smart.example.org/token"
+audiences = ["https://ehr.example.org/openehr/v1"]
+indicators = ["https://ehr.example.org/openehr/v1"]
+```
+
+At FerroSMART, register the bridge as a confidential client with
+`grant_types = ["token_exchange"]` and both the facade's base and FerroEHR's
+openEHR base in its `resources`. The token FerroSMART issues names the
+patient as `sub`, the openEHR base as `aud` and the bridge as `client_id`
+with no `act`; it carries `fhirUser`, `patient`, `ehrId`, a `scope` of at
+most `patient/composition-*.r`, and the subject token's `acr` and
+`auth_time`, and lives at most five minutes.
+
+**Deployment step:** list the bridge's client in `delegates` under the
+`ferrosmart` preset on both sides, in the bridge's
+`[auth.issuer.ferrosmart.profile]` and in FerroEHR's issuer profile, so each
+reads the exchanged token as the patient acting through the bridge:
+
+```toml
+[auth.issuer.ferrosmart.profile]
+delegates = [{ client = "ferrobridge" }]
+```
+
 ## The discovery document
 
 An app that starts at the bridge reads `GET /fhir/.well-known/smart-configuration`

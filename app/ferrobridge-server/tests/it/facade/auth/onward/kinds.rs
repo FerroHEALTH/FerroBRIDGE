@@ -30,6 +30,7 @@ use crate::facade::auth::condition_of;
 use crate::facade::auth::ec_key;
 use crate::facade::auth::mint;
 use crate::facade::auth::now;
+use crate::facade::summary;
 
 /// The patient the caller is launched for, and the subject of its record.
 const PATIENT: &str = "p-1";
@@ -102,6 +103,45 @@ impl Sides {
                 "iat": now,
                 "exp": now + 300,
                 "jti": "synthetic-patient-onward-jti",
+            }),
+        );
+        Mock::given(matchers::method("POST"))
+            .and(matchers::path("/token"))
+            .and(matchers::body_string_contains(TOKEN_EXCHANGE))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": issued,
+                "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+                "token_type": "Bearer",
+                "expires_in": 300,
+            })))
+            .mount(self.patients.server())
+            .await;
+        issued
+    }
+
+    /// Mounts the `FerroSMART` exchange of a patient's token for `patient`
+    /// (FerroHEALTH/FerroSMART#785): the patient as `sub`, the openEHR base as
+    /// `aud`, the bridge as `client_id` with no `act`, at most
+    /// `patient/composition-*.r`, the launch context with `ehrId`, the subject
+    /// token's `acr` and `auth_time`, for five minutes; returns that token.
+    async fn mount_ferrosmart_exchange(&self, patient: &str) -> String {
+        let now = now();
+        let issued = mint(
+            &self.key,
+            &serde_json::json!({
+                "iss": self.patients.uri(),
+                "aud": CDR_AUDIENCE,
+                "sub": "synthetic-client-sub",
+                "client_id": BRIDGE_CLIENT,
+                "scope": "patient/composition-*.r",
+                "fhirUser": format!("Patient/{patient}"),
+                "patient": patient,
+                "ehrId": crate::facade::EHR_ID,
+                "acr": "http://eidas.europa.eu/LoA/substantial",
+                "auth_time": now - 60,
+                "iat": now,
+                "exp": now + 300,
+                "jti": "synthetic-ferrosmart-onward-jti",
             }),
         );
         Mock::given(matchers::method("POST"))
@@ -199,5 +239,64 @@ async fn a_patient_s_own_token_of_a_persons_issuer_is_exchanged_there() -> Resul
     assert_eq!(1, exchanges.len(), "one exchange serves both requests");
     let body = exchanges.first().ok_or("an exchange")?;
     assert!(body.contains(&format!("subject_token={token}")), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
+-> Result<(), Box<dyn Error>> {
+    let sides = Sides::start().await?;
+    sides.world.mount_own_token().await;
+    let scope = "patient/*.rs";
+    let issued = sides.mount_ferrosmart_exchange(summary::UID).await;
+    let term = wiremock::MockServer::start().await;
+    let client = ferrobridge_server::cdr::CdrClient::new(
+        &sides.world.cdr_config.clone().with_demographic(true),
+    )?;
+    let store =
+        std::sync::Arc::new(ferrobridge_server::facade::identity::store::MemoryStore::default());
+    let Some(facade) = summary::summary_facade(
+        &sides.world.harness.cdr,
+        client,
+        crate::support::translator(&term)?,
+        &store,
+    )
+    .await?
+    else {
+        return Ok(());
+    };
+    summary::mount_terminology(&term).await;
+    summary::mount_record(&sides.world.harness.cdr, &[summary::composition()?]).await;
+    let mut claims = sides.patients.claims(scope);
+    claims["patient"] = serde_json::json!(summary::UID);
+    let token = mint(&sides.key, &claims);
+    let state = ferrobridge_server::state::AppState::with_health(
+        ferrohealth_health::registry::Registry::default(),
+    )
+    .with_facade(facade)
+    .with_auth(crate::facade::auth::authority(sides.world.trusted.clone()).await);
+    let response = crate::facade::raw(
+        ferrobridge_server::router(
+            std::sync::Arc::new(state),
+            &crate::facade::server_settings(),
+        ),
+        crate::facade::auth::bearing(
+            http::Request::get(format!("/fhir/Patient/{}/$summary", summary::UID))
+                .body(axum::body::Body::empty())?,
+            &token,
+        ),
+    )
+    .await?;
+    assert_eq!(http::StatusCode::OK, response.status());
+
+    assert_every_call_under(&sides.world.cdr_calls().await, &issued);
+    let exchanges = sides.patient_exchanges().await;
+    assert_eq!(1, exchanges.len(), "one exchange serves the summary");
+    assert!(
+        exchanges
+            .first()
+            .is_some_and(|body| body.contains(&format!("subject_token={token}"))),
+        "{exchanges:?}"
+    );
     Ok(())
 }

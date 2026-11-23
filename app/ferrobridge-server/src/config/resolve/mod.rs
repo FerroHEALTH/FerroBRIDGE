@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use super::CdmSettings;
 use super::FacadeSettings;
 use super::MappingSettings;
+use super::SummarySettings;
 use super::credentials::Upstream;
 use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
@@ -104,7 +105,30 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
             .enabled
             .then(|| facade.launch_task.store.clone()),
         cors: cors(facade)?,
+        summary: summary(facade)?,
     })
+}
+
+/// Returns the patient summary `facade` configures, `None` when it is off.
+fn summary(facade: &Facade) -> Result<Option<SummarySettings>, Error> {
+    let summary = &facade.summary;
+    if !summary.enabled {
+        return Ok(None);
+    }
+    if summary.packages.is_empty() {
+        return Err(Error::Missing {
+            key: String::from("facade.summary.packages"),
+        });
+    }
+    if summary.operator.trim().is_empty() {
+        return Err(Error::Missing {
+            key: String::from("facade.summary.operator"),
+        });
+    }
+    Ok(Some(SummarySettings {
+        packages: summary.packages.clone(),
+        operator: summary.operator.clone(),
+    }))
 }
 
 /// Returns the CORS policy `facade` configures: every listed origin read in

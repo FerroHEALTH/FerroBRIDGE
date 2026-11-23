@@ -37,6 +37,7 @@ mod replay;
 mod search;
 pub(crate) mod stub;
 mod sub_context;
+pub(crate) mod summary;
 mod terminology;
 pub(crate) mod tofhir;
 mod transaction;

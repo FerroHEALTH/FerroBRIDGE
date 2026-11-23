@@ -891,6 +891,24 @@ SMART launch), served as `Task` at the facade's base (the Integrate page,
 Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
 and its file are FerroBRIDGE's own design.
 
+### `[facade.summary]`
+
+The patient summary, `GET /fhir/Patient/{id}/$summary` (HL7 IPS 2.0.1,
+`OperationDefinition/summary`; the Integrate page,
+[Patient summary](../integrate/fhir-facade.md#patientsummary-writes-the-patient-summary)).
+On, the server needs `[cdr] demographic` and a loaded `Patient` party
+context, fetches the `eehrxf` patient summary template from the CDR and
+reads the packages at boot; a template the CDR does not hold, or a package
+set with a dependency missing, refuses the start.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Patient/$summary` is served |
+| `packages` | none | The FHIR packages each document is validated over, each a `.tgz` or an unpacked directory: `hl7.fhir.r4.core` 4.0.1 and the dependency closure of `hl7.fhir.uv.ips` 2.0.1 and `hl7.fhir.eu.eps` 1.0.0-ballot. Required when on |
+| `operator` | none | The name of the organisation that operates this server, which each document names as an author. Required when on |
+
+Each key is settable as `FERROBRIDGE__FACADE__SUMMARY__<KEY>`.
+
 ### `[facade.identifier_search]`
 
 The chained search through a patient's identifier:

@@ -418,6 +418,17 @@ pub struct FacadeSettings {
     pub launch_task: Option<PathBuf>,
     /// The CORS policy of the FHIR base.
     pub cors: crate::facade::cors::Cors,
+    /// The patient summary, when `Patient/[id]/$summary` is served.
+    pub summary: Option<SummarySettings>,
+}
+
+/// The patient summary, resolved.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SummarySettings {
+    /// The FHIR packages each document is validated over.
+    pub packages: Vec<PathBuf>,
+    /// The name of the organisation that operates this server.
+    pub operator: String,
 }
 
 /// The HL7 v2 face, resolved.

@@ -44,6 +44,7 @@ pub mod request;
 pub mod search;
 pub mod status;
 pub mod subject;
+pub mod summary;
 
 use std::sync::Arc;
 
@@ -165,6 +166,8 @@ pub struct Facade {
     launch_tasks: Option<Arc<owned::OwnedStore>>,
     /// The CORS policy of the FHIR base.
     cors: cors::Cors,
+    /// The patient summary, when `Patient/$summary` is served.
+    summary: Option<Arc<summary::Summary>>,
 }
 
 /// Returns the demographics endpoint of a facade at `settings.base_url`: the
@@ -209,6 +212,7 @@ impl Facade {
             app_state: None,
             launch_tasks: None,
             cors: cors::Cors::default(),
+            summary: None,
         }
     }
 
@@ -260,6 +264,20 @@ impl Facade {
         .into_iter()
         .filter_map(|(on, resource_type)| on.then_some(resource_type))
         .collect()
+    }
+
+    /// Returns this facade serving `Patient/$summary` from `summary`, `None`
+    /// serving no summary.
+    #[must_use]
+    pub fn with_summary(mut self, summary: Option<summary::Summary>) -> Self {
+        self.summary = summary.map(Arc::new);
+        self
+    }
+
+    /// Returns the patient summary, when `Patient/$summary` is served.
+    #[must_use]
+    pub fn summary(&self) -> Option<&summary::Summary> {
+        self.summary.as_deref()
     }
 
     /// Returns this facade admitting the origins of `cors` on its REST routes.
@@ -555,7 +573,8 @@ impl Facade {
 /// which the conformance statement declares only then, and `operator` is the
 /// operator scope `$validate` admits. With App State on, `Basic` is mounted as its endpoint
 /// ([`app_state`]) ahead of the generic routes, and with launch `Task`s on,
-/// `Task` ([`launch_task`]).
+/// `Task` ([`launch_task`]). `Patient/[id]/$summary` answers only with the
+/// patient summary on ([`summary`]).
 pub fn routes(
     facade: Arc<Facade>,
     shape: capability::Shape,
@@ -602,6 +621,10 @@ pub fn routes(
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/$document"),
             get(handlers::document_route),
+        )
+        .route(
+            &format!("{BASE_PATH}/{{resource_type}}/{{id}}/$summary"),
+            get(summary::route),
         )
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history/{{vid}}"),

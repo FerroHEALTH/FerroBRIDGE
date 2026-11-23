@@ -39,6 +39,7 @@ for `spec.version`. The service base is `/fhir`.
 | `POST /fhir/{type}/_search` | The same search, its parameters in a form body |
 | `POST /fhir/{type}/$validate` | The dry run that commits nothing |
 | `GET /fhir/Composition/{id}/$document` | The document Bundle of one Composition; also `GET /fhir/Composition/$document?id={id}` |
+| `GET /fhir/Patient/{id}/$summary` | The patient summary of one patient, an IPS 2.0.1 document, with `[facade.summary]` on ([Patient summary](#patientsummary-writes-the-patient-summary)) |
 | `GET /fhir/{type}/{id}` | Read one resource back out of its composition |
 | `GET /fhir/{type}/{id}/_history/{vid}` | Vread: read the version a write's `Location` named |
 | `PUT /fhir/{type}/{id}` | Update, with `If-Match` |
@@ -58,7 +59,8 @@ page it did not ask for.
 The `CapabilityStatement` names exactly the resource types the loaded programs
 map, with `create`, `read`, `vread` and `update` per type, `transaction` and
 `batch` at system level, the `$validate` operation, `$document` on
-`Composition`, `updateCreate: false`,
+`Composition`, `$summary` on `Patient` with `[facade.summary]` on,
+`updateCreate: false`,
 `conditionalCreate` true, `conditionalUpdate` false (no `PUT [type]?[search]`
 is served; `If-Match` on an update is the version-aware update),
 `versioning: versioned-update` and `readHistory: true` per type, and
@@ -834,6 +836,44 @@ is honoured. A Composition named by the URL of another server is refused the
 same way. The operation is declared on `Composition` in the
 `CapabilityStatement`. The R4 `OperationDefinition` describes the document as
 wrapped inside a search Bundle; the facade answers the document Bundle itself.
+
+## `Patient/$summary` writes the patient summary
+
+With `[facade.summary]` on, `GET /fhir/Patient/{id}/$summary` answers the
+IPS operation (HL7 IPS 2.0.1, `OperationDefinition/summary`): a `document`
+Bundle generated on demand from the latest information the CDR holds.
+
+- The patient is the party the loaded `Patient` party context renders, so
+  its identifiers, name, date of birth and sex come from the CDR's
+  demographic `PERSON`.
+- The record is every patient summary composition of the patient's EHR
+  (the `eehrxf` template `openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0`),
+  each mapped by the `eehrxf` EPS project. A code in no preferred system of
+  the eHealth Network Guidelines on Patient Summary is asked of the
+  terminology server's `ConceptMap/$translate`, and every `equivalent` or
+  `equal` match is added beside the recorded code.
+- A section the project feeds and the record holds nothing for carries the
+  empty reason `nilknown`. A required section no openEHR content feeds
+  (problems, allergies) carries `unavailable`, and its narrative says this
+  server does not supply it. A patient with no EHR has an empty record.
+- `profile` selects the `Composition` profile: the IPS
+  `Composition-uv-ips` (2.0.1) by default, or the HL7 Europe Patient Summary
+  `composition-eu-eps` (1.0.0-ballot). Any other profile, and the
+  `identifier` input, answer `400` with `not-supported`.
+- Before it is served, the document is validated in process against the
+  `Bundle` profile of its form over the packages `[facade.summary] packages`
+  names. A document that breaks it answers `422` with the validator's
+  issues and is never served.
+- The CDR is read as the caller: under `[cdr.endpoint.credentials.onward]`
+  a patient's token is exchanged for the CDR's own (a `patients` issuer,
+  FerroSMART in a FerroHEALTH deployment: [Running behind FerroSMART](../operate/behind-ferrosmart.md#the-patient-summary-reads-ferroehr-as-the-patient)),
+  so the CDR applies the patient's own access rules. A `patient/` token
+  launched for another patient answers `404`, and the CDR is never asked.
+  Each access writes one access record that names the caller and the
+  patient's EHR.
+
+The read path, the empty reasons, the `404` for another patient and the
+refusal of an invalid document are FerroBRIDGE's own design.
 
 ## `$validate` is a dry run of this server
 

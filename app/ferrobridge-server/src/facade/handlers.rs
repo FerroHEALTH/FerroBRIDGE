@@ -626,6 +626,21 @@ fn metadata(
             rest.resource.insert(at, app_state::capability());
         }
     }
+    if facade.summary().is_some()
+        && let Some(rest) = statement.rest.first_mut()
+        && let Some(patient) = rest
+            .resource
+            .iter_mut()
+            .find(|entry| entry.r#type.value.as_deref() == Some(crate::facade::summary::PATIENT))
+    {
+        patient.operation.push(
+            fhir_types::r4::capability_statement::CapabilityStatementRestResourceOperation {
+                name: crate::facade::summary::OPERATION.into(),
+                definition: crate::facade::summary::DEFINITION.into(),
+                ..Default::default()
+            },
+        );
+    }
     if facade.launch_tasks().is_some()
         && let Some(rest) = statement.rest.first_mut()
     {

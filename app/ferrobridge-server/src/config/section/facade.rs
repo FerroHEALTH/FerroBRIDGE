@@ -70,6 +70,8 @@ pub struct Facade {
     pub launch_task: FacadeLaunchTask,
     /// Cross-origin resource sharing on the REST routes.
     pub cors: FacadeCors,
+    /// The patient summary, `Patient/[id]/$summary`.
+    pub summary: FacadeSummary,
 }
 
 impl Default for Facade {
@@ -95,6 +97,7 @@ impl Default for Facade {
             consent: FacadeConsent::default(),
             app_state: FacadeAppState::default(),
             launch_task: FacadeLaunchTask::default(),
+            summary: FacadeSummary::default(),
             cors: FacadeCors::default(),
         }
     }
@@ -279,4 +282,24 @@ impl Default for FacadeLaunchTask {
             store: PathBuf::from("launch-tasks.redb"),
         }
     }
+}
+
+/// The patient summary (HL7 IPS 2.0.1 `OperationDefinition/summary`), served
+/// as `Patient/[id]/$summary`.
+///
+/// On, the operation reads the `Patient` party and the patient summary
+/// compositions of the patient's EHR, and validates each document over
+/// `packages` before it is served.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeSummary {
+    /// Whether `Patient/[id]/$summary` is served.
+    pub enabled: bool,
+    /// The FHIR packages each document is validated over: `hl7.fhir.r4.core`
+    /// and the dependency closure of IPS 2.0.1 and of the HL7 Europe Patient
+    /// Summary, each a `.tgz` or an unpacked directory.
+    pub packages: Vec<PathBuf>,
+    /// The name of the organisation that operates this server, which each
+    /// document names as an author.
+    pub operator: String,
 }

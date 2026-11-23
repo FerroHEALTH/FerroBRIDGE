@@ -18,7 +18,7 @@
 # scripts/vendor/hl7-validator-agreement.sh --fetch prepares from the
 # "HL7 FHIR Validator" table of docs/VERSIONS.md, each checked against its
 # sha256, over the profile packages scripts/vendor/profile-packages.sh
-# fetched (hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
+# fetched (hl7.fhir.uv.ips 2.0.1, hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
 # hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0, hl7.fhir.eu.hdr 1.0.0
 # and hl7.fhir.eu.imaging 1.0.0-ballot with their dependency closure). This
 # script adds the vendored MyHealth@EU Master Value Sets Catalogue, whose
@@ -27,7 +27,7 @@
 # closure reads another guide's documents: a discharge report with
 # hl7.fhir.eu.hdr 1.0.0 and the catalogue loaded, an imaging report with
 # hl7.fhir.eu.imaging 1.0.0-ballot loaded, and every other document with the
-# other four guides, the catalogue and the extension loaded. The runs'
+# other four guides, IPS 2.0.1, the catalogue and the extension loaded. The runs'
 # outcomes are judged together.
 #
 # A run fails on an issue of severity error or fatal, on a document the
@@ -296,8 +296,9 @@ run() {
   local parts=()
   if [[ "${#general[@]}" -gt 0 ]]; then
     validate "$out" general "${general[@]}" -- \
-      'hl7.fhir.eu.eps#1.0.0-ballot' 'hl7.fhir.eu.base#2.0.1' 'hl7.fhir.eu.laboratory#2.0.0' \
-      'hl7.fhir.eu.mpd#1.0.0' "$REMAINING" "$name" > "$out/general.bundle.json" || return 1
+      'hl7.fhir.uv.ips#2.0.1' 'hl7.fhir.eu.eps#1.0.0-ballot' 'hl7.fhir.eu.base#2.0.1' \
+      'hl7.fhir.eu.laboratory#2.0.0' 'hl7.fhir.eu.mpd#1.0.0' "$REMAINING" "$name" \
+      > "$out/general.bundle.json" || return 1
     parts+=("$out/general.bundle.json")
   fi
   if [[ "${#imaging[@]}" -gt 0 ]]; then

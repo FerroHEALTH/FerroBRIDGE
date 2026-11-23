@@ -62,7 +62,8 @@ pub enum Interaction {
     History,
     /// `POST [base]/{type}/$validate`.
     Validate,
-    /// `GET [base]/Composition/[id]/$document` and its type-level form.
+    /// `GET [base]/Composition/[id]/$document` and its type-level form, and
+    /// `GET [base]/Patient/[id]/$summary`.
     Document,
     /// `GET [base]/{type}` and `POST [base]/{type}/_search`.
     Search,
@@ -184,7 +185,7 @@ pub const LAUNCH_TASK: [(Method, &str, Interaction); 4] = [
 /// [`Interaction::Unclassified`], which a guarded deployment refuses, so a
 /// route mounted without a classification fails closed (no specification
 /// governs the table: our own design).
-pub const CLASSIFIED: [(Method, &str, Interaction); 22] = [
+pub const CLASSIFIED: [(Method, &str, Interaction); 23] = [
     (Method::GET, "/metadata", Interaction::Capabilities),
     (Method::GET, SMART_CONFIGURATION, Interaction::Discovery),
     (Method::POST, "", Interaction::Transaction),
@@ -208,6 +209,11 @@ pub const CLASSIFIED: [(Method, &str, Interaction); 22] = [
     (
         Method::GET,
         "/{resource_type}/{id}/$document",
+        Interaction::Document,
+    ),
+    (
+        Method::GET,
+        "/{resource_type}/{id}/$summary",
         Interaction::Document,
     ),
     (Method::POST, "/{resource_type}/$bppc", Interaction::Create),
