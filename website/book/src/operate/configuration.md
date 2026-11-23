@@ -1368,6 +1368,28 @@ naming the key. The OMOCL set that does not load and a CDM database the
 concept resolver cannot reach refuse the start. Over `[change_feed] source =
 "ferroehr"`, a CDR that answers `404` for the reader refuses the start.
 
+### `[shl]`
+
+The person's SMART Health Links, the one-time share of their patient
+summary (SMART Health Cards and Links 1.0.0; the Integrate page,
+[The Yellow Button API](../integrate/yellow-button.md)). On, the server needs
+`[facade.summary]` and `[auth]`, and opens the store at boot; a store that
+cannot be opened refuses the start. The store is one `redb` file, so the lane
+runs on one replica.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the `/shl` routes are served |
+| `store` | none | The `redb` file the links are kept in. Required when on |
+| `base_url` | none | The public origin a receiver reaches the bridge at, such as `https://bridge.example.org`. A link's URL is this origin, `/shl/m/` and 43 characters, and the start is refused when that passes 128 characters. Required when on |
+| `default_expiry` | `"24h"` | How long a link lives when its creator names no `exp` |
+| `max_expiry` | `"7d"` | The longest a link may live |
+| `max_answers` | `10` | The most answers a creator may give a link |
+| `passcode_attempts` | `5` | The wrong passcodes a link takes over its life before it is disabled |
+| `location_lifetime` | `"1h"` | How long a file location lives, at most one hour |
+
+Each key is settable as `FERROBRIDGE__SHL__<KEY>`.
+
 ### `[audit]`
 
 The bridge's own access records: one Regulation (EU) 2025/327 Annex II 3.2

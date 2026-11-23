@@ -81,6 +81,8 @@ pub struct AppState {
     terminology: Option<ferrobridge_term::client::Client>,
     /// The access-record lane, when `[audit]` turns it on.
     access_log: Option<Arc<crate::audit::AccessLog>>,
+    /// The person's SMART Health Links, when they are served.
+    links: Option<Arc<crate::shl::Links>>,
     /// The change-feed consumers the operator API reports, when any runs.
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
 }
@@ -178,6 +180,7 @@ impl AppState {
             terminology,
             change_feed: None,
             access_log: None,
+            links: None,
         })
     }
 
@@ -202,7 +205,22 @@ impl AppState {
             terminology: None,
             change_feed: None,
             access_log: None,
+            links: None,
         }
+    }
+
+    /// Returns this state serving the person's SMART Health Links through
+    /// `links`.
+    #[must_use]
+    pub fn with_links(mut self, links: Arc<crate::shl::Links>) -> Self {
+        self.links = Some(links);
+        self
+    }
+
+    /// Returns the links lane, when it is on.
+    #[must_use]
+    pub const fn links(&self) -> Option<&Arc<crate::shl::Links>> {
+        self.links.as_ref()
     }
 
     /// Returns this state recording every facade access and every committed

@@ -147,7 +147,16 @@ pub struct Shape {
     pub hl7v2: Hl7v2,
     /// The authorization server, when inbound authentication is on.
     pub security: Option<Security>,
+    /// The URL a person creates, lists and revokes SMART Health Links at,
+    /// when `[shl]` is on.
+    pub links: Option<String>,
 }
+
+/// The `rest` extension naming where a person's SMART Health Links are
+/// created.
+// NOTE: no specification governs this: our own design; R4 has no element for an endpoint outside
+// the FHIR base, so an extension (extensibility.html) names it for a patient app's discovery.
+pub const SMART_HEALTH_LINKS: &str = "urn:ferrobridge:extension:smart-health-links";
 
 /// The `oauth-uris` extension of SMART App Launch
 /// (<https://hl7.org/fhir/smart-app-launch/1.0.0/conformance/index.html>).
@@ -211,6 +220,7 @@ pub fn statement_with(
             operations,
             hl7v2,
             security: None,
+            links: None,
         },
         Chains::None,
         None,
@@ -277,6 +287,15 @@ pub fn statement_of(
                 .collect(),
             operation: system_operations(operations),
             security: shape.security.as_ref().map(security),
+            extension: shape
+                .links
+                .iter()
+                .map(|url| Extension {
+                    url: SMART_HEALTH_LINKS.into(),
+                    value: Some(ExtensionValue::Url(url.as_str().into())),
+                    ..Extension::default()
+                })
+                .collect(),
             ..CapabilityStatementRest::default()
         }],
         ..CapabilityStatement::default()
