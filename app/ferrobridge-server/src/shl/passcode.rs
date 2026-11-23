@@ -52,4 +52,3 @@ pub fn matches(passcode: &str, stored: &str) -> Result<bool, PasscodeError> {
         Err(error) => Err(PasscodeError::Hash(error)),
     }
 }
-

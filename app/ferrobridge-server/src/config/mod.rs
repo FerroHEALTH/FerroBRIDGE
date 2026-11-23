@@ -24,8 +24,8 @@ mod fhir_outbound;
 pub mod hl7v2;
 mod omop_incremental;
 mod resolve;
-mod shl;
 pub mod section;
+mod shl;
 
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_config::provenance::Provenance;

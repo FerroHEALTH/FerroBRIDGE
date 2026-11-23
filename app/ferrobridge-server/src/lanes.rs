@@ -786,7 +786,10 @@ fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState>
     .with_context(|| format!("opening the link store {}", shl.store.display()))?;
     let links = Arc::new(links);
     drop(links.spawn_sweeper());
-    tracing::info!(lane = "shl", "the person's SMART Health Links are served under /shl");
+    tracing::info!(
+        lane = "shl",
+        "the person's SMART Health Links are served under /shl"
+    );
     Ok(state.with_links(links))
 }
 

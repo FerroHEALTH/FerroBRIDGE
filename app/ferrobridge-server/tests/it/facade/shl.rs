@@ -560,7 +560,10 @@ async fn neither_the_store_nor_the_log_holds_the_key_the_document_or_the_passcod
         assert!(!text.contains(secret), "the store holds {what}");
         assert!(!logged.contains(secret), "the log holds {what}");
     }
-    assert!(!text.contains("\"resourceType\""), "the store holds a document");
+    assert!(
+        !text.contains("\"resourceType\""),
+        "the store holds a document"
+    );
     assert!(
         text.contains("$argon2id$"),
         "the passcode is held as its hash"
@@ -685,7 +688,10 @@ fn an_expired_link_and_a_lapsed_location_answer_inactive() -> Result<(), Box<dyn
     let swept = store.sweep(10_000)?;
     assert_eq!(1, swept.len());
     assert_eq!(Ending::Expired, swept[0].ending);
-    assert_eq!(Vec::<ferrobridge_server::shl::store::Listed>::new(), store.list(UID, 0)?);
+    assert_eq!(
+        Vec::<ferrobridge_server::shl::store::Listed>::new(),
+        store.list(UID, 0)?
+    );
     Ok(())
 }
 
