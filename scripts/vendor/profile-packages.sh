@@ -10,6 +10,9 @@
 # tree; a package two dependents name at different versions has a row per
 # version. The script downloads each pinned version from the FHIR package
 # registry, verifies the tarball against the registry's recorded shasum,
+# or, for a row that names a `tarball` URL and its `sha256`, downloads that
+# URL on the guide's canonical site and verifies the pinned sha256 (a version
+# its publisher released there and no registry lists), and
 # extracts it verbatim into the ignored
 # docs/specs/fhir-packages/<package>#<version>/package/, and checks the count
 # and digest against the pin. At about 970 MB unpacked the trees are fetched at
@@ -97,6 +100,43 @@ pinned_rows() {
       print k "#" t[1] " " files " " digest
     }
   ' "$1"
+}
+
+# The tarball URL and sha256 the Profile packages row of the reference $2 in
+# the matrix $1 names, as `<url> <sha256>`, or nothing for a row the registry
+# serves. Such a row adds `tarball <url> sha256 <sha256>` after its digest.
+pinned_source() {
+  awk -F'|' -v want="$2" '
+    /^## / { on = ($0 ~ /^## Profile packages/); next }
+    on && NF >= 4 && $2 ~ /^[[:space:]]*`/ {
+      k = $2; v = $3
+      sub(/^[[:space:]]*`/, "", k); sub(/`.*/, "", k)
+      gsub(/`/, "", v); gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+      n = split(v, t, /[[:space:]]+/)
+      if (k "#" t[1] != want) next
+      url = ""; sum = ""
+      for (i = 2; i < n; i++) {
+        if (t[i] == "tarball") url = t[i + 1]
+        if (t[i] == "sha256") sum = t[i + 1]
+      }
+      if (url != "") print url " " sum
+      exit
+    }
+  ' "$1"
+}
+
+# Prints why the PROVENANCE.md $1 does not record the canonical-site tarball
+# the pin of the reference $2 names, or nothing when it does or the registry
+# serves the package.
+source_gap() {
+  local url sum
+  read -r url sum <<< "$(pinned_source "$pins" "$2")"
+  [[ -n "$url" ]] || return 0
+  if ! grep -qxF -- "- Tarball: $url" "$1"; then
+    echo "$1 does not record the tarball $url the pin names"
+  elif ! grep -qxF -- "- SHA-256 (tarball): $sum" "$1"; then
+    echo "$1 does not record the sha256 $sum the pin names"
+  fi
 }
 
 # The file count and tree digest of the tree $1, without PROVENANCE.md.
@@ -231,22 +271,32 @@ provenance_gap() {
 fetch_one() {
   local ref="$1" stamp="$2" want_files="$3" want_digest="$4"
   local pkg="${ref%%#*}" ver="${ref#*#}" dest="$vendor_dir/$1"
-  local meta_url meta shasum tarball_url tmp got sha256 license files digest gap
+  local origin meta shasum tarball_url pinned_sha256 tmp got sha256 license files digest gap
   echo "== $pkg $ver"
-  meta_url="$registry/$pkg"
-  meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$meta_url")" \
-    || die "cannot read registry metadata for $pkg"
-  shasum="$(jq -r --arg v "$ver" '.versions[$v].dist.shasum // empty' <<< "$meta")"
-  tarball_url="$(jq -r --arg v "$ver" '.versions[$v].dist.tarball // empty' <<< "$meta")"
-  [[ -n "$shasum" ]] || die "the registry lists no version $ver of $pkg"
-  [[ -n "$tarball_url" ]] || die "the registry lists no tarball for $pkg $ver"
+  read -r tarball_url pinned_sha256 <<< "$(pinned_source "$pins" "$ref")"
+  if [[ -n "$tarball_url" ]]; then
+    [[ "$pinned_sha256" =~ ^[0-9a-f]{64}$ ]] || die "the $ref pin names the tarball $tarball_url and no sha256"
+  else
+    origin="the FHIR package registry, $registry/$pkg"
+    meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$registry/$pkg")" \
+      || die "cannot read registry metadata for $pkg"
+    shasum="$(jq -r --arg v "$ver" '.versions[$v].dist.shasum // empty' <<< "$meta")"
+    tarball_url="$(jq -r --arg v "$ver" '.versions[$v].dist.tarball // empty' <<< "$meta")"
+    [[ -n "$shasum" ]] || die "the registry lists no version $ver of $pkg"
+    [[ -n "$tarball_url" ]] || die "the registry lists no tarball for $pkg $ver"
+  fi
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"; trap - RETURN' RETURN
   with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
     || die "download of $pkg $ver failed"
-  got="$(shasum -a 1 "$tmp/pkg.tgz" | cut -d' ' -f1)"
-  [[ "$got" = "$shasum" ]] || die "checksum mismatch for $pkg $ver: registry $shasum, downloaded $got"
   sha256="$(shasum -a 256 "$tmp/pkg.tgz" | cut -d' ' -f1)"
+  if [[ -n "$pinned_sha256" ]]; then
+    [[ "$sha256" = "$pinned_sha256" ]] || die "checksum mismatch for $pkg $ver: pinned sha256 $pinned_sha256, downloaded $sha256"
+    shasum="$(shasum -a 1 "$tmp/pkg.tgz" | cut -d' ' -f1)"
+  else
+    got="$(shasum -a 1 "$tmp/pkg.tgz" | cut -d' ' -f1)"
+    [[ "$got" = "$shasum" ]] || die "checksum mismatch for $pkg $ver: registry $shasum, downloaded $got"
+  fi
   mkdir -p "$tmp/x"
   tar -xzf "$tmp/pkg.tgz" -C "$tmp/x"
   rm -f "$tmp/pkg.tgz"
@@ -259,11 +309,15 @@ fetch_one() {
     die "$pkg $ver contains RF2-shaped files; SNOMED CT content is never vendored"
   fi
   license="$(jq -r '.license // "unstated"' "$tmp/x/package/package.json")"
+  if [[ -n "$pinned_sha256" ]]; then
+    origin="the guide's canonical site, $(jq -r '.canonical // "unstated"' "$tmp/x/package/package.json")"
+  fi
   read -r files digest <<< "$(tree_state "$tmp/x")"
   if [[ "$stamp" -eq 0 ]]; then
     [[ "$files" = "$want_files" ]] || die "$pkg $ver stages $files files, the pin records $want_files"
     [[ "$digest" = "$want_digest" ]] || die "$pkg $ver stages the digest $digest, the pin records $want_digest"
     gap="$(provenance_gap "$dest/PROVENANCE.md" "$ver" "$files" "$digest")"
+    [[ -n "$gap" ]] || gap="$(source_gap "$dest/PROVENANCE.md" "$ref")"
     [[ -z "$gap" ]] || die "$gap"
   fi
   mkdir -p "$dest"
@@ -271,19 +325,20 @@ fetch_one() {
   mv "$tmp/x/package" "$dest/package"
   git check-ignore -q "$dest/package" || die "$dest/package is not ignored by git; the tree must never be committed"
   if [[ "$stamp" -eq 1 ]]; then
-    write_provenance "$pkg" "$ver" "$meta_url" "$tarball_url" "$shasum" "$sha256" "$license" "$files" "$digest"
+    write_provenance "$pkg" "$ver" "$origin" "$tarball_url" "$shasum" "$sha256" "$license" "$files" "$digest"
     echo "   record in the $pkg $ver row of docs/VERSIONS.md: $ver files $files digest $digest"
   fi
   echo "   $pkg $ver: $files files at digest $digest, license $license"
 }
 
 # Writes the PROVENANCE.md of the package $1 at version $2 from what its fetch
-# read, and leaves a file that already records the same facts as it is: only
+# read ($3 names where it came from; the sha256 it was pinned by, when that
+# is set, marks a canonical-site tarball), and leaves a file that already records the same facts as it is: only
 # its `Stamped:` date would differ, and a pin that did not move keeps its file
 # byte for byte.
 write_provenance() {
-  local pkg="$1" ver="$2" meta_url="$3" tarball_url="$4" shasum="$5" sha256="$6" license="$7" files="$8" digest="$9"
-  local dir="$vendor_dir/$pkg#$ver" author deps fhir resolved
+  local pkg="$1" ver="$2" origin="$3" tarball_url="$4" shasum="$5" sha256="$6" license="$7" files="$8" digest="$9"
+  local dir="$vendor_dir/$pkg#$ver" author deps fhir resolved canonical="${pinned_sha256:-}"
   author="$(jq -r '.author // "unstated"' "$dir/package/package.json")"
   fhir="$(jq -r '(.fhirVersions // .["fhir-version-list"] // []) | join(", ")' "$dir/package/package.json")"
   deps="$(jq -r '.dependencies // {} | to_entries | map("`\(.key)` \(.value)") | join(", ")' "$dir/package/package.json")"
@@ -326,6 +381,8 @@ keep_or_replace() {
 
 # Prints the PROVENANCE.md write_provenance writes, from its locals.
 render_provenance() {
+  local sha1_note="registry shasum"
+  [[ -z "$canonical" ]] || sha1_note="tarball"
   cat << PROV
 <!-- This file describes third-party material fetched at build time; the bytes
      it describes keep their upstream terms and are never committed. -->
@@ -340,9 +397,9 @@ script with \`--stamp\`, and record the count and digest it prints.
 
 - Package: $pkg
 - Version: $ver
-- Source: the FHIR package registry, $meta_url
+- Source: $origin
 - Tarball: $tarball_url
-- SHA-1 (registry shasum): $shasum
+- SHA-1 ($sha1_note): $shasum
 - SHA-256 (tarball): $sha256
 - Upstream license: $license (the \`license\` field of \`package/package.json\`)
 - Author: $author (the \`author\` field of \`package/package.json\`)
@@ -371,6 +428,19 @@ a cache keyed on \`scripts/vendor/profile-packages.sh --cache-key\`, and the
 script verifies the count and digest of a restored tree as it does of a
 download.
 PROV
+  if [[ -n "$canonical" ]]; then
+    cat << PROV
+
+## Why the canonical site
+
+The FHIR package registry (packages.fhir.org and packages2.fhir.org) lists
+no $ver of $pkg. The guide's publisher released it on the guide's canonical
+site, whose \`package-list.json\` names the release, so the tarball comes from
+the versioned path there, pinned by URL and sha256 in docs/VERSIONS.md; any
+other bytes are refused. Once the registry lists the version, the row drops
+its \`tarball\` and \`sha256\` and the package is fetched like any other.
+PROV
+  fi
 }
 
 # The trees under the vendor directory $1, one `<package>#<version>` per line;
@@ -516,6 +586,7 @@ check_all() {
     check_ref "$ref"
     expected=$((expected + 1))
     gap="$(provenance_gap "$vendor_dir/$ref/PROVENANCE.md" "${ref#*#}" "$files" "$digest")"
+    [[ -n "$gap" ]] || gap="$(source_gap "$vendor_dir/$ref/PROVENANCE.md" "$ref")"
     if [[ -n "$gap" ]]; then
       echo "   $gap"
       failed=1
@@ -772,12 +843,38 @@ PINS
   [[ "$status" -eq 7 ]] || die "self-test: a persistent failure ends with status $status, not the fetch's 7"
   # The rendered provenance names no figure of the whole set, which every
   # pin that moves would leave stale in the files whose own pin did not.
-  local pkg=example.dep ver=2.0.0 meta_url=m tarball_url=t shasum=s sha256=h license=CC0-1.0
-  local author=a deps=d resolved="" files=3 digest=abc
+  local pkg=example.dep ver=2.0.0 origin=o tarball_url=t shasum=s sha256=h license=CC0-1.0
+  local author=a deps=d resolved="" files=3 digest=abc canonical=""
   render_provenance > "$work/rendered.md"
   if grep -nE '[0-9]+ ?[MG]B|(two|three|four|five|six|seven|eight|nine|ten|[0-9]+) versions' "$work/rendered.md" > "$work/out"; then
     die "self-test: the rendered provenance names a figure of the set: $(cat "$work/out")"
   fi
+  grep -qxF -- '- SHA-1 (registry shasum): s' "$work/rendered.md" || die "self-test: a registry tarball is not named by its registry shasum"
+  ! grep -q '^## Why the canonical site' "$work/rendered.md" || die "self-test: a registry tarball says it came from a canonical site"
+  canonical=h
+  render_provenance > "$work/rendered.md"
+  grep -qxF -- '- SHA-1 (tarball): s' "$work/rendered.md" || die "self-test: a canonical-site tarball names a registry shasum"
+  grep -q '^## Why the canonical site' "$work/rendered.md" || die "self-test: a canonical-site tarball does not say why"
+
+  # A row with a tarball and its sha256 is fetched from that URL; any other
+  # row from the registry.
+  local sum
+  sum="$(printf 'a%.0s' {1..64})"
+  cat > "$work/matrix.md" << MATRIX
+## Profile packages
+
+| Item | Pin | Repeated in |
+|---|---|---|
+| \`example.reg\` | 1.0.0 files \`3\` digest \`$sum\` | p |
+| \`example.site\` | 0.3.0 files \`8\` digest \`$sum\` tarball \`https://example.org/ig/0.3.0/package.tgz\` sha256 \`$sum\` | p |
+
+## Next
+MATRIX
+  [[ -z "$(pinned_source "$work/matrix.md" example.reg#1.0.0)" ]] || die "self-test: a registry row names a tarball"
+  [[ "$(pinned_source "$work/matrix.md" example.site#0.3.0)" = "https://example.org/ig/0.3.0/package.tgz $sum" ]] \
+    || die "self-test: a canonical-site row does not name its tarball and sha256"
+  [[ "$(pinned_rows "$work/matrix.md" | tail -n 1)" = "example.site#0.3.0 8 $sum" ]] \
+    || die "self-test: a canonical-site row is not read as its version, count and digest"
   say "self-test: OK"
 }
 
