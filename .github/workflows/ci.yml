@@ -1099,6 +1099,18 @@ jobs:
           key: fhir-examples-${{ steps.fhir-examples.outputs.key }}
       - name: Fetch and verify the FHIR examples packages
         run: bash scripts/vendor/fhir-packages.sh --build-time
+      # The patient summary suites validate each document over the profile
+      # packages, and fail in this lane when they are absent.
+      - name: Read the pinned profile packages
+        id: profile-packages
+        run: echo "key=$(bash scripts/vendor/profile-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the profile packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: docs/specs/fhir-packages/*/package
+          key: profile-packages-${{ steps.profile-packages.outputs.key }}
+      - name: Fetch and verify the profile packages
+        run: bash scripts/vendor/profile-packages.sh
       - env:
           PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
         run: |
