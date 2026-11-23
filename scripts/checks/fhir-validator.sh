@@ -9,7 +9,8 @@
 # a dispensation to the MPD resources (`medication::mapped`), also write it
 # to the directory EEHRXF_EMIT_DIR names, and so do the server's
 # Patient/$summary and SMART Health Link suites with each document they
-# serve; this script runs HL7's FHIR Validator over every one of them and fails on an error. Its results
+# serve; this script runs HL7's FHIR Validator over every one of them and
+# fails on an error. Its results
 # are the evidence the component's page cites for the exchange format
 # (Regulation (EU) 2025/327 Art 15, Annex II 2.2); the validator is never
 # shipped.
