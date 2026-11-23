@@ -213,11 +213,11 @@ async fn a_practitioner_reads_from_an_id_coded_person() -> Result<(), Box<dyn Er
     assert_eq!(UID, body["id"]);
     assert_eq!("Synthetic Professional", body["name"][0]["text"], "{body}");
     assert_eq!("SYN-PRO-0001", body["identifier"][0]["value"], "{body}");
-    // RM 1.1.0 types DV_IDENTIFIER.type as a free String, the plain `login` a SCIM-provisioned
-    // professional carries; FHIRconnect String.adoc §Coding reads it as the code, with no system.
+    // RM 1.1.0 types DV_IDENTIFIER.type as a free String; with no known system it is the
+    // concept's R4 text, never a system-less coding (#2038).
     assert_eq!(
-        serde_json::json!([{"code": "login"}]),
-        body["identifier"][0]["type"]["coding"],
+        serde_json::json!({"text": "login"}),
+        body["identifier"][0]["type"],
         "{body}"
     );
     Ok(())
