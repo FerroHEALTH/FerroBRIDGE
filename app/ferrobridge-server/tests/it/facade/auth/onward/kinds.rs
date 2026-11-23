@@ -90,13 +90,6 @@ impl Sides {
     /// Mounts the `patients` issuer's exchange, answering with a token for
     /// the CDR that names the same patient, and returns that token.
     async fn mount_patient_exchange(&self) -> String {
-        self.mount_patient_exchange_for(PATIENT, PATIENT_SCOPE)
-            .await
-    }
-
-    /// Mounts the `patients` issuer's exchange, answering with a token for
-    /// the CDR granting `scope` to `patient`, and returns that token.
-    async fn mount_patient_exchange_for(&self, patient: &str, scope: &str) -> String {
         let now = now();
         let issued = mint(
             &self.key,
@@ -126,7 +119,7 @@ impl Sides {
         issued
     }
 
-    /// Mounts FerroSMART's exchange of a patient's token for `patient`
+    /// Mounts the `FerroSMART` exchange of a patient's token for `patient`
     /// (FerroHEALTH/FerroSMART#785): the patient as `sub`, the openEHR base as
     /// `aud`, the bridge as `client_id` with no `act`, at most
     /// `patient/composition-*.r`, the launch context with `ehrId`, the subject
