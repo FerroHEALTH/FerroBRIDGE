@@ -485,11 +485,72 @@ jobs:
       console-digest: ${{ needs.build-console.outputs.digest }}
       console-tags: ${{ needs.build-console.outputs.tags }}
 
+  # ---- validation-evidence: the HL7 FHIR Validator reports of the version ---
+  # The exchange-format documents the eehrxf suites write, and the patient
+  # summaries the server serves (directly and through a SMART Health Link),
+  # each judged by the pinned HL7 FHIR Validator as the fhir-validator job of
+  # ci.yml judges them. The documents and the validator's results go onto the
+  # draft as one tarball with its checksum, the evidence the xShare Yellow
+  # Button self-assessment points at (#2015).
+  validation-evidence:
+    name: validation evidence
+    needs: [plan, github-release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write # attach the reports to the draft
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No cache: the evidence of a version is built from this checkout alone.
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache: "false"
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-nextest
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Fetch and verify the build-time inputs
+        run: |
+          set -euo pipefail
+          bash scripts/vendor/v2ig.sh
+          bash scripts/vendor/v2-legacy.sh
+          bash scripts/vendor/hl7v2-samples.sh --build-time
+          bash scripts/vendor/fhir-packages.sh --build-time
+          bash scripts/vendor/profile-packages.sh
+      - name: Write the documents
+        env:
+          EEHRXF_EMIT_DIR: ${{ runner.temp }}/documents
+        run: |
+          set -euo pipefail
+          cargo nextest run -p eehrxf --all-features --locked
+          cargo nextest run -p ferrobridge-server --test it --locked \
+            -E 'test(/^facade::(summary|shl)::/)'
+      - name: Every document passes the HL7 FHIR Validator
+        run: bash scripts/checks/fhir-validator.sh "$RUNNER_TEMP/documents" target/fhir-validation
+      - name: Attach the documents and the reports to the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          evidence="ferrobridge-${TAG}-fhir-validation.tar.gz"
+          mkdir -p "$RUNNER_TEMP/evidence"
+          cp -R "$RUNNER_TEMP/documents" "$RUNNER_TEMP/evidence/documents"
+          cp -R target/fhir-validation "$RUNNER_TEMP/evidence/fhir-validation"
+          tar -czf "$evidence" -C "$RUNNER_TEMP/evidence" documents fhir-validation
+          sha256sum "$evidence" > "$evidence.sha256sum"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "$evidence" "$evidence.sha256sum"
+
   # ---- finalize-release: verify the asset set, then PUBLISH -----------------
 
   finalize-release:
     name: github release (publish)
-    needs: [plan, github-release, build-binaries, build-image, build-console, vulnerability-record]
+    needs: [plan, github-release, build-binaries, build-image, build-console, vulnerability-record, validation-evidence]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -543,7 +604,7 @@ jobs:
           for page in information-sheet instructions-for-use; do
             printf '%s\n' "$assets" | grep -Fxq "ferrobridge-${TAG}-${page}.md" || missing="$missing ferrobridge-${TAG}-${page}.md"
           done
-          for record in "ferrobridge-${TAG}-vulnerability-record.json" "ferrobridge-${TAG}-trivy-reports.tar.gz"; do
+          for record in "ferrobridge-${TAG}-vulnerability-record.json" "ferrobridge-${TAG}-trivy-reports.tar.gz" "ferrobridge-${TAG}-fhir-validation.tar.gz" "ferrobridge-${TAG}-fhir-validation.tar.gz.sha256sum"; do
             printf '%s\n' "$assets" | grep -Fxq "$record" || missing="$missing $record"
           done
           if [ -n "$missing" ]; then
@@ -616,7 +677,7 @@ jobs:
   # already-closed milestone counts as done.
   milestone:
     name: close the milestone
-    needs: [plan, github-release, build-binaries, build-image, build-console, vulnerability-record, scan-and-tag, finalize-release, crates]
+    needs: [plan, github-release, build-binaries, build-image, build-console, vulnerability-record, validation-evidence, scan-and-tag, finalize-release, crates]
     if: ${{ always() && needs.plan.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
