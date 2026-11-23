@@ -244,11 +244,13 @@ validate() {
     shift
   done
   shift
+  local ig
   while [[ $# -gt 0 ]]; do
-    if [[ "$1" = profile=* ]]; then
-      igs+=(-profile "${1#profile=}")
+    ig="$1"
+    if [[ "$ig" = profile=* ]]; then
+      igs+=(-profile "${ig#profile=}")
     else
-      igs+=(-ig "$1")
+      igs+=(-ig "$ig")
     fi
     shift
   done
