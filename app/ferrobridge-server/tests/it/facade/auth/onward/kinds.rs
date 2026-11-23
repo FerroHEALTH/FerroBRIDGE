@@ -105,11 +105,50 @@ impl Sides {
                 "aud": CDR_AUDIENCE,
                 "sub": "synthetic-client-sub",
                 "client_id": BRIDGE_CLIENT,
-                "scope": scope,
-                "patient": patient,
+                "scope": PATIENT_SCOPE,
+                "patient": PATIENT,
                 "iat": now,
                 "exp": now + 300,
                 "jti": "synthetic-patient-onward-jti",
+            }),
+        );
+        Mock::given(matchers::method("POST"))
+            .and(matchers::path("/token"))
+            .and(matchers::body_string_contains(TOKEN_EXCHANGE))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": issued,
+                "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+                "token_type": "Bearer",
+                "expires_in": 300,
+            })))
+            .mount(self.patients.server())
+            .await;
+        issued
+    }
+
+    /// Mounts FerroSMART's exchange of a patient's token for `patient`
+    /// (FerroHEALTH/FerroSMART#785): the patient as `sub`, the openEHR base as
+    /// `aud`, the bridge as `client_id` with no `act`, at most
+    /// `patient/composition-*.r`, the launch context with `ehrId`, the subject
+    /// token's `acr` and `auth_time`, for five minutes; returns that token.
+    async fn mount_ferrosmart_exchange(&self, patient: &str) -> String {
+        let now = now();
+        let issued = mint(
+            &self.key,
+            &serde_json::json!({
+                "iss": self.patients.uri(),
+                "aud": CDR_AUDIENCE,
+                "sub": "synthetic-client-sub",
+                "client_id": BRIDGE_CLIENT,
+                "scope": "patient/composition-*.r",
+                "fhirUser": format!("Patient/{patient}"),
+                "patient": patient,
+                "ehrId": crate::facade::EHR_ID,
+                "acr": "http://eidas.europa.eu/LoA/substantial",
+                "auth_time": now - 60,
+                "iat": now,
+                "exp": now + 300,
+                "jti": "synthetic-ferrosmart-onward-jti",
             }),
         );
         Mock::given(matchers::method("POST"))
@@ -216,7 +255,7 @@ async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
     let sides = Sides::start().await?;
     sides.world.mount_own_token().await;
     let scope = "patient/*.rs";
-    let issued = sides.mount_patient_exchange_for(summary::UID, scope).await;
+    let issued = sides.mount_ferrosmart_exchange(summary::UID).await;
     let term = wiremock::MockServer::start().await;
     let client = ferrobridge_server::cdr::CdrClient::new(
         &sides.world.cdr_config.clone().with_demographic(true),

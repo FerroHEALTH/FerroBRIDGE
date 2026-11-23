@@ -865,8 +865,9 @@ Bundle generated on demand from the latest information the CDR holds.
   names. A document that breaks it answers `422` with the validator's
   issues and is never served.
 - The CDR is read as the caller: under `[cdr.endpoint.credentials.onward]`
-  a patient's token is exchanged for the CDR's own (a `patients` issuer), so
-  the CDR applies the patient's own access rules. A `patient/` token
+  a patient's token is exchanged for the CDR's own (a `patients` issuer,
+  FerroSMART in a FerroHEALTH deployment: [Running behind FerroSMART](../operate/behind-ferrosmart.md#the-patient-summary-reads-ferroehr-as-the-patient)),
+  so the CDR applies the patient's own access rules. A `patient/` token
   launched for another patient answers `404`, and the CDR is never asked.
   Each access writes one access record that names the caller and the
   patient's EHR.
