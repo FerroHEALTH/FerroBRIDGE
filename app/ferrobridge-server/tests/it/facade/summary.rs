@@ -332,9 +332,9 @@ pub(crate) async fn mount_terminology(term: &MockServer) {
         .await;
 }
 
-/// Writes `body`, a document the operation served, as `name` under the
+/// Writes `body`, a document the bridge served, as `name` under the
 /// directory `EEHRXF_EMIT_DIR` names, for a run of HL7's FHIR Validator.
-fn emit(name: &str, body: &serde_json::Value) -> Result<(), Box<dyn Error>> {
+pub(super) fn emit(name: &str, body: &serde_json::Value) -> Result<(), Box<dyn Error>> {
     let Some(dir) = std::env::var_os("EEHRXF_EMIT_DIR") else {
         return Ok(());
     };

@@ -289,6 +289,7 @@ async fn a_link_with_a_passcode_opens_once_in_a_receiver_and_yields_the_summary(
     assert_eq!(served["meta"], document["meta"]);
     assert_eq!(kinds(&served), kinds(&document));
     assert_eq!(served["entry"][1], document["entry"][1], "the same patient");
+    super::summary::emit("server-shl-ips", &document)?;
 
     let (status, _, _) = case.fetch(location).await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "a location is single-use");
