@@ -98,7 +98,6 @@ fails when it names a different commit, tag or pin-set digest.
 | HL7 Europe EU Health Data API | package `hl7.fhir.eu.health-data-api` 1.0.0-ballot, pin-set digest `253ebbce321fc294ae582c3c3abb67274ad53de6578c3eb3360e1566697691ac`, tarball sha256 `5204af60bf7f74f301a627e641a34683d392014f53d5df8ba3651c964e92977b` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-health-data-api/PROVENANCE.md` |
 | MyHealth@EU Master Value Sets Catalogue | package `myhealth.eu.fhir.mvc-package` 9.1.0, pin-set digest `06f68a58f7382db396f029b1c0a420fcac6cbf53d8a948df47594937b0886749`, tarball sha256 `3f99350f36a2a1ea17b7fde37c39ff766bd5c3bc9a29c6183af1acfd07b78ce1` | `scripts/vendor/eehrxf.sh`, `docs/specs/ehdsi-mvc/PROVENANCE.md` |
 | HL7 France FR Core | package `hl7.fhir.fr.core` 2.2.0, pin-set digest `a2806a8c83c2b0b85a4b8c2cfd12effc5d37c3c2c0c2670406b840532698510a`, tarball sha256 `085e61bf579829a6d5520c6f388d763d27ba400f9f6ca548bc88da5545ba13f9` | `scripts/vendor/eehrxf.sh`, `docs/specs/fr-ans/PROVENANCE.md` |
-| HL7 Europe xShare Yellow Button | package `hl7.eu.fhir.xshare-yb` 0.2.0, the newest the registry publishes, watched and not vendored: 0.2.0 builds on IPS 2.0.0, and the validator set waits for 0.3.0 (#2029) | `scripts/checks/pin-freshness.sh` |
 | FHIR R4 core specification pages | `hl7.org/fhir/R4/` 4.0.1, pin-set digest `f83b3f5adeb29f74a8c465292689bbdbbf7c6b609b9d5a643ab6954b483244a7`, the Extensibility (2.5.0), Defining Extensions (2.5.1), StructureDefinition and License and Legal Terms (2.20) pages | `scripts/vendor/eehrxf.sh`, `docs/specs/fhir-r4/PROVENANCE.md` |
 | FHIR NPM Packages page | `hl7.org/fhir/` R5 5.0.0 and 6.0.0-ballot4, pin-set digest `cb1fd95460134009903b35dfaefe08f9ab09f28ae754a5faeea4c325f5733499`, the FHIR NPM Packages (2.1.10) and License and Legal Terms pages of each | `scripts/vendor/fhir-package-spec.sh`, `docs/specs/fhir-package-spec/PROVENANCE.md` |
 | UCUM essence | `ucum-org/ucum` tag `v2.2` commit `d060c6d3dfe3b0deb196c190b8024d95385e0b92` path `ucum-essence.xml` sha256 `dfccea1b5dc284245ebae97edd1dc03c45864da4e87df55bc9851797b4fd0b61` | `scripts/vendor/ucum.sh`, `crates/ferrobridge-fhirpath/vendor/ucum/PROVENANCE.md` (embedded whole in the `ferrobridge-fhirpath` crate) |
@@ -269,18 +268,23 @@ against the registry's `latest`.
 ## Profile packages (the profile validator's package set, build time, never committed)
 
 The R4 profile validator runs offline against the packages below, fetched
-verbatim from the FHIR package registry at build time by
+verbatim at build time, from the FHIR package registry or, for a row that
+names its `tarball` and `sha256`, from the guide's canonical site, by
 `scripts/vendor/profile-packages.sh` into the ignored
 `docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
 from this table (#435). At about 970 MB unpacked they are never committed;
 only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
-`scripts/vendor/profile-packages.sh --cache-key`. The seven roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
+`scripts/vendor/profile-packages.sh --cache-key`. The eight roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
 one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.1,
 the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
 2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
 held, `hl7.fhir.eu.imaging` 1.0.0-ballot, the guide a received imaging
-report is validated against (#1601), and `hl7.fhir.eu.hdr` 1.0.0, the
-discharge report a received document is validated against (#1600);
+report is validated against (#1601), `hl7.fhir.eu.hdr` 1.0.0, the
+discharge report a received document is validated against (#1600), and
+`hl7.eu.fhir.xshare-yb` 0.3.0, the xShare Yellow Button guide whose
+Patient Summary content the served summaries are held to (#2029), fetched
+from its canonical site's versioned path because the registry lists 0.2.0
+alone;
 every other row is in the set because a vendored package's `package.json`
 `dependencies` names it at that version. A package two dependents name at
 different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
@@ -335,6 +339,8 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.fhir.eu.laboratory` | 2.0.0 files `94` digest `f142bbdac038895d90841bb92b7865fdf0eb16b9b0b84a8db702998b36636263` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.mpd` | 1.0.0 files `51` digest `e44ea93f6506fc118287051120ae9bfa737cff3a2791cde5ea1f222bf43e88fa` | `docs/specs/fhir-packages/hl7.fhir.eu.mpd#1.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.hdr` | 1.0.0 files `120` digest `184630f1c3f11ac5b27b3d024347fc68cfc4aa55abcb545255a3fa5b4c9f3834` | `docs/specs/fhir-packages/hl7.fhir.eu.hdr#1.0.0/PROVENANCE.md` (a root) |
+| `hl7.eu.fhir.xshare-yb` | 0.3.0 files `13` digest `a411d731a3fa7a1f28f29083b4db10cc6f581c92f7b7b2bece8fee642ae4ae65` tarball `https://hl7.eu/fhir/ig/xshare-yb/0.3.0/package.tgz` sha256 `ba0ced94b5d4bdb463e46375404f805c433640d07604f518a434a58af3c18682` | `docs/specs/fhir-packages/hl7.eu.fhir.xshare-yb#0.3.0/PROVENANCE.md` (a root, from the guide's canonical site: the registry lists 0.2.0 alone) |
+| `hl7.fhir.uv.smart-health-cards-and-links` | 1.0.0 files `20` digest `bf73d0270cce9955a313b755df96a362b21d4faeac6c7a184fc174ff6cf2c480` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-health-cards-and-links#1.0.0/PROVENANCE.md` |
 | `xtehr.eu.ehds.models` | 1.0.0 files `131` digest `e973efecdf61b2ae646407cafbf27177f81c82630938e1f8f2b6b0d20185b184` | `docs/specs/fhir-packages/xtehr.eu.ehds.models#1.0.0/PROVENANCE.md` (FHIR 5.0.0, held and never read) |
 | `hl7.fhir.uv.ipa` | 1.1.0 files `53` digest `70a5f0881a37859ef7fefd5502c0db05c6ce6c2d6dfa1e71828785f523ba7021` | `docs/specs/fhir-packages/hl7.fhir.uv.ipa#1.1.0/PROVENANCE.md` |
 | `hl7.fhir.uv.smart-app-launch` | 2.0.0 files `8` digest `68fd66519d2ff373d8f9e58bfa62455f3e0aeb95a780f2218e5ffee5c4b49c3e` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-app-launch#2.0.0/PROVENANCE.md` (CC-BY-4.0) |
