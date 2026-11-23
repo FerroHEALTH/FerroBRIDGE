@@ -232,7 +232,7 @@ pub(crate) fn person(sex: &str) -> serde_json::Value {
             "name": text("Details"),
             "archetype_node_id": "id2",
             "items": [
-                element("id3", "Patient identifier", serde_json::json!({"_type": "DV_IDENTIFIER", "issuer": "http://example.org/fhir/sid/patients", "assigner": "http://example.org/fhir/sid/assigners::SYN-ORG-1", "id": "SYN-PAT-2014", "type": "patient"})),
+                element("id3", "Patient identifier", serde_json::json!({"_type": "DV_IDENTIFIER", "issuer": "http://example.org/fhir/sid/patients", "assigner": "Synthetic assigner", "id": "SYN-PAT-2014", "type": "patient"})),
                 element("id4", "Date of birth", serde_json::json!({"_type": "DV_DATE", "value": "1970-01-01"})),
                 element("id5", "Sex", serde_json::json!({"_type": "DV_CODED_TEXT", "value": "Female", "defining_code": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "local"}, "code_string": sex}}))
             ]
@@ -332,6 +332,21 @@ pub(crate) async fn mount_terminology(term: &MockServer) {
         .await;
 }
 
+/// Writes `body`, a document the operation served, as `name` under the
+/// directory `EEHRXF_EMIT_DIR` names, for a run of HL7's FHIR Validator.
+fn emit(name: &str, body: &serde_json::Value) -> Result<(), Box<dyn Error>> {
+    let Some(dir) = std::env::var_os("EEHRXF_EMIT_DIR") else {
+        return Ok(());
+    };
+    let dir = PathBuf::from(dir);
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(
+        dir.join(format!("{name}.json")),
+        serde_json::to_string(body)?,
+    )?;
+    Ok(())
+}
+
 /// The synthetic patient summary composition.
 pub(crate) fn composition() -> Result<serde_json::Value, Box<dyn Error>> {
     Ok(serde_json::from_str(
@@ -388,6 +403,10 @@ async fn a_patient_s_summary_is_an_ips_document_with_coded_entries() -> Result<(
     };
     assert_eq!(patient["id"], UID);
     assert_eq!(patient["identifier"][0]["value"], "SYN-PAT-2014");
+    assert_eq!(
+        patient["identifier"][0]["assigner"]["display"],
+        "Synthetic assigner"
+    );
     assert_eq!(patient["name"][0]["family"], "Subject", "{patient}");
     assert_eq!(patient["birthDate"], "1970-01-01");
     assert_eq!(patient["gender"], "female");
@@ -411,6 +430,7 @@ async fn a_patient_s_summary_is_an_ips_document_with_coded_entries() -> Result<(
         "FerroTERM's ATC translation is added: {codings:?}"
     );
     assert_eq!(1, of_kind(&body, "Immunization").len());
+    emit("server-summary-ips", &body)?;
     let medications = section(&body, "10160-0").ok_or("the medication summary")?;
     assert_eq!(1, medications["entry"].as_array().map_or(0, Vec::len));
     for code in ["11450-4", "48765-2"] {
@@ -444,6 +464,7 @@ async fn the_eps_profile_answers_the_hl7_europe_form() -> Result<(), Box<dyn Err
         body["entry"][0]["resource"]["meta"]["profile"][0],
         EPS_COMPOSITION
     );
+    emit("server-summary-eps", &body)?;
     for code in ["47519-4", "46264-8"] {
         assert!(
             section(&body, code).is_some(),
@@ -478,6 +499,7 @@ async fn an_empty_record_answers_every_required_section_with_its_empty_reason()
         );
     }
     assert_eq!(0, of_kind(&body, "MedicationStatement").len());
+    emit("server-summary-ips-empty", &body)?;
     Ok(())
 }
 
