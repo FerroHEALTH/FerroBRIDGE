@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension that makes the ad hoc section named "Allergies and intolerances"
+# the allergies and intolerances section of the HL7 Europe Patient Summary 1.0.0-ballot
+# (Composition slice sectionAllergies, LOINC 48765-2), loaded by
+# ferrobridge_eu_eps_allergies.context alone. Each risk of an adverse reaction the section holds
+# is one entry, the AllergyIntolerance it maps to.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_eps_allergies_section
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: SECTION.adhoc.v1
+
+mappings:
+  - name: "title"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$fhirRoot"
+    manual:
+      - name: "title"
+        fhir:
+          - path: "title"
+            value: "Allergies and intolerances"
+
+  - name: "code"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "code.coding"
+    manual:
+      - name: "loinc"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "48765-2"
+
+  - name: "entries"
+    extension: "add"
+    with:
+      fhir: "entry"
+      openehr: "$archetype/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v2]"
+    followedBy:
+      mappings:
+        - name: "entry"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "$reference"
+          reference:
+            resourceType: "AllergyIntolerance"
+            mappings:
+              - name: "allergiesEntry"
+                with:
+                  fhir: "$fhirRoot"
+                  openehr: "$openehrRoot"
+                slotArchetype: "EVALUATION.adverse_reaction_risk.v2"
