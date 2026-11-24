@@ -102,3 +102,10 @@ fn the_hdr_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
     embeds_its_directory(&eehrxf::mappings::HDR)?;
     writes_its_files(&eehrxf::mappings::HDR)
 }
+
+#[cfg(feature = "laboratory")]
+#[test]
+fn the_test_report_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
+    embeds_its_directory(&eehrxf::mappings::TEST_REPORT)?;
+    writes_its_files(&eehrxf::mappings::TEST_REPORT)
+}

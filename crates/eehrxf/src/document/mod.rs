@@ -56,6 +56,8 @@ mod mapped;
 pub mod metadata;
 pub mod representation;
 pub mod section;
+#[cfg(feature = "laboratory")]
+pub mod test_report;
 
 #[cfg(feature = "patient-summary")]
 use form::PATIENT_SUMMARY_FORM;

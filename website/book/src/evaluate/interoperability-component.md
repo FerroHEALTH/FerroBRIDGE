@@ -202,7 +202,11 @@ receipt are built. The prescription and dispensation records are read and
 written in the MPD form, and [mapped from and into openEHR](prescription-mapping.md)
 through FerroBRIDGE's MPD contexts. The laboratory report is
 [mapped from and into openEHR](laboratory-mapping.md) through the shipped
-laboratory project and received as a `Bundle-eu-lab`. The imaging report is
+laboratory project and received as a `Bundle-eu-lab`. A non-laboratory
+medical test report of Annex VIII, a spirometry or an electrocardiogram
+result, is mapped from openEHR through the shipped `test-report` project into
+an R4 `DiagnosticReport` that claims no profile, since no HL7 Europe guide
+profiles one. The imaging report is
 [mapped from and into openEHR](imaging-mapping.md) through the shipped
 imaging project, over FerroBRIDGE's template of published CKM archetypes,
 and received as a `BundleReportEuImaging`. The discharge report is
