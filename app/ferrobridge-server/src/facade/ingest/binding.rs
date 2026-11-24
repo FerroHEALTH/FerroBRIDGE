@@ -474,19 +474,11 @@ impl Ingest<'_> {
         let path = entry.identity_path().to_owned();
         let key = EntryKey::new(version.versioned_object_id(), path.as_str());
         let map_key = derive::map_key(&key);
-        let recorded = self
+        let id = self
             .store
-            .internal_of(resource_type, &map_key)
+            .record_internal(resource_type, &map_key, &derive::entry_id(&key))
             .await
             .map_err(|error| store_refusal(&error))?;
-        let id = if let Some(known) = recorded {
-            known
-        } else {
-            self.store
-                .record_internal(resource_type, &map_key, &derive::entry_id(&key))
-                .await
-                .map_err(|error| store_refusal(&error))?
-        };
         let binding = CompositionBinding {
             ehr_id: String::from(ehr_id.as_str()),
             versioned_object_uid: String::from(version.versioned_object_id().value()),
