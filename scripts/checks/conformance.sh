@@ -191,8 +191,18 @@ label_of() {
     myhealth-eu-core) echo "MyHealth@EU Core $(ci_build_version myhealth.eu.fhir.core) (CI)" ;;
     myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
     myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
-    myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI), codes in bound value sets" ;;
+    myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI)" ;;
     *) return 1 ;;
+  esac
+}
+
+# What a corpus's N / M counts, after the fraction in its badge message; empty
+# for a corpus whose label says it.
+unit_of() {
+  case "$1" in
+    myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr) echo " valid" ;;
+    myhealth-eu-mvc) echo " codes in bound value sets" ;;
+    *) echo "" ;;
   esac
 }
 
@@ -222,10 +232,11 @@ colour_of() {
   fi
 }
 
-# The badge JSON of a label and k passing out of n.
+# The badge JSON of a label and k passing out of n, the message closing on
+# the unit $4 when given.
 fraction_badge() {
-  local label="$1" passed="$2" total="$3"
-  jq -cn --arg label "$label" --arg message "$passed / $total" --arg color "$(colour_of "$passed" "$total")" \
+  local label="$1" passed="$2" total="$3" unit="${4:-}"
+  jq -cn --arg label "$label" --arg message "$passed / $total$unit" --arg color "$(colour_of "$passed" "$total")" \
     '{schemaVersion: 1, label: $label, message: $message, color: $color}'
 }
 
@@ -235,7 +246,7 @@ badge_of() {
   passed="$(grep -vc '^total ' "$list" || true)"
   total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   [[ -n "$total" ]] || { echo "conformance: $list has no total line" >&2; return 2; }
-  fraction_badge "$(label_of "$corpus")" "$passed" "$total"
+  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(unit_of "$corpus")"
 }
 
 failed=0
@@ -486,6 +497,16 @@ render_block() {
   fi
   echo '<!-- badges:end -->'
 }
+
+# No badge claims more than a self-test measures (#2090): a label or message
+# that says certified, compliant or conformant fails every mode.
+for badge in "$BADGES"/*.json; do
+  [[ -f "$badge" ]] || continue
+  if jq -r '.label, .message' "$badge" | grep -qiE 'certified|compliant|conformant'; then
+    echo "conformance: $badge claims a certification; a badge names what it measures and its N / M"
+    failed=1
+  fi
+done
 
 block="$(render_block)"
 if ! grep -qx '<!-- badges:begin -->' README.md || ! grep -qx '<!-- badges:end -->' README.md; then
