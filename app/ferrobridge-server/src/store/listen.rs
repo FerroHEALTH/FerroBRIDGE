@@ -387,4 +387,16 @@ mod tests {
         assert!(rendered.contains("ferrobridge_test"), "{rendered}");
         assert!(!rendered.contains("s3cret"), "{rendered}");
     }
+
+    #[tokio::test]
+    async fn an_unreachable_listener_leaves_every_request_reading() {
+        let options = sqlx::postgres::PgConnectOptions::new()
+            .host("127.0.0.1")
+            .port(1);
+        let listened = Arc::new(Listened::new("ferrobridge_test"));
+        Listeners::on(options, &[Arc::clone(&listened)]).spawn();
+        assert!(!listened.listening_within(Duration::from_millis(300)).await);
+        assert!(listened.must_read());
+        assert_eq!(0, listened.losses());
+    }
 }

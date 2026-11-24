@@ -300,4 +300,28 @@ mod tests {
             stale.to_string()
         );
     }
+
+    #[tokio::test]
+    async fn an_unreachable_store_is_an_error_and_never_a_held_lease() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .acquire_timeout(Duration::from_millis(500))
+            .connect_lazy("postgres://bridge@127.0.0.1:1/state?sslmode=disable")
+            .expect("a lazy pool");
+        let lease = Lease::new(
+            pool,
+            Lane::new("outbound").expect("a named lane"),
+            Holder::new(),
+            Duration::from_secs(30),
+        );
+        let held = Generation(1);
+        assert!(matches!(lease.claim().await, Err(LeaseError::Database(_))));
+        assert!(matches!(
+            lease.renew(held).await,
+            Err(LeaseError::Database(_))
+        ));
+        assert!(matches!(
+            lease.release(held).await,
+            Err(LeaseError::Database(_))
+        ));
+    }
 }
