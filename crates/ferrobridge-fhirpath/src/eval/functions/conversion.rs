@@ -3,6 +3,7 @@
 
 //! `iif()` and the conversion functions (N1 §5.5).
 
+use std::fmt;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -11,8 +12,9 @@ use rust_decimal::Decimal;
 use super::Call;
 use crate::eval::convert::{boolean, single_value, string};
 use crate::eval::error::EvalError;
-use crate::quantity::{Quantity, Unit};
+use crate::quantity::{Quantity, Unit, write_amount};
 use crate::temporal::{Date, DateTime, Time};
+use crate::value::scaled::Scaled;
 use crate::value::{Collection, Item};
 
 /// `(\+|-)?\d+`, the integer form of N1 §5.5.3.
@@ -47,6 +49,9 @@ pub(super) fn call<'a>(call: &Call<'_, '_, 'a>) -> Result<Option<Collection<'a>>
         Some(unit) => string(call.model(), &unit, call.name)?,
         None => None,
     };
+    if let Item::Scaled(value, own) = &item {
+        return scaled(value, own.as_ref(), target, unit.as_deref(), test).map(Some);
+    }
     let converted = convert(&item, target, unit.as_deref());
     Ok(Some(if test {
         vec![Item::Boolean(converted.is_some())]
@@ -82,6 +87,64 @@ fn iif<'a>(call: &Call<'_, '_, 'a>) -> Result<Collection<'a>, EvalError> {
         evaluate(2)
     } else {
         Ok(Vec::new())
+    }
+}
+
+/// The digits past which `toString()` refuses to write a decimal out.
+///
+/// NOTE: N1 §5.5.8 sets no length; no specification governs this: our own design, a bound
+/// that keeps `1e999999999` from becoming a string of a billion digits.
+const FIXED_DIGITS: u128 = 4096;
+
+/// A conversion of a value the exact decimal cannot hold, `own` its unit
+/// when it is a quantity, by the table of N1 §5.5.
+///
+/// # Errors
+///
+/// Returns [`EvalError::Unwritable`] for `toString()` of a value whose
+/// fixed-point form takes more than [`FIXED_DIGITS`] digits.
+fn scaled<'a>(
+    value: &Scaled,
+    own: Option<&Unit>,
+    target: Target,
+    unit: Option<&str>,
+    test: bool,
+) -> Result<Collection<'a>, EvalError> {
+    let converted = match (target, own) {
+        (Target::Decimal, None) => Some(Item::Scaled(value.clone(), None)),
+        (Target::Boolean, None) => value
+            .normalized()
+            .and_then(|number| to_boolean(&Item::Decimal(number)))
+            .map(Item::Boolean),
+        (Target::Quantity, own) => {
+            let own = own.cloned().unwrap_or_else(Unit::one);
+            // NOTE: N1 §6.6: converting a value the exact decimal cannot hold to another unit overflows.
+            unit.is_none_or(|unit| Unit::from_code(String::from(unit)) == own)
+                .then(|| Item::Scaled(value.clone(), Some(own)))
+        }
+        (Target::String, own) => match value.fixed(FIXED_DIGITS) {
+            Ok(written) => Some(Item::String(match own {
+                Some(unit) => Written(&written, unit).to_string(),
+                None => written,
+            })),
+            Err(_) if test => None,
+            Err(digits) => return Err(EvalError::Unwritable { digits }),
+        },
+        _ => None,
+    };
+    Ok(if test {
+        vec![Item::Boolean(converted.is_some())]
+    } else {
+        converted.into_iter().collect()
+    })
+}
+
+/// A fixed-point amount in its unit, written as a quantity is.
+struct Written<'t>(&'t str, &'t Unit);
+
+impl fmt::Display for Written<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_amount(f, &self.0, false, self.1)
     }
 }
 

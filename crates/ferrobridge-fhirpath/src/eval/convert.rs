@@ -7,13 +7,13 @@
 
 use fhir_types::codec::Value;
 use fhir_types::schema::ValueKind;
-use rust_decimal::Decimal;
 
 use super::error::EvalError;
 use crate::model::{Model, TypeKind, is_a};
 use crate::quantity::{Calendar, Quantity, Unit};
 use crate::temporal::{DateTime, Time};
 use crate::value::node::Node;
+use crate::value::scaled::Scaled;
 use crate::value::{Collection, Item};
 
 /// The UCUM system url (<https://hl7.org/fhir/R4/ucum.html>).
@@ -48,7 +48,7 @@ pub fn primitive_value<'a>(node: &Node<'_>) -> Result<Option<Item<'a>>, EvalErro
             Item::Integer(number.as_i64().ok_or_else(malformed)?)
         }
         (TypeKind::Primitive(ValueKind::Decimal), Value::Number(number)) => {
-            Item::Decimal(decimal(number.as_str()).ok_or_else(malformed)?)
+            decimal(number.as_str(), None).ok_or_else(malformed)?
         }
         (TypeKind::Primitive(ValueKind::Text) | TypeKind::Xhtml, Value::String(text)) => {
             match ty.name {
@@ -64,11 +64,19 @@ pub fn primitive_value<'a>(node: &Node<'_>) -> Result<Option<Item<'a>>, EvalErro
     Ok(Some(value))
 }
 
-/// A decimal in its JSON lexical form, exponent included.
-fn decimal(text: &str) -> Option<Decimal> {
-    text.parse::<Decimal>()
-        .ok()
-        .or_else(|| Decimal::from_scientific(text).ok())
+/// Reads a FHIR R4 `decimal` written as `text` into its system value.
+///
+/// It is a quantity in `unit` when one is given, and the exact decimal where it holds the value with
+/// its stated precision, else the value as written; `None` when `text` is not
+/// in the lexical form of datatypes.html §2.24.0.1.
+#[must_use]
+pub fn decimal(text: &str, unit: Option<Unit>) -> Option<Item<'static>> {
+    let scaled = Scaled::parse(text)?;
+    Some(match (scaled.to_decimal(), unit) {
+        (Some(value), None) => Item::Decimal(value),
+        (Some(value), Some(unit)) => Item::Quantity(Quantity::new(value, unit)),
+        (None, unit) => Item::Scaled(scaled, unit),
+    })
 }
 
 /// The `System.Quantity` a FHIR `Quantity` maps to: only one with a UCUM
@@ -78,7 +86,10 @@ fn decimal(text: &str) -> Option<Decimal> {
 ///
 /// Returns [`EvalError::Document`] when the quantity's value or code
 /// contradicts the model.
-pub fn fhir_quantity(model: &dyn Model, node: &Node<'_>) -> Result<Option<Quantity>, EvalError> {
+pub fn fhir_quantity(
+    model: &dyn Model,
+    node: &Node<'_>,
+) -> Result<Option<Item<'static>>, EvalError> {
     let Some(ty) = node.fhir_type() else {
         return Ok(None);
     };
@@ -95,10 +106,6 @@ pub fn fhir_quantity(model: &dyn Model, node: &Node<'_>) -> Result<Option<Quanti
     let Some(Value::Number(number)) = json.get("value") else {
         return Ok(None);
     };
-    let value = decimal(number.as_str()).ok_or_else(|| EvalError::Document {
-        element: String::from("Quantity.value"),
-        reason: String::from("the value is not a decimal"),
-    })?;
     // NOTE: FHIR R4 fhirpath.html §2.9.1.3 maps only a, mo, d, h, min and s to calendar
     // keywords, so `wk` stays the definite UCUM week, equivalent to `1 week` (N1 §4.1.8).
     let unit = match code {
@@ -110,7 +117,12 @@ pub fn fhir_quantity(model: &dyn Model, node: &Node<'_>) -> Result<Option<Quanti
         "s" => Unit::Calendar(Calendar::Second),
         other => Unit::Ucum(String::from(other)),
     };
-    Ok(Some(Quantity::new(value, unit)))
+    decimal(number.as_str(), Some(unit))
+        .map(Some)
+        .ok_or_else(|| EvalError::Document {
+            element: String::from("Quantity.value"),
+            reason: String::from("the value is not a decimal"),
+        })
 }
 
 /// The item as a system value where it converts to one.
@@ -129,7 +141,7 @@ pub fn system<'a>(model: &dyn Model, item: &Item<'a>) -> Result<Option<Item<'a>>
     match node.fhir_type() {
         Some(ty) if ty.is_primitive() => primitive_value(node),
         Some(_) => match fhir_quantity(model, node)? {
-            Some(quantity) => Ok(Some(Item::Quantity(quantity))),
+            Some(quantity) => Ok(Some(quantity)),
             None => Ok(Some(item.clone())),
         },
         None => Ok(Some(item.clone())),

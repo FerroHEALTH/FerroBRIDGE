@@ -823,6 +823,7 @@ if [[ -f docs/VERSIONS.md ]]; then
     on && NF >= 5 && $2 ~ /^[[:space:]]*`/ {
       k = $2; v = $3; r = $4
       sub(/^[[:space:]]*`/, "", k); sub(/`.*/, "", k)
+      sub(/,[[:space:]]*held:.*$/, "", v)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
       sub(/^[^`]*`/, "", r); sub(/`.*/, "", r)
       if (k != "Item") print k "|" v "|" r
@@ -907,7 +908,7 @@ if [[ -f docs/VERSIONS.md ]]; then
     on && NF >= 4 && $2 ~ /^[[:space:]]*`/ {
       k = $2; v = $3
       sub(/^[[:space:]]*`/, "", k); sub(/`.*/, "", k)
-      gsub(/`/, "", v); gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+      gsub(/`/, "", v); sub(/,[[:space:]]*held:.*$/, "", v); gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
       print k "|" v
     }
   ' docs/VERSIONS.md)"

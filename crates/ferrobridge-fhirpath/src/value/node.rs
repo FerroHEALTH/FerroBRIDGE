@@ -17,6 +17,7 @@ use fhir_types::codec::Value;
 use fhir_types::schema::{FieldSchema, Kind};
 
 use super::{Collection, Item};
+use crate::eval::convert::decimal;
 use crate::eval::error::EvalError;
 use crate::model::{
     FhirType, Model, TypeKind, choice_element, choice_types, defines, field_type, resource_type,
@@ -432,7 +433,7 @@ fn untyped<'a>(model: &dyn Model, doc: Doc<'a>) -> Item<'a> {
         Value::Number(number) => number
             .as_i64()
             .map(Item::Integer)
-            .or_else(|| number.as_str().parse().ok().map(Item::Decimal))
+            .or_else(|| decimal(number.as_str(), None))
             .unwrap_or_else(|| Item::String(String::from(number.as_str()))),
         Value::Object(object) if object.contains_key("resourceType") => {
             Item::Node(Node::resource(model, doc))
