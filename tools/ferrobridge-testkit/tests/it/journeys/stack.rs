@@ -94,7 +94,7 @@ mappings:
 "#;
 
 /// Which lanes the bridge runs.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Lanes {
     /// Every lane: the facade, the operations and the operator API.
     All,
@@ -108,6 +108,9 @@ pub(crate) enum Lanes {
     /// whose run history holds two synthetic runs ([`RUN_ID`] refused one
     /// record).
     WithEtl,
+    /// Every lane, and a state store over a PostgreSQL started for the
+    /// stack, so the operator API keeps inbound sources.
+    WithSources,
 }
 
 /// The run the history of a [`Lanes::WithEtl`] stack holds with one refused
@@ -202,8 +205,8 @@ pub(crate) struct Stack {
     access_token: String,
     /// The bridge's own thread and the sender that stops it.
     bridge: Running,
-    /// The PostgreSQL of a [`Lanes::WithEtl`] stack, kept so it outlives the
-    /// bridge.
+    /// The PostgreSQL of a [`Lanes::WithEtl`] or a [`Lanes::WithSources`]
+    /// stack, kept so it outlives the bridge.
     _postgres: Option<ferrobridge_testkit::containers::Postgres>,
 }
 
@@ -250,6 +253,7 @@ impl Stack {
         provider.publish_metadata().await;
         let postgres = match lanes {
             Lanes::WithEtl => Some(etl_database().await?),
+            Lanes::WithSources => Some(ferrobridge_testkit::containers::postgres().await?),
             Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => None,
         };
         let cdm = postgres.as_ref().map(|postgres| postgres.url().to_owned());
@@ -462,12 +466,17 @@ async fn bridge(
         tree.join("console"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
-    let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
+    let operations = matches!(
+        lanes,
+        Lanes::All | Lanes::WithEvents | Lanes::WithEtl | Lanes::WithSources
+    );
     let mllp_tls = mllp_tls(tree)?;
     let events = match lanes {
         Lanes::WithEvents => events_lane(cdr, tree).await?,
+        Lanes::WithSources => format!("\n[state]\nurl = \"{}\"\n", cdm.unwrap_or_default()),
         Lanes::All | Lanes::WithoutOperations | Lanes::WithEtl => String::new(),
     };
+    let cdm = cdm.filter(|_url| lanes == Lanes::WithEtl);
     let etl = cdm.map_or_else(String::new, |cdm| {
         format!(
             "\n[cdm]\nurl = \"{cdm}\"\n\n\

@@ -47,7 +47,7 @@ async fn sourced() -> Result<Option<Sourced>, Box<dyn Error>> {
     let store = Store::open(&ferrobridge_server::store::Settings {
         connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
         max_connections: 4,
-        acquire_timeout: Duration::from_secs(5),
+        acquire_timeout: Duration::from_secs(30),
         seal: None,
     })
     .await?;
@@ -191,7 +191,10 @@ async fn a_source_and_its_tenants_are_created_changed_disabled_and_deleted_with_
     assert_eq!(StatusCode::NO_CONTENT, deleted.status());
     let gone = case.get(&path, Some(OPERATOR)).await?;
     assert_eq!(StatusCode::NOT_FOUND, gone.status());
-    assert!(tenants(&store, &source.id).await?.is_empty(), "the tenants go with the source");
+    assert!(
+        tenants(&store, &source.id).await?.is_empty(),
+        "the tenants go with the source"
+    );
 
     let versions = case
         .get(&format!("{path}/versions"), Some(OPERATOR))

@@ -2359,7 +2359,12 @@ has one leader across replicas through a row of `lane_lease`: a replica
 takes a free or expired row and its generation moves on, renews at a third
 of the period, and every cursor write locks the row in its own transaction
 and is refused unless it holds the current generation, so a former leader
-paused past its expiry cannot move a cursor. Session advisory locks are not
+paused past its expiry cannot move a cursor. The inbound sources (`0008`)
+are versioned rows: one write validates the kind's document, appends the
+version with its committer, derives the tenants and MLLP routes and
+notifies `ferrobridge_sources`, and each replica reloads the named source
+into a snapshot behind one pointer swap; a source names its secrets, which
+resolve through the `[secrets]` directory of `ferrohealth-secret`. Session advisory locks are not
 used for leadership: they carry no fencing token and end with their
 connection while the task may run on
 (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
