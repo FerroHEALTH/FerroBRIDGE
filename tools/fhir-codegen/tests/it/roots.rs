@@ -97,7 +97,7 @@ fn the_terminology_root_set_is_a_subset_of_the_wide_one() {
 }
 
 #[test]
-fn the_eight_root_resources_are_found() {
+fn the_nine_root_resources_are_found() {
     let roots = RootSet::select(&R4B, RootScope::Terminology).expect("root set selects");
     assert_eq!(
         roots.resources.keys().copied().collect::<Vec<_>>(),

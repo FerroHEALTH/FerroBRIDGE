@@ -1,0 +1,1 @@
+- `fhir-types` 0.1.132 generates the `Provenance` model and its schema behind the `terminology` feature in every FHIR version, so a terminology server reads and serves the provenance of a ConceptMap without the full resource set.

@@ -326,7 +326,7 @@ pub enum Resource {
     #[cfg(any(feature = "resources", feature = "r6-resources"))]
     Procedure(Box<super::procedure::Procedure>),
     /// A `Provenance` resource.
-    #[cfg(any(feature = "resources", feature = "r6-resources"))]
+    #[cfg(feature = "terminology")]
     Provenance(Box<super::provenance::Provenance>),
     /// A `Questionnaire` resource.
     #[cfg(any(feature = "resources", feature = "r6-resources"))]
@@ -640,7 +640,7 @@ impl super::super::codec::Json for Resource {
             Self::PractitionerRole(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Procedure(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(any(feature = "resources", feature = "r6-resources"))]
+            #[cfg(feature = "terminology")]
             Self::Provenance(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Questionnaire(inner) => super::super::codec::Json::to_json(inner.as_ref()),
@@ -1040,7 +1040,7 @@ impl super::super::codec::Json for Resource {
             )?)),
             #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Procedure" => Ok(Self::Procedure(super::super::codec::boxed(object, path)?)),
-            #[cfg(any(feature = "resources", feature = "r6-resources"))]
+            #[cfg(feature = "terminology")]
             "Provenance" => Ok(Self::Provenance(super::super::codec::boxed(object, path)?)),
             #[cfg(any(feature = "resources", feature = "r6-resources"))]
             "Questionnaire" => Ok(Self::Questionnaire(super::super::codec::boxed(
@@ -1427,7 +1427,7 @@ impl serde::Serialize for Resource {
             }
             #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Procedure(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
-            #[cfg(any(feature = "resources", feature = "r6-resources"))]
+            #[cfg(feature = "terminology")]
             Self::Provenance(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
             #[cfg(any(feature = "resources", feature = "r6-resources"))]
             Self::Questionnaire(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
