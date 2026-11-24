@@ -6,14 +6,16 @@
 //! `type()` returns (N1 §10.2).
 
 pub mod node;
+pub mod scaled;
 
 use std::fmt;
 
 use rust_decimal::Decimal;
 
-use crate::quantity::Quantity;
+use crate::quantity::{Quantity, Unit, write_amount};
 use crate::temporal::{Date, DateTime, Time};
 use node::Node;
+use scaled::Scaled;
 
 /// An ordered collection, the result of every expression (N1 §3.1).
 pub type Collection<'a> = Vec<Item<'a>>;
@@ -41,6 +43,10 @@ pub enum Item<'a> {
     Node(Node<'a>),
     /// A type description from `type()` (N1 §10.2).
     Type(TypeInfo),
+    /// A `System.Decimal`, or with a unit a `System.Quantity`, whose value
+    /// the exact decimal cannot hold with its stated precision, as
+    /// `1e999999999` from a FHIR R4 `decimal`.
+    Scaled(Scaled, Option<Unit>),
 }
 
 /// A type description (N1 §10.2): `SimpleTypeInfo` or `ClassInfo` with a
@@ -67,11 +73,11 @@ impl Item<'_> {
             Self::Boolean(_) => Some("Boolean"),
             Self::String(_) => Some("String"),
             Self::Integer(_) => Some("Integer"),
-            Self::Decimal(_) => Some("Decimal"),
+            Self::Decimal(_) | Self::Scaled(_, None) => Some("Decimal"),
             Self::Date(_) => Some("Date"),
             Self::DateTime(_) => Some("DateTime"),
             Self::Time(_) => Some("Time"),
-            Self::Quantity(_) => Some("Quantity"),
+            Self::Quantity(_) | Self::Scaled(_, Some(_)) => Some("Quantity"),
             Self::Node(_) | Self::Type(_) => None,
         }
     }
@@ -97,6 +103,8 @@ impl fmt::Display for Item<'_> {
             Self::DateTime(value) => write!(f, "{value}"),
             Self::Time(value) => write!(f, "{value}"),
             Self::Quantity(value) => write!(f, "{value}"),
+            Self::Scaled(value, None) => write!(f, "{value}"),
+            Self::Scaled(value, Some(unit)) => write_amount(f, value, false, unit),
             Self::Node(node) => write!(f, "{node}"),
             Self::Type(info) => match &info.name {
                 Some(name) => write!(f, "{}.{name}", info.namespace),

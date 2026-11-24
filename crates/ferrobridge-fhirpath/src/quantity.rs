@@ -513,13 +513,26 @@ pub fn equivalent_decimals(a: Decimal, b: Decimal) -> bool {
 
 impl fmt::Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.unit {
-            Unit::Calendar(calendar) if self.value.abs() == Decimal::ONE => {
-                write!(f, "{} {}", self.value, calendar.keyword())
-            }
-            Unit::Calendar(calendar) => write!(f, "{} {}s", self.value, calendar.keyword()),
-            Unit::Ucum(code) => write!(f, "{} '{code}'", self.value),
-        }
+        write_amount(f, &self.value, self.value.abs() == Decimal::ONE, &self.unit)
+    }
+}
+
+/// Writes an amount in `unit`: a calendar keyword, plural unless the amount
+/// is `one`, or a quoted UCUM code.
+///
+/// # Errors
+///
+/// Returns the formatter's error.
+pub fn write_amount(
+    f: &mut fmt::Formatter<'_>,
+    value: &dyn fmt::Display,
+    one: bool,
+    unit: &Unit,
+) -> fmt::Result {
+    match unit {
+        Unit::Calendar(calendar) if one => write!(f, "{value} {}", calendar.keyword()),
+        Unit::Calendar(calendar) => write!(f, "{value} {}s", calendar.keyword()),
+        Unit::Ucum(code) => write!(f, "{value} '{code}'"),
     }
 }
 

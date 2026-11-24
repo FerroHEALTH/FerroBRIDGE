@@ -44,9 +44,12 @@ pub(super) fn call<'a>(call: &Call<'_, '_, 'a>) -> Result<Option<Collection<'a>>
         return Ok(Some(Vec::new()));
     };
     let result = match call.name {
-        "precision" => match precision(&item) {
-            Some(digits) => Some(Item::Integer(i64::from(digits))),
-            None => return Err(EvalError::type_error(call.name, describe(&item))),
+        "precision" => match (&item, precision(&item)) {
+            (Item::Scaled(value, None), _) => i32::try_from(value.places())
+                .ok()
+                .map(|digits| Item::Integer(i64::from(digits))),
+            (_, Some(digits)) => Some(Item::Integer(i64::from(digits))),
+            (_, None) => return Err(EvalError::type_error(call.name, describe(&item))),
         },
         "comparable" => {
             let Some(other) = single_value(model, &call.arg_or_empty(0)?, call.name)? else {
@@ -131,6 +134,9 @@ fn boundary<'a>(
             decimal(*value, end, digits, place).map(Item::Decimal)
         }
         Item::Integer(value) => decimal(Decimal::from(*value), end, digits, 0).map(Item::Decimal),
+        // NOTE: FHIRPath 3.0.0 lowBoundary(): a precision greater than the maximum possible precision
+        // of the implementation is empty, and the boundary of a value it cannot hold needs one.
+        Item::Scaled(_, None) => None,
         Item::Date(date) => {
             // NOTE: FHIRPath 3.0.0 lowBoundary() names "4 for Date" as the default beside "the
             // greatest precision of the type", which for a date is 8; the greatest is taken.
