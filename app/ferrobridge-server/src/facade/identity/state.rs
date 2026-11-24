@@ -3,9 +3,10 @@
 
 //! The identity map in the state store, which every replica shares.
 //!
-//! Every write is record-once: an `INSERT … ON CONFLICT DO NOTHING`, then a
-//! read of the row that stands, so two replicas recording one binding agree
-//! on the winner. A person's identifier and every `Resource.identifier`
+//! Every write is record-once: one statement inserts with `ON CONFLICT DO
+//! NOTHING` and answers the row that stands, read again only when a
+//! concurrent writer's row was not yet visible to it, so two replicas
+//! recording one binding agree on the winner. A person's identifier and every `Resource.identifier`
 //! value are stored as their HMAC under the lookup key, and the person an
 //! EHR was recorded for is sealed, so no identifier value is stored in clear
 //! (GDPR Art 5(1)(c) and Art 32, <https://eur-lex.europa.eu/eli/reg/2016/679/oj>).
@@ -155,45 +156,41 @@ impl Store for StateStore {
 
     async fn record_ehr(&self, patient: &PersonId, ehr: &EhrId) -> Result<EhrId, StoreError> {
         let digest = self.keys.lookup().digest(PERSON, patient.id());
-        let inserted = sqlx::query(
-            "INSERT INTO person_ehr (namespace, id_hmac, ehr_id) VALUES ($1, $2, $3) \
-             ON CONFLICT (namespace, id_hmac) DO NOTHING",
+        let subject = EhrSubject {
+            namespace: patient.namespace().to_owned(),
+            id: patient.id().to_owned(),
+        };
+        let plain = serde_json::to_vec(&subject).map_err(|source| StoreError::Record {
+            key: ehr.as_str().to_owned(),
+            source: Box::new(source),
+        })?;
+        let (key_id, sealed) = self
+            .keys
+            .seal(&Self::subject_context(ehr.as_str()), &plain)
+            .map_err(|source| StoreError::Seal { source })?;
+        let stood: Option<String> = sqlx::query_scalar(
+            "WITH won AS (INSERT INTO person_ehr (namespace, id_hmac, ehr_id) VALUES ($1, $2, $3) \
+               ON CONFLICT (namespace, id_hmac) DO NOTHING RETURNING ehr_id), \
+             subject AS (INSERT INTO ehr_subject (ehr_id, key_id, person_sealed) \
+               SELECT ehr_id, $4, $5 FROM won ON CONFLICT (ehr_id) DO NOTHING) \
+             SELECT ehr_id FROM won UNION ALL \
+             SELECT ehr_id FROM person_ehr WHERE namespace = $1 AND id_hmac = $2 LIMIT 1",
         )
         .bind(patient.namespace())
         .bind(&digest)
         .bind(ehr.as_str())
-        .execute(&self.pool)
+        .bind(key_id.as_str())
+        .bind(&sealed)
+        .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
-        if inserted.rows_affected() == 1 {
-            let subject = EhrSubject {
-                namespace: patient.namespace().to_owned(),
-                id: patient.id().to_owned(),
-            };
-            let plain = serde_json::to_vec(&subject).map_err(|source| StoreError::Record {
-                key: ehr.as_str().to_owned(),
-                source: Box::new(source),
-            })?;
-            let (key_id, sealed) = self
-                .keys
-                .seal(&Self::subject_context(ehr.as_str()), &plain)
-                .map_err(|source| StoreError::Seal { source })?;
-            sqlx::query(
-                "INSERT INTO ehr_subject (ehr_id, key_id, person_sealed) VALUES ($1, $2, $3) \
-                 ON CONFLICT (ehr_id) DO NOTHING",
-            )
-            .bind(ehr.as_str())
-            .bind(key_id.as_str())
-            .bind(&sealed)
-            .execute(&self.pool)
-            .await
-            .map_err(database)?;
-        }
-        self.ehr_of(patient)
-            .await?
-            .ok_or_else(|| StoreError::Missing {
-                key: patient.namespace().to_owned(),
-            })
+        let stood = match stood {
+            Some(value) => Some(checked(patient.namespace(), "ehr_id", value, EhrId::new)?),
+            None => self.ehr_of(patient).await?,
+        };
+        stood.ok_or_else(|| StoreError::Missing {
+            key: patient.namespace().to_owned(),
+        })
     }
 
     async fn person_of(&self, ehr: &EhrId) -> Result<Option<PersonId>, StoreError> {
@@ -251,21 +248,31 @@ impl Store for StateStore {
         external: &ExternalResourceId,
         internal: &FhirResourceId,
     ) -> Result<FhirResourceId, StoreError> {
-        sqlx::query(
-            "INSERT INTO external_internal (resource_type, external_id, internal_id) \
-             VALUES ($1, $2, $3) ON CONFLICT (resource_type, external_id) DO NOTHING",
+        let stood: Option<String> = sqlx::query_scalar(
+            "WITH won AS (INSERT INTO external_internal (resource_type, external_id, internal_id) \
+               VALUES ($1, $2, $3) ON CONFLICT (resource_type, external_id) DO NOTHING \
+               RETURNING internal_id) \
+             SELECT internal_id FROM won UNION ALL SELECT internal_id FROM external_internal \
+             WHERE resource_type = $1 AND external_id = $2 LIMIT 1",
         )
         .bind(resource_type)
         .bind(external.as_str())
         .bind(internal.as_str())
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
-        self.internal_of(resource_type, external)
-            .await?
-            .ok_or_else(|| StoreError::Missing {
-                key: external.as_str().to_owned(),
-            })
+        let stood = match stood {
+            Some(value) => Some(checked(
+                external.as_str(),
+                "FHIR id",
+                value,
+                FhirResourceId::new,
+            )?),
+            None => self.internal_of(resource_type, external).await?,
+        };
+        stood.ok_or_else(|| StoreError::Missing {
+            key: external.as_str().to_owned(),
+        })
     }
 
     async fn binding_of(
@@ -296,21 +303,26 @@ impl Store for StateStore {
             key: internal.as_str().to_owned(),
             source: Box::new(source),
         })?;
-        sqlx::query(
-            "INSERT INTO composition_binding (resource_type, internal_id, binding) \
-             VALUES ($1, $2, $3) ON CONFLICT (resource_type, internal_id) DO NOTHING",
+        let stood: Option<serde_json::Value> = sqlx::query_scalar(
+            "WITH won AS (INSERT INTO composition_binding (resource_type, internal_id, binding) \
+               VALUES ($1, $2, $3) ON CONFLICT (resource_type, internal_id) DO NOTHING \
+               RETURNING binding) \
+             SELECT binding FROM won UNION ALL SELECT binding FROM composition_binding \
+             WHERE resource_type = $1 AND internal_id = $2 LIMIT 1",
         )
         .bind(resource_type)
         .bind(internal.as_str())
         .bind(&value)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
-        self.binding_of(resource_type, internal)
-            .await?
-            .ok_or_else(|| StoreError::Missing {
-                key: internal.as_str().to_owned(),
-            })
+        let stood = match stood {
+            Some(value) => Some(binding_of_row(internal.as_str(), value)?),
+            None => self.binding_of(resource_type, internal).await?,
+        };
+        stood.ok_or_else(|| StoreError::Missing {
+            key: internal.as_str().to_owned(),
+        })
     }
 
     async fn consumed(&self, source: &SourceVersion) -> Result<Option<ConsumedSource>, StoreError> {
@@ -348,10 +360,15 @@ impl Store for StateStore {
         source: &SourceVersion,
         consumed: &ConsumedSource,
     ) -> Result<ConsumedSource, StoreError> {
-        sqlx::query(
-            "INSERT INTO consumed_source (resource_type, source_id, version_id, ehr_id, \
-             versioned_object_uid, internal_id, context) VALUES ($1, $2, $3, $4, $5, $6, $7) \
-             ON CONFLICT (resource_type, source_id, version_id) DO NOTHING",
+        let stood = sqlx::query(
+            "WITH won AS (INSERT INTO consumed_source (resource_type, source_id, version_id, \
+               ehr_id, versioned_object_uid, internal_id, context) \
+               VALUES ($1, $2, $3, $4, $5, $6, $7) \
+               ON CONFLICT (resource_type, source_id, version_id) DO NOTHING \
+               RETURNING ehr_id, versioned_object_uid, internal_id, context) \
+             SELECT ehr_id, versioned_object_uid, internal_id, context FROM won UNION ALL \
+             SELECT ehr_id, versioned_object_uid, internal_id, context FROM consumed_source \
+             WHERE resource_type = $1 AND source_id = $2 AND version_id = $3 LIMIT 1",
         )
         .bind(source.resource_type())
         .bind(source.id().as_str())
@@ -360,14 +377,16 @@ impl Store for StateStore {
         .bind(&consumed.versioned_object_uid)
         .bind(&consumed.internal_id)
         .bind(&consumed.context)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
-        self.consumed(source)
-            .await?
-            .ok_or_else(|| StoreError::Missing {
-                key: source.storage_key(),
-            })
+        let stood = match stood {
+            Some(row) => Some(consumed_of_row(&row)?),
+            None => self.consumed(source).await?,
+        };
+        stood.ok_or_else(|| StoreError::Missing {
+            key: source.storage_key(),
+        })
     }
 
     async fn committed(
@@ -398,24 +417,33 @@ impl Store for StateStore {
         source: &SourceVersion,
         committed: &CommittedSource,
     ) -> Result<CommittedSource, StoreError> {
-        sqlx::query(
-            "INSERT INTO committed_source (resource_type, source_id, version_id, ehr_id, \
-             contribution_uid) VALUES ($1, $2, $3, $4, $5) \
-             ON CONFLICT (resource_type, source_id, version_id) DO NOTHING",
+        let stood = sqlx::query(
+            "WITH won AS (INSERT INTO committed_source (resource_type, source_id, version_id, \
+               ehr_id, contribution_uid) VALUES ($1, $2, $3, $4, $5) \
+               ON CONFLICT (resource_type, source_id, version_id) DO NOTHING \
+               RETURNING ehr_id, contribution_uid) \
+             SELECT ehr_id, contribution_uid FROM won UNION ALL \
+             SELECT ehr_id, contribution_uid FROM committed_source \
+             WHERE resource_type = $1 AND source_id = $2 AND version_id = $3 LIMIT 1",
         )
         .bind(source.resource_type())
         .bind(source.id().as_str())
         .bind(version_slot(source))
         .bind(&committed.ehr_id)
         .bind(&committed.contribution_uid)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
-        self.committed(source)
-            .await?
-            .ok_or_else(|| StoreError::Missing {
-                key: source.storage_key(),
-            })
+        let stood = match stood {
+            Some(row) => Some(CommittedSource {
+                ehr_id: row.try_get("ehr_id").map_err(database)?,
+                contribution_uid: row.try_get("contribution_uid").map_err(database)?,
+            }),
+            None => self.committed(source).await?,
+        };
+        stood.ok_or_else(|| StoreError::Missing {
+            key: source.storage_key(),
+        })
     }
 
     async fn identified(
@@ -478,4 +506,114 @@ fn consumed_of_row(row: &sqlx::postgres::PgRow) -> Result<ConsumedSource, StoreE
         internal_id: row.try_get("internal_id").map_err(database)?,
         context: row.try_get("context").map_err(database)?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{StateStore, version_slot};
+    use crate::cdr::ids::EhrId;
+    use crate::facade::identity::record::{
+        CommittedSource, CompositionBinding, ConsumedSource, Identifier, IdentifierQuery,
+        SourceVersion, SystemMatch,
+    };
+    use crate::facade::identity::store::{Store as _, StoreError};
+    use crate::facade::identity::{ExternalResourceId, FhirResourceId, PersonId};
+    use crate::store::seal::{KeyId, LookupKey, SealKeys, SealingKey};
+
+    /// The base64 of 32 bytes of `A`, made for the tests.
+    const KEY: &str = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=";
+
+    /// A map over a database no server answers.
+    fn unreachable() -> StateStore {
+        let key = SealingKey::from_base64(KEY).expect("a 32-byte key");
+        StateStore {
+            pool: sqlx::postgres::PgPoolOptions::new()
+                .acquire_timeout(Duration::from_millis(300))
+                .connect_lazy("postgres://bridge@127.0.0.1:1/state?sslmode=disable")
+                .expect("a lazy pool"),
+            keys: SealKeys::new(
+                (KeyId::new("k").expect("an id"), key.clone()),
+                Vec::new(),
+                LookupKey::new(&key),
+            ),
+        }
+    }
+
+    /// Whether `outcome` is the database's refusal.
+    fn refused<T: std::fmt::Debug>(outcome: &Result<T, StoreError>) -> bool {
+        matches!(outcome, Err(StoreError::Database { .. }))
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_store_refuses_every_call_and_answers_nothing_empty() {
+        let map = unreachable();
+        let person = PersonId::new("http://example.org/ns", "p-1").expect("a person");
+        let ehr = EhrId::new("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11").expect("an ehr_id");
+        let external = ExternalResourceId::new("sender-1").expect("an external id");
+        let id = FhirResourceId::new("abc").expect("a FHIR id");
+        let source = SourceVersion::new("Condition", external.clone(), None);
+        let binding: CompositionBinding = serde_json::from_value(serde_json::json!({
+            "ehr_id": "e", "versioned_object_uid": "u", "template_id": "t",
+            "resource_type": "Condition", "entry_path": "/p", "split": 0,
+            "context": "c", "derivation": null, "created": null
+        }))
+        .expect("a binding");
+        let consumed = ConsumedSource {
+            ehr_id: String::from("e"),
+            versioned_object_uid: String::from("u"),
+            internal_id: String::from("abc"),
+            context: String::from("c"),
+        };
+        let committed = CommittedSource {
+            ehr_id: String::from("e"),
+            contribution_uid: String::from("c"),
+        };
+        assert!(refused(&map.ehr_of(&person).await));
+        assert!(refused(&map.record_ehr(&person, &ehr).await));
+        assert!(refused(&map.person_of(&ehr).await));
+        assert!(refused(&map.internal_of("Condition", &external).await));
+        assert!(refused(
+            &map.record_internal("Condition", &external, &id).await
+        ));
+        assert!(refused(&map.binding_of("Condition", &id).await));
+        assert!(refused(
+            &map.record_binding("Condition", &id, &binding).await
+        ));
+        assert!(refused(&map.consumed(&source).await));
+        assert!(refused(&map.consumed_versions(&source).await));
+        assert!(refused(&map.record_consumed(&source, &consumed).await));
+        assert!(refused(&map.committed(&source).await));
+        assert!(refused(&map.record_committed(&source, &committed).await));
+        for system in [
+            SystemMatch::Any,
+            SystemMatch::Absent,
+            SystemMatch::Is(String::from("urn:s")),
+        ] {
+            let query = IdentifierQuery::new(system, "v");
+            assert!(refused(&map.identified("Patient", &query).await));
+        }
+        let identifier = Identifier::new(Some("urn:s"), "v");
+        assert!(refused(
+            &map.record_identifier("Patient", &identifier, &id).await
+        ));
+    }
+
+    #[test]
+    fn a_source_without_a_version_takes_the_empty_slot() {
+        let external = ExternalResourceId::new("s").expect("an external id");
+        assert_eq!(
+            "",
+            version_slot(&SourceVersion::new("Condition", external.clone(), None))
+        );
+        assert_eq!(
+            "2",
+            version_slot(&SourceVersion::new(
+                "Condition",
+                external,
+                Some(String::from("2"))
+            ))
+        );
+    }
 }
