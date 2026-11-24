@@ -9,11 +9,11 @@ file from here and never edit one: change the pin in docs/VERSIONS.md, run
 `scripts/vendor/v2ig.sh --stamp`, and record the count and digest it prints.
 
 - Source: <https://github.com/HL7/v2ig>
-- Pin: commit `3adcdbfff654ccbff5cd33aa34bd909a087e8e19`, path `input/sourceOfTruth`, taken whole at its upstream layout
+- Pin: commit `9c307dadb0bb3f99de399d30cd80c24b47bb08da`, path `input/sourceOfTruth`, taken whole at its upstream layout
 - Files: 1694
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
   `PROVENANCE.md` excluded): `9a1fb2b974b69f575bcd9b30fa66d2ff7f13ef7869c1350eca7462067e974f93`
-- Stamped: 2026-09-25. The script verifies the count and the digest on every
+- Stamped: 2026-11-24. The script verifies the count and the digest on every
   fetch, and keeps a tree already on disk at that digest.
 - Content: FHIR StructureDefinitions of kind `logical` (with a few
   CodeSystem, ValueSet and List resources) for the v2 messages, message

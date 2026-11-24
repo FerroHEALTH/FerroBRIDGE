@@ -61,13 +61,14 @@ corpus_require() {
 }
 
 # The Pin cell of the docs/VERSIONS.md row whose Item cell is $1, backticks
-# removed. This is the single source of truth for every pin (docs/VERSIONS.md).
+# and a trailing `, held: <reason>` removed (scripts/checks/pin-freshness.sh
+# reads the reason). This is the single source of truth for every pin.
 corpus_pin_cell() {
   local cell
   cell="$(awk -F'|' -v item="$1" '
     NF >= 3 {
       k = $2; v = $3
-      gsub(/`/, "", k); gsub(/`/, "", v)
+      gsub(/`/, "", k); gsub(/`/, "", v); sub(/,[[:space:]]*held:.*$/, "", v)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", k)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
       if (k == item) { print v; exit }
