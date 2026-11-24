@@ -136,6 +136,15 @@ pub enum EvalError {
         /// What is wrong.
         reason: String,
     },
+    /// A decimal too long to write in the fixed-point form `toString()` gives
+    /// (N1 §5.5.8), as `1e999999999`.
+    #[error(
+        "toString() writes a Decimal as (\\+|-)?\\d+(\\.\\d+)? (N1 §5.5.8), which for this value takes {digits} digits"
+    )]
+    Unwritable {
+        /// The digits the fixed-point form takes.
+        digits: u128,
+    },
 }
 
 impl EvalError {

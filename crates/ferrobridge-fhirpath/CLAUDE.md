@@ -12,7 +12,11 @@ adds. Other FHIRPath engines are prior art only.
 
 Every document this crate reads is the lexical `Value` of `fhir-types`, so a
 decimal keeps the text it was written in and becomes a `rust_decimal` value
-without passing through a float. Never introduce a second JSON model.
+without passing through a float. A decimal that value cannot hold with its
+stated precision, such as `1e999999999`, becomes a `value::scaled::Scaled`
+in its exponent form: it compares exactly, every computation on it is empty
+(N1 §6.6), and `toString()` refuses one too long to write out. Never
+introduce a second JSON model.
 
 ## The element table is the type source, behind `model::Model`
 

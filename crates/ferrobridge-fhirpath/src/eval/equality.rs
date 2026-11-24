@@ -14,6 +14,7 @@ use super::error::EvalError;
 use crate::model::Model;
 use crate::quantity::{Quantity, Unit, equivalent_decimals};
 use crate::value::node::Node;
+use crate::value::scaled::Scaled;
 use crate::value::{Collection, Item};
 
 /// Whether two items are equal, `None` when unknown.
@@ -29,6 +30,9 @@ pub fn equal(
     let (Some(left), Some(right)) = (system(model, left)?, system(model, right)?) else {
         return Ok(None);
     };
+    if let Some(pair) = unbounded(&left, &right) {
+        return Ok(pair.pair().map(|(a, b)| a.compare(&b) == Ordering::Equal));
+    }
     Ok(match (&left, &right) {
         (Item::Boolean(a), Item::Boolean(b)) => Some(a == b),
         (Item::String(a), Item::String(b)) => Some(a == b),
@@ -63,6 +67,9 @@ pub fn equivalent(model: &dyn Model, left: &Item<'_>, right: &Item<'_>) -> Resul
         (None, None) => return Ok(true),
         _ => return Ok(false),
     };
+    if let Some(pair) = unbounded(&left, &right) {
+        return Ok(pair.pair().is_some_and(|(a, b)| a.equivalent(&b)));
+    }
     Ok(match (&left, &right) {
         (Item::Boolean(a), Item::Boolean(b)) => a == b,
         (Item::String(a), Item::String(b)) => fold(a) == fold(b),
@@ -101,6 +108,59 @@ pub fn number(item: &Item<'_>) -> Option<Decimal> {
     match item {
         Item::Integer(value) => Some(Decimal::from(*value)),
         Item::Decimal(value) => Some(*value),
+        _ => None,
+    }
+}
+
+/// Two numbers or quantities, either of them an [`Item::Scaled`], as their
+/// exact values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unbounded {
+    /// Both values in one unit.
+    InOneUnit(Scaled, Scaled),
+    /// Values in units that differ, which do not compare.
+    InOtherUnits,
+}
+
+impl Unbounded {
+    /// The pair in one unit, `None` for values in other units.
+    #[must_use]
+    pub fn pair(self) -> Option<(Scaled, Scaled)> {
+        match self {
+            Self::InOneUnit(left, right) => Some((left, right)),
+            Self::InOtherUnits => None,
+        }
+    }
+}
+
+/// Two numbers or quantities as exact values when either is an
+/// [`Item::Scaled`], `None` when neither is or one is no number or quantity.
+#[must_use]
+pub fn unbounded(left: &Item<'_>, right: &Item<'_>) -> Option<Unbounded> {
+    if !matches!(left, Item::Scaled(..)) && !matches!(right, Item::Scaled(..)) {
+        return None;
+    }
+    let ((a, a_unit), (b, b_unit)) = (exact(left)?, exact(right)?);
+    let one = Unit::one();
+    // NOTE: N1 §6.6: a unit conversion of a value the exact decimal cannot hold overflows,
+    // so only a pair in one unit, a number counting as `'1'` (N1 §5.5), compares.
+    let same = a_unit.as_ref().unwrap_or(&one) == b_unit.as_ref().unwrap_or(&one);
+    Some(if same {
+        Unbounded::InOneUnit(a, b)
+    } else {
+        Unbounded::InOtherUnits
+    })
+}
+
+/// A number or quantity as its exact value and unit.
+fn exact(item: &Item<'_>) -> Option<(Scaled, Option<Unit>)> {
+    match item {
+        Item::Integer(value) => Some((Scaled::from_decimal(Decimal::from(*value)), None)),
+        Item::Decimal(value) => Some((Scaled::from_decimal(*value), None)),
+        Item::Quantity(value) => {
+            Some((Scaled::from_decimal(value.value), Some(value.unit.clone())))
+        }
+        Item::Scaled(value, unit) => Some((value.clone(), unit.clone())),
         _ => None,
     }
 }
@@ -338,6 +398,8 @@ enum Bucket {
     Time,
     /// A quantity that does not convert to `'1'`.
     Quantity,
+    /// A number the exact decimal cannot hold.
+    Scaled,
     /// A complex element or resource.
     Node,
     /// A type description.
@@ -357,6 +419,10 @@ fn bucket(item: &Item<'_>) -> Bucket {
             Some(number) => Bucket::Number(number.value.normalize()),
             None => Bucket::Quantity,
         },
+        Item::Scaled(value, unit) if unit.as_ref().is_none_or(|unit| *unit == Unit::one()) => value
+            .normalized()
+            .map_or(Bucket::Scaled, |number| Bucket::Number(number.normalize())),
+        Item::Scaled(..) => Bucket::Quantity,
         Item::Node(_) => Bucket::Node,
         Item::Type(_) => Bucket::Type,
     }
