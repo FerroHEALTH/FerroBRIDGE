@@ -372,6 +372,9 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `ihe.iti.balp` | 1.1.4 files `126` digest `3a150751bc5fad01361b05518a8e757639fe7cc44b1b9faf7d0844dcce352ea2` | `docs/specs/fhir-packages/ihe.iti.balp#1.1.4/PROVENANCE.md` (CC-BY-4.0) |
 | `ihe.formatcode.fhir` | 1.6.0 files `11` digest `75224d1142b43eeede33ab06aa3ffa69fec1a3c46a97335b1e9c476d6221a06b` | `docs/specs/fhir-packages/ihe.formatcode.fhir#1.6.0/PROVENANCE.md` (CC-BY-4.0) |
 | `ihe.formatcode.fhir` | 1.4.0 files `11` digest `57640df5a7d0136621359309c1c4c4f37b06e67f77769230ed34366509e962ff` | `docs/specs/fhir-packages/ihe.formatcode.fhir#1.4.0/PROVENANCE.md` (CC-BY-4.0) |
+| `hl7.fhir.eu.imaging-manifest` | 1.0.0-ballot files `47` digest `b51c4f440b48fdd7a942001507f010f8698e2ab944e4241b6a8a688ebaf8ceac` | `docs/specs/fhir-packages/hl7.fhir.eu.imaging-manifest#1.0.0-ballot/PROVENANCE.md` (a root) |
+| `ihe.rad.mado` | 1.0.0 files `85` digest `422c937a1b01f98206b1f7cfb110c77494faad814ee05a0fdd45ae8c22017530` | `docs/specs/fhir-packages/ihe.rad.mado#1.0.0/PROVENANCE.md` (CC-BY-4.0) |
+| `ihe.formatcode.fhir` | 1.5.0 files `11` digest `8727847040984389fd846759d214801d2878e7711a6079b4396f56a12aa8f3a7` | `docs/specs/fhir-packages/ihe.formatcode.fhir#1.5.0/PROVENANCE.md` (CC-BY-4.0) |
 | `fhir.dicom` | 2025.3.20250714 files `1415` digest `47f417064ebb643814b66ee9e557a8a2f92e8ae1a7c0eb6d6817608871493ba1` | `docs/specs/fhir-packages/fhir.dicom#2025.3.20250714/PROVENANCE.md` (license `free` in its manifest) |
 
 ## HL7 FHIR Validator (the agreement corpus's reference and the exchange-format lane, never committed)

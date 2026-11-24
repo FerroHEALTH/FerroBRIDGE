@@ -50,6 +50,8 @@ pub mod form;
 pub mod imaging;
 #[cfg(feature = "laboratory")]
 pub mod laboratory;
+#[cfg(feature = "imaging")]
+pub mod manifest;
 mod mapped;
 pub mod metadata;
 pub mod representation;

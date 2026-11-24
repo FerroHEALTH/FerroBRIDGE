@@ -58,6 +58,9 @@ mod imaging_document;
 mod imaging_mapped;
 #[cfg(test)]
 #[cfg(all(feature = "imaging", feature = "fhir-r4"))]
+mod manifest;
+#[cfg(test)]
+#[cfg(all(feature = "imaging", feature = "fhir-r4"))]
 mod imaging_received;
 #[cfg(test)]
 #[cfg(all(feature = "laboratory", feature = "fhir-r4"))]
