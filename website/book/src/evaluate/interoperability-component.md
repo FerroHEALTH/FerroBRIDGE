@@ -93,6 +93,34 @@ four ways:
   `eehrxf-fhir-validation` artifact of the run. They are the evidence for the
   documents the component writes.
 
+## The Annex III metadata
+
+Art 4 and Annex III of the draft implementing act put the metadata of
+Table 1 on every document and the metadata of Table 2 on every data group.
+`document::metadata` writes them: `DocumentMetadata` holds what Table 1 asks
+beyond the parts a document already takes, `Document::with_metadata` writes
+it on the `Composition`, and `DocumentMetadata::describe` writes the
+`DocumentReference` describing the document, with the `masterIdentifier`,
+`type`, `subject`, `date` and `description` MyHealth@EU
+DocumentReference-minimal requires. `DocumentMetadata::from_composition`
+reads the version, the language and the period from the openEHR
+composition. With metadata set, every data group takes the document's date
+and language where it carries none, and one with no subject is refused. The
+crate documentation lists where each Table 1 element is written. FHIR R4
+holds one `Composition.language` and one `practiceSetting`, so a second value
+is refused rather than dropped.
+
+Xt-EHR D5.2 Table 3 adds traceability metadata that Annex III does not ask
+for. The draft leads, so each is recorded as followed or not:
+
+| D5.2 Table 3 element | Followed | Where, or why not |
+|---|---|---|
+| `authorRole` | no | Annex III asks for no role; `author[x]` names the author |
+| `sourceSystem` | yes | `meta.source` of the `Composition` and the `DocumentReference`, when the caller sets it |
+| `creationDate` | yes | `Composition.date` and `DocumentReference.date`, Table 1 `date` |
+| `lastModified` | no | Annex III Table 1 has no such element; a server sets `meta.lastUpdated` |
+| `provenanceEvent` | yes | the `Provenance` each mapping run writes |
+
 ## The definitions it publishes
 
 The component writes two things no specification defines, and FerroBRIDGE

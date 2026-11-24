@@ -51,6 +51,7 @@ pub mod imaging;
 #[cfg(feature = "laboratory")]
 pub mod laboratory;
 mod mapped;
+pub mod metadata;
 pub mod section;
 
 #[cfg(feature = "patient-summary")]
@@ -212,6 +213,31 @@ pub enum DocumentError {
         /// The `fullUrl` of the custodian the document names.
         full_url: String,
     },
+    /// Draft `EEHRxF` Annex III allows more values of an element than FHIR R4
+    /// has a place for.
+    #[error("{given} values of {element}, where FHIR R4 holds one")]
+    TooMany {
+        /// The Annex III element.
+        element: &'static str,
+        /// The number of values given.
+        given: usize,
+    },
+    /// A data group carries no value of an element draft `EEHRxF` Annex III
+    /// Table 2 requires.
+    #[error("a {resource} data group carries no {element}, which Annex III requires")]
+    DataGroup {
+        /// The resource type of the data group.
+        resource: &'static str,
+        /// The Annex III element.
+        element: &'static str,
+    },
+    /// A document carries no value of an element draft `EEHRxF` Annex III
+    /// requires.
+    #[error("the document carries no {element}, which Annex III requires")]
+    MissingMetadata {
+        /// The Annex III element.
+        element: &'static str,
+    },
 }
 
 /// A document as it is assembled.
@@ -230,6 +256,7 @@ pub struct Document {
     encounter: Option<String>,
     language: Option<String>,
     custodian: Option<String>,
+    metadata: Option<metadata::DocumentMetadata>,
 }
 
 impl Document {
@@ -267,6 +294,7 @@ impl Document {
             encounter: None,
             language: None,
             custodian: None,
+            metadata: None,
         }
     }
 
@@ -541,8 +569,12 @@ impl Document {
     /// sections break a rule of the form ([`form::SectionRule`]),
     /// [`DocumentError::Missing`] when the form requires an encounter or a
     /// language that was not given, and [`DocumentError::Report`] when the
-    /// form holds a report and none was given.
+    /// form holds a report and none was given. With metadata set
+    /// ([`Document::with_metadata`]), [`DocumentError::DataGroup`] for a data
+    /// group with no subject and [`DocumentError::TooMany`] for a second
+    /// language.
     pub fn into_bundle(mut self) -> Result<Bundle, DocumentError> {
+        self.fill_data_groups()?;
         let held: BTreeSet<&str> = self.entries.iter().map(|(url, _)| url.as_str()).collect();
         let mut sections = Vec::with_capacity(self.sections.len());
         for section in &self.sections {
@@ -607,6 +639,7 @@ impl Document {
             });
         }
         self.arrange(&mut composition, report.as_ref().map(|(_, report)| report));
+        self.write_metadata(&mut composition)?;
         let mut entry = vec![BundleEntry {
             full_url: Some(composition_url.into()),
             resource: Some(Resource::Composition(Box::new(composition))),

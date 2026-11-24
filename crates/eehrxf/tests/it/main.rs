@@ -87,6 +87,12 @@ mod mappings;
 #[cfg(any(feature = "prescription", feature = "dispensation"))]
 mod medication;
 #[cfg(test)]
+#[cfg(all(
+    feature = "fhir-r4",
+    any(feature = "laboratory", feature = "imaging", feature = "discharge")
+))]
+mod metadata;
+#[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod own;
 #[cfg(test)]

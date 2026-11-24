@@ -108,7 +108,7 @@ fn every_slot_is_a_section_slice_with_the_code_the_profile_fixes() -> Result<(),
 /// A discharge report document over a synthetic patient, given its
 /// encounter when `encounter` and its language when `language`, with its
 /// hospital course.
-fn document(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
+pub(crate) fn document(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
     let mut document = bare(encounter, language)?;
     let course = HDR_SLOTS
         .iter()
