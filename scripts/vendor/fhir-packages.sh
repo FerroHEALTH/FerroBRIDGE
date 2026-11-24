@@ -85,12 +85,14 @@ meta_url_for() {
 }
 
 # The pin for a package: the second cell of its row in the docs/VERSIONS.md
-# FHIR table, e.g. "| `hl7.terminology` (THO) | 7.5.0 | ... |".
+# FHIR table, e.g. "| `hl7.terminology` (THO) | 7.5.0 | ... |", without a
+# trailing `, held: <reason>`.
 pin_for() {
   local pkg="$1"
   awk -F'|' -v pkg="$pkg" '
     $2 ~ "^[[:space:]]*`" pkg "`" {
-      v = $3; gsub(/^[[:space:]]+|[[:space:]]+$/, "", v); print v; exit
+      v = $3; sub(/,[[:space:]]*held:.*$/, "", v)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", v); print v; exit
     }' "$pins"
 }
 

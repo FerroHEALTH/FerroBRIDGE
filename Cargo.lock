@@ -1744,7 +1744,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.26.0"
+version = "0.26.1"
 dependencies = [
  "bytes",
  "chumsky 0.14.2",
@@ -2760,7 +2760,7 @@ dependencies = [
 
 [[package]]
 name = "hl7v2-types"
-version = "0.1.128"
+version = "0.1.129"
 
 [[package]]
 name = "hmac"
