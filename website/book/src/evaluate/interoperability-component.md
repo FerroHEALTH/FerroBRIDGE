@@ -86,6 +86,16 @@ four ways:
   document with the validator's outcome and a summary, are the
   `eehrxf-fhir-validation` artifact of the run. They are the evidence for the
   documents the component writes.
+- **The MyHealth@EU guides on their CI line:** the same job measures the
+  component's documents against four MyHealth@EU guides as built on
+  `build-fhir.ehdsi.eu`, each pinned by sha256 because the publisher
+  overwrites a build in place: each laboratory report against Laboratory
+  9.2.0, each discharge report against HDR 9.2.0, every entry of a type Core
+  1.0.1 profiles against that profile, and every coding against the value
+  sets of the Master Value Sets Catalogue 10.1.0. Each guide is a conformance
+  corpus with a pass list under `conformance/myhealth-eu-*/`, so a case that
+  stops passing fails the job, and its README badge shows the count. A badge
+  is a self-test against the named CI build, never a certification.
 
 ## The definitions it publishes
 

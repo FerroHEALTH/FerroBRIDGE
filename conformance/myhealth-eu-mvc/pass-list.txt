@@ -1,0 +1,27 @@
+http://dicom.nema.org/resources/ontology/DCM|MR
+http://loinc.org|10160-0
+http://loinc.org|10185-7
+http://loinc.org|11369-6
+http://loinc.org|11450-4
+http://loinc.org|11502-2
+http://loinc.org|11535-2
+http://loinc.org|18719-5
+http://loinc.org|2093-3
+http://loinc.org|24331-1
+http://loinc.org|24802-1
+http://loinc.org|34105-7
+http://loinc.org|46264-8
+http://loinc.org|47519-4
+http://loinc.org|48765-2
+http://loinc.org|60591-5
+http://loinc.org|75311-1
+http://loinc.org|8648-8
+http://snomed.info/sct|119364003
+http://snomed.info/sct|14106009
+http://snomed.info/sct|80146002
+http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical|active
+http://terminology.hl7.org/CodeSystem/observation-category|laboratory
+http://terminology.hl7.org/CodeSystem/v3-ActCode|IMP
+http://unitsofmeasure.org|d
+http://unitsofmeasure.org|mg/dL
+total 44

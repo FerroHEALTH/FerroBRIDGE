@@ -348,7 +348,10 @@ the testkit tool crate. Beside it:
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
   FHIR examples packages per version, STU3 to R6, the R4 facade, the HL7
   FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, and
-  the R4 profile validator's agreement with the HL7 FHIR Validator) (a regression fails, a new pass asks for the
+  the R4 profile validator's agreement with the HL7 FHIR Validator), and the four
+  MyHealth@EU corpora HL7's FHIR Validator measures in the `fhir-validator`
+  job (`scripts/checks/fhir-validator.sh --myhealth-eu`: Core, Laboratory and
+  HDR on their CI builds, and the codes against the MVC catalogue), (a regression fails, a new pass asks for the
   list, `--update` rewrites the lists and the shields.io badge JSON).
   `affected.sh` computes the packages a change reaches, which decides the
   CI lanes a pull request runs, and `fast.sh` is the default local gate over

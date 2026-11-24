@@ -926,7 +926,7 @@ jobs:
     needs: [detect, test]
     if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && (contains(needs.detect.outputs.test-matrix, 'eehrxf') || contains(needs.detect.outputs.test-matrix, 'ferrobridge-server'))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -984,12 +984,27 @@ jobs:
             cat target/fhir-validation/summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
           exit "$status"
+      # The same documents against the MyHealth@EU CI guides (#2083), one
+      # corpus per guide, held to the pass lists under conformance/.
+      - name: The MyHealth@EU corpora hold their pass lists
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          bash scripts/checks/fhir-validator.sh --myhealth-eu \
+            "$RUNNER_TEMP/eehrxf-documents" target/fhir-validation/myhealth-eu
+          status=0
+          for corpus in myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc; do
+            bash scripts/checks/conformance.sh --check "$corpus" || status=1
+          done
+          exit "$status"
       - name: Upload the validator's results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: eehrxf-fhir-validation
-          path: target/fhir-validation/
+          path: |
+            target/fhir-validation/
+            target/conformance/
           if-no-files-found: ignore
           retention-days: 30
 
