@@ -15,7 +15,9 @@
 #
 # Reads each pin from docs/VERSIONS.md and each newest release tag from the
 # upstream project's GitHub releases, which is the tag the container image and
-# the installer both carry. A corpus pinned by commit on a repository with no
+# the installer both carry: from the REST API, else from the redirect of the
+# project's releases/latest page, which an organisation's IP allow list does
+# not guard (#2007). A corpus pinned by commit on a repository with no
 # releases is read against the newest commit of the branch it follows, and a
 # FHIR package (a core package, THO, the v2-to-FHIR guide, an examples package
 # or a root of the profile set) against the registry's `latest` version, or
@@ -37,9 +39,11 @@
 # counts as stale. The version of a cell is the word after the package name
 # when the cell reads `package <name> <version>`, else its first word.
 #
+# Every pin is read, so one unreadable source never hides another pin's line.
 # Exit 0 when every pin is current or held, 1 when at least one is behind
-# (each such line starts with STALE), 2 when a release could not be read, so a
-# network failure never reads as a fresh pin.
+# (each such line starts with STALE), 2 when a release could not be read (each
+# such line starts with UNREADABLE), so a network failure never reads as a
+# fresh pin.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -124,6 +128,34 @@ readonly CHROME_FEED=https://googlechromelabs.github.io/chrome-for-testing/last-
 # stdin; fails when the document names no Stable version.
 chrome_stable() {
   jq -er '.channels.Stable.version | select(type == "string" and length > 0)'
+}
+
+# The release tag the releases/latest redirect URL on stdin names for the
+# GitHub repository $1; fails on any other URL, such as the releases page a
+# repository with no release redirects to.
+release_url_tag() {
+  local prefix="https://github.com/$1/releases/tag/" url tag
+  url="$(cat)"
+  [[ "$url" == "$prefix"?* ]] || return 1
+  tag="${url#"$prefix"}"
+  [[ "$tag" != */* ]] || return 1
+  printf '%s\n' "$tag"
+}
+
+# The tag of the newest release of the GitHub repository $1. On failure it
+# prints what each source answered.
+newest_release_tag() {
+  local repo="$1" api page
+  if api="$(gh api "repos/$repo/releases/latest" --jq '.tag_name' 2>&1)" && [[ -n "$api" ]]; then
+    printf '%s\n' "$api"
+    return
+  fi
+  if page="$(curl --proto '=https' --tlsv1.2 -fsS -o /dev/null -w '%{redirect_url}' \
+    "https://github.com/$repo/releases/latest" 2>&1)" && release_url_tag "$repo" <<< "$page"; then
+    return
+  fi
+  printf 'the API answered %s; the releases/latest page answered %s\n' "$api" "${page:-nothing}"
+  return 1
 }
 
 # The line one pin LABEL at PINNED gets against the newest release LATEST read
@@ -351,6 +383,14 @@ self_test() {
   esac
   got="$(family_verdict ferroterm 0.4.2 "$d1" f "a reason" FerroTERM v0.4.7 0.4.7 "$d2" | cut -c1-10)"
   expect "HELD      " "$got" "a held pin behind the latest release"
+  got="$(release_url_tag aquasecurity/trivy <<< 'https://github.com/aquasecurity/trivy/releases/tag/v0.76.2')"
+  expect "v0.76.2" "$got" "the tag of a releases/latest redirect"
+  if got="$(release_url_tag aquasecurity/trivy <<< 'https://github.com/aquasecurity/trivy/releases')"; then
+    expect "a failure" "$got" "a redirect to a repository with no release"
+  fi
+  if got="$(release_url_tag aquasecurity/trivy <<< 'https://github.com/rhysd/actionlint/releases/tag/v1.7.12')"; then
+    expect "a failure" "$got" "a redirect to another repository"
+  fi
   got="$(matrix_pin "$CHROME_LABEL")"
   case "$got" in
     [0-9]*.[0-9]*.[0-9]*.[0-9]*) ;;
@@ -394,7 +434,7 @@ while IFS=$'\t' read -r label repo; do
     continue
   fi
 
-  if ! tag="$(gh api "repos/$repo/releases/latest" --jq '.tag_name' 2>&1)"; then
+  if ! tag="$(newest_release_tag "$repo")"; then
     printf 'UNREADABLE %s: could not read the newest release of %s (%s)\n' "$label" "$repo" "$tag"
     unreadable=1
     continue
