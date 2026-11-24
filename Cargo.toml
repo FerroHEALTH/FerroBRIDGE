@@ -87,10 +87,10 @@ generated-tree = { path = "tools/generated-tree" }
 ferrobridge-term = { path = "crates/ferrobridge-term", version = "=0.17.1", default-features = false }
 # Published from this workspace and consumed by the published
 # ferrobridge-validator, so the requirement carries both a path and a version.
-ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "=0.1.136" }
+ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "=0.1.137" }
 # Published from this workspace and consumed by the published eehrxf, so the
 # requirement carries both a path and a version.
-ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "=0.17.1" }
+ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "=0.17.2" }
 # The FHIR R4 search value grammar, published from this workspace for the
 # facade and the family's FHIR servers, so the requirement carries both a path
 # and a version.
@@ -242,7 +242,7 @@ encoding_rs = "0.8.42"
 # The lexer and parser of the v2-to-FHIR condition and target grammars, the
 # pair openehr-query builds its AQL parser on and the lock already carries.
 logos = "0.16.1"
-chumsky = "0.13.0"
+chumsky = "0.14.1"
 # The `.tgz` form of a FHIR package the profile validator reads offline
 # (https://hl7.org/fhir/packages.html): flate2 on its pure-Rust backend and tar
 # without its extended-attribute feature, which reads nothing a package
@@ -433,6 +433,15 @@ fhir-types = { path = "crates/fhir-types" }
 panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
+
+# Argon2id runs optimised in test builds, so a test of passcode hashing
+# under parallel requests measures the request path and not an unoptimised
+# hash. No specification governs this: our own design.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
 
 # The full-emit tests of fhir-codegen (`cargo nextest run --cargo-profile emit
 # -p fhir-codegen`): the emitter runs optimised, while the two generated crates
