@@ -760,14 +760,11 @@ async fn a_patient_s_own_summary_writes_one_access_record_naming_the_person()
         )]),
         &std::collections::BTreeMap::new(),
     )?;
-    let spool = tempfile::tempdir()?;
-    let log = crate::audit::access_log(
-        &arr,
-        spool.path(),
-        harness.facade.client().base_url(),
-        categories,
-        64 << 20,
-    )?;
+    let Some((_postgres, store)) = crate::audit::state().await? else {
+        return Ok(());
+    };
+    let log =
+        crate::audit::access_log(&arr, &store, harness.facade.client().base_url(), categories)?;
     let key = ec_key("k1", jsonwebtoken::Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let token = mint(&key, &patient_claims(&issuer, UID));

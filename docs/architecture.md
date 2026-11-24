@@ -2359,7 +2359,12 @@ has one leader across replicas through a row of `lane_lease`: a replica
 takes a free or expired row and its generation moves on, renews at a third
 of the period, and every cursor write locks the row in its own transaction
 and is refused unless it holds the current generation, so a former leader
-paused past its expiry cannot move a cursor. Session advisory locks are not
+paused past its expiry cannot move a cursor. The audit outbox (`0010`)
+holds each BALP `AuditEvent` until the Audit Record Repository takes it:
+the recorder commits the row before the answer, and each replica's
+`ihe-atna` forwarder claims the oldest unclaimed row for a lease with
+`FOR UPDATE SKIP LOCKED`, deletes it on a `2xx` and moves a refused one to
+`audit_quarantine`, so a replica that stops loses no access record. Session advisory locks are not
 used for leadership: they carry no fencing token and end with their
 connection while the task may run on
 (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
