@@ -149,8 +149,8 @@ impl PinnedImage {
 /// The PostgreSQL the CDM catalogue test applies the OHDSI DDL to.
 pub const POSTGRES: PinnedImage = PinnedImage {
     repository: "postgres",
-    tag: "18.6",
-    digest: "sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280",
+    tag: "19.0",
+    digest: "sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60",
 };
 
 /// The AMQP 0.9.1 broker the events lane publishes to.
@@ -189,8 +189,8 @@ pub const CDR_POSTGRES: PinnedImage = PinnedImage {
 /// `/r5`, `/r6`), which is why [`Terminology::base_url`] takes the release.
 pub const TERMINOLOGY: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroterm",
-    tag: "0.4.2",
-    digest: "sha256:1853486ae6f85a66424561cbf90f9905027c38d506bdeb24a9e1a831b4b97424",
+    tag: "0.4.7",
+    digest: "sha256:52411e76ea664f9470fda0a7a08202a0ad6f7c39069322f42a754d971cf37a82",
 };
 
 /// A container could not be started, or did not become usable.

@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The committer a write states to the CDR: the caller the request
-//! authenticated, provisioned from the authentication runtime data as
-//! ITS-REST 1.1.0 §openehr-version and openehr-audit-details recommends, and
-//! the bridge itself for a write no caller made.
+//! The committer a header commit states to the CDR: none, whoever the
+//! request authenticated, since the CDR writes who committed from the caller
+//! it authenticated (ITS-REST 1.1.0 §openehr-version and
+//! openehr-audit-details: "None of these headers are mandatory").
 
 use std::error::Error;
 
@@ -45,8 +45,29 @@ async fn audit_lines(cdr: &wiremock::MockServer) -> Result<Vec<String>, Box<dyn 
         .collect())
 }
 
+/// Asserts that `lines` state the change type and the bridge as the
+/// committing system, and no committer.
+fn assert_no_committer(lines: &[String]) {
+    assert!(
+        lines
+            .iter()
+            .any(|line| line == "change_type.code_string=\"249\""),
+        "the change type travels: {lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line == "system_id=\"ferrobridge.test\""),
+        "the bridge stays the committing system: {lines:?}"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains("committer")),
+        "the CDR writes who committed: {lines:?}"
+    );
+}
+
 #[tokio::test]
-async fn a_write_states_the_authenticated_caller_as_its_committer() -> Result<(), Box<dyn Error>> {
+async fn an_authenticated_callers_write_states_no_committer() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
@@ -56,45 +77,17 @@ async fn a_write_states_the_authenticated_caller_as_its_committer() -> Result<()
     let token = mint(&key, &issuer.claims("system/Condition.c"));
     let response = raw(app, bearing(post_condition(&condition()), &token)).await?;
     assert_eq!(StatusCode::CREATED, response.status());
-    let lines = audit_lines(&harness.cdr).await?;
-    let committer = lines
-        .iter()
-        .find(|line| line.starts_with("committer."))
-        .ok_or("the commit names a committer")?;
-    assert!(
-        committer.contains("committer.name=\"synthetic-client-sub\""),
-        "the caller's sub names the committer: {committer}"
-    );
-    assert!(
-        committer.contains(&format!(
-            "committer.external_ref.namespace=\"{}\"",
-            issuer.uri()
-        )),
-        "the issuer is the namespace: {committer}"
-    );
-    assert!(committer.contains("committer.external_ref.type=\"PARTY\""));
-    assert!(
-        lines
-            .iter()
-            .any(|line| line == "system_id=\"ferrobridge.test\""),
-        "the bridge stays the committing system: {lines:?}"
-    );
+    assert_no_committer(&audit_lines(&harness.cdr).await?);
     Ok(())
 }
 
 #[tokio::test]
-async fn a_write_on_an_open_surface_is_the_bridges() -> Result<(), Box<dyn Error>> {
+async fn a_write_on_an_open_surface_states_no_committer() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     mount_create(&harness.cdr, VERSION_ONE, &harness.composition()).await;
     let response = raw(harness.app(), post_condition(&condition())).await?;
     assert_eq!(StatusCode::CREATED, response.status());
-    let lines = audit_lines(&harness.cdr).await?;
-    assert!(
-        lines
-            .iter()
-            .any(|line| line == "committer.name=\"ferrobridge.test\""),
-        "no caller, so the bridge commits under its own name: {lines:?}"
-    );
+    assert_no_committer(&audit_lines(&harness.cdr).await?);
     Ok(())
 }

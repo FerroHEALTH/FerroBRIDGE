@@ -152,6 +152,12 @@ impl Refusal {
     }
 }
 
+impl IntoResponse for Refusal {
+    fn into_response(self) -> Response {
+        *self.0
+    }
+}
+
 impl From<Refused> for Refusal {
     /// Renders a refusal of the ingest service, its `ETag` and its
     /// `WWW-Authenticate` challenge travelling as headers.

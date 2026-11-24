@@ -33,7 +33,6 @@ use http::Uri;
 
 use crate::facade::Facade;
 use crate::facade::commit::Change;
-use crate::facade::commit::Committer;
 use crate::facade::compartment;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::read;
@@ -87,7 +86,6 @@ pub(crate) async fn transaction(
     }
     admit_entries(facade, access, bundle.document())?;
     let client = facade.client_for(headers, access).await?;
-    let committer = Committer::of(access, &client, &facade.settings().system_id);
     let resolved =
         crate::facade::references::resolve_bundle(facade, &client, bundle.document()).await;
     let bundled = fhirconnect::engine::seam::BundleReferences::new(
@@ -97,7 +95,6 @@ pub(crate) async fn transaction(
     let ingested = facade
         .ingest(client)
         .with_references(&bundled)
-        .with_committer(committer)
         .with_originating_system(crate::facade::commit::originating_system(access))
         .ingest_bundle(
             bundle.document(),

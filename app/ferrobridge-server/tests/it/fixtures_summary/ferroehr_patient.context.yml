@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The party context the patient summary suite reads its patient through: the
+# base Patient onto the reference CDR's patient PERSON definition.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferroehr_patient.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Patient"
+  template:
+    id: "openEHR-DEMOGRAPHIC-PERSON.patient.v1.0.0"
+  archetypes:
+    - "ferroehr_patient"
+  start: "ferroehr_patient"

@@ -21,7 +21,6 @@ use http::StatusCode;
 use http::header;
 use jsonwebtoken::Algorithm;
 
-use super::CLIENT;
 use super::Issuer;
 use super::SigningKey;
 use super::authority;
@@ -119,9 +118,9 @@ impl Case {
 fn assert_forbidden((status, challenge, body): &(StatusCode, Option<String>, String)) {
     assert_eq!(StatusCode::FORBIDDEN, *status, "{body}");
     assert_eq!(
-        Some("Bearer error=\"insufficient_scope\""),
+        Some("Bearer error=\"insufficient_scope\", error_description=\"scope-not-granted\""),
         challenge.as_deref(),
-        "RFC 6750 §3.1 insufficient_scope, naming no scope"
+        "RFC 6750 §3.1 insufficient_scope, naming no scope, §3 the reason code"
     );
     assert!(body.contains("\"forbidden\""), "{body}");
     for named in ["Condition.", "system/", "scope", ".c", ".r"] {
@@ -295,39 +294,14 @@ async fn the_wildcard_user_and_v1_scopes_grant_as_their_letters_say() -> Result<
 }
 
 #[tokio::test]
-async fn a_scopeless_token_gets_system_rights_only_when_its_subject_is_listed()
--> Result<(), Box<dyn Error>> {
-    let unlisted = Case::new().await;
-    let machine = unlisted.issuer.machine_claims("");
+async fn a_scopeless_token_gets_no_rights() -> Result<(), Box<dyn Error>> {
+    let case = Case::new().await;
+    let machine = case.issuer.machine_claims("");
     assert_forbidden(
-        &unlisted
+        &case
             .send_claims(post_condition(&condition()), &machine)
             .await?,
     );
-    let listed = Case::with(|settings| {
-        settings.issuers[0]
-            .scopeless_subjects
-            .insert(String::from(CLIENT));
-    })
-    .await;
-    let machine = listed.issuer.machine_claims("");
-    let (status, _, body) = listed
-        .send_claims(post_condition(&condition()), &machine)
-        .await?;
-    assert_eq!(StatusCode::CREATED, status, "{body}");
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_listed_subject_that_is_a_person_gets_no_system_rights() -> Result<(), Box<dyn Error>> {
-    // NOTE: no specification governs this: our own design, the crate's; system
-    // rights without a scope are a machine's, and a person's token is no machine's.
-    let case = Case::with(|settings| {
-        settings.issuers[0]
-            .scopeless_subjects
-            .insert(String::from("synthetic-client-sub"));
-    })
-    .await;
     assert_forbidden(&case.send(post_condition(&condition()), "").await?);
     Ok(())
 }

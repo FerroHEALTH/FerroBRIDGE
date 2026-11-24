@@ -7,25 +7,22 @@
 //! these headers are mandatory"), and the CONTRIBUTION body carries the same
 //! facts as schema members instead (`ehr-codegen.openapi.yaml`,
 //! `contribution_create`). This module builds both from one description, so a
-//! single write and a transaction record the same committer and change type.
+//! single write and a transaction record the same change type and system.
 //!
-//! The committer is the caller the request authenticated, provisioned "based
-//! on authentication and authorization runtime data" as ITS-REST 1.1.0
-//! §openehr-version and openehr-audit-details recommends, and the bridge
-//! itself only for a write no caller made; `system_id` always names the
-//! bridge, so the version records both who asked and what committed.
+//! The CDR writes who committed, from the caller it authenticated: a header
+//! commit states no committer, and a CONTRIBUTION, whose `UpdateAudit`
+//! requires one, names that same caller and nothing more. `system_id` always
+//! names the bridge. Which form names the caller is our own design.
 
 use std::collections::BTreeMap;
 
+use crate::cdr::Principal;
 use crate::cdr::commit::CommitContext;
+use crate::cdr::commit::HeaderAudit;
 use crate::cdr::ids::IdError;
 use crate::cdr::ids::template_id;
 use ferrohealth_smart::kind::CallerKind;
 use ferrohealth_smart::resource::Access;
-use ferrohealth_smart::resource::Via;
-use openehr_base::v1_3::base_types::identification::generic_id::GenericId;
-use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
-use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_base::v1_3::base_types::identification::terminology_id::TerminologyId;
 use openehr_its::rest::generated::common::UpdateAudit;
 use openehr_its::rest::generated::common::UpdateAuditData;
@@ -80,135 +77,86 @@ impl Change {
     }
 }
 
-/// The `PARTY_REF.type` of a caller: the abstract `PARTY`, since a token
-/// does not say whether its subject is a person or a client application
-/// (openEHR BASE, `PARTY_REF`: "Abstract supertypes are allowed").
-const CALLER_PARTY_TYPE: &str = "PARTY";
-
-/// The `GENERIC_ID.scheme` of a caller's identifier: the `sub` claim of
-/// RFC 7519 §4.1.2, or a Basic user-id (no specification governs the scheme
-/// name: our own design).
-const CALLER_ID_SCHEME: &str = "sub";
-
-/// Who a commit is attributed to as `AUDIT_DETAILS.committer`.
+/// Who a CONTRIBUTION names as `AUDIT_DETAILS.committer`: the party the
+/// CDR authenticated the call as, in a form that states nothing more.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Committer {
-    /// The bridge, named by its system id: a write no authenticated caller
-    /// made, such as an HL7 v2 message or a request on an open surface.
+    /// The bridge, named by its system id: the CDR authenticates no
+    /// credential of the bridge's, or a Basic user with no
+    /// `[cdr] committer_issuer`.
     Bridge,
-    /// The bridge as the client of its own client credentials grant, named by
-    /// its client id: a write no authenticated caller made, which reaches the
-    /// CDR under the bridge's token.
-    ///
-    /// ITS-REST 1.1.0 §openehr-version and openehr-audit-details provisions the
-    /// committer "based on authentication and authorization runtime data", and
-    /// the authenticated party is that client.
+    /// The client of the bridge's own client credentials grant, named by its
+    /// client id, the name a CDR that writes the committer gives a system
+    /// client.
     Client {
         /// The client id the grant authenticates as.
         client_id: String,
     },
-    /// The caller the request authenticated.
-    Caller {
-        /// The token's `sub`, or the Basic user-id.
-        subject: String,
-        /// The namespace the subject belongs to: the issuer that vouched for
-        /// it, or the bridge's system id for a Basic user the bridge checked.
-        namespace: String,
-    },
-    /// A caller the request reaches the CDR as through an onward token, which
-    /// the CDR derives the committer from.
-    ///
-    /// A header commit then states no committer, and a CONTRIBUTION the one
-    /// placeholder the CDR discards: a `PARTY_IDENTIFIED` whose only member
-    /// is a `DV_IDENTIFIER` of the onward token's `iss` and `sub`.
+    /// The placeholder a CDR that writes the committer itself discards: a
+    /// `PARTY_IDENTIFIED` whose only member is one `DV_IDENTIFIER` of the
+    /// authenticated caller's issuer and subject (an onward token's `iss` and
+    /// `sub`, or a Basic user under `[cdr] committer_issuer`).
     Placeholder {
-        /// The onward token's `iss`.
+        /// The issuer the CDR names the caller under.
         issuer: String,
-        /// The onward token's `sub`.
+        /// The caller's subject at that issuer.
         subject: String,
     },
 }
 
 impl Committer {
-    /// Returns the committer of a request admitted with `access` that calls
-    /// the CDR through `client`: the placeholder of the onward token it
-    /// carries, the caller, or the bridge for an open surface.
+    /// Returns the committer of a commit sent through `client`: the
+    /// placeholder of the onward token it carries, or the party its own
+    /// credential authenticates as.
     #[must_use]
-    pub fn of(access: &Access, client: &crate::cdr::CdrClient, system_id: &str) -> Self {
+    pub fn of(client: &crate::cdr::CdrClient) -> Self {
         if let Some(onward) = client.on_behalf() {
             return Self::Placeholder {
                 issuer: onward.issuer.clone(),
                 subject: onward.subject.clone(),
             };
         }
-        let Some(caller) = access.caller() else {
-            return Self::unattended(client);
-        };
-        let namespace = match (caller.via(), caller.issuer()) {
-            (Via::Bearer, Some(issuer)) => issuer,
-            _ => system_id,
-        };
-        Self::Caller {
-            subject: caller.subject().to_owned(),
-            namespace: namespace.to_owned(),
+        match client.principal() {
+            Some(Principal::Client { client_id }) => Self::Client {
+                client_id: client_id.clone(),
+            },
+            Some(Principal::Basic {
+                user,
+                issuer: Some(issuer),
+            }) => Self::Placeholder {
+                issuer: issuer.clone(),
+                subject: user.clone(),
+            },
+            Some(Principal::Basic { issuer: None, .. }) | None => Self::Bridge,
         }
     }
 
-    /// Returns the committer of a write no authenticated caller made through
-    /// `client`: its own client credentials client when it authenticates with
-    /// one, the bridge otherwise.
-    #[must_use]
-    pub fn unattended(client: &crate::cdr::CdrClient) -> Self {
-        client
-            .client_id()
-            .map_or(Self::Bridge, |client_id| Self::Client {
-                client_id: client_id.to_owned(),
-            })
-    }
-
     /// Returns the `PARTY_PROXY` this committer is written as.
-    ///
-    /// A caller is a `PARTY_IDENTIFIED` named by its subject, with a
-    /// `PARTY_REF` into the namespace of its issuer when that namespace is a
-    /// legal one (openEHR BASE, `OBJECT_REF.namespace`: the regex
-    /// `[a-zA-Z][a-zA-Z0-9_.:/&?=+-]*`); the name alone carries it otherwise.
     fn party(&self, system_id: &str) -> PartyProxy {
-        let (name, external_ref) = match self {
-            Self::Placeholder { issuer, subject } => {
-                return PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(
-                    PartyIdentifiedData {
-                        external_ref: None,
-                        name: None,
-                        identifiers: Some(openehr_base::containers::NonEmptyVec::of(
-                            DvIdentifier {
-                                issuer: Some(issuer.clone()),
-                                assigner: None,
-                                id: subject.clone(),
-                                r#type: None,
-                            },
-                        )),
-                    },
-                ));
-            }
-            Self::Bridge => (system_id, None),
-            Self::Client { client_id } => (client_id.as_str(), None),
-            Self::Caller { subject, namespace } => (
-                subject.as_str(),
-                legal_namespace(namespace).then(|| PartyRef {
-                    namespace: namespace.clone(),
-                    r#type: String::from(CALLER_PARTY_TYPE),
-                    id: ObjectId::GenericId(GenericId {
-                        value: subject.clone(),
-                        scheme: String::from(CALLER_ID_SCHEME),
-                    }),
-                }),
-            ),
+        let party = match self {
+            Self::Placeholder { issuer, subject } => PartyIdentifiedData {
+                external_ref: None,
+                name: None,
+                identifiers: Some(openehr_base::containers::NonEmptyVec::of(DvIdentifier {
+                    issuer: Some(issuer.clone()),
+                    assigner: None,
+                    id: subject.clone(),
+                    r#type: None,
+                })),
+            },
+            Self::Bridge => named(system_id),
+            Self::Client { client_id } => named(client_id),
         };
-        PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(PartyIdentifiedData {
-            external_ref,
-            name: Some(String::from(name)),
-            identifiers: None,
-        }))
+        PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party))
+    }
+}
+
+/// Returns a `PARTY_IDENTIFIED` stating `name` alone.
+fn named(name: &str) -> PartyIdentifiedData {
+    PartyIdentifiedData {
+        external_ref: None,
+        name: Some(String::from(name)),
+        identifiers: None,
     }
 }
 
@@ -228,17 +176,6 @@ pub fn originating_system(access: &Access) -> Option<String> {
         .then(|| caller.client_id().unwrap_or(caller.subject()).to_owned())
 }
 
-/// Returns whether `namespace` matches the `OBJECT_REF.namespace` regex
-/// `[a-zA-Z][a-zA-Z0-9_.:/&?=+-]*` of openEHR BASE.
-fn legal_namespace(namespace: &str) -> bool {
-    let mut characters = namespace.chars();
-    characters
-        .next()
-        .is_some_and(|first| first.is_ascii_alphabetic())
-        && characters
-            .all(|character| character.is_ascii_alphanumeric() || "_.:/&?=+-".contains(character))
-}
-
 /// Why the committal metadata could not be built.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -256,22 +193,22 @@ pub enum CommitError {
 
 /// Returns the commit headers one `EHR_STATUS` write carries.
 ///
-/// The write is a modification by `committer` through `system_id` in the
-/// lifecycle a composition write takes, with no template, since an
-/// `EHR_STATUS` is built from none.
+/// The write is a modification through `system_id` in the lifecycle a
+/// composition write takes, with no template, since an `EHR_STATUS` is built
+/// from none.
 #[must_use]
-pub fn status_context(system_id: &str, committer: &Committer) -> CommitContext {
+pub fn status_context(system_id: &str) -> CommitContext {
     CommitContext {
         lifecycle_state: Some(lifecycle_state(VersionLifecycleState::Complete)),
-        audit: header_audit(Change::Modification, system_id, committer),
+        audit: Some(header_audit(Change::Modification, system_id)),
         template_id: None,
     }
 }
 
 /// Returns the commit headers one composition write carries.
 ///
-/// The audit is the one [`audit`] puts into a CONTRIBUTION entry, so a single
-/// write and a transaction state the same committer and change type.
+/// The audit states the change type and the system [`audit`] puts into a
+/// CONTRIBUTION entry, and no committer, which the CDR writes.
 ///
 /// # Errors
 ///
@@ -280,7 +217,6 @@ pub fn status_context(system_id: &str, committer: &Committer) -> CommitContext {
 pub fn context(
     change: Change,
     system_id: &str,
-    committer: &Committer,
     template: &str,
 ) -> Result<CommitContext, CommitError> {
     Ok(CommitContext {
@@ -292,7 +228,7 @@ pub fn context(
                 lifecycle_state(VersionLifecycleState::Complete)
             }
         }),
-        audit: header_audit(change, system_id, committer),
+        audit: Some(header_audit(change, system_id)),
         template_id: Some(
             template_id(template).map_err(|source| CommitError::Template {
                 template: String::from(template),
@@ -305,24 +241,18 @@ pub fn context(
 /// Returns the `UpdateAudit` a contribution entry carries.
 ///
 /// The CONTRIBUTION body states the committer and the change type as schema
-/// members rather than as headers, so a transaction records exactly what a
-/// single write does.
+/// members, and ITS-REST requires `committer` there, so it names the party
+/// the CDR authenticated the call as.
 #[must_use]
 pub fn audit(change: Change, system_id: &str, committer: &Committer) -> UpdateAudit {
     UpdateAudit::UpdateAudit(audit_data(change, system_id, committer))
 }
 
-/// Returns the `openehr-audit-details` a header commit states, none under an
-/// onward token, whose committer the CDR derives from the token.
-///
-/// ITS-REST 1.1.0 leaves the header optional ("None of these headers are
-/// mandatory"), and `committer` is a required member of it.
-fn header_audit(change: Change, system_id: &str, committer: &Committer) -> Option<UpdateAuditData> {
-    match committer {
-        Committer::Placeholder { .. } => None,
-        Committer::Bridge | Committer::Client { .. } | Committer::Caller { .. } => {
-            Some(audit_data(change, system_id, committer))
-        }
+/// Returns the `openehr-audit-details` a header commit states.
+fn header_audit(change: Change, system_id: &str) -> HeaderAudit {
+    HeaderAudit {
+        system_id: Some(String::from(system_id)),
+        ..HeaderAudit::new(coded(change.code(), change.rubric()))
     }
 }
 
@@ -366,8 +296,7 @@ fn coded(code: &str, rubric: &str) -> DvCodedText {
 
 #[cfg(test)]
 mod tests {
-    use super::{Change, Committer, audit, context, legal_namespace, lifecycle_state};
-    use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
+    use super::{Change, Committer, audit, context, lifecycle_state, status_context};
     use openehr_its::rest::generated::common::UpdateAudit;
     use openehr_rm::v1_2::common::generic::party_identified::PartyIdentified;
     use openehr_rm::v1_2::common::generic::party_proxy::PartyProxy;
@@ -382,13 +311,8 @@ mod tests {
 
     #[test]
     fn a_commit_context_carries_the_change_type_the_system_and_the_template() {
-        let built = context(
-            Change::Creation,
-            "FerroBRIDGE",
-            &Committer::Bridge,
-            "ferrobridge.diagnose.v1",
-        )
-        .expect("the context builds");
+        let built =
+            context(Change::Creation, "FerroBRIDGE", "ferrobridge.diagnose.v1").expect("builds");
         let audit = built.audit.as_ref().expect("the context carries an audit");
         assert_eq!("249", audit.change_type.defining_code.code_string);
         assert_eq!(Some("FerroBRIDGE"), audit.system_id.as_deref());
@@ -396,6 +320,13 @@ mod tests {
             Some("ferrobridge.diagnose.v1"),
             built.template_id.as_ref().map(|id| id.value.as_str())
         );
+        let status = status_context("FerroBRIDGE");
+        let audit = status
+            .audit
+            .as_ref()
+            .expect("a status write carries an audit");
+        assert_eq!("251", audit.change_type.defining_code.code_string);
+        assert!(status.template_id.is_none());
     }
 
     #[test]
@@ -420,60 +351,11 @@ mod tests {
 
     #[test]
     fn a_template_identifier_a_header_cannot_hold_is_refused() {
-        assert!(context(Change::Creation, "FerroBRIDGE", &Committer::Bridge, "").is_err());
+        assert!(context(Change::Creation, "FerroBRIDGE", "").is_err());
     }
 
     #[test]
-    fn a_caller_commits_under_its_subject_in_its_issuers_namespace() {
-        let caller = Committer::Caller {
-            subject: String::from("synthetic-sub"),
-            namespace: String::from("https://as.example.org/realms/ferro"),
-        };
-        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &caller) else {
-            panic!("the facade writes an UPDATE_AUDIT");
-        };
-        assert_eq!(
-            Some("FerroBRIDGE"),
-            data.system_id.as_deref(),
-            "the bridge commits"
-        );
-        let PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) = data.committer
-        else {
-            panic!("a caller is a PARTY_IDENTIFIED");
-        };
-        assert_eq!(Some("synthetic-sub"), party.name.as_deref());
-        let reference = party
-            .external_ref
-            .expect("a legal namespace carries a PARTY_REF");
-        assert_eq!("https://as.example.org/realms/ferro", reference.namespace);
-        assert_eq!("PARTY", reference.r#type);
-        assert!(matches!(reference.id, ObjectId::GenericId(ref id) if id.value == "synthetic-sub"));
-    }
-
-    #[test]
-    fn a_namespace_outside_the_openehr_regex_leaves_the_name_alone() {
-        assert!(legal_namespace("https://as.example.org/realms/ferro"));
-        assert!(legal_namespace("FerroBRIDGE"));
-        for illegal in ["", "1as", "https://as.example.org/~user", "a b", "x%20"] {
-            assert!(!legal_namespace(illegal), "{illegal}");
-        }
-        let caller = Committer::Caller {
-            subject: String::from("synthetic-sub"),
-            namespace: String::from("https://as.example.org/~tenant"),
-        };
-        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &caller) else {
-            panic!("the facade writes an UPDATE_AUDIT");
-        };
-        let PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) = data.committer
-        else {
-            panic!("a caller is a PARTY_IDENTIFIED");
-        };
-        assert_eq!(Some("synthetic-sub"), party.name.as_deref());
-        assert_eq!(None, party.external_ref);
-    }
-
-    #[test]
-    fn a_write_no_caller_made_is_the_bridges() {
+    fn a_contribution_through_an_open_cdr_names_the_bridge() {
         let UpdateAudit::UpdateAudit(data) =
             audit(Change::Creation, "FerroBRIDGE", &Committer::Bridge)
         else {
@@ -485,21 +367,18 @@ mod tests {
         };
         assert_eq!(Some("FerroBRIDGE"), party.name.as_deref());
         assert_eq!(None, party.external_ref);
+        assert_eq!(None, party.identifiers);
     }
 
     #[test]
-    fn a_write_under_the_bridges_own_grant_names_its_client() {
+    fn a_contribution_under_the_bridges_own_grant_names_its_client_alone() {
         let client = Committer::Client {
             client_id: String::from("ferrobridge"),
         };
         let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &client) else {
             panic!("the facade writes an UPDATE_AUDIT");
         };
-        assert_eq!(
-            Some("FerroBRIDGE"),
-            data.system_id.as_deref(),
-            "the bridge commits"
-        );
+        assert_eq!(Some("FerroBRIDGE"), data.system_id.as_deref());
         let PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) = data.committer
         else {
             panic!("the client is a PARTY_IDENTIFIED");
@@ -509,59 +388,54 @@ mod tests {
         assert_eq!(None, party.identifiers);
     }
 
+    fn client(config: &crate::cdr::config::CdrConfig) -> crate::cdr::CdrClient {
+        crate::cdr::CdrClient::new(config).expect("a client")
+    }
+
+    fn base() -> crate::cdr::config::CdrConfig {
+        crate::cdr::config::CdrConfig::new("http://cdr.example.org/v1".parse().expect("a URL"))
+    }
+
     #[test]
-    fn an_unattended_write_names_the_client_of_an_oauth_cdr_client_only() {
-        let base: url::Url = "http://cdr.example.org/v1".parse().expect("a base URL");
-        let open = crate::cdr::CdrClient::new(&crate::cdr::config::CdrConfig::new(base.clone()))
-            .expect("an open client");
-        assert_eq!(Committer::Bridge, Committer::unattended(&open));
-        let granted =
-            crate::cdr::CdrClient::new(&crate::cdr::config::CdrConfig::new(base).with_oauth(
-                ferrohealth_smart::client::ClientCredentials::new(
-                    ferrohealth_smart::client::Endpoint::Token(
-                        "http://as.example.org/token".parse().expect("a token URL"),
-                    ),
-                    String::from("ferrobridge"),
-                    secrecy::SecretString::from("synthetic-secret"),
-                ),
-            ))
-            .expect("a client credentials client");
+    fn the_committer_is_the_party_the_cdr_authenticates() {
+        assert_eq!(Committer::Bridge, Committer::of(&client(&base())));
+        let granted = base().with_oauth(ferrohealth_smart::client::ClientCredentials::new(
+            ferrohealth_smart::client::Endpoint::Token(
+                "http://as.example.org/token".parse().expect("a token URL"),
+            ),
+            String::from("ferrobridge"),
+            secrecy::SecretString::from("synthetic-secret"),
+        ));
         assert_eq!(
             Committer::Client {
                 client_id: String::from("ferrobridge"),
             },
-            Committer::unattended(&granted)
+            Committer::of(&client(&granted))
+        );
+        let basic = base().with_basic("synthetic-user", uuid::Uuid::new_v4().simple().to_string());
+        assert_eq!(
+            Committer::Bridge,
+            Committer::of(&client(&basic)),
+            "a Basic user with no issuer has no placeholder"
+        );
+        assert_eq!(
+            Committer::Placeholder {
+                issuer: String::from("urn:example:cdr"),
+                subject: String::from("synthetic-user"),
+            },
+            Committer::of(&client(
+                &basic.with_committer_issuer(Some(String::from("urn:example:cdr")))
+            ))
         );
     }
 
-    fn placeholder() -> Committer {
-        Committer::Placeholder {
+    #[test]
+    fn the_placeholder_committer_is_one_identifier_of_the_issuer_and_subject() {
+        let placeholder = Committer::Placeholder {
             issuer: String::from("https://as.example.org"),
             subject: String::from("synthetic-sub"),
-        }
-    }
-
-    #[test]
-    fn a_header_commit_under_an_onward_token_states_no_audit() {
-        let built = context(
-            Change::Creation,
-            "FerroBRIDGE",
-            &placeholder(),
-            "ferrobridge.diagnose.v1",
-        )
-        .expect("the context builds");
-        assert!(built.audit.is_none());
-        assert!(built.lifecycle_state.is_some());
-        assert!(
-            super::status_context("FerroBRIDGE", &placeholder())
-                .audit
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn the_placeholder_committer_is_one_identifier_of_the_token_s_iss_and_sub() {
-        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &placeholder())
+        };
+        let UpdateAudit::UpdateAudit(data) = audit(Change::Creation, "FerroBRIDGE", &placeholder)
         else {
             panic!("the facade writes an UPDATE_AUDIT, never an attestation");
         };

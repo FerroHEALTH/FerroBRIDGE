@@ -147,7 +147,16 @@ pub struct Shape {
     pub hl7v2: Hl7v2,
     /// The authorization server, when inbound authentication is on.
     pub security: Option<Security>,
+    /// The URL a person creates, lists and revokes SMART Health Links at,
+    /// when `[shl]` is on.
+    pub links: Option<String>,
 }
+
+/// The `rest` extension naming where a person's SMART Health Links are
+/// created.
+// NOTE: no specification governs this: our own design; R4 has no element for an endpoint outside
+// the FHIR base, so an extension (extensibility.html) names it for a patient app's discovery.
+pub const SMART_HEALTH_LINKS: &str = "urn:ferrobridge:extension:smart-health-links";
 
 /// The `oauth-uris` extension of SMART App Launch
 /// (<https://hl7.org/fhir/smart-app-launch/1.0.0/conformance/index.html>).
@@ -211,6 +220,7 @@ pub fn statement_with(
             operations,
             hl7v2,
             security: None,
+            links: None,
         },
         Chains::None,
         None,
@@ -277,6 +287,15 @@ pub fn statement_of(
                 .collect(),
             operation: system_operations(operations),
             security: shape.security.as_ref().map(security),
+            extension: shape
+                .links
+                .iter()
+                .map(|url| Extension {
+                    url: SMART_HEALTH_LINKS.into(),
+                    value: Some(ExtensionValue::Url(url.as_str().into())),
+                    ..Extension::default()
+                })
+                .collect(),
             ..CapabilityStatementRest::default()
         }],
         ..CapabilityStatement::default()
@@ -451,15 +470,12 @@ fn party_resource(name: &str, parties: Option<&PartySearch>) -> CapabilityStatem
     CapabilityStatementRestResource {
         r#type: name.into(),
         documentation: Some(documentation.into()),
-        interaction: PARTY_INTERACTIONS
-            .iter()
-            .copied()
-            .chain(searched.then_some(SEARCH_INTERACTION))
-            .map(|code| CapabilityStatementRestResourceInteraction {
-                code: code.into(),
-                ..CapabilityStatementRestResourceInteraction::default()
-            })
-            .collect(),
+        interaction: interactions(
+            PARTY_INTERACTIONS
+                .iter()
+                .copied()
+                .chain(searched.then_some(SEARCH_INTERACTION)),
+        ),
         search_param,
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),
@@ -501,17 +517,44 @@ fn created_resource(name: &str) -> CapabilityStatementRestResource {
     CapabilityStatementRestResource {
         r#type: name.into(),
         documentation: Some(CREATED_DOCUMENTATION.into()),
-        interaction: CREATED_INTERACTIONS
-            .iter()
-            .map(|code| CapabilityStatementRestResourceInteraction {
-                code: (*code).into(),
-                ..CapabilityStatementRestResourceInteraction::default()
-            })
-            .collect(),
+        interaction: interactions(CREATED_INTERACTIONS),
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),
         ..CapabilityStatementRestResource::default()
     }
+}
+
+/// Returns the `rest.resource.interaction` entries of `codes`, in order.
+#[must_use]
+pub fn interactions<'a>(
+    codes: impl IntoIterator<Item = &'a str>,
+) -> Vec<CapabilityStatementRestResourceInteraction> {
+    codes
+        .into_iter()
+        .map(|code| CapabilityStatementRestResourceInteraction {
+            code: code.into(),
+            ..CapabilityStatementRestResourceInteraction::default()
+        })
+        .collect()
+}
+
+/// Returns the `rest.resource.searchParam` entries of `parameters`, each a
+/// name, the canonical of its definition and its type, in order.
+#[must_use]
+pub fn declared_params(
+    parameters: &[(&str, &str, &str)],
+) -> Vec<CapabilityStatementRestResourceSearchParam> {
+    parameters
+        .iter()
+        .map(
+            |(name, definition, kind)| CapabilityStatementRestResourceSearchParam {
+                name: (*name).into(),
+                definition: Some((*definition).into()),
+                r#type: (*kind).into(),
+                ..CapabilityStatementRestResourceSearchParam::default()
+            },
+        )
+        .collect()
 }
 
 /// Returns the `rest.resource` entry of one supported type.
@@ -520,15 +563,7 @@ fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatement
     let searched = surface.as_ref().map(|_surface| SEARCH_INTERACTION);
     CapabilityStatementRestResource {
         r#type: name.into(),
-        interaction: RESOURCE_INTERACTIONS
-            .iter()
-            .copied()
-            .chain(searched)
-            .map(|code| CapabilityStatementRestResourceInteraction {
-                code: code.into(),
-                ..CapabilityStatementRestResourceInteraction::default()
-            })
-            .collect(),
+        interaction: interactions(RESOURCE_INTERACTIONS.iter().copied().chain(searched)),
         search_param: surface
             .map(|surface| search_params(name, &surface, chains))
             .unwrap_or_default(),

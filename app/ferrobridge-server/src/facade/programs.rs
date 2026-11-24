@@ -121,6 +121,18 @@ pub enum LoadError {
         /// The resource type.
         resource_type: String,
     },
+    /// A context maps a type the facade serves itself: `Basic` under
+    /// `[facade.app_state]`, `Task` under `[facade.launch_task]`.
+    #[error(
+        "the context {context} maps {resource_type}, which the facade serves itself under \
+         [facade.app_state] or [facade.launch_task]"
+    )]
+    Owned {
+        /// The context.
+        context: String,
+        /// The resource type.
+        resource_type: String,
+    },
 }
 
 /// One compiled context, with the template index it runs against.
@@ -422,6 +434,27 @@ pub fn check_parties(programs: &Programs, demographic: bool) -> Result<(), LoadE
         }
     }
     Ok(())
+}
+
+/// Checks that no program maps one of `owned`, the types the facade serves
+/// itself, which would leave the program unreachable (no specification
+/// governs this: our own design).
+///
+/// # Errors
+///
+/// Returns [`LoadError::Owned`] naming the first such context.
+pub fn check_owned(programs: &Programs, owned: &[&str]) -> Result<(), LoadError> {
+    programs
+        .loaded()
+        .iter()
+        .chain(programs.parties())
+        .find(|entry| owned.contains(&entry.program.resource().as_str()))
+        .map_or(Ok(()), |entry| {
+            Err(LoadError::Owned {
+                context: entry.program.context().as_str().to_owned(),
+                resource_type: entry.program.resource().as_str().to_owned(),
+            })
+        })
 }
 
 /// Checks that every type `[facade.party_search]` configures is served by a

@@ -22,8 +22,8 @@ under `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/`, and
 `src/map/generated/` is `// @generated` and off-limits; change the generator
 or its inputs and regenerate. The table maps are terminology: of them the
 crate holds only the generated header (id, url, each group's systems), and
-every table value goes through `ferrobridge_term::client::Client::translate`
-on a terminology server, the only translator; there is no offline copy of a
+every table value goes through `ferrobridge_term::client::Client::translate_all`
+(the inverse through `translate`) on a terminology server, the only translator; there is no offline copy of a
 table and no directory or server is read for a structure map. Nothing here
 maps a message, segment or table by hand: the message map names a resource
 per segment, the segment map maps the fields, a data type map maps the
@@ -262,7 +262,7 @@ caller answers it as any malformed frame.
 against the generated structures, the ACK codes on the wire against a plain
 `TcpStream` sender, and the interpreter over the generated maps with the
 table values answered by a `wiremock` terminology stub (`tests/it/tables.rs`,
-`support::terminology`) that answers `$translate`, `reverse` included, from the
+`support::terminology`) that answers `$translate`, alone or in a `batch`, `reverse` included, from the
 table maps of the guide package and of the value package. The bundles and outcome lists are reviewed `insta`
 snapshots. Every fixture is synthetic (`tests/it/fixtures.rs`); the one
 exception is the guide's own MDM^T02 sample pair under

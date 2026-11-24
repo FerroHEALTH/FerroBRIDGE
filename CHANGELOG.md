@@ -26,6 +26,100 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.28] - 2026-11-22
+
+SMART breadth and the committer the CDR writes. The facade serves SMART App
+State and SMART launch `Task`s, reads a FerroSMART patient's own token as the
+person's own access, and takes `ferrohealth-smart` 0.33 with its named issuer
+tables, a breaking change to `[auth]`. A facade write no longer fails against
+a CDR that writes the committer itself: a single write states no committer,
+and a transaction names the party the CDR authenticated, a Basic user under
+the new `[cdr] committer_issuer`. The CDM database runs on PostgreSQL 19, the
+HL7 v2 face asks every translation of a message in one batch, `timingToDaily`
+carries every time of day, and the workspace moves to the `openehr-*` crates
+0.3.0 and takes `url` 2.5.9 for RUSTSEC-2026-0592. The crates move to
+`openehr-mapping-core` 0.5.0, `fhirconnect` 0.7.0, `ferrobridge-term` and
+`ferrobridge-validator` 0.17.1, `ferrobridge-hl7v2` 0.25.1 and `eehrxf`
+0.23.1.
+
+### Added
+
+- The FHIR facade serves SMART App State (SMART App Launch 2.2.0, Persisting
+  App State) behind `[facade.app_state]`: `Basic` at the base becomes the App
+  State endpoint with create, update and delete under `If-Match` and the search
+  by `code` and `subject`, kept in a store of its own; the discovery document
+  lists `smart-app-state` and the `CapabilityStatement` instantiates
+  `smart-app-state-server`. Granular `?code=` scopes on `Basic` are honoured (#1968).
+- The FHIR facade serves SMART launch `Task`s (SMART App Launch 2.2.0, Task
+  profile for requesting a SMART launch) behind `[facade.launch_task]`:
+  create, read and search by `patient`, `status` and `code` on `Task`, every
+  `Task` checked against `task-ehr-launch` or `task-standalone-launch` and a
+  `Task` of neither refused, kept in a store of its own; the
+  `CapabilityStatement` declares both profiles (#1969).
+
+### Changed
+
+- The workspace moves to the `openehr-*` crates 0.3.0, and `openehr-mapping-core` takes the `ARCHETYPE_SLOT` admission decision from `openehr-sdt` (`WebTemplateArchetypeSlot::admits`) in place of its own copy of the rule, so the bridge and the CDR's composition validator decide a slot filler by one matcher. A slot whose pattern no regex engine compiles still admits nothing. `OpenSlot` no longer implements `PartialEq` and `Eq`. The published crates whose public API names openEHR types move to their next minor: `openehr-mapping-core` 0.5.0, `fhirconnect` 0.6.0 and `eehrxf` 0.18.0 take `openehr-base`, `openehr-rm`, `openehr-its`, `openehr-sdt`, `openehr-am` and `openehr-term` from the 0.3 line, and `ferrobridge-hl7v2` 0.20.0 follows `fhirconnect` 0.6. A dependant moves its own `openehr-*` requirements to `"0.3"` with them (#1943).
+- The consent lane follows the `openehr-rm` 0.3.0 access draft: every access term is coded in the terminology the draft gives it, `openehr_access` for the draft's own codes (formerly `ferroehr-operations`), HL7 `consent-provision-type` for a directive's effect and HL7 `extra-security-role-type` `datasubject` for the subject caller kind. A FHIR Consent export and import carry an actor scope's `organisation_type` in the new `https://ferrobridge.eu/fhir/StructureDefinition/organisation-type` extension, and an APPC export refuses it naming `applies_to.organisation_type`, since APPC defines no subject attribute for an organisation type (#1962).
+- **`jsonschema` 0.61.0.** The FHIRconnect and OMOCL mapping schemas are
+  checked with `jsonschema` 0.61.0. `jsonschema` is part of the public API of
+  `openehr-mapping-core` (`schema::compile` returns a `jsonschema::Validator`)
+  and `fhirconnect` (`Schemas::validator`), so both move to a new
+  compatibility line, and so do `eehrxf` and `ferrobridge-hl7v2`, which
+  expose them: a consumer requires `openehr-mapping-core = "0.5"`,
+  `fhirconnect = "0.6"`, `eehrxf = "0.18"` and `ferrobridge-hl7v2 = "0.20"`,
+  and takes the `jsonschema` 0.61 `Validator` (#1965).
+- **`timingToDaily` carries every time of day.** The CKM daily timing
+  cluster repeats its time of day (`at0004`, `0..*`) as R4
+  `Timing.repeat.timeOfDay` does, and the function now writes and reads one
+  time per instance in order, where it refused more than one. A function
+  declares a port repeating through `MappingCodeRegistry::repeating`, the
+  compiler accepts such a port whose node repeats directly below the
+  mapping's `with.openehr` (`Port::repeats`), and `Ports` holds one value per
+  instance (`Ports::with_each`, `Ports::all`, `Ports::ports`). A function
+  that writes more than one value at a port whose node holds one is refused
+  with the new `MappingCodeError::RepeatedPort`, a breaking change to that
+  enum, so a consumer requires `fhirconnect = "0.7"`, `eehrxf = "0.19"` and
+  `ferrobridge-hl7v2 = "0.21"` (#1972).
+- The workspace moves to `ferrohealth-smart` 0.30.0, `ferrohealth-server` 0.11.0 and `ferrohealth-session` 0.25.0. A request past `server.max_concurrent_requests` now waits for a slot, at most `server.admission_wait` (100 milliseconds by default) in a first-come queue of `server.max_waiting_requests` (256 by default; `0` keeps no queue), before it is refused `503` with `Retry-After`; the health routes are never refused or queued. `ferrobridge-term` carries smart types in its public API, so it moves to 0.14.0, and the crates that require it follow: `ferrobridge-validator` 0.14.0, `ferrobridge-hl7v2` 0.22.0 and `eehrxf` 0.20.0. A dependant moves `ferrohealth-smart` to 0.30 with them (#1979).
+- Behind FerroSMART, a patient's own token is now the person's own access. Under `ferrohealth-smart` 0.31 the `ferrosmart` preset reads such a token as the patient: `fhirUser` is `Patient/<x>`, the `patient` claim is `x`, and the scopes are `patient/` grants alone. The facade's access record carries the binding `self` for it. The onward lane exchanges it at the `patients` issuer when one is declared, and otherwise at the `persons` issuer. Before, the lane refused a patient at a `persons` issuer. A professional who holds `patient/` scopes is unchanged. To keep the earlier reading, set `fhir_user_patient = false` on the FerroSMART `[[auth.issuer]]` table (#1986).
+- The workspace moves to `ferrohealth-smart` 0.31.0 and `ferrohealth-session` 0.26.0. `ferrobridge-term` carries smart types in its public API, so it moves to 0.15.0, and the crates that require it follow: `ferrobridge-validator` 0.15.0, `ferrobridge-hl7v2` 0.23.0 and `eehrxf` 0.21.0. A dependant moves `ferrohealth-smart` to 0.31 with them; one that builds smart's `Profile`, `ProfileKeys` or `IssuerEntry` with a struct literal adds the `fhir_user_patient` field (#1987).
+- Breaking: the bridge moves to `ferrohealth-smart` 0.32.0 and `ferrohealth-session` 0.27.0, and `[auth]` takes their simpler issuer configuration. Each trusted issuer is a named table, `[auth.issuer.<name>]`, in place of the `[[auth.issuer]]` array, and `described_issuer` names a table by its name. An issuer that sets no `audience` takes `[facade] base_url`, and `kind` defaults to the preset's (`persons` under `ferrosmart`, `keycloak`, `entra` and `okta`). The preset is `preset = "…"` in place of `profile = "…"`, every profile key (`first_party_clients`, `delegates`, `app_only`, `token_types` and the rest) moves into the issuer's `[auth.issuer.<name>.profile]` table, and `profile_file` reads a profile file you supply. `scopeless_subjects` moves onto its issuer table as a list of `sub` values. The onward tables follow: `[cdr.endpoint.credentials.onward]` and `[[cdr.onward]]` take `preset` and a `profile` table in place of `profile` and `keys`. Upgrade: give each `[[auth.issuer]]` table a name, rename `profile` to `preset`, move its profile keys under `.profile`, drop an `audience` equal to the facade's base, and set `described_issuer` to the name (#1991).
+- Breaking: the facade reads a token's `patient` claim as the launch context only from an issuer whose profile sets `patient_context`, the per-issuer rule FerroEHR reads too. The `ferrosmart` preset sets it; under any other preset a `patient` claim is ignored, so a `patient/` scope reaches no patient, until the issuer's profile table sets `patient_context = true`. Behind FerroSMART no self-delegate is needed for its patient picker (`issuer_client_is_person`), and `audience_delegates = true` admits every app registered at FerroSMART for the facade without a `delegates` entry (#1991).
+- Breaking: every `401` and `403` `Bearer` challenge with an error code carries the stable reason code of the check that refused the token as its `error_description` (RFC 6750 §3), such as `expired`, `audience-mismatch` or `scope-not-granted`. The `OperationOutcome` and the problem body are unchanged and still name no claim and no scope (#1991).
+- `ferrobridge-term` carries smart types in its public API, so it moves to 0.16.0, and the crates that require it follow: `ferrobridge-validator` 0.16.0, `ferrobridge-hl7v2` 0.24.0 and `eehrxf` 0.22.0. A dependant moves `ferrohealth-smart` to 0.32 with them (#1991).
+- The CDM database runs on PostgreSQL 19: `cdm init`, `vocab load`, `etl
+  run` and every other CDM job refuse an older server when they connect,
+  naming the `server_version_num` found and the 190000 needed. The
+  quickstart's `cdm` profile runs `postgres:19.0` with its volume at
+  `/var/lib/postgresql`, where the official image keeps its data.
+  PostgreSQL 18 is no longer supported and there is no upgrade path: a
+  `cdm-data` volume holding an older cluster is removed and created again (#1993).
+- The bridge moves to `ferrohealth-smart` 0.33, `ferrohealth-session` 0.28 and `ferrohealth-server` 0.12. `ferrobridge-term` carries smart types in its public API, so it moves to 0.17.0, and the crates that require it follow: `ferrobridge-validator` 0.17.0, `ferrobridge-hl7v2` 0.25.0 and `eehrxf` 0.23.0; a dependant moves `ferrohealth-smart` to 0.33 with them. The server takes `[server] request_decompression`, off by default, which decodes a request body sent in gzip or Brotli under `body_limit` (FerroHEALTH/FerroSYS#408) (#1995).
+- The HL7 v2 face asks every `ConceptMap/$translate` of a message in one FHIR `batch` Bundle, where it sent one request per table value and target system; each value still takes the first target system that answers. `ferrobridge-term` adds `Client::translate_all`, one call for one translation and one `batch` for several (#1997).
+
+### Fixed
+
+- A FHIRconnect mapping of a FHIR time onto a single `EVENT` that the template
+  folds into its `OBSERVATION` now compiles and runs, as `EVENT.adoc` pairs a
+  `dateTime` with a `POINT_EVENT` and a `Period` with an `INTERVAL_EVENT`. The
+  engine writes and reads the event through the `time` leaf the Web Template
+  keeps at the event's path, with the class, width and function in the object
+  that holds it. The library's `medication_statement.v0.yml` no longer stops
+  at line 44 against `KDS_Medikationseintrag`. `openehr-mapping-core` gains
+  `WebTemplateIndex::read_holder` and `amend_holder`, and `fhirconnect` gains
+  `EventTime::in_folded_event` and `is_folded` (#1924).
+- A facade write no longer fails with `500` against a CDR that writes the committer itself. A single write states the change type and `system_id` in `openehr-audit-details` and no committer, which ITS-REST 1.1.0 leaves optional, and a transaction's CONTRIBUTION names the party the CDR authenticated: the bridge's client id under its client credentials grant, or the placeholder of an exchanged token's `iss` and `sub` or of a Basic user under the new `[cdr] committer_issuer`. The authenticated facade caller is no longer stated as the committer; the access record names it (#2002).
+
+### Security
+
+Shipped with functional changes because: the `url` fix is a lockfile move on `main`, where the library crates publish one patch per change and the unreleased changes above already sit, so a security-only patch has no tree of its own to come from.
+
+- The workspace takes `url` 2.5.9 in place of 2.5.8 (RUSTSEC-2026-0592,
+  GHSA-hrj5-67jp-wqp9): every earlier `url` lets `Url::origin()` recurse
+  without a bound on a nested `blob:` URL, so a crafted URL overflows the
+  stack (#1999).
+
 ## [0.0.27] - 2026-11-17
 
 Browser apps and FerroSMART. The facade answers CORS: the SMART discovery
@@ -6981,7 +7075,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.27...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.28...HEAD
+[0.0.28]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.27...v0.0.28
 [0.0.27]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.26...v0.0.27
 [0.0.26]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.25...v0.0.26
 [0.0.25]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.24...v0.0.25

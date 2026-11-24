@@ -59,6 +59,9 @@ pub struct CdrConfig {
     /// The onward lane a facade request reaches the CDR under its caller
     /// through, when `[cdr.endpoint.credentials.onward]` declares one.
     pub onward: Option<crate::cdr::onward::CdrOnward>,
+    /// The issuer the CDR names a Basic user under in the committer
+    /// placeholder a CONTRIBUTION states, from `[cdr] committer_issuer`.
+    pub committer_issuer: Option<String>,
 }
 
 impl CdrConfig {
@@ -75,6 +78,7 @@ impl CdrConfig {
             credentials: None,
             demographic: false,
             onward: None,
+            committer_issuer: None,
             connect_timeout: None,
             tls: None,
         }
@@ -129,6 +133,14 @@ impl CdrConfig {
             user: user.into(),
             password: password.into(),
         });
+        self
+    }
+
+    /// Returns this configuration naming a Basic user under `issuer` in the
+    /// committer placeholder a CONTRIBUTION states.
+    #[must_use]
+    pub fn with_committer_issuer(mut self, issuer: Option<String>) -> Self {
+        self.committer_issuer = issuer;
         self
     }
 

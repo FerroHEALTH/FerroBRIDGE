@@ -304,7 +304,7 @@ pub(crate) async fn upload_template(base_url: &str) -> Result<(), Box<dyn Error>
 }
 
 /// Returns the create request the case sends.
-fn post_condition() -> Result<Request<Body>, Box<dyn Error>> {
+pub(crate) fn post_condition() -> Result<Request<Body>, Box<dyn Error>> {
     let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)?;
     resource["meta"] = serde_json::json!({ "profile": [PROFILE] });
     resource["subject"] = serde_json::json!({
@@ -531,7 +531,7 @@ fn strip_facade_owned(document: &mut serde_json::Value) {
 
 /// Returns the synthetic `Condition` with `id`, coded `code`, for the case's
 /// subject.
-fn condition_coded(id: &str, code: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+pub(crate) fn condition_coded(id: &str, code: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)?;
     resource["id"] = serde_json::json!(id);
     resource["meta"] = serde_json::json!({ "profile": [PROFILE] });

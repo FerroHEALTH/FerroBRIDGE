@@ -4,9 +4,11 @@
 //! The configuration contract: the file, the environment over it, the `_file`
 //! secrets, and every refusal.
 
+mod app_state;
 mod audit;
 mod auth;
 mod change_feed;
+mod committer;
 mod consent;
 mod cors;
 mod environment;
@@ -16,12 +18,15 @@ mod facade;
 mod fhir_outbound;
 mod file;
 mod hl7v2;
+mod launch_task;
 mod oauth;
 mod omop_incremental;
 mod onward;
 mod operator;
 mod refusals;
 mod secrets;
+mod shl;
+mod summary;
 mod usage_report;
 
 use ferrobridge_server::config::Config;

@@ -120,7 +120,7 @@ async fn credential_of(world: &World, method: &str, path: &str) -> Option<String
 async fn a_persons_consent_reaches_the_ehr_access_under_the_exchanged_token()
 -> Result<(), Box<dyn Error>> {
     let world = World::start(Grant::Standard, "").await?;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    let issued = mint(&world.key, &world.issued_claims(300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
         .await;

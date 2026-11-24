@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use super::CdmSettings;
 use super::FacadeSettings;
 use super::MappingSettings;
+use super::SummarySettings;
 use super::credentials::Upstream;
 use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
@@ -95,8 +96,39 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         party_search: party_search(facade)?,
         binding_issuers: facade.binding_identifier_issuers.clone(),
         consent: consent(facade)?,
+        app_state: facade
+            .app_state
+            .enabled
+            .then(|| facade.app_state.store.clone()),
+        launch_task: facade
+            .launch_task
+            .enabled
+            .then(|| facade.launch_task.store.clone()),
         cors: cors(facade)?,
+        summary: summary(facade)?,
     })
+}
+
+/// Returns the patient summary `facade` configures, `None` when it is off.
+fn summary(facade: &Facade) -> Result<Option<SummarySettings>, Error> {
+    let summary = &facade.summary;
+    if !summary.enabled {
+        return Ok(None);
+    }
+    if summary.packages.is_empty() {
+        return Err(Error::Missing {
+            key: String::from("facade.summary.packages"),
+        });
+    }
+    if summary.operator.trim().is_empty() {
+        return Err(Error::Missing {
+            key: String::from("facade.summary.operator"),
+        });
+    }
+    Ok(Some(SummarySettings {
+        packages: summary.packages.clone(),
+        operator: summary.operator.clone(),
+    }))
 }
 
 /// Returns the CORS policy `facade` configures: every listed origin read in
@@ -355,7 +387,15 @@ pub(super) fn resolve_cdr(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Er
     };
     match resolve_credentials("cdr.endpoint.credentials", &own)? {
         Some(Upstream::Basic { user, password }) => {
-            config = config.with_basic(user, password);
+            config = config
+                .with_basic(user, password)
+                .with_committer_issuer(cdr.committer_issuer.clone());
+        }
+        Some(Upstream::OAuth(_)) | None if cdr.committer_issuer.is_some() => {
+            return Err(Error::Needs {
+                key: String::from("cdr.committer_issuer"),
+                needs: String::from("cdr.endpoint.credentials.user"),
+            });
         }
         Some(Upstream::OAuth(grant)) => {
             config = config.with_oauth(*grant);
@@ -403,7 +443,7 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
             .credentials
             .onward
             .as_ref()
-            .and_then(|onward| onward.kind),
+            .map(|onward| onward.kind.unwrap_or_default()),
     ) {
         issuers.push((lane, kind));
     }
@@ -420,14 +460,7 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
             .resolve_with_tls(&ferrohealth_smart::config::ServerTls)
             .and_then(|credentials| section.resolve(credentials))
             .map_err(|source| refused("cdr.onward", source))?;
-        let kind = section.kind.ok_or_else(|| {
-            refused(
-                "cdr.onward",
-                ferrohealth_smart::config::ConfigError::Missing {
-                    key: "credentials.onward.kind",
-                },
-            )
-        })?;
+        let kind = section.kind.unwrap_or_default();
         if issuers.iter().any(|(_, seen)| *seen == kind) {
             return Err(Error::Duplicate {
                 key: String::from("cdr.onward.kind"),

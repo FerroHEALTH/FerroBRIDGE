@@ -12,16 +12,13 @@ default. No specification governs it: it is FerroBRIDGE's own design.
 Set `[operator] enabled = true` (or `FERROBRIDGE__OPERATOR__ENABLED=true`).
 The API needs inbound authentication, so the server refuses to start when
 `[operator] enabled` is true and `[auth] enabled` is false or `[auth]` holds
-no `[[auth.issuer]]` table. The routes are
+no `[auth.issuer.<name>]` table. The routes are
 mounted under `/operator` on the server's one listener; the bridge has no
 second admin listener.
 
 ```toml
-[[auth.issuer]]
+[auth.issuer.clinic]
 issuer = "https://auth.example.org/realms/clinic"
-kind = "persons"
-audience = ["https://bridge.example.org/fhir"]
-first_party_clients = ["ferrobridge-console"]
 
 [operator]
 enabled = true

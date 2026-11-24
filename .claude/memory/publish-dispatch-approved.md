@@ -20,3 +20,5 @@ approved from my side always".
 preflight passes; confirm the version on crates.io or the chart's
 attestation afterwards; workers still never dispatch a publish
 ([[release-tag-and-approve-autonomously]]).
+
+**Reaffirmed (owner, 2026-11-19):** "you are always allowed to approve this for me" about a tag-started `release.yml` run waiting on the `crates-io` environment. The orchestrator approves that pending deployment itself (`gh api -X POST repos/<repo>/actions/runs/<id>/pending_deployments -F "environment_ids[]=<id>" -f state=approved`) once the preflight passed at the tagged merge commit.

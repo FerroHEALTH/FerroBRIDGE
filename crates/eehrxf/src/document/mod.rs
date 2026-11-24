@@ -15,7 +15,8 @@
 //! generated narrative, its entries and, when it has none, an empty reason,
 //! and the report a form carries beside its composition. The patient summary
 //! is written to HL7 Europe Patient Summary 1.0.0-ballot
-//! ([`PATIENT_SUMMARY_FORM`]), the laboratory report to HL7 Europe
+//! ([`PATIENT_SUMMARY_FORM`]) or to HL7 International Patient Summary 2.0.1
+//! ([`form::IPS_PATIENT_SUMMARY_FORM`]), the laboratory report to HL7 Europe
 //! Laboratory Report 2.0.0 (`laboratory`), the discharge report to HL7
 //! Europe Hospital Discharge Report 1.0.0 (`discharge`) and the imaging report
 //! to HL7 Europe Imaging Report 1.0.0-ballot (`imaging`). What feeds each
@@ -67,6 +68,22 @@ pub const EPS_BUNDLE: &str = "http://hl7.eu/fhir/eps/StructureDefinition/bundle-
 /// The canonical URL of the HL7 Europe Patient Summary `Patient` profile.
 #[cfg(feature = "patient-summary")]
 pub const EPS_PATIENT: &str = "http://hl7.eu/fhir/eps/StructureDefinition/patient-eu-eps";
+
+/// The canonical URL of the HL7 International Patient Summary 2.0.1 `Bundle`
+/// profile.
+#[cfg(feature = "patient-summary")]
+pub const IPS_BUNDLE: &str = "http://hl7.org/fhir/uv/ips/StructureDefinition/Bundle-uv-ips";
+
+/// The canonical URL of the HL7 International Patient Summary 2.0.1
+/// `Composition` profile.
+#[cfg(feature = "patient-summary")]
+pub const IPS_COMPOSITION: &str =
+    "http://hl7.org/fhir/uv/ips/StructureDefinition/Composition-uv-ips";
+
+/// The canonical URL of the HL7 International Patient Summary 2.0.1 `Patient`
+/// profile.
+#[cfg(feature = "patient-summary")]
+pub const IPS_PATIENT: &str = "http://hl7.org/fhir/uv/ips/StructureDefinition/Patient-uv-ips";
 
 /// The LOINC code system, which codes the document type and every section.
 pub const LOINC: &str = "http://loinc.org";

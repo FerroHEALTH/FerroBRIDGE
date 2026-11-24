@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.21"
+ferrobridge-hl7v2 = "0.26"
 ```
 
-Name a patch (`"0.21.N"`) when you need the first release that carries what
+Name a patch (`"0.26.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -70,7 +70,7 @@ you use; the range is the same caret range.
   message map names a resource per segment, the segment map maps the fields,
   a data type map maps the components, and every table value is translated by
   `ConceptMap/$translate` on a terminology server through `ferrobridge-term`'s
-  client: load the guide's package and FerroBRIDGE's value package
+  client, every translation of a message asked in one `batch`: load the guide's package and FerroBRIDGE's value package
   (packed from `terminology/hl7v2-values/` in the repository by
   `scripts/terminology/pack-hl7v2-values.sh`) into it. `map::single` maps
   one segment to one resource, a PID to a `Patient`. `map::inverse` writes a
@@ -90,7 +90,7 @@ With `map` off the crate is the listener, the decoder, the parser, the writer
 and the acknowledgment:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.21", default-features = false }
+ferrobridge-hl7v2 = { version = "0.26", default-features = false }
 ```
 
 ## Example

@@ -202,9 +202,11 @@ the operator API or the FHIRconnect operations refuses to start until it
 names the authorization server that issues its callers' tokens:
 
 ```sh
-FERROBRIDGE__AUTH__ISSUER=https://auth.example.org/realms/clinic
-FERROBRIDGE__AUTH__AUDIENCE='["https://bridge.example.org/fhir"]'
+FERROBRIDGE__AUTH__ISSUER__CLINIC__ISSUER=https://auth.example.org/realms/clinic
 ```
+
+The issuer is named `clinic` here, and its audience is the facade's
+`base_url` (`FERROBRIDGE__FACADE__BASE_URL`).
 
 On a network only trusted callers reach, `FERROBRIDGE__AUTH__ENABLED=false`
 serves those routes open instead.
@@ -371,7 +373,7 @@ bridge must validate it: name the issuer and the audience in the bridge's
 Two compose profiles cover the OMOP target, and neither runs on a plain
 `docker compose up`.
 
-The `cdm` profile stands up the CDM database on PostgreSQL 18.6, pinned by
+The `cdm` profile stands up the CDM database on PostgreSQL 19.0, pinned by
 digest, with its password read from `secrets/cdm_password` rather than from the
 environment, and a `pg_isready` health check that gates the jobs below:
 

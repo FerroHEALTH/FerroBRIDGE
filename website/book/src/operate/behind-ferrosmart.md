@@ -42,48 +42,83 @@ it is the `aud` of every token the bridge admits.
 
 ## The bridge's issuer table
 
-The bridge trusts FerroSMART as one `[[auth.issuer]]` of kind `persons` under
-the `ferrosmart` preset of `ferrohealth-smart`:
+The bridge trusts FerroSMART with one named issuer table that names only
+the issuer:
 
 ```toml
-[[auth.issuer]]
+[auth.issuer.ferrosmart]
 issuer = "https://smart.example.org"
-kind = "persons"
-profile = "ferrosmart"
-audience = ["https://bridge.example.org/fhir"]
-delegates = [{ client = "growth-chart" }]
 ```
 
-The preset keeps every `rfc9068` default but two: a token's `typ` is
-`at+jwt` alone (RFC 9068 §2.1), and `scope` is a required claim, since
-FerroSMART writes the granted scopes into every token. What it admits:
+The issuer is a SMART App Launch 2.2 authorization server, and its audience
+is the facade's `base_url`, so neither needs a key. FerroSMART's client
+registry is the one list of clients: a token FerroSMART signs whose `aud`
+names the facade admits its client, and the bridge keeps no client list of
+its own. A token's `typ` is `at+jwt` or `application/at+jwt` (RFC 9068 §4),
+and `scope` is a required claim. The caller is read from the token's
+standard claims:
 
-| Token | Read as | Admitted when |
-|---|---|---|
-| A person's token through a SMART app (`sub` is FerroSMART's identifier of the person, `client_id` the app) | the person, acting through the app | the app's `client_id` is in `delegates` |
-| A SMART Backend Services token (`sub` equals `client_id`, RFC 9068 §2.2) | a machine | always, with the `system/` scopes it carries |
-| A person's token through any other app | | never: `401` |
-| A token with no `scope`, or a `typ` other than `at+jwt` | | never: `401` |
+| Token | Read as |
+|---|---|
+| A user's token (`sub` names the user, `client_id` the app) | a user, by the resource type of the `fhirUser` claim: `Patient`, `Practitioner`, `PractitionerRole`, `RelatedPerson` or `Person`, or a user of no stated type without `fhirUser` |
+| A patient's own token: `fhirUser` is `Patient/<x>` (relative, or an absolute URL ending in `/Patient/<x>`), the `patient` claim is `x`, and it carries no `act` | the patient, the person's own access |
+| A `RelatedPerson` token with a `patient` claim | the patient's representative (Regulation (EU) 2025/327 Art 4(2)) |
+| A token with an RFC 8693 `act` | the user, with the actor that acts for them |
+| A SMART Backend Services token (`sub` equals `client_id`, RFC 9068 §2.2) | a machine, with the `system/` scopes it carries |
+| A token whose `aud` names another server, with no `scope`, or with another `typ` | refused: `401` |
 
-The preset lists no app, because the apps belong to each deployment: list
-every SMART app you admit in `delegates` by its `client_id`. Use one
-table for FerroSMART: a `persons` issuer already reads its machines' client
-credentials tokens, and two `[[auth.issuer]]` tables naming one issuer refuse
-the start.
+Use one table for FerroSMART: two issuer tables naming one issuer refuse the
+start. Every other key of the issuer table (`algorithms`, `clock_skew`,
+`jwks_max_age` and the rest) and every profile key is on the
+[`[auth]`](configuration.md#auth) page.
 
 The launch context FerroSMART puts in the token (`patient`, `encounter` and
 `fhirUser`) needs no key. A `patient/` scope holds the caller to the patient
 its `patient` claim names, as the [facade's Security section](../integrate/fhir-facade.md#security)
-describes for any issuer.
+describes.
+
+A patient's own token is the person's own access (Regulation (EU) 2025/327
+Art 9). The bridge reads it as `ferrohealth-smart` classifies it
+(`Caller::is_the_person`), so a professional who holds `patient/` scopes
+stays a professional held to the launch context. For the patient's own
+token, the facade's access record carries the binding `self`.
+
+## The patient summary reads FerroEHR as the patient
+
+`Patient/$summary` ([`[facade.summary]`](configuration.md#facadesummary))
+reads FerroEHR with the patient's own token, exchanged at FerroSMART
+(RFC 8693 §2.1), so FerroEHR applies the patient's own access rules and its
+access record names the person. FerroSMART is then also the CDR lane's
+onward issuer:
+
+```toml
+[cdr.endpoint.credentials.onward]
+issuer = "https://smart.example.org"
+token_endpoint = "https://smart.example.org/token"
+audiences = ["https://ehr.example.org/openehr/v1"]
+indicators = ["https://ehr.example.org/openehr/v1"]
+
+[cdr.endpoint.credentials.onward.profile]
+max_onward_lifetime = "5min"
+```
+
+At FerroSMART, register the bridge as a confidential client with
+`grant_types = ["token_exchange"]` and both the facade's base and FerroEHR's
+openEHR base in its `resources`. The token FerroSMART issues names the
+patient as `sub`, the openEHR base as `aud` and the bridge as `client_id`
+with no `act`; it carries `fhirUser`, `patient`, `ehrId`, the scopes
+`patient/composition-*.r` and `patient/aql-*.s`, and the subject token's
+`acr` and `auth_time`, and lives at most five minutes. FerroEHR trusts
+FerroSMART the same way, with an issuer table that names only the issuer.
 
 ## The discovery document
 
 An app that starts at the bridge reads `GET /fhir/.well-known/smart-configuration`
-and must find FerroSMART there. With FerroSMART as the bridge's one `persons`
+and must find FerroSMART there. With FerroSMART as the bridge's one SMART
 issuer, the [described-issuer rule](configuration.md#the-described-issuer)
 picks it, and the document names FerroSMART's `authorization_endpoint` and
 `token_endpoint`. With other issuers beside it, set
-`[auth] described_issuer = "https://smart.example.org"`. The document and
+`[auth] described_issuer = "ferrosmart"`, the name of its table. The document and
 `GET /fhir/metadata` answer any origin with CORS, and the REST routes answer
 the origins [`[facade.cors] allowed_origins`](configuration.md#facadecors)
 lists, so list the origin of every browser app.

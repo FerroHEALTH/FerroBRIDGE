@@ -848,9 +848,12 @@ jobs:
       # kills it with exit 143 (docs/ci-cd.md). nextest does not run doctests,
       # so they get their own compile, over the packages with a library
       # target: `cargo test --doc` refuses a binary-only one (tools/forwarders),
-      # the filter scripts/checks/fast.sh applies.
+      # the filter scripts/checks/fast.sh applies. The server's Patient/$summary
+      # suites write each document they serve under EEHRXF_EMIT_DIR too, for
+      # the fhir-validator job.
       - env:
           PACKAGES: ${{ matrix.packages }}
+          EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
           set -euo pipefail
           read -ra packages <<<"$PACKAGES"
@@ -899,17 +902,20 @@ jobs:
             cargo nextest run -p ferrobridge-term --no-default-features --features "$release" --locked --no-tests=pass
           done
       - name: Upload the emitted exchange-format documents
-        if: contains(matrix.packages, 'eehrxf')
+        if: contains(matrix.packages, 'eehrxf') || contains(matrix.packages, 'ferrobridge-server')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: eehrxf-documents
+          name: eehrxf-documents-${{ strategy.job-index }}
           path: ${{ runner.temp }}/eehrxf-documents/
           if-no-files-found: error
           retention-days: 7
 
   # HL7's FHIR Validator over the patient summary, laboratory and imaging report
-  # documents the eehrxf suites write (#1318; no specification governs the
-  # lane: our own design), the evidence the component's page cites for the
+  # documents the eehrxf suites write, and the patient summaries the server's
+  # Patient/$summary and SMART Health Link suites serve (#1318, #2015; no
+  # specification governs the lane: our own design), each patient summary also
+  # with the xShare Yellow Button guide 0.3.0 loaded against the Patient Summary
+  # content it names (#2029), the evidence the component's page cites for the
   # exchange format. It runs offline, the jar and the packages pinned in the
   # "HL7 FHIR Validator" table of docs/VERSIONS.md, and fails on an error, a fatal issue or a
   # claimed profile it could not find (scripts/checks/fhir-validator.sh). Its
@@ -918,7 +924,7 @@ jobs:
   fhir-validator:
     name: fhir-validator (eehrxf documents)
     needs: [detect, test]
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && contains(needs.detect.outputs.test-matrix, 'eehrxf')
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && (contains(needs.detect.outputs.test-matrix, 'eehrxf') || contains(needs.detect.outputs.test-matrix, 'ferrobridge-server'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -934,7 +940,8 @@ jobs:
       - name: Download the emitted exchange-format documents
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: eehrxf-documents
+          pattern: eehrxf-documents-*
+          merge-multiple: true
           path: ${{ runner.temp }}/eehrxf-documents
       - name: Read the pinned profile packages
         id: profile-packages
@@ -1099,6 +1106,22 @@ jobs:
           key: fhir-examples-${{ steps.fhir-examples.outputs.key }}
       - name: Fetch and verify the FHIR examples packages
         run: bash scripts/vendor/fhir-packages.sh --build-time
+      # The patient summary suites validate each document over the profile
+      # packages, and fail in this lane when they are absent.
+      - name: Read the pinned profile packages
+        id: profile-packages
+        run: echo "key=$(bash scripts/vendor/profile-packages.sh --cache-key)" >> "$GITHUB_OUTPUT"
+      - name: Restore the profile packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: docs/specs/fhir-packages/*/package
+          key: profile-packages-${{ steps.profile-packages.outputs.key }}
+      - name: Fetch and verify the profile packages
+        run: bash scripts/vendor/profile-packages.sh
+      # A test starts against a local image, so a slow registry fails this
+      # step and never a test (#2043).
+      - name: Pull the pinned container images
+        run: bash scripts/e2e-images.sh
       - env:
           PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
         run: |
@@ -1126,7 +1149,7 @@ jobs:
       contents: read
     services:
       postgres:
-        image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+        image: postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
         env:
           POSTGRES_USER: ferrobridge
           POSTGRES_DB: ferrobridge

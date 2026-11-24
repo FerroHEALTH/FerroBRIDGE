@@ -45,22 +45,21 @@ fn config_check_prints_the_running_tree_with_every_secret_redacted() {
     );
 }
 
-/// The `[auth]` section the four tables that name an issuer are written
-/// under: one trusted issuer, with no userinfo.
+/// The `[auth]` section a second issuer table is written under: one trusted
+/// issuer, with no userinfo.
 const NAMED_ISSUER: &str = r#"[auth]
 enabled = true
 
-[[auth.issuer]]
+[auth.issuer.ferro]
 issuer = "https://as.example.org/realms/ferro"
-kind = "persons"
 audience = ["https://bridge.example.org/fhir"]
 "#;
 
 /// A configured issuer identifier with a password in its userinfo reaches
 /// neither stream of `config check`, rendered or refused (RFC 3986 §3.2.1:
 /// the password is never rendered in clear text): the inbound issuer, the
-/// CDR grant's issuer, the onward issuer, and the issuer of each of the four
-/// `[auth]` tables that name one, each case naming its own host.
+/// CDR grant's issuer, the onward issuer, a second named issuer and an
+/// introspection endpoint, each case naming its own host.
 #[test]
 fn config_check_never_renders_an_issuers_userinfo() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
@@ -68,7 +67,7 @@ fn config_check_never_renders_an_issuers_userinfo() -> Result<(), Box<dyn Error>
         (
             "auth",
             "as.example.org",
-            "[auth]\nenabled = true\n\n[[auth.issuer]]\nissuer = \"https://u:SYNTH_AUTH_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://bridge.example.org/fhir\"]\n".to_owned(),
+            "[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://u:SYNTH_AUTH_PW@as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n".to_owned(),
         ),
         (
             "oauth",
@@ -78,34 +77,20 @@ fn config_check_never_renders_an_issuers_userinfo() -> Result<(), Box<dyn Error>
         (
             "onward",
             "as.example.org",
-            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials.onward]\nissuer = \"https://u:SYNTH_ONWARD_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\n".to_owned(),
+            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials.onward]\nissuer = \"https://u:SYNTH_ONWARD_PW@as.example.org/realms/ferro\"\n".to_owned(),
         ),
         (
-            "attributes",
-            "attributes.example.org",
+            "second issuer",
+            "second.example.org",
             format!(
-                "{NAMED_ISSUER}\n[[auth.attributes]]\nissuer = \"https://u:SYNTH_ATTRIBUTES_PW@attributes.example.org/realms/ferro\"\nmapping = \"iua\"\n"
+                "{NAMED_ISSUER}\n[auth.issuer.second]\nissuer = \"https://u:SYNTH_SECOND_PW@second.example.org/realms/ferro\"\n"
             ),
         ),
         (
-            "federation",
-            "federation.example.org",
+            "introspection",
+            "introspect.example.org",
             format!(
-                "{NAMED_ISSUER}\n[[auth.federation]]\nissuer = \"https://u:SYNTH_FEDERATION_PW@federation.example.org/realms/ferro\"\ncontact_point = false\n"
-            ),
-        ),
-        (
-            "party",
-            "party.example.org",
-            format!(
-                "{NAMED_ISSUER}\n[[auth.party]]\nissuer = \"https://u:SYNTH_PARTY_PW@party.example.org/realms/ferro\"\nidentifier_issuer = \"urn:example:people\"\nidentifier_type = \"guid\"\n"
-            ),
-        ),
-        (
-            "scopeless_subjects",
-            "scopeless.example.org",
-            format!(
-                "{NAMED_ISSUER}\n[[auth.scopeless_subjects]]\nissuer = \"https://u:SYNTH_SCOPELESS_PW@scopeless.example.org/realms/ferro\"\nsub = \"service\"\n"
+                "{NAMED_ISSUER}mode = \"introspection\"\n\n[auth.issuer.ferro.introspection]\nendpoint = \"https://u:SYNTH_INTROSPECT_PW@introspect.example.org/introspect\"\n\n[auth.issuer.ferro.introspection.client]\nclient_id = \"ferrobridge\"\nclient_secret = \"synthetic-client-secret\"\n"
             ),
         ),
     ] {

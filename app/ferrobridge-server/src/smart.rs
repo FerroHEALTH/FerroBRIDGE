@@ -6,10 +6,12 @@
 //!
 //! The crate reads each configured issuer's metadata and key set, validates
 //! every access token, or for an issuer with `mode = "introspection"` asks
-//! its introspection endpoint (RFC 7662), classifies every caller by its
-//! issuer's `kind`, checks the Basic users of `[[auth.basic.users]]`, each a
-//! person, picks the issuer the SMART discovery document describes
-//! (`resource::described::describe`) and builds that document; this module
+//! its introspection endpoint (RFC 7662), reads every caller from the
+//! token's standard claims (`sub`, `fhirUser`, the `patient` launch context,
+//! `act`), checks the Basic users of `[[auth.basic.users]]`, each a person,
+//! picks the issuer the SMART
+//! discovery document describes (`resource::described::describe`) and builds
+//! that document; this module
 //! holds what is the bridge's own: the R4 resource types a clinical scope
 //! may name, the operator scope, and the token endpoint the
 //! `CapabilityStatement` names.
@@ -312,9 +314,22 @@ impl Smart {
     /// capability requires, only when `[auth] capabilities` names it. A
     /// `machines` issuer is described for SMART Backend Services alone, with
     /// no app-launch member (SMART App Launch 2.2.0, Backend Services,
-    /// §Retrieve `.well-known/smart-configuration`).
+    /// §Retrieve `.well-known/smart-configuration`). It lists `smart-app-state`
+    /// exactly when `app_state` says the facade serves App State, whatever
+    /// `[auth] capabilities` names (SMART App Launch 2.2.0, Persisting App
+    /// State, §Discovery).
     #[must_use]
-    pub fn configuration(&self) -> serde_json::Value {
+    pub fn configuration(&self, app_state: bool) -> serde_json::Value {
+        let mut capabilities: Vec<String> = self
+            .options
+            .capabilities
+            .iter()
+            .filter(|capability| capability.as_str() != crate::facade::app_state::CAPABILITY)
+            .cloned()
+            .collect();
+        if app_state {
+            capabilities.push(String::from(crate::facade::app_state::CAPABILITY));
+        }
         let sign_on = self
             .options
             .capabilities
@@ -332,6 +347,7 @@ impl Smart {
             } else {
                 OpenIdConnect::Withheld
             },
+            capabilities,
             ..self.options.clone()
         })
     }
@@ -378,9 +394,10 @@ pub struct Security {
 /// location SMART App Launch 2.2.0, Conformance, §Using Well-Known, fixes,
 /// and at the server root for a client that looks there (no specification
 /// governs the root copy: our own design). It "SHALL be JSON, regardless of
-/// `Accept` headers".
-pub fn routes(smart: &Smart) -> Router {
-    let document = Arc::new(smart.configuration());
+/// `Accept` headers". `app_state` says whether the facade serves SMART App
+/// State, which the document then advertises.
+pub fn routes(smart: &Smart, app_state: bool) -> Router {
+    let document = Arc::new(smart.configuration(app_state));
     let answer = move || {
         let document = Arc::clone(&document);
         async move { axum::Json(document.as_ref().clone()).into_response() }

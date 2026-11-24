@@ -72,7 +72,7 @@ mappings:
   - name: "sectionMedications"
     with:
       fhir: "$resource.section"
-      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1]"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1,'Medication summary']"
     slotContext: "ferrobridge_eu_eps_medication.context"
     fhirCondition:
       targetRoot: "$resource.section"
@@ -90,3 +90,47 @@ mappings:
       targetAttribute: "code.coding.code"
       operator: "one of"
       criteria: "11369-6"
+
+  - name: "sectionProblems"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1,'Problem list']"
+    slotContext: "ferrobridge_eu_eps_problems.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "11450-4"
+
+  - name: "sectionAllergies"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1,'Allergies and intolerances']"
+    slotContext: "ferrobridge_eu_eps_allergies.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "48765-2"
+
+  - name: "sectionProceduresHx"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1,'History of procedures']"
+    slotContext: "ferrobridge_eu_eps_procedures.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "47519-4"
+
+  - name: "sectionMedicalDevices"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1,'Medical devices']"
+    slotContext: "ferrobridge_eu_eps_devices.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "46264-8"

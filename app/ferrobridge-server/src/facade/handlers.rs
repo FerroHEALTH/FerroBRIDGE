@@ -44,10 +44,12 @@ use http::StatusCode;
 use http::Uri;
 
 use crate::facade::Facade;
+use crate::facade::app_state;
 use crate::facade::capability;
 use crate::facade::compartment;
 use crate::facade::consent;
 use crate::facade::guard::OperatorScope;
+use crate::facade::launch_task;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -610,6 +612,44 @@ fn metadata(
             .resource
             .partition_point(|entry| entry.r#type.value.as_deref() < Some(consent::CONSENT));
         rest.resource.insert(at, consent::capability());
+    }
+    if facade.app_state().is_some() {
+        statement
+            .instantiates
+            .push(app_state::SERVER_CAPABILITY.into());
+        if let Some(rest) = statement.rest.first_mut() {
+            rest.resource
+                .retain(|entry| entry.r#type.value.as_deref() != Some(app_state::BASIC));
+            let at = rest
+                .resource
+                .partition_point(|entry| entry.r#type.value.as_deref() < Some(app_state::BASIC));
+            rest.resource.insert(at, app_state::capability());
+        }
+    }
+    if facade.summary().is_some()
+        && let Some(rest) = statement.rest.first_mut()
+        && let Some(patient) = rest
+            .resource
+            .iter_mut()
+            .find(|entry| entry.r#type.value.as_deref() == Some(crate::facade::summary::PATIENT))
+    {
+        patient.operation.push(
+            fhir_types::r4::capability_statement::CapabilityStatementRestResourceOperation {
+                name: crate::facade::summary::OPERATION.into(),
+                definition: crate::facade::summary::DEFINITION.into(),
+                ..Default::default()
+            },
+        );
+    }
+    if facade.launch_tasks().is_some()
+        && let Some(rest) = statement.rest.first_mut()
+    {
+        rest.resource
+            .retain(|entry| entry.r#type.value.as_deref() != Some(launch_task::TASK));
+        let at = rest
+            .resource
+            .partition_point(|entry| entry.r#type.value.as_deref() < Some(launch_task::TASK));
+        rest.resource.insert(at, launch_task::capability());
     }
     let encoded = statement.to_json().map_err(|error| {
         reply::refusal(

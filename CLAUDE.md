@@ -101,7 +101,11 @@ the testkit tool crate. Beside it:
   the `redb` identity store with the derivation
   `docs/architecture.md` §9 fixes, the one status table
   from a CDR answer to a FHIR answer, and the `CapabilityStatement` built from
-  the loaded programs. `src/hl7v2/` is the HL7 v2 face (#255), behind
+  the loaded programs. `facade::summary` is `Patient/[id]/$summary` behind
+  `[facade.summary]` (#2014): the IPS 2.0.1 or EPS document `eehrxf` writes
+  from the patient's summary compositions, validated by
+  `ferrobridge-validator` before it is served. `src/hl7v2/` is the HL7 v2
+  face (#255), behind
   `[hl7v2]` and beside the facade: the MLLP listener under the same drain,
   each message mapped by `ferrobridge-hl7v2` and written through the facade's
   `ingest` service as one transaction, and the acknowledgment chosen from the

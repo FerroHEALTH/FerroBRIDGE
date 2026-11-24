@@ -57,9 +57,9 @@
   is killed with exit 143 when two generated giants compile together; lint
   per package with cargo hack, never the all-features union of fhir-types;
   2026-09-12
-- [PostgreSQL 18](postgresql-18.md): every PostgreSQL the project tests
-  against or documents is the latest release (18.6 on 2026-09-12), never 16;
-  owner ruling 2026-09-12
+- [PostgreSQL 19](postgresql-19.md): every family product with a database
+  runs, tests against and documents PostgreSQL 19, and 19 is the minimum the
+  CDM clients start against; owner 2026-11-21
 - [End-to-end gate](e2e-gate.md): container tests run only with
   `FERROBRIDGE_E2E=1` through the testkit harness; images pinned by digest and
   checked by the versions guard; 2026-09-12
@@ -132,3 +132,23 @@
   shell cleanup; it also flags unarmed PRs; owner 2026-11-10
 - [Websites consistency pass](websites-consistency-pass.md) — after FerroPIX #594, one worker aligns every product website
 - [Quick start from the release download](quickstart-from-release-download.md) — one self-contained compose.yaml per product, curled from the latest release; no clone, no bundle
+- [backlog-fix-comments](backlog-fix-comments.md) — When a fix for a Cadasto/FerroHEALTH-backlog issue merges, post a proper comment on the backlog issue
+- [capacity-target-2000-rps](capacity-target-2000-rps.md) — The owner wants FerroEHR to sustain 3000 requests per second at very low latency (raised from 2000 on 2026-11-16) with the full access path and access log on; measure capacity (the knee), not only head-against-base (owner, 2026-11-15)
+- [cdr-mechanism-app-policy](cdr-mechanism-app-policy.md) — The CDR provides the generic mechanism; national rules and controller policy come from the deployment or the application on top as content, never from code (owner, 2026-11-15)
+- [core-rewrite-one-pr](core-rewrite-one-pr.md) — FerroEHR's hot-core rewrite (#6001) lands as one breaking PR; the branch may be broken while it is built, but it merges only green
+- [definitions-change-in-place](definitions-change-in-place.md) — Until FerroEHR has a production release, shipped definitions (archetypes, templates) change in place at v1.0.0; never bump to v1.1.0 because an rc published them (owner, 2026-11-14)
+- [draft-classes-apache](draft-classes-apache.md) — The generated openEHR draft classes (ABAC, access log) ship in openehr-rm behind feature `draft` under Apache-2.0, published to crates.io (owner, 2026-11-14)
+- [efficiency-first-rust](efficiency-first-rust.md) — The owner wants FerroEHR (and the family) stable, fast, low on storage, CPU and RAM; idiomatic Rust without needless clones, allocations or layered indirection; external suites (Cadasto aql-conformance, cdr-benchmark) measure it too (owner, 2026-11-16)
+- [fable-design-review-after-rewrite](fable-design-review-after-rewrite.md) — When the FerroEHR core rewrite (#6001) is finished, run ONE Fable worker on #6019, a whole-system performance review (open scope, research AND test)
+- [ferroehr-v6-major](ferroehr-v6-major.md) — The FerroEHR release now worked on as v5.7.2 will be renamed v6.0.0, a major release where everything is done the clean, proper, new way; older minor milestones (v5.8.0, v5.9.0) are emptied into it after a relevance check (owner, 2026-11-16)
+- [ferrosmart-in-v6](ferrosmart-in-v6.md) — Owner decisions 2026-11-16 on FerroSMART, the family's own SMART App Launch 2.x authorization server
+- [findings-drive-redesign](findings-drive-redesign.md) — A real-world scenario or test that our design can't handle is a design finding (draft model or code), never something to work around in a fixture or probe (owner, 2026-11-14)
+- [new-design-no-legacy](new-design-no-legacy.md) — In a breaking release, build the new design in full and keep nothing of the old one; never relay a worker's "kept for compatibility" choice as a question (owner, 2026-11-14)
+- [owner-voice-outward-text](owner-voice-outward-text.md) — Text the owner sends under their own name (Discourse, email to openEHR people) is written plainly in their voice, short paragraphs, few headings or bullets (owner, 2026-11-14)
+- [quiet-host-perf-runs](quiet-host-perf-runs.md) — A baseline capacity run of FerroEHR runs on a quiet host, with every worker stopped and Podman empty, and perf fixes come only after it
+- [spec-over-test-suites](spec-over-test-suites.md) — External conformance suites (Cadasto aql-conformance etc.) are regression signals, never the oracle; the spec decides
+- [verify-before-implementing-old-issues](verify-before-implementing-old-issues.md) — Before assigning or building an older issue, check it against current main and the current spec; close what is done or obsolete with evidence, implement only what is still open (owner, 2026-11-16)
+- [FerroHEALTH not in production](ferrohealth-not-in-production.md) — no product runs in production (2026-11-19): fix designs by full refactor, no compat layer
+- [hosted-ops-approved](hosted-ops-approved.md) — The orchestrator may operate the hosted sandbox and its database server over SSH when work needs it, plan and rollback first (owner, 2026-11-22)
+- [Lean comments, no history](lean-comments-no-history.md) — comments rare and short, describe only the current code, rewrite whole on change; never the old way (owner hard rule 2026-11-23)
+- [Family memories in every repo](family-memories-every-repo.md) — a family-wide owner rule goes into every FerroHEALTH repo's .claude/memory through a merged PR (owner 2026-11-23)

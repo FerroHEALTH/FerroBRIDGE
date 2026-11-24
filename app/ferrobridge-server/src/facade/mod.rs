@@ -17,6 +17,7 @@
 //! A disabled facade mounts no route, so a request answers `404` rather than
 //! `403`: capability is not authorisation.
 
+pub mod app_state;
 pub mod audit;
 pub mod capability;
 pub mod commit;
@@ -31,8 +32,10 @@ pub mod guard;
 pub mod handlers;
 pub mod identity;
 pub mod ingest;
+pub mod launch_task;
 pub mod media;
 pub mod outcome;
+pub mod owned;
 pub mod party;
 pub mod programs;
 pub mod references;
@@ -41,6 +44,7 @@ pub mod request;
 pub mod search;
 pub mod status;
 pub mod subject;
+pub mod summary;
 
 use std::sync::Arc;
 
@@ -51,6 +55,7 @@ use fhirconnect::engine::demographics::NoDemographics;
 use axum::Router;
 use axum::routing::get;
 use axum::routing::post;
+use axum::routing::put;
 
 use crate::cdr::CdrClient;
 use crate::facade::identity::claims::Claims;
@@ -155,8 +160,14 @@ pub struct Facade {
     demographics: Arc<dyn Demographics>,
     /// The access directive exchange, when `Consent` is served.
     consent: Option<crate::consent::exchange::Settings>,
+    /// The SMART App State store, when `Basic` is the App State endpoint.
+    app_state: Option<Arc<owned::OwnedStore>>,
+    /// The launch `Task` store, when `Task` is the launch endpoint.
+    launch_tasks: Option<Arc<owned::OwnedStore>>,
     /// The CORS policy of the FHIR base.
     cors: cors::Cors,
+    /// The patient summary, when `Patient/$summary` is served.
+    summary: Option<Arc<summary::Summary>>,
 }
 
 /// Returns the demographics endpoint of a facade at `settings.base_url`: the
@@ -198,7 +209,10 @@ impl Facade {
             references: references::Policy::default(),
             usage: Arc::new(crate::usage_report::window()),
             consent: None,
+            app_state: None,
+            launch_tasks: None,
             cors: cors::Cors::default(),
+            summary: None,
         }
     }
 
@@ -208,6 +222,62 @@ impl Facade {
     pub fn with_consent(mut self, consent: Option<crate::consent::exchange::Settings>) -> Self {
         self.consent = consent;
         self
+    }
+
+    /// Returns this facade serving SMART App State as `Basic` over `store`,
+    /// `None` serving none.
+    #[must_use]
+    pub fn with_app_state(mut self, store: Option<Arc<owned::OwnedStore>>) -> Self {
+        self.app_state = store;
+        self
+    }
+
+    /// Returns the SMART App State store, when `Basic` is the App State
+    /// endpoint.
+    #[must_use]
+    pub fn app_state(&self) -> Option<&owned::OwnedStore> {
+        self.app_state.as_deref()
+    }
+
+    /// Returns this facade serving SMART launch `Task`s over `store`, `None`
+    /// serving none.
+    #[must_use]
+    pub fn with_launch_tasks(mut self, store: Option<Arc<owned::OwnedStore>>) -> Self {
+        self.launch_tasks = store;
+        self
+    }
+
+    /// Returns the launch `Task` store, when `Task` is the launch endpoint.
+    #[must_use]
+    pub fn launch_tasks(&self) -> Option<&owned::OwnedStore> {
+        self.launch_tasks.as_deref()
+    }
+
+    /// Returns the resource types the facade serves itself rather than
+    /// through a program.
+    #[must_use]
+    pub fn owned_types(&self) -> Vec<&'static str> {
+        [
+            (self.app_state.is_some(), app_state::BASIC),
+            (self.launch_tasks.is_some(), launch_task::TASK),
+        ]
+        .into_iter()
+        .filter_map(|(on, resource_type)| on.then_some(resource_type))
+        .collect()
+    }
+
+    /// Returns this facade serving `Patient/$summary` from `summary`, `None`
+    /// serving no summary.
+    #[must_use]
+    pub fn with_summary(mut self, summary: Option<summary::Summary>) -> Self {
+        self.summary = summary.map(Arc::new);
+        self
+    }
+
+    /// Returns the patient summary, when `Patient/$summary` is served.
+    #[must_use]
+    pub fn summary(&self) -> Option<&summary::Summary> {
+        self.summary.as_deref()
     }
 
     /// Returns this facade admitting the origins of `cors` on its REST routes.
@@ -501,7 +571,10 @@ impl Facade {
 /// says whether the same router serves the FHIRconnect operations, whether
 /// the HL7 v2 face runs and which authorization server guards the facade,
 /// which the conformance statement declares only then, and `operator` is the
-/// operator scope `$validate` admits.
+/// operator scope `$validate` admits. With App State on, `Basic` is mounted as its endpoint
+/// ([`app_state`]) ahead of the generic routes, and with launch `Task`s on,
+/// `Task` ([`launch_task`]). `Patient/[id]/$summary` answers only with the
+/// patient summary on ([`summary`]).
 pub fn routes(
     facade: Arc<Facade>,
     shape: capability::Shape,
@@ -550,6 +623,10 @@ pub fn routes(
             get(handlers::document_route),
         )
         .route(
+            &format!("{BASE_PATH}/{{resource_type}}/{{id}}/$summary"),
+            get(summary::route),
+        )
+        .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history/{{vid}}"),
             get(handlers::vread_route),
         )
@@ -564,5 +641,41 @@ pub fn routes(
             get(handlers::history_route),
         )
         .layer(axum::Extension(operator));
+    let router = if facade.app_state().is_some() {
+        router
+            .route(
+                &format!("{BASE_PATH}/Basic"),
+                post(app_state::interactions::create)
+                    .get(owned::answer::search(app_state::interactions::searched)),
+            )
+            .route(
+                &format!("{BASE_PATH}/Basic/_search"),
+                post(owned::answer::search(app_state::interactions::searched)),
+            )
+            .route(
+                &format!("{BASE_PATH}/Basic/{{id}}"),
+                put(app_state::interactions::update).delete(app_state::interactions::delete),
+            )
+    } else {
+        router
+    };
+    let router = if facade.launch_tasks().is_some() {
+        router
+            .route(
+                &format!("{BASE_PATH}/Task"),
+                post(launch_task::interactions::create)
+                    .get(owned::answer::search(launch_task::interactions::searched)),
+            )
+            .route(
+                &format!("{BASE_PATH}/Task/_search"),
+                post(owned::answer::search(launch_task::interactions::searched)),
+            )
+            .route(
+                &format!("{BASE_PATH}/Task/{{id}}"),
+                get(launch_task::interactions::read),
+            )
+    } else {
+        router
+    };
     router.with_state(facade)
 }

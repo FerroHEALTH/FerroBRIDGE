@@ -25,16 +25,16 @@ use std::error::Error;
 use eehrxf::crosswalk::patient_summary::{
     PATIENT_SUMMARY, PATIENT_SUMMARY_TEMPLATE, SOURCES, Source,
 };
-use eehrxf::document::form::slot;
+use eehrxf::document::form::{IPS_PATIENT_SUMMARY_FORM, slot};
 use eehrxf::document::section::{EmptyReason, Section};
-use eehrxf::document::{Document, DocumentError, EPS_BUNDLE};
+use eehrxf::document::{Document, DocumentError, EPS_BUNDLE, IPS_BUNDLE};
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::EPS;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::conform::check_resource;
 use ferrobridge_testkit::fixtures::{
-    CKM_MEDICATION_ARCHETYPES, FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE,
-    FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID,
+    CKM_MEDICATION_ARCHETYPES, CKM_PATIENT_SUMMARY_ARCHETYPES,
+    FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE, FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID,
 };
 use fhir_types::codec::{Json, Value};
 use fhir_types::r4::device::{Device, DeviceDeviceName};
@@ -50,7 +50,8 @@ use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
 use openehr_mapping_core::template::TemplateSource;
 
-use super::support::{emit, eps, vendored};
+use super::eps_sections;
+use super::support::{emit, eps, profile_set, vendored};
 
 /// The root context of the EPS project.
 const ROOT: &str = "ferrobridge_eu_eps.context";
@@ -74,7 +75,7 @@ const EPS_COMPOSITION: &str = "http://hl7.eu/fhir/eps/StructureDefinition/compos
 
 /// The base the document names its entries under, in the `example.org`
 /// domain RFC 6761 §6.5 reserves.
-const BASE: &str = "https://gateway.example.org/fhir";
+pub(crate) const BASE: &str = "https://gateway.example.org/fhir";
 
 /// The synthetic medicine's code.
 const MEDICINE: &str = "SYN-MEDICINE-0001";
@@ -83,9 +84,12 @@ const MEDICINE: &str = "SYN-MEDICINE-0001";
 const VACCINE: &str = "SYN-VACCINE-0001";
 
 /// The ADL 2 operational template of the patient summary template.
-fn template() -> Result<TemplateSource, Box<dyn Error>> {
+pub(crate) fn template() -> Result<TemplateSource, Box<dyn Error>> {
     let mut repository = ArchetypeRepository::default();
-    for (file, source) in CKM_MEDICATION_ARCHETYPES {
+    for (file, source) in CKM_MEDICATION_ARCHETYPES
+        .iter()
+        .chain(CKM_PATIENT_SUMMARY_ARCHETYPES.iter())
+    {
         let archetype = openehr_adl::assemble::parse_artefact(source, Dialect::Adl14)
             .map_err(|errors| format!("{file}: {errors:?}"))?;
         repository.insert(archetype);
@@ -103,7 +107,7 @@ fn template() -> Result<TemplateSource, Box<dyn Error>> {
 }
 
 /// The EPS project, its one root context compiled from its embedded files.
-fn summary() -> Result<Mapping, Box<dyn Error>> {
+pub(crate) fn summary() -> Result<Mapping, Box<dyn Error>> {
     Ok(Mapping::compile_project(&template()?, &EPS)?)
 }
 
@@ -115,14 +119,14 @@ fn coded(value: &str, code: &str) -> String {
 }
 
 /// The archetype details of `id`.
-fn details(id: &str) -> String {
+pub(crate) fn details(id: &str) -> String {
     format!(
         r#""archetype_node_id": "{id}", "archetype_details": {{ "_type": "ARCHETYPED", "archetype_id": {{ "_type": "ARCHETYPE_ID", "value": "{id}" }}, "rm_version": "1.1.0" }}"#
     )
 }
 
 /// The language, encoding and subject of an entry.
-const ENTRY: &str = r#""language": { "_type": "CODE_PHRASE", "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "ISO_639-1" }, "code_string": "en" },
+pub(crate) const ENTRY: &str = r#""language": { "_type": "CODE_PHRASE", "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "ISO_639-1" }, "code_string": "en" },
   "encoding": { "_type": "CODE_PHRASE", "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "IANA_character-sets" }, "code_string": "UTF-8" },
   "subject": { "_type": "PARTY_SELF" }"#;
 
@@ -223,7 +227,7 @@ const MEDICATION_SUMMARY: (&str, &str) = ("Medication summary", "openEHR-EHR-SEC
 const IMMUNISATIONS: (&str, &str) = ("Immunisations", "openEHR-EHR-SECTION.immunisation_list.v0");
 
 /// The section `(name, archetype)` of the template, holding `items`.
-fn section((name, archetype): (&str, &str), items: &[String]) -> String {
+pub(crate) fn section((name, archetype): (&str, &str), items: &[String]) -> String {
     format!(
         r#"{{ "_type": "SECTION", "name": {{ "_type": "DV_TEXT", "value": "{name}" }}, {details}, "items": [{items}] }}"#,
         details = details(archetype),
@@ -233,7 +237,7 @@ fn section((name, archetype): (&str, &str), items: &[String]) -> String {
 
 /// A synthetic composition of the patient summary template
 /// whose sections hold `sections`.
-fn composition(sections: &[String]) -> String {
+pub(crate) fn composition(sections: &[String]) -> String {
     format!(
         r#"{{
   "_type": "COMPOSITION",
@@ -275,12 +279,12 @@ fn medicine_and_vaccine() -> String {
 }
 
 /// The run settings: a synthetic engine device and a fixed instant.
-fn settings() -> Settings {
+pub(crate) fn settings() -> Settings {
     Settings::new("Device/ferrobridge-eehrxf-test", "2026-10-06T10:00:00Z")
 }
 
 /// The call context naming the document's subject and its gateway device.
-fn call(subject: &str, device: &str) -> CallContext {
+pub(crate) fn call(subject: &str, device: &str) -> CallContext {
     CallContext::new()
         .with_patient(reference(subject))
         .with_who(reference(device))
@@ -299,7 +303,7 @@ fn reference(url: &str) -> Reference {
 /// an element the project does not read: the synthetic order's
 /// `ACTIVITY.timing`, a `DV_PARSABLE` no FHIRconnect data-type page pairs with
 /// R4 `Timing`.
-fn run(
+pub(crate) fn run(
     mapping: &Mapping,
     composition: &str,
     context: CallContext,
@@ -349,7 +353,7 @@ fn of_type<'a>(resources: &'a [Resource], name: &str) -> Result<Vec<&'a Resource
 
 /// The resources the section of `resources`' one `Composition` whose LOINC
 /// code is `code` names as its entries, in its order.
-fn section_entries<'a>(
+pub(crate) fn section_entries<'a>(
     resources: &'a [Resource],
     code: &str,
 ) -> Result<Vec<&'a Resource>, Box<dyn Error>> {
@@ -519,13 +523,13 @@ fn a_vaccine_alone_writes_no_medication_summary_entry() -> Result<(), Box<dyn Er
     Ok(())
 }
 
-/// The template overlay of FerroBRIDGE's patient summary template that
-/// specialises the section archetype `section`.
-fn overlay(section: &str) -> Option<&'static str> {
+/// The template overlays of FerroBRIDGE's patient summary template that
+/// specialise the section archetype `section`.
+fn overlays(section: &str) -> impl Iterator<Item = &'static str> + '_ {
     FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE
         .split("template_overlay")
         .skip(1)
-        .find(|part| part.contains(&format!("specialize\n    {section}\n")))
+        .filter(move |part| part.contains(&format!("specialize\n    {section}\n")))
 }
 
 #[test]
@@ -542,9 +546,8 @@ fn every_source_names_the_template_section_that_holds_it() -> Result<(), Box<dyn
     } in SOURCES
     {
         assert_eq!(*template, PATIENT_SUMMARY_TEMPLATE, "{path}");
-        let overlay = overlay(section).ok_or_else(|| format!("{path}: no overlay of {section}"))?;
         assert!(
-            overlay.contains(&format!(", {archetype}]")),
+            overlays(section).any(|overlay| overlay.contains(&format!(", {archetype}]"))),
             "{path}: the template's {section} holds {archetype}"
         );
         let row = PATIENT_SUMMARY
@@ -566,18 +569,57 @@ fn every_source_feeds_its_row_from_its_section() -> Result<(), Box<dyn Error>> {
         ..
     } in SOURCES
     {
-        let (holder, code) = if *held_by == MEDICATION_SUMMARY.1 {
-            (MEDICATION_SUMMARY, MEDICATIONS)
-        } else if *held_by == IMMUNISATIONS.1 {
-            (IMMUNISATIONS, IMMUNIZATIONS)
-        } else {
-            return Err(format!("{path}: {held_by} is no section of the suite").into());
-        };
-        let item = match *archetype {
-            "openEHR-EHR-INSTRUCTION.medication_order.v3" => order(MEDICINE),
-            "openEHR-EHR-ACTION.medication.v1" if code == MEDICATIONS => taken(MEDICINE),
-            "openEHR-EHR-ACTION.medication.v1" => administered(VACCINE),
-            other => return Err(format!("{path}: no synthetic {other}").into()),
+        let (holder, code, item) = match (*held_by, *archetype) {
+            (section, "openEHR-EHR-INSTRUCTION.medication_order.v3")
+                if section == MEDICATION_SUMMARY.1 =>
+            {
+                (MEDICATION_SUMMARY, MEDICATIONS, order(MEDICINE))
+            }
+            (section, "openEHR-EHR-ACTION.medication.v1") if section == MEDICATION_SUMMARY.1 => {
+                (MEDICATION_SUMMARY, MEDICATIONS, taken(MEDICINE))
+            }
+            (section, "openEHR-EHR-ACTION.medication.v1") if section == IMMUNISATIONS.1 => {
+                (IMMUNISATIONS, IMMUNIZATIONS, administered(VACCINE))
+            }
+            (section, "openEHR-EHR-EVALUATION.problem_diagnosis.v1")
+                if section == eps_sections::PROBLEM_LIST.1 =>
+            {
+                (
+                    eps_sections::PROBLEM_LIST,
+                    eps_sections::PROBLEMS_CODE,
+                    eps_sections::problem(eps_sections::HYPERTENSION),
+                )
+            }
+            (section, "openEHR-EHR-EVALUATION.adverse_reaction_risk.v2")
+                if section == eps_sections::ALLERGIES.1 =>
+            {
+                (
+                    eps_sections::ALLERGIES,
+                    eps_sections::ALLERGIES_CODE,
+                    eps_sections::allergy(eps_sections::PENICILLIN),
+                )
+            }
+            (section, "openEHR-EHR-ACTION.procedure.v1")
+                if section == eps_sections::PROCEDURES.1 =>
+            {
+                (
+                    eps_sections::PROCEDURES,
+                    eps_sections::PROCEDURES_CODE,
+                    eps_sections::procedure(eps_sections::APPENDECTOMY),
+                )
+            }
+            (section, "openEHR-EHR-EVALUATION.device_summary.v0")
+                if section == eps_sections::DEVICES.1 =>
+            {
+                (
+                    eps_sections::DEVICES,
+                    eps_sections::DEVICES_CODE,
+                    eps_sections::device(eps_sections::PACEMAKER),
+                )
+            }
+            (section, other) => {
+                return Err(format!("{path}: no synthetic {other} in {section}").into());
+            }
         };
         let resources = run(
             &mapping,
@@ -607,7 +649,7 @@ fn every_source_feeds_its_row_from_its_section() -> Result<(), Box<dyn Error>> {
 }
 
 /// The synthetic patient.
-fn patient() -> Patient {
+pub(crate) fn patient() -> Patient {
     Patient {
         id: Some(String::from("synthetic-subject")),
         name: vec![HumanName {
@@ -711,6 +753,60 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
             .all(|entry| entry.contains("Immunization"))
     );
     emit("eehrxf-summary-medicine-and-vaccine", &text)?;
+    Ok(())
+}
+
+#[test]
+fn the_summary_in_the_ips_form_validates_against_bundle_uv_ips() -> Result<(), Box<dyn Error>> {
+    let Some(set) = profile_set()? else {
+        return Ok(());
+    };
+    let mut document = Document::of(
+        &IPS_PATIENT_SUMMARY_FORM,
+        BASE,
+        String::from("urn:uuid:4f5c1d1e-0000-4000-8000-000000001326"),
+        String::from("2026-10-06T10:00:00Z"),
+        String::from("Patient Summary"),
+    );
+    let subject = document.with_patient(patient())?;
+    let device = document.with_author(&Resource::Device(Box::new(Device {
+        id: Some(String::from("gateway")),
+        ..Device::default()
+    })))?;
+    let answer = summary()?.to_fhir_with(
+        &medicine_and_vaccine(),
+        &settings(),
+        call(&subject, &device),
+    )?;
+    let mut placed = Vec::new();
+    for mapped in document.with_mapped_composition(answer.bundle())? {
+        placed.push(mapped.slot.slice);
+        document.with_section(mapped.into_section(vec![String::from("One synthetic entry.")]))?;
+    }
+    assert_eq!(placed, ["sectionMedications", "sectionImmunizations"]);
+    for slice in ["sectionProblems", "sectionAllergies"] {
+        let slot = IPS_PATIENT_SUMMARY_FORM
+            .slots
+            .iter()
+            .find(|slot| slot.slice == slice)
+            .ok_or(slice)?;
+        document.with_section(
+            Section::new(slot, vec![String::from("Nothing recorded.")])
+                .empty_because(EmptyReason::Unavailable),
+        )?;
+    }
+    let text = serde_json::to_string(&document.into_bundle()?)?;
+    let root: serde_json::Value = serde_json::from_str(&text)?;
+    assert_eq!(root["meta"]["profile"][0], IPS_BUNDLE);
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime
+        .block_on(ReceivedDocument::read(&text)?.validate(
+            set,
+            IPS_BUNDLE,
+            None::<&ferrobridge_term::client::Client>,
+        ))
+        .map_err(|error| format!("{error:?}"))?;
+    emit("eehrxf-ips-summary-medicine-and-vaccine", &text)?;
     Ok(())
 }
 

@@ -172,21 +172,24 @@ impl Lens<DvIdentifier, Identifier> for IdentifierLens {
 /// Returns the `CodeableConcept` a `DV_IDENTIFIER.type` string stands for.
 ///
 /// The RM types `type` as a free `String` (RM Release 1.1.0, Data Types,
-/// `DV_IDENTIFIER`), and `String.adoc` §Coding maps the string to `code`,
-/// reading `system` and `code` only when it contains `::`, so a plain type
-/// such as `login` is a coding with a code and no system.
+/// `DV_IDENTIFIER`). A `system::code` string (`String.adoc` §Coding) is a
+/// coding; any other string is the concept's `text`.
+// NOTE: R4 Coding.system "defines the meaning of the symbol in the code", so a type with no known
+// system is CodeableConcept.text, never a system-less coding (#2038).
 fn concept_of(kind: &str) -> fhir_types::r4::codeable_concept::CodeableConcept {
-    let (system, code) = match kind.split_once(SEPARATOR) {
-        Some((system, code)) => (Some(Uri::from(system)), code),
-        None => (None, kind),
-    };
-    fhir_types::r4::codeable_concept::CodeableConcept {
-        coding: vec![fhir_types::r4::coding::Coding {
-            system,
-            code: Some(primitives::Code::from(code)),
-            ..fhir_types::r4::coding::Coding::default()
-        }],
-        ..fhir_types::r4::codeable_concept::CodeableConcept::default()
+    match kind.split_once(SEPARATOR) {
+        Some((system, code)) => fhir_types::r4::codeable_concept::CodeableConcept {
+            coding: vec![fhir_types::r4::coding::Coding {
+                system: Some(Uri::from(system)),
+                code: Some(primitives::Code::from(code)),
+                ..fhir_types::r4::coding::Coding::default()
+            }],
+            ..fhir_types::r4::codeable_concept::CodeableConcept::default()
+        },
+        None => fhir_types::r4::codeable_concept::CodeableConcept {
+            text: Some(primitives::String::from(kind)),
+            ..fhir_types::r4::codeable_concept::CodeableConcept::default()
+        },
     }
 }
 
@@ -194,23 +197,28 @@ fn concept_of(kind: &str) -> fhir_types::r4::codeable_concept::CodeableConcept {
 ///
 /// `String.adoc` §Coding takes the first coding and writes `system::code`, or
 /// the bare `code` when the coding names no system; a concept with no coded
-/// code has nothing to encode.
+/// code gives its `text`.
 fn coded_of(concept: &fhir_types::r4::codeable_concept::CodeableConcept) -> Option<String> {
-    let coding = concept.coding.first()?;
-    let code = text_of(coding.code.as_ref().map(|code| &code.value))?;
-    Some(
-        match text_of(coding.system.as_ref().map(|system| &system.value)) {
-            Some(system) => format!("{system}{SEPARATOR}{code}"),
-            None => String::from(code),
-        },
-    )
+    let coded = concept.coding.first().and_then(|coding| {
+        let code = text_of(coding.code.as_ref().map(|code| &code.value))?;
+        Some(
+            match text_of(coding.system.as_ref().map(|system| &system.value)) {
+                Some(system) => format!("{system}{SEPARATOR}{code}"),
+                None => String::from(code),
+            },
+        )
+    });
+    coded.or_else(|| text_of(concept.text.as_ref().map(|text| &text.value)).map(String::from))
 }
 
 /// Returns the `Reference` an assigner string stands for.
 ///
 /// `String.adoc` §References makes the identifier form the default, so a
-/// string carrying `::` becomes an identifier and anything else the reference
-/// string the page allows as the weaker form.
+/// string carrying `::` becomes an identifier, a literal reference stays the
+/// reference string the page allows, and any other text is the reference's
+/// `display`.
+// NOTE: FHIRconnect 1.0.0 `String.adoc` is silent on free text; R4 references.html#literal admits
+// only a URL in `Reference.reference`, so text goes to `display`: our own design (#2021).
 fn reference_of(assigner: &str) -> Reference {
     match assigner.split_once(SEPARATOR) {
         Some((system, value)) => Reference {
@@ -221,14 +229,40 @@ fn reference_of(assigner: &str) -> Reference {
             })),
             ..Reference::default()
         },
-        None => Reference {
+        None if literal(assigner) => Reference {
             reference: Some(primitives::String::from(assigner)),
+            ..Reference::default()
+        },
+        None => Reference {
+            display: Some(primitives::String::from(assigner)),
             ..Reference::default()
         },
     }
 }
 
-/// Returns the assigner string a `Reference` stands for.
+/// Whether `text` is a literal reference: a relative `[type]/[id]`, an
+/// absolute URL or a URN (<https://hl7.org/fhir/R4/references.html#literal>).
+fn literal(text: &str) -> bool {
+    if text.starts_with("urn:") || text.contains("://") {
+        return !text.chars().any(char::is_whitespace);
+    }
+    let Some((kind, id)) = text.split_once('/') else {
+        return false;
+    };
+    kind.chars()
+        .next()
+        .is_some_and(|first| first.is_ascii_uppercase())
+        && kind
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
+        && (1..=64).contains(&id.len())
+        && id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '.'))
+}
+
+/// Returns the assigner string a `Reference` stands for: its identifier, its
+/// reference or its display, in that order.
 fn assigner_of(assigner: &Reference) -> Option<String> {
     if let Some(identifier) = assigner.identifier.as_deref() {
         let system = text_of(identifier.system.as_ref().map(|system| &system.value));
@@ -243,6 +277,7 @@ fn assigner_of(assigner: &Reference) -> Option<String> {
             .as_ref()
             .map(|reference| &reference.value),
     )
+    .or_else(|| text_of(assigner.display.as_ref().map(|display| &display.value)))
     .map(String::from)
 }
 
@@ -267,7 +302,9 @@ mod tests {
             id in "[A-Za-z0-9-]{1,12}",
             issuer in proptest::option::of("[a-z]{1,6}://[a-z.]{1,10}"),
             kind in proptest::option::of("([a-z]{1,6}://[a-z.]{1,8}::)?[A-Za-z]{1,8}"),
-            assigner in proptest::option::of("[a-z]{1,6}://[a-z.]{1,8}::[A-Za-z0-9]{1,6}"),
+            assigner in proptest::option::of(
+                "[a-z]{1,6}://[a-z.]{1,8}::[A-Za-z0-9]{1,6}|Organization/[a-z0-9]{1,8}|[A-Za-z][a-z ]{0,12}[a-z]",
+            ),
         ) -> DvIdentifier {
             DvIdentifier { issuer, assigner, id, r#type: kind }
         }
@@ -345,6 +382,77 @@ mod tests {
     }
 
     #[test]
+    fn a_free_text_type_is_the_text_and_a_system_code_one_the_coding() {
+        let kind = |text: &str| {
+            IdentifierLens
+                .get(&DvIdentifier {
+                    issuer: None,
+                    assigner: None,
+                    id: String::from("SYN-1"),
+                    r#type: Some(String::from(text)),
+                })
+                .expect("an id is present")
+                .r#type
+                .expect("the type travels")
+        };
+        let free = kind("patient");
+        assert_eq!(
+            free.text.and_then(|text| text.value).as_deref(),
+            Some("patient")
+        );
+        assert!(free.coding.is_empty(), "free text makes no coding");
+        let coded = kind("http://terminology.hl7.org/CodeSystem/v2-0203::MR");
+        assert_eq!(coded.text, None);
+        let coding = coded.coding.first().expect("a coding");
+        assert_eq!(
+            coding
+                .system
+                .as_ref()
+                .and_then(|system| system.value.as_deref()),
+            Some("http://terminology.hl7.org/CodeSystem/v2-0203")
+        );
+        assert_eq!(
+            coding.code.as_ref().and_then(|code| code.value.as_deref()),
+            Some("MR")
+        );
+    }
+
+    #[test]
+    fn a_free_text_assigner_is_the_display_and_a_literal_one_the_reference() {
+        let assigner = |text: &str| {
+            IdentifierLens
+                .get(&DvIdentifier {
+                    issuer: None,
+                    assigner: Some(String::from(text)),
+                    id: String::from("SYN-1"),
+                    r#type: None,
+                })
+                .expect("an id is present")
+                .assigner
+                .map(|assigner| *assigner)
+                .unwrap_or_default()
+        };
+        let text = |value: Option<&primitives::String>| value.and_then(|value| value.value.clone());
+        let free = assigner("Synthetic assigner");
+        assert_eq!(
+            text(free.display.as_ref()).as_deref(),
+            Some("Synthetic assigner")
+        );
+        assert_eq!(free.reference, None, "free text is no literal reference");
+        for literal in [
+            "Organization/org-1",
+            "https://fhir.example.org/Organization/org-1",
+            "urn:uuid:5a1c3e20-0000-4000-8000-000000002021",
+        ] {
+            let held = assigner(literal);
+            assert_eq!(text(held.reference.as_ref()).as_deref(), Some(literal));
+            assert_eq!(held.display, None, "{literal}");
+        }
+        assert!(assigner("Organization/").reference.is_none());
+        assert!(assigner("organization/org-1").reference.is_none());
+    }
+
+    #[test]
     fn a_reference_string_is_left_for_the_facade_to_resolve() {
         let view = Reference {
             reference: Some(primitives::String::from("Organization/ward-b")),
@@ -418,28 +526,6 @@ mod tests {
             Some("http://example.org/ids"),
             "the issuer becomes the identifier system"
         );
-    }
-
-    #[test]
-    fn a_plain_type_reads_as_a_code_with_no_system() {
-        // String.adoc §Coding: the openEHR string is the `code`, and a system only when it holds `::`.
-        let source = DvIdentifier {
-            issuer: Some(String::from("http://example.org/ids")),
-            assigner: None,
-            id: String::from("SYN-0001"),
-            r#type: Some(String::from("login")),
-        };
-        let view: Identifier = IdentifierLens.get(&source).expect("a plain type is legal");
-        let coding = view
-            .r#type
-            .as_ref()
-            .and_then(|kind| kind.coding.first())
-            .expect("the type becomes a coding");
-        assert_eq!(
-            coding.code.as_ref().and_then(|code| code.value.as_deref()),
-            Some("login")
-        );
-        assert_eq!(coding.system, None, "a plain type names no system");
     }
 
     #[test]

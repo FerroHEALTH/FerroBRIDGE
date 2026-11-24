@@ -3,7 +3,8 @@
 
 //! The `[cdr.endpoint.credentials.onward]` table and the `[[cdr.onward]]` tables
 //! beside it: the onward lane the facade reaches the CDR under its caller
-//! through, one issuer per kind, and every refusal of it.
+//! through, one SMART and one `federation` issuer at most, and every refusal
+//! of it.
 
 use std::collections::BTreeMap;
 
@@ -24,28 +25,14 @@ const OAUTH: &str = concat!(
     "resource = \"https://cdr.example/openehr\"\n\n",
 );
 
-/// A complete onward table: a `persons` issuer exchanging under RFC 8693.
+/// A complete onward table: a SMART issuer exchanging under RFC 8693.
 const ONWARD: &str = concat!(
     "[cdr.endpoint.credentials.onward]\n",
     "issuer = \"https://as.example.org\"\n",
-    "kind = \"persons\"\n",
     "token_endpoint = \"https://as.example.org/token\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.endpoint.credentials.onward.keys]\n",
-    "max_onward_lifetime = \"5min\"\n",
-);
-
-/// A `[[cdr.onward]]` table of the deployment's `patients` issuer, a realm
-/// of its own.
-const PATIENTS: &str = concat!(
-    "[[cdr.onward]]\n",
-    "issuer = \"https://as.example.org/patients\"\n",
-    "kind = \"patients\"\n",
-    "token_endpoint = \"https://as.example.org/patients/token\"\n",
-    "audiences = [\"https://cdr.example/openehr\"]\n",
-    "indicators = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.onward.keys]\n",
+    "[cdr.endpoint.credentials.onward.profile]\n",
     "max_onward_lifetime = \"5min\"\n",
 );
 
@@ -56,7 +43,7 @@ const FEDERATION: &str = concat!(
     "issuer = \"https://sts.partner.example.org\"\n",
     "kind = \"federation\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
-    "[cdr.onward.keys]\n",
+    "[cdr.onward.profile]\n",
     "max_onward_lifetime = \"5min\"\n",
     "[cdr.onward.federation]\n",
     "contact_point = false\n",
@@ -95,12 +82,12 @@ fn an_onward_table_resolves_into_the_cdr_lane() -> Result<(), Box<dyn std::error
         .ok_or("the CDR lane is on")?
         .onward
         .ok_or("the onward lane is on")?;
-    assert_eq!(vec![IssuerKind::Persons], onward.kinds());
+    assert_eq!(vec![IssuerKind::Smart], onward.kinds());
     assert_eq!(
         ["https://cdr.example/openehr"],
         onward
-            .target(IssuerKind::Persons)
-            .ok_or("the persons issuer")?
+            .target(IssuerKind::Smart)
+            .ok_or("the SMART issuer")?
             .audiences(),
         "the target names the CDR alone"
     );
@@ -116,15 +103,15 @@ fn an_onward_table_caches_its_tokens_by_default() -> Result<(), Box<dyn std::err
         .ok_or("the CDR lane is on")?
         .onward
         .ok_or("the onward lane is on")?;
-    assert_eq!(Some(true), onward.caches(IssuerKind::Persons));
+    assert_eq!(Some(true), onward.caches(IssuerKind::Smart));
     Ok(())
 }
 
 #[test]
 fn an_onward_table_with_cache_off_holds_no_token() -> Result<(), Box<dyn std::error::Error>> {
     let table = ONWARD.replace(
-        "[cdr.endpoint.credentials.onward.keys]\n",
-        "cache = false\n[cdr.endpoint.credentials.onward.keys]\n",
+        "[cdr.endpoint.credentials.onward.profile]\n",
+        "cache = false\n[cdr.endpoint.credentials.onward.profile]\n",
     );
     let settings = Config::from_sources(Some(&cdr(&format!("{OAUTH}{table}"))), &BTreeMap::new())?
         .resolve(Process::Job)?;
@@ -133,7 +120,7 @@ fn an_onward_table_with_cache_off_holds_no_token() -> Result<(), Box<dyn std::er
         .ok_or("the CDR lane is on")?
         .onward
         .ok_or("the onward lane is on")?;
-    assert_eq!(Some(false), onward.caches(IssuerKind::Persons));
+    assert_eq!(Some(false), onward.caches(IssuerKind::Smart));
     Ok(())
 }
 
@@ -161,17 +148,15 @@ fn an_onward_table_without_its_oauth_table_is_refused() -> Result<(), Box<dyn st
 }
 
 #[test]
-fn an_onward_table_without_a_kind_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let table = ONWARD.replace("kind = \"persons\"\n", "");
-    let error = refusal(&cdr(&format!("{OAUTH}{table}")), Process::Job)?;
-    assert!(
-        matches!(
-            &error,
-            Error::Credentials { source, .. }
-                if matches!(source.as_ref(), ConfigError::Missing { key } if *key == "credentials.onward.kind")
-        ),
-        "{error:?}"
-    );
+fn an_onward_table_declares_no_kind_but_federation() -> Result<(), Box<dyn std::error::Error>> {
+    for kind in ["persons", "patients", "smart"] {
+        let table = ONWARD.replace(
+            "issuer = \"https://as.example.org\"\n",
+            &format!("issuer = \"https://as.example.org\"\nkind = \"{kind}\"\n"),
+        );
+        let error = refusal(&cdr(&format!("{OAUTH}{table}")), Process::Job)?;
+        assert!(matches!(error, Error::Parse { .. }), "{kind}: {error:?}");
+    }
     Ok(())
 }
 
@@ -215,7 +200,7 @@ fn an_onward_table_on_the_terminology_lane_is_refused() -> Result<(), Box<dyn st
 fn an_onward_lane_whose_own_grant_names_no_cdr_is_refused() -> Result<(), Box<dyn std::error::Error>>
 {
     // RFC 8707 §2: a machine's commit goes under the bridge's own token, which
-    // names the CDR by `resource`, or by `scope` under the Entra profile.
+    // names the CDR by `resource`, or by `scope`.
     let own = OAUTH.replace("resource = \"https://cdr.example/openehr\"\n", "");
     let error = refusal(&cdr(&format!("{own}{ONWARD}")), Process::Job)?;
     assert!(
@@ -238,9 +223,9 @@ fn an_onward_lane_whose_own_grant_names_no_cdr_is_refused() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_persons_a_federation_and_a_patients_issuer_resolve_side_by_side()
--> Result<(), Box<dyn std::error::Error>> {
-    let text = cdr(&format!("{OAUTH}{FEDERATION}{PATIENTS}{ONWARD}"));
+fn a_smart_and_a_federation_issuer_resolve_side_by_side() -> Result<(), Box<dyn std::error::Error>>
+{
+    let text = cdr(&format!("{OAUTH}{FEDERATION}{ONWARD}"));
     let onward = Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve(Process::Job)?
         .cdr
@@ -248,37 +233,31 @@ fn a_persons_a_federation_and_a_patients_issuer_resolve_side_by_side()
         .onward
         .ok_or("the onward lane is on")?;
     assert_eq!(
-        vec![
-            IssuerKind::Persons,
-            IssuerKind::Federation,
-            IssuerKind::Patients
-        ],
+        vec![IssuerKind::Smart, IssuerKind::Federation],
         onward.kinds(),
         "the credentials table first, then the array in order"
     );
-    assert_eq!(Route::Exchanged, onward.route(&CallerKind::Person));
+    assert_eq!(Route::Exchanged, onward.route(&CallerKind::Practitioner));
     assert_eq!(Route::Exchanged, onward.route(&CallerKind::Patient));
+    assert_eq!(Route::Exchanged, onward.route(&CallerKind::User));
     assert_eq!(Route::Own, onward.route(&CallerKind::System));
-    assert_eq!(
-        Route::Refused,
-        onward.route(&CallerKind::Guest(Box::new(CallerKind::Person)))
-    );
     Ok(())
 }
 
 #[test]
-fn a_patients_issuer_alone_carries_patients_and_refuses_persons()
+fn a_federation_issuer_alone_refuses_this_organisation_s_users()
 -> Result<(), Box<dyn std::error::Error>> {
-    let text = cdr(&format!("{OAUTH}{PATIENTS}"));
+    let text = cdr(&format!("{OAUTH}{FEDERATION}"));
     let onward = Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve(Process::Job)?
         .cdr
         .ok_or("the CDR lane is on")?
         .onward
         .ok_or("the onward lane is on")?;
-    assert_eq!(vec![IssuerKind::Patients], onward.kinds());
-    assert_eq!(Route::Exchanged, onward.route(&CallerKind::Patient));
-    assert_eq!(Route::Refused, onward.route(&CallerKind::Person));
+    assert_eq!(vec![IssuerKind::Federation], onward.kinds());
+    assert_eq!(Route::Refused, onward.route(&CallerKind::Patient));
+    assert_eq!(Route::Refused, onward.route(&CallerKind::Practitioner));
+    assert_eq!(Route::Own, onward.route(&CallerKind::System));
     Ok(())
 }
 
@@ -287,22 +266,25 @@ fn two_issuers_of_one_kind_are_refused() -> Result<(), Box<dyn std::error::Error
     let twice = ONWARD
         .replace("[cdr.endpoint.credentials.onward]", "[[cdr.onward]]")
         .replace(
-            "[cdr.endpoint.credentials.onward.keys]",
-            "[cdr.onward.keys]",
+            "[cdr.endpoint.credentials.onward.profile]",
+            "[cdr.onward.profile]",
         );
     let error = refusal(&cdr(&format!("{OAUTH}{ONWARD}{twice}")), Process::Job)?;
     assert!(
         matches!(
             &error,
-            Error::Duplicate { key, value } if key == "cdr.onward.kind" && value == "persons"
+            Error::Duplicate { key, value } if key == "cdr.onward.kind" && value == "smart"
         ),
         "{error:?}"
     );
-    let error = refusal(&cdr(&format!("{OAUTH}{PATIENTS}{PATIENTS}")), Process::Job)?;
+    let error = refusal(
+        &cdr(&format!("{OAUTH}{FEDERATION}{FEDERATION}")),
+        Process::Job,
+    )?;
     assert!(
         matches!(
             &error,
-            Error::Duplicate { key, value } if key == "cdr.onward.kind" && value == "patients"
+            Error::Duplicate { key, value } if key == "cdr.onward.kind" && value == "federation"
         ),
         "{error:?}"
     );
@@ -311,7 +293,7 @@ fn two_issuers_of_one_kind_are_refused() -> Result<(), Box<dyn std::error::Error
 
 #[test]
 fn an_onward_array_without_the_oauth_table_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refusal(&cdr(PATIENTS), Process::Job)?;
+    let error = refusal(&cdr(FEDERATION), Process::Job)?;
     assert!(
         matches!(
             &error,
@@ -327,7 +309,7 @@ fn an_onward_array_without_the_oauth_table_is_refused() -> Result<(), Box<dyn st
 fn an_onward_array_on_a_server_without_auth_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
         "[auth]\nenabled = false\n\n{}",
-        cdr(&format!("{OAUTH}{PATIENTS}"))
+        cdr(&format!("{OAUTH}{FEDERATION}"))
     );
     let error = refusal(&text, Process::Server)?;
     assert!(

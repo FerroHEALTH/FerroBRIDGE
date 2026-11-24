@@ -154,48 +154,57 @@ fn segments<'a>(ack: &'a str, id: &str) -> Vec<&'a str> {
 }
 
 /// A terminology server loaded with the one table value the Observation
-/// needs: OBX-11 `F` through `table-hl70085-to-observation-status`. Every
-/// other translation states no match.
+/// needs: OBX-11 `F` through `table-hl70085-to-observation-status`, alone or
+/// in a `batch`. Every other translation states no match.
 #[derive(Debug, Clone, Copy)]
 struct Tables;
 
 impl Respond for Tables {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
-        let parameter = |name: &str, kind: &str| {
-            body["parameter"]
-                .as_array()
-                .and_then(|parameters| {
-                    parameters
-                        .iter()
-                        .find(|parameter| parameter["name"] == name)
-                        .and_then(|parameter| parameter[kind].as_str())
-                })
-                .map(String::from)
-                .unwrap_or_default()
-        };
-        let url = parameter("url", "valueUri");
-        let code = parameter("code", "valueCode");
-        if url.ends_with("/table-hl70085-to-observation-status") && code == "F" {
-            return terminology::translate(
-                "equivalent",
-                "http://hl7.org/fhir/observation-status",
-                "final",
-                "Final",
-            );
-        }
-        terminology::translate_no_match("no mapping for the code")
+        terminology::each_parameters(request, |body| {
+            let parameter = |name: &str, kind: &str| {
+                body["parameter"]
+                    .as_array()
+                    .and_then(|parameters| {
+                        parameters
+                            .iter()
+                            .find(|parameter| parameter["name"] == name)
+                            .and_then(|parameter| parameter[kind].as_str())
+                    })
+                    .map(String::from)
+                    .unwrap_or_default()
+            };
+            let url = parameter("url", "valueUri");
+            let code = parameter("code", "valueCode");
+            let found = url.ends_with("/table-hl70085-to-observation-status") && code == "F";
+            let parameters = if found {
+                terminology::translate_body(&[(
+                    "equivalent",
+                    "http://hl7.org/fhir/observation-status",
+                    "final",
+                    "Final",
+                )])
+            } else {
+                vec![
+                    serde_json::json!({"name": "result", "valueBoolean": false}),
+                    serde_json::json!({"name": "message", "valueString": "no mapping for the code"}),
+                ]
+            };
+            (200, terminology::parameters_resource(&parameters))
+        })
     }
 }
 
 /// Returns a terminology client over a started stub.
 async fn terminology_stub() -> (MockServer, ferrobridge_term::client::Client) {
     let server = MockServer::start().await;
-    Mock::given(matchers::method("POST"))
-        .and(matchers::path("/r4/ConceptMap/$translate"))
-        .respond_with(Tables)
-        .mount(&server)
-        .await;
+    for route in ["/r4/ConceptMap/$translate", "/r4"] {
+        Mock::given(matchers::method("POST"))
+            .and(matchers::path(route))
+            .respond_with(Tables)
+            .mount(&server)
+            .await;
+    }
     let base = format!("{}/r4", server.uri()).parse().expect("a base url");
     let config =
         ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::R4)

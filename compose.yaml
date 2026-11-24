@@ -27,17 +27,18 @@
 # INBOUND AUTHENTICATION is on by default. A lane that serves FHIR (the facade,
 # the operator API, or the FHIRconnect operations over a mapping directory)
 # refuses to start until you name the authorization server that issues your
-# callers' tokens, or say the network is trusted. Each trusted server is an
-# [[auth.issuer]] table with its kind, written in a configuration file in the
-# ./config directory beside this one, which FERROBRIDGE_CONFIG names:
+# callers' tokens, or say the network is trusted. Each trusted server is a
+# named [auth.issuer.<name>] table naming its issuer, written in a configuration
+# file in the ./config directory beside this one, which FERROBRIDGE_CONFIG
+# names. Its audience is the facade's base_url unless the table sets one:
 #
 #   mkdir -p config
 #   cat > config/ferrobridge.toml <<'TOML'
-#   [[auth.issuer]]
+#   [facade]
+#   base_url = "https://bridge.example.org/fhir"
+#
+#   [auth.issuer.clinic]
 #   issuer = "https://auth.example.org/realms/clinic"
-#   kind = "persons"
-#   audience = ["https://bridge.example.org/fhir"]
-#   first_party_clients = ["clinic-portal"]
 #   TOML
 #   FERROBRIDGE_CONFIG=/etc/ferrobridge/ferrobridge.toml
 #   # or, on a network only trusted callers reach:
@@ -91,7 +92,7 @@ name: ferrobridge
 
 services:
   ferrobridge:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.27}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.28}
     container_name: ferrobridge
     restart: unless-stopped
     ports:
@@ -122,7 +123,7 @@ services:
       FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE:
       FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__AUDIENCE:
       FERROBRIDGE__CDM__URL_FILE:
-      # The configuration file under ./config that holds the [[auth.issuer]]
+      # The configuration file under ./config that holds the [auth.issuer.<name>]
       # tables, and the inbound authentication switch, passed through when set.
       FERROBRIDGE_CONFIG:
       FERROBRIDGE__AUTH__ENABLED:
@@ -187,7 +188,7 @@ services:
   # POSTGRES_PASSWORD_FILE, so the value lives in ./secrets/cdm_password and in
   # the connection URL in ./secrets/cdm_url, which must agree.
   cdm:
-    image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    image: postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
     profiles: [cdm, vocab]
     restart: unless-stopped
     environment:
@@ -197,7 +198,7 @@ services:
     secrets:
       - cdm_password
     volumes:
-      - cdm-data:/var/lib/postgresql/data
+      - cdm-data:/var/lib/postgresql
     # What gates cdm-init and vocab-load below: the server accepts connections
     # only after the first-run initialisation has finished.
     healthcheck:
@@ -218,7 +219,7 @@ services:
   #
   #   docker compose --profile cdm run --rm cdm-init
   cdm-init:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.27}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.28}
     profiles: [cdm]
     command: ["cdm", "init"]
     restart: "no"
@@ -242,7 +243,7 @@ services:
   #   FERROBRIDGE_VOCAB_DIR=/srv/athena/2026-09 \
   #     docker compose --profile vocab run --rm vocab-load
   vocab-load:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.27}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.28}
     profiles: [vocab]
     command: ["vocab", "load", "/vocabulary", "--schema", "cdm"]
     restart: "no"
@@ -289,12 +290,12 @@ services:
   # leave it unset so the session cookie carries Secure.
   #
   # The bridge refuses the console's calls unless it validates the operator's
-  # token: name the issuer in an [[auth.issuer]] table of its configuration
-  # file, list the console's client id in that table's first_party_clients,
-  # and turn on [operator] for the mapping files.
+  # token: name the issuer in an [auth.issuer.<name>] table of its configuration
+  # file, register the console at that issuer as a client of the bridge, and
+  # turn on [operator] for the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
   console:
-    image: ghcr.io/ferrohealth/ferrobridge-console:${FERROBRIDGE_VERSION:-0.0.27}
+    image: ghcr.io/ferrohealth/ferrobridge-console:${FERROBRIDGE_VERSION:-0.0.28}
     profiles: [console]
     restart: unless-stopped
     depends_on:

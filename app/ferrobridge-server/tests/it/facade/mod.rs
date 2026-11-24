@@ -8,6 +8,7 @@
 //! guard, the program selection, the engine, the identity map and the status
 //! table.
 
+mod app_state;
 mod attestation;
 pub(crate) mod auth;
 pub(crate) mod batch;
@@ -21,6 +22,7 @@ mod demographic;
 mod document;
 mod ehr_status;
 mod examples;
+mod launch_task;
 mod linked;
 mod losses;
 mod outbound;
@@ -33,8 +35,10 @@ mod reconcile;
 mod references;
 mod replay;
 mod search;
+mod shl;
 pub(crate) mod stub;
 mod sub_context;
+pub(crate) mod summary;
 mod terminology;
 pub(crate) mod tofhir;
 mod transaction;

@@ -64,8 +64,14 @@ pub struct Facade {
     /// The exchange of access directives as FHIR `Consent`, IHE BPPC and
     /// IHE APPC.
     pub consent: FacadeConsent,
+    /// SMART App State, served as `Basic`.
+    pub app_state: FacadeAppState,
+    /// SMART launch `Task`s, served as `Task`.
+    pub launch_task: FacadeLaunchTask,
     /// Cross-origin resource sharing on the REST routes.
     pub cors: FacadeCors,
+    /// The patient summary, `Patient/[id]/$summary`.
+    pub summary: FacadeSummary,
 }
 
 impl Default for Facade {
@@ -89,6 +95,9 @@ impl Default for Facade {
             party_search: FacadePartySearch::default(),
             binding_identifier_issuers: Vec::new(),
             consent: FacadeConsent::default(),
+            app_state: FacadeAppState::default(),
+            launch_task: FacadeLaunchTask::default(),
+            summary: FacadeSummary::default(),
             cors: FacadeCors::default(),
         }
     }
@@ -223,4 +232,74 @@ pub struct FacadeCors {
     /// The origins a browser app may call the REST routes from, each an
     /// `http` or `https` origin; empty admits none.
     pub allowed_origins: Vec<String>,
+}
+
+/// SMART App State (SMART App Launch 2.2.0, Persisting App State), served as
+/// `Basic` at the facade's base.
+///
+/// Off, `Basic` is an ordinary resource type a program may map. On, it is the
+/// App State endpoint, its resources kept in `store` apart from the identity
+/// map, and the discovery document lists `smart-app-state` (no specification
+/// governs the store: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeAppState {
+    /// Whether `Basic` is the App State endpoint.
+    pub enabled: bool,
+    /// The file the App State resources are kept in.
+    pub store: PathBuf,
+}
+
+impl Default for FacadeAppState {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            store: PathBuf::from("app-state.redb"),
+        }
+    }
+}
+
+/// SMART launch `Task`s (SMART App Launch 2.2.0, Task profile for requesting
+/// a SMART launch), served as `Task` at the facade's base.
+///
+/// Off, `Task` is an ordinary resource type a program may map. On, it serves
+/// the `task-ehr-launch` and `task-standalone-launch` profiles, its resources
+/// kept in `store` apart from the identity map (no specification governs the
+/// store: our own design).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeLaunchTask {
+    /// Whether `Task` is the launch endpoint.
+    pub enabled: bool,
+    /// The file the launch `Task`s are kept in.
+    pub store: PathBuf,
+}
+
+impl Default for FacadeLaunchTask {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            store: PathBuf::from("launch-tasks.redb"),
+        }
+    }
+}
+
+/// The patient summary (HL7 IPS 2.0.1 `OperationDefinition/summary`), served
+/// as `Patient/[id]/$summary`.
+///
+/// On, the operation reads the `Patient` party and the patient summary
+/// compositions of the patient's EHR, and validates each document over
+/// `packages` before it is served.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeSummary {
+    /// Whether `Patient/[id]/$summary` is served.
+    pub enabled: bool,
+    /// The FHIR packages each document is validated over: `hl7.fhir.r4.core`
+    /// and the dependency closure of IPS 2.0.1 and of the HL7 Europe Patient
+    /// Summary, each a `.tgz` or an unpacked directory.
+    pub packages: Vec<PathBuf>,
+    /// The name of the organisation that operates this server, which each
+    /// document names as an author.
+    pub operator: String,
 }

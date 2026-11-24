@@ -19,10 +19,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-term = "0.13"
+ferrobridge-term = "0.18"
 ```
 
-Name a patch (`"0.13.N"`) when you need the first release that carries what
+Name a patch (`"0.18.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -49,7 +49,8 @@ so a caller can tell an unserved code system from an unknown code.
 system, `systemVersion` and `display`, a code with the `context` that implies
 its system (`Coded::InContext`, R4 and R4B), a `Coding`, or a
 `CodeableConcept`, with an optional `valueSetVersion` (R4 and R4B). `validate_all` answers several validations
-by position, one call for one and one `batch` for several.
+by position, one call for one and one `batch` for several, and
+`translate_all` does the same for several translations.
 
 `batch` sends several of them as one `batch` `Bundle` and answers them by
 position; an entry the server refused is that entry's own typed error and
@@ -119,7 +120,7 @@ call in it does not compile. The default is `stu3`, `r4` and `r4b`; a
 consumer that speaks R5 or the R6 ballot turns `r5` or `r6` on:
 
 ```toml
-ferrobridge-term = { version = "0.13", features = ["r5", "r6"] }
+ferrobridge-term = { version = "0.18", features = ["r5", "r6"] }
 ```
 
 The HTTP client is the default `client` feature: `reqwest`, the retry
@@ -129,7 +130,7 @@ request, concept and outcome types and the transport-free writers and readers
 speaks with no HTTP stack:
 
 ```toml
-ferrobridge-term = { version = "0.13", default-features = false, features = ["r4"] }
+ferrobridge-term = { version = "0.18", default-features = false, features = ["r4"] }
 ```
 
 R5 and R6 are off by default because a binary that also enables the

@@ -8,7 +8,6 @@
 use std::error::Error;
 use std::time::Duration;
 
-use ferrohealth_smart::profile::Marker;
 use http::StatusCode;
 use jsonwebtoken::Algorithm;
 use jsonwebtoken::EncodingKey;
@@ -56,13 +55,19 @@ async fn read_with(
     Ok((status, challenge, body))
 }
 
-/// Asserts the generic refusal of an invalid token.
-fn assert_refused((status, challenge, body): &(StatusCode, Option<String>, serde_json::Value)) {
+/// Asserts the generic refusal of an invalid token, whose challenge names
+/// the reason `code` of the check that refused it.
+fn assert_refused(
+    (status, challenge, body): &(StatusCode, Option<String>, serde_json::Value),
+    code: &str,
+) {
     assert_eq!(StatusCode::UNAUTHORIZED, *status, "{body}");
     assert_eq!(
-        Some("Bearer error=\"invalid_token\""),
-        challenge.as_deref(),
-        "RFC 6750 §3.1 invalid_token"
+        Some(format!(
+            "Bearer error=\"invalid_token\", error_description=\"{code}\""
+        )),
+        *challenge,
+        "RFC 6750 §3.1 invalid_token, §3 the reason code as error_description"
     );
     assert_eq!(Some("login"), body["issue"][0]["code"].as_str(), "{body}");
     assert_eq!(
@@ -146,18 +151,18 @@ async fn every_invalid_token_gets_the_same_body_naming_no_claim() -> Result<(), 
         .ok_or("claims are an object")?
         .remove("sub");
     let cases = [
-        ("expired", expired),
-        ("not yet valid", early),
-        ("another issuer", foreign_issuer),
-        ("another audience", foreign_audience),
-        ("issued in the future", future),
-        ("no client_id under RFC 9068", no_client),
-        ("no sub", no_subject),
+        ("expired", expired, "expired"),
+        ("not yet valid", early, "not-yet-valid"),
+        ("another issuer", foreign_issuer, "issuer-unknown"),
+        ("another audience", foreign_audience, "audience-mismatch"),
+        ("issued in the future", future, "issued-in-future"),
+        ("no client_id under RFC 9068", no_client, "claim-missing"),
+        ("no sub", no_subject, "claim-missing"),
     ];
     let mut bodies = Vec::new();
-    for (case, claims) in cases {
+    for (case, claims, code) in cases {
         let answer = read_with(secured(&harness, &authority), Some(&mint(&key, &claims))).await?;
-        assert_refused(&answer);
+        assert_refused(&answer, code);
         let text = answer.2.to_string();
         for claim in ["exp", "nbf", "iss", "aud", "iat", "sub", "client_id"] {
             assert!(!text.contains(&format!("\"{claim}\"")), "{case}: {text}");
@@ -180,7 +185,7 @@ async fn a_token_signed_by_another_key_under_a_known_kid_is_refused() -> Result<
     let harness = harness().await;
     let app = secured(&harness, &authority(issuer.settings()).await);
     let token = mint(&forger, &issuer.claims("system/Condition.r"));
-    assert_refused(&read_with(app, Some(&token)).await?);
+    assert_refused(&read_with(app, Some(&token)).await?, "signature-invalid");
     Ok(())
 }
 
@@ -193,7 +198,7 @@ async fn an_algorithm_outside_the_configured_set_is_refused() -> Result<(), Box<
     settings.issuers[0].algorithms = vec![Algorithm::RS256, Algorithm::ES256];
     let app = secured(&harness, &authority(settings).await);
     let token = mint(&key, &issuer.claims("system/Condition.r"));
-    assert_refused(&read_with(app, Some(&token)).await?);
+    assert_refused(&read_with(app, Some(&token)).await?, "algorithm-refused");
     Ok(())
 }
 
@@ -213,7 +218,7 @@ async fn a_symmetric_token_is_refused() -> Result<(), Box<dyn Error>> {
         &issuer.claims("system/Condition.r"),
         &EncodingKey::from_secret(b"synthetic-shared-secret"),
     )?;
-    assert_refused(&read_with(app, Some(&token)).await?);
+    assert_refused(&read_with(app, Some(&token)).await?, "algorithm-refused");
     Ok(())
 }
 
@@ -223,7 +228,10 @@ async fn a_token_that_is_no_jwt_is_refused() -> Result<(), Box<dyn Error>> {
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
     let app = secured(&harness, &authority(issuer.settings()).await);
-    assert_refused(&read_with(app, Some("an-opaque-token")).await?);
+    assert_refused(
+        &read_with(app, Some("an-opaque-token")).await?,
+        "malformed-token",
+    );
     Ok(())
 }
 
@@ -235,21 +243,13 @@ async fn the_rfc_9068_profile_refuses_a_plain_jwt_and_a_profile_naming_its_shape
     let harness = harness().await;
     let mut header = Header::new(Algorithm::ES256);
     header.kid = Some(String::from("k1"));
-    let mut claims = issuer.claims("system/Condition.r");
-    claims
-        .as_object_mut()
-        .ok_or("claims are an object")?
-        .remove("client_id");
-    let token = mint_with(&key, &header, &claims);
+    let token = mint_with(&key, &header, &issuer.machine_claims("system/Condition.r"));
     let strict = secured(&harness, &authority(issuer.settings()).await);
-    assert_refused(&read_with(strict, Some(&token)).await?);
-    // NOTE: RFC 7519 §5.1 and §4.1, a plain JWT is typed `JWT` and needs no
-    // `client_id`, so this profile names its machine by `sub`.
+    assert_refused(&read_with(strict, Some(&token)).await?, "type-mismatch");
+    // NOTE: RFC 7519 §5.1, a plain JWT is typed `JWT`; a profile that names the
+    // type takes it.
     let mut settings = issuer.settings();
-    let profile = &mut settings.issuers[0].profile;
-    profile.token_types = vec![String::from("JWT")];
-    profile.required_claims = ["iss", "exp", "aud", "sub"].map(String::from).to_vec();
-    profile.app_only = vec![Marker::Subjects(vec![String::from("synthetic-client-sub")])];
+    settings.issuers[0].profile.token_types = vec![String::from("JWT")];
     let lenient = secured(&harness, &authority(settings).await);
     let (status, _, body) = read_with(lenient, Some(&token)).await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "{body}");
@@ -287,7 +287,10 @@ async fn an_unknown_kid_within_the_interval_reads_nothing_and_is_refused()
     let authority = authority(settings).await;
     for _ in 0..3 {
         let token = mint(&stranger, &issuer.claims("system/Condition.r"));
-        assert_refused(&read_with(secured(&harness, &authority), Some(&token)).await?);
+        assert_refused(
+            &read_with(secured(&harness, &authority), Some(&token)).await?,
+            "key-unknown",
+        );
     }
     assert_eq!(1, issuer.key_reads().await, "only the boot read");
     Ok(())
@@ -338,7 +341,10 @@ async fn a_key_the_issuer_withdrew_stops_verifying_once_the_set_is_past_its_max_
         "the key still verifies: {body}"
     );
     tokio::time::sleep(Duration::from_millis(400)).await;
-    assert_refused(&read_with(secured(&harness, &authority), Some(&old)).await?);
+    assert_refused(
+        &read_with(secured(&harness, &authority), Some(&old)).await?,
+        "key-unknown",
+    );
     assert_eq!(
         2,
         issuer.key_reads().await,
@@ -376,7 +382,10 @@ async fn a_token_with_a_blank_sub_is_the_generic_401() -> Result<(), Box<dyn Err
         let app = secured(&harness, &authority(issuer.settings()).await);
         let mut claims = issuer.claims("system/Condition.r");
         claims["sub"] = serde_json::json!(blank);
-        assert_refused(&read_with(app, Some(&mint(&key, &claims))).await?);
+        assert_refused(
+            &read_with(app, Some(&mint(&key, &claims))).await?,
+            "subject-blank",
+        );
     }
     Ok(())
 }
@@ -390,7 +399,7 @@ async fn a_bearer_value_outside_b64token_is_the_generic_401() -> Result<(), Box<
     let harness = harness().await;
     for value in ["a,b", "a=b", "=abc"] {
         let app = secured(&harness, &authority(issuer.settings()).await);
-        assert_refused(&read_with(app, Some(value)).await?);
+        assert_refused(&read_with(app, Some(value)).await?, "not-b64token");
     }
     Ok(())
 }

@@ -40,9 +40,10 @@ const BEARER: &str = "bearer";
 /// The onward lane of the CDR: for each issuer, the client of its grant,
 /// the target it asks for, and its kind.
 ///
-/// It holds at most one issuer per kind: a `persons`, a `federation` and a
-/// `patients` issuer, each carrying the callers of its kind. The client is
-/// cheap to clone: clones share one cache per lane.
+/// It holds at most one issuer per kind: a SMART authorization server for
+/// this organisation's users and a `federation` issuer for another party's
+/// professionals. The client is cheap to clone: clones share one cache per
+/// lane.
 #[derive(Debug, Clone)]
 pub struct CdrOnward {
     /// The issuers, at most one per kind.
@@ -256,21 +257,17 @@ impl Lane {
 ///
 /// A machine keeps the bridge's credential: the on-behalf-of flow "only
 /// works for user principals" (Microsoft identity platform, "On-behalf-of
-/// flow"). A person of this organisation, acting alone, through a client or
-/// for another, is exchanged at a `persons` issuer, a professional of another
-/// party at a `federation` issuer, and a patient at the deployment's
-/// `patients` issuer. Another party's organisation and a guest are carried by
-/// none, so they are refused.
+/// flow"). A user of this organisation, whatever the type of their
+/// `fhirUser` and whether or not an actor acts for them, is exchanged at a
+/// SMART issuer, and a professional of another party at a `federation`
+/// issuer. Another party's organisation is carried by none, so it is
+/// refused.
 #[must_use]
 pub const fn route(caller: &CallerKind, issuer: IssuerKind) -> Route {
     match (caller, issuer) {
         (CallerKind::System, _) => Route::Own,
-        (
-            CallerKind::Person | CallerKind::Delegated { .. } | CallerKind::Representative { .. },
-            IssuerKind::Persons,
-        )
-        | (CallerKind::ExternalPerson(_), IssuerKind::Federation)
-        | (CallerKind::Patient, IssuerKind::Patients) => Route::Exchanged,
+        (CallerKind::ExternalPerson(_), IssuerKind::Federation) => Route::Exchanged,
+        (user, IssuerKind::Smart) if user.is_user() => Route::Exchanged,
         _ => Route::Refused,
     }
 }
@@ -323,56 +320,25 @@ mod tests {
 
     #[test]
     fn a_machine_keeps_the_bridge_credential_under_either_issuer() {
-        assert_eq!(Route::Own, route(&CallerKind::System, IssuerKind::Persons));
+        assert_eq!(Route::Own, route(&CallerKind::System, IssuerKind::Smart));
         assert_eq!(
             Route::Own,
             route(&CallerKind::System, IssuerKind::Federation)
         );
-        assert_eq!(Route::Own, route(&CallerKind::System, IssuerKind::Patients));
     }
 
     #[test]
-    fn a_person_is_exchanged_at_a_persons_issuer_alone() {
-        let delegated = CallerKind::Delegated { actor: None };
-        let representative = CallerKind::Representative {
-            represented: String::from("synthetic-subject"),
-            ground: None,
-        };
-        for kind in [&CallerKind::Person, &delegated, &representative] {
-            assert_eq!(Route::Exchanged, route(kind, IssuerKind::Persons));
-            assert_eq!(Route::Refused, route(kind, IssuerKind::Federation));
-        }
-    }
-
-    #[test]
-    fn a_patient_is_exchanged_at_a_patients_issuer_alone() {
-        assert_eq!(
-            Route::Exchanged,
-            route(&CallerKind::Patient, IssuerKind::Patients)
-        );
-        assert_eq!(
-            Route::Refused,
-            route(&CallerKind::Patient, IssuerKind::Persons)
-        );
-        assert_eq!(
-            Route::Refused,
-            route(&CallerKind::Patient, IssuerKind::Federation)
-        );
-        assert_eq!(
-            Route::Refused,
-            route(&CallerKind::Person, IssuerKind::Patients)
-        );
-    }
-
-    #[test]
-    fn a_guest_is_never_exchanged() {
-        let guest = CallerKind::Guest(Box::new(CallerKind::Person));
-        for issuer in [
-            IssuerKind::Persons,
-            IssuerKind::Federation,
-            IssuerKind::Patients,
+    fn a_user_is_exchanged_at_a_smart_issuer_alone() {
+        for kind in [
+            CallerKind::Patient,
+            CallerKind::Practitioner,
+            CallerKind::PractitionerRole,
+            CallerKind::RelatedPerson,
+            CallerKind::Person,
+            CallerKind::User,
         ] {
-            assert_eq!(Route::Refused, route(&guest, issuer));
+            assert_eq!(Route::Exchanged, route(&kind, IssuerKind::Smart));
+            assert_eq!(Route::Refused, route(&kind, IssuerKind::Federation));
         }
     }
 

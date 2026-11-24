@@ -1042,6 +1042,20 @@ expression is a load error: the reference CDR's connector let `where()` and
   (`facade::document`); `persist=true` and `graph` are refused, never
   ignored. A context whose start is a composition model binds the composition
   itself as its one entry, under the path `/`.
+- **`Patient/$summary` answers the patient summary, validated before it is
+  served.** `GET [base]/Patient/[id]/$summary` (HL7 IPS 2.0.1,
+  `OperationDefinition/summary`) reads the patient through the `Patient`
+  party context and every patient summary composition of the patient's EHR
+  as the caller (the onward exchange carries a patient's token to the CDR),
+  maps them through the `eehrxf` EPS project, translates each code in no
+  preferred system on the terminology server, and writes the IPS 2.0.1 form,
+  or the HL7 Europe Patient Summary form that `profile` names. The document
+  is validated in process by `ferrobridge-validator` over the configured
+  packages and an invalid one answers `422`, never served. A section the
+  project feeds and the record leaves empty is `nilknown`, a required section
+  no openEHR content feeds `unavailable`, and a `patient/` token launched for
+  another patient answers `404` with no CDR call. All of it is our own design
+  (`facade::summary`, decided for FerroHEALTH/FerroEHR#6419).
 - **`$validate` is a dry run that commits nothing.** `POST [base]/{type}/$validate`
   runs the full inbound path (program selection, mapping, composition build,
   the CDR's own template validation through a commit the bridge never
@@ -2579,30 +2593,27 @@ draft upstream change.
   those two: our own design.
 - **The caller at the CDR.** The bridge validates each caller's token and
   reaches the CDR with its own credential, never the caller's token, which
-  names the bridge as its audience (RFC 9068 §4). The caller still reaches
-  every write the CDR records: ITS-REST 1.1.0 (§openehr-version and
-  openehr-audit-details) has a service accept a client-supplied
-  `committer` and "merge" it into the version's `AUDIT_DETAILS`, and makes
-  it "RECOMMENDED to provision these headers based on authentication and
-  authorization runtime data". So a write the facade makes for an
-  authenticated caller, a single write as `openehr-audit-details` and a
-  transaction as each `UPDATE_AUDIT` of its CONTRIBUTION, states the caller
-  as a `PARTY_IDENTIFIED` named by the token's `sub` (or the Basic user-id),
-  with a `PARTY_REF` of type `PARTY` (openEHR BASE: "Abstract supertypes are
-  allowed", since a token does not say whether its subject is a person or a
-  client) and a `GENERIC_ID` of the subject in the namespace of the issuer
-  that vouched for it, or of the bridge's `system_id` for a Basic user the
-  bridge checked. A namespace outside the `OBJECT_REF.namespace` regex
-  leaves the name alone. `system_id` keeps naming the bridge, so each
-  version records who asked and which system committed. An HL7 v2 message
-  and a request on an open surface carry no caller and commit under the
-  bridge's name (#532). Reads carry no audit metadata in ITS-REST, so the
-  CDR's access log still names the bridge for them; carrying the caller there
-  needs a per-caller token the CDR accepts, such as an OAuth 2.0 Token
-  Exchange (RFC 8693) token with an `act` claim, which needs an
-  authorization server that issues it and a CDR that reads it, and stays
-  open until both exist. The mapping of a caller onto `committer` is no
-  specification's: our own design.
+  names the bridge as its audience (RFC 9068 §4), or, under the onward lane
+  below, with a token exchanged for the caller. The CDR writes who committed
+  each version from the credential it authenticated (#2002): RM common
+  master04 §Audit Details makes `committer` the "identity ... of user who
+  committed the item", and a CDR that derives it, as the reference CDR does
+  under EHDS Art. 13(4), refuses a stated committer that says more than its
+  own. ITS-REST 1.1.0 (§openehr-version and openehr-audit-details) makes
+  every commit header optional ("None of these headers are mandatory"), so
+  a single write states `change_type` and `system_id` (the bridge) in
+  `openehr-audit-details` and no committer. A CONTRIBUTION's `UpdateAudit`
+  requires one (`schemas/common/UpdateAudit.yaml`), so each `UPDATE_AUDIT`
+  names the authenticated party and nothing more: the bridge's own client
+  credentials client as a `PARTY_IDENTIFIED` of its client id, a Basic user
+  as one `DV_IDENTIFIER` of `[cdr] committer_issuer` and the user, an
+  exchanged token as one `DV_IDENTIFIER` of its `iss` and `sub`, and the
+  bridge by `system_id` when the CDR authenticates no credential of the
+  bridge's. The facade caller reaches the record through the access record
+  below and, for a machine, as the originating system. This replaces the
+  earlier design (#532), which stated the facade caller as the committer and
+  which such a CDR refuses. Which form names the authenticated party is our
+  own design.
 - **The access record** (the owner's decision on #1301; implementation
   #1377). The facade records every access an authenticated caller makes
   itself. ITS-REST 1.1.0 carries no end-user identity on a read
@@ -2645,28 +2656,27 @@ draft upstream change.
     request reaches the CDR under its caller, so the CDR's own record names
     the clinician too. The bridge exchanges the caller's token through
     `ferrohealth-smart`'s onward client: RFC 8693 §2.1 token exchange
-    (`docs/specs/ietf-oauth/rfc8693.txt`), with `audience` under the Keycloak
-    profile, or the RFC 7523 §2.1 JWT bearer grant with the Microsoft identity
+    (`docs/specs/ietf-oauth/rfc8693.txt`), naming the CDR by `resource` or
+    `audience`, or the RFC 7523 §2.1 JWT bearer grant with the Microsoft identity
     platform's on-behalf-of parameters (`docs/specs/entra-docs/`). The issued
     token is checked for its issuer, audience, lifetime, actor and person
-    (`person_equality`) and cached under the caller's token and the target
+    (`iss` and `sub`) and cached under the caller's token and the target
     within its expiry. A machine keeps the bridge's own client credentials
     token, since the on-behalf-of flow "only works for user principals"; a
-    person is exchanged at a `persons` issuer and another party's
-    professional at a `federation` issuer; every other caller is refused with
+    user of this organisation is exchanged at the SMART issuer and another
+    party's professional at a `federation` issuer; every other caller is refused with
     `403`, and a failed exchange fails the request, never falling back to the
     bridge's credential. Which caller is exchanged, and the status of each
     refusal, is our own design (`cdr::onward`, `facade::status::onward`).
-    Under an onward token a header commit states no committer, and a
-    CONTRIBUTION states the placeholder FerroEHR discards (a
-    `PARTY_IDENTIFIED` with one `DV_IDENTIFIER` of the token's `iss` and
-    `sub`), since the CDR derives the committer from the token; the facade
-    sends no attestation. A machine keeps the bridge's own token, which the
+    Under an onward token a CONTRIBUTION states the placeholder the CDR
+    discards (a `PARTY_IDENTIFIED` with one `DV_IDENTIFIER` of the token's
+    `iss` and `sub`), since the CDR derives the committer from the token, as
+    every header commit leaves it out; the facade sends no attestation. A machine keeps the bridge's own token, which the
     onward lane requires to be asked for the CDR alone (`resource`, RFC 8707
     §2, or `scope`); its composition names its client as the originating
     system (`FEEDER_AUDIT.originating_system_audit.system_id`) and the bridge
-    as the feeder, and the access record names the client. The `patients`
-    and `federation` lanes beside `persons` (#1636) and the HL7 v2 face's
+    as the feeder, and the access record names the client. The `federation`
+    lane beside the SMART one (#1636) and the HL7 v2 face's
     TLS and commit rules (#1638, #1639) follow on their own issues.
 - **Tenancy.** The reference CDR scopes its mapping rows per tenant with
   row-level security and keeps its outbound watermark deliberately unscoped

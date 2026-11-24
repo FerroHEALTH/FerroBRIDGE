@@ -19,6 +19,7 @@
 //! an Athena download.
 #![doc(test(attr(deny(warnings))))]
 
+pub mod bound_cdr;
 pub mod conformance;
 pub mod containers;
 pub mod examples;

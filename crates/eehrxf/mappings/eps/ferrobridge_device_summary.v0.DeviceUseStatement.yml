@@ -1,0 +1,99 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM EVALUATION.device_summary.v0 to the
+# HL7 Europe Patient Summary 1.0.0-ballot deviceUseStatement-eu-eps profile,
+# the entry the patient summary's medical devices section takes: the status,
+# the device details' start and end dates as the timing period, the body site,
+# the description and the device-eu-eps Device of the device type. A current device is active and a previous one completed (no
+# specification governs the pairing: our own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: EVALUATION.device_summary.v0
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.device_summary.v0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/DeviceUseStatement
+
+mappings:
+  - name: "metaURL"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/eps/StructureDefinition/deviceUseStatement-eu-eps"
+
+  - name: "status"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+    manual:
+      - name: "current"
+        fhir:
+          - path: "status"
+            value: "active"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0004"
+      - name: "previous"
+        fhir:
+          - path: "status"
+            value: "completed"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0005"
+
+  - name: "timingStart"
+    with:
+      fhir: "$resource.timing.as(Period).start"
+      openehr: "$archetype/data[at0001]/items[at0022]/items[at0008]"
+
+  - name: "timingEnd"
+    with:
+      fhir: "$resource.timing.as(Period).end"
+      openehr: "$archetype/data[at0001]/items[at0022]/items[at0009]"
+
+  - name: "bodySite"
+    with:
+      fhir: "$resource.bodySite"
+      openehr: "$archetype/data[at0001]/items[at0022]/items[at0012]"
+
+  - name: "comment"
+    with:
+      fhir: "$resource.note.text"
+      openehr: "$archetype/data[at0001]/items[at0015]"
+
+  - name: "device"
+    with:
+      fhir: "$resource.device"
+      openehr: "$reference"
+    reference:
+      resourceType: "Device"
+      mappings:
+        - name: "deviceProfile"
+          unidirectional: "openEHR->fhir"
+          with:
+            fhir: "meta"
+          manual:
+            - name: "profileUrl"
+              fhir:
+                - path: "profile"
+                  value: "http://hl7.eu/fhir/eps/StructureDefinition/device-eu-eps"
+
+        - name: "deviceType"
+          with:
+            fhir: "type"
+            openehr: "data[at0001]/items[at0020]"
+

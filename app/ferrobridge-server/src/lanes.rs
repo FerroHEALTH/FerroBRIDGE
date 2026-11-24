@@ -96,6 +96,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         );
         state = state.with_access_log(Arc::new(log));
     }
+    state = start_links(settings, state)?;
     if let Some(operator) = settings.operator.as_ref() {
         let operator = build_operator(
             settings,
@@ -659,6 +660,15 @@ async fn build_facade(
         .context("checking the party contexts against [cdr] demographic")?;
     facade::programs::check_party_search(&programs, lane.party_search.as_ref())
         .context("checking [facade.party_search] against the party contexts")?;
+    let owned: Vec<&str> = [
+        (lane.app_state.is_some(), facade::app_state::BASIC),
+        (lane.launch_task.is_some(), facade::launch_task::TASK),
+    ]
+    .into_iter()
+    .filter_map(|(on, resource_type)| on.then_some(resource_type))
+    .collect();
+    facade::programs::check_owned(&programs, &owned)
+        .context("checking the contexts against [facade.app_state] and [facade.launch_task]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -677,6 +687,24 @@ async fn build_facade(
     let search = facade::search::load(directory, &programs).context("reading the searches")?;
     let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
         .with_context(|| format!("opening {}", lane.identity_store.display()))?;
+    let owned_store = |path: Option<&std::path::PathBuf>| {
+        path.map(|path| {
+            facade::owned::OwnedStore::open(path)
+                .map(Arc::new)
+                .with_context(|| format!("opening {}", path.display()))
+        })
+        .transpose()
+    };
+    let app_state = owned_store(lane.app_state.as_ref())?;
+    let launch_tasks = owned_store(lane.launch_task.as_ref())?;
+    let summary = match lane.summary.as_ref() {
+        Some(summary) => Some(
+            build_summary(summary, &programs, &client)
+                .await
+                .context("building the patient summary of [facade.summary]")?,
+        ),
+        None => None,
+    };
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
         .with_translator(
             Translator::new(terminology).with_display_fallback(settings.display_fallback),
@@ -689,9 +717,80 @@ async fn build_facade(
             .with_party_search(lane.party_search.clone())
             .with_binding_issuers(lane.binding_issuers.clone())
             .with_consent(lane.consent.clone())
+            .with_app_state(app_state)
+            .with_launch_tasks(launch_tasks)
+            .with_summary(summary)
             .with_cors(lane.cors.clone()),
         counts,
     ))
+}
+
+/// Builds the patient summary `summary` configures: the EPS project compiled
+/// against the patient summary template the CDR serves, over the profile
+/// packages read once at boot, so a template or a package set that cannot
+/// serve refuses the start.
+async fn build_summary(
+    summary: &config::SummarySettings,
+    programs: &facade::programs::Programs,
+    client: &cdr::CdrClient,
+) -> anyhow::Result<facade::summary::Summary> {
+    use anyhow::Context;
+
+    if programs.party(facade::summary::PATIENT).is_none() {
+        anyhow::bail!(
+            "the patient summary reads its patient through a Patient party context, and the mapping set loads none"
+        );
+    }
+    let id = facade::summary::Summary::template_id();
+    let template_id =
+        cdr::ids::template_id(id).with_context(|| format!("reading {id} as a template id"))?;
+    let template = match client
+        .template(&template_id)
+        .await
+        .with_context(|| format!("fetching the template {id}"))?
+    {
+        cdr::template::TemplateOutcome::Found(template) => template,
+        cdr::template::TemplateOutcome::UnknownTemplate => {
+            anyhow::bail!("the CDR holds no template {id}")
+        }
+        cdr::template::TemplateOutcome::BadRequest(upstream) => {
+            anyhow::bail!(
+                "the CDR refused the template {id} with {}",
+                upstream.status()
+            )
+        }
+    };
+    let paths = summary.packages.clone();
+    let packages =
+        tokio::task::spawn_blocking(move || ferrobridge_validator::set::PackageSet::load(paths))
+            .await
+            .context("reading the profile packages")?
+            .context("reading the profile packages of [facade.summary] packages")?;
+    facade::summary::Summary::new(&template, packages, summary.operator.clone())
+        .with_context(|| format!("compiling the patient summary project against {id}"))
+}
+
+/// Returns `state` serving the person's SMART Health Links when `[shl]` is
+/// on, with the sweep of its store started.
+fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState> {
+    use anyhow::Context;
+
+    let (Some(shl), Some(mounted)) = (settings.shl.as_ref(), state.facade()) else {
+        return Ok(state);
+    };
+    let links = crate::shl::Links::open(
+        shl.clone(),
+        Arc::clone(mounted),
+        state.access_log().cloned(),
+    )
+    .with_context(|| format!("opening the link store {}", shl.store.display()))?;
+    let links = Arc::new(links);
+    drop(links.spawn_sweeper());
+    tracing::info!(
+        lane = "shl",
+        "the person's SMART Health Links are served under /shl"
+    );
+    Ok(state.with_links(links))
 }
 
 /// Returns the names of the surfaces `[auth]` guards that run: the facade,

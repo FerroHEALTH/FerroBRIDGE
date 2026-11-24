@@ -39,6 +39,7 @@ for `spec.version`. The service base is `/fhir`.
 | `POST /fhir/{type}/_search` | The same search, its parameters in a form body |
 | `POST /fhir/{type}/$validate` | The dry run that commits nothing |
 | `GET /fhir/Composition/{id}/$document` | The document Bundle of one Composition; also `GET /fhir/Composition/$document?id={id}` |
+| `GET /fhir/Patient/{id}/$summary` | The patient summary of one patient, an IPS 2.0.1 document, with `[facade.summary]` on ([Patient summary](#patientsummary-writes-the-patient-summary)) |
 | `GET /fhir/{type}/{id}` | Read one resource back out of its composition |
 | `GET /fhir/{type}/{id}/_history/{vid}` | Vread: read the version a write's `Location` named |
 | `PUT /fhir/{type}/{id}` | Update, with `If-Match` |
@@ -46,6 +47,8 @@ for `spec.version`. The service base is `/fhir`.
 | `GET /fhir/{type}/{id}/_history` | The history of a party resource |
 | `DELETE /fhir/{type}/{id}` | Delete a party resource |
 | `GET /fhir/.well-known/smart-configuration` | The SMART discovery document, with `[auth]` on |
+| `POST`, `PUT`, `DELETE` and `GET /fhir/Basic` | SMART App State, with `[facade.app_state]` on ([SMART App State](#smart-app-state)) |
+| `POST` and `GET /fhir/Task`, `GET /fhir/Task/{id}` | SMART launch `Task`s, with `[facade.launch_task]` on ([SMART launch Tasks](#smart-launch-tasks)) |
 
 A type no loaded program maps is absent from the `CapabilityStatement` and
 answers `404` with a `not-supported` `OperationOutcome` on the wire. A search on a type no search
@@ -56,7 +59,8 @@ page it did not ask for.
 The `CapabilityStatement` names exactly the resource types the loaded programs
 map, with `create`, `read`, `vread` and `update` per type, `transaction` and
 `batch` at system level, the `$validate` operation, `$document` on
-`Composition`, `updateCreate: false`,
+`Composition`, `$summary` on `Patient` with `[facade.summary]` on,
+`updateCreate: false`,
 `conditionalCreate` true, `conditionalUpdate` false (no `PUT [type]?[search]`
 is served; `If-Match` on an update is the version-aware update),
 `versioning: versioned-update` and `readHistory: true` per type, and
@@ -81,7 +85,9 @@ endpoints, for clients that discover SMART through the statement (see
 
 With [`[auth]`](../operate/configuration.md#auth) on, the default, the facade
 is a SMART App Launch 2.x resource server for the authorization servers the
-deployment trusts, each fixed by its issuer, and the audiences it configures.
+deployment trusts, each a named `[auth.issuer.<name>]` table fixed by its
+issuer. A token is for the facade when its `aud` names `[facade] base_url`, or
+one of the audiences the issuer table lists in its place.
 The check is `ferrohealth-smart`'s, the resource server every FerroHEALTH
 product runs. **With `[auth]` off, the
 facade authenticates nobody and serves every request it receives.**
@@ -92,28 +98,35 @@ or the Basic credential of a user `[[auth.basic.users]]` lists, except `GET /fhi
 `/.well-known/smart-configuration`), which a client reads before it holds a
 token. The health routes stay open too. The token is a JWT signed by a key
 in the issuer's key set, with an `iss` equal to the issuer, an `aud` naming
-the audience, and an `exp`, `nbf` and `iat` that hold within the configured
-clock skew. Under the default `rfc9068` profile it also carries `typ: at+jwt`,
-`sub`, `client_id`, `iat` and `jti` (RFC 9068). The issuer's `kind` and
-profile decide who the caller is: a person through one of the deployment's
-own clients, a patient, a machine's client credentials token, or another
-party's person on a `federation` issuer. A Basic credential is always a
-person's; a machine never authenticates with one.
+the facade, and an `exp`, `nbf` and `iat` that hold within the configured
+clock skew. It also carries `typ: at+jwt` or `application/at+jwt`, `sub`,
+`client_id`, `iat`, `jti` and `scope` (RFC 9068). The authorization server's
+client registry decides which clients reach the facade, and the token's
+standard claims decide who the caller is: a machine's client credentials
+token, whose `sub` is its `client_id`, a user named by the type of their
+`fhirUser` with an actor named by `act`, or another party's person on a
+`federation` issuer. A Basic credential is always a user's; a machine never
+authenticates with one.
 
 | Answer | When | `WWW-Authenticate` |
 |---|---|---|
 | `401` | No credential, or one in a scheme the server does not admit | `Bearer`, and a `Basic realm="", charset="UTF-8"` challenge beside it when Basic users are configured |
 | `400` | Two credentials, or an `Authorization` value that is no credential | `Bearer error="invalid_request"` |
-| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience, and a valid token that names no caller its issuer's kind admits | `Bearer error="invalid_token"` |
+| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience, and a valid token whose claims name no caller | `Bearer error="invalid_token", error_description="<reason>"` |
 | `401` | A Basic credential that does not hold, whatever the reason | `Basic realm="", charset="UTF-8"` |
-| `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope"` |
+| `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope", error_description="scope-not-granted"` |
 | `403` | Any request to a route under `/fhir` the guard does not classify, before the token is read | none |
 | `503` | A token naming a key the server cannot fetch because the key set does not answer | none |
 
 Each refusal carries an `OperationOutcome`, `login` for a `401`, `invalid` for
 a `400` and `forbidden` for a `403`. A configured `realm` is named on every
-challenge. Neither names the claim that failed or the scope
-that was missing.
+challenge. A `Bearer` challenge with an error code carries the stable reason
+code of the check that refused the token as its `error_description` (RFC 6750
+§3), such as `expired`, `audience-mismatch`, `issuer-unknown`,
+`signature-invalid` or `scope-not-granted`; the `ferrohealth-smart` book lists
+every code. The bridge logs the code with the token's issuer, client and key
+id, never the token. Neither the challenge nor the body names the claim that
+failed or the scope that was missing.
 
 The guard classifies every route it admits by name: the interactions in the
 table below, the two FHIRconnect operations and their direct forms, the
@@ -147,10 +160,11 @@ out of order, an unknown resource type, or a `?` search constraint grants
 nothing; the facade does not evaluate the constraint, so it does not grant
 more than the scope says. A `user/` scope reaches every resource of its type,
 because the facade has no per-user access model of its own, and so does a
-`system/` scope. A token with no clinical scope at all gets system-wide
-access only when its `sub` is in `scopeless_subjects`.
+`system/` scope. A token with no clinical scope reaches nothing.
 
-A `patient/` scope reaches only the patient in the token's `patient` claim.
+A `patient/` scope reaches only the patient in the token's `patient` claim,
+the launch context the authorization server sets (SMART App Launch 2.2.0,
+Scopes and Launch Context, `launch/patient`).
 The facade reads a patient's data as the EHR it resolves for the subject
 `Patient/<id>`: a create or update must name `subject` (or `patient`) as
 the literal reference `Patient/<id>`, and a read reaches a resource only
@@ -386,23 +400,30 @@ feeder "different from the originating system". A source resource that carries n
 recorded as unknown, never given one. So a reader of the CDR can tell which
 FHIR resource a composition came from without asking the bridge.
 
-Each version also names who asked for it. The committer the facade states
-in `AUDIT_DETAILS` is the caller the request authenticated: the token's
-`sub`, or the Basic user-id, with a reference into the namespace of the
-issuer that vouched for it. `system_id` keeps naming the bridge. A write no
-caller made, such as an HL7 v2 message or a request while `[auth]` is off,
-commits under the bridge's name. Reads reach the CDR under the bridge's own
-credential, so the CDR's access log names the bridge for them.
+The CDR writes who committed each version, from the credential it
+authenticated. A single write states the change type and `system_id`, which
+names the bridge, in `openehr-audit-details`, and no committer: ITS-REST
+1.1.0 leaves every member of the header optional, and a CDR that writes the
+committer itself refuses one that says more than its own. A transaction's
+CONTRIBUTION must carry a committer in its `audit` and in every version's
+`commit_audit`, so there the facade names the party the CDR authenticated,
+and nothing more:
 
-Under [`[cdr.endpoint.credentials.onward]`](../operate/configuration.md#cdrendpointcredentialsonward)
-the request reaches the CDR under the token the caller's was exchanged for,
-and the CDR derives the committer from that token. A single write then sends
-no `openehr-audit-details` header, which ITS-REST 1.1.0 leaves optional. A
-transaction's CONTRIBUTION must carry a committer in its `audit` and in every
-version's `commit_audit`, so there the facade sends the placeholder the CDR
-discards: `{"_type": "PARTY_IDENTIFIED", "identifiers": [{"_type":
-"DV_IDENTIFIER", "issuer": "<token iss>", "id": "<token sub>"}]}`, read from
-the exchanged token. The facade sends no attestation.
+- under the bridge's own client credentials grant, a `PARTY_IDENTIFIED`
+  named by its client id;
+- as a Basic user with [`[cdr] committer_issuer`](../operate/configuration.md#cdr)
+  set, the placeholder `{"_type": "PARTY_IDENTIFIED", "identifiers":
+  [{"_type": "DV_IDENTIFIER", "issuer": "<committer_issuer>", "id":
+  "<user>"}]}`;
+- under [`[cdr.endpoint.credentials.onward]`](../operate/configuration.md#cdrendpointcredentialsonward),
+  where the request reaches the CDR under the token the caller's was
+  exchanged for, the same placeholder with the exchanged token's `iss` and
+  `sub`;
+- otherwise, a `PARTY_IDENTIFIED` named by `system_id`.
+
+The caller the facade authenticated is recorded in the bridge's own
+[access record](../operate/access-record.md), and a machine caller as the
+originating system above. The facade sends no attestation.
 
 ## Writes
 
@@ -714,6 +735,82 @@ refused with the element named. The routes, the id and the extension set
 are FerroBRIDGE's own design: no specification defines a FHIR operation for
 BPPC or APPC, or how a `Consent` maps onto openEHR access directives.
 
+## SMART App State
+
+With `[facade.app_state]` on, `Basic` at the facade's base is the SMART App
+State endpoint of SMART App Launch 2.2.0, Persisting App State: an app keeps
+a small amount of its own state at the EHR, such as display preferences or
+the keys to an external data set. The CDR holds no `Basic`, so the facade
+keeps these resources in a store of its own, apart from the identity map. The
+discovery document lists `smart-app-state`, and the `CapabilityStatement`
+instantiates `smart-app-state-server` and lists `Basic` with the
+`smart-app-state-basic` profile.
+
+| Interaction | Route | Answer |
+|---|---|---|
+| create | `POST [base]/Basic` | `201` with `Location`, `ETag: W/"1"` and the resource with its `id` and `meta.versionId` |
+| update | `PUT [base]/Basic/{id}` with `If-Match` | `200` with the next `ETag` |
+| delete | `DELETE [base]/Basic/{id}` with `If-Match` | `204` |
+| search | `GET [base]/Basic?code={system}\|{code}&subject={reference}` | a `searchset` of the matching state |
+| search, global | `GET [base]/Basic?code={system}\|{code}&subject:missing=true` | a `searchset` of the state with no subject |
+
+The facade refuses with `400` a body that breaks the profile or the page's
+rules: an `id` or `meta.versionId` on a create, a `Basic.code` with other than
+exactly one coding naming a system and a code, an extension with a value other
+than `valueString` or with nested extensions, a modifier extension, and a
+subject that is no absolute reference under the facade's base to a `Patient`,
+`Practitioner`, `PractitionerRole`, `RelatedPerson` or `Person`. A body over
+256 KiB is a `413`. An update or a delete without `If-Match`, with a stale
+version, for an id already deleted, or an update that changes `subject` or
+`code`, is a `412`; an id never issued is a `404`. A search takes `code`
+once, as `system|code`, and `subject` or `subject:missing` once; another
+parameter is a `400`.
+
+Under the guard every App State request needs a token, and the facade decides
+the `Basic` permission against the state itself: `c` to create, `u` to update,
+`d` to delete, `s` to search. A granular scope counts when it names only
+`code` with this state's `system|code`, so
+`patient/Basic.cuds?code=https://myapp.example.org|encrypted-phr-access-keys`
+reaches that one state code. A `patient/` scope reaches only state whose
+subject is `[base]/Patient/{patient}` of the launch context, and never global
+state; a `user/` or `system/` scope reaches every subject and global state. A
+search with no subject answers the state the token reaches. The store and
+these access rules are FerroBRIDGE's own design within the page's
+§Security and Access controls.
+
+## SMART launch Tasks
+
+With `[facade.launch_task]` on, `Task` at the facade's base serves the two
+launch profiles of SMART App Launch 2.2.0, Task profile for requesting a SMART
+launch: `task-ehr-launch` asks the EHR to launch an app with an optional
+`appContext`, and `task-standalone-launch` asks for a standalone launch. An
+EHR viewer lists the `Task`s for the patient in view and acts on one; for an
+EHR launch it registers the launch at the authorization server's launch API
+with the `Task`'s `for`, `encounter` and `appContext`. The CDR holds no
+`Task`, so the facade keeps them in a store of its own.
+
+| Interaction | Route | Answer |
+|---|---|---|
+| create | `POST [base]/Task` | `201` with `Location`, `ETag: W/"1"` and the `Task` under a new id |
+| read | `GET [base]/Task/{id}` | the `Task` |
+| search | `GET [base]/Task?patient=…&status=…&code=…` | a `searchset` of the matching `Task`s |
+
+A `Task` conforms to one profile or is refused with `422` naming the element:
+`Task.code` carries `launch-app-ehr` or `launch-app-standalone` of
+`http://hl7.org/fhir/smart-app-launch/CodeSystem/smart-codes`, exactly one
+input of type `smartonfhir-application` carries the app's URL as `valueUrl`,
+and at most one input of type `smartonfhir-appcontext` carries a
+`valueString`; other inputs stand. A body that is no R4 `Task`, or carries a
+modifier extension, is a `400`, and the `id` a create carries is ignored, as
+FHIR R4 `http.html` says. `patient` takes `Patient/{id}`, a bare id, or an
+absolute reference, matched against `Task.for` with this server's base taken
+as relative; `status` and `code` are tokens; each takes a comma-separated
+list, and another parameter is a `400`. The `CapabilityStatement` lists `Task`
+with both profiles. Under the guard each interaction needs its `Task`
+permission, and a `patient/` scope reaches only the `Task`s whose `for` is the
+patient of its launch context. The store and these rules are FerroBRIDGE's own
+design.
+
 ## `Composition/$document` assembles a document
 
 FHIR R4 defines `Composition/$document`
@@ -736,6 +833,47 @@ is honoured. A Composition named by the URL of another server is refused the
 same way. The operation is declared on `Composition` in the
 `CapabilityStatement`. The R4 `OperationDefinition` describes the document as
 wrapped inside a search Bundle; the facade answers the document Bundle itself.
+
+## `Patient/$summary` writes the patient summary
+
+With `[facade.summary]` on, `GET /fhir/Patient/{id}/$summary` answers the
+IPS operation (HL7 IPS 2.0.1, `OperationDefinition/summary`): a `document`
+Bundle generated on demand from the latest information the CDR holds.
+
+- The patient is the party the loaded `Patient` party context renders, so
+  its identifiers, name, date of birth and sex come from the CDR's
+  demographic `PERSON`.
+- The record is every patient summary composition of the patient's EHR
+  (the `eehrxf` template `openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0`),
+  each mapped by the `eehrxf` EPS project. A code in no preferred system of
+  the eHealth Network Guidelines on Patient Summary is asked of the
+  terminology server's `ConceptMap/$translate`, and every `equivalent` or
+  `equal` match is added beside the recorded code.
+- The project feeds the problems, the allergies and intolerances, the
+  medication summary, the history of procedures, the medical devices and the
+  immunisations, which covers every section either form requires. A section
+  the project feeds and the record holds nothing for carries the empty
+  reason `nilknown`. A required section no openEHR content feeds would carry
+  `unavailable`, with a narrative saying this server does not supply it. A
+  patient with no EHR has an empty record.
+- `profile` selects the `Composition` profile: the IPS
+  `Composition-uv-ips` (2.0.1) by default, or the HL7 Europe Patient Summary
+  `composition-eu-eps` (1.0.0-ballot). Any other profile, and the
+  `identifier` input, answer `400` with `not-supported`.
+- Before it is served, the document is validated in process against the
+  `Bundle` profile of its form over the packages `[facade.summary] packages`
+  names. A document that breaks it answers `422` with the validator's
+  issues and is never served.
+- The CDR is read as the caller: under `[cdr.endpoint.credentials.onward]`
+  a patient's token is exchanged for the CDR's own (a `patients` issuer,
+  FerroSMART in a FerroHEALTH deployment: [Running behind FerroSMART](../operate/behind-ferrosmart.md#the-patient-summary-reads-ferroehr-as-the-patient)),
+  so the CDR applies the patient's own access rules. A `patient/` token
+  launched for another patient answers `404`, and the CDR is never asked.
+  Each access writes one access record that names the caller and the
+  patient's EHR.
+
+The read path, the empty reasons, the `404` for another patient and the
+refusal of an invalid document are FerroBRIDGE's own design.
 
 ## `$validate` is a dry run of this server
 

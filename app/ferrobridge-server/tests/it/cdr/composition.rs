@@ -72,7 +72,6 @@ async fn create_composition_sends_the_three_commit_headers() -> Result<(), Box<d
         vec![
             "change_type.code_string=\"251\"".to_owned(),
             "description.value=\"A synthetic commit\"".to_owned(),
-            "committer.name=\"Synthetic Committer\",committer.external_ref.id=\"bc8132ea-0000-4000-8000-000000000003\",committer.external_ref.namespace=\"demographic\",committer.external_ref.type=\"PERSON\"".to_owned(),
         ],
         support::request_header(&server, 0, "openehr-audit-details").await?
     );

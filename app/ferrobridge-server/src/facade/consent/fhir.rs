@@ -106,10 +106,8 @@ pub async fn create(
         },
     )
     .map_err(|why| refuse(&of_document_refusal(&why)))?;
-    let Committed { added, ids } = commit(
-        facade, &client, access, &reached, &current, directives, settings,
-    )
-    .await?;
+    let Committed { added, ids } =
+        commit(facade, &client, &reached, &current, directives, settings).await?;
     let base = facade.settings().base_url.trim_end_matches('/');
     let location = ids
         .first()

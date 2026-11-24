@@ -17,9 +17,10 @@ use crate::smart::SmartSettings;
 /// Returns the resource server settings `auth` describes, `None` when it is
 /// off.
 ///
-/// `ferrohealth-smart` checks the section: every `[[auth.issuer]]` with its
-/// `kind`, its audience, its asymmetric algorithms and its profile, the
-/// removed section-level keys and the flat `issuer` form, every Basic user,
+/// `ferrohealth-smart` checks the section: every `[auth.issuer.<name>]` with
+/// its audience (`base_url`, the facade's base, when the table names none),
+/// its asymmetric algorithms, its profile keys, a `federation` table, and
+/// every name another key gives an issuer, every Basic user,
 /// every capability against SMART App Launch 2.2.0, Conformance,
 /// §Capabilities, every listed scope, and the product scope in an extension
 /// form of Scopes and Launch Context, §Extensibility. The product scope is
@@ -35,9 +36,10 @@ use crate::smart::SmartSettings;
 pub(super) fn resolve_auth(
     auth: &AuthSection,
     grants: &BasicGrants,
+    base_url: &str,
 ) -> Result<Option<SmartSettings>, Error> {
     let resolved = auth
-        .resolve_with_tls(&ferrohealth_smart::config::ServerTls)
+        .resolve_with_tls(&ferrohealth_smart::config::ServerTls, &[base_url])
         .map_err(|source| Error::Auth {
             source: Box::new(source),
         })?;

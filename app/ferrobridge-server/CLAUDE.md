@@ -87,7 +87,11 @@ the real run path; a binary-only crate cannot be imported from `tests/`
   holds identity and nothing else. A cache of resource content, a local copy of
   a composition, or a column with a mapped value in the identity store all
   break the premise, and a test greps the store file for a mapped marker to
-  prove it stays out.
+  prove it stays out. The one exception is what the CDR has no home for:
+  SMART App State (`facade::app_state`) and SMART launch `Task`s
+  (`facade::launch_task`) live in their own `facade::owned` stores behind
+  `[facade.app_state]` and `[facade.launch_task]`, never in the identity
+  store.
 - **Two error vocabularies never mix.** The CDR speaks `{error, message,
   validationErrors}` and the wire speaks `OperationOutcome`. Everything the
   facade authors is an `OperationOutcome` with an `issue.code` from the R4

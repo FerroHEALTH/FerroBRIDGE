@@ -25,6 +25,10 @@ context:
   archetypes:
     - "COMPOSITION.health_summary.v1.Composition"
   contexts:
+    - "ferrobridge_eu_eps_problems.context"
+    - "ferrobridge_eu_eps_allergies.context"
     - "ferrobridge_eu_eps_medication.context"
+    - "ferrobridge_eu_eps_procedures.context"
+    - "ferrobridge_eu_eps_devices.context"
     - "ferrobridge_eu_eps_immunization.context"
   start: "COMPOSITION.health_summary.v1.Composition"

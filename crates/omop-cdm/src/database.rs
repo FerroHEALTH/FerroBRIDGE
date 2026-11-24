@@ -12,6 +12,7 @@
 //!
 //! No specification governs this: our own design.
 
+use crate::connection::{SERVER_VERSION_QUERY, UnsupportedServer, supported};
 use crate::ddl::{self, SchemaName};
 use crate::generated;
 use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
@@ -26,20 +27,38 @@ pub struct CdmPool {
     schema: SchemaName,
 }
 
-/// The pool could not reach the database.
+/// The pool could not reach the database, or the database runs a
+/// PostgreSQL the clients do not support.
 #[derive(Debug, thiserror::Error)]
-#[error("cannot connect to the CDM database for schema {schema}")]
-pub struct ConnectError {
-    schema: SchemaName,
-    #[source]
-    source: sqlx::Error,
+pub enum ConnectError {
+    /// The first connection could not be opened, or its version not read.
+    #[error("cannot connect to the CDM database for schema {schema}")]
+    Unreachable {
+        /// The schema the pool was being opened for.
+        schema: SchemaName,
+        /// The database's own error.
+        #[source]
+        source: sqlx::Error,
+    },
+    /// The database runs a PostgreSQL older than
+    /// [`MINIMUM_SERVER_VERSION`](crate::connection::MINIMUM_SERVER_VERSION).
+    #[error("the CDM database for schema {schema} runs an unsupported PostgreSQL")]
+    UnsupportedServer {
+        /// The schema the pool was being opened for.
+        schema: SchemaName,
+        /// The version found and the version required.
+        #[source]
+        source: UnsupportedServer,
+    },
 }
 
 impl ConnectError {
     /// Returns the schema the pool was being opened for.
     #[must_use]
     pub fn schema(&self) -> &SchemaName {
-        &self.schema
+        match self {
+            Self::Unreachable { schema, .. } | Self::UnsupportedServer { schema, .. } => schema,
+        }
     }
 }
 
@@ -47,13 +66,17 @@ impl CdmPool {
     /// Opens a pool on `options` whose connections search only `schema`.
     ///
     /// `pool` carries the caller's sizing and timeouts. The pool opens one
-    /// connection before it returns, so an unreachable database or a refused
-    /// login is reported here.
+    /// connection before it returns and reads the server's version on it, so
+    /// an unreachable database, a refused login or a PostgreSQL older than
+    /// [`MINIMUM_SERVER_VERSION`](crate::connection::MINIMUM_SERVER_VERSION)
+    /// is reported here.
     ///
     /// # Errors
     ///
-    /// Returns [`ConnectError`] with the database's own error as its source
-    /// when the first connection cannot be opened.
+    /// Returns [`ConnectError::Unreachable`] with the database's own error as
+    /// its source when the first connection cannot be opened or the version
+    /// cannot be read, and [`ConnectError::UnsupportedServer`] for an older
+    /// PostgreSQL.
     pub async fn connect(
         pool: PgPoolOptions,
         options: PgConnectOptions,
@@ -62,10 +85,21 @@ impl CdmPool {
         // NOTE: PostgreSQL docs, 5.10.3 "The Schema Search Path": an unqualified
         // name resolves against search_path, and pg_catalog is searched first.
         let options = options.options([("search_path", schema.as_str())]);
-        match pool.connect_with(options).await {
-            Ok(pool) => Ok(Self { pool, schema }),
-            Err(source) => Err(ConnectError { schema, source }),
+        let pool = match pool.connect_with(options).await {
+            Ok(pool) => pool,
+            Err(source) => return Err(ConnectError::Unreachable { schema, source }),
+        };
+        let found: i32 = match sqlx::query_scalar(SERVER_VERSION_QUERY)
+            .fetch_one(&pool)
+            .await
+        {
+            Ok(found) => found,
+            Err(source) => return Err(ConnectError::Unreachable { schema, source }),
+        };
+        if let Err(source) = supported(found) {
+            return Err(ConnectError::UnsupportedServer { schema, source });
         }
+        Ok(Self { pool, schema })
     }
 
     /// Returns the pool.

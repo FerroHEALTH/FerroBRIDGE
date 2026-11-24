@@ -146,7 +146,7 @@ fn a_basic_caller_is_audited_as_a_person_never_a_system() -> Result<(), Box<dyn 
     let line = &lines[0];
     assert_eq!(Some(USER), line["principal"].as_str(), "{line}");
     assert_eq!(Some("basic"), line["via"].as_str(), "{line}");
-    assert_eq!(Some("person"), line["kind"].as_str(), "{line}");
+    assert_eq!(Some("user"), line["kind"].as_str(), "{line}");
     // NOTE: GHSA-jhg2-jwjp-hq74, a Basic user granted a `system/` scope never
     // reaches the facade: the store refuses it, naming the user and the scope.
     for (scopes, refused) in [

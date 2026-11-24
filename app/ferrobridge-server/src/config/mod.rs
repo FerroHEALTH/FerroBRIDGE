@@ -25,6 +25,7 @@ pub mod hl7v2;
 mod omop_incremental;
 mod resolve;
 pub mod section;
+mod shl;
 
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_config::provenance::Provenance;
@@ -66,6 +67,7 @@ use section::events::Events;
 use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
 use section::omop_incremental::OmopIncremental;
+use section::shl::Shl;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
 /// `[server] listen`, and `FERROBRIDGE_CONFIG` names the file.
@@ -149,6 +151,8 @@ pub struct Config {
     /// The access records of the facade and the HL7 v2 face, off until its
     /// section turns it on.
     pub audit: Audit,
+    /// The person's SMART Health Links, off until its section turns it on.
+    pub shl: Shl,
     /// Where each key came from, which the load records and no file states.
     #[serde(skip)]
     provenance: Provenance,
@@ -329,7 +333,7 @@ impl Config {
                 None
             },
             auth: if serves && self.guards_a_surface() {
-                auth::resolve_auth(&self.auth, &self.basic_grants)?
+                auth::resolve_auth(&self.auth, &self.basic_grants, &self.facade.base_url)?
             } else {
                 None
             },
@@ -354,6 +358,7 @@ impl Config {
             },
             omop_incremental: omop_incremental::resolve(self)?,
             fhir_outbound: fhir_outbound::resolve(self)?,
+            shl: shl::resolve(self)?,
             hl7v2: if self.hl7v2.enabled {
                 Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
             } else {
@@ -410,8 +415,25 @@ pub struct FacadeSettings {
     pub binding_issuers: Vec<String>,
     /// The access directive exchange, when `Consent` is served.
     pub consent: Option<crate::consent::exchange::Settings>,
+    /// The file SMART App State is kept in, when `Basic` is the App State
+    /// endpoint.
+    pub app_state: Option<PathBuf>,
+    /// The file the SMART launch `Task`s are kept in, when `Task` is the launch
+    /// endpoint.
+    pub launch_task: Option<PathBuf>,
     /// The CORS policy of the FHIR base.
     pub cors: crate::facade::cors::Cors,
+    /// The patient summary, when `Patient/[id]/$summary` is served.
+    pub summary: Option<SummarySettings>,
+}
+
+/// The patient summary, resolved.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SummarySettings {
+    /// The FHIR packages each document is validated over.
+    pub packages: Vec<PathBuf>,
+    /// The name of the organisation that operates this server.
+    pub operator: String,
 }
 
 /// The HL7 v2 face, resolved.
@@ -495,6 +517,8 @@ pub struct Settings {
     pub omop_incremental: Option<OmopIncrementalSettings>,
     /// The outbound FHIR lane, when it is on.
     pub fhir_outbound: Option<crate::outbound::Settings>,
+    /// The person's SMART Health Links, when they are served.
+    pub shl: Option<crate::shl::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.

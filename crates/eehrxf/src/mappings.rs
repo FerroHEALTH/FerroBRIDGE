@@ -303,11 +303,19 @@ pub const LABORATORY: Project = Project {
 /// `composition-eu-eps` and enters each section of the template through the
 /// sub-context its section path names (FHIRconnect 1.0.0,
 /// `types-of-mapping-files/sub-contexts.adoc`):
-/// `ferrobridge_eu_eps_medication.context` maps each medication order and
-/// each medication action of the medication summary section to a
-/// `MedicationStatement-eu-eps`, and
-/// `ferrobridge_eu_eps_immunization.context` maps each medication action of
-/// the immunisations section to an `immunization-eu-core`. The section path
+/// `ferrobridge_eu_eps_problems.context` maps each problem or diagnosis of
+/// the problem list to a `condition-eu-core`,
+/// `ferrobridge_eu_eps_allergies.context` each adverse reaction risk of the
+/// allergies and intolerances to an `allergyIntolerance-eu-core`,
+/// `ferrobridge_eu_eps_medication.context` each medication order and each
+/// medication action of the medication summary section to a
+/// `MedicationStatement-eu-eps`, `ferrobridge_eu_eps_procedures.context`
+/// each procedure of the history of procedures to a `procedure-eu-eps`,
+/// `ferrobridge_eu_eps_devices.context` each medical device summary of the
+/// medical devices to a `deviceUseStatement-eu-eps` naming a
+/// `device-eu-eps`, and
+/// `ferrobridge_eu_eps_immunization.context` each medication action of the
+/// immunisations section to an `immunization-eu-core`. The section path
 /// is the placement criterion, so one archetype held in two sections is
 /// placed by the section that holds it. A document takes the run with
 /// [`crate::document::Document::with_mapped_composition`].
@@ -330,6 +338,24 @@ pub const EPS: Project = Project {
         shipped!("eps", "ferrobridge_section_immunisation_list.v0.yml"),
         shipped!("eps", "ferrobridge_eu_eps_immunization_section.yml"),
         shipped!("eps", "ferrobridge_medication.v1.Immunization.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_problems.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_problems_section.yml"),
+        shipped!("eps", "ferrobridge_problem_diagnosis.v1.Condition.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_allergies.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_allergies_section.yml"),
+        shipped!(
+            "eps",
+            "ferrobridge_adverse_reaction_risk.v2.AllergyIntolerance.yml"
+        ),
+        shipped!("eps", "ferrobridge_eu_eps_procedures.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_procedures_section.yml"),
+        shipped!("eps", "ferrobridge_procedure.v1.Procedure.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_devices.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_devices_section.yml"),
+        shipped!(
+            "eps",
+            "ferrobridge_device_summary.v0.DeviceUseStatement.yml"
+        ),
     ],
     accounted: &[],
     followed: &[],

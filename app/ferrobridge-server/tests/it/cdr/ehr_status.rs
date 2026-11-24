@@ -158,7 +158,7 @@ async fn the_update_sends_if_match_and_the_commit_headers() -> Result<(), Box<dy
         !support::request_header(&server, 0, "openehr-audit-details")
             .await?
             .is_empty(),
-        "the update states its committer"
+        "the update states its audit"
     );
     Ok(())
 }

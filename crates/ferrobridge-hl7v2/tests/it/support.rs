@@ -149,11 +149,7 @@ impl Tables {
     /// Mounts the stub on a new server and returns a client of it.
     pub(crate) async fn serve(&self) -> (MockServer, Client) {
         let server = MockServer::start().await;
-        Mock::given(wiremock::matchers::method("POST"))
-            .and(wiremock::matchers::path("/r4/ConceptMap/$translate"))
-            .respond_with(self.clone())
-            .mount(&server)
-            .await;
+        mount_translate(&server, self.clone()).await;
         let base = format!("{}/r4", server.uri()).parse().expect("a base url");
         let config = Config::new(base, WireVersion::R4)
             .with_timeout(Duration::from_secs(5))
@@ -169,7 +165,14 @@ impl Tables {
 
 impl Respond for Tables {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
+        answer_each(request, |body| self.reply(body))
+    }
+}
+
+impl Tables {
+    /// Returns the `Parameters` answering the `$translate` `Parameters` `body`,
+    /// and records the question.
+    pub(crate) fn reply(&self, body: &serde_json::Value) -> serde_json::Value {
         let parameter = |name: &str, kind: &str| {
             body["parameter"]
                 .as_array()
@@ -189,9 +192,46 @@ impl Respond for Tables {
             .push(key.clone());
         match self.answers.get(&key) {
             Some((system, code, display)) => {
-                terminology::translate("equivalent", system, code, display)
+                terminology::parameters_resource(&terminology::translate_body(&[(
+                    "equivalent",
+                    system.as_str(),
+                    code.as_str(),
+                    display.as_str(),
+                )]))
             }
-            None => terminology::translate_no_match("no mapping for the code"),
+            None => no_match("no mapping for the code"),
         }
     }
+}
+
+/// Mounts `stub` on `server` for `ConceptMap/$translate` and for a `batch`
+/// at the R4 base.
+pub(crate) async fn mount_translate<R: Respond + Clone + 'static>(server: &MockServer, stub: R) {
+    Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path("/r4/ConceptMap/$translate"))
+        .respond_with(stub.clone())
+        .mount(server)
+        .await;
+    Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path("/r4"))
+        .respond_with(stub)
+        .mount(server)
+        .await;
+}
+
+/// Answers `request`, a `$translate` or a `batch` of them, with `answer`
+/// for each `Parameters`.
+pub(crate) fn answer_each(
+    request: &Request,
+    answer: impl Fn(&serde_json::Value) -> serde_json::Value,
+) -> ResponseTemplate {
+    terminology::each_parameters(request, |body| (200, answer(body)))
+}
+
+/// The `$translate` `Parameters` of no match, with `message`.
+pub(crate) fn no_match(message: &str) -> serde_json::Value {
+    terminology::parameters_resource(&[
+        serde_json::json!({"name": "result", "valueBoolean": false}),
+        serde_json::json!({"name": "message", "valueString": message}),
+    ])
 }

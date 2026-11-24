@@ -9,7 +9,7 @@ members = ["crates/*", "app/*", "tools/*"]
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.0.27"
+version = "0.0.28"
 edition = "2024"
 rust-version = "1.98"
 license = "BUSL-1.1"
@@ -84,13 +84,13 @@ generated-tree = { path = "tools/generated-tree" }
 # Published from this workspace and consumed by the published
 # ferrobridge-hl7v2, so the requirement carries both a path and a version.
 # Each member names the FHIR releases it compiles the client for (#1737).
-ferrobridge-term = { path = "crates/ferrobridge-term", version = "=0.13.0", default-features = false }
+ferrobridge-term = { path = "crates/ferrobridge-term", version = "=0.18.0", default-features = false }
 # Published from this workspace and consumed by the published
 # ferrobridge-validator, so the requirement carries both a path and a version.
-ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "=0.1.136" }
+ferrobridge-fhirpath = { path = "crates/ferrobridge-fhirpath", version = "=0.1.137" }
 # Published from this workspace and consumed by the published eehrxf, so the
 # requirement carries both a path and a version.
-ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "=0.13.0" }
+ferrobridge-validator = { path = "crates/ferrobridge-validator", version = "=0.18.0" }
 # The FHIR R4 search value grammar, published from this workspace for the
 # facade and the family's FHIR servers, so the requirement carries both a path
 # and a version.
@@ -98,12 +98,15 @@ fhir-search = { path = "crates/fhir-search", version = "=0.1.131" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
-ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "=0.21.0" }
+ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "=0.26.0" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version. Its `mapping` feature is off here: each consumer of the
 # language names it, and ferrobridge-hl7v2 takes the FHIR path model alone.
-fhirconnect = { path = "crates/fhirconnect", version = "=0.7.0", default-features = false }
+fhirconnect = { path = "crates/fhirconnect", version = "=0.7.2", default-features = false }
+# The European interoperability component: the server's `Patient/$summary`
+# is its one in-process consumer, so the requirement is path-only.
+eehrxf = { path = "crates/eehrxf" }
 # The OMOCL language crate: the ETL runner is its one in-process consumer, so
 # the requirement is path-only too.
 omocl = { path = "crates/omocl" }
@@ -134,21 +137,18 @@ openehr-term = "0.3.0"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }
 backon = "1.6.0"
 # The FerroHEALTH family's SMART App Launch and OAuth 2.0 resource-server
-# crate: the token check of the facade and the operator API, the scopes, the
-# audit line, and the client credentials token of the CDR and terminology
-# lanes, and the RFC 7662 introspection check of an `[[auth.issuer]]` with `mode =
-# "introspection"`. A caret requirement, as a shared crate takes another (owner
-# decision, 2026-10-26), with 0.28.0 as the floor, which holds the issuer of
-# every configuration table with its userinfo masked: it classifies every caller by
-# its issuer's `kind`, holds a Basic credential to a person, carries the
-# onward grants (RFC 8693, RFC 7523) the facade reaches the CDR under its
-# caller with, and reads a Keycloak 26.8 impersonation as issued. `fetch`
-# reads each issuer's metadata and key set and runs the client credentials
-# token client, the onward client and the introspector.
+# crate: the token check of the facade and the operator API, the caller read
+# from the token's standard claims, the scopes, the audit line, the client
+# credentials token of the CDR and terminology lanes, the onward grants
+# (RFC 8693, RFC 7523) the facade reaches the CDR under its caller with, and
+# the RFC 7662 introspection check of an issuer with `mode = "introspection"`.
+# A caret requirement, as a shared crate takes another (owner decision,
+# 2026-10-26), on ferrohealth-server 0.12. `fetch` reads each issuer's
+# metadata and key set and runs the token, onward and introspection clients.
 # The server adds `axum` for its guard and `server-tls`, the family's reader
-# of every outbound `tls` table;
-# ferrobridge-term's `smart` feature takes the token client alone.
-ferrohealth-smart = { version = "0.29.1", default-features = false, features = ["fetch"] }
+# of every outbound `tls` table; ferrobridge-term's `smart` feature takes the
+# token client alone.
+ferrohealth-smart = { version = "0.34.0", default-features = false, features = ["fetch"] }
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
 # `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
 # query masked. Pinned exactly, as a product pins every shared crate.
@@ -166,11 +166,11 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body.
-ferrohealth-server = { version = "=0.10.0", default-features = false }
+ferrohealth-server = { version = "=0.12.1", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
 # the request log and the panic line; 0.5 installs its own bridge from the
 # `log` crate beside the subscriber.
-ferrohealth-telemetry = { version = "=0.5.0", default-features = false }
+ferrohealth-telemetry = { version = "=0.5.1", default-features = false }
 # The family's installation report to FerroPULSE (FerroSYS): envelope v2, the
 # latency window the request log fills and the start and daily reporter.
 ferrohealth-usage-report = { version = "=0.5.0", default-features = false }
@@ -186,12 +186,12 @@ ihe-atna = { version = "=0.23.0", default-features = false }
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs"] }
-# The test-time key pairs the inbound token tests sign with, in the lock
-# already through rustls; 1.18.1 is the version the lock carries.
+# The AES-256-GCM seal and the random source of the SMART Health Links, and
+# the key pairs the inbound token tests sign with; in the lock through rustls.
 aws-lc-rs = { version = "1.18.1", default-features = false, features = ["aws-lc-sys"] }
-# The test-time Argon2id hash of the synthetic password an inbound Basic case
-# authenticates with, in the lock already through ferrohealth-smart; 0.6.0 is
-# the version the lock carries.
+# The Argon2id hash of a SMART Health Link passcode, and of the synthetic
+# password an inbound Basic case authenticates with; in the lock through
+# ferrohealth-smart.
 argon2 = { version = "0.6.0", default-features = false, features = ["password-hash", "alloc"] }
 # The openehr-its client runtime's Transport is an async-trait trait, so the
 # server's per-call engine implements it through the same macro, as does the
@@ -237,7 +237,7 @@ encoding_rs = "0.8.42"
 # The lexer and parser of the v2-to-FHIR condition and target grammars, the
 # pair openehr-query builds its AQL parser on and the lock already carries.
 logos = "0.16.1"
-chumsky = "0.13.0"
+chumsky = "0.14.1"
 # The `.tgz` form of a FHIR package the profile validator reads offline
 # (https://hl7.org/fhir/packages.html): flate2 on its pure-Rust backend and tar
 # without its extended-attribute feature, which reads nothing a package
@@ -249,13 +249,13 @@ tar = { version = "0.4.46", default-features = false }
 similar = { version = "3.2.1", default-features = false, features = ["std", "text"] }
 # The mapping-set archive the operator API exports and imports (#610): a ZIP
 # written with fixed timestamps in sorted order, read with a ceiling. MIT.
-zip = { version = "=9.5.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "=9.6.0", default-features = false, features = ["deflate-flate2"] }
 # The FerroHEALTH components the operator console (app/ferrobridge-console,
 # #599) draws with: the server-rendered views, the shell, the table model, the
 # highlighter, the Lucide icons, the stylesheet, the role tokens and the script
 # modules with the router that serves them, shared by every FerroHEALTH
 # console. Pinned exactly, so the console moves to a new version deliberately.
-ferrohealth-ui = "=0.6.10"
+ferrohealth-ui = "=0.6.11"
 # The console's string catalogs (#956): Project Fluent messages embedded at
 # build time from app/ferrobridge-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -268,7 +268,7 @@ base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 # with its idle and absolute lifetimes, the refresh, and the four routes with
 # the session watch FerroUI's pages ask. Pinned exactly, as a product pins
 # every shared crate; the console adds `axum`.
-ferrohealth-session = { version = "=0.24.0", default-features = false }
+ferrohealth-session = { version = "=0.29.0", default-features = false }
 # Test-only.
 wiremock = "0.6.5"
 # The operator console's browser journeys (#602): a WebDriver client in Rust
@@ -428,6 +428,15 @@ fhir-types = { path = "crates/fhir-types" }
 panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
+
+# Argon2id runs optimised in test builds, so a test of passcode hashing
+# under parallel requests measures the request path and not an unoptimised
+# hash. No specification governs this: our own design.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
 
 # The full-emit tests of fhir-codegen (`cargo nextest run --cargo-profile emit
 # -p fhir-codegen`): the emitter runs optimised, while the two generated crates

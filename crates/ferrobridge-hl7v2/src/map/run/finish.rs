@@ -23,43 +23,65 @@ use crate::map::{MapError, Outcome};
 use ferrobridge_term::client::Client;
 
 impl Run<'_> {
-    /// Asks the translator for every recorded translation.
+    /// Asks the translator for every recorded translation, in one request.
+    ///
+    /// Each table value is asked of every target system of its map, and the
+    /// answer is the first system's, in the map's order, that holds an
+    /// accepted concept, as asking them one after the other would give.
     ///
     /// # Errors
     ///
     /// Returns [`MapError::Terminology`] when the server refuses a
-    /// translation or cannot be reached.
+    /// translation before the one that answers, or cannot be reached.
     pub(in crate::map) async fn translate(
         &mut self,
         translator: Option<&Client>,
     ) -> Result<usize, MapError> {
-        let mut calls = 0usize;
-        let mut outcomes = Vec::new();
-        for request in &mut self.requests {
-            let Some(translator) = translator else {
-                outcomes.push(Outcome::NoTerminology {
+        let Some(translator) = translator else {
+            let unanswered: Vec<Outcome> = self
+                .requests
+                .iter()
+                .map(|request| Outcome::NoTerminology {
                     at: request.at.clone(),
                     row: request.row.clone(),
-                });
-                continue;
-            };
-            for group in &request.groups {
-                calls = calls.saturating_add(1);
-                let answer = translator
-                    .translate(
-                        &Translation::new(group.source.as_str(), request.code.as_str())
-                            .with_concept_map(request.url.as_str())
-                            .with_target_system(group.target.as_str()),
-                    )
-                    .await
-                    .map_err(|source| MapError::Terminology {
-                        concept_map: request.url.clone(),
-                        source: Box::new(source),
-                    })?;
-                if let Some(found) = answer.accepted().find_map(|found| found.concept.clone()) {
-                    request.answer = Some(found);
-                    break;
+                })
+                .collect();
+            self.outcomes.extend(unanswered);
+            return Ok(0);
+        };
+        let asked: Vec<Translation> = self
+            .requests
+            .iter()
+            .flat_map(|request| {
+                request.groups.iter().map(|group| {
+                    Translation::new(group.source.as_str(), request.code.as_str())
+                        .with_concept_map(request.url.as_str())
+                        .with_target_system(group.target.as_str())
+                })
+            })
+            .collect();
+        let refused = |concept_map: &str, source| MapError::Terminology {
+            concept_map: concept_map.to_owned(),
+            source: Box::new(source),
+        };
+        let first = self
+            .requests
+            .iter()
+            .find(|request| !request.groups.is_empty())
+            .map_or("", |request| request.url.as_str());
+        let mut answers = translator
+            .translate_all(&asked)
+            .await
+            .map_err(|source| refused(first, source))?
+            .into_iter();
+        let mut outcomes = Vec::new();
+        for request in &mut self.requests {
+            for answer in answers.by_ref().take(request.groups.len()) {
+                if request.answer.is_some() {
+                    continue;
                 }
+                let answer = answer.map_err(|source| refused(&request.url, source))?;
+                request.answer = answer.accepted().find_map(|found| found.concept.clone());
             }
             if request.answer.is_none() {
                 outcomes.push(Outcome::Untranslated {
@@ -70,7 +92,7 @@ impl Run<'_> {
             }
         }
         self.outcomes.extend(outcomes);
-        Ok(calls)
+        Ok(asked.len())
     }
 
     /// Applies every write and returns the envelope's document, when it was

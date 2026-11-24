@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! A terminology stub answering `$translate` from the table maps of the guide
-//! and of FerroBRIDGE's value package, as a server loaded with both does.
+//! A terminology stub answering `$translate`, alone or in a `batch`, from the
+//! table maps of the guide and of FerroBRIDGE's value package, as a server
+//! loaded with both does.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -13,7 +14,9 @@ use std::time::Duration;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
 use ferrobridge_testkit::stubs::terminology;
-use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
+use wiremock::{MockServer, Request, Respond, ResponseTemplate};
+
+use crate::support;
 
 /// A `$translate` question: the table map's url, the source system, the code
 /// and the target system.
@@ -97,11 +100,7 @@ impl PackageTables {
             .disable_request_recording()
             .start()
             .await;
-        Mock::given(wiremock::matchers::method("POST"))
-            .and(wiremock::matchers::path("/r4/ConceptMap/$translate"))
-            .respond_with(self.clone())
-            .mount(&server)
-            .await;
+        support::mount_translate(&server, self.clone()).await;
         let config = Config::new(format!("{}/r4", server.uri()).parse()?, WireVersion::R4)
             .with_timeout(Duration::from_secs(30))
             .with_retry(RetryPolicy {
@@ -115,7 +114,13 @@ impl PackageTables {
 
 impl Respond for PackageTables {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
+        support::answer_each(request, |body| self.reply(body))
+    }
+}
+
+impl PackageTables {
+    /// Returns the `Parameters` answering the `$translate` `Parameters` `body`.
+    fn reply(&self, body: &serde_json::Value) -> serde_json::Value {
         let parameter = |name: &str| {
             body["parameter"]
                 .as_array()
@@ -168,13 +173,10 @@ impl Respond for PackageTables {
             })
             .collect();
         if matches.is_empty() {
-            return terminology::translate_no_match("the table map holds no such code");
+            return support::no_match("the table map holds no such code");
         }
         let mut parameter = vec![serde_json::json!({"name": "result", "valueBoolean": true})];
         parameter.extend(matches);
-        let body = serde_json::json!({"resourceType": "Parameters", "parameter": parameter});
-        ResponseTemplate::new(200)
-            .insert_header("Content-Type", "application/fhir+json")
-            .set_body_string(body.to_string())
+        terminology::parameters_resource(&parameter)
     }
 }

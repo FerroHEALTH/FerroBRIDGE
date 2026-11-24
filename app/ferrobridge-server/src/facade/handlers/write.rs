@@ -41,7 +41,6 @@ use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVer
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::facade::Facade;
-use crate::facade::commit::Committer;
 use crate::facade::compartment;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::conditional;
@@ -84,11 +83,9 @@ pub(crate) async fn create(
     let program = &select_program(facade, &inbound, headers)?;
     let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
-    let committer = Committer::of(access, &client, &facade.settings().system_id);
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_committer(committer)
         .with_originating_system(crate::facade::commit::originating_system(access));
     let claim = ingest.claim_resource(&inbound)?;
 
@@ -186,11 +183,9 @@ pub(crate) async fn update(
     let program = &select_program(facade, &inbound, headers)?;
     let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
-    let committer = Committer::of(access, &client, &facade.settings().system_id);
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_committer(committer)
         .with_originating_system(crate::facade::commit::originating_system(access));
     resend(
         facade,

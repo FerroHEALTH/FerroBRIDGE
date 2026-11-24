@@ -3,7 +3,7 @@
 
 # Provenance: the CKM archetypes of the FHIRconnect mapping library
 
-24 published archetypes of the openEHR Clinical Knowledge Manager,
+25 published archetypes of the openEHR Clinical Knowledge Manager,
 vendored verbatim by `scripts/vendor/ckm-library.sh`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -11,8 +11,8 @@ docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/openEHR/CKM-mirror>, the mirror of the international CKM
 - Pin: commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `c03b7860a3c10512052f68ecb2c420224969014e4381fcaa3ff1fbd42f819896`
-- Fetched: 2026-11-17
+  `PROVENANCE.md` excluded): `2a6f31341c9ae2addbf46a8bded54e3f1288a50fb7de2504f6e76525c0ea373d`
+- Fetched: 2026-11-24
 - Upstream licence: Creative Commons Attribution-ShareAlike 3.0 Unported, the
   mirror's `LICENSE` file at the same commit, vendored beside this file
 - Use: the archetypes the FHIRconnect mapping library's model mappings
@@ -31,6 +31,7 @@ Files:
 - `openEHR-EHR-EVALUATION.exclusion_global.v1.adl` from `local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.exclusion_global.v1.adl`, sha256 `1acceb83c8b962abc10bb777eef32eb5bf7386a67890cbbfa19d10b988fd70e8`
 - `openEHR-EHR-EVALUATION.gender.v1.adl` from `local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.gender.v1.adl`, sha256 `00fe97854efddf97374753b04494551a29a034eba78b1c13b1591752bbc5f5f9`
 - `openEHR-EHR-EVALUATION.adverse_reaction_risk.v2.adl` from `local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.adverse_reaction_risk.v2.adl`, sha256 `661df61e13bd0f4ecfacd62349c175519c25a4c1ffd388f8ed81aa77249c1a1c`
+- `openEHR-EHR-EVALUATION.device_summary.v0.adl` from `local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.device_summary.v0.adl`, sha256 `c3acc311a00cdf34db6fc43bff23456732001ea6671118b35169518a5bdab646`
 - `openEHR-EHR-CLUSTER.device.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.device.v1.adl`, sha256 `0da92215f0d8603a36ed778143c1b767e2993739c6b31e2da91497589ca12efa`
 - `openEHR-EHR-CLUSTER.case_identification.v0.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.case_identification.v0.adl`, sha256 `57a81376648a098b70bfd500e4db3f62d1acd2c48d52535004fde8f1aea55121`
 - `openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl`, sha256 `e7b4aaa58db2c298e335edc99a5d08919848bdd1d2267b5901a074f70ad0f33d`

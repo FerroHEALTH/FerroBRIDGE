@@ -75,7 +75,9 @@ The section is the FerroHEALTH family's (`ferrohealth-server`).
 | `body_limit` | `"1MiB"` | The largest request body read before the server answers `413` |
 | `drain_delay` | `"0s"` | How long readiness stays withdrawn after `SIGTERM` or `SIGINT` before the listener closes |
 | `shutdown_timeout` | `"10s"` | How long the requests in flight may take once the listener closed |
-| `max_concurrent_requests` | `256` | How many requests the server serves at once, always bounded; past it a request is answered `503` with `Retry-After`, and the health routes are never refused |
+| `max_concurrent_requests` | `256` | How many requests the server serves at once, always bounded; past it a request waits for a slot in the queue below and is answered `503` with `Retry-After` when the queue is full or the wait expires, and the health routes are never refused or queued |
+| `max_waiting_requests` | `256` | How many requests past `max_concurrent_requests` may wait for a slot at once, first come first served; `0` keeps no queue |
+| `admission_wait` | 100 milliseconds | How long a request past `max_concurrent_requests` waits for a slot before it is refused, written with the `ms` or `s` unit; `"0s"` keeps no queue |
 | `retry_after` | `"1s"` | The seconds a refused request is told to wait |
 | `trusted_proxies` | `[]` | The reverse proxies, each an address or a CIDR block, whose forwarded client address is believed |
 | `forwarded_header` | `forwarded` | The header a trusted proxy names the client in: `forwarded` or `x-forwarded-for` |
@@ -201,6 +203,7 @@ server says so once at start-up, naming the section and never a value.
 | `endpoint.connect_timeout` | unset | | How long opening the connection may take; unset, only `timeout` bounds it |
 | `endpoint.tls` | the platform's roots | | `trust_roots_file`, `client_identity_file` or `client_identity` (secret), and `min_version` (`"1.3"`): the TLS of the CDR's connection, for a CDR behind a private root or one that asks for a client certificate |
 | `demographic` | `false` | | Whether the bridge reaches the CDR's ITS-REST 1.1.0 Demographic API, which the release marks `x-status: DEVELOPMENT` |
+| `committer_issuer` | unset | | The issuer the CDR names the Basic user of `endpoint.credentials` under, so a transaction's CONTRIBUTION states the committer placeholder of that issuer and the user; needs a Basic `endpoint.credentials.user`. Unset, a CONTRIBUTION under a Basic user names the bridge by `system_id` |
 
 ### `[cdr.endpoint.retry]` and `[terminology.endpoint.retry]`
 
@@ -333,49 +336,43 @@ the CDR's issuer that names the same person, and sends that token on every
 CDR call of the request. The bridge authenticates the exchange with its own
 client of `[cdr.endpoint.credentials.oauth]`, which the table requires and which must ask
 for the CDR alone, by `resource` (RFC 8707 §2) or by `scope` (such as
-`api://<cdr>/.default` under Entra ID), because a machine's request reaches the
+`api://<cdr>/.default`), because a machine's request reaches the
 CDR under that token; one naming neither refuses the start. Only the CDR
 lane takes the table: an `onward` table under `[terminology.endpoint.credentials]` or
 another lane refuses the start, and so does one on a server whose `[auth]` is
 off, because no caller then holds a token to exchange.
 
-The issuer's `profile` picks the grant:
+The profile keys of the onward table pick the grant:
 
-- `rfc9068` (and `keycloak`): OAuth 2.0 Token Exchange (RFC 8693 §2.1). The
-  caller's token is the `subject_token`, an access token, and the CDR is named
-  by `resource`, or by `audience` under `keycloak`. Keycloak requires the
-  bridge's client in the `aud` of the caller's token, so the client scope of
-  the facade's clients carries an audience mapper that puts it there.
-- `entra`: the JWT bearer grant (RFC 7523 §2.1) with the Microsoft identity
-  platform's on-behalf-of parameters. The caller's token, whose `aud` is the
-  bridge's application id, is the `assertion`, `requested_token_use` is
-  `on_behalf_of`, and `scope` names the CDR, such as `api://<cdr>/.default`.
-  Register the bridge and the CDR to issue v2.0 tokens.
+- By default, OAuth 2.0 Token Exchange (RFC 8693 §2.1). The caller's token is
+  the `subject_token`, an access token, and the CDR is named by `resource`,
+  or by `audience` with `onward_indicator = "audience"`.
+- With `onward_grant = "jwt_bearer"`, the JWT bearer grant (RFC 7523 §2.1).
+  The caller's token is the `assertion` and `scope` names the CDR; the
+  Microsoft identity platform's on-behalf-of flow adds
+  `onward_parameters = { requested_token_use = "on_behalf_of" }` and
+  `onward_client_id = true`.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `issuer` | none, required | The issuer of the onward tokens; its metadata names the token endpoint unless `token_endpoint` is set |
-| `kind` | none, required | `persons` for a same-organisation person, `federation` for a professional of another party, `patients` for a patient |
-| `profile` | `rfc9068` | The preset the issuer's profile starts from: `rfc9068`, `entra`, `keycloak` and the others `[[auth.issuer]]` takes |
+| `kind` | none | `federation` for another party's issuer, which carries its professionals and needs its `federation` table; unset for a SMART authorization server, which carries this organisation's users |
 | `token_endpoint` | none | The token endpoint itself |
 | `client_id` | the `oauth` table's | The bridge's client id at this issuer |
 | `audiences` | none, required | The audiences an onward token may name; a token naming any other is refused |
 | `indicators` | none | The `resource` or `audience` values the exchange names the CDR by |
 | `scope` | none | The `scope` the request names; the on-behalf-of grant requires it |
 | `correlation_claim` | none | The claim a chained `federation` route carries from the caller's token to the onward one |
-| `keys` | none | The profile keys over the preset; `max_onward_lifetime`, a duration such as `"1h"`, is required |
+| `profile` | none | The table of profile keys: `max_onward_lifetime`, a duration such as `"1h"`, is required; `onward_grant`, `onward_indicator`, `onward_parameters`, `onward_client_id` and `onward_subject_audience` shape the request |
 | `cache` | `true` | `false` holds no onward token, so every CDR call exchanges one at the issuer, with a warning logged at start; a setting for a performance measurement, never for production |
 | `actor_assertion` | `false` | `true` names the bridge's client as the actor of every exchange it sends without an actor token, with an assertion signed by the `oauth` table's key (RFC 8693 §2.1); a lane with no assertion key, or under the JWT bearer grant, is refused at start |
 
 Each issued token is decoded and refused unless its issuer is the one asked,
 its `aud` lies inside `audiences`, it lives no longer than
 `max_onward_lifetime`, it names the bridge's client as its actor (`act`, or
-the profile's client claim such as `azp`), and it names the caller's person
-by the profile's `person_equality` claims (`iss` and `sub` by default, `oid`
-and `tid` under `entra`, so a different pairwise `sub` is accepted). A
-`patients` issuer's token must also read as a patient token, a `patient/`
-grant with no `user/` or `system/` one, and carry the caller's `patient`
-launch context unchanged. Unless
+its `client_id`), and it names the caller by `iss` and `sub` (OpenID Connect
+Core 1.0 §5.7). For a patient's token it must also name a `Patient` as its
+`fhirUser` and carry the caller's `patient` launch context unchanged. Unless
 `cache = false`, the bridge caches the token under the caller's token and the
 target until
 `refresh_margin` before the earlier of its own and the caller's token's
@@ -387,10 +384,9 @@ Who reaches the CDR how:
 | Caller | Reaches the CDR |
 |---|---|
 | A machine (a client credentials token) | Under the bridge's own token of `[cdr.endpoint.credentials.oauth]`, never exchanged; its composition names the machine's client in `originating_system_audit.system_id` |
-| A person, a delegated or representing person, under `kind = "persons"` | Under the exchanged token |
-| A professional of another party, under `kind = "federation"` | Under the exchanged token |
-| A patient, under `kind = "patients"` | Under the exchanged token |
-| A caller no issuer's kind carries, another party's organisation, a guest, a Basic user | Refused with `403` |
+| A user of this organisation, whatever their `fhirUser` and with or without an actor | Under the token the SMART issuer exchanges |
+| A professional of another party | Under the token the `federation` issuer exchanges |
+| A caller no issuer of the lane carries, another party's organisation, a Basic user | Refused with `403` |
 
 A failed exchange fails the request, and the bridge's own token is never sent
 in its place. The token endpoint's `400` or `403` (RFC 8693 §2.2.2,
@@ -410,58 +406,53 @@ private_key_file = "/run/secrets/bridge_key.pem"
 
 [cdr.endpoint.credentials.onward]
 issuer = "https://login.microsoftonline.com/<tenant>/v2.0"
-kind = "persons"
-profile = "entra"
 token_endpoint = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"
 audiences = ["<cdr application id>"]
 scope = "api://<cdr application id>/.default"
 
-[cdr.endpoint.credentials.onward.keys]
-max_onward_lifetime = 3600
+[cdr.endpoint.credentials.onward.profile]
+max_onward_lifetime = "1h"
+onward_grant = "jwt_bearer"
+onward_client_id = true
+onward_parameters = { requested_token_use = "on_behalf_of" }
 ```
 
 As environment variables, the table reads
 `FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__ONWARD__ISSUER`,
-`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__ONWARD__KIND`,
-`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__ONWARD__PROFILE` and the other keys the same
-way.
+`FERROBRIDGE__CDR__ENDPOINT__CREDENTIALS__ONWARD__TOKEN_ENDPOINT` and the other keys
+the same way.
 
 ### `[[cdr.onward]]`
 
 Each `[[cdr.onward]]` table adds one more onward issuer beside
 `[cdr.endpoint.credentials.onward]`, with the same keys. The bridge then carries
-each caller through the issuer whose `kind` carries it: a person to the
-`persons` issuer, a professional of another party to the `federation`
-issuer, and a patient to the `patients` issuer. Every table authenticates
-with the client of `[cdr.endpoint.credentials.oauth]`, which it requires. Two issuers
-of one kind refuse the start, across `[cdr.endpoint.credentials.onward]` and the
-array, and so does the array on a server whose `[auth]` is off. Either form
-may stand alone: a deployment that carries only patients declares one
-`[[cdr.onward]]` table and no `[cdr.endpoint.credentials.onward]`.
-
-Patients usually sign in at an issuer of their own, a separate Keycloak
-realm or Entra ID tenant, whose tokens the facade admits through an
-`[[auth.issuer]]` of `kind = "patients"`. The onward table then names that
-realm or tenant. Under the default `rfc9068` profile:
+each caller through the issuer that carries it: a user of this organisation
+to the SMART issuer and a professional of another party to the `federation`
+issuer. Every table authenticates with the client of
+`[cdr.endpoint.credentials.oauth]`, which it requires. Two SMART issuers or
+two `federation` issuers refuse the start, across
+`[cdr.endpoint.credentials.onward]` and the array, and so does the array on a
+server whose `[auth]` is off.
 
 ```toml
 [cdr.endpoint.credentials.onward]
-issuer = "https://id.example.org/realms/staff"
-kind = "persons"
-audiences = ["cdr"]
-indicators = ["cdr"]
+issuer = "https://smart.example.org"
+audiences = ["https://cdr.example.org/openehr/v1"]
+indicators = ["https://cdr.example.org/openehr/v1"]
 
-[cdr.endpoint.credentials.onward.keys]
-max_onward_lifetime = 300
+[cdr.endpoint.credentials.onward.profile]
+max_onward_lifetime = "5min"
 
 [[cdr.onward]]
-issuer = "https://id.example.org/realms/patients"
-kind = "patients"
-audiences = ["cdr"]
-indicators = ["cdr"]
+issuer = "https://sts.partner.example.org"
+kind = "federation"
+audiences = ["https://cdr.example.org/openehr/v1"]
 
-[cdr.onward.keys]
-max_onward_lifetime = 300
+[cdr.onward.profile]
+max_onward_lifetime = "5min"
+
+# The [cdr.onward.federation] table, as the ferrohealth-smart book describes
+# it for a federation issuer.
 ```
 
 ### `[terminology]`
@@ -698,7 +689,7 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `composition_territory` | none, required | The `COMPOSITION.territory` every commit carries, an ISO 3166-1 code |
 | `search_count` | `20` | The page size of a search that names no `_count` |
 | `search_count_max` | `100` | The largest page one search answers; a larger `_count` is answered with this many |
-| `binding_identifier_issuers` | none | The `DV_IDENTIFIER.issuer` of each binding key the CDR binds a login to (the `identifier_issuer` of its `[[auth.party]]` tables); the facade refuses with `403` to create, update or delete a party resource whose party carries an identifier of one of them |
+| `binding_identifier_issuers` | none | The `DV_IDENTIFIER.issuer` of each binding key the CDR binds a login to (the `identifier_issuer` of its issuers' party tables); the facade refuses with `403` to create, update or delete a party resource whose party carries an identifier of one of them |
 
 The three `subject_` keys make the facade's link between a Patient and its
 EHR match the one the CDR's owner writes, because the facade finds an EHR
@@ -838,6 +829,60 @@ exchange writes first; an enabled exchange without it, or with another value,
 is a boot error naming `facade.consent.default_access`. This is FerroBRIDGE's
 own design.
 
+### `[facade.app_state]`
+
+SMART App State (SMART App Launch 2.2.0, Persisting App State), served as
+`Basic` at the facade's base (the Integrate page,
+[SMART App State](../integrate/fhir-facade.md#smart-app-state)). Off, `Basic`
+is an ordinary resource type a program may map. On, `Basic` is the App State
+endpoint, the discovery document lists `smart-app-state`, and the
+`CapabilityStatement` instantiates `smart-app-state-server`; a context that
+maps `Basic` is then a boot error, and a reload that adds one is refused.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Basic` is the SMART App State endpoint |
+| `store` | `app-state.redb` | The file the App State resources are kept in, apart from the identity map |
+
+Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. App State can
+hold an app's keys, so keep the file on storage you protect as you protect the
+CDR's. The store and its file are FerroBRIDGE's own design.
+
+### `[facade.launch_task]`
+
+SMART launch `Task`s (SMART App Launch 2.2.0, Task profile for requesting a
+SMART launch), served as `Task` at the facade's base (the Integrate page,
+[SMART launch Tasks](../integrate/fhir-facade.md#smart-launch-tasks)). Off,
+`Task` is an ordinary resource type a program may map. On, `Task` serves the
+`task-ehr-launch` and `task-standalone-launch` profiles; a context that maps
+`Task` is then a boot error, and a reload that adds one is refused.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Task` is the launch endpoint |
+| `store` | `launch-tasks.redb` | The file the launch `Task`s are kept in, apart from the identity map |
+
+Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
+and its file are FerroBRIDGE's own design.
+
+### `[facade.summary]`
+
+The patient summary, `GET /fhir/Patient/{id}/$summary` (HL7 IPS 2.0.1,
+`OperationDefinition/summary`; the Integrate page,
+[Patient summary](../integrate/fhir-facade.md#patientsummary-writes-the-patient-summary)).
+On, the server needs `[cdr] demographic` and a loaded `Patient` party
+context, fetches the `eehrxf` patient summary template from the CDR and
+reads the packages at boot; a template the CDR does not hold, or a package
+set with a dependency missing, refuses the start.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Patient/$summary` is served |
+| `packages` | none | The FHIR packages each document is validated over, each a `.tgz` or an unpacked directory: `hl7.fhir.r4.core` 4.0.1 and the dependency closure of `hl7.fhir.uv.ips` 2.0.1 and `hl7.fhir.eu.eps` 1.0.0-ballot. Required when on |
+| `operator` | none | The name of the organisation that operates this server, which each document names as an author. Required when on |
+
+Each key is settable as `FERROBRIDGE__FACADE__SUMMARY__<KEY>`.
+
 ### `[facade.identifier_search]`
 
 The chained search through a patient's identifier:
@@ -945,7 +990,7 @@ Launch 2.x resource server. The section is the one `ferrohealth-smart`, the
 FerroHEALTH resource-server crate, defines for every product, and it is **on
 by default**: `serve` refuses to start a facade, an operator API or a
 FHIRconnect operations lane until `[auth]` names an issuer in an
-`[[auth.issuer]]` table, or until `enabled = false` says the bridge runs on a
+`[auth.issuer.<name>]` table, or until `enabled = false` says the bridge runs on a
 network only trusted callers reach. A server that serves only `/` and the
 health routes, and the jobs (`cdm init`, `etl run`, `mapping check`), read no
 `[auth]`. **While it is off, the facade authenticates no caller and serves
@@ -958,23 +1003,27 @@ sends and what each refusal looks like.
 |---|---|---|
 | `enabled` | `true` | Whether every guarded request needs a credential; `false` serves the facade and the operations open |
 | `realm` | none | The `realm` every `WWW-Authenticate` challenge names |
-| `scopeless_subjects` | `[]` | The machines whose token gets system-wide access when it names no SMART clinical scope, such as a backend service whose authorization server issues no scope, each a table `{ issuer, sub }` naming its `[[auth.issuer]]` table and its `sub`. Only a token the issuer's profile classifies as a machine is admitted this way; any other scopeless token is refused with `403`. An entry naming an issuer the section does not trust refuses the start |
 | `capabilities` | `[]` | SMART capabilities the discovery document lists beside the three the facade enforces (`permission-v1`, `permission-patient`, `permission-user`) and the ones the issuer's metadata shows, such as `launch-ehr` or `context-ehr-patient`; each is one SMART App Launch 2.2.0 (Conformance, Capabilities) defines, or a full URI. `sso-openid-connect` also writes the issuer's `issuer`, which the document omits otherwise (Conformance, Metadata) |
 | `scopes_supported` | `[]` | The scopes the discovery document lists as `scopes_supported`; list only scopes the bridge honours, because "the server SHALL support all scopes listed here" (SMART App Launch 2.2.0, Conformance, Metadata). Empty omits the member |
-| `described_issuer` | none | The `[[auth.issuer]]` the discovery document and the `CapabilityStatement` describe, when the bridge trusts several. Unset, the bridge describes the one issuer of kind `persons`, `patients` or `federation` whose metadata it holds, and with only `machines` issuers trusted the one `machines` issuer, for SMART Backend Services alone. The [rule](#the-described-issuer) says which issuers it may name |
+| `described_issuer` | none | The name of the `[auth.issuer.<name>]` table the discovery document and the `CapabilityStatement` describe, when the bridge trusts several. Unset, the bridge describes the one SMART issuer whose metadata it holds. The [rule](#the-described-issuer) says which issuers it may name |
 | `product_scope` | `__ferrobridge.operator` | The operator scope: it guards the operator API and admits `$validate`, `$tofhir` and `$toopenehr` on the facade, which commit nothing. SMART scopes cover FHIR resources only, so this scope is FerroBRIDGE's own, in a form SMART App Launch 2.2.0 gives an extension scope: a string starting with `__` or a full URI; any other value refuses the start |
 | `tls.trust_roots_file` | none | A PEM file of trust roots added to the platform's, for an issuer behind a private certificate authority. The discovery document and the key set of every issuer are read trusting it, and for an issuer with `mode = "introspection"` so are the introspection endpoint and the token endpoint of its credential. It is read once at start; a file that cannot be read, is no PEM, or holds no certificate refuses the start. `tls.client_identity_file` and `tls.min_version` (`"1.3"` unless lowered to `"1.2"`) complete the table |
 
-Each trusted authorization server is one `[[auth.issuer]]` table, and every
-setting of an issuer lives on its table:
+#### `[auth.issuer.<name>]`
+
+Each trusted authorization server is one table named for it, such as
+`[auth.issuer.clinic]`, and every setting of an issuer lives on its table or
+the tables nested under it. A name is a lower-case letter followed by at most
+63 lower-case letters, digits and `_`; any other refuses the start, and so
+does a key that names an issuer table no table carries, listing the names
+there are. The tables are read in the order of their names, and that order
+decides nothing.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `issuer` | none, required | The authorization server's issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2), or plain `http` on a loopback host; a token's `iss` must equal it |
-| `kind` | none, required | Whose tokens the issuer signs: `persons` (the deployment's people, through its own clients, and the app-only tokens of its machines), `patients` (patients, each token naming only the record subject), `machines` (client credentials tokens only) or `federation` (another party's people, which needs its `[[auth.federation]]` table) |
-| `profile` | `rfc9068` | The issuer profile the token shape and the caller classification start from: `rfc9068` (a standards-only server), `entra`, `keycloak`, `okta`, `nl` or `ferrosmart` (FerroSMART's tokens, [running behind FerroSMART](behind-ferrosmart.md)). Any profile key set on the table, such as `first_party_clients`, `delegates`, `token_types`, `required_claims`, `scope_claim` or `client_claims`, is set over it |
-| `first_party_clients` | `[]` | The deployment's own clients: a person's token of a `persons` issuer is admitted only through one of these or a declared delegate, so list the clients your clinicians and operators sign in with, the operator console's included |
-| `audience` | none, required | The audiences, a list, of which every token's `aud` must contain one, normally the facade's `base_url` (RFC 9068 §4) |
+| `kind` | none | `federation` for another party's issuer, whose tokens name its professionals or its organisation and which needs its `[auth.issuer.<name>.federation]` table; unset for a SMART App Launch 2.2 authorization server such as FerroSMART ([running behind FerroSMART](behind-ferrosmart.md)) |
+| `audience` | `[facade] base_url` | The audiences, a list, of which every token's `aud` must contain one (RFC 9068 §4); unset, the facade's base URL |
 | `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use; a symmetric `HS*` algorithm is refused and `none` is no algorithm |
 | `clock_skew` | `"1min"` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
 | `jwks_max_age` | `"10min"` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
@@ -984,16 +1033,27 @@ setting of an issuer lives on its table:
 | `role_claims` | `["roles", "groups", "entitlements"]` | The claims this issuer's roles are read from, each a dotted path into the token's JSON (the default is the three RFC 9068 §2.2.3.1 names). A path with an empty step or with whitespace refuses the start. The bridge grants nothing by role: no route it guards asks for one, so the roles a token carries change no answer |
 | `mode` | `jwt` | `jwt` checks JWT access tokens against the issuer's key set; `introspection` asks the issuer's introspection endpoint |
 
-Under the default `rfc9068` profile a token carries `typ: at+jwt` and the
-claims `iss`, `exp`, `aud`, `sub`, `client_id`, `iat` and `jti` (RFC 9068
-§2.2 and §4). The profile also decides who stands behind a token: a token
-whose `sub` equals its `client_id` is a machine's client credentials token
-(RFC 9068 §2.2), and any other token of a `persons` issuer is a person's,
-admitted only through a client the table lists in `first_party_clients` or
-`delegates`. The `keycloak` preset names no machine: its table lists the
-`sub` of each service account in `app_only = [{ subjects = [...] }]`, and
-without one refuses the start. A valid token that fits none of the issuer's kind is refused
-with `401`. A token is checked by the issuer its `iss` names.
+A token carries `typ: at+jwt` or `application/at+jwt` and the claims `iss`,
+`exp`, `aud`, `sub`, `client_id`, `iat`, `jti` and `scope` (RFC 9068 §2.2
+and §4). The authorization server's client registry is the one list of
+clients: a token of a trusted issuer whose `aud` names the bridge admits its
+client, and the bridge keeps no client list. The caller is read from the
+token's standard claims. A token whose `sub` equals its `client_id` is a
+machine's client credentials token (RFC 9068 §2.2). Any other token is a
+user's, named by the resource type of its `fhirUser` (`Patient`,
+`Practitioner`, `PractitionerRole`, `RelatedPerson` or `Person`, SMART App
+Launch 2.2.0, Scopes and Launch Context), with its `patient` claim as the
+launch context and an RFC 8693 `act` as the actor who acts for them. A valid
+token that reads as none of these is refused with `401`. A token is checked
+by the issuer its `iss` names.
+
+The `[auth.issuer.<name>.profile]` table sets the profile keys:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `token_types` | `["at+jwt", "application/at+jwt"]` | The `typ` header values a token may carry |
+| `required_claims` | `iss`, `exp`, `aud`, `sub`, `client_id`, `iat`, `jti`, `scope` | The claims every token must carry |
+| `max_actor_chain` | `1` | The deepest `act` chain a token may carry |
 
 #### The described issuer
 
@@ -1003,46 +1063,27 @@ and a backend client takes its tokens from its token endpoint (SMART App
 Launch 2.2.0, Conformance, Metadata, and Backend Services, Retrieve
 `.well-known/smart-configuration`). SMART does not say which of several
 trusted issuers that is, so `ferrohealth-smart` fixes one rule for the
-FerroHEALTH servers, and the order of the `[[auth.issuer]]` tables never
-decides:
+FerroHEALTH servers, and the order of the issuer tables never decides:
 
 - With `described_issuer`, the bridge describes that issuer once it is a
-  trusted issuer whose metadata it holds. A `machines` issuer is described
-  for SMART Backend Services alone, and refused while another issuer serves
-  a user launch.
-- Otherwise, when the bridge trusts an issuer of kind `persons`, `patients`
-  or `federation`, it describes the one such issuer whose metadata it holds,
-  for SMART App Launch. Several refuse the start, naming them and the key,
-  and so does none: an issuer read from a `jwks_file` names no
-  authorization endpoint.
-- Otherwise it describes the one `machines` issuer for SMART Backend
-  Services: the token endpoint, `private_key_jwt`, the client credentials
-  grant and the `system/` scopes of `scopes_supported`, with no
-  authorization endpoint and no launch capability. Several refuse the start
-  the same way.
-
-A `machines` issuer signs client credentials tokens only, so no user launch
-works there.
+  trusted issuer whose metadata it holds.
+- Otherwise it describes the one SMART issuer whose metadata it holds. A
+  `federation` issuer is another party's, so it is never described unnamed.
+  Several SMART issuers refuse the start, naming them and the key, and so
+  does none: an issuer read from a `jwks_file` names no authorization
+  endpoint.
 
 ```toml
-[auth]
-scopeless_subjects = [{ issuer = "https://auth.example.org/realms/clinic", sub = "service-account-ferrofed" }]
-
-[[auth.issuer]]
+[auth.issuer.clinic]
 issuer = "https://auth.example.org/realms/clinic"
-kind = "persons"
-profile = "keycloak"
-audience = ["https://bridge.example.org/fhir"]
 algorithms = ["RS256"]
-first_party_clients = ["ferrobridge-console", "clinic-portal"]
-app_only = [{ subjects = ["service-account-ferrofed"] }]
 
-[[auth.issuer]]
+[auth.issuer.partner]
 issuer = "https://partner.example.net"
-kind = "machines"
-audience = ["https://bridge.example.org/fhir"]
 role_claims = []
 ```
+
+Both issuers take the facade's `base_url` as their audience.
 
 `[[auth.basic.users]]` tables admit HTTP Basic callers (RFC 7617) beside the
 tokens. A Basic credential is always a person's, never a machine's: each
@@ -1066,8 +1107,8 @@ scopes = ["__ferrobridge.operator"]
 
 A machine that calls the facade, such as an ETL client or another
 FerroHEALTH product, holds a client credentials token (RFC 6749 §4.4) that
-its authorization server issues: register it as a client of a `machines` or
-`persons` issuer the section trusts, grant it the SMART `system/` scopes it
+its authorization server issues: register it as a client of an issuer the
+section trusts, grant it the SMART `system/` scopes it
 needs, and send the token as `Authorization: Bearer`. The bridge is a
 resource server and issues no token itself.
 
@@ -1084,8 +1125,8 @@ once more, which is how a key rotation arrives, and never more often than
 
 An authorization server whose access tokens are opaque, so the bridge cannot
 check them against a key set, is checked by OAuth 2.0 Token Introspection
-(RFC 7662) instead: `mode = "introspection"` on its `[[auth.issuer]]` table,
-with an `[auth.issuer.introspection]` table. The bridge posts each token to
+(RFC 7662) instead: `mode = "introspection"` on its issuer table, with an
+`[auth.issuer.<name>.introspection]` table. The bridge posts each token to
 the issuer's introspection endpoint under its own credential, admits it when
 the answer is `active: true` with `scope`, `client_id` and `exp` (SMART App
 Launch 2.2.0, Token Introspection), checks an `iss` and an `aud` the answer
@@ -1105,24 +1146,21 @@ endpoint that fails answers `503`. An introspected issuer takes no
 | `introspection.bearer` | none | Instead of `client`: a client credentials grant, in the same keys, whose token the bridge sends as `Authorization: Bearer`, the form SMART App Launch 2.2.0 has an EHR accept |
 
 ```toml
-[[auth.issuer]]
+[auth.issuer.clinic]
 issuer = "https://auth.example.org/realms/clinic"
-kind = "persons"
-audience = ["https://bridge.example.org/fhir"]
-first_party_clients = ["clinic-portal"]
 mode = "introspection"
 
-[auth.issuer.introspection]
+[auth.issuer.clinic.introspection]
 cache_max_age = "30s"
 
-[auth.issuer.introspection.client]
+[auth.issuer.clinic.introspection.client]
 client_id = "ferrobridge-rs"
 client_secret_file = "/run/secrets/introspection-secret"
 ```
 
-The `[[auth.issuer]]` tables live in the configuration file: an environment
-variable sets one key, and `FERROBRIDGE__AUTH__ISSUER` set to a URL is refused,
-since `issuer` is a list of tables. The section's own keys read from the environment, such as
+An environment variable addresses an issuer by its name, such as
+`FERROBRIDGE__AUTH__ISSUER__CLINIC__CLOCK_SKEW`, and `FERROBRIDGE__AUTH__ISSUER`
+set to a URL is refused, since `issuer` is a table of tables. The section's own keys read from the environment, such as
 `FERROBRIDGE__AUTH__ENABLED` and `FERROBRIDGE__AUTH__PRODUCT_SCOPE`.
 Apart from the Basic users' hashes and the introspection credential the
 section holds no secret: the resource server checks signatures with the
@@ -1290,6 +1328,28 @@ events lane's, and a missing section the load runs over are each a boot error
 naming the key. The OMOCL set that does not load and a CDM database the
 concept resolver cannot reach refuse the start. Over `[change_feed] source =
 "ferroehr"`, a CDR that answers `404` for the reader refuses the start.
+
+### `[shl]`
+
+The person's SMART Health Links, the one-time share of their patient
+summary (SMART Health Cards and Links 1.0.0; the Integrate page,
+[The Yellow Button API](../integrate/yellow-button.md)). On, the server needs
+`[facade.summary]` and `[auth]`, and opens the store at boot; a store that
+cannot be opened refuses the start. The store is one `redb` file, so the lane
+runs on one replica.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the `/shl` routes are served |
+| `store` | none | The `redb` file the links are kept in. Required when on |
+| `base_url` | none | The public origin a receiver reaches the bridge at, such as `https://bridge.example.org`. A link's URL is this origin, `/shl/m/` and 43 characters, and the start is refused when that passes 128 characters. Required when on |
+| `default_expiry` | `"24h"` | How long a link lives when its creator names no `exp` |
+| `max_expiry` | `"7d"` | The longest a link may live |
+| `max_answers` | `10` | The most answers a creator may give a link |
+| `passcode_attempts` | `5` | The wrong passcodes a link takes over its life before it is disabled |
+| `location_lifetime` | `"1h"` | How long a file location lives, at most one hour |
+
+Each key is settable as `FERROBRIDGE__SHL__<KEY>`.
 
 ### `[audit]`
 

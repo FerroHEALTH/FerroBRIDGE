@@ -25,6 +25,7 @@ use ferrohealth_smart::guard::Gate;
 use ferrohealth_smart::guard::Render;
 use ferrohealth_smart::guard::Requirement;
 use ferrohealth_smart::guard::Target;
+use ferrohealth_smart::refusal::Denied;
 use ferrohealth_smart::refusal::Refusal;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::resource::Honoured;
@@ -61,7 +62,8 @@ pub enum Interaction {
     History,
     /// `POST [base]/{type}/$validate`.
     Validate,
-    /// `GET [base]/Composition/[id]/$document` and its type-level form.
+    /// `GET [base]/Composition/[id]/$document` and its type-level form, and
+    /// `GET [base]/Patient/[id]/$summary`.
     Document,
     /// `GET [base]/{type}` and `POST [base]/{type}/_search`.
     Search,
@@ -151,6 +153,31 @@ impl Interaction {
     }
 }
 
+/// The routes of the SMART App State endpoint, mounted only with
+/// `[facade.app_state]` on ([`crate::facade::app_state`]).
+///
+/// The layer admits any caller on them and the handler decides the `Basic`
+/// permission against the state, because a granular `?code=` scope is a
+/// property of the state (SMART App Launch 2.2.0, Persisting App State,
+/// §Security and Access controls).
+pub const APP_STATE: [(Method, &str, Interaction); 5] = [
+    (Method::POST, "/Basic", Interaction::Create),
+    (Method::GET, "/Basic", Interaction::Search),
+    (Method::POST, "/Basic/_search", Interaction::Search),
+    (Method::PUT, "/Basic/{id}", Interaction::Update),
+    (Method::DELETE, "/Basic/{id}", Interaction::Delete),
+];
+
+/// The routes of the SMART launch `Task` endpoint, mounted only with
+/// `[facade.launch_task]` on ([`crate::facade::launch_task`]); each needs the
+/// `Task` permission of its interaction.
+pub const LAUNCH_TASK: [(Method, &str, Interaction); 4] = [
+    (Method::POST, "/Task", Interaction::Create),
+    (Method::GET, "/Task", Interaction::Search),
+    (Method::POST, "/Task/_search", Interaction::Search),
+    (Method::GET, "/Task/{id}", Interaction::Read),
+];
+
 /// Every route under the FHIR base the guard admits: the method, the route
 /// template relative to the base, and the interaction it is.
 ///
@@ -158,7 +185,7 @@ impl Interaction {
 /// [`Interaction::Unclassified`], which a guarded deployment refuses, so a
 /// route mounted without a classification fails closed (no specification
 /// governs the table: our own design).
-pub const CLASSIFIED: [(Method, &str, Interaction); 22] = [
+pub const CLASSIFIED: [(Method, &str, Interaction); 23] = [
     (Method::GET, "/metadata", Interaction::Capabilities),
     (Method::GET, SMART_CONFIGURATION, Interaction::Discovery),
     (Method::POST, "", Interaction::Transaction),
@@ -182,6 +209,11 @@ pub const CLASSIFIED: [(Method, &str, Interaction); 22] = [
     (
         Method::GET,
         "/{resource_type}/{id}/$document",
+        Interaction::Document,
+    ),
+    (
+        Method::GET,
+        "/{resource_type}/{id}/$summary",
         Interaction::Document,
     ),
     (Method::POST, "/{resource_type}/$bppc", Interaction::Create),
@@ -230,6 +262,8 @@ pub fn classify(method: &Method, template: &str, path: &str) -> Option<Classifie
     }
     let interaction = CLASSIFIED
         .iter()
+        .chain(APP_STATE.iter())
+        .chain(LAUNCH_TASK.iter())
         .find(|(listed, listed_template, _)| listed == method && *listed_template == relative)
         .map_or(Interaction::Unclassified, |(_, _, interaction)| {
             *interaction
@@ -297,6 +331,13 @@ impl ferrohealth_smart::guard::Classify for Classifier {
         // table cannot classify needs no permission it could check, so it fails closed.
         let requirement = if classified.interaction == Interaction::Unclassified && self.guarded {
             Requirement::Refused
+        } else if APP_STATE
+            .iter()
+            .any(|(_, template, _)| classified.template.strip_prefix(BASE_PATH) == Some(*template))
+        {
+            // NOTE: SMART App Launch 2.2.0, Persisting App State, §Security and Access controls;
+            // a `?code=` scope is decided against the state, so the handler checks the permission.
+            Requirement::Caller
         } else {
             classified.interaction.requirement(
                 classified.resource_type.as_deref(),
@@ -330,14 +371,22 @@ pub struct Outcome {
 }
 
 impl Render for Outcome {
-    fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
-        self.respond(refusal)
+    fn render(&self, denied: &Denied, _parts: &Parts) -> Response {
+        self.respond(denied)
     }
 }
 
 impl Outcome {
-    /// Returns the `OperationOutcome` response of `refusal`.
-    fn respond(&self, refusal: &Refusal) -> Response {
+    /// Returns the renderer whose challenges name `realm`.
+    #[must_use]
+    pub const fn new(realm: Option<String>) -> Self {
+        Self { realm }
+    }
+
+    /// Returns the `OperationOutcome` response of `denied`, whose challenge
+    /// carries the reason code as `error_description` (RFC 6750 §3).
+    fn respond(&self, denied: &Denied) -> Response {
+        let refusal = denied.refusal();
         let issue = match refusal {
             Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => {
                 Issue::error(IssueType::Login)
@@ -353,7 +402,7 @@ impl Outcome {
             _ => Issue::error(IssueType::Exception)
                 .diagnosing("the request was refused at the gate"),
         };
-        let headers: Vec<reply::Header> = refusal
+        let headers: Vec<reply::Header> = denied
             .challenge(self.realm.as_deref())
             .iter()
             .map(|challenge| reply::Header::challenge(challenge))
@@ -385,7 +434,7 @@ pub struct OperatorScope(pub Option<String>);
 /// Returns the `403` of a token that does not permit the request.
 #[must_use]
 pub fn forbidden() -> reply::Refusal {
-    reply::Refusal::new(Outcome::default().respond(&Refusal::Forbidden))
+    reply::Refusal::new(Outcome::default().respond(&Denied::from(Refusal::Forbidden)))
 }
 
 /// Checks that `access` grants a permission `interaction` needs on

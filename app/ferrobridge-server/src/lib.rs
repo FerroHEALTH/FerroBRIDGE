@@ -39,6 +39,7 @@ pub mod outbound;
 pub mod panic;
 pub mod problem;
 pub mod quality;
+pub mod shl;
 pub mod smart;
 pub mod startup;
 pub mod state;
@@ -457,11 +458,17 @@ async fn serve_command(settings: Settings) -> anyhow::Result<()> {
 /// base: any origin on the discovery document and the `CapabilityStatement`,
 /// the origins `[facade.cors]` lists on the REST routes.
 pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
+    let app_state = state
+        .facade()
+        .is_some_and(|mounted| mounted.app_state().is_some());
     let mut routes = Router::new()
         .route("/", get(root))
         .merge(operations::router(state.served_operations()));
     if let Some(smart) = state.auth() {
-        routes = routes.merge(smart::routes(smart));
+        routes = routes.merge(smart::routes(smart, app_state));
+        if let Some(links) = state.links() {
+            routes = routes.merge(shl::routes(Arc::clone(links), smart));
+        }
         if let Some(operator) = state.operator() {
             routes = routes.merge(operator::routes(
                 Arc::clone(operator),
@@ -487,6 +494,9 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 facade::capability::Hl7v2::Absent
             },
             security: state.auth().map(|smart| smart.security()),
+            links: state
+                .links()
+                .map(|links| format!("{}{}", links.settings().base_url, shl::BASE)),
         };
         let operator = facade::guard::OperatorScope(
             state.auth().map(|smart| smart.operator_scope().to_owned()),
@@ -530,6 +540,7 @@ pub fn with_middleware(product: Router, state: Arc<AppState>, server: &ServerSec
         refusal_body: facade::edge::body(server.body_limit_bytes(), server.request_timeout.get()),
         request_log: RequestLog::new(state.logged_query_parameters())
             .with_recorder(state.usage_window().clone()),
+        meter: None,
     };
     stack::app(product, health(state), server, policy)
 }

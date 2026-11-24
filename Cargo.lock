@@ -964,6 +964,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "chumsky"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6313a87def838ae23848f344d38799e6370342efd0ec0229b15469d3b6459923"
+dependencies = [
+ "hashbrown 0.16.1",
+ "regex-automata",
+ "serde",
+ "stacker",
+ "unicode-ident",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1138,9 +1152,9 @@ dependencies = [
 
 [[package]]
 name = "cookie"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a373e3602691c3cdea496d2f0ee5935151e6168fe87739483c463db1b2f2f87"
+checksum = "d55f2d6c30eeec7d5c6f98bd4395d4abb1895629eab97ee6522d340623615f8a"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -1507,7 +1521,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.19.0"
+version = "0.26.0"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1674,7 +1688,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-console"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1711,10 +1725,10 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.1.136"
+version = "0.1.137"
 dependencies = [
  "base64 0.23.1",
- "chumsky",
+ "chumsky 0.14.2",
  "ferrobridge-testkit",
  "fhir-types",
  "jiff",
@@ -1730,10 +1744,10 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.21.0"
+version = "0.26.0"
 dependencies = [
  "bytes",
- "chumsky",
+ "chumsky 0.14.2",
  "encoding_rs",
  "ferrobridge-term",
  "ferrobridge-testkit",
@@ -1769,7 +1783,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-server"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1778,11 +1792,13 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
+ "eehrxf",
  "ehds-logging",
  "ferrobridge-hl7v2",
  "ferrobridge-operator-api",
  "ferrobridge-term",
  "ferrobridge-testkit",
+ "ferrobridge-validator",
  "ferrohealth-config",
  "ferrohealth-health",
  "ferrohealth-secret",
@@ -1844,7 +1860,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.13.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "backon",
@@ -1868,9 +1884,10 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-testkit"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "anyhow",
+ "argon2",
  "aws-lc-rs",
  "base64 0.23.1",
  "ferrobridge-console",
@@ -1906,7 +1923,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.13.0"
+version = "0.18.0"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -1962,9 +1979,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.10.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f745cfd2746a4fcfbc7528a36004d934d4dad107a38908cc72f068bf75dd97c8"
+checksum = "6b81adde7764e4b10b55c7bd4579ad0dd60b584320df0ba9a8d09f2c52f2dcb1"
 dependencies = [
  "axum",
  "clap",
@@ -1973,9 +1990,11 @@ dependencies = [
  "ferrohealth-secret",
  "ferrohealth-telemetry",
  "http",
+ "http-body-util",
  "hyper",
  "hyper-util",
  "ipnet",
+ "opentelemetry",
  "pin-project-lite",
  "rustls",
  "rustls-platform-verifier",
@@ -1994,9 +2013,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.24.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6da0649cb92a96487255ce8f55156ed78a8ec2626eb52d023c5624660a8da7a"
+checksum = "7f202e4902815a7d02b45e4faea1cd68eed1c4ead02db89dca8f2929c1142cfd"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -2019,9 +2038,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.29.1"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64721f5376469aed14727623e2892e0ef9709387ce325b10de42edbe4fbe36de"
+checksum = "1b07089669e8f38d9ff0b2ad0fbc192fc1cf62facc4a59687de63cec8e6f7e05"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -2049,9 +2068,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-telemetry"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1bef07d3744883e3a6bc48a1eb375146a2e731199160eaf452fecaae70d6b0d"
+checksum = "310273c87483166f7ce87517a0df9e2052a40031c0e29bdff99fef280a3284a2"
 dependencies = [
  "axum",
  "ferrohealth-config",
@@ -2079,9 +2098,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-ui"
-version = "0.6.10"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc75ea549c2645895f5dbffcb1105d2da2fef594189d8f8cb2913b925afdf3e0"
+checksum = "f940baa5278f9e2eabeee9bd773aba6b69c3b30dc03d79f9d9c5afa1a1cfb22b"
 dependencies = [
  "askama",
  "axum",
@@ -2125,7 +2144,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-codegen"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "anyhow",
  "clap",
@@ -2163,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.7.0"
+version = "0.7.2"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -2328,16 +2347,16 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "form_urlencoded"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
+checksum = "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e"
 dependencies = [
  "percent-encoding",
 ]
 
 [[package]]
 name = "forwarders"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -2486,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "generated-tree"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "tempfile",
  "thiserror",
@@ -3191,9 +3210,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jiff"
-version = "0.2.42"
+version = "0.2.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fefca06093eeaed707a905795e68206da0edca4edef23d2a3997a3ddbee462aa"
+checksum = "175dc66334db3b9ab9985bf8b61cfed50dc16d20964bb47f9e479adcae984a7f"
 dependencies = [
  "jiff-core",
  "jiff-static",
@@ -3207,18 +3226,18 @@ dependencies = [
 
 [[package]]
 name = "jiff-core"
-version = "0.1.4"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a24020db0ee88d1c681d677681bd31f9f4ea189a455425223d52ce4f1508aa"
+checksum = "e599b80292e597019b8b3e392de3f4bea2959ddfb8c7dff60e035e9e311a2c1b"
 dependencies = [
  "log",
 ]
 
 [[package]]
 name = "jiff-static"
-version = "0.2.42"
+version = "0.2.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41d3213549742662eea1a18e6c5af9be5dfbabeb7611ab71356a54928ec398f0"
+checksum = "c7b1af7547d47354bc438d797e3854601bde8f8d185780c5ba4ab27afa54f1ba"
 dependencies = [
  "jiff-core",
  "proc-macro2",
@@ -3640,9 +3659,9 @@ checksum = "27b02d87554356db9e9a873add8782d4ea6e3e58ea071a9adb9a2e8ddb884a8b"
 
 [[package]]
 name = "nix"
-version = "0.31.3"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+checksum = "77730ed34f01f4990cb2ea67fec715ecebc6fab9a6396cf83c5529b13f581bdc"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -3853,7 +3872,7 @@ dependencies = [
 
 [[package]]
 name = "omop-cdm-codegen"
-version = "0.0.27"
+version = "0.0.28"
 dependencies = [
  "anyhow",
  "clap",
@@ -3966,7 +3985,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cbdac2b1ae348ecf5c36747434175e8f66e3f47e11e3985c5d2ce2cd71cd16d"
 dependencies = [
- "chumsky",
+ "chumsky 0.13.0",
  "indexmap 2.14.2",
  "logos",
  "openehr-base",
@@ -4001,7 +4020,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cbd5545dcebab184957d252ba28441021a884be846f4a3ad7fb6007ee89128f"
 dependencies = [
- "chumsky",
+ "chumsky 0.13.0",
  "logos",
  "thiserror",
 ]
@@ -5054,9 +5073,9 @@ checksum = "eec689c0bc40ff2458a5977b6619cb718087084a18e02a131c599b62d05e1a5f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.16"
+version = "0.103.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
+checksum = "e3a0760a887c14823fca5a1c970b01d47c328c696c0c64829d1df50e8f853fd5"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -5939,9 +5958,9 @@ dependencies = [
 
 [[package]]
 name = "thirtyfour"
-version = "0.38.1"
+version = "0.38.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee66d96cfd32e01668efd6ec62caf5f7000438d771a9d673bf0c727bc05fbb6"
+checksum = "bd5b97143d859c32e767eb1f57ad64d2319358a2005d39c7d5f13a5e7568349a"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -6571,9 +6590,9 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "url"
-version = "2.5.8"
+version = "2.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
+checksum = "f00cd2407bb42c0ef17be88d4cf020f5cceffd121665bac9b8b9493a369b3b1a"
 dependencies = [
  "form_urlencoded",
  "idna",
@@ -6797,9 +6816,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
+checksum = "7265c9301c16a8711c992c2d8da90ee77ef54b1ed51482d6dfeb00dc756b1297"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -7220,9 +7239,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "9.5.0"
+version = "9.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0700e6c427aff64acdbf02e85fbfd946c2ee12319d1af013092f3a2178914ff8"
+checksum = "80cc68510ea7553c30a69c732de5278e94183f68765af6c642dbccefd6ec777e"
 dependencies = [
  "constant_time_eq",
  "crc32fast",

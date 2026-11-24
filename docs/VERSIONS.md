@@ -69,10 +69,12 @@ fails when it names a different commit, tag or pin-set digest.
 | KDS Studienteilnahme operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/studienteilnahme/Studienteilnahme.opt` sha256 `4e1e919e18f0f527661201819d3ed4b3ae2cab5cff88724edd70b7462d484004` | `scripts/vendor/kds-studienteilnahme-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-studienteilnahme/PROVENANCE.md` |
 | KDS Todesursache operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/todesursache/KDS_Todesursache.opt` sha256 `8140e5f7c8a18e460399977fc81110fcaeb1bc87c8c04a739fadfff81774e756` | `scripts/vendor/kds-todesursache-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-todesursache/PROVENANCE.md` |
 | FerroEHR professional PERSON definition (fixture) | `FerroHEALTH/FerroEHR` commit `7d85f0a1d2b86ca5bf2d43025090e6a102d99f74` path `deploy/definitions/professional/openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0.adls` sha256 `22e0004006afb36e903841afecaa2541c7624f3f1d6e03dfeb5c9354ee370c7f` | `scripts/vendor/ferroehr-professional.sh`, `tools/ferrobridge-testkit/fixtures/adl2/ferroehr-professional/PROVENANCE.md` |
+| FerroEHR professional ROLE definition (fixture) | `FerroHEALTH/FerroEHR` commit `7d85f0a1d2b86ca5bf2d43025090e6a102d99f74` path `deploy/definitions/professional/openEHR-DEMOGRAPHIC-ROLE.healthcare_professional.v1.0.0.adls` sha256 `a9cb003e2238dd4ba8d69b5184fc917102b538b198344d9507f303215b9a3fec` | `scripts/vendor/ferroehr-professional.sh`, `tools/ferrobridge-testkit/fixtures/adl2/ferroehr-professional/PROVENANCE.md` |
+| FerroEHR patient PERSON definition (fixture) | `FerroHEALTH/FerroEHR` commit `9ecc070f1801effc73a92d21b8096df3ed154b04` path `deploy/definitions/patient/openEHR-DEMOGRAPHIC-PERSON.patient.v1.0.0.adls` sha256 `803899d103437837a955089b7fd5b7333522d35e80a0055cd3c1db9a7a35ae92` | `scripts/vendor/ferroehr-patient.sh`, `tools/ferrobridge-testkit/fixtures/adl2/ferroehr-patient/PROVENANCE.md` |
 | KDS Vitalstatus operational template (fixture) | `openFHIR/openfhir` commit `5e4d68007518fcddae1907b333a86f495791aa53` path `core/src/test/resources/kds/vitalstatus/KDS_Vitalstatus.opt` sha256 `48c66f243813890b00228a34df0f5f118da3a6f252fdc86020498b389b880332` | `scripts/vendor/kds-vitalstatus-opt.sh`, `tools/ferrobridge-testkit/fixtures/opt/kds-vitalstatus/PROVENANCE.md` |
 | CKM medication archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `a8f6c55b67008f89dfb8f5309c3f37994951174e11b83b4053205beb60593e9a` (`COMPOSITION.encounter.v1`, `COMPOSITION.health_summary.v1`, `SECTION.adhoc.v1`, `SECTION.immunisation_list.v0`, `INSTRUCTION.medication_order.v3`, `ACTION.medication.v1`, `CLUSTER.medication.v2`, `CLUSTER.therapeutic_direction.v1`, `CLUSTER.dosage.v2`, `CLUSTER.timing_daily.v1`, `CLUSTER.medication_authorisation.v0`, `CLUSTER.medication_order_summary.v0`, `CLUSTER.medication_supply_amount.v0`) | `scripts/vendor/ckm-medication.sh`, `tools/ferrobridge-testkit/fixtures/ckm/medication/PROVENANCE.md` |
 | CKM discharge archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `d46b60528c41db623f5aada90b6a2b2d51aa494d21451626ddb56b12e2ad9930` (`COMPOSITION.transfer_summary.v1`, `EVALUATION.problem_diagnosis.v1`, `ACTION.procedure.v1`) | `scripts/vendor/ckm-discharge.sh`, `tools/ferrobridge-testkit/fixtures/ckm/discharge/PROVENANCE.md` |
-| CKM library archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `c03b7860a3c10512052f68ecb2c420224969014e4381fcaa3ff1fbd42f819896` (`COMPOSITION.report.v1`, `COMPOSITION.report-result.v1`, `COMPOSITION.medication_list.v1`, `EVALUATION.absence.v2`, `EVALUATION.exclusion_global.v1`, `EVALUATION.gender.v1`, `EVALUATION.adverse_reaction_risk.v2`, `CLUSTER.device.v1`, `CLUSTER.case_identification.v0`, `CLUSTER.adverse_reaction_event.v1`, `CLUSTER.clinical_evidence.v1`, `CLUSTER.organisation.v1`, `OBSERVATION.medication_statement.v0`, `CLUSTER.timing_nondaily.v1`, `CLUSTER.person.v1`, `CLUSTER.address.v1`, `CLUSTER.structured_name.v1`, `CLUSTER.anatomical_location.v1`, `CLUSTER.problem_qualifier.v2`, `CLUSTER.laboratory_test_analyte.v1`, `CLUSTER.specimen.v1`, `INSTRUCTION.service_request.v1`, `OBSERVATION.laboratory_test_result.v1`, `ACTION.informed_consent.v0`) | `scripts/vendor/ckm-library.sh`, `tools/ferrobridge-testkit/fixtures/ckm/library/PROVENANCE.md` |
+| CKM library archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `2a6f31341c9ae2addbf46a8bded54e3f1288a50fb7de2504f6e76525c0ea373d` (`COMPOSITION.report.v1`, `COMPOSITION.report-result.v1`, `COMPOSITION.medication_list.v1`, `EVALUATION.absence.v2`, `EVALUATION.exclusion_global.v1`, `EVALUATION.gender.v1`, `EVALUATION.adverse_reaction_risk.v2`, `EVALUATION.device_summary.v0`, `CLUSTER.device.v1`, `CLUSTER.case_identification.v0`, `CLUSTER.adverse_reaction_event.v1`, `CLUSTER.clinical_evidence.v1`, `CLUSTER.organisation.v1`, `OBSERVATION.medication_statement.v0`, `CLUSTER.timing_nondaily.v1`, `CLUSTER.person.v1`, `CLUSTER.address.v1`, `CLUSTER.structured_name.v1`, `CLUSTER.anatomical_location.v1`, `CLUSTER.problem_qualifier.v2`, `CLUSTER.laboratory_test_analyte.v1`, `CLUSTER.specimen.v1`, `INSTRUCTION.service_request.v1`, `OBSERVATION.laboratory_test_result.v1`, `ACTION.informed_consent.v0`) | `scripts/vendor/ckm-library.sh`, `tools/ferrobridge-testkit/fixtures/ckm/library/PROVENANCE.md` |
 | CKM imaging archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `e53e09672873105cd90a2503f96049159a520b797ad5458076a2630fb49ba6ca` (`OBSERVATION.imaging_exam_result.v1`) | `scripts/vendor/ckm-imaging.sh`, `tools/ferrobridge-testkit/fixtures/ckm/imaging/PROVENANCE.md` |
 | CKM HiGHmed archetypes (fixture) | `openEHR-de/CKM-mirror` commit `adc22deddb96d5e557186fe595f52ef287510633` sha256 `68cdc0829dcf9dc6bfc30a8f2b03fa67625c955b663f1bfded953a58ef644d0a` (`COMPOSITION.fall.v1`, `COMPOSITION.person.v0`, `CLUSTER.entry_category.v0`, `CLUSTER.identifier_fhir.v0`, `CLUSTER.medication_status_fhir.v0`, `CLUSTER.observation_status_fhir.v1`, `CLUSTER.organization.v0`, `ADMIN_ENTRY.person_data.v0`, `ADMIN_ENTRY.versicherungsinformationen.v0`, `ADMIN_ENTRY.episode_institution_local.v0`, `CLUSTER.death_details.v1`, `CLUSTER.person_birth_data_iso.v0`, `CLUSTER.location.v1`, `CLUSTER.multiple_coding_icd10gm.v1`, `EVALUATION.vital_status.v1`) | `scripts/vendor/ckm-highmed.sh`, `tools/ferrobridge-testkit/fixtures/ckm/highmed/PROVENANCE.md` |
 | HL7 v2 definitions (v2ig source of truth, never committed) | `HL7/v2ig` commit `3adcdbfff654ccbff5cd33aa34bd909a087e8e19` path `input/sourceOfTruth` files `1694` digest `9a1fb2b974b69f575bcd9b30fa66d2ff7f13ef7869c1350eca7462067e974f93` | `scripts/vendor/v2ig.sh`, `tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md`, the `codegen-drift` job of `.github/workflows/ci.yml` (its cache key) |
@@ -173,11 +175,11 @@ in code is the matching constant in
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| PostgreSQL image | `postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280` | the `POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, the `sqlx-offline` service in `.github/workflows/ci.yml` |
+| PostgreSQL image | `postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60` | the `POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, the `sqlx-offline` service in `.github/workflows/ci.yml` |
 | RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.7.0@sha256:44c9268cb8a154df118a10ffe84329633f22923ea2cc54261ff0cea57a2ee7e7` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.7.0@sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
-| FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.2@sha256:1853486ae6f85a66424561cbf90f9905027c38d506bdeb24a9e1a831b4b97424` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.7@sha256:52411e76ea664f9470fda0a7a08202a0ad6f7c39069322f42a754d971cf37a82` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 
 The CDR runs against its own published database image rather than the plain
 PostgreSQL above: that image is built from `postgres:18.6` and carries the
@@ -200,7 +202,7 @@ The quickstart `compose.yaml` pulls `ghcr.io/ferrohealth/ferrobridge` and,
 under its `console` profile, `ghcr.io/ferrohealth/ferrobridge-console` at the
 release it shipped with, so both tags are the product version below rather
 than pins of their own, and the guard compares them. Its CDM service runs the same
-`postgres:18.6` image the row above pins for the end-to-end lane, so a
+`postgres:19.0` image the row above pins for the end-to-end lane, so a
 PostgreSQL bump moves one row and both readers follow it.
 
 The terminology server needs no database. It reads the synthetic `CodeSystem`,
@@ -266,18 +268,23 @@ against the registry's `latest`.
 ## Profile packages (the profile validator's package set, build time, never committed)
 
 The R4 profile validator runs offline against the packages below, fetched
-verbatim from the FHIR package registry at build time by
+verbatim at build time, from the FHIR package registry or, for a row that
+names its `tarball` and `sha256`, from the guide's canonical site, by
 `scripts/vendor/profile-packages.sh` into the ignored
 `docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
 from this table (#435). At about 970 MB unpacked they are never committed;
 only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
-`scripts/vendor/profile-packages.sh --cache-key`. The seven roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
+`scripts/vendor/profile-packages.sh --cache-key`. The eight roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
 one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.1,
 the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
 2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
 held, `hl7.fhir.eu.imaging` 1.0.0-ballot, the guide a received imaging
-report is validated against (#1601), and `hl7.fhir.eu.hdr` 1.0.0, the
-discharge report a received document is validated against (#1600);
+report is validated against (#1601), `hl7.fhir.eu.hdr` 1.0.0, the
+discharge report a received document is validated against (#1600), and
+`hl7.eu.fhir.xshare-yb` 0.3.0, the xShare Yellow Button guide whose
+Patient Summary content the served summaries are held to (#2029), fetched
+from its canonical site's versioned path because the registry lists 0.2.0
+alone;
 every other row is in the set because a vendored package's `package.json`
 `dependencies` names it at that version. A package two dependents name at
 different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
@@ -332,6 +339,8 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.fhir.eu.laboratory` | 2.0.0 files `94` digest `f142bbdac038895d90841bb92b7865fdf0eb16b9b0b84a8db702998b36636263` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.mpd` | 1.0.0 files `51` digest `e44ea93f6506fc118287051120ae9bfa737cff3a2791cde5ea1f222bf43e88fa` | `docs/specs/fhir-packages/hl7.fhir.eu.mpd#1.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.hdr` | 1.0.0 files `120` digest `184630f1c3f11ac5b27b3d024347fc68cfc4aa55abcb545255a3fa5b4c9f3834` | `docs/specs/fhir-packages/hl7.fhir.eu.hdr#1.0.0/PROVENANCE.md` (a root) |
+| `hl7.eu.fhir.xshare-yb` | 0.3.0 files `13` digest `a411d731a3fa7a1f28f29083b4db10cc6f581c92f7b7b2bece8fee642ae4ae65` tarball `https://hl7.eu/fhir/ig/xshare-yb/0.3.0/package.tgz` sha256 `ba0ced94b5d4bdb463e46375404f805c433640d07604f518a434a58af3c18682` | `docs/specs/fhir-packages/hl7.eu.fhir.xshare-yb#0.3.0/PROVENANCE.md` (a root, from the guide's canonical site: the registry lists 0.2.0 alone) |
+| `hl7.fhir.uv.smart-health-cards-and-links` | 1.0.0 files `20` digest `bf73d0270cce9955a313b755df96a362b21d4faeac6c7a184fc174ff6cf2c480` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-health-cards-and-links#1.0.0/PROVENANCE.md` |
 | `xtehr.eu.ehds.models` | 1.0.0 files `131` digest `e973efecdf61b2ae646407cafbf27177f81c82630938e1f8f2b6b0d20185b184` | `docs/specs/fhir-packages/xtehr.eu.ehds.models#1.0.0/PROVENANCE.md` (FHIR 5.0.0, held and never read) |
 | `hl7.fhir.uv.ipa` | 1.1.0 files `53` digest `70a5f0881a37859ef7fefd5502c0db05c6ce6c2d6dfa1e71828785f523ba7021` | `docs/specs/fhir-packages/hl7.fhir.uv.ipa#1.1.0/PROVENANCE.md` |
 | `hl7.fhir.uv.smart-app-launch` | 2.0.0 files `8` digest `68fd66519d2ff373d8f9e58bfa62455f3e0aeb95a780f2218e5ffee5c4b49c3e` | `docs/specs/fhir-packages/hl7.fhir.uv.smart-app-launch#2.0.0/PROVENANCE.md` (CC-BY-4.0) |
@@ -434,11 +443,11 @@ an MSRV is only ever raised.
 
 The product version is the workspace `version` in the root `Cargo.toml`, which
 every member inherits. The milestone line is 0.0.x, so the first product
-version is 0.0.27.
+version is 0.0.28.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| Product version | 0.0.27 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
+| Product version | 0.0.28 | root `Cargo.toml` `[workspace.package]` `version` (#20), `CITATION.cff` `version` (#18), the `ghcr.io/ferrohealth/ferrobridge` image tag default in `compose.yaml` (#22) |
 
 `CITATION.cff` tracks this row exactly, and the guard compares the two whenever
 `CITATION.cff` exists. Once the root `Cargo.toml` lands, the guard also compares
