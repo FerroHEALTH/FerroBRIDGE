@@ -211,7 +211,7 @@ fn the_closure_holds_every_primitive_and_the_open_datatypes() {
             "{name} is in the closure"
         );
     }
-    assert_eq!(closure.roots().len(), 8);
+    assert_eq!(closure.roots().len(), 9);
 }
 
 #[test]
@@ -416,7 +416,7 @@ fn r5_model() -> VersionModule {
 fn r5_closes_over_its_own_datatypes() {
     let roots = RootSet::select(&R5, RootScope::Terminology).expect("R5 root set selects");
     let closure = TypeClosure::compute(&R5, &roots).expect("R5 closure computes");
-    assert_eq!(closure.roots().len(), 8);
+    assert_eq!(closure.roots().len(), 9);
     // R5 adds integer64 and new datatypes to the open type set
     // (https://hl7.org/fhir/R5/datatypes.html#open).
     for name in ["integer64", "Availability", "ExtendedContactDetail"] {
