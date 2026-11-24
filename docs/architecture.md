@@ -2337,6 +2337,42 @@ closes them (#1290): a refusal the edge answers leaves no request line, and
 the facade's `504` timeout and streamed `413` are set outside the stack. No
 specification governs process plumbing: our own design.
 
+**The state store.** The bridge keeps its own state in one PostgreSQL
+database that every replica shares, configured by `[state]` (`url` or
+`url_file`, `tls_ca` or `tls_ca_file` under the same `sslmode` rules as
+`[cdm]`, `max_connections`, `acquire_timeout`) and kept apart from the OMOP
+CDM, which is a research target with its own DDL and `cdm init` lifecycle
+and stays its own database (purpose limitation, GDPR Art 5(1)(b),
+<https://eur-lex.europa.eu/eli/reg/2016/679/oj>). The `store` module holds
+one `sqlx` pool and refuses a server older than PostgreSQL 19, the floor of
+the family. Its migrations ship in the binary under
+`app/ferrobridge-server/migrations/state/`, one baseline file per area,
+`NNNN_baseline_<area>.sql`, each table in its final shape and edited in
+place until the release that ships it, with the grants last; `serve` runs
+them at start under `sqlx`'s advisory lock, so replicas starting together
+migrate once. The areas take the numbers foundation `0001`, settings `0002`,
+identity `0003`, owned resources `0004`, SHL `0005`, change feed `0006`,
+outbound `0007`, sources `0008`, inbound `0009`, audit `0010`, mappings
+`0011` and grants `0012`, each file landing with the area that moves onto
+the store. A single-consumer lane (a change-feed reader, the outbound lane)
+has one leader across replicas through a row of `lane_lease`: a replica
+takes a free or expired row and its generation moves on, renews at a third
+of the period, and every cursor write locks the row in its own transaction
+and is refused unless it holds the current generation, so a former leader
+paused past its expiry cannot move a cursor. Session advisory locks are not
+used for leadership: they carry no fencing token and end with their
+connection while the task may run on
+(<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
+State held in memory listens on one `LISTEN` session per replica, apart
+from the pool: a notification marks the copy stale, a reconnect drops it
+whole, and while the session is down every request reads the store;
+PostgreSQL delivers a `NOTIFY` at commit and never on rollback
+(<https://www.postgresql.org/docs/current/sql-notify.html>). `[state.seal]`
+lists the keys stored bodies are sealed under, each named by the id a sealed
+row carries, the first one sealing. The `redb` files stay until each area
+has moved. No specification governs where the bridge keeps its state: our
+own design on family precedent.
+
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
 `docs/VERSIONS.md`: `openehr-base`, `openehr-rm`, `openehr-its`,
@@ -2345,7 +2381,7 @@ maintained serde YAML with anchors, aliases, merge keys and spans;
 `serde_yaml` is archived, `serde-yaml-ng` and `serde_yml` unmaintained);
 `jsonschema` 0.61.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
 0.7.1, `reqwest` 0.13.5 with rustls, `backon` 1.6.0; `sqlx` 0.9.0 for checked
-queries and `tokio-postgres` 0.7.18 for binary `COPY`; `redb` 4.3.0 for the
+queries and the state store, `tokio-postgres` 0.7.18 for binary `COPY`; `redb` 4.3.0 for the
 identity store; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
 dates stay in their lexical form in `openehr-base`; FHIR primitives keep theirs
 in `fhir-types`); `sha2` 0.11.0; `insta`, `proptest`, `wiremock`,

@@ -9,7 +9,7 @@ the image or a release binary as [The container](container.md) describes.
 
 <!-- toc -->
 
-## One process, four neighbours
+## One process, five neighbours
 
 FerroBRIDGE is its own process and its own image. It is not a crate inside a
 CDR, not a plugin, and not a library a CDR links. It reaches every neighbour
@@ -22,6 +22,7 @@ build.
 | A FHIR terminology server | FHIR terminology operations, R4 or R4B | the FHIR side |
 | An OMOP CDM v5.4 database | SQL, PostgreSQL | the OMOP side |
 | The OHDSI vocabulary, loaded into that database | SQL | the OMOP side |
+| A PostgreSQL 19 state database, `[state]` | SQL, PostgreSQL | the bridge's own state, shared by its replicas |
 
 You run each of these, or you point FerroBRIDGE at ones you already run. None
 of them is a compile-time dependency, and the bridge treats any conformant
@@ -35,7 +36,10 @@ holding the patient identifier to `ehr_id` relation, the external to internal
 resource id relation and the resource id to composition relation; and, on the
 OMOP side, a side table in its own schema beside the CDM that maps each source
 record to its rows, which is what makes a re-run replace rather than
-duplicate. Everything else it holds is configuration: the loaded
+duplicate. The bridge's own working state moves, area by area, into one
+PostgreSQL database that every replica shares, the `[state]` store, which
+the bridge migrates at start and which stays apart from the CDM database
+([`[state]`](configuration.md#state)). Everything else it holds is configuration: the loaded
 mapping files, the terminology server address, and the CDR address.
 
 ## What it asks of the CDR

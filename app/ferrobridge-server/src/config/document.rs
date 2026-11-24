@@ -21,8 +21,10 @@ use ferrohealth_config::provenance::Provenance;
 
 /// The secrets the tree holds as a value or through a `_file` sibling, by
 /// dotted key; a key under an array of tables names the array.
-const SECRETS: [&str; 10] = [
+const SECRETS: [&str; 12] = [
     "cdm.url",
+    "state.url",
+    "state.seal.keys.key",
     "cdr.endpoint.credentials.password",
     "cdr.endpoint.credentials.oauth.client_secret",
     "terminology.endpoint.credentials.password",

@@ -42,6 +42,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=FERROBRIDGE_BUILD_TIMESTAMP={built_at}");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     println!("cargo:rerun-if-changed=src");
+    // NOTE: the `sqlx::migrate!` docs: a build script watches the migrations,
+    // so a new file is embedded without a change to the source.
+    println!("cargo:rerun-if-changed=migrations");
 
     let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
     let rustc_version = Command::new(rustc)

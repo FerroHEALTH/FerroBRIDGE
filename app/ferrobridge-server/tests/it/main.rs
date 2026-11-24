@@ -47,6 +47,7 @@ mod readiness;
 mod run;
 mod search_e2e;
 mod shutdown;
+mod store;
 mod support;
 mod telemetry;
 mod terminology_oauth;

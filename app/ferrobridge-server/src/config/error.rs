@@ -223,6 +223,24 @@ pub enum Error {
         #[source]
         source: omop_cdm::connection::ConnectionError,
     },
+    /// The state database URL, or the CA it is checked against, is refused.
+    #[error("{key} is refused")]
+    StateConnection {
+        /// The key that holds the refused value.
+        key: String,
+        /// Why it is refused, the `sslmode` named when that is the fault.
+        #[source]
+        source: omop_cdm::connection::ConnectionError,
+    },
+    /// A sealing key of `[state.seal]`, or its id, is refused.
+    #[error("{key} is refused")]
+    SealKey {
+        /// The key that holds the refused value.
+        key: String,
+        /// Why it is refused; never the key material.
+        #[source]
+        source: crate::store::seal::KeyError,
+    },
     /// The person policy names neither of the two values.
     #[error("{key} is `{value}`; the policies are create_on_first_sight and existing")]
     PersonPolicy {

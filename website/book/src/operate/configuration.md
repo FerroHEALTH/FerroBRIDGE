@@ -576,6 +576,63 @@ out with the CDM ([Pseudonymisation](../integrate/omop-etl.md#pseudonymisation))
 | `key_file` | none | yes | A file holding the key, read at boot |
 | `date_shift_days` | `0` | no | The largest shift of a person's dates either way, in whole days, at most 3650; `0` leaves dates as they are |
 
+### `[state]`
+
+The PostgreSQL database the bridge keeps its own state in, shared by every
+replica. It is a database of its own, apart from the OMOP CDM: the CDM is a
+research target with its own `cdm init` lifecycle, and the state store holds
+the bridge's working records. The server needs PostgreSQL 19 or newer and
+refuses to start against an older server. `serve` opens the store at start
+and applies the migrations the binary carries under a PostgreSQL advisory
+lock, so replicas that start together migrate once; readiness carries a
+`state` indicator that reports whether the database answers.
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `url` | none, required when the section is present | yes | The PostgreSQL connection URL; it must name its `sslmode` |
+| `tls_ca` | none | no | The PEM CA the database's certificate is checked against |
+| `tls_ca_file` | none | no | A file holding that CA, read at boot |
+| `max_connections` | `10` | no | The most connections the pool holds, at least 1 |
+| `acquire_timeout` | `5s` | no | How long a request waits for a connection before the store answers that it is unavailable; more than `0s` |
+
+The URL and the CA follow the rules of `[cdm]` above: the same four
+`sslmode` values, the same refusals of `prefer`, `allow`, a missing mode and
+any other `ssl` parameter, and the same relay for TLS. Give the bridge a
+role that owns the database it migrates. When a role named
+`ferrobridge_state_reader` exists, the migrations grant it read access to
+every table of the store, for a support account that must never write.
+
+```toml
+[state]
+url_file = "/run/secrets/state_url"   # postgres://bridge:...@state.internal:5432/ferrobridge?sslmode=verify-full
+tls_ca_file = "/run/secrets/state_ca.pem"
+```
+
+### `[state.seal]`
+
+The keys the store seals stored bodies under. Each key is 32 random bytes
+written as base64 (`openssl rand -base64 32`) and named by an id that every
+sealed row records. The first key seals; every listed key opens what was
+sealed under it, so a rotation adds the new key first and keeps the old one
+until no row names it.
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `keys` | none, at least one when the section is present | no | The keys, newest first, each a table of the three keys below |
+| `keys.id` | none, required | no | The id, 1 to 64 characters of `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, unique in the list |
+| `keys.key` | none, required | yes | The base64 of the key's 32 bytes |
+| `keys.key_file` | none | yes | A file holding that base64, read at boot |
+
+```toml
+[[state.seal.keys]]
+id = "2026-11"
+key_file = "/run/secrets/state_seal_2026_11"
+
+[[state.seal.keys]]
+id = "2026-05"
+key_file = "/run/secrets/state_seal_2026_05"
+```
+
 ### `[etl]`
 
 The OMOP ETL jobs `ferrobridge etl run` and `ferrobridge etl fhir` run. Both queries are parsed and
@@ -1446,6 +1503,7 @@ it carries.
 | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
+| `FERROBRIDGE__STATE__URL` | `FERROBRIDGE__STATE__URL_FILE` |
 | `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
 | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
@@ -1483,6 +1541,10 @@ are refused:
 - a `[cdm] url` that names no `sslmode`, or one that falls back to plaintext
   or is not a libpq mode, a `[cdm]` CA that holds no PEM certificate, and a
   `PGSSLROOTCERT`, `PGSSLCERT` or `PGSSLKEY` in the environment;
+- the same faults of the `[state]` URL and CA, a `[state] max_connections`
+  of 0 or an `acquire_timeout` of `0s`, and a `[state.seal]` key that is not
+  the base64 of 32 bytes, an id outside its alphabet, an id listed twice, or
+  a section with no key;
 - a secret set both inline and through its `_file` sibling;
 - a section that is present and names no value for a key it needs.
 - `[operator] enabled` while `[auth]` is off.

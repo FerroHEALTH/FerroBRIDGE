@@ -14,7 +14,6 @@ use ferrohealth_smart::config::credentials::Outbound;
 use secrecy::SecretString;
 
 use super::error::Error;
-use super::section::Cdm;
 
 /// What a `[<lane>.credentials]` table resolves to.
 pub(super) enum Upstream {
@@ -71,31 +70,65 @@ pub(super) fn resolve_credentials(
         .transpose()
 }
 
-/// Returns the key whose value `error` refuses: the CA's for a CA fault, the
-/// URL's for every other.
-pub(super) fn cdm_connection_key(
-    error: &omop_cdm::connection::ConnectionError,
-    cdm: &Cdm,
-) -> &'static str {
-    use omop_cdm::connection::ConnectionError;
-    match error {
-        ConnectionError::NoCertificate
-        | ConnectionError::Pem { .. }
-        | ConnectionError::Root { .. }
-        | ConnectionError::CaWithoutTls => {
-            if cdm.tls_ca_file.is_some() {
-                "cdm.tls_ca_file"
-            } else {
-                "cdm.tls_ca"
-            }
+/// The keys of one PostgreSQL connection section, `[cdm]` or `[state]`.
+pub(super) struct ConnectionKeys<'a> {
+    /// The section's name.
+    pub section: &'static str,
+    /// Whether the URL comes from `url_file`.
+    pub url_file: bool,
+    /// The PEM CA, inline.
+    pub tls_ca: Option<&'a str>,
+    /// The file holding the PEM CA.
+    pub tls_ca_file: Option<&'a Path>,
+}
+
+impl ConnectionKeys<'_> {
+    /// Returns the configured CA, read from `tls_ca` or `tls_ca_file`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Conflict`] when both are set and [`Error::Secret`]
+    /// when the file cannot be read.
+    pub(super) fn ca(&self) -> Result<Option<Vec<u8>>, Error> {
+        match (self.tls_ca, self.tls_ca_file) {
+            (Some(_), Some(_)) => Err(Error::Conflict {
+                key: format!("{}.tls_ca", self.section),
+            }),
+            (Some(pem), None) => Ok(Some(pem.as_bytes().to_vec())),
+            (None, Some(path)) => std::fs::read(path)
+                .map(Some)
+                .map_err(|source| Error::Secret {
+                    key: format!("{}.tls_ca_file", self.section),
+                    path: path.to_path_buf(),
+                    source,
+                }),
+            (None, None) => Ok(None),
         }
-        _ => {
-            if cdm.url_file.is_some() {
-                "cdm.url_file"
-            } else {
-                "cdm.url"
+    }
+
+    /// Returns the key whose value `error` refuses: the CA's for a CA fault,
+    /// the URL's for every other.
+    pub(super) fn refused(&self, error: &omop_cdm::connection::ConnectionError) -> String {
+        use omop_cdm::connection::ConnectionError;
+        let key = match error {
+            ConnectionError::NoCertificate
+            | ConnectionError::Pem { .. }
+            | ConnectionError::Root { .. }
+            | ConnectionError::CaWithoutTls => {
+                if self.tls_ca_file.is_some() {
+                    "tls_ca_file"
+                } else {
+                    "tls_ca"
+                }
             }
-        }
+            _ => {
+                if self.url_file {
+                    "url_file"
+                } else {
+                    "url"
+                }
+            }
+        };
+        format!("{}.{key}", self.section)
     }
 }
 

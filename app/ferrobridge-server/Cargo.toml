@@ -116,8 +116,9 @@ serde.workspace = true
 # The search declarations beside the context mappings are YAML.
 serde-saphyr.workspace = true
 serde_json.workspace = true
-# The connection options `cdm init` opens the CDM pool with.
-sqlx.workspace = true
+# The connection options `cdm init` opens the CDM pool with, and the state
+# store with its migrations and its holder ids.
+sqlx = { workspace = true, features = ["migrate", "uuid"] }
 # The digest behind a derived FHIR resource id.
 sha2.workspace = true
 # The line diff of a revision against the running one.

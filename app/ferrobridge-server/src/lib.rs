@@ -43,6 +43,7 @@ pub mod shl;
 pub mod smart;
 pub mod startup;
 pub mod state;
+pub mod store;
 pub mod terminology;
 pub mod usage_report;
 pub mod walk;
