@@ -409,21 +409,18 @@ async fn a_machine_s_access_is_recorded_naming_its_client() -> Result<(), Box<dy
 }
 
 /// Returns the resource-server settings of a bridge behind the `FerroSMART` at
-/// `issuer`, one `persons` issuer under the `ferrosmart` preset that admits
-/// the cases' client, as `[auth]` reads them.
+/// `issuer`, a table naming only the issuer, as `[auth]` reads them.
 fn behind_ferrosmart(issuer: &Issuer) -> Result<SmartSettings, Box<dyn Error>> {
     let text = format!(
         concat!(
             "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
             "[auth]\nenabled = true\n\n",
             "[facade]\nbase_url = \"{audience}\"\n\n",
-            "[auth.issuer.ferrosmart]\nissuer = \"{issuer}\"\npreset = \"ferrosmart\"\n",
-            "jwks_refresh_interval = \"0s\"\n\n",
-            "[auth.issuer.ferrosmart.profile]\ndelegates = [{{ client = \"{client}\" }}]\n",
+            "[auth.issuer.ferrosmart]\nissuer = \"{issuer}\"\n",
+            "jwks_refresh_interval = \"0s\"\n",
         ),
         issuer = issuer.uri(),
         audience = AUDIENCE,
-        client = CLIENT,
     );
     Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve(Process::Server)?

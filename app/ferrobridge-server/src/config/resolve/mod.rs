@@ -443,7 +443,7 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
             .credentials
             .onward
             .as_ref()
-            .and_then(|onward| onward.kind),
+            .map(|onward| onward.kind.unwrap_or_default()),
     ) {
         issuers.push((lane, kind));
     }
@@ -460,14 +460,7 @@ fn resolve_onward(cdr: &Cdr) -> Result<Option<crate::cdr::onward::CdrOnward>, Er
             .resolve_with_tls(&ferrohealth_smart::config::ServerTls)
             .and_then(|credentials| section.resolve(credentials))
             .map_err(|source| refused("cdr.onward", source))?;
-        let kind = section.kind.ok_or_else(|| {
-            refused(
-                "cdr.onward",
-                ferrohealth_smart::config::ConfigError::Missing {
-                    key: "credentials.onward.kind",
-                },
-            )
-        })?;
+        let kind = section.kind.unwrap_or_default();
         if issuers.iter().any(|(_, seen)| *seen == kind) {
             return Err(Error::Duplicate {
                 key: String::from("cdr.onward.kind"),

@@ -52,7 +52,6 @@ enabled = true
 
 [auth.issuer.ferro]
 issuer = "https://as.example.org/realms/ferro"
-kind = "persons"
 audience = ["https://bridge.example.org/fhir"]
 "#;
 
@@ -68,7 +67,7 @@ fn config_check_never_renders_an_issuers_userinfo() -> Result<(), Box<dyn Error>
         (
             "auth",
             "as.example.org",
-            "[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://u:SYNTH_AUTH_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://bridge.example.org/fhir\"]\n".to_owned(),
+            "[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://u:SYNTH_AUTH_PW@as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n".to_owned(),
         ),
         (
             "oauth",
@@ -78,13 +77,13 @@ fn config_check_never_renders_an_issuers_userinfo() -> Result<(), Box<dyn Error>
         (
             "onward",
             "as.example.org",
-            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials.onward]\nissuer = \"https://u:SYNTH_ONWARD_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\n".to_owned(),
+            "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[cdr.endpoint.credentials.onward]\nissuer = \"https://u:SYNTH_ONWARD_PW@as.example.org/realms/ferro\"\n".to_owned(),
         ),
         (
             "second issuer",
             "second.example.org",
             format!(
-                "{NAMED_ISSUER}\n[auth.issuer.second]\nissuer = \"https://u:SYNTH_SECOND_PW@second.example.org/realms/ferro\"\nkind = \"machines\"\n"
+                "{NAMED_ISSUER}\n[auth.issuer.second]\nissuer = \"https://u:SYNTH_SECOND_PW@second.example.org/realms/ferro\"\n"
             ),
         ),
         (

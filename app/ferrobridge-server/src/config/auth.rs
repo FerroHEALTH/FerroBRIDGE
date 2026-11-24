@@ -18,8 +18,8 @@ use crate::smart::SmartSettings;
 /// off.
 ///
 /// `ferrohealth-smart` checks the section: every `[auth.issuer.<name>]` with
-/// its `kind`, its audience (`base_url`, the facade's base, when the table
-/// names none), its asymmetric algorithms, its preset and profile keys, and
+/// its audience (`base_url`, the facade's base, when the table names none),
+/// its asymmetric algorithms, its profile keys, a `federation` table, and
 /// every name another key gives an issuer, every Basic user,
 /// every capability against SMART App Launch 2.2.0, Conformance,
 /// §Capabilities, every listed scope, and the product scope in an extension

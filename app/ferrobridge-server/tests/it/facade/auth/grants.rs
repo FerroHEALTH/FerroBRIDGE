@@ -109,39 +109,30 @@ fn a_constrained_scope_grants_nothing_without_an_evaluator() {
 }
 
 #[test]
-fn a_scopeless_token_reaches_everything_only_when_allowlisted() {
-    let allowed = Caller::new(
+fn a_scopeless_token_reaches_nothing() {
+    let caller = Caller::new(
         String::from("svc"),
         None,
         "openid",
         None,
-        true,
         CallerKind::System,
     );
-    assert_eq!(
-        Some(Compartment::Any),
-        allowed.reach(Permission::Create, "Condition")
-    );
-    let other = Caller::new(
-        String::from("svc"),
-        None,
-        "",
-        None,
-        false,
-        CallerKind::System,
-    );
-    assert_eq!(None, other.reach(Permission::Read, "Condition"));
+    assert_eq!(None, caller.reach(Permission::Create, "Condition"));
+    assert_eq!(None, caller.reach(Permission::Read, "Condition"));
 }
 
 #[test]
-fn an_allowlisted_subject_with_scopes_gets_only_its_scopes() {
+fn a_machine_gets_only_its_scopes() {
     let caller = Caller::new(
         String::from("svc"),
         None,
         "system/Condition.r",
         None,
-        true,
         CallerKind::System,
+    );
+    assert_eq!(
+        Some(Compartment::Any),
+        caller.reach(Permission::Read, "Condition")
     );
     assert_eq!(None, caller.reach(Permission::Create, "Condition"));
 }
@@ -153,8 +144,7 @@ fn a_patient_scope_without_a_patient_claim_reaches_nothing() {
         None,
         "patient/*.rs",
         None,
-        false,
-        CallerKind::Person,
+        CallerKind::Practitioner,
     );
     assert_eq!(None, without.reach(Permission::Read, "Condition"));
     let with = Caller::new(
@@ -162,8 +152,7 @@ fn a_patient_scope_without_a_patient_claim_reaches_nothing() {
         None,
         "patient/*.rs",
         Some(String::from("123")),
-        false,
-        CallerKind::Person,
+        CallerKind::Practitioner,
     );
     assert_eq!(
         Some(Compartment::Patient(String::from("123"))),

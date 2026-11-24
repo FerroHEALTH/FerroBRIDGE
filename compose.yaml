@@ -28,7 +28,7 @@
 # the operator API, or the FHIRconnect operations over a mapping directory)
 # refuses to start until you name the authorization server that issues your
 # callers' tokens, or say the network is trusted. Each trusted server is a
-# named [auth.issuer.<name>] table with its kind, written in a configuration
+# named [auth.issuer.<name>] table naming its issuer, written in a configuration
 # file in the ./config directory beside this one, which FERROBRIDGE_CONFIG
 # names. Its audience is the facade's base_url unless the table sets one:
 #
@@ -39,10 +39,6 @@
 #
 #   [auth.issuer.clinic]
 #   issuer = "https://auth.example.org/realms/clinic"
-#   kind = "persons"
-#
-#   [auth.issuer.clinic.profile]
-#   first_party_clients = ["clinic-portal"]
 #   TOML
 #   FERROBRIDGE_CONFIG=/etc/ferrobridge/ferrobridge.toml
 #   # or, on a network only trusted callers reach:
@@ -295,8 +291,8 @@ services:
   #
   # The bridge refuses the console's calls unless it validates the operator's
   # token: name the issuer in an [auth.issuer.<name>] table of its configuration
-  # file, list the console's client id in its profile table's first_party_clients,
-  # and turn on [operator] for the mapping files.
+  # file, register the console at that issuer as a client of the bridge, and
+  # turn on [operator] for the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
   console:
     image: ghcr.io/ferrohealth/ferrobridge-console:${FERROBRIDGE_VERSION:-0.0.28}

@@ -208,14 +208,11 @@ impl Issuer {
         SmartSettings::new(self.issuer_settings())
     }
 
-    /// Returns the resource-server settings of this issuer alone, a
-    /// `persons` issuer whose first-party client is the one the cases'
-    /// tokens name and whose `patient` claim is the launch context, reading
-    /// the key set again on every unknown `kid`.
+    /// Returns the resource-server settings of this issuer alone, a SMART
+    /// authorization server, reading the key set again on every unknown
+    /// `kid`.
     pub(crate) fn issuer_settings(&self) -> Settings {
-        let mut settings = Settings::new(self.uri(), AUDIENCE, IssuerKind::Persons);
-        settings.profile.first_party_clients = vec![String::from(CLIENT)];
-        settings.profile.patient_context = true;
+        let mut settings = Settings::new(self.uri(), AUDIENCE, IssuerKind::Smart);
         settings.jwks_refresh_interval = Duration::ZERO;
         settings
     }

@@ -19,10 +19,6 @@ second admin listener.
 ```toml
 [auth.issuer.clinic]
 issuer = "https://auth.example.org/realms/clinic"
-kind = "persons"
-
-[auth.issuer.clinic.profile]
-first_party_clients = ["ferrobridge-console"]
 
 [operator]
 enabled = true

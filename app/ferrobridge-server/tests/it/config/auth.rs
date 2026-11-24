@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The `[auth]` section `ferrohealth-smart` defines and the operator scope:
-//! the resource server's named issuers with their kinds, presets and profile
-//! keys, audiences (the facade's base by default) and algorithms, the Basic
+//! the resource server's named issuers with their profile keys, audiences (the facade's base by default) and algorithms, the Basic
 //! users, each a person, with the scopes and roles
 //! `[basic_grants]` grants them, and every refusal of them,
 //! the shapes the section no longer takes included.
@@ -40,11 +39,10 @@ const SECTION: &str = "[auth]\nenabled = true\n";
 
 /// The one `[auth.issuer.ferro]` table of the smallest section, whose own
 /// keys a case writes after it.
-const ISSUER: &str =
-    "\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\n";
+const ISSUER: &str = "\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\n";
 
 /// The smallest `[auth]` section that boots, its audience the facade's base.
-const MINIMAL: &str = "[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\n";
+const MINIMAL: &str = "[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\n";
 
 /// A Basic user's synthetic Argon2id PHC string.
 const PHC: &str = "$argon2id$v=19$m=19456,t=2,p=1$c3ludGhldGljLXNhbHQtMTY$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -148,24 +146,32 @@ fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn std::error::Erro
         ],
         issuer.algorithms
     );
-    assert_eq!(IssuerKind::Persons, issuer.kind);
-    // NOTE: RFC 9068 §4 and §2.2, the default `rfc9068` profile takes the
-    // `at+jwt` type and requires the seven claims of the JWT access token.
+    assert_eq!(IssuerKind::Smart, issuer.kind);
+    // NOTE: RFC 9068 §4 and §2.2, the default profile takes the `at+jwt` type
+    // and requires the claims of the JWT access token, `scope` among them.
     assert_eq!(
         vec![String::from("at+jwt"), String::from("application/at+jwt")],
         issuer.profile.token_types
     );
     assert_eq!(
-        ["iss", "exp", "aud", "sub", "client_id", "iat", "jti"]
-            .map(String::from)
-            .to_vec(),
+        [
+            "iss",
+            "exp",
+            "aud",
+            "sub",
+            "client_id",
+            "iat",
+            "jti",
+            "scope"
+        ]
+        .map(String::from)
+        .to_vec(),
         issuer.profile.required_claims
     );
     assert_eq!(Duration::from_secs(60), issuer.clock_skew);
     assert_eq!(Duration::from_secs(60), issuer.jwks_refresh_interval);
     assert_eq!(Duration::from_secs(600), issuer.jwks_max_age);
     assert_eq!(Duration::from_secs(10), issuer.timeout);
-    assert!(issuer.scopeless_subjects.is_empty());
     assert!(issuer.jwks_file.is_none());
     assert_eq!(OPERATOR_SCOPE, auth.operator_scope);
     assert_eq!(auth.options.capabilities, Vec::<String>::new());
@@ -190,21 +196,17 @@ fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
             "jwks_refresh_interval = \"1s\"\n",
             "jwks_max_age = \"2min\"\n",
             "timeout = \"2s\"\n",
-            "scopeless_subjects = [\"svc-ferrofed\"]\n",
             "audience = [\"https://bridge.example.org/fhir\", \"https://bridge.example.org/operator\"]\n",
             "\n[auth.issuer.ferro.profile]\n",
             "token_types = [\"JWT\"]\n",
-            "first_party_clients = [\"ferrobridge-console\"]\n",
+            "max_actor_chain = 2\n",
         ),
     );
     let auth = settings(&text)?.ok_or("auth is on")?;
     let issuer = &auth.issuers[0];
     assert_eq!(vec![Algorithm::ES384, Algorithm::PS256], issuer.algorithms);
     assert_eq!(vec![String::from("JWT")], issuer.profile.token_types);
-    assert_eq!(
-        vec![String::from("ferrobridge-console")],
-        issuer.profile.first_party_clients
-    );
+    assert_eq!(2, issuer.profile.max_actor_chain);
     assert_eq!(Duration::from_secs(5), issuer.clock_skew);
     assert_eq!(Duration::from_secs(1), issuer.jwks_refresh_interval);
     assert_eq!(Duration::from_secs(120), issuer.jwks_max_age);
@@ -217,7 +219,6 @@ fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
         issuer.audience,
         "an issuer's own audience replaces the facade's base"
     );
-    assert!(issuer.scopeless_subjects.contains("svc-ferrofed"));
     assert_eq!(Some("ferrobridge"), auth.realm.as_deref());
     assert_eq!("__bridge.operator", auth.operator_scope);
     assert_eq!(2, auth.options.capabilities.len());
@@ -235,16 +236,16 @@ fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
 fn several_issuers_read_each_with_its_own_keys() -> Result<(), Box<dyn std::error::Error>> {
     let auth = settings(concat!(
         "[auth]\nenabled = true\n\n",
-        "[auth.issuer.one]\nissuer = \"https://one.example.org\"\nkind = \"persons\"\n",
+        "[auth.issuer.one]\nissuer = \"https://one.example.org\"\n",
         "clock_skew = \"30s\"\n\n",
-        "[auth.issuer.two]\nissuer = \"https://two.example.org\"\nkind = \"machines\"\n",
+        "[auth.issuer.two]\nissuer = \"https://two.example.org\"\n",
         "clock_skew = \"10s\"\n",
     ))?
     .ok_or("auth is on")?;
     assert_eq!(2, auth.issuers.len());
     assert_eq!("https://one.example.org", auth.issuers[0].issuer);
-    assert_eq!(IssuerKind::Persons, auth.issuers[0].kind);
-    assert_eq!(IssuerKind::Machines, auth.issuers[1].kind);
+    assert_eq!(IssuerKind::Smart, auth.issuers[0].kind);
+    assert_eq!(IssuerKind::Smart, auth.issuers[1].kind);
     assert_eq!(Duration::from_secs(30), auth.issuers[0].clock_skew);
     assert_eq!(Duration::from_secs(10), auth.issuers[1].clock_skew);
     assert_eq!(
@@ -260,9 +261,9 @@ fn two_issuers(extra: &str, issuer: &str) -> String {
     format!(
         concat!(
             "[auth]\nenabled = true\n{}\n",
-            "[auth.issuer.one]\nissuer = \"https://one.example.org\"\nkind = \"persons\"\n",
+            "[auth.issuer.one]\nissuer = \"https://one.example.org\"\n",
             "{}\n",
-            "[auth.issuer.two]\nissuer = \"https://two.example.org\"\nkind = \"persons\"\n",
+            "[auth.issuer.two]\nissuer = \"https://two.example.org\"\n",
             "{}",
         ),
         extra, issuer, issuer
@@ -270,23 +271,14 @@ fn two_issuers(extra: &str, issuer: &str) -> String {
 }
 
 #[test]
-fn an_issuer_without_its_kind_is_refused_naming_the_key() -> Result<(), Box<dyn std::error::Error>>
-{
-    let error = refusal(concat!(
-        "[auth]\nenabled = true\n\n[auth.issuer.ferro]\n",
-        "issuer = \"https://as.example.org/realms/ferro\"\n",
-    ))?;
-    assert!(
-        matches!(
-            rule(&error),
-            Some(ConfigError::Missing {
-                key: "auth.issuer.kind"
-            })
-        ),
-        "{error:?}"
-    );
-    let error = refusal(&auth("", "").replace("kind = \"persons\"", "kind = \"robots\""))?;
-    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
+fn an_issuer_is_a_smart_issuer_unless_it_declares_federation()
+-> Result<(), Box<dyn std::error::Error>> {
+    // NOTE: SMART App Launch 2.2.0; every issuer is an authorization server read
+    // from its standard claims, and `federation` the one kind a table declares.
+    for kind in ["persons", "smart", "robots"] {
+        let error = refusal(&auth("", &format!("kind = \"{kind}\"\n")))?;
+        assert!(matches!(error, Error::Parse { .. }), "{kind}: {error:?}");
+    }
     Ok(())
 }
 
@@ -335,42 +327,8 @@ fn the_token_profile_key_is_refused_as_an_unknown_key() -> Result<(), Box<dyn st
 }
 
 #[test]
-fn a_profile_preset_reads_with_a_key_set_over_it() -> Result<(), Box<dyn std::error::Error>> {
-    let read = settings(&auth(
-        "",
-        concat!(
-            "preset = \"keycloak\"\n\n[auth.issuer.ferro.profile]\n",
-            "first_party_clients = [\"ferrobridge-console\"]\n",
-            "app_only = [{ subjects = [\"service-account-etl\"] }]\n",
-        ),
-    ))?
-    .ok_or("auth is on")?;
-    let profile = &read.issuers[0].profile;
-    assert_eq!(vec![String::from("azp")], profile.client_claims);
-    assert_eq!(
-        vec![String::from("ferrobridge-console")],
-        profile.first_party_clients
-    );
-    // NOTE: no specification governs this: our own design, the crate's; the
-    // `keycloak` preset names no service account, so the table must.
-    let error = refusal(&auth("", "preset = \"keycloak\"\n"))?;
-    assert!(
-        matches!(rule(&error), Some(ConfigError::Issuer { .. })),
-        "{error:?}"
-    );
-    let error = refusal(&auth("", "preset = \"unknown\"\n"))?;
-    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
-    Ok(())
-}
-
-#[test]
-fn a_preset_named_as_profile_or_a_profile_key_on_the_issuer_table_is_refused()
--> Result<(), Box<dyn std::error::Error>> {
-    for line in [
-        "profile = \"keycloak\"\n",
-        "first_party_clients = [\"ferrobridge-console\"]\n",
-        "patient_context = true\n",
-    ] {
+fn a_profile_key_on_the_issuer_table_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    for line in ["token_types = [\"JWT\"]\n", "max_actor_chain = 2\n"] {
         let error = refusal(&auth("", line))?;
         assert!(matches!(error, Error::Parse { .. }), "{line}: {error:?}");
     }
@@ -381,7 +339,7 @@ fn a_preset_named_as_profile_or_a_profile_key_on_the_issuer_table_is_refused()
 fn the_issuer_array_form_is_refused_at_load() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(concat!(
         "[auth]\nenabled = true\n\n[[auth.issuer]]\n",
-        "issuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\n",
+        "issuer = \"https://as.example.org/realms/ferro\"\n",
     ))?;
     assert!(matches!(error, Error::Parse { .. }), "{error:?}");
     Ok(())
@@ -394,42 +352,6 @@ fn an_issuer_name_outside_the_name_form_is_refused() -> Result<(), Box<dyn std::
         matches!(rule(&error), Some(ConfigError::IssuerName { name }) if name == "Ferro-1"),
         "{error:?}"
     );
-    Ok(())
-}
-
-#[test]
-fn the_patient_context_is_read_only_from_an_issuer_whose_profile_turns_it_on()
--> Result<(), Box<dyn std::error::Error>> {
-    // NOTE: SMART App Launch 2.2.0, Scopes and Launch Context, `launch/patient`:
-    // the authorization server sets the patient context, read from an issuer trusted to.
-    let read = |issuer: &str| -> Result<bool, Box<dyn std::error::Error>> {
-        let auth = settings(&auth("", issuer))?.ok_or("auth is on")?;
-        Ok(auth.issuers[0].profile.patient_context)
-    };
-    assert!(
-        !read("")?,
-        "the standards-only preset reads no patient claim"
-    );
-    assert!(read("preset = \"ferrosmart\"\n")?);
-    assert!(!read(
-        "preset = \"ferrosmart\"\n\n[auth.issuer.ferro.profile]\npatient_context = false\n"
-    )?);
-    assert!(read(
-        "\n[auth.issuer.ferro.profile]\npatient_context = true\n"
-    )?);
-    Ok(())
-}
-
-#[test]
-fn a_section_level_scopeless_subjects_list_is_refused_at_load()
--> Result<(), Box<dyn std::error::Error>> {
-    for entry in [
-        "[\"svc-ferrofed\"]",
-        "[{ issuer = \"https://one.example.org\", sub = \"svc-ferrofed\" }]",
-    ] {
-        let error = refusal(&two_issuers(&format!("scopeless_subjects = {entry}\n"), ""))?;
-        assert!(matches!(error, Error::Parse { .. }), "{entry}: {error:?}");
-    }
     Ok(())
 }
 
@@ -456,21 +378,18 @@ fn a_described_issuer_naming_no_issuer_table_is_refused() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_scopeless_subject_and_the_role_claims_hold_for_their_issuer_alone()
--> Result<(), Box<dyn std::error::Error>> {
+fn the_role_claims_hold_for_their_issuer_alone() -> Result<(), Box<dyn std::error::Error>> {
     let auth = settings(&format!(
         concat!(
             "[auth]\nenabled = true\n\n",
-            "[auth.issuer.one]\nissuer = \"https://one.example.org\"\nkind = \"persons\"\n",
-            "scopeless_subjects = [\"svc-ferrofed\"]\nrole_claims = []\n\n",
-            "[auth.issuer.two]\nissuer = \"https://two.example.org\"\nkind = \"persons\"\n",
+            "[auth.issuer.one]\nissuer = \"https://one.example.org\"\n",
+            "role_claims = []\n\n",
+            "[auth.issuer.two]\nissuer = \"https://two.example.org\"\n",
             "{}",
         ),
         "role_claims = [\"realm_access.roles\"]\n"
     ))?
     .ok_or("auth is on")?;
-    assert!(auth.issuers[0].scopeless_subjects.contains("svc-ferrofed"));
-    assert!(auth.issuers[1].scopeless_subjects.is_empty());
     assert_eq!(Vec::<String>::new(), auth.issuers[0].role_claims);
     assert_eq!(
         vec![String::from("realm_access.roles")],
@@ -635,7 +554,7 @@ fn the_environment_turns_auth_on_over_the_files_issuer() -> Result<(), Box<dyn s
         "https://as.example.org/realms/ferro",
         auth.issuers[0].issuer
     );
-    assert_eq!(IssuerKind::Persons, auth.issuers[0].kind);
+    assert_eq!(IssuerKind::Smart, auth.issuers[0].kind);
     let off = BTreeMap::from([(
         String::from("FERROBRIDGE__AUTH__ENABLED"),
         String::from("false"),
@@ -679,7 +598,7 @@ fn an_issuer_that_is_no_https_url_is_refused() -> Result<(), Box<dyn std::error:
             "{issuer}: {error:?}"
         );
     }
-    let error = refusal("[auth]\nenabled = true\n\n[auth.issuer.ferro]\nkind = \"persons\"\n")?;
+    let error = refusal("[auth]\nenabled = true\n\n[auth.issuer.ferro]\ntimeout = \"2s\"\n")?;
     assert!(
         matches!(
             rule(&error),
@@ -853,14 +772,14 @@ fn a_basic_only_section_is_refused_because_the_facade_names_an_issuer()
 fn introspection_mode_resolves_the_introspection_check_in_place_of_the_issuers()
 -> Result<(), Box<dyn std::error::Error>> {
     let settings = settings(
-        "[auth]\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"persons\"\nmode = \"introspection\"\n\n[auth.issuer.ferro.introspection]\ncache_max_age = \"30s\"\n\n[auth.issuer.ferro.introspection.client]\nclient_id = \"ferrobridge-rs\"\nclient_secret = \"synthetic-secret\"\n",
+        "[auth]\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\nmode = \"introspection\"\n\n[auth.issuer.ferro.introspection]\ncache_max_age = \"30s\"\n\n[auth.issuer.ferro.introspection.client]\nclient_id = \"ferrobridge-rs\"\nclient_secret = \"synthetic-secret\"\n",
     )?
     .ok_or("auth is on")?;
     assert!(settings.issuers.is_empty(), "no key set is read");
     let [introspection] = settings.introspection.as_slice() else {
         return Err("one introspection check".into());
     };
-    assert_eq!(IssuerKind::Persons, introspection.kind);
+    assert_eq!(IssuerKind::Smart, introspection.kind);
     assert_eq!("https://as.example.org/realms/ferro", introspection.issuer);
     assert_eq!(Duration::from_secs(30), introspection.cache_max_age);
     assert_eq!(OPERATOR_SCOPE, settings.operator_scope);
@@ -887,7 +806,7 @@ fn two_tables_naming_one_issuer_refuse_to_boot() -> Result<(), Box<dyn std::erro
     // NOTE: no specification governs this: our own design, the crate's; one issuer is
     // trusted in one table, so a later table never replaces an earlier one unseen.
     let error = refusal(&format!(
-        "{MINIMAL}\n[auth.issuer.again]\nissuer = \"https://as.example.org/realms/ferro\"\nkind = \"machines\"\n"
+        "{MINIMAL}\n[auth.issuer.again]\nissuer = \"https://as.example.org/realms/ferro\"\n"
     ))?;
     assert!(
         matches!(rule(&error), Some(ConfigError::DuplicateIssuer { .. })),
@@ -914,16 +833,10 @@ fn the_environment_addresses_an_issuer_by_its_name() -> Result<(), Box<dyn std::
 
 #[test]
 fn the_environment_alone_declares_a_named_issuer() -> Result<(), Box<dyn std::error::Error>> {
-    let environment = BTreeMap::from([
-        (
-            String::from("FERROBRIDGE__AUTH__ISSUER__CLINIC__ISSUER"),
-            String::from("https://auth.example.org/realms/clinic"),
-        ),
-        (
-            String::from("FERROBRIDGE__AUTH__ISSUER__CLINIC__KIND"),
-            String::from("persons"),
-        ),
-    ]);
+    let environment = BTreeMap::from([(
+        String::from("FERROBRIDGE__AUTH__ISSUER__CLINIC__ISSUER"),
+        String::from("https://auth.example.org/realms/clinic"),
+    )]);
     let auth = Config::from_sources(Some(GUARDED), &environment)?
         .resolve(Process::Server)?
         .auth

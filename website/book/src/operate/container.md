@@ -203,7 +203,6 @@ names the authorization server that issues its callers' tokens:
 
 ```sh
 FERROBRIDGE__AUTH__ISSUER__CLINIC__ISSUER=https://auth.example.org/realms/clinic
-FERROBRIDGE__AUTH__ISSUER__CLINIC__KIND=persons
 ```
 
 The issuer is named `clinic` here, and its audience is the facade's

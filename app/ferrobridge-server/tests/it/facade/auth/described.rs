@@ -3,12 +3,10 @@
 
 //! The issuer the SMART discovery document and the `CapabilityStatement`
 //! name, chosen by `ferrohealth-smart`'s `describe`: `[auth]
-//! described_issuer`, else the one issuer a user launch starts at, else, with
-//! only `machines` issuers trusted, the one `machines` issuer for SMART
-//! Backend Services; never by the order of the `[[auth.issuer]]` tables.
-//! SMART App Launch 2.2.0, Conformance, §Metadata, and Backend Services,
-//! §Retrieve `.well-known/smart-configuration`; which of several issuers is
-//! described is our own design.
+//! described_issuer`, else the one SMART issuer; never a `federation` issuer
+//! unnamed, and never by the order of the `[auth.issuer.<name>]` tables.
+//! SMART App Launch 2.2.0, Conformance, §Metadata; which of several issuers
+//! is described is our own design.
 
 use std::error::Error;
 
@@ -32,6 +30,28 @@ use crate::facade::harness;
 fn of_kind(issuer: &Issuer, kind: IssuerKind) -> Settings {
     let mut settings = issuer.issuer_settings();
     settings.kind = kind;
+    settings
+}
+
+/// The resource-server settings of `issuer` as another party's `federation`
+/// issuer, mapping the persons of `https://as.example.org`.
+fn federation_of(issuer: &Issuer) -> Settings {
+    let mut settings = of_kind(issuer, IssuerKind::Federation);
+    settings.role_claims = Vec::new();
+    settings.federation = Some(
+        toml::from_str(concat!(
+            "contact_point = false\n",
+            "mapping = \"iua\"\n",
+            "countries = [\"NL\"]\n",
+            "issuing_authorities = [\"CIBG\"]\n",
+            "provider_identifier_prefixes = [\"urn:oid:2.16.528.1.1007.3.3.\"]\n",
+            "exchanges_from = [\"https://as.example.org\"]\n",
+            "person_mapping = \"hp_identifier\"\n",
+            "fields = { \"professional.country_code\" = [{ constant = \"NL\" }], ",
+            "\"professional.issuing_authority_name\" = [{ constant = \"CIBG\" }] }\n",
+        ))
+        .expect("the federation table reads"),
+    );
     settings
 }
 
@@ -83,13 +103,13 @@ async fn refusal(settings: SmartSettings) -> Result<DescribeError, Box<dyn Error
 }
 
 #[tokio::test]
-async fn a_machines_issuer_written_first_is_never_described() -> Result<(), Box<dyn Error>> {
+async fn a_federation_issuer_written_first_is_never_described() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
-    let machines = Issuer::start(&[&key]).await;
+    let federation = Issuer::start(&[&key]).await;
     let persons = Issuer::start(&[&key]).await;
     let written = vec![
-        of_kind(&machines, IssuerKind::Machines),
-        of_kind(&persons, IssuerKind::Persons),
+        federation_of(&federation),
+        of_kind(&persons, IssuerKind::Smart),
     ];
     let mut reversed = written.clone();
     reversed.reverse();
@@ -118,13 +138,13 @@ async fn a_machines_issuer_written_first_is_never_described() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn several_user_issuers_without_the_key_refuse_the_start() -> Result<(), Box<dyn Error>> {
+async fn several_smart_issuers_without_the_key_refuse_the_start() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let persons = Issuer::start(&[&key]).await;
     let patients = Issuer::start(&[&key]).await;
     let written = vec![
-        of_kind(&persons, IssuerKind::Persons),
-        of_kind(&patients, IssuerKind::Patients),
+        of_kind(&persons, IssuerKind::Smart),
+        of_kind(&patients, IssuerKind::Smart),
     ];
     let mut reversed = written.clone();
     reversed.reverse();
@@ -133,7 +153,7 @@ async fn several_user_issuers_without_the_key_refuse_the_start() -> Result<(), B
     for issuers in [written, reversed] {
         let DescribeError::SeveralEligible { issuers } = refusal(trusting(issuers, None)).await?
         else {
-            return Err("several user issuers are refused as such".into());
+            return Err("several SMART issuers are refused as such".into());
         };
         let named: Vec<&str> = issuers.iter().map(SecretUrl::expose).collect();
         assert_eq!(named, sorted, "the table order never shows");
@@ -147,8 +167,8 @@ async fn the_named_issuer_is_described_among_several() -> Result<(), Box<dyn Err
     let persons = Issuer::start(&[&key]).await;
     let patients = Issuer::start(&[&key]).await;
     let issuers = vec![
-        of_kind(&persons, IssuerKind::Persons),
-        of_kind(&patients, IssuerKind::Patients),
+        of_kind(&persons, IssuerKind::Smart),
+        of_kind(&patients, IssuerKind::Smart),
     ];
     for named in [&persons, &patients] {
         let (document, members) = documents(trusting(issuers.clone(), Some(named))).await?;
@@ -167,81 +187,12 @@ async fn the_named_issuer_is_described_among_several() -> Result<(), Box<dyn Err
 }
 
 #[tokio::test]
-async fn a_machines_only_bridge_is_described_for_backend_services() -> Result<(), Box<dyn Error>> {
-    let key = ec_key("k1", Algorithm::ES256);
-    let machines = Issuer::start(&[&key]).await;
-    let mut settings = trusting(vec![of_kind(&machines, IssuerKind::Machines)], None);
-    settings.options.scopes_supported = vec![
-        String::from("system/Condition.rs"),
-        String::from("user/Condition.rs"),
-    ];
-    settings.options.capabilities = vec![String::from("launch-ehr")];
-    let (document, members) = documents(settings).await?;
-    let uri = machines.uri();
-    // NOTE: SMART App Launch 2.2.0, Backend Services, Retrieve
-    // `.well-known/smart-configuration`: a backend client reads the token endpoint here.
-    assert_eq!(
-        Some(format!("{uri}/token").as_str()),
-        document["token_endpoint"].as_str(),
-        "{document}"
-    );
-    assert_eq!(
-        serde_json::json!(["client_credentials"]),
-        document["grant_types_supported"]
-    );
-    assert_eq!(
-        serde_json::json!(["private_key_jwt"]),
-        document["token_endpoint_auth_methods_supported"]
-    );
-    assert_eq!(
-        serde_json::json!(["client-confidential-asymmetric", "permission-v1"]),
-        document["capabilities"]
-    );
-    assert_eq!(
-        serde_json::json!(["system/Condition.rs"]),
-        document["scopes_supported"]
-    );
-    assert!(
-        document.get("authorization_endpoint").is_none(),
-        "{document}"
-    );
-    assert!(
-        members.contains(&(String::from("token"), format!("{uri}/token"))),
-        "{members:?}"
-    );
-    assert!(
-        !members.iter().any(|(name, _)| name == "authorize"),
-        "no user launch starts at a machines issuer: {members:?}"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_named_machines_issuer_beside_a_user_issuer_refuses_the_start()
--> Result<(), Box<dyn Error>> {
-    let key = ec_key("k1", Algorithm::ES256);
-    let machines = Issuer::start(&[&key]).await;
-    let persons = Issuer::start(&[&key]).await;
-    let issuers = vec![
-        of_kind(&persons, IssuerKind::Persons),
-        of_kind(&machines, IssuerKind::Machines),
-    ];
-    let DescribeError::MachinesIssuer { issuer } =
-        refusal(trusting(issuers, Some(&machines))).await?
-    else {
-        return Err("a named machines issuer beside a user issuer is refused".into());
-    };
-    assert_eq!(issuer.expose(), machines.uri());
-    Ok(())
-}
-
-#[tokio::test]
 async fn a_named_unknown_issuer_refuses_the_start() -> Result<(), Box<dyn Error>> {
     let key = ec_key("k1", Algorithm::ES256);
     let persons = Issuer::start(&[&key]).await;
     let elsewhere = Issuer::start(&[&key]).await;
     let refused = refusal(trusting(
-        vec![of_kind(&persons, IssuerKind::Persons)],
+        vec![of_kind(&persons, IssuerKind::Smart)],
         Some(&elsewhere),
     ))
     .await?;
