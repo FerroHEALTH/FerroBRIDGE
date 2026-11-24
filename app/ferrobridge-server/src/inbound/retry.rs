@@ -80,7 +80,9 @@ impl Policy {
         let half = delay >> 1;
         let jitter = half.saturating_mul(u128::from(random)) >> 32;
         let nanos = delay.saturating_sub(half).saturating_add(jitter);
-        Next::Retry(Duration::from_nanos(u64::try_from(nanos).unwrap_or(u64::MAX)))
+        Next::Retry(Duration::from_nanos(
+            u64::try_from(nanos).unwrap_or(u64::MAX),
+        ))
     }
 }
 
