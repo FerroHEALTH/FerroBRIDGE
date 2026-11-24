@@ -3,7 +3,8 @@
 
 //! The events lane at boot: a CDR that serves no outbox feed for the reader
 //! refuses the start, and a lane whose broker is down starts degraded while
-//! the process stays ready.
+//! the process stays ready. The lane keeps its cursors in the state store,
+//! so the cases run only when `FERROBRIDGE_E2E=1` admits the harness.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -13,6 +14,7 @@ use ferrobridge_server::boot::{Backoff, serve_settings};
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::config::Settings;
+use ferrobridge_testkit::containers;
 use serde_json::json;
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
@@ -26,19 +28,20 @@ const BACKOFF: Backoff = Backoff {
 
 /// Returns settings whose events lane follows the reference CDR's feed at
 /// `cdr` and publishes to a broker on `broker_port`, where nothing listens,
-/// parking poisoned events in `store`.
+/// keeping its state in the database `state` reaches.
 fn settings(
     cdr: &MockServer,
     broker_port: u16,
-    store: &tempfile::TempDir,
+    state: &containers::Postgres,
 ) -> Result<Settings, Box<dyn Error>> {
     let text = format!(
         "[usage_report]\nenabled = false\n\n\
          [cdr]\nendpoint.url = \"{uri}/v1\"\n\n\
-         [change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\npoll_interval = \"10ms\"\nbackoff = \"10ms\"\nmax_backoff = \"20ms\"\ndead_letters = \"{dead_letters}\"\n\n\
+         [change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\npoll_interval = \"10ms\"\nbackoff = \"10ms\"\nmax_backoff = \"20ms\"\n\n\
+         [state]\nurl = \"{state}\"\n\n\
          [events]\nenabled = true\nreader = \"ferrobridge-test\"\nurl = \"amqp://guest:guest@127.0.0.1:{broker_port}/%2f\"\nexchange = \"ferrobridge.test.events\"\nconfirm_timeout = \"500ms\"\n",
         uri = cdr.uri(),
-        dead_letters = store.path().join("dead-letters.redb").display(),
+        state = state.url(),
     );
     Ok(Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?)
 }
@@ -53,8 +56,11 @@ fn closed_port() -> Result<u16, Box<dyn Error>> {
 #[tokio::test]
 async fn a_cdr_that_serves_no_feed_for_the_reader_refuses_the_start() -> Result<(), Box<dyn Error>>
 {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let store = containers::postgres().await?;
     let cdr = MockServer::start().await;
-    let store = tempfile::tempdir()?;
     Mock::given(method("GET"))
         .and(path("/ext/admin/outbox/ferrobridge-test"))
         .respond_with(ResponseTemplate::new(404))
@@ -78,8 +84,11 @@ async fn a_cdr_that_serves_no_feed_for_the_reader_refuses_the_start() -> Result<
 #[tokio::test]
 async fn a_broker_that_is_down_degrades_the_lane_and_the_process_stays_ready()
 -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let store = containers::postgres().await?;
     let cdr = MockServer::start().await;
-    let store = tempfile::tempdir()?;
     Mock::given(method("GET"))
         .and(path("/ext/admin/outbox/ferrobridge-test"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({

@@ -3,8 +3,11 @@
 
 //! The bounded retry and the dead-letter store: a poisoned event is charged
 //! one pass at a time and parked on the bound with its cause, a transient
-//! failure is never charged, a replay offers a parked event again, and two
-//! consumers of one CDR each acknowledge their own finished prefix.
+//! failure is never charged, an operator's retry offers a parked event again
+//! and a discard settles it, each with who decided and why, and two
+//! consumers of one CDR each acknowledge their own finished prefix. The
+//! cases over the store run only when `FERROBRIDGE_E2E=1` admits the
+//! harness.
 //!
 //! Every event is synthetic: sequence numbers and identifiers invented for
 //! the test.
@@ -13,7 +16,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::num::NonZeroU32;
-use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
 
@@ -27,6 +29,8 @@ use ferrobridge_server::change_feed::Position;
 use ferrobridge_server::change_feed::ReaderName;
 use ferrobridge_server::change_feed::Seq;
 use ferrobridge_server::change_feed::dead_letter::DeadLetters;
+use ferrobridge_server::change_feed::dead_letter::Decided;
+use ferrobridge_server::change_feed::dead_letter::Decision;
 use ferrobridge_server::change_feed::ferroehr::FerroEhrFeed;
 use ferrobridge_server::change_feed::follow::Consumer;
 use ferrobridge_server::change_feed::follow::ConsumerError;
@@ -34,12 +38,16 @@ use ferrobridge_server::change_feed::follow::Cursor;
 use ferrobridge_server::change_feed::follow::Parking;
 use ferrobridge_server::change_feed::follow::PassError;
 use ferrobridge_server::change_feed::follow::pass;
+use ferrobridge_server::store::lease::Term;
+use ferrobridge_testkit::containers;
 use serde_json::json;
 use wiremock::matchers::{body_json, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::Recording;
 use super::client;
+use super::idle_term;
+use super::led;
 use super::reader;
 
 /// A clinical outbox in memory, with one cursor per reader.
@@ -176,16 +184,47 @@ impl Consumer for Failing {
     }
 }
 
-/// Returns a cursor parking on the third poisoned pass into a store in the
-/// returned directory.
-fn parking() -> Result<(tempfile::TempDir, Arc<DeadLetters>, Cursor), Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let store = Arc::new(DeadLetters::open(&dir.path().join("dead-letters.redb"))?);
+/// A store in a PostgreSQL container, the lease its follower holds, and a
+/// cursor parking on the third poisoned pass; `None` unless the harness is
+/// admitted.
+struct Parking3 {
+    /// The container, held for the case.
+    _postgres: containers::Postgres,
+    /// The dead letters.
+    store: DeadLetters,
+    /// The follower's lease.
+    term: Term,
+    /// The cursor.
+    cursor: Cursor,
+}
+
+/// Returns the parking of a case, `None` unless `FERROBRIDGE_E2E=1`.
+async fn parking() -> Result<Option<Parking3>, Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(None);
+    }
+    let postgres = containers::postgres().await?;
+    let (state, term) = led(postgres.url()).await?;
+    let store = DeadLetters::new(state.pool().clone());
     let cursor = Cursor::parking(Parking {
-        store: Arc::clone(&store),
+        store: store.clone(),
         max_attempts: NonZeroU32::new(3).ok_or("a bound")?,
     });
-    Ok((dir, store, cursor))
+    Ok(Some(Parking3 {
+        _postgres: postgres,
+        store,
+        term,
+        cursor,
+    }))
+}
+
+/// The settlement an operator gives in these cases.
+fn decided(decision: Decision) -> Decided {
+    Decided {
+        decision,
+        by: String::from("operator-test"),
+        reason: String::from("the synthetic template was deployed"),
+    }
 }
 
 /// Returns the page size every case asks for.
@@ -201,20 +240,28 @@ async fn a_poisoned_event_is_parked_on_the_bound_and_the_cursor_moves_past_it()
         poisoned: BTreeSet::from([2]),
         ..Failing::default()
     };
-    let (_dir, store, mut cursor) = parking()?;
+    let Some(Parking3 {
+        store,
+        term,
+        mut cursor,
+        ..
+    }) = parking().await?
+    else {
+        return Ok(());
+    };
     for _below_the_bound in 0..2 {
-        let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await;
+        let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await;
         assert!(
             matches!(failed, Err(PassError::Consumer { .. })),
             "{failed:?}"
         );
         assert_eq!(Some(1), outbox.cursor(&reader()));
-        assert!(store.parked(&reader())?.is_empty());
+        assert!(store.parked(&reader()).await?.is_empty());
     }
-    let done = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    let done = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
     assert_eq!(vec![clinical(3)], done.acknowledged);
     assert_eq!(Some(3), outbox.cursor(&reader()));
-    let parked = store.parked(&reader())?;
+    let parked = store.parked(&reader()).await?;
     let [entry] = parked.as_slice() else {
         return Err("one parked event".into());
     };
@@ -237,19 +284,27 @@ async fn a_transient_failure_never_charges_the_bound() -> Result<(), Box<dyn Err
         transient: BTreeSet::from([2]),
         ..Failing::default()
     };
-    let (_dir, store, mut cursor) = parking()?;
+    let Some(Parking3 {
+        store,
+        term,
+        mut cursor,
+        ..
+    }) = parking().await?
+    else {
+        return Ok(());
+    };
     for _pass in 0..6 {
-        let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await;
+        let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await;
         assert!(
             matches!(failed, Err(PassError::Consumer { .. })),
             "{failed:?}"
         );
     }
     assert_eq!(Some(1), outbox.cursor(&reader()));
-    assert!(store.parked(&reader())?.is_empty());
+    assert!(store.parked(&reader()).await?.is_empty());
     assert_eq!(
         1,
-        store.charge(&reader(), &clinical(2))?,
+        store.charge(&term, &reader(), &clinical(2)).await?,
         "no pass was charged"
     );
     Ok(())
@@ -263,14 +318,22 @@ async fn an_event_that_recovers_below_the_bound_starts_its_count_again()
         poisoned: BTreeSet::from([1]),
         ..Failing::default()
     };
-    let (_dir, store, mut cursor) = parking()?;
-    let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await;
+    let Some(Parking3 {
+        store,
+        term,
+        mut cursor,
+        ..
+    }) = parking().await?
+    else {
+        return Ok(());
+    };
+    let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await;
     assert!(failed.is_err());
     consumer.heal();
-    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
     assert_eq!(
         1,
-        store.charge(&reader(), &clinical(1))?,
+        store.charge(&term, &reader(), &clinical(1)).await?,
         "the count was forgotten"
     );
     Ok(())
@@ -284,55 +347,157 @@ async fn a_replay_offers_the_parked_event_again_before_the_next_page() -> Result
         poisoned: BTreeSet::from([1]),
         ..Failing::default()
     };
-    let (_dir, store, mut cursor) = parking()?;
+    let Some(Parking3 {
+        store,
+        term,
+        mut cursor,
+        ..
+    }) = parking().await?
+    else {
+        return Ok(());
+    };
     for _bound in 0..3 {
-        let _outcome = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await;
+        let _outcome = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await;
     }
     let id = store
-        .parked(&reader())?
+        .parked(&reader())
+        .await?
         .first()
         .map(|parked| parked.id)
         .ok_or("one parked event")?;
-    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
     assert_eq!(
         vec![1, 1, 1],
         consumer.offered(),
-        "no replay without a request"
+        "no replay without a retry"
     );
-    assert!(store.request_replay(&reader(), id)?);
-    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
-    let parked = store.parked(&reader())?;
+    assert!(
+        store
+            .decide(&reader(), id, &decided(Decision::Retry))
+            .await?
+    );
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
+    let parked = store.parked(&reader()).await?;
     let entry = parked.first().ok_or("still parked")?;
     assert_eq!((4, false), (entry.attempts, entry.replay), "parked again");
+    assert_eq!(Some(decided(Decision::Retry)), entry.decided);
     consumer.heal();
-    assert!(store.request_replay(&reader(), id)?);
-    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    assert!(
+        store
+            .decide(&reader(), id, &decided(Decision::Retry))
+            .await?
+    );
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
     assert_eq!(vec![1, 1, 1, 1, 1], consumer.offered());
-    assert!(store.parked(&reader())?.is_empty());
+    assert!(store.parked(&reader()).await?.is_empty());
+    assert!(
+        !store
+            .decide(&reader(), id, &decided(Decision::Retry))
+            .await?,
+        "a settled event takes no second settlement"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_discard_settles_the_parked_event_and_it_is_never_offered_again()
+-> Result<(), Box<dyn Error>> {
+    let outbox = Outbox::new(&[1]);
+    let consumer = Failing {
+        poisoned: BTreeSet::from([1]),
+        ..Failing::default()
+    };
+    let Some(Parking3 {
+        store,
+        term,
+        mut cursor,
+        ..
+    }) = parking().await?
+    else {
+        return Ok(());
+    };
+    for _bound in 0..3 {
+        let _outcome = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await;
+    }
+    let id = store
+        .parked(&reader())
+        .await?
+        .first()
+        .map(|parked| parked.id)
+        .ok_or("one parked event")?;
+    let other = ReaderName::new("another-reader")?;
+    assert!(
+        !store
+            .decide(&other, id, &decided(Decision::Discard))
+            .await?,
+        "another reader's event is not this one"
+    );
+    assert!(
+        store
+            .decide(&reader(), id, &decided(Decision::Discard))
+            .await?
+    );
+    assert!(store.parked(&reader()).await?.is_empty());
+    consumer.heal();
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
+    assert_eq!(
+        vec![1, 1, 1],
+        consumer.offered(),
+        "a discard is never offered"
+    );
+    let (decision, by, why): (String, String, String) = sqlx::query_as(
+        "SELECT decision, decided_by, decision_reason FROM dead_letter WHERE id = $1 AND settled_at IS NOT NULL",
+    )
+    .bind(i64::try_from(id)?)
+    .fetch_one(term.pool())
+    .await?;
+    assert_eq!(
+        (
+            "discard",
+            "operator-test",
+            "the synthetic template was deployed"
+        ),
+        (decision.as_str(), by.as_str(), why.as_str())
+    );
     Ok(())
 }
 
 #[tokio::test]
 async fn a_replay_that_meets_a_transient_failure_stays_requested() -> Result<(), Box<dyn Error>> {
     let outbox = Outbox::new(&[]);
-    let (_dir, store, mut cursor) = parking()?;
-    let id = store.park(
-        &reader(),
-        &event(9),
-        "the synthetic event names no template",
-        3,
-    )?;
-    assert!(store.request_replay(&reader(), id)?);
+    let Some(Parking3 {
+        store,
+        term,
+        mut cursor,
+        ..
+    }) = parking().await?
+    else {
+        return Ok(());
+    };
+    let id = store
+        .park(
+            &term,
+            &reader(),
+            &event(9),
+            "the synthetic event names no template",
+            3,
+        )
+        .await?;
+    assert!(
+        store
+            .decide(&reader(), id, &decided(Decision::Retry))
+            .await?
+    );
     let consumer = Failing {
         transient: BTreeSet::from([9]),
         ..Failing::default()
     };
-    let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await;
+    let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await;
     assert!(
         matches!(failed, Err(PassError::Replay { .. })),
         "{failed:?}"
     );
-    let parked = store.parked(&reader())?;
+    let parked = store.parked(&reader()).await?;
     let entry = parked.first().ok_or("still parked")?;
     assert_eq!((3, true), (entry.attempts, entry.replay));
     Ok(())
@@ -397,9 +562,10 @@ async fn two_consumers_of_one_cdr_each_acknowledge_their_own_finished_prefix()
     let stopping = Recording::failing_at(1);
     let mut first = Cursor::default();
     let mut second = Cursor::default();
-    let done = pass(&feed, &events, &finishing, limit(), &mut first).await?;
+    let term = idle_term();
+    let done = pass(&feed, &events, &finishing, limit(), &mut first, &term).await?;
     assert_eq!(vec![clinical(7)], done.acknowledged);
-    let failed = pass(&feed, &omop, &stopping, limit(), &mut second).await;
+    let failed = pass(&feed, &omop, &stopping, limit(), &mut second, &term).await;
     assert!(
         matches!(failed, Err(PassError::Consumer { .. })),
         "{failed:?}"
@@ -450,7 +616,8 @@ async fn a_pass_settles_before_it_acknowledges_and_a_failed_settle_acknowledges_
         ..Settling::default()
     };
     let mut cursor = Cursor::default();
-    let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await;
+    let term = idle_term();
+    let failed = pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await;
     assert!(
         matches!(failed, Err(PassError::Settle { .. })),
         "{failed:?}"
@@ -460,9 +627,9 @@ async fn a_pass_settles_before_it_acknowledges_and_a_failed_settle_acknowledges_
         .refuse
         .lock()
         .unwrap_or_else(PoisonError::into_inner) = false;
-    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
     assert_eq!(Some(2), outbox.cursor(&reader()));
-    pass(&outbox, &reader(), &consumer, limit(), &mut cursor).await?;
+    pass(&outbox, &reader(), &consumer, limit(), &mut cursor, &term).await?;
     assert_eq!(
         2,
         *consumer

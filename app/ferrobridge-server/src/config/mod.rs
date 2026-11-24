@@ -358,6 +358,7 @@ impl Config {
                 Some(change_feed::resolve_change_feed(
                     &self.change_feed,
                     self.cdr.is_some(),
+                    self.state.is_some(),
                     usize::from(self.events.enabled)
                         + usize::from(self.omop_incremental.enabled)
                         + usize::from(self.fhir_outbound.enabled),

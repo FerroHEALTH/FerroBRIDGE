@@ -121,6 +121,8 @@ port() {
 facade() { echo "http://127.0.0.1:$(port "$1" facade)"; }
 cdr_origin() { echo "http://127.0.0.1:$(port "$1" cdr)"; }
 admin_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" db)/ferroehr?sslmode=disable"; }
+# state_url ARM: the bridge's state store, a database of ARM's CDR server.
+state_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" db)/postgres?sslmode=disable"; }
 
 # pin ITEM [MATRIX]: the pin of the docs/VERSIONS.md row whose first cell is
 # ITEM, backticks off.
@@ -384,6 +386,7 @@ fill() {
     value="${value//@DIR@/$root/$WORK/$arm}"
     value="${value//@TLS@/$root/$WORK/tls}"
     value="${value//@TERMINOLOGY@/$TERMINOLOGY}"
+    value="${value//@STATE@/$(state_url "$arm")}"
     if [[ "$value" =~ @[A-Z][A-Z0-9_]*@ ]]; then
       die "$file: $name names the unknown placeholder ${BASH_REMATCH[0]}"
     fi
@@ -684,7 +687,7 @@ GATE
   check "an older gate whose serve() sets nothing is refused" 2 "$( (arm_env head "$old") > /dev/null 2>&1; echo $?)"
   local committed
   committed="$(arm_env head "$root")"
-  check "the committed perf/arm.env fills every placeholder" 0 "$(grep -c '@' <<< "$committed" || true)"
+  check "the committed perf/arm.env fills every placeholder" 0 "$(grep -cE '@[A-Z][A-Z0-9_]*@' <<< "$committed" || true)"
   check "the committed perf/arm.env switches the usage report off" 1 \
     "$(grep -cx 'FERROBRIDGE__USAGE_REPORT__ENABLED=false' <<< "$committed" || true)"
   local repo="$work/repo" saved_root="$root"

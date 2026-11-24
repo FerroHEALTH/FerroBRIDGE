@@ -39,6 +39,8 @@ pub struct Following {
 pub enum State {
     /// No pass has completed yet.
     Starting,
+    /// Another replica leads the consumer's reader; this one stands by.
+    Standby,
     /// The last pass completed.
     Following,
     /// The last pass failed, for the reason held.
@@ -84,6 +86,11 @@ impl Following {
                 last_failure: None,
             })),
         }
+    }
+
+    /// Records that another replica leads the consumer's reader.
+    pub fn standby(&self) {
+        self.with(|status| status.state = State::Standby);
     }
 
     /// Records a pass that completed.
@@ -135,7 +142,7 @@ impl Following {
     #[must_use]
     pub fn outcome(&self) -> Outcome {
         match self.status().state {
-            State::Following => Outcome::up(),
+            State::Following | State::Standby => Outcome::up(),
             State::Starting => Outcome::degraded("the consumer has not read its feed yet"),
             State::Stalled(reason) => Outcome::degraded(reason),
         }

@@ -28,6 +28,7 @@ use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::change_feed::client;
+use crate::change_feed::idle_term;
 use crate::change_feed::reader;
 
 /// The queue the lane binds in these cases.
@@ -117,6 +118,7 @@ async fn a_real_broker_holds_every_confirmed_message_in_order() -> Result<(), Bo
         &publisher,
         PageSize::new(10).ok_or("a page size")?,
         &mut cursor,
+        &idle_term(),
     )
     .await?;
 

@@ -4,12 +4,11 @@
 //! The running change-feed consumers, as the operator API reports them.
 //!
 //! The document `GET /operator/events` answers holds every consumer with its
-//! parked events and the AMQP topology of the events lane, and `POST
-//! /operator/events/{consumer}/parked/{id}/replay` requests a replay.
+//! open parked events and the AMQP topology of the events lane, and `POST
+//! /operator/events/{consumer}/parked/{id}/settle` records an operator's
+//! retry or discard with who decided and why.
 //!
 //! No specification governs the operator surface: our own design.
-
-use std::sync::Arc;
 
 use ferrobridge_operator_api::events as document;
 
@@ -18,6 +17,8 @@ use crate::change_feed::ReaderName;
 use crate::change_feed::Source;
 use crate::change_feed::dead_letter::DeadLetterError;
 use crate::change_feed::dead_letter::DeadLetters;
+use crate::change_feed::dead_letter::Decided;
+use crate::change_feed::dead_letter::Decision;
 use crate::change_feed::dead_letter::Parked;
 use crate::change_feed::health::Following;
 use crate::change_feed::health::State;
@@ -39,22 +40,22 @@ pub struct Report {
     /// The source they follow.
     source: Source,
     /// The store their parked events are in.
-    dead_letters: Arc<DeadLetters>,
+    dead_letters: DeadLetters,
     /// The consumers, in the order they started.
     followers: Vec<Follower>,
     /// The AMQP topology of the events lane, when it runs.
     topology: Option<document::Topology>,
 }
 
-/// What a replay request found.
+/// What a settlement found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Replay {
-    /// The event is marked; its follower offers it again before its next
-    /// page.
-    Requested,
+pub enum Settlement {
+    /// The settlement is recorded: a retried event is offered again before
+    /// its consumer's next page, a discarded one never again.
+    Recorded,
     /// No running consumer has the name.
     UnknownConsumer,
-    /// The consumer has no parked event with the number.
+    /// The consumer has no open parked event with the number.
     UnknownEvent,
 }
 
@@ -62,7 +63,7 @@ impl Report {
     /// Returns the report of no consumer yet over `source`, whose parked
     /// events `dead_letters` holds.
     #[must_use]
-    pub const fn new(source: Source, dead_letters: Arc<DeadLetters>) -> Self {
+    pub const fn new(source: Source, dead_letters: DeadLetters) -> Self {
         Self {
             source,
             dead_letters,
@@ -89,35 +90,46 @@ impl Report {
     ///
     /// # Errors
     /// Returns [`DeadLetterError`] when the parked events cannot be read.
-    pub fn document(&self) -> Result<document::Events, DeadLetterError> {
-        let consumers = self
-            .followers
-            .iter()
-            .map(|follower| self.consumer(follower))
-            .collect::<Result<Vec<_>, _>>()?;
+    pub async fn document(&self) -> Result<document::Events, DeadLetterError> {
+        let mut consumers = Vec::with_capacity(self.followers.len());
+        for follower in &self.followers {
+            consumers.push(self.consumer(follower).await?);
+        }
         Ok(document::Events {
             consumers,
             topology: self.topology.clone(),
         })
     }
 
-    /// Requests the replay of the event `id` parked for the consumer `name`.
+    /// Settles the event `id` parked for the consumer `name` as `decided`
+    /// says.
     ///
     /// # Errors
     /// Returns [`DeadLetterError`] when the store refuses the write.
-    pub fn replay(&self, name: &str, id: u64) -> Result<Replay, DeadLetterError> {
+    pub async fn settle(
+        &self,
+        name: &str,
+        id: u64,
+        decided: &Decided,
+    ) -> Result<Settlement, DeadLetterError> {
         let Some(follower) = self.followers.iter().find(|follower| follower.name == name) else {
-            return Ok(Replay::UnknownConsumer);
+            return Ok(Settlement::UnknownConsumer);
         };
-        Ok(if self.dead_letters.request_replay(&follower.reader, id)? {
-            Replay::Requested
-        } else {
-            Replay::UnknownEvent
-        })
+        Ok(
+            if self
+                .dead_letters
+                .decide(&follower.reader, id, decided)
+                .await?
+            {
+                Settlement::Recorded
+            } else {
+                Settlement::UnknownEvent
+            },
+        )
     }
 
     /// Returns the document entry of `follower`.
-    fn consumer(&self, follower: &Follower) -> Result<document::Consumer, DeadLetterError> {
+    async fn consumer(&self, follower: &Follower) -> Result<document::Consumer, DeadLetterError> {
         let status = follower.following.status();
         Ok(document::Consumer {
             name: String::from(follower.name),
@@ -129,6 +141,7 @@ impl Report {
             positions: status.positions.values().map(position).collect(),
             state: match status.state {
                 State::Starting => document::State::Starting,
+                State::Standby => document::State::Standby,
                 State::Following => document::State::Following,
                 State::Stalled(_) => document::State::Stalled,
             },
@@ -140,7 +153,8 @@ impl Report {
             }),
             parked: self
                 .dead_letters
-                .parked(&follower.reader)?
+                .parked(&follower.reader)
+                .await?
                 .iter()
                 .map(parked)
                 .collect(),
@@ -175,6 +189,14 @@ fn parked(entry: &Parked) -> document::Parked {
         attempts: entry.attempts,
         at: entry.at.to_string(),
         replay_requested: entry.replay,
+        decision: entry.decided.as_ref().map(|decided| document::Decided {
+            decision: match decided.decision {
+                Decision::Retry => document::Decision::Retry,
+                Decision::Discard => document::Decision::Discard,
+            },
+            by: decided.by.clone(),
+            reason: decided.reason.clone(),
+        }),
     }
 }
 

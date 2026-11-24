@@ -1278,8 +1278,10 @@ naming the key.
 
 The source the change-feed consumers follow: the commits of the CDR, read
 after each consumer's own watermark. It is off until `enabled` is true, and
-an enabled feed is a boot error without a `[cdr]` section, and while no
-consumer section is switched on. The [change feed](../integrate/change-feed.md)
+an enabled feed is a boot error without a `[cdr]` section, without a
+[`[state]`](#state) section, which keeps the watermarks of the `aql` source,
+the dead letters and the reader leases, and while no consumer section is
+switched on. The [change feed](../integrate/change-feed.md)
 page states what each source reads and what it cannot guarantee. No
 specification governs the change feed: it is FerroBRIDGE's own design.
 
@@ -1288,17 +1290,16 @@ specification governs the change feed: it is FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the consumers follow the source |
 | `source` | `aql` | `aql`, the poll of `/query/aql` that works against any CDR, or `ferroehr`, the reference CDR's outbox feed |
 | `url` | none | `ferroehr` only, required: the root of the CDR's extensions, the path `/admin/outbox` lives under |
-| `watermarks` | none | `aql` only, required: the `redb` file each reader's watermark is kept in |
 | `start` | `now` | `aql` only: where a reader with no watermark starts, `now`, `beginning` or an RFC 3339 instant |
-| `dead_letters` | none, required | The `redb` file the consumers park a poisoned event in and count its poisoned passes in; keep it beside `watermarks` |
 | `max_attempts` | `5` | How many passes an event may fail with a poisoned failure before it is parked, 1 to 1000 |
 | `page_size` | `100` | How many events one read asks for, 1 to 1000 |
 | `poll_interval` | `"1s"` | How long a consumer waits after a read that found no full page |
 | `backoff` | `"1s"` | How long a consumer waits after its first failed read, doubled per failure |
 | `max_backoff` | `"1min"` | The longest wait after a failed read, at least `backoff` |
+| `lease` | `"30s"` | How long a replica's lease on a reader holds; the leader renews it every third of the period, and another replica takes the reader over once it runs out |
 
-A missing `dead_letters`, an unknown `source`, a `start` that names no
-instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `"0s"`,
+An unknown `source`, a `start` that names no
+instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait or a `lease` of `"0s"`,
 and a `url` that is no http or https base without a query or a fragment are
 each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
