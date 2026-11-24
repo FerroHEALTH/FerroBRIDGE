@@ -1118,6 +1118,10 @@ jobs:
           key: profile-packages-${{ steps.profile-packages.outputs.key }}
       - name: Fetch and verify the profile packages
         run: bash scripts/vendor/profile-packages.sh
+      # A test starts against a local image, so a slow registry fails this
+      # step and never a test (#2043).
+      - name: Pull the pinned container images
+        run: bash scripts/e2e-images.sh
       - env:
           PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
         run: |
