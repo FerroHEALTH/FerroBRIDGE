@@ -85,6 +85,7 @@ testEscapeUnescape/testUnescapeJson3
 testEscapeUnescape/testUnescapeJson4
 testJoin/testJoin
 testJoin/testJoinEmpty
+testLargeExponents/testNegativeQtyHighBoundaryPrecision
 testMatches/testMatchesFullWithinUrl1
 testMatches/testMatchesFullWithinUrl1a
 testMatches/testMatchesFullWithinUrl2
@@ -112,4 +113,4 @@ testTrim/testTrim3
 testTrim/testTrim4
 testTrim/testTrim5
 testTrim/testTrim6
-total 125
+total 130

@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's Condition model over the CKM problem diagnosis, slotting the
+# library's anatomical location, problem qualifier and ICD-10-GM multiple
+# coding clusters at the elements the library's own slotting methods name
+# (#1963): bodySiteCluster of problem_diagnosis.v1.yml, problemQualifier and
+# multipleCoding of the KDS problem diagnosis extension, whose context does
+# not compile.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_problem_diagnosis_clusters
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+mappings:
+  - name: bodySiteCluster
+    with:
+      fhir: $resource.bodySite
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.anatomical_location.v1]
+    slotArchetype: CLUSTER.anatomical_location.v1
+  - name: problemQualifier
+    with:
+      fhir: $resource
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.problem_qualifier.v2]
+    slotArchetype: CLUSTER.problem_qualifier.v2
+  - name: multipleCoding
+    with:
+      fhir: $resource.code.coding.extension
+      openehr: $archetype/data[at0001]/items[openEHR-EHR-CLUSTER.multiple_coding_icd10gm.v1]
+    fhirCondition:
+      targetRoot: $resource.code.coding.extension
+      targetAttribute: url
+      operator: one of
+      criteria: http://fhir.de/StructureDefinition/icd-10-gm-mehrfachcodierungs-kennzeichen
+    slotArchetype: CLUSTER.multiple_coding_icd10gm.v1

@@ -1,0 +1,9 @@
+---
+source: crates/fhirconnect/tests/it/mapping_library/ckm_entries.rs
+expression: rows(&diagnostics)
+---
+[
+  "ferrobridge_library_informed_consent.context.yml:22 fc-unknown-mapping-reference",
+  "study_details.v1.yml:15 fc-schema-violation",
+  "study_participation.v1.yml:35 fc-unknown-mapping-reference"
+]

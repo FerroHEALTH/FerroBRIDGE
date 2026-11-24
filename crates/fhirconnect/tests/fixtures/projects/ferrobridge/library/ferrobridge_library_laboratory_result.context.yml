@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's laboratory result model with its
+# specimen cluster and, through FerroBRIDGE's analyte extension, its analyte
+# cluster as published (#1963), against the library laboratory template
+# built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_laboratory_result.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/DiagnosticReport"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_laboratory.v1.0.0"
+  archetypes:
+    - "ferrobridge_laboratory_result_analyte"
+    - "OBSERVATION.laboratory_test_result.v1"
+    - "CLUSTER.specimen.v1"
+    - "CLUSTER.laboratory_test_analyte.v1"
+  extensions:
+    - "ferrobridge_laboratory_result_analyte"
+  start: "OBSERVATION.laboratory_test_result.v1"
