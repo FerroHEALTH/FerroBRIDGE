@@ -743,7 +743,8 @@ With `[facade.app_state]` on, `Basic` at the facade's base is the SMART App
 State endpoint of SMART App Launch 2.2.0, Persisting App State: an app keeps
 a small amount of its own state at the EHR, such as display preferences or
 the keys to an external data set. The CDR holds no `Basic`, so the facade
-keeps these resources in a store of its own, apart from the identity map. The
+keeps these resources in the state store, apart from the identity map, so
+every replica serves the same ones. The
 discovery document lists `smart-app-state`, and the `CapabilityStatement`
 instantiates `smart-app-state-server` and lists `Basic` with the
 `smart-app-state-basic` profile.
@@ -789,7 +790,7 @@ launch: `task-ehr-launch` asks the EHR to launch an app with an optional
 EHR viewer lists the `Task`s for the patient in view and acts on one; for an
 EHR launch it registers the launch at the authorization server's launch API
 with the `Task`'s `for`, `encounter` and `appContext`. The CDR holds no
-`Task`, so the facade keeps them in a store of its own.
+`Task`, so the facade keeps them in the state store, shared by every replica.
 
 | Interaction | Route | Answer |
 |---|---|---|

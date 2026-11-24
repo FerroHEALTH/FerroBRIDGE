@@ -35,17 +35,23 @@ const KEYS: &str = "https://myapp.example.org|encrypted-phr-access-keys";
 
 /// One case: the store's directory and the harness over it.
 pub(super) struct Case {
-    /// The directory the App State store lives in, removed on drop.
-    _directory: tempfile::TempDir,
+    /// The state store the resources live in, and its PostgreSQL.
+    _state: (
+        ferrobridge_testkit::containers::Postgres,
+        ferrobridge_server::store::Store,
+    ),
     /// The harness, its facade serving App State.
     pub(super) harness: Harness,
 }
 
 impl Case {
-    /// Returns a facade with no program, serving App State.
-    pub(super) async fn new() -> Result<Self, Box<dyn Error>> {
-        let directory = tempfile::tempdir()?;
-        let owned = OwnedStore::open(&directory.path().join("app-state.redb"))?;
+    /// Returns a facade with no program over a state store, `None` unless the
+    /// harness admits a PostgreSQL, serving App State.
+    pub(super) async fn new() -> Result<Option<Self>, Box<dyn Error>> {
+        let Some(state) = crate::store::sealed_store().await? else {
+            return Ok(None);
+        };
+        let owned = OwnedStore::open(&state.1);
         let cdr = MockServer::start().await;
         let store = Arc::new(MemoryStore::default());
         let facade = Facade::new(
@@ -55,14 +61,14 @@ impl Case {
             settings(),
         )
         .with_app_state(Some(Arc::new(owned)));
-        Ok(Self {
-            _directory: directory,
+        Ok(Some(Self {
+            _state: state,
             harness: Harness {
                 cdr,
                 store,
                 facade: Arc::new(facade),
             },
-        })
+        }))
     }
 
     /// Returns the open router over the facade.
@@ -126,8 +132,9 @@ pub(super) fn get(path: &str) -> Request<Body> {
 
 #[tokio::test]
 async fn the_page_examples_create_query_update_and_delete_in_order() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await;
-    let case = case?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     // NOTE: SMART App Launch 2.2.0, Persisting App State, §API Examples, Example 1.
     let response = raw(case.app(), with_body("POST", "/fhir/Basic", &preferences())).await?;
     assert_eq!(StatusCode::CREATED, response.status());
@@ -227,7 +234,9 @@ async fn the_page_examples_create_query_update_and_delete_in_order() -> Result<(
 
 #[tokio::test]
 async fn global_state_is_found_with_subject_missing() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let mut global = preferences();
     global.as_object_mut().ok_or("an object")?.remove("subject");
     let (status, _) = call(case.app(), with_body("POST", "/fhir/Basic", &global)).await?;
@@ -250,7 +259,9 @@ async fn global_state_is_found_with_subject_missing() -> Result<(), Box<dyn Erro
 #[tokio::test]
 async fn an_update_that_moves_the_subject_or_the_code_is_a_failed_precondition()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let (_, created) = call(case.app(), with_body("POST", "/fhir/Basic", &keys("a"))).await?;
     let id = created["id"].as_str().ok_or("an id")?.to_owned();
     let path = format!("/fhir/Basic/{id}");
@@ -277,7 +288,9 @@ async fn an_update_that_moves_the_subject_or_the_code_is_a_failed_precondition()
 
 #[tokio::test]
 async fn a_write_without_if_match_is_a_failed_precondition() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let (_, created) = call(case.app(), with_body("POST", "/fhir/Basic", &keys("a"))).await?;
     let id = created["id"].as_str().ok_or("an id")?.to_owned();
     let mut update = keys("b");
@@ -296,7 +309,9 @@ async fn a_write_without_if_match_is_a_failed_precondition() -> Result<(), Box<d
 
 #[tokio::test]
 async fn an_id_never_issued_is_not_found() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let mut update = keys("b");
     update["id"] = json!("never");
     let (status, _) = call(
@@ -311,7 +326,9 @@ async fn an_id_never_issued_is_not_found() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn a_search_without_a_system_code_or_with_another_parameter_is_refused()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     for query in [
         "/fhir/Basic",
         "/fhir/Basic?code=display-preferences",
@@ -327,7 +344,9 @@ async fn a_search_without_a_system_code_or_with_another_parameter_is_refused()
 
 #[tokio::test]
 async fn a_create_breaking_the_profile_is_refused_at_its_element() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let mut with_id = preferences();
     with_id["id"] = json!("app-state");
     let (status, body) = call(case.app(), with_body("POST", "/fhir/Basic", &with_id)).await?;
@@ -342,7 +361,9 @@ async fn a_create_breaking_the_profile_is_refused_at_its_element() -> Result<(),
 
 #[tokio::test]
 async fn the_capability_statement_declares_the_app_state_endpoint() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let (status, statement) = call(case.app(), get("/fhir/metadata")).await?;
     assert_eq!(StatusCode::OK, status);
     assert_eq!(

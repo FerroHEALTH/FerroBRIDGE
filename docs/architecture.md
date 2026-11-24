@@ -2369,8 +2369,10 @@ whole, and while the session is down every request reads the store;
 PostgreSQL delivers a `NOTIFY` at commit and never on rollback
 (<https://www.postgresql.org/docs/current/sql-notify.html>). `[state.seal]`
 lists the keys stored bodies are sealed under, each named by the id a sealed
-row carries, the first one sealing. The `redb` files stay until each area
-has moved. No specification governs where the bridge keeps its state: our
+row carries, the first one sealing, and the lookup key identifier values are
+stored as an HMAC under. The identity map (section 9), the SMART Health Links
+and the facade's own App State and launch `Task`s live there; the change-feed
+and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
 own design on family precedent.
 
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
