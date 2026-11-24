@@ -964,6 +964,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "chumsky"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6313a87def838ae23848f344d38799e6370342efd0ec0229b15469d3b6459923"
+dependencies = [
+ "hashbrown 0.16.1",
+ "regex-automata",
+ "serde",
+ "stacker",
+ "unicode-ident",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1507,7 +1521,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.24.0"
+version = "0.24.1"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1711,10 +1725,10 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.1.136"
+version = "0.1.137"
 dependencies = [
  "base64 0.23.1",
- "chumsky",
+ "chumsky 0.14.2",
  "ferrobridge-testkit",
  "fhir-types",
  "jiff",
@@ -1730,10 +1744,10 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.25.2"
+version = "0.25.3"
 dependencies = [
  "bytes",
- "chumsky",
+ "chumsky 0.14.2",
  "encoding_rs",
  "ferrobridge-term",
  "ferrobridge-testkit",
@@ -1909,7 +1923,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -3971,7 +3985,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cbdac2b1ae348ecf5c36747434175e8f66e3f47e11e3985c5d2ce2cd71cd16d"
 dependencies = [
- "chumsky",
+ "chumsky 0.13.0",
  "indexmap 2.14.2",
  "logos",
  "openehr-base",
@@ -4006,7 +4020,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cbd5545dcebab184957d252ba28441021a884be846f4a3ad7fb6007ee89128f"
 dependencies = [
- "chumsky",
+ "chumsky 0.13.0",
  "logos",
  "thiserror",
 ]
