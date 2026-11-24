@@ -191,7 +191,7 @@ label_of() {
     myhealth-eu-core) echo "MyHealth@EU Core $(ci_build_version myhealth.eu.fhir.core) (CI)" ;;
     myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
     myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
-    myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI), codes in its value sets" ;;
+    myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI), codes in bound value sets" ;;
     *) return 1 ;;
   esac
 }
