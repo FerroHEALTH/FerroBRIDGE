@@ -91,9 +91,10 @@ jobs:
           for p in ferrobridge-testkit ferrobridge-server ferrobridge-validator; do
             if [ "$(has "$p")" = true ]; then examples=true; fi
           done
-          # fhirconnect maps the HL7 Europe EPS example documents of one of them.
+          # fhirconnect maps the HL7 Europe EPS example documents of one of them,
+          # and the ferrobridge-server tests validate the patient summary against them.
           profiles=false
-          for p in ferrobridge-validator fhirconnect; do
+          for p in ferrobridge-validator fhirconnect ferrobridge-server; do
             if [ "$(has "$p")" = true ]; then profiles=true; fi
           done
           {
