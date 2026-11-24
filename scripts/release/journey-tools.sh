@@ -19,11 +19,11 @@
 #                                          DIR/chromedriver-<platform>/
 set -Eeuo pipefail
 
-chrome_version="156.0.8078.80"
-chrome_linux64_sha256="b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7"
-chrome_mac_arm64_sha256="8bc590d1b1acac042a000234c768f31830f25a3983a83ed5e067114c87c4cad1"
-chromedriver_linux64_sha256="cae58bbd262ba5c8a0ce2540f44254b6e789efc4fe9b18bbb4a00487a9f5859e"
-chromedriver_mac_arm64_sha256="b5fe5abe5a82ca3ac49b3f2ea9e177b63f82fc3a4227883e0eaa9894a6bf3b7f"
+chrome_version="158.0.8127.88"
+chrome_linux64_sha256="59e3b43f8b3aaa292238fbdcfb36a93127debd53e212510dcdc2cc8812b4b57e"
+chrome_mac_arm64_sha256="6caf16b007aafaf6d4a4db252262be8ebbf0d91a2af005257e388996dbe463d6"
+chromedriver_linux64_sha256="afabc2d0f866af4d9e209389f930ce34b5f2d365fb1b6c83874845cc123b0e2e"
+chromedriver_mac_arm64_sha256="7f9653f99ff26c4649dd7dc771c0c5a28248d836dd8bae6e71227b3d35cfd642"
 
 api="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
 

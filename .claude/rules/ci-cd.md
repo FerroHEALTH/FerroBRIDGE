@@ -84,8 +84,9 @@ Fourteen workflows:
   documentation toolchain. It opens one issue when a pin is behind its newest
   upstream release, through `scripts/gh/fields.sh new` (its default token may
   not set the issue type and fields, and the issue then lands with its label
-  alone, `issue-workflow.md` §Type, priority and labels), and fails only when
-  a release could not be read (`docs/ci-cd.md`). Its `family` job reads the
+  alone, `issue-workflow.md` §Type, priority and labels), rewrites that
+  issue while it stays open, and fails only when a release could not be read,
+  after the issue is written (`docs/ci-cd.md`). Its `family` job reads the
   other products' `ghcr.io/ferrohealth/*` images in `docs/VERSIONS.md` against
   each product's latest release and image index digest, and opens or rewrites
   one issue per image behind.

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over its Condition model and the library's diagnosis
+# clusters as published (#1963), against the library diagnosis template
+# built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_diagnosis.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Condition"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_diagnosis.v1.0.0"
+  archetypes:
+    - "ferrobridge_problem_diagnosis_clusters"
+    - "CLUSTER.anatomical_location.v1"
+    - "CLUSTER.problem_qualifier.v2"
+    - "CLUSTER.multiple_coding_icd10gm.v1"
+  start: "ferrobridge_problem_diagnosis_clusters"

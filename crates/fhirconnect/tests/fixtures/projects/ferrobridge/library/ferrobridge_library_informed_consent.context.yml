@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's informed consent model and the
+# study clusters it slots as published (#1963), against the library
+# laboratory template built from the CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_informed_consent.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/Consent"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_laboratory.v1.0.0"
+  archetypes:
+    - "ACTION.informed_consent.v0"
+    - "CLUSTER.study_participation.v1"
+    - "CLUSTER.study_details.v1"
+  start: "ACTION.informed_consent.v0"

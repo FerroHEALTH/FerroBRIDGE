@@ -16,8 +16,10 @@
 # docs/VERSIONS.md, against that product's latest release and image index
 # digest, and opens one issue per image that fell behind.
 #
-# It opens an issue rather than failing: a weekly red job trains a maintainer
-# to ignore red jobs (#41), and a newer lint release is not a broken build.
+# It opens an issue rather than failing on a stale pin: a weekly red job trains
+# a maintainer to ignore red jobs (#41), and a newer lint release is not a
+# broken build. A pin it could not read is named in the issue and fails the
+# run after the issue is written, so it never hides a stale pin (#2007).
 name: Pin freshness
 
 on:
@@ -51,15 +53,12 @@ jobs:
           bash scripts/checks/pin-freshness.sh > freshness.txt || status=$?
           cat freshness.txt
           # 0 every pin current, 1 at least one behind, 2 a release could not
-          # be read. Only 1 opens an issue; 2 fails the job, because a pin that
-          # could not be compared is not a pin known to be fresh.
-          if [ "$status" -eq 2 ]; then
-            echo "a release could not be read; the comparison is incomplete" >&2
-            exit 1
-          fi
-          echo "stale=$([ "$status" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # be read. The script reads every pin either way, so the STALE rows
+          # decide the issue and the status only whether the job ends red.
+          echo "stale=$(grep -q '^STALE' freshness.txt && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
 
-      - name: Open an issue when a pin is behind
+      - name: Open or update the issue when a pin is behind
         if: steps.check.outputs.stale == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -67,20 +66,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          # --limit well past the open count: the default page is 30 issues,
-          # and a report that scrolled off it would be reopened every week.
-          open="$(gh issue list --state open --limit 500 --json number,title \
-            --jq "[.[] | select(.title == \"$TITLE\")] | length")"
-          if [ "$open" -ne 0 ]; then
-            echo "an open issue already carries this report; not opening a second"
-            exit 0
-          fi
           {
             echo "\`scripts/checks/pin-freshness.sh\` found a pin behind its newest upstream release."
             echo
             echo "Bump the pin in \`docs/VERSIONS.md\` and in the file that repeats it, keep the local"
             echo "install on the same number, and re-run the gates. The digest beside an image tag"
             echo "moves with the tag, so read the new digest from the registry rather than guessing it."
+            echo "An UNREADABLE row is a pin whose newest release could not be read, so it is not known"
+            echo "to be current."
             echo
             echo '```text'
             cat freshness.txt
@@ -88,12 +81,31 @@ jobs:
             echo
             echo "Reported by [this run]($RUN_URL)."
           } > body.md
-          # fields.sh files the issue as a Task at Low priority and Low effort;
-          # this job's default token may not read the organisation's issue
-          # types, and then the issue lands with its label alone and whoever
-          # picks it up sets the three (.claude/rules/issue-workflow.md).
-          bash scripts/gh/fields.sh new task low low \
-            --title "$TITLE" --body-file body.md --label ci
+          # --limit well past the open count: the default page is 30 issues,
+          # and a report that scrolled off it would be opened a second time.
+          number="$(gh issue list --state open --limit 500 --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\")][0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file body.md
+            echo "updated #$number"
+          else
+            # fields.sh files the issue as a Task at Low priority and Low
+            # effort; this job's default token may not read the organisation's
+            # issue types, and then the issue lands with its label alone and
+            # whoever picks it up sets the three (.claude/rules/issue-workflow.md).
+            bash scripts/gh/fields.sh new task low low \
+              --title "$TITLE" --body-file body.md --label ci
+          fi
+
+      - name: Fail when the comparison is incomplete
+        if: steps.check.outputs.status != '0' && steps.check.outputs.status != '1'
+        env:
+          STATUS: ${{ steps.check.outputs.status }}
+        run: |
+          # 2 means a release could not be read, and anything else a broken
+          # script: the UNREADABLE rows above are not known to be current.
+          echo "pin-freshness.sh exited $STATUS; the comparison is incomplete" >&2
+          exit 1
 
   # The product images of the family, each against the latest release of the
   # product that publishes it. Its own job, so a tool pin that could not be

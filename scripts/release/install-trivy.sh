@@ -17,7 +17,7 @@ set -euo pipefail
 
 # One "version<TAB>sha256 of trivy_<version>_Linux-64bit.tar.gz" row per line.
 readonly CHECKSUMS="\
-0.73.0	2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b"
+0.76.2	bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf"
 
 die() {
   printf 'install-trivy: %s\n' "$1" >&2

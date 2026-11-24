@@ -3,7 +3,7 @@
 
 # Provenance: the CKM archetypes of the FHIRconnect mapping library
 
-18 published archetypes of the openEHR Clinical Knowledge Manager,
+25 published archetypes of the openEHR Clinical Knowledge Manager,
 vendored verbatim by `scripts/vendor/ckm-library.sh`
 (.claude/rules/vendored-inputs.md). Never edit a file here: change the pin in
 docs/VERSIONS.md and re-run the script.
@@ -11,8 +11,8 @@ docs/VERSIONS.md and re-run the script.
 - Source: <https://github.com/openEHR/CKM-mirror>, the mirror of the international CKM
 - Pin: commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094`
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `14aec82252e7c236f1c2c93469cc8969c0c254c7e8d4b61771a0833a8fd7f2bf`
-- Fetched: 2026-11-23
+  `PROVENANCE.md` excluded): `2a6f31341c9ae2addbf46a8bded54e3f1288a50fb7de2504f6e76525c0ea373d`
+- Fetched: 2026-11-24
 - Upstream licence: Creative Commons Attribution-ShareAlike 3.0 Unported, the
   mirror's `LICENSE` file at the same commit, vendored beside this file
 - Use: the archetypes the FHIRconnect mapping library's model mappings
@@ -42,3 +42,10 @@ Files:
 - `openEHR-EHR-CLUSTER.person.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.person.v1.adl`, sha256 `69cc7845b3f4491102d32750c884bdda2593c42c869c14afeed17cd2e5c3b056`
 - `openEHR-EHR-CLUSTER.address.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.address.v1.adl`, sha256 `f3b7a6f8a96f98be8ea7f09e47359ec14d7b35fce07ed78225aa26738ce27bcc`
 - `openEHR-EHR-CLUSTER.structured_name.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.structured_name.v1.adl`, sha256 `9fcae353fa335726679dd8374a7fd5b5916d3f266ce41d3bea315db75e7e80d2`
+- `openEHR-EHR-CLUSTER.anatomical_location.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.anatomical_location.v1.adl`, sha256 `6d9b4a7a75e69d18a12118d7d7cc8ca9987bd7ad3f0b90fcfd74e9328e40af4a`
+- `openEHR-EHR-CLUSTER.problem_qualifier.v2.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.problem_qualifier.v2.adl`, sha256 `7aff9a2d05a44e2ba821ab5538a4cb0a018931f9eab38e7cf604d2a7ab186443`
+- `openEHR-EHR-CLUSTER.laboratory_test_analyte.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.laboratory_test_analyte.v1.adl`, sha256 `ed33842067482ebe2f83c6b2645ea29fe82148f5f7d849bd75f5adc94b232290`
+- `openEHR-EHR-CLUSTER.specimen.v1.adl` from `local/archetypes/cluster/openEHR-EHR-CLUSTER.specimen.v1.adl`, sha256 `cde20f8498883d8f1bff699841405d412c4e20f32cf292e0be3a76ec8d6016bf`
+- `openEHR-EHR-INSTRUCTION.service_request.v1.adl` from `local/archetypes/entry/instruction/openEHR-EHR-INSTRUCTION.service_request.v1.adl`, sha256 `087513076affe63704a535a8a07cd46e9876fe5736c8b4f9cf220ab25a2b16dd`
+- `openEHR-EHR-OBSERVATION.laboratory_test_result.v1.adl` from `local/archetypes/entry/observation/openEHR-EHR-OBSERVATION.laboratory_test_result.v1.adl`, sha256 `a3d34d9202094f1045f2183f32b842ab41fd50c02b62cca07031caf258d75f03`
+- `openEHR-EHR-ACTION.informed_consent.v0.adl` from `local/archetypes/entry/action/openEHR-EHR-ACTION.informed_consent.v0.adl`, sha256 `096b834d4d19b29c4ca246cd9958cc8f085213be7a5deec4f5ecb4fcd36a8a3e`

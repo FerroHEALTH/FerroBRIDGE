@@ -133,21 +133,27 @@ pub async fn resolve(
                     subject: person.to_string(),
                 });
             }
-            Policy::CreateOnFirstWrite => create(client, person, link).await?,
+            Policy::CreateOnFirstWrite => {
+                create(client, person, link, &subject_id, &namespace).await?
+            }
         },
     };
     store.record_ehr(person, &ehr_id).map_err(store_error)
 }
 
-/// Creates an EHR whose `EHR_STATUS.subject` names `person`.
+/// Creates an EHR whose `EHR_STATUS.subject` names `person`, or returns the
+/// one another writer created for the same subject first.
 ///
 /// Under `return=minimal` the service answers `201` or `204`, and the `ETag`
-/// of either names the new `ehr_id` (`ehr-codegen.openapi.yaml`,
-/// `ehr_create`).
+/// of either names the new `ehr_id`; a `409` means an EHR with that subject
+/// already exists (`ehr-codegen.openapi.yaml`, `ehr_create`), so the subject
+/// is read again.
 async fn create(
     client: &CdrClient,
     person: &PersonId,
     link: &SubjectLink,
+    subject_id: &SubjectId,
+    namespace: &SubjectNamespace,
 ) -> Result<EhrId, EhrError> {
     let status = status_of(person, link);
     let answered = client
@@ -167,10 +173,19 @@ async fn create(
             subject: person.to_string(),
             detail: crate::facade::status::diagnostics(StatusCode::BAD_REQUEST, &body),
         }),
-        EhrCreateOutcome::Conflict { body } => Err(EhrError::Refused {
-            subject: person.to_string(),
-            detail: crate::facade::status::diagnostics(StatusCode::CONFLICT, &body),
-        }),
+        EhrCreateOutcome::Conflict { body } => {
+            let found = client
+                .ehr_by_subject(subject_id, namespace)
+                .await
+                .map_err(client_error)?;
+            match found.outcome {
+                EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body),
+                EhrGetBySubjectOutcome::NotFound { .. } => Err(EhrError::Refused {
+                    subject: person.to_string(),
+                    detail: crate::facade::status::diagnostics(StatusCode::CONFLICT, &body),
+                }),
+            }
+        }
     }
 }
 

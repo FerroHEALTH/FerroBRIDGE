@@ -399,12 +399,16 @@ fixture rows pin one file each and the UCUM row a release tag, so the script
 leaves them out. A pin cell that ends in `held: <reason>` records why the pin
 stays behind the newest release; the script reports it as HELD with that
 reason and never as stale. The workflow runs it every Monday and on dispatch. When a pin is behind it opens one issue
-carrying the report, and when an open issue already carries that report it adds
-nothing. The issue goes through `scripts/gh/fields.sh new` as a Task at Low
+carrying the report, and when an open issue already carries that report it
+rewrites that issue's body with the new report. The issue goes through `scripts/gh/fields.sh new` as a Task at Low
 priority and Low effort. The job's default token may not read the
 organisation's issue types; then the issue lands with its `ci` label alone,
-and whoever picks it up sets the type, the priority and the effort. A pin it
-could not read fails the job, so a network failure never reads as a fresh pin.
+and whoever picks it up sets the type, the priority and the effort. A release
+tag is read from the REST API, else from the redirect of the project's
+`releases/latest` page, since an organisation's IP allow list refuses the
+runner's token on the API (#2007). A pin it could not read is an UNREADABLE row
+in the report and fails the job after the issue is written, so a network
+failure never reads as a fresh pin and never hides a stale one.
 
 The `family` job runs `scripts/checks/pin-freshness.sh --family`, which reads
 every `ghcr.io/ferrohealth/*` image another product publishes, pinned by tag
