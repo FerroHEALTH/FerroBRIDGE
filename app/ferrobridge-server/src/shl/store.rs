@@ -382,10 +382,38 @@ impl LinkStore {
         embedded_max: Option<usize>,
         (now, lifetime): (i64, i64),
     ) -> Result<Answer, StoreError> {
+        let checked = self.check(id, passcode)?;
         let write = self.database.begin_write().map_err(transaction)?;
-        let answer = Self::answer_in(&write, id, passcode, embedded_max, (now, lifetime))?;
+        let answer = Self::answer_in(
+            &write,
+            id,
+            passcode,
+            checked.as_ref(),
+            embedded_max,
+            (now, lifetime),
+        )?;
         write.commit().map_err(transaction)?;
         Ok(answer)
+    }
+
+    /// Returns the passcode hash of link `id` and whether `passcode` matches
+    /// it, checked before the write transaction so parallel guesses hash at
+    /// once and only the attempt count waits on the transaction.
+    fn check(&self, id: &str, passcode: Option<&str>) -> Result<Option<Checked>, StoreError> {
+        let Some(given) = passcode else {
+            return Ok(None);
+        };
+        let read = self.database.begin_read().map_err(transaction)?;
+        let links = read.open_table(LINKS).map_err(transaction)?;
+        let Some(text) = links.get(id).map_err(transaction)? else {
+            return Ok(None);
+        };
+        let link: Link = serde_json::from_str(text.value()).map_err(StoreError::Record)?;
+        let Some(hash) = link.passcode else {
+            return Ok(None);
+        };
+        let right = super::passcode::matches(given, &hash).map_err(StoreError::Passcode)?;
+        Ok(Some(Checked { hash, right }))
     }
 
     /// The transaction of [`LinkStore::answer`].
@@ -393,6 +421,7 @@ impl LinkStore {
         write: &WriteTransaction,
         id: &str,
         passcode: Option<&str>,
+        checked: Option<&Checked>,
         embedded_max: Option<usize>,
         (now, lifetime): (i64, i64),
     ) -> Result<Answer, StoreError> {
@@ -408,11 +437,12 @@ impl LinkStore {
             return Ok(Answer::Inactive { gone: None });
         }
         if let Some(stored) = link.passcode.as_deref() {
-            let right = match passcode {
-                Some(given) => {
+            let right = match (passcode, checked) {
+                (Some(_), Some(checked)) if checked.hash == stored => checked.right,
+                (Some(given), _) => {
                     super::passcode::matches(given, stored).map_err(StoreError::Passcode)?
                 }
-                None => false,
+                (None, _) => false,
             };
             if !right {
                 link.attempts_left = link.attempts_left.saturating_sub(1);
@@ -602,6 +632,14 @@ fn get_link(write: &WriteTransaction, id: &str) -> Result<Option<Link>, StoreErr
         .map_err(transaction)?
         .map(|text| serde_json::from_str(text.value()).map_err(StoreError::Record))
         .transpose()
+}
+
+/// A passcode checked against a link's hash outside the write transaction.
+struct Checked {
+    /// The hash it was checked against.
+    hash: String,
+    /// Whether it matched.
+    right: bool,
 }
 
 /// Stores `link` under `id`.

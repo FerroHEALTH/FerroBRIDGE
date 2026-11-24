@@ -411,6 +411,11 @@ async fn a_patient_s_summary_is_an_ips_document_with_coded_entries() -> Result<(
         patient["identifier"][0]["assigner"]["display"],
         "Synthetic assigner"
     );
+    assert_eq!(
+        patient["identifier"][0]["type"],
+        serde_json::json!({"text": "patient"}),
+        "{patient}"
+    );
     assert_eq!(patient["name"][0]["family"], "Subject", "{patient}");
     assert_eq!(patient["birthDate"], "1970-01-01");
     assert_eq!(patient["gender"], "female");
