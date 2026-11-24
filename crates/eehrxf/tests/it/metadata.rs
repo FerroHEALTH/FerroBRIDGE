@@ -19,6 +19,7 @@ use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+#[cfg(feature = "laboratory")]
 use fhir_types::r4::observation::Observation;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::resource::Resource;

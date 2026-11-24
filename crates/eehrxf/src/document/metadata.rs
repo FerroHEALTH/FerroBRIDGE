@@ -37,6 +37,9 @@
 //! a second value is refused with [`DocumentError::TooMany`] rather than
 //! dropped.
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::composition::{Composition, CompositionAttester, CompositionEvent};
@@ -44,12 +47,15 @@ use fhir_types::r4::document_reference::{
     DocumentReference, DocumentReferenceContent, DocumentReferenceContext,
 };
 use fhir_types::r4::extension::{Extension, ExtensionValue};
+use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::period::Period;
 use fhir_types::r4::primitives::{Code, DateTime};
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
+use sha1::{Digest as _, Sha1};
 
+use crate::document::representation::PdfA;
 use crate::document::{Document, DocumentError, reference};
 
 /// The cross-version extension that carries R5 `Composition.version` in R4
@@ -61,6 +67,9 @@ pub const COMPOSITION_VERSION: &str =
 /// in R4 (<https://hl7.org/fhir/extensions/xver.html>).
 pub const DOCUMENT_REFERENCE_VERSION: &str =
     "http://hl7.org/fhir/5.0/StructureDefinition/extension-DocumentReference.version";
+
+/// The media type of a PDF document (RFC 8118).
+pub const PDF: &str = "application/pdf";
 
 /// The media type of a FHIR document in JSON (FHIR R4 `http.html#mime-type`).
 pub const FHIR_JSON: &str = "application/fhir+json";
@@ -238,6 +247,164 @@ impl DocumentMetadata {
     /// identifier, type, date or title, and [`DocumentError::TooMany`] for
     /// more than one service specialty or language.
     pub fn describe(&self, bundle: &Bundle, id: &str) -> Result<DocumentReference, DocumentError> {
+        let header = Header::of_document(bundle)?;
+        let title = header.title.clone();
+        self.reference(
+            &header,
+            id,
+            Attachment {
+                content_type: Some(FHIR_JSON.into()),
+                title: Some(title.into()),
+                ..Attachment::default()
+            },
+        )
+    }
+
+    /// Writes the `DocumentReference` of draft `EEHRxF` Art 3(1)(a): the
+    /// PDF/A-1 document `pdf`, its bytes unchanged in the attachment with
+    /// their size and SHA-1, described by `header` and this metadata.
+    ///
+    /// # Errors
+    ///
+    /// [`DocumentError::TooMany`] for more than one service specialty,
+    /// language or legal authentication, and [`DocumentError::TooLarge`]
+    /// for a PDF whose size an R4 `unsignedInt` cannot hold.
+    pub fn describe_pdf(
+        &self,
+        header: &Header,
+        pdf: &PdfA,
+        id: &str,
+    ) -> Result<DocumentReference, DocumentError> {
+        let size = u32::try_from(pdf.bytes().len()).map_err(|source| DocumentError::TooLarge {
+            size: pdf.bytes().len(),
+            source,
+        })?;
+        self.reference(
+            header,
+            id,
+            Attachment {
+                content_type: Some(PDF.into()),
+                data: Some(STANDARD.encode(pdf.bytes()).into()),
+                size: Some(size.into()),
+                hash: Some(STANDARD.encode(Sha1::digest(pdf.bytes())).into()),
+                title: Some(header.title.as_str().into()),
+                ..Attachment::default()
+            },
+        )
+    }
+
+    /// The `DocumentReference` of `header` and this metadata, its one
+    /// content `attachment`.
+    fn reference(
+        &self,
+        header: &Header,
+        id: &str,
+        mut attachment: Attachment,
+    ) -> Result<DocumentReference, DocumentError> {
+        let practice_setting = at_most_one("serviceSpecialty", &self.specialties)?.cloned();
+        let language = at_most_one("language", &self.languages)?;
+        let legal = at_most_one("legalAuthentication", &self.legal)?;
+        attachment.language = language.map(|language| language.as_str().into());
+        Ok(DocumentReference {
+            id: Some(id.to_owned()),
+            meta: self.source.as_ref().map(|source| Meta {
+                source: Some(source.as_str().into()),
+                ..Meta::default()
+            }),
+            extension: vec![version_extension(DOCUMENT_REFERENCE_VERSION, &self.version)],
+            master_identifier: Some(header.identifier.clone()),
+            identifier: header.composition.iter().cloned().collect(),
+            status: "current".into(),
+            doc_status: Some(header.status.as_str().into()),
+            r#type: Some(header.kind.clone()),
+            category: vec![self.category.clone()],
+            subject: Some(header.subject.clone()),
+            date: Some(header.date.as_str().into()),
+            author: header.authors.clone(),
+            authenticator: legal.map(|legal| reference(&legal.party)),
+            custodian: header.custodian.clone(),
+            description: Some(header.title.as_str().into()),
+            content: vec![DocumentReferenceContent {
+                attachment,
+                ..DocumentReferenceContent::default()
+            }],
+            context: Some(DocumentReferenceContext {
+                event: self.events.clone(),
+                period: self.period.clone(),
+                practice_setting,
+                ..DocumentReferenceContext::default()
+            }),
+            ..DocumentReference::default()
+        })
+    }
+}
+
+/// The Annex III Table 1 elements a [`Document`] writes on its parts: what a
+/// `DocumentReference` describes beside the [`DocumentMetadata`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct Header {
+    identifier: Identifier,
+    composition: Option<Identifier>,
+    subject: Reference,
+    authors: Vec<Reference>,
+    date: String,
+    kind: CodeableConcept,
+    title: String,
+    custodian: Option<Reference>,
+    status: String,
+}
+
+impl Header {
+    /// Creates the header of the document `identifier` about `subject`,
+    /// issued at `date`, a FHIR `instant`, of the type `kind` (Table 1
+    /// `documentType`), titled `title`, by `author`, with the status
+    /// `final`.
+    #[must_use]
+    pub fn new(
+        identifier: Identifier,
+        subject: Reference,
+        date: String,
+        kind: CodeableConcept,
+        title: String,
+        author: Reference,
+    ) -> Self {
+        Self {
+            identifier,
+            composition: None,
+            subject,
+            authors: vec![author],
+            date,
+            kind,
+            title,
+            custodian: None,
+            status: String::from("final"),
+        }
+    }
+
+    /// Adds an author.
+    #[must_use]
+    pub fn with_author(mut self, author: Reference) -> Self {
+        self.authors.push(author);
+        self
+    }
+
+    /// Sets the custodian.
+    #[must_use]
+    pub fn with_custodian(mut self, custodian: Reference) -> Self {
+        self.custodian = Some(custodian);
+        self
+    }
+
+    /// Reads the header of `bundle`, a document [`Document::into_bundle`]
+    /// wrote: the `Bundle` identifier and timestamp and the parts of its
+    /// `Composition`.
+    ///
+    /// # Errors
+    ///
+    /// [`DocumentError::Dangling`] when `bundle` holds no `Composition`
+    /// first, and [`DocumentError::MissingMetadata`] when it carries no
+    /// identifier, subject, author, type, date or title.
+    pub fn of_document(bundle: &Bundle) -> Result<Self, DocumentError> {
         let Some(Resource::Composition(composition)) = bundle
             .entry
             .first()
@@ -247,65 +414,42 @@ impl DocumentMetadata {
                 slice: "composition",
             });
         };
-        let master = bundle
-            .identifier
-            .clone()
-            .ok_or(DocumentError::MissingMetadata {
-                element: "identifier",
-            })?;
-        if composition.title.value.as_deref().is_none_or(str::is_empty) {
-            return Err(DocumentError::MissingMetadata {
-                element: "documentTitle",
-            });
+        let missing = |element| DocumentError::MissingMetadata { element };
+        if composition.author.is_empty() {
+            return Err(missing("author"));
         }
         if composition.r#type.coding.is_empty() {
-            return Err(DocumentError::MissingMetadata {
-                element: "documentType",
-            });
+            return Err(missing("documentType"));
         }
-        let timestamp = bundle
-            .timestamp
-            .clone()
-            .ok_or(DocumentError::MissingMetadata { element: "date" })?;
-        let practice_setting = at_most_one("serviceSpecialty", &self.specialties)?.cloned();
-        let language = at_most_one("language", &self.languages)?.cloned();
-        let legal = at_most_one("legalAuthentication", &self.legal)?;
-        let context = DocumentReferenceContext {
-            event: self.events.clone(),
-            period: self.period.clone(),
-            practice_setting,
-            ..DocumentReferenceContext::default()
-        };
-        Ok(DocumentReference {
-            id: Some(id.to_owned()),
-            meta: self.source.as_ref().map(|source| Meta {
-                source: Some(source.as_str().into()),
-                ..Meta::default()
-            }),
-            extension: vec![version_extension(DOCUMENT_REFERENCE_VERSION, &self.version)],
-            master_identifier: Some(master),
-            identifier: composition.identifier.iter().cloned().collect(),
-            status: "current".into(),
-            doc_status: Some(composition.status.clone()),
-            r#type: Some(composition.r#type.clone()),
-            category: vec![self.category.clone()],
-            subject: composition.subject.clone(),
-            date: Some(timestamp),
-            author: composition.author.clone(),
-            authenticator: legal.map(|legal| reference(&legal.party)),
+        Ok(Self {
+            identifier: bundle
+                .identifier
+                .clone()
+                .ok_or_else(|| missing("identifier"))?,
+            composition: composition.identifier.clone(),
+            subject: composition
+                .subject
+                .clone()
+                .ok_or_else(|| missing("subject"))?,
+            authors: composition.author.clone(),
+            date: bundle
+                .timestamp
+                .as_ref()
+                .and_then(|timestamp| timestamp.value.clone())
+                .ok_or_else(|| missing("date"))?,
+            kind: composition.r#type.clone(),
+            title: composition
+                .title
+                .value
+                .clone()
+                .filter(|title| !title.is_empty())
+                .ok_or_else(|| missing("documentTitle"))?,
             custodian: composition.custodian.clone(),
-            description: Some(composition.title.clone()),
-            content: vec![DocumentReferenceContent {
-                attachment: fhir_types::r4::attachment::Attachment {
-                    content_type: Some(FHIR_JSON.into()),
-                    language: language.map(|language| language.as_str().into()),
-                    title: Some(composition.title.clone()),
-                    ..fhir_types::r4::attachment::Attachment::default()
-                },
-                ..DocumentReferenceContent::default()
-            }],
-            context: Some(context),
-            ..DocumentReference::default()
+            status: composition
+                .status
+                .value
+                .clone()
+                .unwrap_or_else(|| String::from("final")),
         })
     }
 }

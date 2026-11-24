@@ -105,6 +105,17 @@ mod receive;
 #[cfg(test)]
 mod refusals;
 #[cfg(test)]
+#[cfg(all(
+    feature = "fhir-r4",
+    any(
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging",
+        feature = "discharge"
+    )
+))]
+mod representation;
+#[cfg(test)]
 mod support;
 #[cfg(test)]
 #[cfg(feature = "fhir-r4")]

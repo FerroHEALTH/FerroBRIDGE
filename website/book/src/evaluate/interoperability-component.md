@@ -121,6 +121,37 @@ for. The draft leads, so each is recorded as followed or not:
 | `lastModified` | no | Annex III Table 1 has no such element; a server sets `meta.lastUpdated` |
 | `provenanceEvent` | yes | the `Provenance` each mapping run writes |
 
+## The representations
+
+Art 3(1) of the draft implementing act exchanges a document as (a) a PDF
+attachment embedded in a FHIR resource with its metadata, (b) FHIR
+narrative by data group, (c) structured FHIR with its narrative, or (d) for
+imaging, DICOM with a FHIR report and manifest. Annex II admits PDF/A-1a or
+PDF/A-1b alone, and admits (d) for imaging only.
+
+- **(a) PDF:** `PdfA::new` accepts a PDF only when its XMP metadata carries
+  the PDF/A identification schema with part 1 and conformance A or B, and
+  refuses any other with a typed error. `DocumentMetadata::describe_pdf`
+  embeds the bytes unchanged in a `DocumentReference`, `contentType`
+  `application/pdf`, with their size and SHA-1, beside the full Annex III
+  metadata. The `DocumentReference` is the FHIR resource Art 3(1)(a) names,
+  and the one MyHealth@EU searches by content type.
+- **(b) Narrative:** `Document::narrative_only` writes the sections with
+  their narrative and refuses a section given a structured entry. A section
+  rule of the category's profile that asks for an entry or an empty reason
+  still holds, so a category whose profile does not permit a narrative-only
+  section refuses it.
+- **(c) Structured** is what every category's document writes.
+
+Which representations a system declares per category is configuration: a
+`Declarations` map from the category code of HL7 Europe's
+`EEHRxFDocumentPriorityCategoryCS` (`Patient-Summaries`,
+`Laboratory-Reports` and the others) to its representations (`pdf`,
+`narrative`, `structured`, `dicom`), read with serde from the system's
+configuration and held to Annex II by `Declarations::check`.
+`Declarations::structured` declares structured FHIR for every category, and
+DICOM beside it for imaging.
+
 ## The definitions it publishes
 
 The component writes two things no specification defines, and FerroBRIDGE

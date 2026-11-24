@@ -52,6 +52,7 @@ pub mod imaging;
 pub mod laboratory;
 mod mapped;
 pub mod metadata;
+pub mod representation;
 pub mod section;
 
 #[cfg(feature = "patient-summary")]
@@ -222,6 +223,22 @@ pub enum DocumentError {
         /// The number of values given.
         given: usize,
     },
+    /// A narrative-only document (draft `EEHRxF` Art 3(1)(b)) holds a
+    /// section with a structured entry.
+    #[error("the narrative-only document holds entries in {slice}")]
+    NarrativeOnly {
+        /// The section slice.
+        slice: &'static str,
+    },
+    /// A PDF is larger than an R4 `unsignedInt` size can say.
+    #[error("a PDF of {size} bytes is larger than an R4 Attachment.size holds")]
+    TooLarge {
+        /// The size in bytes.
+        size: usize,
+        /// Why it does not fit.
+        #[source]
+        source: std::num::TryFromIntError,
+    },
     /// A data group carries no value of an element draft `EEHRxF` Annex III
     /// Table 2 requires.
     #[error("a {resource} data group carries no {element}, which Annex III requires")]
@@ -257,6 +274,7 @@ pub struct Document {
     language: Option<String>,
     custodian: Option<String>,
     metadata: Option<metadata::DocumentMetadata>,
+    narrative_only: bool,
 }
 
 impl Document {
@@ -295,6 +313,7 @@ impl Document {
             language: None,
             custodian: None,
             metadata: None,
+            narrative_only: false,
         }
     }
 
@@ -572,8 +591,10 @@ impl Document {
     /// form holds a report and none was given. With metadata set
     /// ([`Document::with_metadata`]), [`DocumentError::DataGroup`] for a data
     /// group with no subject and [`DocumentError::TooMany`] for a second
-    /// language.
+    /// language. For a narrative-only document ([`Document::narrative_only`]),
+    /// [`DocumentError::NarrativeOnly`] for a section with an entry.
     pub fn into_bundle(mut self) -> Result<Bundle, DocumentError> {
+        self.hold_representation()?;
         self.fill_data_groups()?;
         let held: BTreeSet<&str> = self.entries.iter().map(|(url, _)| url.as_str()).collect();
         let mut sections = Vec::with_capacity(self.sections.len());
