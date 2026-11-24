@@ -434,6 +434,15 @@ panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
 
+# Argon2id runs optimised in test builds, so a test of passcode hashing
+# under parallel requests measures the request path and not an unoptimised
+# hash. No specification governs this: our own design.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
 # The full-emit tests of fhir-codegen (`cargo nextest run --cargo-profile emit
 # -p fhir-codegen`): the emitter runs optimised, while the two generated crates
 # its tests link stay unoptimised, as in a test build, because optimising them
