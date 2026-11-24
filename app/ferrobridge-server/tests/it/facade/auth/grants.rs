@@ -110,7 +110,13 @@ fn a_constrained_scope_grants_nothing_without_an_evaluator() {
 
 #[test]
 fn a_scopeless_token_reaches_nothing() {
-    let caller = Caller::new(String::from("svc"), None, "openid", None, CallerKind::System);
+    let caller = Caller::new(
+        String::from("svc"),
+        None,
+        "openid",
+        None,
+        CallerKind::System,
+    );
     assert_eq!(None, caller.reach(Permission::Create, "Condition"));
     assert_eq!(None, caller.reach(Permission::Read, "Condition"));
 }

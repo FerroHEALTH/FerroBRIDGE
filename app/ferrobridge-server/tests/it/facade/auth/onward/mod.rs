@@ -492,7 +492,8 @@ async fn an_audience_exchange_names_the_cdr_by_audience() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn the_on_behalf_of_grant_sends_the_caller_s_token_as_assertion() -> Result<(), Box<dyn Error>> {
+async fn the_on_behalf_of_grant_sends_the_caller_s_token_as_assertion() -> Result<(), Box<dyn Error>>
+{
     let world = World::start(Grant::OnBehalfOf, "").await?;
     let issued = mint(&world.key, &world.issued_claims(3269));
     world

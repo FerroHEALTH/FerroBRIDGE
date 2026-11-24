@@ -39,8 +39,7 @@ const SECTION: &str = "[auth]\nenabled = true\n";
 
 /// The one `[auth.issuer.ferro]` table of the smallest section, whose own
 /// keys a case writes after it.
-const ISSUER: &str =
-    "\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\n";
+const ISSUER: &str = "\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\n";
 
 /// The smallest `[auth]` section that boots, its audience the facade's base.
 const MINIMAL: &str = "[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\n";
@@ -155,9 +154,18 @@ fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn std::error::Erro
         issuer.profile.token_types
     );
     assert_eq!(
-        ["iss", "exp", "aud", "sub", "client_id", "iat", "jti", "scope"]
-            .map(String::from)
-            .to_vec(),
+        [
+            "iss",
+            "exp",
+            "aud",
+            "sub",
+            "client_id",
+            "iat",
+            "jti",
+            "scope"
+        ]
+        .map(String::from)
+        .to_vec(),
         issuer.profile.required_claims
     );
     assert_eq!(Duration::from_secs(60), issuer.clock_skew);
@@ -370,8 +378,7 @@ fn a_described_issuer_naming_no_issuer_table_is_refused() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn the_role_claims_hold_for_their_issuer_alone()
--> Result<(), Box<dyn std::error::Error>> {
+fn the_role_claims_hold_for_their_issuer_alone() -> Result<(), Box<dyn std::error::Error>> {
     let auth = settings(&format!(
         concat!(
             "[auth]\nenabled = true\n\n",
@@ -826,12 +833,10 @@ fn the_environment_addresses_an_issuer_by_its_name() -> Result<(), Box<dyn std::
 
 #[test]
 fn the_environment_alone_declares_a_named_issuer() -> Result<(), Box<dyn std::error::Error>> {
-    let environment = BTreeMap::from([
-        (
-            String::from("FERROBRIDGE__AUTH__ISSUER__CLINIC__ISSUER"),
-            String::from("https://auth.example.org/realms/clinic"),
-        ),
-    ]);
+    let environment = BTreeMap::from([(
+        String::from("FERROBRIDGE__AUTH__ISSUER__CLINIC__ISSUER"),
+        String::from("https://auth.example.org/realms/clinic"),
+    )]);
     let auth = Config::from_sources(Some(GUARDED), &environment)?
         .resolve(Process::Server)?
         .auth

@@ -277,7 +277,10 @@ fn two_issuers_of_one_kind_are_refused() -> Result<(), Box<dyn std::error::Error
         ),
         "{error:?}"
     );
-    let error = refusal(&cdr(&format!("{OAUTH}{FEDERATION}{FEDERATION}")), Process::Job)?;
+    let error = refusal(
+        &cdr(&format!("{OAUTH}{FEDERATION}{FEDERATION}")),
+        Process::Job,
+    )?;
     assert!(
         matches!(
             &error,
