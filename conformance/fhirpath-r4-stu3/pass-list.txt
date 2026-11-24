@@ -85,6 +85,8 @@ testEscapeUnescape/testUnescapeJson3
 testEscapeUnescape/testUnescapeJson4
 testJoin/testJoin
 testJoin/testJoinEmpty
+testLargeExponents/testLargeExponentDecHighBoundary
+testLargeExponents/testLargeExponentDecLowBoundary
 testLargeExponents/testNegativeQtyHighBoundaryPrecision
 testMatches/testMatchesFullWithinUrl1
 testMatches/testMatchesFullWithinUrl1a
