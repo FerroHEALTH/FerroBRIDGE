@@ -332,3 +332,44 @@ fn exhausted(key: &str) -> OwnedError {
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{Change, OwnedError, OwnedStore};
+
+    /// A store over a database no server answers.
+    fn unreachable() -> OwnedStore {
+        OwnedStore {
+            pool: sqlx::postgres::PgPoolOptions::new()
+                .acquire_timeout(Duration::from_millis(300))
+                .connect_lazy("postgres://bridge@127.0.0.1:1/state?sslmode=disable")
+                .expect("a lazy pool"),
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_store_refuses_every_call() {
+        let store = unreachable();
+        let basic = serde_json::from_str(r#"{"resourceType":"Basic"}"#).expect("JSON");
+        assert!(matches!(
+            store.create("Basic", basic).await,
+            Err(OwnedError::Database { .. })
+        ));
+        assert!(matches!(
+            store.get("Basic", "x").await,
+            Err(OwnedError::Database { .. })
+        ));
+        assert!(matches!(
+            store
+                .change("Basic", "x", |_held| Ok::<_, ()>(Change::Delete))
+                .await,
+            Err(OwnedError::Database { .. })
+        ));
+        assert!(matches!(
+            store.scan("Basic").await,
+            Err(OwnedError::Database { .. })
+        ));
+    }
+}

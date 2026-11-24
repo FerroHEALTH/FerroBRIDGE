@@ -479,3 +479,113 @@ fn consumed_of_row(row: &sqlx::postgres::PgRow) -> Result<ConsumedSource, StoreE
         context: row.try_get("context").map_err(database)?,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{StateStore, version_slot};
+    use crate::cdr::ids::EhrId;
+    use crate::facade::identity::record::{
+        CommittedSource, CompositionBinding, ConsumedSource, Identifier, IdentifierQuery,
+        SourceVersion, SystemMatch,
+    };
+    use crate::facade::identity::store::{Store as _, StoreError};
+    use crate::facade::identity::{ExternalResourceId, FhirResourceId, PersonId};
+    use crate::store::seal::{KeyId, LookupKey, SealKeys, SealingKey};
+
+    /// The base64 of 32 bytes of `A`, made for the tests.
+    const KEY: &str = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=";
+
+    /// A map over a database no server answers.
+    fn unreachable() -> StateStore {
+        let key = SealingKey::from_base64(KEY).expect("a 32-byte key");
+        StateStore {
+            pool: sqlx::postgres::PgPoolOptions::new()
+                .acquire_timeout(Duration::from_millis(300))
+                .connect_lazy("postgres://bridge@127.0.0.1:1/state?sslmode=disable")
+                .expect("a lazy pool"),
+            keys: SealKeys::new(
+                (KeyId::new("k").expect("an id"), key.clone()),
+                Vec::new(),
+                LookupKey::new(&key),
+            ),
+        }
+    }
+
+    /// Whether `outcome` is the database's refusal.
+    fn refused<T: std::fmt::Debug>(outcome: &Result<T, StoreError>) -> bool {
+        matches!(outcome, Err(StoreError::Database { .. }))
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_store_refuses_every_call_and_answers_nothing_empty() {
+        let map = unreachable();
+        let person = PersonId::new("http://example.org/ns", "p-1").expect("a person");
+        let ehr = EhrId::new("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11").expect("an ehr_id");
+        let external = ExternalResourceId::new("sender-1").expect("an external id");
+        let id = FhirResourceId::new("abc").expect("a FHIR id");
+        let source = SourceVersion::new("Condition", external.clone(), None);
+        let binding: CompositionBinding = serde_json::from_value(serde_json::json!({
+            "ehr_id": "e", "versioned_object_uid": "u", "template_id": "t",
+            "resource_type": "Condition", "entry_path": "/p", "split": 0,
+            "context": "c", "derivation": null, "created": null
+        }))
+        .expect("a binding");
+        let consumed = ConsumedSource {
+            ehr_id: String::from("e"),
+            versioned_object_uid: String::from("u"),
+            internal_id: String::from("abc"),
+            context: String::from("c"),
+        };
+        let committed = CommittedSource {
+            ehr_id: String::from("e"),
+            contribution_uid: String::from("c"),
+        };
+        assert!(refused(&map.ehr_of(&person).await));
+        assert!(refused(&map.record_ehr(&person, &ehr).await));
+        assert!(refused(&map.person_of(&ehr).await));
+        assert!(refused(&map.internal_of("Condition", &external).await));
+        assert!(refused(
+            &map.record_internal("Condition", &external, &id).await
+        ));
+        assert!(refused(&map.binding_of("Condition", &id).await));
+        assert!(refused(
+            &map.record_binding("Condition", &id, &binding).await
+        ));
+        assert!(refused(&map.consumed(&source).await));
+        assert!(refused(&map.consumed_versions(&source).await));
+        assert!(refused(&map.record_consumed(&source, &consumed).await));
+        assert!(refused(&map.committed(&source).await));
+        assert!(refused(&map.record_committed(&source, &committed).await));
+        for system in [
+            SystemMatch::Any,
+            SystemMatch::Absent,
+            SystemMatch::Is(String::from("urn:s")),
+        ] {
+            let query = IdentifierQuery::new(system, "v");
+            assert!(refused(&map.identified("Patient", &query).await));
+        }
+        let identifier = Identifier::new(Some("urn:s"), "v");
+        assert!(refused(
+            &map.record_identifier("Patient", &identifier, &id).await
+        ));
+    }
+
+    #[test]
+    fn a_source_without_a_version_takes_the_empty_slot() {
+        let external = ExternalResourceId::new("s").expect("an external id");
+        assert_eq!(
+            "",
+            version_slot(&SourceVersion::new("Condition", external.clone(), None))
+        );
+        assert_eq!(
+            "2",
+            version_slot(&SourceVersion::new(
+                "Condition",
+                external,
+                Some(String::from("2"))
+            ))
+        );
+    }
+}

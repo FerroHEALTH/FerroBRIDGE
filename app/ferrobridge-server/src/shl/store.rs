@@ -792,3 +792,81 @@ async fn remove(
         .map_err(database)?;
     Ok(gone(link, ending))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{Ending, FileEntry, Link, LinkStore, Resolution, StoreError, record_of};
+    use crate::store::seal::{KeyId, LookupKey, SealKeys, SealingKey};
+
+    /// The base64 of 32 bytes of `A`, made for the tests.
+    const KEY: &str = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=";
+
+    /// A link store over a database no server answers.
+    fn unreachable() -> LinkStore {
+        let key = SealingKey::from_base64(KEY).expect("a 32-byte key");
+        LinkStore {
+            pool: sqlx::postgres::PgPoolOptions::new()
+                .acquire_timeout(Duration::from_millis(300))
+                .connect_lazy("postgres://bridge@127.0.0.1:1/state?sslmode=disable")
+                .expect("a lazy pool"),
+            keys: SealKeys::new(
+                (KeyId::new("k").expect("an id"), key.clone()),
+                Vec::new(),
+                LookupKey::new(&key),
+            ),
+        }
+    }
+
+    /// A link of one file.
+    fn link() -> Link {
+        Link {
+            handle: String::from("h-1"),
+            owner: String::from("Patient/p"),
+            created: 0,
+            expires: 100,
+            label: None,
+            resolution: Resolution::Direct,
+            passcode: None,
+            attempts_left: 1,
+            answers_left: 1,
+            files: vec![FileEntry {
+                content_type: String::from("application/fhir+json"),
+                last_updated: String::from("1970-01-01T00:00:00Z"),
+            }],
+            outstanding: 0,
+        }
+    }
+
+    /// Whether `outcome` is the database's refusal.
+    fn refused<T: std::fmt::Debug>(outcome: &Result<T, StoreError>) -> bool {
+        matches!(outcome, Err(StoreError::Database(_)))
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_store_refuses_every_call() {
+        let store = unreachable();
+        assert!(refused(
+            &store.create("m", &link(), &[String::from("jwe")]).await
+        ));
+        assert!(refused(&store.list("Patient/p", 0).await));
+        assert!(refused(&store.revoke("Patient/p", "h-1").await));
+        assert!(refused(&store.answer("m", None, None, (0, 60)).await));
+        assert!(refused(
+            &store.answer("m", Some("1234"), None, (0, 60)).await
+        ));
+        assert!(refused(&store.fetch("t", 0).await));
+        assert!(refused(&store.direct("m", 0).await));
+        assert!(refused(&store.sweep(0).await));
+    }
+
+    #[test]
+    fn a_record_leaves_the_handle_out_and_an_ending_is_named() {
+        let record = record_of(&link()).expect("a record");
+        assert_eq!(Some(""), record["handle"].as_str());
+        assert_eq!(Some("Patient/p"), record["owner"].as_str());
+        assert!(link().expired(100));
+        assert_ne!(Ending::Expired, Ending::Used);
+    }
+}
