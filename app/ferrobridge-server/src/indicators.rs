@@ -113,6 +113,38 @@ impl HealthIndicator for Cdm {
     }
 }
 
+/// The state store probe: `SELECT 1` through the store's pool, so a store
+/// that cannot answer takes the replica out of service before a request
+/// that needs it fails.
+#[derive(Debug, Clone)]
+pub struct State {
+    /// The store the probe asks through.
+    store: crate::store::Store,
+}
+
+impl State {
+    /// Returns a probe over `store`.
+    #[must_use]
+    pub const fn new(store: crate::store::Store) -> Self {
+        Self { store }
+    }
+}
+
+impl HealthIndicator for State {
+    fn name(&self) -> &'static str {
+        "state"
+    }
+
+    fn check(&self) -> Check<'_> {
+        Box::pin(async move {
+            match self.store.ping().await {
+                Ok(()) => Outcome::up(),
+                Err(error) => Outcome::down(reason(error)),
+            }
+        })
+    }
+}
+
 /// The identity-map probe.
 ///
 /// The facade resolves every request through the identity store, so a store

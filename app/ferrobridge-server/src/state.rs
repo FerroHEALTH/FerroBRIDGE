@@ -24,6 +24,13 @@ pub enum BuildError {
     /// An upstream client or a lane refused the settings it was handed.
     #[error(transparent)]
     Config(#[from] crate::config::error::Error),
+    /// The state store could not be opened or migrated.
+    #[error("the state store could not be opened")]
+    Store {
+        /// Why it could not, the database's own error included.
+        #[source]
+        source: crate::store::StoreError,
+    },
     /// The mapping set the operations lane runs did not load.
     #[error("the mapping set could not be loaded")]
     Mappings {
@@ -85,6 +92,8 @@ pub struct AppState {
     links: Option<Arc<crate::shl::Links>>,
     /// The change-feed consumers the operator API reports, when any runs.
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
+    /// The state store, when `[state]` is configured.
+    store: Option<crate::store::Store>,
 }
 
 impl AppState {
@@ -128,6 +137,16 @@ impl AppState {
             })?;
             indicators.push(Arc::new(probe));
         }
+        let store = match settings.state.as_ref() {
+            Some(state) => {
+                let store = crate::store::Store::open(state)
+                    .await
+                    .map_err(|source| BuildError::Store { source })?;
+                indicators.push(Arc::new(indicators::State::new(store.clone())));
+                Some(store)
+            }
+            None => None,
+        };
         let programs = crate::mappings::load_configured(settings, cdr.as_ref())
             .await
             .map_err(|source| BuildError::Mappings {
@@ -181,6 +200,7 @@ impl AppState {
             change_feed: None,
             access_log: None,
             links: None,
+            store,
         })
     }
 
@@ -206,6 +226,7 @@ impl AppState {
             change_feed: None,
             access_log: None,
             links: None,
+            store: None,
         }
     }
 
@@ -215,6 +236,12 @@ impl AppState {
     pub fn with_links(mut self, links: Arc<crate::shl::Links>) -> Self {
         self.links = Some(links);
         self
+    }
+
+    /// Returns the state store, when `[state]` is configured.
+    #[must_use]
+    pub const fn store(&self) -> Option<&crate::store::Store> {
+        self.store.as_ref()
     }
 
     /// Returns the links lane, when it is on.

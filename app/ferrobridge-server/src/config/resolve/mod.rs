@@ -12,8 +12,8 @@ use super::CdmSettings;
 use super::FacadeSettings;
 use super::MappingSettings;
 use super::SummarySettings;
+use super::credentials::ConnectionKeys;
 use super::credentials::Upstream;
-use super::credentials::cdm_connection_key;
 use super::credentials::resolve_credentials;
 use super::credentials::secret;
 use super::error::Error;
@@ -538,20 +538,13 @@ pub(super) fn resolve_cdm(cdm: &Cdm) -> Result<CdmSettings, Error> {
             });
         }
     };
-    let ca = match (cdm.tls_ca.as_deref(), cdm.tls_ca_file.as_deref()) {
-        (Some(_), Some(_)) => {
-            return Err(Error::Conflict {
-                key: String::from("cdm.tls_ca"),
-            });
-        }
-        (Some(pem), None) => Some(pem.as_bytes().to_vec()),
-        (None, Some(path)) => Some(std::fs::read(path).map_err(|source| Error::Secret {
-            key: String::from("cdm.tls_ca_file"),
-            path: path.to_path_buf(),
-            source,
-        })?),
-        (None, None) => None,
+    let keys = ConnectionKeys {
+        section: "cdm",
+        url_file: cdm.url_file.is_some(),
+        tls_ca: cdm.tls_ca.as_deref(),
+        tls_ca_file: cdm.tls_ca_file.as_deref(),
     };
+    let ca = keys.ca()?;
     let pseudonymiser = cdm
         .pseudonymisation
         .as_ref()
@@ -559,7 +552,7 @@ pub(super) fn resolve_cdm(cdm: &Cdm) -> Result<CdmSettings, Error> {
         .transpose()?;
     let connection = omop_cdm::connection::CdmConnection::new(url.expose_secret(), ca.as_deref())
         .map_err(|source| Error::CdmConnection {
-        key: String::from(cdm_connection_key(&source, cdm)),
+        key: keys.refused(&source),
         source,
     })?;
     Ok(CdmSettings {

@@ -26,6 +26,7 @@ mod omop_incremental;
 mod resolve;
 pub mod section;
 mod shl;
+mod state;
 
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_config::provenance::Provenance;
@@ -68,6 +69,7 @@ use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
 use section::omop_incremental::OmopIncremental;
 use section::shl::Shl;
+use section::state::State;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
 /// `[server] listen`, and `FERROBRIDGE_CONFIG` names the file.
@@ -118,6 +120,8 @@ pub struct Config {
     pub terminology: Option<Terminology>,
     /// The OMOP CDM database, when one is configured.
     pub cdm: Option<Cdm>,
+    /// The PostgreSQL state store, when one is configured.
+    pub state: Option<State>,
     /// The OMOP ETL job, when one is configured.
     pub etl: Option<Etl>,
     /// Where the mapping files are read from.
@@ -231,6 +235,24 @@ impl Config {
             || (self.operations.enabled && self.mappings.directory.is_some())
     }
 
+    /// Refuses operations over a mapping directory with neither a template
+    /// directory nor a CDR to take the templates from, before any network
+    /// call.
+    fn templates_sourced(&self) -> Result<(), Error> {
+        if let Some(directory) = self.mappings.directory.as_ref()
+            && self.operations.enabled
+            && self.mappings.templates.is_none()
+            && self.cdr.is_none()
+        {
+            return Err(Error::Mappings {
+                source: error::NoTemplateSource {
+                    directory: directory.clone(),
+                },
+            });
+        }
+        Ok(())
+    }
+
     /// Refuses an onward lane on a server whose callers hold no token to
     /// exchange, because `[auth]` is off.
     fn onward_guarded(&self, serves: bool) -> Result<(), Error> {
@@ -293,17 +315,7 @@ impl Config {
     /// network call.
     pub fn resolve(&self, process: Process) -> Result<Settings, Error> {
         let serves = process == Process::Server;
-        if let Some(directory) = self.mappings.directory.as_ref()
-            && self.operations.enabled
-            && self.mappings.templates.is_none()
-            && self.cdr.is_none()
-        {
-            return Err(Error::Mappings {
-                source: error::NoTemplateSource {
-                    directory: directory.clone(),
-                },
-            });
-        }
+        self.templates_sourced()?;
         if self.server.caller_rate.is_some() {
             return Err(Error::CallerRate);
         }
@@ -323,6 +335,11 @@ impl Config {
                 .as_ref()
                 .is_some_and(|terminology| terminology.display_fallback),
             cdm: self.cdm.as_ref().map(resolve_cdm).transpose()?,
+            state: self
+                .state
+                .as_ref()
+                .map(|state| state::resolve(state).map(Box::new))
+                .transpose()?,
             etl: self.etl.as_ref().map(resolve_etl).transpose()?,
             mapping_directory: self.mappings.directory.clone(),
             omocl_directory: self.mappings.omocl.clone(),
@@ -489,6 +506,9 @@ pub struct Settings {
     pub display_fallback: bool,
     /// The OMOP CDM database, when the lane is on.
     pub cdm: Option<CdmSettings>,
+    /// The PostgreSQL state store, when one is configured, boxed so the
+    /// settings stay small enough to move through a job's future.
+    pub state: Option<Box<crate::store::Settings>>,
     /// The OMOP ETL job, when it is configured.
     pub etl: Option<EtlSettings>,
     /// The directory the mapping files are read from, when one is configured.

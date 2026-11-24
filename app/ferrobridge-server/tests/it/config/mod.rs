@@ -26,6 +26,7 @@ mod operator;
 mod refusals;
 mod secrets;
 mod shl;
+mod state;
 mod summary;
 mod usage_report;
 

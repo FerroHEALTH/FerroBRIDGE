@@ -140,6 +140,11 @@ the testkit tool crate. Beside it:
   facade's and the operations lane's programs, which every request reads once
   at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
   lanes, `mapping check` and the reload share (#725).
+  `src/store/` is the PostgreSQL state store behind `[state]` (#2053): one
+  pool, the PostgreSQL 19 floor, the baselines under `migrations/state/`
+  (`NNNN_baseline_<area>.sql`, grants last) run at start under the advisory
+  lock, the `lane_lease` lease with its fencing generation, the `LISTEN`
+  session apart from the pool, and the `[state.seal]` keys.
 - `app/ferrobridge-console`: the operator console (#599, `docs/architecture.md`
   §4.10), its own binary `ferrobridge-console`, every page drawn on its
   server with FerroUI 0.6 and no Leptos or WebAssembly (#1355): each request
