@@ -9,8 +9,13 @@
 
 use std::error::Error;
 
+use ferrobridge_server::cdr::CdrClient;
+use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::facade::Settings;
+use ferrobridge_server::facade::ehr;
 use ferrobridge_server::facade::ehr::Policy;
+use ferrobridge_server::facade::identity::PersonId;
+use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::subject::IdForm;
 use ferrobridge_server::facade::subject::SubjectLink;
 use http::StatusCode;
@@ -230,5 +235,71 @@ async fn a_refused_ehr_creation_is_a_refusal_that_names_the_stored_patient()
             .contains(&format!("Patient/{UID}")),
         "{body}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<(), Box<dyn Error>>
+{
+    let cdr = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/ehr"))
+        .respond_with(ferrobridge_testkit::stubs::its_rest::not_found(
+            "no EHR for the subject",
+        ))
+        .up_to_n_times(2)
+        .mount(&cdr)
+        .await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/ehr"))
+        .and(matchers::query_param("subject_id", UID))
+        .and(matchers::query_param("subject_namespace", NAMESPACE))
+        .respond_with(ResponseTemplate::new(200).set_body_string(ehr_body()))
+        .mount(&cdr)
+        .await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/ehr"))
+        .respond_with(ResponseTemplate::new(201).insert_header("ETag", format!("\"{EHR_ID}\"")))
+        .up_to_n_times(1)
+        .mount(&cdr)
+        .await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/ehr"))
+        .respond_with(
+            ResponseTemplate::new(409)
+                .insert_header("Content-Type", "application/json")
+                .set_body_json(serde_json::json!({"message": "an EHR with this subject exists"})),
+        )
+        .mount(&cdr)
+        .await;
+    let client = CdrClient::new(&CdrConfig::new(cdr.uri().parse()?))?;
+    let link = SubjectLink::new(NAMESPACE, IdForm::LogicalId, "PERSON")?;
+    let person = PersonId::new(NAMESPACE, UID)?;
+    let (first_store, second_store) = (MemoryStore::default(), MemoryStore::default());
+
+    let (first, second) = tokio::join!(
+        ehr::resolve(
+            &client,
+            &first_store,
+            &person,
+            &link,
+            Policy::CreateOnFirstWrite
+        ),
+        ehr::resolve(
+            &client,
+            &second_store,
+            &person,
+            &link,
+            Policy::CreateOnFirstWrite
+        ),
+    );
+    assert_eq!(EHR_ID, first?.as_str());
+    assert_eq!(EHR_ID, second?.as_str());
+    let creates = ehr_calls(&cdr)
+        .await
+        .into_iter()
+        .filter(|(method, _, _)| method == "POST")
+        .count();
+    assert_eq!(2, creates, "both writers tried to create");
     Ok(())
 }
