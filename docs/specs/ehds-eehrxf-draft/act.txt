@@ -1,0 +1,432 @@
+                                                                            Ref. Ares(2026)10884928 - 23/11/2026
+
+
+
+
+                           EUROPEAN
+                           COMMISSION
+
+
+
+
+                                                    Brussels, XXX
+                                                    […](2024) XXX draft
+
+
+
+
+             COMMISSION IMPLEMENTING REGULATION (EU) …/...
+
+                                          of XXX
+
+               on the European health record exchange format (EEHRxF)
+
+                                 (Text with EEA relevance)
+
+
+
+
+     This draft has not been adopted or endorsed by the European Commission. Any
+     views expressed are the preliminary views of the Commission services and may not
+     in any circumstances be regarded as stating an official position of the Commission.
+
+
+
+
+EN                                                                                                   EN
+                   COMMISSION IMPLEMENTING REGULATION (EU) …/...
+
+                                                     of XXX
+
+                on the European electronic health record exchange format (EEHRxF)
+
+                                         (Text with EEA relevance)
+
+
+     THE EUROPEAN COMMISSION,
+     Having regard to the Treaty on the Functioning of the European Union,
+     Having regard to Regulation (EU) 2025/327 of the European Parliament and of the Council of
+     11 February 2025 on the European Health Data Space and amending Directive 2011/24/EU
+     and Regulation (EU) 2024/28471, and in particular Article 15(1) thereof,
+     Whereas:
+     (1)    Regulation (EU) 2025/327 aims to improve natural persons’ access to and control over
+            their personal electronic health data in the context of healthcare and to facilitate the
+            exchange of such data. To this end, Article 15(1) of Regulation (EU) 2025/327
+            empowers the Commission to lay down the technical specifications for the priority
+            categories of personal electronic health data, setting out the European electronic health
+            record exchange format (EEHRxF).
+     (2)    Commission Recommendation (EU) 2019/243(2) sets out a framework for the
+            development of the EEHRxF based on the eHealth Network guidelines on electronic
+            exchange of electronic health data. That framework on the EEHRxF was further
+            developed through the Xt-EHR joint action(3) funded under the EU4Health
+            programme and through the eHealth Network. The development of the EEHRxF has
+            also benefited from the technical and methodological work carried out under Horizon
+            Europe-funded projects, in particular XpanDH and xShare, including
+            recommendations on interoperability, implementation methodologies, feasibility
+            demonstrations and stakeholder involvement.
+     (3)    The EEHRxF is intended to facilitate the exchange of personal electronic health data
+            referred to in Article 14(1) of Regulation (EU) 2025/327. The EEHRxF should be used
+            in several cases, namely the download of an electronic copy of personal electronic
+            health data when exercising the right of access, the transmission of a downloaded
+            electronic copy to healthcare providers, the transmission of personal electronic health
+            data between healthcare providers in different Member States following a natural
+            person’s request when exercising the right to data portability, and the implementation
+            of the harmonised interoperability software components of electronic health record
+            systems (‘EHR systems’). The EEHRxF does not require any particular internal
+            architecture or data storage model in EHR systems. It does not establish a minimum or
+            maximum set of data that healthcare providers are required to register.
+
+     1
+            OJ L, 2025/327, 5.3.2025, ELI: http://data.europa.eu/eli/reg/2025/327/oj.
+     2
+            Commission Recommendation (EU) 2019/243 of 6 February 2019 on a European Electronic Health
+            Record exchange format (OJ L 39, 11.2.2019, p. 18, ELI: http://data.europa.eu/eli/reco/2019/243/oj).
+     3
+            Joint action ‘Extended EHR@EU Data Space for Primary use’.
+
+
+
+
+EN                                                      1                                                          EN
+     (4)   Where personal electronic health data is collected and recorded in an EHR system, that
+           data should be made available in the EEHRxF either upon issuance or transmission, to
+           the extent that the data collected correspond to the data elements and use cases set out
+           in this Regulation. For the purposes of this Regulation, the transmission of personal
+           electronic health data may take place by sending the data or by making the data
+           available in response to a request. References to access, download and transmission in
+           this Regulation concern electronic means and do not include the provision of data on a
+           physical medium or through postal or courier services.
+     (5)   To understand, correctly identify and use personal electronic health data, it is
+           necessary to provide information describing that data to query and retrieve the data in
+           the context of an electronic exchange. Such information, commonly referred to as
+           metadata, does not form part of the clinical content itself, but provides essential
+           context, such as how the data can be identified, organised or related to other
+           information. The EEHRxF should therefore include common metadata specifications
+           applicable to the exchange, search and retrieval of priority categories of personal
+           electronic health data.
+     (6)   Information related to natural persons used in the EEHRxF, in particular in the
+           metadata for query and retrieval, should be consistent, where relevant, with the
+           healthcare attributes referred to in Article 2(1) of Commission Implementing
+           Regulation (EU) 2026/2099, and with other attributes of natural persons issued to their
+           European Digital Identity Wallets in accordance with Regulation (EU) No 910/2014.
+     (7)   To enable the consistent and interoperable exchange of personal electronic health data,
+           the EEHRxF should include technical specifications governing how such data are
+           represented and exchanged. The EEHRxF should support the exchange of priority
+           categories of personal electronic health data in both structured and unstructured form.
+           Where personal electronic health data are not structured, the possibility of exchanging
+           unstructured data, in the form of human-readable records, including text or portable
+           document format (PDF) attachments, is necessary to safeguard patient safety and
+           ensure continuity of care. The progressive increase of the share of structured data in
+           health data exchanges including exchanges through national contact points for digital
+           health, should further improve the usability of exchanged data.
+     (8)   Considering the widespread use of the Fast Healthcare Interoperability Resources
+           developed by Health Level Seven International (‘HL7 FHIR’), the Digital Imaging and
+           Communications in Medicine standard defined by the National Electrical
+           Manufacturers Association (‘the DICOM standard’) and PDF in existing digital health
+           infrastructures, these technical interoperability standards should form the technical
+           basis of the EEHRxF. Version R4 of HL7 FHIR should be used as part of technical
+           interoperability and exchange specifications, considering its maturity. The use of these
+           standards in the EEHRxF should not prevent Member States from using other
+           technical interoperability standards or information models within their national digital
+           health infrastructures. Where other standards, information models or versions of HL7
+           FHIR are used, Member States should ensure, through appropriate mappings or
+           transformation mechanisms, that it remains possible to exchange personal electronic
+           health data and to make that data available in conformity with the EEHRxF for the use
+           cases set out in this Regulation.
+     (9)   The priority categories of personal electronic health data covered by the EEHRxF
+           differ in their purpose of exchange, content and level of clinical detail. Category-
+           dependent specifications should determine, for each priority category of personal
+
+
+
+EN                                                2                                                   EN
+            electronic health data referred to in Article 14 of Regulation (EU) 2025/327, the
+            required structural format and semantic representation, taking into account the specific
+            characteristics of that category. Where appropriate, the category-dependent
+            specifications should rely on common data groups or elements whose meaning is
+            determined in a uniform way in the EEHRxF.
+     (10)   Some data groups are relevant to multiple priority categories of personal electronic
+            health data. This includes shared clinical or administrative concepts, such as those
+            relating to a natural person or a medicinal product. To avoid unnecessary duplication,
+            inconsistencies in structure or meaning, and reduced interoperability, those data
+            groups should be determined once and reused in category-dependent specifications,
+            where appropriate, and be maintained accordingly.
+     (11)   Semantic interoperability in the exchange of personal electronic health data requires
+            the consistent interpretation of coded information across Member States. Where, to
+            support the provision of healthcare services at national level, a Member State requires,
+            for a specific data field, the use of a national or international coding system that is not
+            referred to in binding requirements, mapping between coding systems is necessary to
+            facilitate the implementation of EEHRxF use-cases. Where mapping is not possible,
+            providing a textual designation in English facilitates the interpretation of the
+            information. Consistent governance of value sets at Union level is necessary to ensure
+            their uniform application across Member States.
+     (12)   To assist the implementation of the EEHRxF, the Commission, in cooperation with the
+            Member States, and taking into account the input of relevant stakeholders, should
+            develop an EEHRxF implementation guide on the basis of this Regulation. To
+            facilitate compliance with this Regulation, the EHDS Board should endorse the
+            EEHRxF implementation guide. The Commission should publish the endorsed
+            implementation guide, and information on its updated versions and their applicability
+            periods. That information should clearly indicate whether a particular requirement in
+            the EEHRxF implementation guide is affected by any updates of the EEHRxF. To
+            facilitate the systematic updating of the EEHRxF implementation guide, the
+            Commission, together with the EHDS Board, should develop and make publicly
+            available an EEHRxF maintenance plan.
+     (13)   [Article: National profiles] To take due account of national specificities in the
+            organisation of healthcare services, Member States should be allowed to define
+            national profiles of the EEHRxF, including for the operation of national digital health
+            infrastructures. Such national profiles may provide additional requirements or
+            restrictions for national use, including constraining or expanding the data groups, data
+            elements, cardinalities, coding systems, value sets, data types and metadata. National
+            profiles should not undermine national and cross-border interoperability by preventing
+            the exchange, access, interpretation or processing of personal electronic health data
+            conforming to the EEHRxF for use cases covered by this Regulation.
+     (14)   The European Data Protection Supervisor has been consulted in accordance with
+            Article 42(1) of Regulation (EU) 2018/1725 of the European Parliament and of the
+            Council4 and delivered an opinion on XX XX 2026.
+
+
+     4
+            Regulation (EU) 2018/1725 of the European Parliament and of the Council of 23 October 2018 on the
+            protection of natural persons with regard to the processing of personal data by the Union institutions,
+            bodies, offices and agencies and on the free movement of such data, and repealing Regulation (EC)
+
+
+
+
+EN                                                        3                                                           EN
+     (15)   This Regulation introduces binding requirements for cross-border digital public
+            services within the meaning of Regulation (EU) 2024/903 of the European Parliament
+            and of the Council5. Accordingly, an interoperability assessment has been carried out
+            and the resulting report is to be published on the Interoperable Europe portal.
+     (16)   The measures provided for in this Regulation are in accordance with the opinion of the
+            committee established by Article 98(1) of Regulation (EU) 2025/327,
+     HAS ADOPTED THIS REGULATION:
+
+                                                   Article 1
+                                           Subject matter and scope
+     1.       This Regulation lays down the technical specifications for the priority categories of
+              personal electronic health data referred to in Article 14(1) of Regulation (EU)
+              2025/327, setting out the European electronic health record exchange format
+              (EEHRxF).
+     2.       The EEHRxF is intended to be used in the following cases:
+              (a)   to download an electronic copy of personal electronic health data by natural
+                    persons pursuant to Article 3(2) of Regulation (EU) 2025/327;
+              (b)   to transmit a downloaded electronic copy of personal electronic health data to a
+                    healthcare provider of the natural person’s choice pursuant to Article 7(4) of
+                    Regulation (EU) 2025/327;
+              (c)   to transmit personal electronic health data between healthcare providers
+                    pursuant to Article 7(2) of Regulation (EU) 2025/327;
+              (d)   to exchange personal electronic health data across borders through
+                    MyHealth@EU pursuant to Article 23(3) of Regulation (EU) 2025/327;
+              (e)   to implement the harmonised software components of EHR systems pursuant
+                    to the common specifications provided for in Article 36 of Regulation (EU)
+                    2025/327.
+
+                                                     Article 2
+                                                    Definitions
+     For the purposes of this Regulation, the following definitions shall apply:
+     1.       ‘structured content representation’ means a form of machine-readable encoding of
+              personal electronic health data that enables automatic identification of individual
+              elements;
+     2.       ‘unstructured content representation’ means a form of encoding of personal
+              electronic health data in a machine-readable transmission container, in the form of
+              human-readable content, which does not enable automated identification of
+              individual elements;
+
+
+            No 45/2001 and Decision No 1247/2002/EC (OJ L 295, 21.11.2018, p. 39, ELI:
+            http://data.europa.eu/eli/reg/2018/1725/oj).
+     5
+            Regulation (EU) 2024/903 of the European Parliament and of the Council of 13 March 2024 laying
+            down measures for a high level of public sector interoperability across the Union (Interoperable Europe
+            Act) (OJ L, 2024/903, 22.3.2024, ELI: http://data.europa.eu/eli/reg/2024/903/oj).
+
+
+
+
+EN                                                        4                                                           EN
+     3.    ‘content transmission’ means a technical method for electronic transmission of
+           electronic health data between systems;
+     4.    ‘data field’ means an individual item of information that represents a single, specific
+           piece of data;
+     5.    ‘document’ means a self-contained set of personal electronic health data belonging to
+           a priority data category referred to in Article14(1) of Regulation (EU) 2025/327;
+     6.    ‘data group’ means a logical collection of related data fields that together represent a
+           coherent set of information;
+     7.    ‘data type’ means a classification that determines how the content of a data field or
+           data group is structured and expressed;
+     8.    ‘binding requirement’ means a requirement that constrains the permitted values of a
+           data element through the designation of a specific coding system or value set;
+     9.    ‘coding system’ means a system of codes used to represent concepts in a
+           standardised and unambiguous way;
+     10.   ‘value set’ means a set of codes drawn from one or more coding systems;
+     11.   ‘preferred coding system’ means the coding system designated as the first choice
+           among the coding systems permitted by a binding requirement;
+     12.   ‘coded data field’ means a data field whose value shall be drawn from a coding
+           system or a value set;
+     13.   ‘mapping rules’ means rules that establish a correspondence between codes from
+           different coding systems for the purpose of representing the values of a coded data
+           field;
+     14.   ‘logical information model’ means a machine-readable structured representation of
+           the data structures set out in Annexes II to X;
+     15.   ‘EEHRxF implementation guide’ means a machine-readable technical documentation
+           for the implementation of the EEHRxF and conformance testing of the EHR systems
+           that implement the EEHRxF;
+     16.   ‘national profile’ means a specification adopted by a Member State that complements
+           the EEHRxF for national interoperability needs and the provision of healthcare
+           services within that Member State.
+
+                                          Article 3
+                    Technical interoperability and exchange specifications
+     1.    Where the EEHRxF is used for the exchange of personal electronic health data, the
+           exchange shall be performed by one or more of the following technical
+           representations:
+           (a)   a representation consisting of a portable document format (PDF) attachment
+                 embedded in Fast Healthcare Interoperability Resources developed by Health
+                 Level Seven International (‘HL7 FHIR’) resource, including the applicable
+                 metadata set;
+           (b)   a representation compliant with HL7 FHIR and consisting of a set of human-
+                 readable summaries expressed as a narrative, organised as per the relevant data
+                 groups and including the applicable metadata set;
+
+
+
+EN                                               5                                                    EN
+             (c)   a representation compliant with HL7 FHIR and consisting of structured data
+                   accompanied by human-readable summaries of the same data expressed as a
+                   narrative, organised as per the relevant data groups and including the
+                   applicable metadata set;
+             (d)   for medical imaging, a representation consisting of structured data using the
+                   Digital Imaging and Communications in Medicine standard defined by the
+                   National Electrical Manufacturers Association (‘DICOM standard’), with
+                   related imaging reports using HL7 FHIR and imaging study manifests using
+                   HL7 FHIR or the DICOM standard.
+     2.      Where HL7 FHIR is used for the technical representations referred to in paragraph 1,
+             version R4 of HL7 FHIR shall be used.
+     3.      The requirements laying down the technical interoperability and exchange
+             specifications of the EEHRxF are set out in Annex II.
+
+                                             Article 4
+                                       Metadata specifications
+     The specifications of metadata applicable to the exchange, search and retrieval of personal
+     electronic health data are set out in Annex III to this Regulation.
+
+                                              Article 5
+                                  Category-dependent specifications
+     The specifications for each priority category of personal electronic health data referred to in
+     Article 14(1) of Regulation (EU) 2025/327, including the structural and semantic
+     requirements, are set out in Annexes IV to IX to this Regulation.
+
+                                              Article 6
+                                    Coding systems and value sets
+     1.      The coding systems to be used for each coded data field are set out in Annexes III to
+             X. Where the binding requirement designates a preferred coding system among
+             multiple options, that coding system shall be used, unless the concept to be
+             represented is not covered by it. In that case, another coding system listed in the
+             binding requirement shall be used. Where a Member State requires, for a coded data
+             field, the use of a coding system that is not referred to in the binding requirements for
+             that data field, it shall make available to the Commission and to the EHDS Board the
+             mapping rules for at least one of the coding systems referred to in the binding
+             requirements for that data field, using as the first choice the preferred coding system.
+     2.      Member States shall ensure that such mapping rules are clinically validated,
+             maintained and updated. Such mapping rules shall specify their input and output
+             sides, the versions of the source and target coding systems, the degree of semantic
+             equivalence, the provenance of clinical validation and any conditions or limitations
+             of use.
+     3.      Following the application to personal electronic health data of such mapping, both
+             the original coding and the result of the mapping shall be provided as part of the
+             coded data field. Where mapping is not possible and the original coding is not in
+             English, the original national coding, together with its textual designation in English,
+             shall be provided.
+
+
+
+EN                                                  6                                                    EN
+     4.        Where a value set is not established directly in this Regulation, the EHDS Board
+               shall endorse that value set based on the coding system or standard referred to in this
+               Regulation.
+     5.        The Commission shall publish the value sets referred to in paragraph 4, and the
+               mapping rules provided for in paragraph 2, in a machine-readable format through a
+               versioned terminology service that identifies the version of each published value set
+               and mapping rule. The versioned terminology service shall support the terminology
+               specifications set out in HL7 FHIR. This requirement shall not apply to coded data
+               fields that allow the use of non-defined coding systems.
+
+                                                Article 7
+                                               Data groups
+     1.        The requirements for data groups representing elements applicable to multiple
+               priority categories of personal electronic health data referred to in Article 14(1) of
+               Regulation (EU) 2025/327 are set out in Annex X to this Regulation.
+     2.        Data groups may be exchanged either as part of priority data categories or as
+               individual resources depending on the needs for a particular data exchange.
+
+                                              Article 8
+                                  General conventions and data types
+               The general conventions for interpreting the Annexes and the definitions of data
+               types used in Annexes III to X are set out in Annex I.
+
+                                             Article 9
+          Governance, implementation guide and versioning of the EEHRxF and maintenance
+                                               plan
+     1.        The Commission shall publish and maintain online the EEHRxF logical information
+               models that represent the data structures set out in Annexes III to X.
+     2.        The Commission, in cooperation with the Member States and taking into account the
+               input of relevant stakeholders, shall develop and maintain the EEHRxF
+               implementation guide on the basis of this Regulation, with a view to enabling the
+               technical implementation of the EEHRxF. The EEHRxF implementation guide and
+               any updates to it shall be endorsed by the EHDS Board. The Commission shall
+               publish the first version of the EEHRxF implementation guide in machine-readable
+               format by 31 October 2027.
+     3.        The implementation guide referred to in paragraph 2 may adapt the names of data
+               fields and data groups where necessary to comply with the naming conventions of
+               the technical standard used for content representation. Such adaptations shall
+               preserve the meaning, cardinalities and binding requirements of the elements
+               concerned, as set out in this Regulation. The implementation guide shall include a
+               correspondence between the elements set out in the Annexes and their technical
+               representation.
+     4.        The Commission shall make publicly available information on the versions of the
+               EEHRxF and the EEHRxF implementation guide, including references to the
+               applicable logical information models. That information shall identify which
+
+
+
+
+EN                                                   7                                                   EN
+              requirements o the implementation guide are affected by each update of the
+              EEHRxF.
+     5.       The Commission, together with the EHDS Board, shall develop and make publicly
+              available an EEHRxF maintenance plan for the EEHRxF logical information models
+              and the EEHRxF implementation guide, covering at least:
+              (a)   the process for amending the EEHRxF logical information models and the
+                    EEHRxF implementation guide, including transition between its versions;
+              (b)   the roles of participants in that process, including representatives from standard
+                    development organisations and the stakeholder forum referred to in Article 93
+                    of Regulation (EU) 2025/327.
+
+                                             Article 10
+                           Relation of the EEHRxF with national profiles
+     1.       Member States may define national profiles of the EEHRxF, including for the
+              purposes of operating national digital health infrastructures.
+     2.       National profiles may introduce additional requirements or restrictions for national
+              use, provided that those requirements or restrictions do not prevent the exchange,
+              access, interpretation or processing of personal electronic health data conforming to
+              the EEHRxF for the use cases referred to in Article 1(2).
+
+                                               Article 11
+                                            Entry into force
+     This Regulation shall enter into force on the twentieth day following that of its publication in
+     the Official Journal of the European Union.
+     This Regulation shall be binding in its entirety and directly applicable in all Member States.
+     Done at Brussels,
+
+
+
+                                                  For the Commission
+                                                  The President
+                                                  […]
+
+
+
+
+EN                                                  8                                                    EN
+
