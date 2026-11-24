@@ -50,9 +50,8 @@
 - [Subagent reports go to a file](subagent-reports-to-file.md): a long
   agent report is written to the scratchpad by the agent, because a truncated
   result is lost and a finished agent cannot be resumed; 2026-09-12
-- [Mermaid diagrams](mermaid-diagrams.md): the architecture carries mermaid
-  diagrams; render every fence with mermaid-cli against the installed Chrome
-  before a pull request; a semicolon ends a sequence message; 2026-09-12
+- [Mermaid diagrams](mermaid-diagrams.md): every diagram is a mermaid block, never ASCII
+  art; render each fence before a PR; owner 2026-11-24
 - [CI runner memory](ci-runner-memory.md): a workspace-wide check or clippy
   is killed with exit 143 when two generated giants compile together; lint
   per package with cargo hack, never the all-features union of fhir-types;

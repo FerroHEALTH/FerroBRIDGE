@@ -12,18 +12,21 @@ FerroSMART's architecture describes the whole deployment in
 [§13.21 A product behind FerroSMART](https://github.com/FerroHEALTH/FerroSMART/blob/main/docs/architecture.md#1321-a-product-behind-ferrosmart);
 this page is FerroBRIDGE's side of it.
 
-```text
- browser          SMART app            FerroSMART            IdP (login only)
-    | 1. launch      |                      |                        |
-    |--------------->| 2. /authorize        |                        |
-    |                |  aud = facade base   |                        |
-    |<--------------------------------------| 3. OpenID Connect login |
-    |---------------------------------------------------------------->|
-    | 4. patient picker and consent         |                        |
-    |                |<- 5. code, /token -->|                        |
-    |                |  RFC 9068 token with the launch context        |
-    |                | 6. FHIR call, Bearer token                     |
-    |                |--------------------------> FerroBRIDGE /fhir   |
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant A as SMART app
+    participant S as FerroSMART
+    participant I as IdP (login only)
+    participant F as FerroBRIDGE /fhir
+    B->>A: 1. Launch
+    A->>S: 2. /authorize, aud = facade base
+    S-->>B: 3. OpenID Connect login
+    B->>I: 3. OpenID Connect login
+    Note over B,S: 4. Patient picker and consent
+    A->>S: 5. Code, /token
+    S-->>A: RFC 9068 token with the launch context
+    A->>F: 6. FHIR call, Bearer token
 ```
 
 ## FerroSMART's resource table

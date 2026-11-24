@@ -49,9 +49,12 @@ unsigned tag is refused at push time.
 `.github/workflows/release.yml` is dormant until a `v*` tag arrives. It does
 not run on a push to `main`, on a pull request, or in a merge group.
 
-```text
-plan ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ finalize-release (publish) ── crates
-                                └─ build-console ──────────────────┘
+```mermaid
+flowchart LR
+    plan --> release["github-release (draft)"]
+    release --> binaries["build-binaries"] --> image["build-image"] --> finalize["finalize-release (publish)"]
+    release --> console["build-console"] --> finalize
+    finalize --> crates
 ```
 
 - **plan** validates the tag shape, checks it against every file that declares
