@@ -86,42 +86,30 @@ pub struct Source {
 /// action never in the immunisations (no specification governs the choice of
 /// sections: our own design).
 pub const SOURCES: &[Source] = &[
-    Source {
-        path: "EHDSPatientSummary.problems.problem",
-        template: PATIENT_SUMMARY_TEMPLATE,
-        section: "openEHR-EHR-SECTION.adhoc.v1",
-        archetype: "openEHR-EHR-EVALUATION.problem_diagnosis.v1",
-    },
-    Source {
-        path: "EHDSPatientSummary.allergiesAndIntolerances.allergyIntolerance",
-        template: PATIENT_SUMMARY_TEMPLATE,
-        section: "openEHR-EHR-SECTION.adhoc.v1",
-        archetype: "openEHR-EHR-EVALUATION.adverse_reaction_risk.v2",
-    },
-    Source {
-        path: "EHDSPatientSummary.medicationSummary.medicationUse",
-        template: PATIENT_SUMMARY_TEMPLATE,
-        section: "openEHR-EHR-SECTION.adhoc.v1",
-        archetype: "openEHR-EHR-INSTRUCTION.medication_order.v3",
-    },
-    Source {
-        path: "EHDSPatientSummary.medicationSummary.medicationUse",
-        template: PATIENT_SUMMARY_TEMPLATE,
-        section: "openEHR-EHR-SECTION.adhoc.v1",
-        archetype: "openEHR-EHR-ACTION.medication.v1",
-    },
-    Source {
-        path: "EHDSPatientSummary.medicalDevicesAndImplants.deviceUse",
-        template: PATIENT_SUMMARY_TEMPLATE,
-        section: "openEHR-EHR-SECTION.adhoc.v1",
-        archetype: "openEHR-EHR-EVALUATION.device_summary.v0",
-    },
-    Source {
-        path: "EHDSPatientSummary.procedures.procedure",
-        template: PATIENT_SUMMARY_TEMPLATE,
-        section: "openEHR-EHR-SECTION.adhoc.v1",
-        archetype: "openEHR-EHR-ACTION.procedure.v1",
-    },
+    adhoc(
+        "EHDSPatientSummary.problems.problem",
+        "openEHR-EHR-EVALUATION.problem_diagnosis.v1",
+    ),
+    adhoc(
+        "EHDSPatientSummary.allergiesAndIntolerances.allergyIntolerance",
+        "openEHR-EHR-EVALUATION.adverse_reaction_risk.v2",
+    ),
+    adhoc(
+        "EHDSPatientSummary.medicationSummary.medicationUse",
+        "openEHR-EHR-INSTRUCTION.medication_order.v3",
+    ),
+    adhoc(
+        "EHDSPatientSummary.medicationSummary.medicationUse",
+        "openEHR-EHR-ACTION.medication.v1",
+    ),
+    adhoc(
+        "EHDSPatientSummary.medicalDevicesAndImplants.deviceUse",
+        "openEHR-EHR-EVALUATION.device_summary.v0",
+    ),
+    adhoc(
+        "EHDSPatientSummary.procedures.procedure",
+        "openEHR-EHR-ACTION.procedure.v1",
+    ),
     Source {
         path: "EHDSPatientSummary.immunisations.immunisation",
         template: PATIENT_SUMMARY_TEMPLATE,
@@ -129,6 +117,17 @@ pub const SOURCES: &[Source] = &[
         archetype: "openEHR-EHR-ACTION.medication.v1",
     },
 ];
+
+/// Returns the source of the row `path` that the ad hoc section of the
+/// patient summary template named for it holds as `archetype`.
+const fn adhoc(path: &'static str, archetype: &'static str) -> Source {
+    Source {
+        path,
+        template: PATIENT_SUMMARY_TEMPLATE,
+        section: "openEHR-EHR-SECTION.adhoc.v1",
+        archetype,
+    }
+}
 
 /// The elements open for the clinical safety review: the medical alert
 /// (A.2.1.2) and the functional status (A.2.3.4), for which no openEHR
