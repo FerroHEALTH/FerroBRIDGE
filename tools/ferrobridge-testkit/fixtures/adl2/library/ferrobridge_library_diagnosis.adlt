@@ -1,0 +1,107 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's diagnosis
+-- clusters, over five published CKM archetypes (fixtures/ckm/library,
+-- fixtures/ckm/discharge, fixtures/ckm/highmed): a report COMPOSITION whose
+-- content holds EVALUATION.problem_diagnosis.v1 with
+-- CLUSTER.anatomical_location.v1 in its structured body site slot,
+-- CLUSTER.problem_qualifier.v2 in its status slot and
+-- CLUSTER.multiple_coding_icd10gm.v1 in its specific details slot. No
+-- specification governs this template: our own design, carrying the
+-- archetypes the mappings name. Node identifiers are at-coded, the ADL 1.4
+-- codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_diagnosis.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library diagnosis clusters FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype EVALUATION[at0000.2, openEHR-EHR-EVALUATION.problem_diagnosis-ferrobridge.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library diagnosis">
+                description = <"Library diagnosis">
+            >
+            ["at0000.2"] = <
+                text = <"Problem/Diagnosis">
+                description = <"Problem/Diagnosis">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-EVALUATION.problem_diagnosis-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-EVALUATION.problem_diagnosis.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library diagnosis clusters FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    EVALUATION[at0000.1] matches {
+        /data[at0001]/items matches {
+            use_archetype CLUSTER[at0039.1, openEHR-EHR-CLUSTER.anatomical_location.v1]
+            use_archetype CLUSTER[at0046.1, openEHR-EHR-CLUSTER.problem_qualifier.v2]
+            use_archetype CLUSTER[at0043.1, openEHR-EHR-CLUSTER.multiple_coding_icd10gm.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Problem/Diagnosis">
+                description = <"Problem/Diagnosis">
+            >
+            ["at0039.1"] = <
+                text = <"Structured body site">
+                description = <"Structured body site">
+            >
+            ["at0046.1"] = <
+                text = <"Status">
+                description = <"Status">
+            >
+            ["at0043.1"] = <
+                text = <"Multiple coding">
+                description = <"Multiple coding">
+            >
+        >
+    >

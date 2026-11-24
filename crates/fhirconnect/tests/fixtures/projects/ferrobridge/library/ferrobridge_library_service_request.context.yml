@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context over the library's service request model as
+# published (#1963), against the library laboratory template built from the
+# CKM archetypes.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_library_service_request.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/ServiceRequest"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_library_laboratory.v1.0.0"
+  archetypes:
+    - "INSTRUCTION.service_request.v1"
+    - "CLUSTER.organisation.v1"
+  start: "INSTRUCTION.service_request.v1"

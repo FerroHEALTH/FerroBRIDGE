@@ -1,0 +1,163 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's template for the FHIRconnect mapping library's laboratory
+-- models, over eight published CKM archetypes (fixtures/ckm/library,
+-- fixtures/ckm/highmed): a report COMPOSITION whose content holds
+-- OBSERVATION.laboratory_test_result.v1 with CLUSTER.specimen.v1 in its
+-- specimen detail slot and CLUSTER.laboratory_test_analyte.v1 in its test
+-- result slot, its analyte result constrained to a DV_QUANTITY, a
+-- DV_CODED_TEXT or a DV_TEXT and its test method to a DV_TEXT, which the CKM
+-- source leaves unconstrained, INSTRUCTION.service_request.v1,
+-- EVALUATION.vital_status.v1 and ACTION.informed_consent.v0. No
+-- specification governs this template: our own design, carrying the
+-- archetypes the mappings name. Node identifiers are at-coded, the ADL 1.4
+-- codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_library_laboratory.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.report.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library laboratory models FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        /content matches {
+            use_archetype OBSERVATION[at0000.2, openEHR-EHR-OBSERVATION.laboratory_test_result-ferrobridge.v1]
+            use_archetype INSTRUCTION[at0000.3, openEHR-EHR-INSTRUCTION.service_request.v1]
+            use_archetype EVALUATION[at0000.4, openEHR-EHR-EVALUATION.vital_status.v1]
+            use_archetype ACTION[at0000.5, openEHR-EHR-ACTION.informed_consent.v0]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Library laboratory">
+                description = <"Library laboratory">
+            >
+            ["at0000.2"] = <
+                text = <"Laboratory test result">
+                description = <"Laboratory test result">
+            >
+            ["at0000.3"] = <
+                text = <"Service request">
+                description = <"Service request">
+            >
+            ["at0000.4"] = <
+                text = <"Vital status">
+                description = <"Vital status">
+            >
+            ["at0000.5"] = <
+                text = <"Informed consent">
+                description = <"Informed consent">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-OBSERVATION.laboratory_test_result-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-OBSERVATION.laboratory_test_result.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library laboratory models FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    OBSERVATION[at0000.1] matches {
+        /data[at0001]/events[at0002]/data[at0003]/items matches {
+            use_archetype CLUSTER[at0065.1, openEHR-EHR-CLUSTER.specimen.v1]
+            use_archetype CLUSTER[at0097.1, openEHR-EHR-CLUSTER.laboratory_test_analyte-ferrobridge.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Laboratory test result">
+                description = <"Laboratory test result">
+            >
+            ["at0065.1"] = <
+                text = <"Specimen">
+                description = <"Specimen">
+            >
+            ["at0097.1"] = <
+                text = <"Analyte result">
+                description = <"Analyte result">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-CLUSTER.laboratory_test_analyte-ferrobridge.v1.0.0
+
+specialize
+    openEHR-EHR-CLUSTER.laboratory_test_analyte.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The FHIRconnect mapping library laboratory models FerroBRIDGE compiles over the CKM archetypes.">
+        >
+    >
+
+definition
+    CLUSTER[at0000.1] matches {
+        /items[at0001]/value matches {
+            DV_QUANTITY matches {*}
+            DV_CODED_TEXT matches {*}
+            DV_TEXT matches {*}
+        }
+        /items[at0028]/value matches {
+            DV_TEXT matches {*}
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Analyte result">
+                description = <"Analyte result">
+            >
+        >
+    >
