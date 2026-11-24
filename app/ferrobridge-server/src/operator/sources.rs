@@ -24,8 +24,10 @@ use uuid::Uuid;
 
 use super::guard;
 use super::save::subject_of;
+use crate::facade::reply::Refusal;
 use crate::problem::{Kind, refuse, refuse_with};
 use crate::sources::Sources;
+use crate::sources::document::Document;
 use crate::sources::store::WriteError;
 
 /// The sources a request reads and writes, `None` without `[state]`.
@@ -85,6 +87,25 @@ fn matched(headers: &HeaderMap) -> Matched {
         .and_then(|rest| rest.strip_suffix('"'))
         .and_then(|version| version.parse::<i64>().ok())
         .map_or(Matched::Foreign, Matched::Version)
+}
+
+/// Returns the version the `If-Match` of `headers` names, `None` for `*`,
+/// or the refusal of a write whose `If-Match` is `missing` or foreign.
+fn expected(headers: &HeaderMap, missing: &'static str) -> Result<Option<i64>, Refusal> {
+    match matched(headers) {
+        Matched::Missing => Err(Refusal::new(refuse(Kind::PreconditionRequired, missing))),
+        Matched::Foreign => Err(Refusal::new(refused(&WriteError::Stale { current: 0 }))),
+        Matched::Any => Ok(None),
+        Matched::Version(version) => Ok(Some(version)),
+    }
+}
+
+/// Returns the document `write` carries, checked against its kind, or the
+/// refusal of an invalid one.
+fn validated(sources: &Sources, write: &Write) -> Result<Document, Refusal> {
+    sources
+        .validate(write.kind, &write.document)
+        .map_err(|invalid| Refusal::new(refused(&WriteError::Invalid(invalid))))
 }
 
 /// Returns the response of a refused or failed write.
@@ -189,28 +210,21 @@ async fn create(
     State(sources): Held,
     access: ferrohealth_smart::resource::Access,
     axum::Json(write): axum::Json<Write>,
-) -> Response {
-    let Some(sources) = sources else {
-        return refuse(Kind::NotFound, NO_STORE);
-    };
-    let document = match sources.validate(write.kind, &write.document) {
-        Ok(document) => document,
-        Err(invalid) => return refused(&WriteError::Invalid(invalid)),
-    };
+) -> Result<Response, Refusal> {
+    let sources = sources.ok_or_else(|| Refusal::new(refuse(Kind::NotFound, NO_STORE)))?;
+    let document = validated(&sources, &write)?;
     let subject = subject_of(&access);
-    match sources.store().create(&write, &document, subject).await {
-        Ok(created) => {
-            audited(subject, "create-source", created.id, StatusCode::CREATED);
-            let mut response = answered(&created, StatusCode::CREATED);
-            if let Ok(location) =
-                HeaderValue::from_str(&format!("/operator/sources/{}", created.id))
-            {
-                response.headers_mut().insert(header::LOCATION, location);
-            }
-            response
-        }
-        Err(error) => refused(&error),
+    let created = sources
+        .store()
+        .create(&write, &document, subject)
+        .await
+        .map_err(|error| Refusal::new(refused(&error)))?;
+    audited(subject, "create-source", created.id, StatusCode::CREATED);
+    let mut response = answered(&created, StatusCode::CREATED);
+    if let Ok(location) = HeaderValue::from_str(&format!("/operator/sources/{}", created.id)) {
+        response.headers_mut().insert(header::LOCATION, location);
     }
+    Ok(response)
 }
 
 /// `PUT /operator/sources/{id}`: changes a source to its next version under
@@ -221,39 +235,21 @@ async fn change(
     headers: HeaderMap,
     access: ferrohealth_smart::resource::Access,
     axum::Json(write): axum::Json<Write>,
-) -> Response {
-    let (Some(sources), Some(id)) = (sources, id_of(&id)) else {
-        return refuse(Kind::NotFound, NO_SOURCE);
-    };
-    let expected = match matched(&headers) {
-        Matched::Missing => {
-            return refuse(
-                Kind::PreconditionRequired,
-                "a change names the version it replaces in If-Match",
-            );
-        }
-        Matched::Foreign => {
-            return refused(&WriteError::Stale { current: 0 });
-        }
-        Matched::Any => None,
-        Matched::Version(version) => Some(version),
-    };
-    let document = match sources.validate(write.kind, &write.document) {
-        Ok(document) => document,
-        Err(invalid) => return refused(&WriteError::Invalid(invalid)),
-    };
+) -> Result<Response, Refusal> {
+    let (sources, id) = held(sources, &id)?;
+    let expected = expected(
+        &headers,
+        "a change names the version it replaces in If-Match",
+    )?;
+    let document = validated(&sources, &write)?;
     let subject = subject_of(&access);
-    match sources
+    let changed = sources
         .store()
         .update(id, expected, &write, &document, subject)
         .await
-    {
-        Ok(changed) => {
-            audited(subject, "change-source", id, StatusCode::OK);
-            answered(&changed, StatusCode::OK)
-        }
-        Err(error) => refused(&error),
-    }
+        .map_err(|error| Refusal::new(refused(&error)))?;
+    audited(subject, "change-source", id, StatusCode::OK);
+    Ok(answered(&changed, StatusCode::OK))
 }
 
 /// `DELETE /operator/sources/{id}`: deletes a source under `If-Match`,
@@ -263,27 +259,27 @@ async fn remove(
     Path(id): Path<String>,
     headers: HeaderMap,
     access: ferrohealth_smart::resource::Access,
-) -> Response {
-    let (Some(sources), Some(id)) = (sources, id_of(&id)) else {
-        return refuse(Kind::NotFound, NO_SOURCE);
-    };
-    let expected = match matched(&headers) {
-        Matched::Missing => {
-            return refuse(
-                Kind::PreconditionRequired,
-                "a deletion names the version it replaces in If-Match",
-            );
-        }
-        Matched::Foreign => return refused(&WriteError::Stale { current: 0 }),
-        Matched::Any => None,
-        Matched::Version(version) => Some(version),
-    };
+) -> Result<Response, Refusal> {
+    let (sources, id) = held(sources, &id)?;
+    let expected = expected(
+        &headers,
+        "a deletion names the version it replaces in If-Match",
+    )?;
     let subject = subject_of(&access);
-    match sources.store().delete(id, expected, subject).await {
-        Ok(()) => {
-            audited(subject, "delete-source", id, StatusCode::NO_CONTENT);
-            StatusCode::NO_CONTENT.into_response()
-        }
-        Err(error) => refused(&error),
+    sources
+        .store()
+        .delete(id, expected, subject)
+        .await
+        .map_err(|error| Refusal::new(refused(&error)))?;
+    audited(subject, "delete-source", id, StatusCode::NO_CONTENT);
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+/// Returns the sources and the source id `id` names, or the `404` of a
+/// bridge that keeps no sources or an id that names none.
+fn held(sources: Option<Arc<Sources>>, id: &str) -> Result<(Arc<Sources>, Uuid), Refusal> {
+    match (sources, id_of(id)) {
+        (Some(sources), Some(id)) => Ok((sources, id)),
+        _ => Err(Refusal::new(refuse(Kind::NotFound, NO_SOURCE))),
     }
 }

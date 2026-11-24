@@ -109,13 +109,8 @@ impl SourceStore {
     /// Returns [`sqlx::Error`] when the read fails, or its document does not
     /// read.
     pub async fn get(&self, id: Uuid) -> Result<Option<Source>, sqlx::Error> {
-        let row: Option<Row> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-            "SELECT {COLUMNS} FROM inbound_source WHERE id = $1"
-        )))
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await?;
-        row.map(source).transpose()
+        let mut connection = self.pool.acquire().await?;
+        read(&mut connection, id).await
     }
 
     /// Returns the source named `name`.

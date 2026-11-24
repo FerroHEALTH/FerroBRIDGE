@@ -10,7 +10,6 @@
 
 use ferrobridge_operator_api::sources::{Source, Sources, Versions, Write};
 use http::StatusCode;
-use url::Url;
 
 use crate::bridge::{AccessToken, Bridge, BridgeError, JSON};
 
@@ -41,19 +40,6 @@ impl Bridge {
         .map(|(_status, sources)| sources)
     }
 
-    /// The URL of the source `id`, with `tail` after it when given.
-    fn source_url(&self, id: &str, tail: Option<&str>) -> Result<Url, BridgeError> {
-        let mut url = self.url("operator/sources")?;
-        {
-            let mut segments = url.path_segments_mut().map_err(|()| BridgeError::Path)?;
-            segments.push(id);
-            if let Some(tail) = tail {
-                segments.push(tail);
-            }
-        }
-        Ok(url)
-    }
-
     /// Reads one source with its `ETag`, `GET {base}operator/sources/{id}`.
     ///
     /// # Errors
@@ -63,7 +49,8 @@ impl Bridge {
     pub async fn source(&self, id: &str, token: &AccessToken) -> Result<Tagged, BridgeError> {
         let (_status, headers, body) = self
             .exchange(
-                self.client.get(self.source_url(id, None)?),
+                self.client
+                    .get(self.item_url("operator/sources", id, None)?),
                 JSON,
                 token,
                 &[StatusCode::OK],
@@ -82,7 +69,7 @@ impl Bridge {
         id: &str,
         token: &AccessToken,
     ) -> Result<Versions, BridgeError> {
-        let url = self.source_url(id, Some("versions"))?;
+        let url = self.item_url("operator/sources", id, Some("versions"))?;
         let (_status, _headers, body) = self
             .exchange(self.client.get(url), JSON, token, &[StatusCode::OK])
             .await?;
@@ -125,7 +112,7 @@ impl Bridge {
     ) -> Result<Tagged, BridgeError> {
         let request = self
             .client
-            .put(self.source_url(id, None)?)
+            .put(self.item_url("operator/sources", id, None)?)
             .header(http::header::IF_MATCH, etag)
             .json(write);
         let (_status, headers, body) = self
@@ -149,7 +136,7 @@ impl Bridge {
     ) -> Result<(), BridgeError> {
         let request = self
             .client
-            .delete(self.source_url(id, None)?)
+            .delete(self.item_url("operator/sources", id, None)?)
             .header(http::header::IF_MATCH, etag);
         self.exchange(request, JSON, token, &[StatusCode::NO_CONTENT])
             .await
