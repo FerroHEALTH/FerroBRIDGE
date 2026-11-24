@@ -298,3 +298,93 @@ async fn connect(
     listener.listen_all(channels.iter().copied()).await?;
     Ok(listener)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Mutex, PoisonError};
+    use std::time::Duration;
+
+    use super::{Dropping, Listened, Listeners, Subscriber};
+
+    /// The longest a case waits on a state it set itself.
+    const WAIT: Duration = Duration::from_secs(1);
+
+    /// A copy that records what it was told to drop.
+    #[derive(Debug, Default)]
+    struct Recorded {
+        payloads: Mutex<Vec<String>>,
+        resets: AtomicU64,
+    }
+
+    impl Subscriber for Recorded {
+        fn notified<'a>(&'a self, payload: &'a str) -> Dropping<'a> {
+            Box::pin(async move {
+                self.payloads
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .push(payload.to_owned());
+            })
+        }
+
+        fn reset(&self) -> Dropping<'_> {
+            Box::pin(async move {
+                self.resets.fetch_add(1, Ordering::AcqRel);
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn a_copy_is_read_while_unlistened_and_once_per_notification() {
+        let recorded = Arc::new(Recorded::default());
+        let listened = Listened::with_subscriber("ferrobridge_test", recorded.clone());
+        assert_eq!("ferrobridge_test", listened.channel());
+        assert!(listened.must_read());
+        assert!(listened.must_read(), "every request reads while unlistened");
+        assert!(!listened.listening_within(Duration::from_millis(10)).await);
+
+        listened.connected().await;
+        assert!(listened.listening_within(WAIT).await);
+        assert!(listened.must_read(), "a connect makes up what was missed");
+        assert!(!listened.must_read());
+
+        listened.heard("row-1").await;
+        assert!(listened.notified_after(0, WAIT).await);
+        assert_eq!(1, listened.notifications());
+        assert!(listened.must_read());
+        assert!(!listened.must_read());
+
+        listened.lost().await;
+        assert!(listened.lost_after(0, WAIT).await);
+        assert_eq!(1, listened.losses());
+        assert!(!listened.is_listening());
+        assert!(listened.must_read());
+        assert_eq!(
+            vec![String::from("row-1")],
+            *recorded
+                .payloads
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+        );
+        assert_eq!(2, recorded.resets.load(Ordering::Acquire));
+    }
+
+    #[tokio::test]
+    async fn a_copy_without_a_subscriber_counts_alone() {
+        let listened = Listened::new("ferrobridge_test");
+        listened.connected().await;
+        listened.heard("row").await;
+        listened.lost().await;
+        assert_eq!((1, 1), (listened.notifications(), listened.losses()));
+    }
+
+    #[test]
+    fn the_session_renders_its_channels_and_never_its_credential() {
+        let options = sqlx::postgres::PgConnectOptions::new().password("s3cret");
+        let listened = [Arc::new(Listened::new("ferrobridge_test"))];
+        let rendered = format!("{:?}", Listeners::on(options, &listened));
+        assert!(rendered.contains("ferrobridge_test"), "{rendered}");
+        assert!(!rendered.contains("s3cret"), "{rendered}");
+    }
+}

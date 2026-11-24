@@ -204,7 +204,9 @@ impl Store {
 
 #[cfg(test)]
 mod tests {
-    use super::{MINIMUM_SERVER_VERSION, StoreError, supported};
+    use std::time::Duration;
+
+    use super::{MINIMUM_SERVER_VERSION, Settings, Store, StoreError, supported};
 
     #[test]
     fn a_server_older_than_postgresql_19_is_refused() {
@@ -216,6 +218,24 @@ mod tests {
                 found: 180_006,
                 required: 190_000
             })
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_database_is_a_database_error() {
+        let settings = Settings {
+            connection: omop_cdm::connection::CdmConnection::new(
+                "postgres://bridge@127.0.0.1:1/state?sslmode=disable",
+                None,
+            )
+            .expect("a plaintext URL"),
+            max_connections: 1,
+            acquire_timeout: Duration::from_secs(2),
+            seal: None,
+        };
+        assert!(matches!(
+            Store::open(&settings).await,
+            Err(StoreError::Database(_))
         ));
     }
 }

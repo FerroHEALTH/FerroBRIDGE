@@ -252,3 +252,52 @@ impl Lease {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{Generation, Holder, Lane, Lease, LeaseError};
+
+    #[test]
+    fn a_lane_is_named() {
+        assert!(matches!(Lane::new(""), Err(LeaseError::Lane)));
+        let lane = Lane::new("outbound").expect("a named lane");
+        assert_eq!("outbound", lane.as_str());
+        assert_eq!("outbound", lane.to_string());
+        assert_ne!(Holder::new(), Holder::default());
+        assert_eq!(7, Generation(7).get());
+    }
+
+    #[tokio::test]
+    async fn a_lease_renews_three_times_a_period_and_binds_its_period_in_milliseconds() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://bridge@db.invalid/state")
+            .expect("a lazy pool");
+        let lane = Lane::new("outbound").expect("a named lane");
+        let lease = Lease::new(
+            pool.clone(),
+            lane.clone(),
+            Holder::new(),
+            Duration::from_secs(30),
+        );
+        assert_eq!(&lane, lease.lane());
+        assert_eq!(Duration::from_secs(10), lease.renew_every());
+        assert_eq!(30_000, lease.ttl_ms());
+        let endless = Lease::new(pool, lane, Holder::new(), Duration::MAX);
+        assert_eq!(i64::MAX, endless.ttl_ms());
+    }
+
+    #[test]
+    fn a_stale_write_names_both_generations() {
+        let stale = LeaseError::Stale {
+            lane: Lane::new("outbound").expect("a named lane"),
+            held: 3,
+            current: Some(4),
+        };
+        assert_eq!(
+            "lane outbound is at generation Some(4); the write held generation 3",
+            stale.to_string()
+        );
+    }
+}
