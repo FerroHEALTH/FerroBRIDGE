@@ -689,6 +689,7 @@ testRepeat/testRepeat2
 testRepeat/testRepeat3
 testRepeat/testRepeat4
 testRepeat/testRepeat5
+testRepeat/testRepeat6
 testReplace/testReplace1
 testReplace/testReplace2
 testReplace/testReplace3
@@ -927,4 +928,4 @@ testWhere/testWhere1
 testWhere/testWhere2
 testWhere/testWhere3
 testWhere/testWhere4
-total 951
+total 980

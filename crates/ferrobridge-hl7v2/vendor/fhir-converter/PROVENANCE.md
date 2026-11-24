@@ -9,7 +9,7 @@ Never edit a file here: change the pin in docs/VERSIONS.md, run the script
 with `--stamp`, and record the count and digest it prints.
 
 - Source: <https://github.com/microsoft/FHIR-Converter>
-- Pin: commit `70fd328e05019142f616a660cf65c6034baaa3c9`
+- Pin: commit `5af2dcf72317fe2d9bbf35602b29c631854c044a`
 - Paths: `data/SampleData/Hl7v2` (139 HL7 v2 messages) and
   `src/Microsoft.Health.Fhir.Liquid.Converter.FunctionalTests/TestData/Expected/Hl7v2`
   (132 expected R4 Bundles, one per message it names, under
@@ -19,7 +19,7 @@ with `--stamp`, and record the count and digest it prints.
 - Files: 272
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
   `PROVENANCE.md` excluded): `8ba5602d3efc0f1161c1329887e3a9178983e1d2ed76f4353968aacd90c1420c`
-- Stamped: 2026-09-25
+- Stamped: 2026-11-24
 
 The messages are test messages the converter's authors wrote, never patient
 data. The expected Bundles are what Microsoft's own Liquid templates produce,
