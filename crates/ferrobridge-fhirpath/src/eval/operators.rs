@@ -11,12 +11,15 @@ use rust_decimal::Decimal;
 use super::convert::{boolean, describe, single_value};
 use super::equality::{
     collections_equal, collections_equivalent, contains, date_time, distinct, number, quantity,
+    unbounded,
 };
 use super::error::EvalError;
 use super::{Engine, Frame};
 use crate::ast::{BinaryOp, Expr};
 use crate::model::Model;
 use crate::quantity::{Calendar, Unit};
+use crate::temporal::arithmetic::ArithmeticError;
+use crate::value::scaled::Scaled;
 use crate::value::{Collection, Item};
 
 /// The lower and upper bound of `System.Integer` (N1 §4.1.3).
@@ -40,6 +43,7 @@ pub(crate) fn negate<'a>(
         None => Vec::new(),
         Some(Item::Integer(value)) => integer(value.checked_neg()).into_iter().collect(),
         Some(Item::Decimal(value)) => vec![Item::Decimal(-value)],
+        Some(Item::Scaled(value, unit)) => vec![Item::Scaled(value.negated(), unit)],
         Some(Item::Quantity(mut value)) => {
             value.value = -value.value;
             vec![Item::Quantity(value)]
@@ -56,7 +60,11 @@ pub(crate) fn plus<'a>(
     let value = single_value(model, operand, "unary +")?;
     Ok(match value {
         None => Vec::new(),
-        Some(item @ (Item::Integer(_) | Item::Decimal(_) | Item::Quantity(_))) => vec![item],
+        Some(
+            item @ (Item::Integer(_) | Item::Decimal(_) | Item::Quantity(_) | Item::Scaled(..)),
+        ) => {
+            vec![item]
+        }
         Some(other) => return Err(EvalError::type_error("unary +", describe(&other))),
     })
 }
@@ -204,6 +212,9 @@ pub(crate) fn compare(
     if let (Item::String(a), Item::String(b)) = (a, b) {
         return Ok(Some(a.cmp(b)));
     }
+    if let Some(pair) = unbounded(a, b) {
+        return Ok(pair.pair().map(|(a, b)| a.compare(&b)));
+    }
     if let (Some(a), Some(b)) = (number(a), number(b)) {
         return Ok(Some(a.cmp(&b)));
     }
@@ -232,6 +243,17 @@ fn arithmetic<'a>(op: BinaryOp, a: &Item<'a>, b: &Item<'a>) -> Result<Collection
     let operation = op.to_string();
     let mismatch =
         || EvalError::type_error(&operation, format!("{} and {}", describe(a), describe(b)));
+    // NOTE: N1 §6.6: an operation that overflows or underflows is empty, and every result
+    // from an operand the exact decimal cannot hold lies outside the range it holds.
+    if unbounded(a, b).is_some() {
+        return Ok(Vec::new());
+    }
+    if let Item::Scaled(value, Some(_)) = b
+        && matches!(a, Item::Date(_) | Item::DateTime(_) | Item::Time(_))
+        && matches!(op, BinaryOp::Add | BinaryOp::Subtract)
+    {
+        return moved_far(value);
+    }
     if let (Item::Integer(x), Item::Integer(y)) = (a, b) {
         let result = match op {
             BinaryOp::Add => integer(x.checked_add(*y)),
@@ -281,6 +303,23 @@ fn arithmetic<'a>(op: BinaryOp, a: &Item<'a>, b: &Item<'a>) -> Result<Collection
         return Ok(result.map(Item::Quantity).into_iter().collect());
     }
     Err(mismatch())
+}
+
+/// A date, datetime or time moved by a quantity the exact decimal cannot hold:
+/// past the year 9999 when its leading digit is at or above `10^28`, which
+/// is more than 9999 years in any time unit, an error by N1 §6.7, and an
+/// underflow below it, which is empty (N1 §6.6).
+///
+/// # Errors
+///
+/// Returns [`EvalError::Arithmetic`] for a result past the year 9999.
+fn moved_far<'a>(value: &Scaled) -> Result<Collection<'a>, EvalError> {
+    if value.magnitude() >= 28 {
+        return Err(EvalError::Arithmetic {
+            source: ArithmeticError::Range,
+        });
+    }
+    Ok(Vec::new())
 }
 
 /// A date, datetime or time moved by a time-valued quantity (N1 §6.7).

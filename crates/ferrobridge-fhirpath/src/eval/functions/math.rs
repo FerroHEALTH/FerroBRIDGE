@@ -50,6 +50,11 @@ pub(super) fn call<'a>(call: &Call<'_, '_, 'a>) -> Result<Option<Collection<'a>>
     let Some(item) = single_value(model, &call.input, call.name)? else {
         return Ok(Some(Vec::new()));
     };
+    // NOTE: N1 §5.7.7, §5.7.9 and §6.6: a result that cannot be represented is empty, and so is
+    // every result from a value the exact decimal cannot hold.
+    if matches!(item, Item::Scaled(..)) {
+        return Ok(Some(Vec::new()));
+    }
     let mismatch = || EvalError::type_error(call.name, describe(&item));
     let result = match (call.name, &item) {
         ("abs", Item::Integer(value)) => value.checked_abs().map(Item::Integer),
@@ -86,20 +91,25 @@ pub(super) fn call<'a>(call: &Call<'_, '_, 'a>) -> Result<Option<Collection<'a>>
                     log(value, base).map(Item::Decimal)
                 }
                 _ => {
-                    let places = match single_value(model, &call.arg_or_empty(0)?, "round")? {
-                        None => 0,
-                        Some(Item::Integer(places)) => {
-                            u32::try_from(places)
-                                .ok()
-                                .ok_or_else(|| EvalError::Argument {
+                    let places =
+                        match single_value(model, &call.arg_or_empty(0)?, "round")? {
+                            None => 0,
+                            Some(Item::Integer(places)) => u32::try_from(places).ok().ok_or_else(
+                                || EvalError::Argument {
                                     function: String::from("round"),
-                                    reason: String::from("the precision is negative"),
-                                })?
-                        }
-                        Some(other) => {
-                            return Err(EvalError::type_error("round", describe(&other)));
-                        }
-                    };
+                                    reason: String::from(
+                                        "the precision is negative, which N1 §5.7.8 makes an error",
+                                    ),
+                                },
+                            )?,
+                            Some(other) => {
+                                return Err(EvalError::type_error("round", describe(&other)));
+                            }
+                        };
+                    // NOTE: N1 §6.6: a result past the places the exact decimal holds overflows.
+                    if places > Decimal::MAX_SCALE {
+                        return Ok(Some(Vec::new()));
+                    }
                     Some(Item::Decimal(value.round_dp_with_strategy(
                         places,
                         RoundingStrategy::MidpointAwayFromZero,
@@ -149,6 +159,7 @@ fn power(base: &Item<'_>, exponent: &Item<'_>) -> Result<Option<Item<'static>>, 
     }
     let base = number(base).ok_or_else(mismatch)?;
     Ok(match exponent {
+        Item::Scaled(..) => None,
         Item::Integer(exponent) => base.checked_powi(*exponent).map(Item::Decimal),
         Item::Decimal(exponent) if exponent.fract().is_zero() => exponent
             .to_i64()
