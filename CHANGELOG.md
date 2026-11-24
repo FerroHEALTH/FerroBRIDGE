@@ -26,6 +26,144 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.29] - 2026-11-24
+
+The patient summary and SMART Health Links. The facade answers
+`Patient/$summary` with an HL7 IPS 2.0.1 or HL7 Europe Patient Summary
+document carrying problems, allergies, procedures and medical devices, and a
+person shares their summary through a one-time SMART Health Link. Every
+release attaches the HL7 FHIR Validator's reports on the documents the bridge
+serves. The bridge reads every caller from a token's standard claims on
+`ferrohealth-smart` 0.34, a breaking change to `[auth]`. Concurrent first
+writes for one patient converge on one EHR, the FHIRPath evaluator reads a
+decimal with a large exponent, and `cookie` 0.18.3 closes RUSTSEC-2026-0594.
+
+### Added
+
+- `GET /fhir/Patient/{id}/$summary` answers the patient summary of one
+  patient as an HL7 IPS 2.0.1 document, or in the HL7 Europe Patient Summary
+  form that `profile` names, behind `[facade.summary]`. The patient comes from
+  the `Patient` party context and the record from the patient summary
+  compositions of the patient's EHR, read as the caller; each code in no
+  preferred system is translated on the terminology server, and the document
+  is validated in process before it is served, a `422` when it breaks its
+  profile. `eehrxf` 0.23.2 adds the IPS 2.0.1 form beside the EPS one (#2014).
+- Every release carries `ferrobridge-vX.Y.Z-fhir-validation.tar.gz` and its
+  checksum: the exchange-format documents the `eehrxf` suites map and the
+  patient summaries the server serves, directly and through a SMART Health
+  Link, with the pinned HL7 FHIR Validator's report on each. A document the
+  validator refuses stops the release (#2015).
+- SMART Health Links behind `[shl]`: a person with a `patient/` token creates
+  a one-time share of their patient summary at `POST /shl`, lists their
+  active links at `GET /shl` and revokes one at `DELETE /shl/{handle}`; a
+  receiver resolves it without an account by the manifest request or, under
+  `U`, the direct file request (SMART Health Cards and Links 1.0.0). The file
+  is a compact JWE (`dir`, `A256GCM`) under a key only the link carries; the
+  store keeps the ciphertext and the passcode's Argon2id hash, and deletes the
+  link at expiry, revocation, lockout or last use. A link expires after 24
+  hours by default and 7 days at most, answers once by default, takes 5 wrong
+  passcodes over its life, and hands out single-use file locations that lapse
+  within the hour. Each creation, answer with its `recipient`, refused
+  passcode, revocation and end is a BALP `AuditEvent` in the access record,
+  and the `CapabilityStatement` names where links are created (#2016).
+- The patient summary carries problems, allergies and intolerances, and
+  procedures: FerroBRIDGE's patient summary template adds a problem list
+  (`EVALUATION.problem_diagnosis.v1`), an allergies and intolerances section
+  (`EVALUATION.adverse_reaction_risk.v2`) and a history of procedures
+  (`ACTION.procedure.v1`), and `eehrxf` 0.24.0's EPS project maps them to
+  `condition-eu-core`, `allergyIntolerance-eu-core` and `procedure-eu-eps`
+  with their SNOMED CT codes. `Patient/$summary` fills those sections from
+  the record, and a fed section the record leaves empty is `nilknown` (#2020).
+- The release's `ferrobridge-vX.Y.Z-fhir-validation.tar.gz` also holds every
+  patient summary judged by the HL7 FHIR Validator with the xShare Yellow
+  Button guide 0.3.0 loaded, against the Patient Summary content the guide
+  names (`Bundle-uv-ips` of IPS 2.0.1) (#2029).
+- The patient summary carries medical devices: FerroBRIDGE's patient summary
+  template adds a medical devices section (`EVALUATION.device_summary.v0`,
+  vendored from CKM), and `eehrxf` 0.25.0's EPS project maps each medical
+  device summary to a `deviceUseStatement-eu-eps` and a `device-eu-eps`
+  `Device` with its SNOMED CT type. `Patient/$summary` fills the EPS medical
+  devices section from the record, and a record with no device answers it
+  `nilknown` (#2033).
+
+### Changed
+
+- Breaking: the bridge trusts an authorization server, FerroSMART among
+  them, with an `[auth.issuer.<name>]` table that names only its `issuer`,
+  and reads every caller from the token's standard claims, as
+  `ferrohealth-smart` 0.34 does: a client credentials token, whose `sub` is
+  its `client_id`, is a machine, and any other token is a user named by the
+  resource type of its `fhirUser`, with its `patient` claim as the launch
+  context and an RFC 8693 `act` as the actor. The authorization server's
+  client registry is the one list of clients: a token whose `aud` names the
+  bridge admits its client. A token's `typ` is `at+jwt` or
+  `application/at+jwt` and `scope` is required. The onward lane carries
+  every user at its SMART issuer and another party's professional at its
+  `federation` issuer, and the onward grant is set by the onward table's
+  profile keys (`onward_grant`, `onward_indicator`, `onward_parameters`,
+  `onward_client_id`). The crates move to `ferrobridge-term` and
+  `ferrobridge-validator` 0.18.0 and `ferrobridge-hl7v2` and `eehrxf` 0.26.0,
+  and the server and the console to `ferrohealth-smart` 0.34.0 and
+  `ferrohealth-session` 0.29.0. Upgrade: delete every key listed under
+  Removed and keep `kind = "federation"` only on another party's issuer (#2028).
+- `hl7v2-types` 0.1.129 and `ferrobridge-hl7v2` 0.27.1 are generated from the
+  HL7 v2 definitions at `HL7/v2ig` `9c307dadb`. The source of truth is unchanged
+  at that commit, so only the provenance in the generated files moves (#967).
+
+### Removed
+
+- Breaking: the issuer keys `kind` (except `kind = "federation"`),
+  `preset`, `profile_file` and `scopeless_subjects`, the whole `[auth.idp]`
+  table, and the profile keys `first_party_clients`, `delegates`,
+  `audience_delegates`, `issuer_client_is_person`, `patient_context`,
+  `fhir_user_patient`, `representation`, `act_represents_patient`, `guest`
+  and every vendor profile key (`app_only`, `client_claims`,
+  `person_equality` and the rest) are removed from `[auth.issuer.<name>]`,
+  `[cdr.endpoint.credentials.onward]` and `[[cdr.onward]]`, and a
+  configuration that sets one is refused as an unknown key. The `persons`,
+  `patients` and `machines` issuer kinds go with them (#2028).
+
+### Fixed
+
+- A free-text `DV_IDENTIFIER.assigner` maps to `Identifier.assigner.display`
+  and back, in place of a `Reference.reference` no FHIR document resolves, so
+  `Patient/$summary` serves a patient whose identifier names its assigner in
+  words; a literal reference keeps `reference` and the `system::value` form
+  keeps `identifier`. `fhirconnect` 0.7.1, with `ferrobridge-hl7v2` 0.25.2
+  and `eehrxf` 0.23.3 on it (#2021).
+- A free-text `DV_IDENTIFIER.type`, such as the `patient` of every patient
+  summary's Patient identifier, maps to `Identifier.type.text` and back, so
+  no identifier carries a coding with no system; a `system::code` type stays
+  a coding of that system (#2038).
+- Parallel passcode guesses against one SMART Health Link check the
+  passcode against its Argon2id hash at once, and only the attempt count
+  waits on the link's write, so a burst of guesses no longer runs past the
+  request timeout. The lifetime attempts are still counted exactly (#2041).
+- When the CDR answers `409 Conflict` to an EHR creation because another
+  writer created the EHR for the same subject first, the facade reads the EHR
+  by subject again and writes into it, so concurrent first writes for one
+  patient converge on one EHR in place of a refusal (#2046).
+- The FHIRPath evaluator reads an R4 decimal the exact decimal cannot hold
+  with its stated precision, such as `1e999999999` (FHIR R4 datatypes.html
+  §2.24.0.1), as `Item::Scaled` in its exponent form, where it refused the
+  value before. It compares exactly, every computation on it is empty (N1
+  §6.6), and `toString()` refuses one whose fixed-point form passes 4096
+  digits with `EvalError::Unwritable`. `round()` past 28 places is empty.
+  Breaking for a consumer that matches `Item` or `EvalError` exhaustively or
+  calls `eval::convert::fhir_quantity`, which now returns an `Item`:
+  `ferrobridge-fhirpath` 0.2.0, with `ferrobridge-validator` 0.19.0,
+  `ferrobridge-hl7v2` 0.27.0 and `eehrxf` 0.27.0 on it (#2069).
+
+### Security
+
+Shipped with functional changes because: the `cookie` upgrade closes an advisory no shipped build met, so it ships with the next feature release rather than in a release of its own.
+
+- The operator console takes `cookie` 0.18.3 in place of 0.18.2
+  (RUSTSEC-2026-0594, GHSA-8wcq-xq25-7fhm): in 0.14.0 up to 0.18.2 a private
+  cookie added in more than one process after a `fork()` could reuse an
+  AES-GCM nonce. The console does not fork, so no shipped build met the
+  conditions; the upgrade closes the advisory (#2012).
+
 ## [0.0.28] - 2026-11-22
 
 SMART breadth and the committer the CDR writes. The facade serves SMART App
@@ -7075,7 +7213,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.28...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.29...HEAD
+[0.0.29]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.28...v0.0.29
 [0.0.28]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.27...v0.0.28
 [0.0.27]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.26...v0.0.27
 [0.0.26]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.25...v0.0.26
