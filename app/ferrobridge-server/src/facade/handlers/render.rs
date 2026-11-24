@@ -61,10 +61,11 @@ pub(crate) struct Rendered {
 /// # Errors
 ///
 /// The refusal an identity-store failure renders as.
-pub(crate) fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value>, Refusal> {
+pub(crate) async fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value>, Refusal> {
     let person = facade
         .store()
         .person_of(ehr_id)
+        .await
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
     Ok(person.map(|person| complete::reference_to(&person, &facade.settings().subject)))
 }
@@ -340,7 +341,9 @@ async fn produce(
             )
         })
         .await;
-    let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id);
+    let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id)
+        .await
+        .map_err(|error| created_refusal(&error))?;
     let produced = engine::outbound(
         program,
         index,
@@ -353,9 +356,24 @@ async fn produce(
         crate::usage_report::record_mapping_failure(origin.usage);
         Refusal::from(Refused::of_answer(&status::of_outbound_refusal(&error)))
     })?;
+    identities
+        .persist()
+        .await
+        .map_err(|error| created_refusal(&error))?;
     let warnings = produced.warnings().to_vec();
     let (value, created) = produced.into_parts();
     Ok((value, created, warnings))
+}
+
+/// Returns the `500` a created resource whose identity cannot be recorded
+/// answers.
+fn created_refusal(error: &crate::facade::identity::created::CreatedError) -> Refusal {
+    reply::refusal(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Issue::error(IssueType::Exception).diagnosing(format!(
+            "a resource the mapping created has no identity: {error}"
+        )),
+    )
 }
 
 /// Writes the identity of one rendered resource onto `body` and checks it

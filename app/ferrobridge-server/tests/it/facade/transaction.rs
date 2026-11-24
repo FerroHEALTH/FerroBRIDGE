@@ -170,7 +170,8 @@ async fn each_transaction_entry_answers_the_location_and_etag_a_create_answers()
     let internal = ferrobridge_server::facade::identity::FhirResourceId::new(id)?;
     let binding = harness
         .store
-        .binding_of("Condition", &internal)?
+        .binding_of("Condition", &internal)
+        .await?
         .ok_or("the transaction recorded the entry's identity binding")?;
     assert_eq!(CONTAINER, binding.versioned_object_uid);
     assert_eq!(EHR_ID, binding.ehr_id);
@@ -426,6 +427,9 @@ async fn a_transaction_carrying_one_id_at_two_versions_is_refused_naming_both()
         "{body}"
     );
     assert_eq!((0, 0, 0), writes(&harness).await, "nothing is committed");
-    assert_eq!(None, harness.store.consumed(&condition_source_at("1")?)?);
+    assert_eq!(
+        None,
+        harness.store.consumed(&condition_source_at("1")?).await?
+    );
     Ok(())
 }
