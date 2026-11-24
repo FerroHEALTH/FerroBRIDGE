@@ -1521,7 +1521,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.24.1"
+version = "0.24.2"
 dependencies = [
  "async-trait",
  "ferrobridge-term",
@@ -1744,7 +1744,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.25.3"
+version = "0.25.4"
 dependencies = [
  "bytes",
  "chumsky 0.14.2",
@@ -2182,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
