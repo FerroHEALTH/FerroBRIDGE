@@ -63,9 +63,9 @@ trust roots for a provider behind a private certificate authority
 `timeout` (default `"10s"`) bounds one call to the provider.
 
 The access token the provider issues is the one the bridge receives, so its
-audience and scopes must be ones the bridge's `[auth]` accepts, the console's
-client id must be listed in the issuer's `first_party_clients`, and the
-operator API needs the operator scope (see
+audience and scopes must be ones the bridge's `[auth]` accepts, the console
+must be a client the provider registers for the bridge, and the operator API
+needs the operator scope (see
 [The operator API](operator-api.md)).
 
 ## Sessions

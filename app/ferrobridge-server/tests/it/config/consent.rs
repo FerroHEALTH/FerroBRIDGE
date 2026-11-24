@@ -20,7 +20,6 @@ const CDR: &str = concat!(
     "resource = \"https://cdr.example/openehr\"\n\n",
     "[cdr.endpoint.credentials.onward]\n",
     "issuer = \"https://as.example.org\"\n",
-    "kind = \"persons\"\n",
     "token_endpoint = \"https://as.example.org/token\"\n",
     "audiences = [\"https://cdr.example/openehr\"]\n",
     "indicators = [\"https://cdr.example/openehr\"]\n",

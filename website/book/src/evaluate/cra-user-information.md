@@ -248,7 +248,9 @@ data;"
 
 - **Configuration.** `[auth] enabled = false` removes the credential check
   from the facade and the operations. Granting a user of `[[auth.basic.users]]` scopes in `[basic_grants]`
-  or adding a subject to `scopeless_subjects` grants access to patient data.
+  grants access to patient data, and so does trusting an issuer in
+  `[auth.issuer.<name>]`, whose client registry then decides which apps
+  reach the facade.
   `[operator] mapping_dir` lets an operator-scope token change the mappings.
   `[hl7v2] enabled` opens an MLLP listener that writes into the CDR. A name in
   `[telemetry] logged_query_parameters` lets that parameter's value reach the

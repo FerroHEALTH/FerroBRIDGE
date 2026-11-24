@@ -99,18 +99,20 @@ or the Basic credential of a user `[[auth.basic.users]]` lists, except `GET /fhi
 token. The health routes stay open too. The token is a JWT signed by a key
 in the issuer's key set, with an `iss` equal to the issuer, an `aud` naming
 the facade, and an `exp`, `nbf` and `iat` that hold within the configured
-clock skew. Under the default `rfc9068` preset it also carries `typ: at+jwt`,
-`sub`, `client_id`, `iat` and `jti` (RFC 9068). The issuer's `kind` and
-profile (its `preset` with the keys of its `profile` table over it) decide who the caller is: a person through one of the deployment's
-own clients, a patient, a machine's client credentials token, or another
-party's person on a `federation` issuer. A Basic credential is always a
-person's; a machine never authenticates with one.
+clock skew. It also carries `typ: at+jwt` or `application/at+jwt`, `sub`,
+`client_id`, `iat`, `jti` and `scope` (RFC 9068). The authorization server's
+client registry decides which clients reach the facade, and the token's
+standard claims decide who the caller is: a machine's client credentials
+token, whose `sub` is its `client_id`, a user named by the type of their
+`fhirUser` with an actor named by `act`, or another party's person on a
+`federation` issuer. A Basic credential is always a user's; a machine never
+authenticates with one.
 
 | Answer | When | `WWW-Authenticate` |
 |---|---|---|
 | `401` | No credential, or one in a scheme the server does not admit | `Bearer`, and a `Basic realm="", charset="UTF-8"` challenge beside it when Basic users are configured |
 | `400` | Two credentials, or an `Authorization` value that is no credential | `Bearer error="invalid_request"` |
-| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience, and a valid token that names no caller its issuer's kind admits | `Bearer error="invalid_token", error_description="<reason>"` |
+| `401` | A token that does not hold, whatever the reason, including a token of another issuer or for another audience, and a valid token whose claims name no caller | `Bearer error="invalid_token", error_description="<reason>"` |
 | `401` | A Basic credential that does not hold, whatever the reason | `Basic realm="", charset="UTF-8"` |
 | `403` | A valid token whose scopes do not permit the request | `Bearer error="insufficient_scope", error_description="scope-not-granted"` |
 | `403` | Any request to a route under `/fhir` the guard does not classify, before the token is read | none |
@@ -158,16 +160,11 @@ out of order, an unknown resource type, or a `?` search constraint grants
 nothing; the facade does not evaluate the constraint, so it does not grant
 more than the scope says. A `user/` scope reaches every resource of its type,
 because the facade has no per-user access model of its own, and so does a
-`system/` scope. A token with no clinical scope at all gets system-wide
-access only when its `sub` is in `scopeless_subjects`.
+`system/` scope. A token with no clinical scope reaches nothing.
 
 A `patient/` scope reaches only the patient in the token's `patient` claim,
-which the facade reads as the launch context only from an issuer whose
-profile sets `patient_context` (SMART App Launch 2.2.0, Scopes and Launch
-Context, `launch/patient`: the authorization server sets it). The
-`ferrosmart` preset sets it; every other preset leaves it off, so a
-`patient` claim of such an issuer is ignored unless its
-`[auth.issuer.<name>.profile]` table sets `patient_context = true`. This is the rule FerroEHR reads too.
+the launch context the authorization server sets (SMART App Launch 2.2.0,
+Scopes and Launch Context, `launch/patient`).
 The facade reads a patient's data as the EHR it resolves for the subject
 `Patient/<id>`: a create or update must name `subject` (or `patient`) as
 the literal reference `Patient/<id>`, and a read reaches a resource only

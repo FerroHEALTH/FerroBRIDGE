@@ -7,11 +7,11 @@
 //! refused exchange never sent under the bridge's credential.
 //!
 //! The grants are RFC 8693 §2.1 token exchange (`docs/specs/ietf-oauth/rfc8693.txt`,
-//! the request of §2.3 Figure 2 and the answer of Figure 3), the Keycloak
-//! "Example token exchange request" with `audience`, and the RFC 7523 §2.1
-//! JWT bearer grant with the Microsoft identity platform's "On-behalf-of
-//! flow" parameters (`docs/specs/entra-docs/`, "Second case" and its
-//! "Success response example" and "Error response example").
+//! the request of §2.3 Figure 2 and the answer of Figure 3), the same
+//! exchange naming the CDR by `audience`, and the RFC 7523 §2.1 JWT bearer
+//! grant with the Microsoft identity platform's "On-behalf-of flow"
+//! parameters (`docs/specs/entra-docs/`, "Second case" and its "Error
+//! response example"), each set by the onward table's profile keys.
 
 use std::error::Error;
 use std::io::Write;
@@ -90,32 +90,39 @@ const ASSERTION_TYPE: &str =
 enum Grant {
     /// RFC 8693 token exchange naming the CDR by `resource`.
     Standard,
-    /// The Keycloak profile: token exchange naming the CDR by `audience`.
-    Keycloak,
-    /// The Entra ID profile: the on-behalf-of JWT bearer grant.
-    Entra,
+    /// RFC 8693 token exchange naming the CDR by `audience`, asking for an
+    /// access token.
+    Audience,
+    /// The RFC 7523 JWT bearer grant with the on-behalf-of parameters.
+    OnBehalfOf,
 }
 
 impl Grant {
     /// Returns the `[cdr.endpoint.credentials.onward]` table of this grant at `issuer`.
     fn table(self, issuer: &str) -> String {
-        let (profile, target) = match self {
-            Self::Standard => ("rfc9068", format!("indicators = [\"{CDR_AUDIENCE}\"]")),
-            Self::Keycloak => ("keycloak", format!("indicators = [\"{CDR_AUDIENCE}\"]")),
-            Self::Entra => ("entra", String::from("scope = \"api://cdr/.default\"")),
-        };
-        // NOTE: the Keycloak profile refuses its issuer until the deployment lists its
-        // service accounts, `service-account-CLIENT_ID` (Keycloak admin-cli guide).
-        let keys = match self {
-            Self::Keycloak => "app_only = [{ subjects = [\"service-account-ferrobridge\"] }]\n",
-            Self::Standard | Self::Entra => "",
+        let (target, keys) = match self {
+            Self::Standard => (format!("indicators = [\"{CDR_AUDIENCE}\"]"), ""),
+            Self::Audience => (
+                format!("indicators = [\"{CDR_AUDIENCE}\"]"),
+                concat!(
+                    "onward_indicator = \"audience\"\n",
+                    "onward_parameters = { requested_token_type = ",
+                    "\"urn:ietf:params:oauth:token-type:access_token\" }\n",
+                ),
+            ),
+            Self::OnBehalfOf => (
+                String::from("scope = \"api://cdr/.default\""),
+                concat!(
+                    "onward_grant = \"jwt_bearer\"\n",
+                    "onward_client_id = true\n",
+                    "onward_parameters = { requested_token_use = \"on_behalf_of\" }\n",
+                ),
+            ),
         };
         format!(
             concat!(
                 "[cdr.endpoint.credentials.onward]\n",
                 "issuer = \"{issuer}\"\n",
-                "kind = \"persons\"\n",
-                "preset = \"{profile}\"\n",
                 "token_endpoint = \"{issuer}/token\"\n",
                 "audiences = [\"{audience}\"]\n",
                 "{target}\n",
@@ -124,7 +131,6 @@ impl Grant {
                 "{keys}",
             ),
             issuer = issuer,
-            profile = profile,
             audience = CDR_AUDIENCE,
             target = target,
             keys = keys,
@@ -217,56 +223,41 @@ impl World {
     }
 
     /// Returns the claims of a person's token at the facade, naming the
-    /// bridge in its `aud` beside the facade, as the Keycloak and Entra
-    /// profiles require of a subject token.
+    /// bridge in its `aud` beside the facade, as an on-behalf-of issuer
+    /// requires of a subject token.
     fn person_claims(&self) -> serde_json::Value {
         let mut claims = self.issuer.claims("user/Condition.cru");
         claims["aud"] = serde_json::json!([AUDIENCE, BRIDGE_CLIENT]);
-        claims["oid"] = serde_json::json!("synthetic-oid-1");
-        claims["tid"] = serde_json::json!("synthetic-tenant");
         claims
     }
 
     /// Returns the claims of the token the authorization server issues for
-    /// the CDR on behalf of the person of `person_claims`, under `grant`,
-    /// living `lifetime` seconds.
-    fn issued_claims(&self, grant: Grant, lifetime: i64) -> serde_json::Value {
+    /// the CDR on behalf of the person of `person_claims`, living `lifetime`
+    /// seconds.
+    fn issued_claims(&self, lifetime: i64) -> serde_json::Value {
         let now = now();
-        let mut claims = serde_json::json!({
+        serde_json::json!({
             "iss": self.issuer.uri(),
             "aud": CDR_AUDIENCE,
             "sub": "synthetic-client-sub",
+            "client_id": BRIDGE_CLIENT,
             "iat": now,
             "exp": now + lifetime,
             "jti": "synthetic-onward-jti",
-        });
-        match grant {
-            Grant::Standard => claims["client_id"] = serde_json::json!(BRIDGE_CLIENT),
-            Grant::Keycloak => claims["azp"] = serde_json::json!(BRIDGE_CLIENT),
-            Grant::Entra => {
-                // NOTE: Microsoft, "Access token claims reference": `sub` is pairwise per
-                // application, so the person is the `oid` and `tid` pair.
-                claims["sub"] = serde_json::json!("synthetic-pairwise-sub-for-the-cdr");
-                claims["azp"] = serde_json::json!(BRIDGE_CLIENT);
-                claims["oid"] = serde_json::json!("synthetic-oid-1");
-                claims["tid"] = serde_json::json!("synthetic-tenant");
-                claims["ver"] = serde_json::json!("2.0");
-            }
-        }
-        claims
+        })
     }
 
     /// Mounts the token endpoint answering the onward grant with `issued`,
     /// and the client credentials grant with [`OWN_TOKEN`].
     async fn mount_token_endpoint(&self, grant: Grant, issued: &str, lifetime: i64) {
         let answer = match grant {
-            Grant::Standard | Grant::Keycloak => serde_json::json!({
+            Grant::Standard | Grant::Audience => serde_json::json!({
                 "access_token": issued,
                 "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
                 "token_type": "Bearer",
                 "expires_in": lifetime,
             }),
-            Grant::Entra => serde_json::json!({
+            Grant::OnBehalfOf => serde_json::json!({
                 "token_type": "Bearer",
                 "scope": "api://cdr/.default",
                 "expires_in": lifetime,
@@ -275,8 +266,8 @@ impl World {
             }),
         };
         let grant_type = match grant {
-            Grant::Standard | Grant::Keycloak => TOKEN_EXCHANGE,
-            Grant::Entra => JWT_BEARER,
+            Grant::Standard | Grant::Audience => TOKEN_EXCHANGE,
+            Grant::OnBehalfOf => JWT_BEARER,
         };
         Mock::given(matchers::method("POST"))
             .and(matchers::path("/token"))
@@ -424,7 +415,7 @@ async fn read_once(
 async fn a_person_writes_and_reads_under_the_rfc_8693_exchanged_token() -> Result<(), Box<dyn Error>>
 {
     let world = World::start(Grant::Standard, "").await?;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    let issued = mint(&world.key, &world.issued_claims(300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
         .await;
@@ -468,11 +459,11 @@ async fn a_person_writes_and_reads_under_the_rfc_8693_exchanged_token() -> Resul
 }
 
 #[tokio::test]
-async fn the_keycloak_exchange_names_the_cdr_by_audience() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Keycloak, "").await?;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Keycloak, 300));
+async fn an_audience_exchange_names_the_cdr_by_audience() -> Result<(), Box<dyn Error>> {
+    let world = World::start(Grant::Audience, "").await?;
+    let issued = mint(&world.key, &world.issued_claims(300));
     world
-        .mount_token_endpoint(Grant::Keycloak, &issued, 300)
+        .mount_token_endpoint(Grant::Audience, &issued, 300)
         .await;
     world.mount_cdr(&condition_of("p-1")).await;
     let token = mint(&world.key, &world.person_claims());
@@ -501,11 +492,11 @@ async fn the_keycloak_exchange_names_the_cdr_by_audience() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn the_entra_on_behalf_of_grant_names_the_person_by_oid() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Entra, "").await?;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Entra, 3269));
+async fn the_on_behalf_of_grant_sends_the_caller_s_token_as_assertion() -> Result<(), Box<dyn Error>> {
+    let world = World::start(Grant::OnBehalfOf, "").await?;
+    let issued = mint(&world.key, &world.issued_claims(3269));
     world
-        .mount_token_endpoint(Grant::Entra, &issued, 3269)
+        .mount_token_endpoint(Grant::OnBehalfOf, &issued, 3269)
         .await;
     world.mount_cdr(&condition_of("p-1")).await;
     let token = mint(&world.key, &world.person_claims());
@@ -536,12 +527,14 @@ async fn the_entra_on_behalf_of_grant_names_the_person_by_oid() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn an_entra_token_naming_another_person_is_refused() -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Entra, "").await?;
-    let mut claims = world.issued_claims(Grant::Entra, 300);
-    claims["oid"] = serde_json::json!("synthetic-oid-2");
+async fn an_issued_token_naming_another_person_is_refused() -> Result<(), Box<dyn Error>> {
+    let world = World::start(Grant::Standard, "").await?;
+    let mut claims = world.issued_claims(300);
+    claims["sub"] = serde_json::json!("synthetic-other-person");
     let issued = mint(&world.key, &claims);
-    world.mount_token_endpoint(Grant::Entra, &issued, 300).await;
+    world
+        .mount_token_endpoint(Grant::Standard, &issued, 300)
+        .await;
     let token = mint(&world.key, &world.person_claims());
 
     let response = read_once(&world, &token).await?;
@@ -555,9 +548,9 @@ async fn an_entra_token_naming_another_person_is_refused() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn an_entra_interaction_required_answer_is_a_401_with_the_claims_challenge()
+async fn an_interaction_required_answer_is_a_401_with_the_claims_challenge()
 -> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Entra, "").await?;
+    let world = World::start(Grant::OnBehalfOf, "").await?;
     world.mount_own_token().await;
     // Microsoft, "On-behalf-of flow", "Error response example".
     Mock::given(matchers::method("POST"))
@@ -595,7 +588,7 @@ async fn the_exchanged_token_is_reused_while_it_lives() -> Result<(), Box<dyn Er
     let world = World::start(Grant::Standard, "").await?;
     let resource = condition_of("p-1");
     world.mount_cdr(&resource).await;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    let issued = mint(&world.key, &world.issued_claims(300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
         .await;
@@ -613,7 +606,7 @@ async fn the_exchanged_token_is_reused_while_it_lives() -> Result<(), Box<dyn Er
 async fn an_expiring_exchanged_token_is_exchanged_again() -> Result<(), Box<dyn Error>> {
     let world = World::start(Grant::Standard, "").await?;
     world.mount_cdr(&condition_of("p-1")).await;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 2));
+    let issued = mint(&world.key, &world.issued_claims(2));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 2)
         .await;
@@ -676,7 +669,7 @@ async fn a_refused_exchange_answers_its_status_and_reaches_no_cdr() -> Result<()
 async fn an_issued_token_for_another_audience_is_never_sent() -> Result<(), Box<dyn Error>> {
     let world = World::start(Grant::Standard, "").await?;
     world.mount_cdr(&condition_of("p-1")).await;
-    let mut claims = world.issued_claims(Grant::Standard, 300);
+    let mut claims = world.issued_claims(300);
     claims["aud"] = serde_json::json!("https://other.example/api");
     let issued = mint(&world.key, &claims);
     world
@@ -698,7 +691,7 @@ async fn an_issued_token_for_another_audience_is_never_sent() -> Result<(), Box<
 async fn an_issued_token_naming_another_client_is_never_sent() -> Result<(), Box<dyn Error>> {
     let world = World::start(Grant::Standard, "").await?;
     world.mount_cdr(&condition_of("p-1")).await;
-    let mut claims = world.issued_claims(Grant::Standard, 300);
+    let mut claims = world.issued_claims(300);
     claims["client_id"] = serde_json::json!("synthetic-other-client");
     let issued = mint(&world.key, &claims);
     world

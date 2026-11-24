@@ -8,7 +8,6 @@
 use std::error::Error;
 use std::time::Duration;
 
-use ferrohealth_smart::profile::Marker;
 use http::StatusCode;
 use jsonwebtoken::Algorithm;
 use jsonwebtoken::EncodingKey;
@@ -244,21 +243,13 @@ async fn the_rfc_9068_profile_refuses_a_plain_jwt_and_a_profile_naming_its_shape
     let harness = harness().await;
     let mut header = Header::new(Algorithm::ES256);
     header.kid = Some(String::from("k1"));
-    let mut claims = issuer.claims("system/Condition.r");
-    claims
-        .as_object_mut()
-        .ok_or("claims are an object")?
-        .remove("client_id");
-    let token = mint_with(&key, &header, &claims);
+    let token = mint_with(&key, &header, &issuer.machine_claims("system/Condition.r"));
     let strict = secured(&harness, &authority(issuer.settings()).await);
     assert_refused(&read_with(strict, Some(&token)).await?, "type-mismatch");
-    // NOTE: RFC 7519 §5.1 and §4.1, a plain JWT is typed `JWT` and needs no
-    // `client_id`, so this profile names its machine by `sub`.
+    // NOTE: RFC 7519 §5.1, a plain JWT is typed `JWT`; a profile that names the
+    // type takes it.
     let mut settings = issuer.settings();
-    let profile = &mut settings.issuers[0].profile;
-    profile.token_types = vec![String::from("JWT")];
-    profile.required_claims = ["iss", "exp", "aud", "sub"].map(String::from).to_vec();
-    profile.app_only = vec![Marker::Subjects(vec![String::from("synthetic-client-sub")])];
+    settings.issuers[0].profile.token_types = vec![String::from("JWT")];
     let lenient = secured(&harness, &authority(settings).await);
     let (status, _, body) = read_with(lenient, Some(&token)).await?;
     assert_eq!(StatusCode::NOT_FOUND, status, "{body}");

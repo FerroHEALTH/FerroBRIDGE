@@ -65,7 +65,7 @@ async fn answer(issuer: &Issuer, response: ResponseTemplate, times: u64) {
 fn settings(issuer: &Issuer) -> SmartSettings {
     let mut settings = issuer.settings();
     settings.issuers = Vec::new();
-    let mut introspection = IntrospectionSettings::new(
+    let introspection = IntrospectionSettings::new(
         issuer.uri(),
         AUDIENCE,
         IntrospectionAuth::Client(Box::new(ClientCredentials::new(
@@ -73,9 +73,8 @@ fn settings(issuer: &Issuer) -> SmartSettings {
             String::from("ferrobridge-rs"),
             SecretString::from("synthetic-secret"),
         ))),
-        IssuerKind::Persons,
+        IssuerKind::Smart,
     );
-    introspection.profile.first_party_clients = vec![String::from(CLIENT)];
     settings.introspection = vec![introspection];
     settings
 }

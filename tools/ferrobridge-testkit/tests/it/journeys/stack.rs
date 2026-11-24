@@ -481,8 +481,7 @@ async fn bridge(
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
-         [auth.issuer.ferro]\nissuer = \"{issuer}\"\nkind = \"persons\"\n\n[auth.issuer.ferro.profile]\n\
-         first_party_clients = [\"ferrobridge-console\"]\n\n\
+         [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
          [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n\
          senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}]\n{mllp_tls}\n\

@@ -172,7 +172,6 @@ pub(crate) fn running_configuration() -> serde_json::Value {
         "entries": [
             entry("auth.issuer", &json!({"kind": "table", "value": {"bridge": {"kind": "table", "value": {
                 "issuer": text("https://idp.example.org/realms/bridge"),
-                "kind": text("persons"),
             }}}}), "file"),
             entry("auth.product_scope", &text("__ferrobridge.operator"), "default"),
             entry("cdm.bridge_schema", &text("ferrobridge"), "default"),

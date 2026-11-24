@@ -60,7 +60,7 @@ fn audit_lines(commit: &Request) -> Vec<String> {
 #[tokio::test]
 async fn a_header_commit_under_an_onward_token_states_no_committer() -> Result<(), Box<dyn Error>> {
     let world = World::start(Grant::Standard, "").await?;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    let issued = mint(&world.key, &world.issued_claims(300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
         .await;
@@ -105,7 +105,7 @@ async fn a_header_commit_under_an_onward_token_states_no_committer() -> Result<(
 async fn a_contribution_under_an_onward_token_carries_the_placeholder_committer()
 -> Result<(), Box<dyn Error>> {
     let world = World::start(Grant::Standard, "").await?;
-    let issued = mint(&world.key, &world.issued_claims(Grant::Standard, 300));
+    let issued = mint(&world.key, &world.issued_claims(300));
     world
         .mount_token_endpoint(Grant::Standard, &issued, 300)
         .await;
@@ -194,7 +194,7 @@ async fn machine_create(grant: Grant) -> Result<(serde_json::Value, String), Box
 #[tokio::test]
 async fn a_machine_s_composition_names_its_client_as_the_originating_system()
 -> Result<(), Box<dyn Error>> {
-    for grant in [Grant::Standard, Grant::Entra] {
+    for grant in [Grant::Standard, Grant::OnBehalfOf] {
         let (composition, own) = machine_create(grant).await?;
         // RM FEEDER_AUDIT: `originating_system_audit` is the audit "from the originating
         // system", `feeder_system_audit` that of the feeder "if different".

@@ -2656,15 +2656,15 @@ draft upstream change.
     request reaches the CDR under its caller, so the CDR's own record names
     the clinician too. The bridge exchanges the caller's token through
     `ferrohealth-smart`'s onward client: RFC 8693 §2.1 token exchange
-    (`docs/specs/ietf-oauth/rfc8693.txt`), with `audience` under the Keycloak
-    profile, or the RFC 7523 §2.1 JWT bearer grant with the Microsoft identity
+    (`docs/specs/ietf-oauth/rfc8693.txt`), naming the CDR by `resource` or
+    `audience`, or the RFC 7523 §2.1 JWT bearer grant with the Microsoft identity
     platform's on-behalf-of parameters (`docs/specs/entra-docs/`). The issued
     token is checked for its issuer, audience, lifetime, actor and person
-    (`person_equality`) and cached under the caller's token and the target
+    (`iss` and `sub`) and cached under the caller's token and the target
     within its expiry. A machine keeps the bridge's own client credentials
     token, since the on-behalf-of flow "only works for user principals"; a
-    person is exchanged at a `persons` issuer and another party's
-    professional at a `federation` issuer; every other caller is refused with
+    user of this organisation is exchanged at the SMART issuer and another
+    party's professional at a `federation` issuer; every other caller is refused with
     `403`, and a failed exchange fails the request, never falling back to the
     bridge's credential. Which caller is exchanged, and the status of each
     refusal, is our own design (`cdr::onward`, `facade::status::onward`).
@@ -2675,8 +2675,8 @@ draft upstream change.
     onward lane requires to be asked for the CDR alone (`resource`, RFC 8707
     §2, or `scope`); its composition names its client as the originating
     system (`FEEDER_AUDIT.originating_system_audit.system_id`) and the bridge
-    as the feeder, and the access record names the client. The `patients`
-    and `federation` lanes beside `persons` (#1636) and the HL7 v2 face's
+    as the feeder, and the access record names the client. The `federation`
+    lane beside the SMART one (#1636) and the HL7 v2 face's
     TLS and commit rules (#1638, #1639) follow on their own issues.
 - **Tenancy.** The reference CDR scopes its mapping rows per tenant with
   row-level security and keeps its outbound watermark deliberately unscoped
