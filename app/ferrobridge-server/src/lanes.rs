@@ -328,8 +328,10 @@ fn start_outbound(
         .facade()
         .cloned()
         .context("the outbound FHIR lane maps through the facade, and the facade is off")?;
-    let consumer = crate::outbound::Outbound::start(lane, facade, client)
-        .with_context(|| format!("opening {}", lane.emitted.display()))?
+    let store = state.store().context(
+        "the outbound FHIR lane keeps its delivery record in the state store, and [state] is not set",
+    )?;
+    let consumer = crate::outbound::Outbound::start(lane, facade, client, store)
         .with_following(follower_lane.following.clone());
     tracing::warn!(
         lane = name,

@@ -93,7 +93,8 @@ the testkit tool crate. Beside it:
   is the outbound FHIR lane behind `[fhir_outbound]` (#1374): a change-feed
   consumer that maps each changed composition through the facade's programs
   (`facade::handlers::emit`) and posts one transaction Bundle per event, with
-  the `redb` record of what it delivered that a deletion or an erasure
+  the record of what it delivered (`outbound_delivered` in the state store,
+  committed with the lane's watermark) that a deletion or an erasure
   retracts. `src/facade/`
   is the FHIR R4 facade (#85), mounted under `/fhir` behind `[facade]`: the
   six interactions over the CDR and search over the AQL projections a

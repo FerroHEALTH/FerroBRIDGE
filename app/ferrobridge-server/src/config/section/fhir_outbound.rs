@@ -7,8 +7,6 @@
 //! No specification governs the outbound lane: our own design. It is off
 //! until `enabled` is set, and it follows the `[change_feed]` source.
 
-use std::path::PathBuf;
-
 use ferrohealth_config::units::Duration;
 use ferrohealth_smart::config::endpoint::EndpointSection;
 use serde::{Deserialize, Serialize};
@@ -27,8 +25,6 @@ pub struct FhirOutbound {
     /// Whether an `http` base is accepted, for a TLS terminator beside the
     /// bridge that the operator answers for.
     pub cleartext: bool,
-    /// The file the record of what was delivered is kept in.
-    pub emitted: Option<PathBuf>,
 }
 
 impl Default for FhirOutbound {
@@ -41,7 +37,6 @@ impl Default for FhirOutbound {
                 ..EndpointSection::default()
             },
             cleartext: false,
-            emitted: None,
         }
     }
 }

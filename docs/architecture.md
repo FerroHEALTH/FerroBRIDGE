@@ -2364,7 +2364,11 @@ area on the store (`0006`): the watermarks of the AQL source, the dead
 letters with the operator's settlement (who decided, retry or discard, and
 why) and the poisoned-pass counts, every follower write fenced by its
 reader's lease; the reference CDR's feed keeps its cursor in the CDR and
-takes only the lease. Session advisory locks are not
+takes only the lease. The outbound lane (`0007`) stages what each accepted
+delivery stands at and writes `outbound_delivered` in the transaction that
+moves its watermark, so with idempotent `PUT` and `DELETE` entries
+(<https://hl7.org/fhir/R4/http.html#transaction>) and one leader per lane
+each effect lands once at the endpoint. Session advisory locks are not
 used for leadership: they carry no fencing token and end with their
 connection while the task may run on
 (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
