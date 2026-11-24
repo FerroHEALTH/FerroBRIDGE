@@ -272,12 +272,13 @@ pub const FERROBRIDGE_MEDICATION_TEMPLATE_ID: &str =
 /// FerroBRIDGE's ADL 2 patient summary template, with its template
 /// overlays.
 ///
-/// A health summary `COMPOSITION` holding five sections: four ad hoc
+/// A health summary `COMPOSITION` holding six sections: five ad hoc
 /// `SECTION`s named for the problem list (`EVALUATION.problem_diagnosis.v1`),
 /// the allergies and intolerances (`EVALUATION.adverse_reaction_risk.v2`), the
 /// medication summary (`INSTRUCTION.medication_order.v3` and
-/// `ACTION.medication.v1`) and the history of procedures
-/// (`ACTION.procedure.v1`), and the vaccination list `SECTION` whose
+/// `ACTION.medication.v1`), the history of procedures (`ACTION.procedure.v1`)
+/// and the medical devices (`EVALUATION.device_summary.v0`), and the
+/// vaccination list `SECTION` whose
 /// "Vaccinations administered" slot holds `ACTION.medication.v1`. A suite
 /// builds the ADL 2 operational template from it,
 /// [`CKM_MEDICATION_ARCHETYPES`] and [`CKM_PATIENT_SUMMARY_ARCHETYPES`] at test
@@ -366,13 +367,15 @@ pub const CKM_DISCHARGE_ARCHETYPES: [(&str, &str); 3] = [
 ///
 /// Each is `(file name, ADL 1.4 source)` from the vendored trees of
 /// [`CKM_DISCHARGE_ARCHETYPES`] and [`CKM_LIBRARY_ARCHETYPES`]: the problem or
-/// diagnosis evaluation, the adverse reaction risk evaluation and the
-/// procedure action that [`FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE`]'s problem
-/// list, allergies and intolerances, and history of procedures sections hold.
-pub const CKM_PATIENT_SUMMARY_ARCHETYPES: [(&str, &str); 3] = [
+/// diagnosis evaluation, the adverse reaction risk evaluation, the procedure
+/// action and the medical device summary evaluation that
+/// [`FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE`]'s problem list, allergies and
+/// intolerances, history of procedures and medical devices sections hold.
+pub const CKM_PATIENT_SUMMARY_ARCHETYPES: [(&str, &str); 4] = [
     ckm_discharge!("openEHR-EHR-EVALUATION.problem_diagnosis.v1.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.adverse_reaction_risk.v2.adl"),
     ckm_discharge!("openEHR-EHR-ACTION.procedure.v1.adl"),
+    ckm_library!("openEHR-EHR-EVALUATION.device_summary.v0.adl"),
 ];
 
 /// One FerroBRIDGE library template as `(template identifier, source)`.
@@ -432,10 +435,11 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 12] = [
     library_template!("case"),
 ];
 
-/// The seventeen international CKM archetypes of the library templates.
+/// The eighteen international CKM archetypes of the library templates.
 ///
 /// They are the report, report result and medication list compositions, the
 /// absence, global exclusion, gender and adverse reaction risk evaluations,
+/// the medical device summary evaluation the patient summary template holds,
 /// the medication statement observation, and the device, case
 /// identification, adverse reaction event, clinical evidence, non-daily
 /// timing, person, address and structured name clusters of
@@ -446,7 +450,7 @@ pub const FERROBRIDGE_LIBRARY_TEMPLATES: [(&str, &str); 12] = [
 /// `scripts/vendor/ckm-library.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
 /// source and licence.
-pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 17] = [
+pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 18] = [
     ckm_library!("openEHR-EHR-COMPOSITION.report.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.report-result.v1.adl"),
     ckm_library!("openEHR-EHR-COMPOSITION.medication_list.v1.adl"),
@@ -454,6 +458,7 @@ pub const CKM_LIBRARY_ARCHETYPES: [(&str, &str); 17] = [
     ckm_library!("openEHR-EHR-EVALUATION.exclusion_global.v1.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.gender.v1.adl"),
     ckm_library!("openEHR-EHR-EVALUATION.adverse_reaction_risk.v2.adl"),
+    ckm_library!("openEHR-EHR-EVALUATION.device_summary.v0.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.device.v1.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.case_identification.v0.adl"),
     ckm_library!("openEHR-EHR-CLUSTER.adverse_reaction_event.v1.adl"),
@@ -548,9 +553,9 @@ pub const KDS_PERSON_FLAT: &str = include_str!("../fixtures/composition/kds_pers
 /// It holds one medicine ordered in its medication summary section and one
 /// vaccine administered in its immunisations section, coded
 /// `SYN-MEDICINE-0001` and `SYN-VACCINE-0001` in the synthetic products code
-/// system [`PATIENT_SUMMARY_PRODUCTS`], and one problem, one allergy and one
-/// procedure in their sections, coded in SNOMED CT: 38341003, 764146007 and
-/// 80146002.
+/// system [`PATIENT_SUMMARY_PRODUCTS`], and one problem, one allergy, one
+/// procedure and one implanted device in their sections, coded in SNOMED CT:
+/// 38341003, 764146007, 80146002 and 14106009.
 pub const FERROBRIDGE_PATIENT_SUMMARY_COMPOSITION: &str =
     include_str!("../fixtures/composition/ferrobridge_patient_summary.json");
 

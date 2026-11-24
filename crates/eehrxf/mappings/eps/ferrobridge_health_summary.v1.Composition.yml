@@ -123,3 +123,14 @@ mappings:
       targetAttribute: "code.coding.code"
       operator: "one of"
       criteria: "47519-4"
+
+  - name: "sectionMedicalDevices"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.adhoc.v1,'Medical devices']"
+    slotContext: "ferrobridge_eu_eps_devices.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "46264-8"

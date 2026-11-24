@@ -608,6 +608,15 @@ fn every_source_feeds_its_row_from_its_section() -> Result<(), Box<dyn Error>> {
                     eps_sections::procedure(eps_sections::APPENDECTOMY),
                 )
             }
+            (section, "openEHR-EHR-EVALUATION.device_summary.v0")
+                if section == eps_sections::DEVICES.1 =>
+            {
+                (
+                    eps_sections::DEVICES,
+                    eps_sections::DEVICES_CODE,
+                    eps_sections::device(eps_sections::PACEMAKER),
+                )
+            }
             (section, other) => {
                 return Err(format!("{path}: no synthetic {other} in {section}").into());
             }

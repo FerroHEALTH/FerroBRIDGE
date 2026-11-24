@@ -45,7 +45,7 @@ functional status (A.2.3.4).
 
 ### The openEHR sources of the patient summary entries
 
-The crosswalk also names the openEHR content that feeds five entry rows, in
+The crosswalk also names the openEHR content that feeds six entry rows, in
 `SOURCES`, each with the section of FerroBRIDGE's patient summary template
 that holds it:
 
@@ -55,6 +55,7 @@ that holds it:
 | `EHDSPatientSummary.allergiesAndIntolerances.allergyIntolerance` | `openEHR-EHR-EVALUATION.adverse_reaction_risk.v2` | Allergies and intolerances |
 | `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-INSTRUCTION.medication_order.v3` | Medication summary |
 | `EHDSPatientSummary.medicationSummary.medicationUse` | `openEHR-EHR-ACTION.medication.v1` | Medication summary |
+| `EHDSPatientSummary.medicalDevicesAndImplants.deviceUse` | `openEHR-EHR-EVALUATION.device_summary.v0` | Medical devices |
 | `EHDSPatientSummary.procedures.procedure` | `openEHR-EHR-ACTION.procedure.v1` | History of procedures |
 | `EHDSPatientSummary.immunisations.immunisation` | `openEHR-EHR-ACTION.medication.v1` | Immunisations |
 
@@ -81,6 +82,12 @@ entries:
 - `ferrobridge_eu_eps_procedures.context` maps each procedure to a
   `procedure-eu-eps`: its name, the time of its careflow step, its body
   site, reasons, outcomes, complications and comment.
+- `ferrobridge_eu_eps_devices.context` maps each medical device summary to
+  a `deviceUseStatement-eu-eps`: its status (a current device is `active`, a
+  previous one `completed`), the start and end dates of its device details
+  as the timing period, its body site and description, and a
+  `device-eu-eps` `Device` whose type is the summary's device type, the SNOMED
+  CT code the IPS medical devices value set binds.
 - `ferrobridge_eu_eps_medication.context` maps each order and each action
   of the medication summary section to a `MedicationStatement-eu-eps`. An
   order's status is `unknown`, because no published crosswalk pairs an order
