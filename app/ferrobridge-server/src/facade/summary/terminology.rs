@@ -68,6 +68,7 @@ impl TerminologyServer for Server {
                         .as_ref()
                         .map(|equivalence| equivalence.as_str().to_owned()),
                     concept: found.concept.as_ref().map(coding),
+                    source: found.source.clone().or_else(|| found.origin_map.clone()),
                 })
                 .collect()),
             // NOTE: FHIR R4 `$translate`: a `result` of false states that no match exists.
@@ -84,6 +85,35 @@ impl TerminologyServer for Server {
             .map_err(|error| refusal(Operation::Lookup, error))?;
         match outcome {
             LookupOutcome::Found { display, .. } => Ok(display),
+            LookupOutcome::NotFound { .. } => Err(TerminologyError::NotFound {
+                operation: Operation::Lookup,
+            }),
+            _ => Err(unread(Operation::Lookup)),
+        }
+    }
+
+    async fn designation(
+        &self,
+        system: &str,
+        code: &str,
+        language: &str,
+    ) -> Result<Option<String>, TerminologyError> {
+        let outcome = self
+            .client
+            .lookup(system, code, None)
+            .await
+            .map_err(|error| refusal(Operation::Lookup, error))?;
+        match outcome {
+            // NOTE: FHIR R4 `$lookup`: each `designation` names its language as a BCP 47 code.
+            LookupOutcome::Found { designations, .. } => Ok(designations
+                .into_iter()
+                .find(|designation| {
+                    designation
+                        .language
+                        .as_deref()
+                        .is_some_and(|held| held == language || held.starts_with(&format!("{language}-")))
+                })
+                .map(|designation| designation.value)),
             LookupOutcome::NotFound { .. } => Err(TerminologyError::NotFound {
                 operation: Operation::Lookup,
             }),

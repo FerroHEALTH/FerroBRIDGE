@@ -38,6 +38,9 @@ use http::StatusCode;
 /// A preferred code system.
 pub(crate) const PREFERRED: &str = "http://example.org/fhir/CodeSystem/preferred";
 
+/// The concept map the scripted server translates with, at its version.
+pub(crate) const MAP: &str = "http://example.org/fhir/ConceptMap/local-to-preferred|1.0.0";
+
 /// A code system no deployment prefers.
 pub(crate) const LOCAL: &str = "http://example.org/fhir/CodeSystem/local";
 
@@ -51,6 +54,9 @@ pub(crate) enum Script {
     Display(&'static str),
     /// `$validate-code` answers this result.
     Valid(bool),
+    /// `$translate` answers no match, and `$lookup` this English
+    /// designation.
+    Unmapped(&'static str),
     /// Every operation is refused with this status.
     Refuse(StatusCode),
 }
@@ -79,6 +85,9 @@ impl TerminologyServer for Scripted {
         _code: &str,
         _target: &str,
     ) -> Result<Vec<Match>, TerminologyError> {
+        if matches!(self.0, Script::Unmapped(_)) {
+            return Ok(Vec::new());
+        }
         let Script::Translate(matches) = &self.0 else {
             return Err(self.refusal(Operation::Translate));
         };
@@ -87,6 +96,7 @@ impl TerminologyServer for Scripted {
             .map(|(equivalence, system, code)| Match {
                 equivalence: Some((*equivalence).to_owned()),
                 concept: Some(coding(system, code)),
+                source: Some(MAP.to_owned()),
             })
             .collect())
     }
@@ -96,6 +106,18 @@ impl TerminologyServer for Scripted {
             return Err(self.refusal(Operation::Lookup));
         };
         Ok(display.to_owned())
+    }
+
+    async fn designation(
+        &self,
+        _system: &str,
+        _code: &str,
+        language: &str,
+    ) -> Result<Option<String>, TerminologyError> {
+        let Script::Unmapped(english) = self.0 else {
+            return Err(self.refusal(Operation::Lookup));
+        };
+        Ok((language == "en").then(|| english.to_owned()))
     }
 
     async fn validate_code(

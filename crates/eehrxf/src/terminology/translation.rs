@@ -35,6 +35,7 @@ use fhir_types::r4::resource::Resource;
 
 use crate::terminology::Terminology;
 use crate::terminology::TerminologyError;
+use crate::terminology::Translated;
 use crate::terminology::walk;
 use crate::terminology::walk::Coded;
 use crate::terminology::walk::Step;
@@ -69,6 +70,9 @@ pub enum TranslationError {
     Terminology(#[from] TerminologyError),
 }
 
+/// The R4 extension that carries a translation of a string element.
+pub const TRANSLATION: &str = "http://hl7.org/fhir/StructureDefinition/translation";
+
 /// A concept to translate: where it is, and its codings as system and code.
 struct Pending {
     location: String,
@@ -83,7 +87,22 @@ struct Pending {
 pub struct Translator<'t> {
     terminology: &'t Terminology,
     targets: &'t [&'t str],
-    asked: BTreeMap<(String, String, String), Vec<Coding>>,
+    asked: BTreeMap<(String, String, String), Vec<Translated>>,
+    english: bool,
+    mapped: Vec<Mapping>,
+    unmapped: Vec<(String, String)>,
+}
+
+/// One coding a translation added, with its mapping provenance (draft
+/// `EEHRxF` Art 6(2) and (3)).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Mapping {
+    /// Where the concept is, as an element path.
+    pub location: String,
+    /// The original coding, as system and code.
+    pub original: (String, String),
+    /// The translation.
+    pub translated: Translated,
 }
 
 impl<'t> Translator<'t> {
@@ -95,7 +114,32 @@ impl<'t> Translator<'t> {
             terminology,
             targets,
             asked: BTreeMap::new(),
+            english: false,
+            mapped: Vec::new(),
+            unmapped: Vec::new(),
         }
+    }
+
+    /// Returns the translator for content not written in English: a concept
+    /// no translation covers then carries the English designation of each
+    /// of its codings, as draft `EEHRxF` Art 6(3) asks.
+    #[must_use]
+    pub const fn for_non_english(mut self) -> Self {
+        self.english = true;
+        self
+    }
+
+    /// Returns every coding the translator added, with its provenance.
+    #[must_use]
+    pub fn mapped(&self) -> &[Mapping] {
+        &self.mapped
+    }
+
+    /// Returns each original coding, as system and code, of a concept no
+    /// translation covered: the mapping gaps the run report counts.
+    #[must_use]
+    pub fn unmapped(&self) -> &[(String, String)] {
+        &self.unmapped
     }
 
     /// Returns `resource` with every `equivalent` or `equal` translation of
@@ -135,19 +179,28 @@ impl<'t> Translator<'t> {
         let mut changed = false;
         for concept in pending {
             let added = self.equivalents(&concept.originals).await?;
-            if added.is_empty() {
-                continue;
-            }
-            changed = true;
             let codings = codings_at(&mut object, &concept.steps).ok_or_else(|| {
                 TranslationError::Unwalkable {
                     location: concept.location.clone(),
                 }
             })?;
-            for coding in &added {
-                let encoded =
-                    Json::to_json(coding).map_err(|source| TranslationError::Encode { source })?;
+            if added.is_empty() {
+                self.unmapped.extend(concept.originals.iter().cloned());
+                if self.english {
+                    changed |= self.designate(codings).await?;
+                }
+                continue;
+            }
+            changed = true;
+            for (original, translated) in added {
+                let encoded = Json::to_json(&translated.coding)
+                    .map_err(|source| TranslationError::Encode { source })?;
                 codings.push(Value::Object(encoded));
+                self.mapped.push(Mapping {
+                    location: concept.location.clone(),
+                    original,
+                    translated,
+                });
             }
         }
         if !changed {
@@ -157,14 +210,71 @@ impl<'t> Translator<'t> {
             .map_err(|source| TranslationError::Decode { source })
     }
 
+    /// Gives each of `codings` the English designation the server holds for
+    /// it: as its `display` when it has none, and otherwise in the R4
+    /// `translation` extension of its `display`
+    /// (<https://hl7.org/fhir/R4/extension-translation.html>), and answers
+    /// whether any changed.
+    async fn designate(&self, codings: &mut [Value]) -> Result<bool, TerminologyError> {
+        let mut changed = false;
+        for coding in codings.iter_mut() {
+            let Value::Object(coding) = coding else {
+                continue;
+            };
+            let text = |key: &str| match coding.get(key) {
+                Some(Value::String(text)) => Some(text.clone()),
+                _ => None,
+            };
+            let (Some(system), Some(code)) = (text("system"), text("code")) else {
+                continue;
+            };
+            let Some(english) = self.terminology.english(&system, &code).await? else {
+                continue;
+            };
+            changed = true;
+            if !coding.contains_key("display") {
+                coding.insert("display".into(), Value::String(english));
+                continue;
+            }
+            let part = |url: &str, key: &str, value: String| {
+                Value::Object(Object::from([
+                    ("url".to_owned(), Value::String(url.to_owned())),
+                    (key.to_owned(), Value::String(value)),
+                ]))
+            };
+            let translation = Value::Object(Object::from([
+                ("url".to_owned(), Value::String(TRANSLATION.to_owned())),
+                (
+                    "extension".to_owned(),
+                    Value::Array(vec![
+                        part("lang", "valueCode", String::from("en")),
+                        part("content", "valueString", english),
+                    ]),
+                ),
+            ]));
+            let element = coding
+                .entry("_display".to_owned())
+                .or_insert_with(|| Value::Object(Object::new()));
+            if let Value::Object(element) = element {
+                let extensions = element
+                    .entry("extension".to_owned())
+                    .or_insert_with(|| Value::Array(Vec::new()));
+                if let Value::Array(extensions) = extensions {
+                    extensions.push(translation);
+                }
+            }
+        }
+        Ok(changed)
+    }
+
     /// Returns every accepted translation of `originals` into the targets,
     /// in order, leaving out a coding the originals or an earlier
     /// translation already carry.
     async fn equivalents(
         &mut self,
         originals: &[(String, String)],
-    ) -> Result<Vec<Coding>, TerminologyError> {
-        let mut added: Vec<Coding> = Vec::new();
+    ) -> Result<Vec<((String, String), Translated)>, TerminologyError> {
+        let mut added: Vec<((String, String), Translated)> = Vec::new();
         for (system, code) in originals {
             for target in self.targets {
                 let key = (system.clone(), code.clone(), (*target).to_owned());
@@ -173,14 +283,14 @@ impl<'t> Translator<'t> {
                     self.asked.insert(key.clone(), found);
                 }
                 for found in self.asked.get(&key).into_iter().flatten() {
-                    let pair = identity(found);
+                    let pair = identity(&found.coding);
                     let known = pair.is_some_and(|(system, code)| {
                         originals
                             .iter()
                             .any(|(held, value)| held == system && value == code)
                     });
-                    if !known && !added.iter().any(|held| identity(held) == pair) {
-                        added.push(found.clone());
+                    if !known && !added.iter().any(|(_, held)| identity(&held.coding) == pair) {
+                        added.push(((system.clone(), code.clone()), found.clone()));
                     }
                 }
             }
