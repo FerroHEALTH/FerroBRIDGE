@@ -36,8 +36,12 @@ pub(crate) struct Started {
 }
 
 impl Started {
-    /// Logs the boot summary and the indicators readiness runs.
+    /// Logs the boot summary and the indicators readiness runs, and starts
+    /// the replica's `LISTEN` session on the inbound sources.
     pub(crate) fn announce(&self) {
+        if let (Some(store), Some(sources)) = (self.state.store(), self.state.sources()) {
+            store.listeners(&[sources.listened()]).spawn();
+        }
         startup::log(&self.lanes);
         tracing::info!(
             version = crate::build_info::VERSION,
@@ -75,6 +79,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             );
         }
     }
+    state = open_sources(settings, state)?;
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
         let (mounted, counts) = build_facade(settings, lane, state.terminology().cloned())
@@ -147,6 +152,19 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         face,
         feeds,
     })
+}
+
+/// Returns `state` serving the inbound sources of its state store, the
+/// `[secrets]` directory they name opened.
+fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState> {
+    use anyhow::Context;
+
+    let Some(store) = state.store() else {
+        return Ok(state);
+    };
+    let sources = crate::sources::Sources::open(store, settings.secrets.as_ref())
+        .context("opening the [secrets] directory the inbound sources name")?;
+    Ok(state.with_sources(Arc::new(sources)))
 }
 
 /// One change-feed consumer, ready to follow its source.
