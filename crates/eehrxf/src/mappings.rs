@@ -141,9 +141,6 @@ impl Project {
     feature = "discharge"
 ))]
 macro_rules! shipped {
-    ($directory:literal, [$($name:literal),+ $(,)?]) => {
-        &[$(shipped!($directory, $name)),+]
-    };
     ($directory:literal, $name:literal) => {
         File {
             name: $name,
@@ -171,20 +168,17 @@ pub const MPD: Project = Project {
         "ferrobridge_eu_mpd_request.context",
         "ferrobridge_eu_mpd_dispense.context",
     ],
-    files: shipped!(
-        "mpd",
-        [
-            "ferrobridge_eu_mpd_request.context.yml",
-            "ferrobridge_medication_order.v3.yml",
-            "ferrobridge_medication.v2.yml",
-            "ferrobridge_dosage.v2.yml",
-            "ferrobridge_eu_mpd_request.yml",
-            "ferrobridge_eu_mpd_medication.yml",
-            "ferrobridge_eu_mpd_dispense.context.yml",
-            "ferrobridge_medication.v1.yml",
-            "ferrobridge_eu_mpd_dispense.yml",
-        ]
-    ),
+    files: &[
+        shipped!("mpd", "ferrobridge_eu_mpd_request.context.yml"),
+        shipped!("mpd", "ferrobridge_medication_order.v3.yml"),
+        shipped!("mpd", "ferrobridge_medication.v2.yml"),
+        shipped!("mpd", "ferrobridge_dosage.v2.yml"),
+        shipped!("mpd", "ferrobridge_eu_mpd_request.yml"),
+        shipped!("mpd", "ferrobridge_eu_mpd_medication.yml"),
+        shipped!("mpd", "ferrobridge_eu_mpd_dispense.context.yml"),
+        shipped!("mpd", "ferrobridge_medication.v1.yml"),
+        shipped!("mpd", "ferrobridge_eu_mpd_dispense.yml"),
+    ],
     accounted: &[],
     followed: &[],
 };
@@ -204,15 +198,12 @@ pub const MPD: Project = Project {
 pub const IMAGING: Project = Project {
     directory: "imaging",
     contexts: &["ferrobridge_eu_imaging.context"],
-    files: shipped!(
-        "imaging",
-        [
-            "ferrobridge_eu_imaging.context.yml",
-            "ferrobridge_imaging_exam_result.v1.yml",
-            "ferrobridge_eu_imaging_report.yml",
-            "ferrobridge_organisation.v1.yml",
-        ]
-    ),
+    files: &[
+        shipped!("imaging", "ferrobridge_eu_imaging.context.yml"),
+        shipped!("imaging", "ferrobridge_imaging_exam_result.v1.yml"),
+        shipped!("imaging", "ferrobridge_eu_imaging_report.yml"),
+        shipped!("imaging", "ferrobridge_organisation.v1.yml"),
+    ],
     // NOTE: no specification governs this: our own design; every section and every element of the report and
     // its study but identity, subject, choice elements and `imagingStudy` (whose studies declare their own) is accounted.
     accounted: &[
@@ -278,22 +269,19 @@ pub const LABORATORY: Project = Project {
         "ferrobridge_eu_laboratory.context",
         "ferrobridge_eu_lab_composition.context",
     ],
-    files: shipped!(
-        "laboratory",
-        [
-            "ferrobridge_eu_laboratory.context.yml",
-            "ferrobridge_laboratory_test_result.v1.yml",
-            "ferrobridge_laboratory_test_analyte.v1.yml",
-            "ferrobridge_specimen.v1.yml",
-            "ferrobridge_eu_laboratory_result.yml",
-            "ferrobridge_eu_laboratory_analyte.yml",
-            "ferrobridge_eu_laboratory_specimen.yml",
-            "ferrobridge_eu_lab_composition.context.yml",
-            "ferrobridge_report_result.v1.Composition.yml",
-            "ferrobridge_eu_lab_composition.yml",
-            "ferrobridge_eu_lab_composition_report.yml",
-        ]
-    ),
+    files: &[
+        shipped!("laboratory", "ferrobridge_eu_laboratory.context.yml"),
+        shipped!("laboratory", "ferrobridge_laboratory_test_result.v1.yml"),
+        shipped!("laboratory", "ferrobridge_laboratory_test_analyte.v1.yml"),
+        shipped!("laboratory", "ferrobridge_specimen.v1.yml"),
+        shipped!("laboratory", "ferrobridge_eu_laboratory_result.yml"),
+        shipped!("laboratory", "ferrobridge_eu_laboratory_analyte.yml"),
+        shipped!("laboratory", "ferrobridge_eu_laboratory_specimen.yml"),
+        shipped!("laboratory", "ferrobridge_eu_lab_composition.context.yml"),
+        shipped!("laboratory", "ferrobridge_report_result.v1.Composition.yml"),
+        shipped!("laboratory", "ferrobridge_eu_lab_composition.yml"),
+        shipped!("laboratory", "ferrobridge_eu_lab_composition_report.yml"),
+    ],
     // NOTE: no specification governs this: our own design; a result read without its
     // reference range or the order it answers is misread, so each loss of one is declared.
     accounted: &[
@@ -335,34 +323,40 @@ pub const LABORATORY: Project = Project {
 pub const EPS: Project = Project {
     directory: "eps",
     contexts: &["ferrobridge_eu_eps.context"],
-    files: shipped!(
-        "eps",
-        [
-            "ferrobridge_eu_eps.context.yml",
-            "ferrobridge_health_summary.v1.Composition.yml",
-            "ferrobridge_eu_eps_medication.context.yml",
-            "ferrobridge_section_adhoc.v1.yml",
-            "ferrobridge_eu_eps_medication_section.yml",
-            "ferrobridge_medication_order.v3.MedicationStatement.yml",
-            "ferrobridge_medication.v1.MedicationStatement.yml",
-            "ferrobridge_eu_eps_immunization.context.yml",
-            "ferrobridge_section_immunisation_list.v0.yml",
-            "ferrobridge_eu_eps_immunization_section.yml",
-            "ferrobridge_medication.v1.Immunization.yml",
-            "ferrobridge_eu_eps_problems.context.yml",
-            "ferrobridge_eu_eps_problems_section.yml",
-            "ferrobridge_problem_diagnosis.v1.Condition.yml",
-            "ferrobridge_eu_eps_allergies.context.yml",
-            "ferrobridge_eu_eps_allergies_section.yml",
-            "ferrobridge_adverse_reaction_risk.v2.AllergyIntolerance.yml",
-            "ferrobridge_eu_eps_procedures.context.yml",
-            "ferrobridge_eu_eps_procedures_section.yml",
-            "ferrobridge_procedure.v1.Procedure.yml",
-            "ferrobridge_eu_eps_devices.context.yml",
-            "ferrobridge_eu_eps_devices_section.yml",
-            "ferrobridge_device_summary.v0.DeviceUseStatement.yml",
-        ]
-    ),
+    files: &[
+        shipped!("eps", "ferrobridge_eu_eps.context.yml"),
+        shipped!("eps", "ferrobridge_health_summary.v1.Composition.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_medication.context.yml"),
+        shipped!("eps", "ferrobridge_section_adhoc.v1.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_medication_section.yml"),
+        shipped!(
+            "eps",
+            "ferrobridge_medication_order.v3.MedicationStatement.yml"
+        ),
+        shipped!("eps", "ferrobridge_medication.v1.MedicationStatement.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_immunization.context.yml"),
+        shipped!("eps", "ferrobridge_section_immunisation_list.v0.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_immunization_section.yml"),
+        shipped!("eps", "ferrobridge_medication.v1.Immunization.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_problems.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_problems_section.yml"),
+        shipped!("eps", "ferrobridge_problem_diagnosis.v1.Condition.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_allergies.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_allergies_section.yml"),
+        shipped!(
+            "eps",
+            "ferrobridge_adverse_reaction_risk.v2.AllergyIntolerance.yml"
+        ),
+        shipped!("eps", "ferrobridge_eu_eps_procedures.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_procedures_section.yml"),
+        shipped!("eps", "ferrobridge_procedure.v1.Procedure.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_devices.context.yml"),
+        shipped!("eps", "ferrobridge_eu_eps_devices_section.yml"),
+        shipped!(
+            "eps",
+            "ferrobridge_device_summary.v0.DeviceUseStatement.yml"
+        ),
+    ],
     accounted: &[],
     followed: &[],
 };
@@ -385,16 +379,13 @@ pub const EPS: Project = Project {
 pub const HDR: Project = Project {
     directory: "hdr",
     contexts: &["ferrobridge_eu_hdr.context"],
-    files: shipped!(
-        "hdr",
-        [
-            "ferrobridge_eu_hdr.context.yml",
-            "ferrobridge_transfer_summary.v1.Composition.yml",
-            "ferrobridge_problem_diagnosis.v1.yml",
-            "ferrobridge_procedure.v1.yml",
-            "ferrobridge_medication_order.v3.yml",
-        ]
-    ),
+    files: &[
+        shipped!("hdr", "ferrobridge_eu_hdr.context.yml"),
+        shipped!("hdr", "ferrobridge_transfer_summary.v1.Composition.yml"),
+        shipped!("hdr", "ferrobridge_problem_diagnosis.v1.yml"),
+        shipped!("hdr", "ferrobridge_procedure.v1.yml"),
+        shipped!("hdr", "ferrobridge_medication_order.v3.yml"),
+    ],
     // NOTE: no specification governs this: our own design; every section and every element of an entry
     // but its identity, subject, encounter (the stay the context carries) and choice elements is accounted.
     accounted: &[
