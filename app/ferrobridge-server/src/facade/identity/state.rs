@@ -326,13 +326,11 @@ impl Store for StateStore {
     }
 
     async fn consumed(&self, source: &SourceVersion) -> Result<Option<ConsumedSource>, StoreError> {
-        let row = sqlx::query(
+        let row = keyed(
             "SELECT ehr_id, versioned_object_uid, internal_id, context FROM consumed_source \
              WHERE resource_type = $1 AND source_id = $2 AND version_id = $3",
+            source,
         )
-        .bind(source.resource_type())
-        .bind(source.id().as_str())
-        .bind(version_slot(source))
         .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
@@ -360,7 +358,7 @@ impl Store for StateStore {
         source: &SourceVersion,
         consumed: &ConsumedSource,
     ) -> Result<ConsumedSource, StoreError> {
-        let stood = sqlx::query(
+        let stood = keyed(
             "WITH won AS (INSERT INTO consumed_source (resource_type, source_id, version_id, \
                ehr_id, versioned_object_uid, internal_id, context) \
                VALUES ($1, $2, $3, $4, $5, $6, $7) \
@@ -369,10 +367,8 @@ impl Store for StateStore {
              SELECT ehr_id, versioned_object_uid, internal_id, context FROM won UNION ALL \
              SELECT ehr_id, versioned_object_uid, internal_id, context FROM consumed_source \
              WHERE resource_type = $1 AND source_id = $2 AND version_id = $3 LIMIT 1",
+            source,
         )
-        .bind(source.resource_type())
-        .bind(source.id().as_str())
-        .bind(version_slot(source))
         .bind(&consumed.ehr_id)
         .bind(&consumed.versioned_object_uid)
         .bind(&consumed.internal_id)
@@ -393,23 +389,15 @@ impl Store for StateStore {
         &self,
         source: &SourceVersion,
     ) -> Result<Option<CommittedSource>, StoreError> {
-        let row = sqlx::query(
+        let row = keyed(
             "SELECT ehr_id, contribution_uid FROM committed_source \
              WHERE resource_type = $1 AND source_id = $2 AND version_id = $3",
+            source,
         )
-        .bind(source.resource_type())
-        .bind(source.id().as_str())
-        .bind(version_slot(source))
         .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
-        row.map(|row| {
-            Ok(CommittedSource {
-                ehr_id: row.try_get("ehr_id").map_err(database)?,
-                contribution_uid: row.try_get("contribution_uid").map_err(database)?,
-            })
-        })
-        .transpose()
+        row.map(|row| committed_of_row(&row)).transpose()
     }
 
     async fn record_committed(
@@ -417,7 +405,7 @@ impl Store for StateStore {
         source: &SourceVersion,
         committed: &CommittedSource,
     ) -> Result<CommittedSource, StoreError> {
-        let stood = sqlx::query(
+        let stood = keyed(
             "WITH won AS (INSERT INTO committed_source (resource_type, source_id, version_id, \
                ehr_id, contribution_uid) VALUES ($1, $2, $3, $4, $5) \
                ON CONFLICT (resource_type, source_id, version_id) DO NOTHING \
@@ -425,20 +413,15 @@ impl Store for StateStore {
              SELECT ehr_id, contribution_uid FROM won UNION ALL \
              SELECT ehr_id, contribution_uid FROM committed_source \
              WHERE resource_type = $1 AND source_id = $2 AND version_id = $3 LIMIT 1",
+            source,
         )
-        .bind(source.resource_type())
-        .bind(source.id().as_str())
-        .bind(version_slot(source))
         .bind(&committed.ehr_id)
         .bind(&committed.contribution_uid)
         .fetch_optional(&self.pool)
         .await
         .map_err(database)?;
         let stood = match stood {
-            Some(row) => Some(CommittedSource {
-                ehr_id: row.try_get("ehr_id").map_err(database)?,
-                contribution_uid: row.try_get("contribution_uid").map_err(database)?,
-            }),
+            Some(row) => Some(committed_of_row(&row)?),
             None => self.committed(source).await?,
         };
         stood.ok_or_else(|| StoreError::Missing {
@@ -496,6 +479,26 @@ impl Store for StateStore {
         .map_err(database)?;
         Ok(())
     }
+}
+
+/// Returns the statement `sql` with the three keys of `source` bound as its
+/// first three parameters.
+fn keyed<'q>(
+    sql: &'static str,
+    source: &'q SourceVersion,
+) -> sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments> {
+    sqlx::query(sql)
+        .bind(source.resource_type())
+        .bind(source.id().as_str())
+        .bind(version_slot(source))
+}
+
+/// Returns the committed record a row holds.
+fn committed_of_row(row: &sqlx::postgres::PgRow) -> Result<CommittedSource, StoreError> {
+    Ok(CommittedSource {
+        ehr_id: row.try_get("ehr_id").map_err(database)?,
+        contribution_uid: row.try_get("contribution_uid").map_err(database)?,
+    })
 }
 
 /// Returns the consumed record a row holds.
