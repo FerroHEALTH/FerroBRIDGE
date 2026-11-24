@@ -592,7 +592,7 @@ async fn park(state: &str) -> Result<(), Box<dyn Error>> {
     let store = ferrobridge_server::store::Store::open(&ferrobridge_server::store::Settings {
         connection: omop_cdm::connection::CdmConnection::new(state, None)?,
         max_connections: 1,
-        acquire_timeout: Duration::from_secs(5),
+        acquire_timeout: Duration::from_secs(30),
         seal: None,
     })
     .await?;

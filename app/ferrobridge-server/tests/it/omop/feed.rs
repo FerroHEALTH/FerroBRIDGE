@@ -172,7 +172,7 @@ async fn feed(
     let store = Store::open(&StoreSettings {
         connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
         max_connections: 2,
-        acquire_timeout: std::time::Duration::from_secs(5),
+        acquire_timeout: std::time::Duration::from_secs(30),
         seal: None,
     })
     .await?;
