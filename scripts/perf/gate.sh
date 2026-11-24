@@ -121,6 +121,8 @@ port() {
 facade() { echo "http://127.0.0.1:$(port "$1" facade)"; }
 cdr_origin() { echo "http://127.0.0.1:$(port "$1" cdr)"; }
 admin_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" db)/ferroehr?sslmode=disable"; }
+# state_url ARM: the bridge's state store, a database of ARM's CDR server.
+state_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" db)/postgres?sslmode=disable"; }
 
 # pin ITEM [MATRIX]: the pin of the docs/VERSIONS.md row whose first cell is
 # ITEM, backticks off.
@@ -384,6 +386,7 @@ fill() {
     value="${value//@DIR@/$root/$WORK/$arm}"
     value="${value//@TLS@/$root/$WORK/tls}"
     value="${value//@TERMINOLOGY@/$TERMINOLOGY}"
+    value="${value//@STATE@/$(state_url "$arm")}"
     if [[ "$value" =~ @[A-Z][A-Z0-9_]*@ ]]; then
       die "$file: $name names the unknown placeholder ${BASH_REMATCH[0]}"
     fi
@@ -499,7 +502,33 @@ start() {
   for arm in head base; do
     wait_for "the $arm bridge" 120 curl --fail --silent "$(facade "$arm")/health/readiness" ||
       die "the $arm bridge did not come up: $(tail -n 20 "$WORK/$arm/server.log")"
+    route "$arm"
   done
+}
+
+# route ARM: routes the PERFLAB laboratory system to an MLLP source in ARM's
+# state store, as one operator write would, when ARM's bridge keeps its
+# senders there; a tree that reads them from its file has no such table.
+route() {
+  local arm="$1" db="ferrobridge-perf-$1-db" document
+  document='{"routes": [{"sending_application": "LAB", "sending_facility": "PERFLAB", "certificate_subject": "'"$SENDER_SUBJECT"'"}], "profiles": {"Observation": "http://example.org/fhir/StructureDefinition/ferrobridge-hl7v2-observation"}}'
+  if [[ "$("$engine" exec "$db" psql --quiet --tuples-only --no-align --username postgres --dbname postgres \
+    --command "SELECT to_regclass('inbound_source') IS NOT NULL")" != t ]]; then
+    return 0
+  fi
+  "$engine" exec "$db" psql --quiet --username postgres --dbname postgres --set ON_ERROR_STOP=1 \
+    --set document="$document" > /dev/null <<'SQL'
+WITH source AS (
+  INSERT INTO inbound_source (name, kind, enabled, version, document, updated_by)
+  VALUES ('perflab', 'mllp', true, 1, :'document'::jsonb, 'perf-gate') RETURNING id
+), version AS (
+  INSERT INTO inbound_source_version (source_id, version, name, kind, enabled, document, committer)
+  SELECT id, 1, 'perflab', 'mllp', true, :'document'::jsonb, 'perf-gate' FROM source
+)
+INSERT INTO inbound_route_mllp (sending_application, sending_facility, source_id, certificate_subject)
+SELECT 'LAB', 'PERFLAB', id, :'document'::jsonb #>> '{routes,0,certificate_subject}' FROM source;
+SELECT pg_notify('ferrobridge_sources', 'perf-gate');
+SQL
 }
 
 # seed ARM: creates the Condition of the subject the read and the search
@@ -684,7 +713,7 @@ GATE
   check "an older gate whose serve() sets nothing is refused" 2 "$( (arm_env head "$old") > /dev/null 2>&1; echo $?)"
   local committed
   committed="$(arm_env head "$root")"
-  check "the committed perf/arm.env fills every placeholder" 0 "$(grep -c '@' <<< "$committed" || true)"
+  check "the committed perf/arm.env fills every placeholder" 0 "$(grep -cE '@[A-Z][A-Z0-9_]*@' <<< "$committed" || true)"
   check "the committed perf/arm.env switches the usage report off" 1 \
     "$(grep -cx 'FERROBRIDGE__USAGE_REPORT__ENABLED=false' <<< "$committed" || true)"
   local repo="$work/repo" saved_root="$root"

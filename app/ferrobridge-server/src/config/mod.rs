@@ -381,7 +381,11 @@ impl Config {
             fhir_outbound: fhir_outbound::resolve(self)?,
             shl: shl::resolve(self)?,
             hl7v2: if self.hl7v2.enabled {
-                Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
+                Some(resolve_hl7v2(
+                    &self.hl7v2,
+                    self.facade.enabled,
+                    self.state.is_some(),
+                )?)
             } else {
                 None
             },
@@ -457,41 +461,20 @@ pub struct SummarySettings {
     pub operator: String,
 }
 
-/// The HL7 v2 face, resolved.
+/// The HL7 v2 face's listeners, resolved; its senders are MLLP sources.
 #[derive(Debug, Clone)]
 pub struct Hl7v2Settings {
     /// The socket address the TLS listener binds, when one runs.
     pub listen: SocketAddr,
-    /// The character set a message with an empty MSH-18 is read in.
-    pub default_charset: ferrobridge_hl7v2::decode::Charset,
-    /// What an entry no program maps does to the message.
-    pub unmapped: crate::facade::ingest::UnmappedEntries,
-    /// The EHR policy of the face, when it differs from the facade's.
-    pub ehr_policy: Option<crate::facade::ehr::Policy>,
-    /// The profile each resource type claims when the message map wrote
-    /// none, by resource type.
-    pub profiles: BTreeMap<String, String>,
     /// How long a connection and a frame may wait on the peer.
     pub timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts,
     /// The largest message one frame may carry, in bytes.
     pub frame_limit: usize,
-    /// Whether an `AE` or an `AR` also logs the counted outcomes.
-    pub log_outcomes: bool,
-    /// The issuer a facility's namespace id is written under, when one is
-    /// configured.
-    pub facility_issuer: Option<String>,
-    /// The sending facilities the face accepts; empty accepts any.
-    pub senders: Vec<hl7v2::Sender>,
-    /// The senders that are devices, whose results commit as device acts.
-    pub devices: Vec<hl7v2::Device>,
-    /// The DNS name the client certificate of each sender carries.
-    pub subjects: Vec<hl7v2::Subject>,
     /// The TLS the listener serves, requiring a client certificate; `None`
-    /// when every sender is plain, and no TLS listener runs.
+    /// when no TLS listener runs.
     pub tls: Option<hl7v2::Tls>,
-    /// The plain listener for the devices that cannot speak TLS, when one
-    /// is configured.
-    pub plain: Option<hl7v2::Plain>,
+    /// The socket address the plain listener binds, when one runs.
+    pub plain: Option<SocketAddr>,
 }
 
 /// The settings the run path holds, with every secret already read.

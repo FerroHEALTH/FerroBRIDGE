@@ -65,9 +65,6 @@ pub struct Lane {
     /// one is configured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plain: Option<PlainListener>,
-    /// The senders the face accepts, each with the transport it sends on.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub senders: Vec<Sender>,
 }
 
 /// A plain listener of a face: MLLP with no TLS.
@@ -78,25 +75,4 @@ pub struct PlainListener {
     pub listen: String,
     /// Whether it accepts connections now.
     pub up: bool,
-}
-
-/// One sender a face accepts.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Sender {
-    /// The sending facility as MSH-4 names it: the namespace id, or
-    /// `^<universal id>^<type>`.
-    pub facility: String,
-    /// The transport it sends on.
-    pub transport: Transport,
-}
-
-/// The transport a sender reaches the face on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Transport {
-    /// MLLP over TLS with a client certificate.
-    Tls,
-    /// Plain MLLP from a device, admitted by its network address.
-    Plain,
 }

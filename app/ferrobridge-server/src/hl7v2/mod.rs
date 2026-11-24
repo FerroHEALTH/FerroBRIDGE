@@ -15,12 +15,20 @@
 //! message's compositions ([`answer`]). No specification governs the
 //! hand-off from a message Bundle to a transaction: our own design.
 //!
+//! Each message is routed by MSH-3 and MSH-4 to its MLLP source in the state
+//! store (HL7 v2.9 §2.14.9), whose document says how the message is read and
+//! committed; the route must agree with the connection, its client
+//! certificate's subject on the TLS listener or its peer's network on the
+//! plain one, and a message no enabled route takes, or one that disagrees,
+//! is answered `AR`.
+//!
 //! No byte of a message reaches a log line. The span of a message names its
 //! MSH-10 and its type, and the events name the acknowledgment code and
 //! counts. The usage report's window takes each message's latency and its
 //! acknowledgment code, nothing of its content.
 
 pub mod answer;
+pub mod authorities;
 pub mod directory;
 pub mod edit;
 mod envelope;
@@ -28,7 +36,6 @@ pub mod origin;
 pub mod plain;
 mod stamped;
 
-use std::collections::BTreeMap;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -36,7 +43,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use ferrobridge_hl7v2::ack::{self, Code, Header};
-use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Inbound, Received};
 use ferrobridge_hl7v2::map::maps::Maps;
 use ferrobridge_hl7v2::mllp::listener::{self, Connection, Handler, Timeouts};
@@ -51,10 +57,12 @@ use crate::audit::AccessLog;
 use crate::config::Hl7v2Settings;
 use crate::config::hl7v2::Sender;
 use crate::facade::Facade;
-use crate::facade::ingest::{Provenance, UnmappedEntries};
+use crate::facade::ingest::Provenance;
 use crate::hl7v2::answer::{Settled, Tally};
 use crate::hl7v2::plain::Lane;
 use crate::hl7v2::stamped::Stamped;
+use crate::sources::Routes;
+use crate::sources::document::{Document, Mllp, Origin, Route};
 use ferrohealth_usage_report::window::Window;
 
 /// The face: what one frame's answer is built from.
@@ -66,26 +74,8 @@ pub struct Face {
     directory: Arc<directory::Directory>,
     /// The terminology server the table maps are translated on.
     terminology: Option<ferrobridge_term::client::Client>,
-    /// The facade's settings, under the face's EHR policy.
-    settings: crate::facade::Settings,
-    /// The character set a message with an empty MSH-18 is read in.
-    charset: Charset,
-    /// What an entry no program maps does to the message.
-    unmapped: UnmappedEntries,
-    /// The profile each resource type claims when the run wrote none.
-    profiles: BTreeMap<String, String>,
-    /// Whether an `AE` or an `AR` also logs the counted outcomes.
-    log_outcomes: bool,
-    /// The sending facilities the face accepts; empty accepts any.
-    senders: Vec<Sender>,
-    /// The senders that are devices.
-    devices: Vec<crate::config::hl7v2::Device>,
-    /// The issuer a facility's namespace id is written under.
-    facility_issuer: Option<String>,
-    /// The DNS name each sender's client certificate carries.
-    subjects: Vec<crate::config::hl7v2::Subject>,
-    /// The plain listener and its device senders, when one is configured.
-    plain: Option<crate::config::hl7v2::Plain>,
+    /// Where each message's MLLP source is found.
+    routes: Arc<dyn Routes>,
     /// The listener this face answers on.
     lane: Lane,
     /// The usage report's window each message and acknowledgment is counted
@@ -128,47 +118,71 @@ fn sending_facility(message: &Message) -> Option<&str> {
         .and_then(|component| component.subcomponent(1))
 }
 
-/// Returns whether the client certificate of `connection` names the subject
-/// of the sender MSH-4 of `message` names.
+/// Returns MSH-3 and MSH-4 of the message `bytes` holds, each as a route
+/// names it: its namespace id, or `^<universal id>^<type>` (HL7 v2.5.1
+/// chapter 2, `HD` data type); `None` when no header reads.
 ///
-/// A sender is tied to the DNS name its certificate carries, so a peer sends
-/// only as the sender its certificate names (our own design).
+/// The route is read before the message is decoded, since the source names
+/// the character set an empty MSH-18 is read in; MSH-3 and MSH-4 are read as
+/// ASCII.
 #[must_use]
-pub fn certified(
-    subjects: &[crate::config::hl7v2::Subject],
-    message: &Message,
-    connection: &Connection,
-) -> bool {
-    let Some(certificate) = connection.certificate() else {
-        return false;
+pub fn route_of(bytes: &[u8]) -> Option<(String, String)> {
+    let text = String::from_utf8_lossy(bytes);
+    let segment = text
+        .split(['\r', '\n'])
+        .find(|segment| segment.starts_with("MSH"))?;
+    let mut characters = segment.chars().skip(3);
+    let field = characters.next()?;
+    let component = characters.next()?;
+    let fields: Vec<&str> = segment.split(field).collect();
+    let hd = |value: &str| {
+        let first = value.split('~').next().unwrap_or_default();
+        let parts: Vec<&str> = first.split(component).collect();
+        match parts.first() {
+            Some(namespace) if !namespace.is_empty() => (*namespace).to_owned(),
+            _ => format!(
+                "^{}^{}",
+                parts.get(1).copied().unwrap_or_default(),
+                parts.get(2).copied().unwrap_or_default()
+            ),
+        }
     };
-    subjects.iter().any(|subject| {
-        subject.sender.names(message)
-            && ferrobridge_hl7v2::mllp::tls::names(certificate, &subject.name)
-    })
+    Some((hd(fields.get(2)?), hd(fields.get(3)?)))
 }
 
-/// Returns whether `senders` accepts the sending facility of `message`; an
-/// empty list accepts any.
-#[must_use]
-pub fn admitted(senders: &[Sender], message: &Message) -> bool {
-    senders.is_empty() || senders.iter().any(|sender| sender.names(message))
+/// What a message is routed to: its source's MLLP document and the route
+/// that names its sender.
+#[derive(Debug, Clone)]
+struct Routed {
+    /// The source.
+    source: Arc<crate::sources::Source>,
+    /// The route of the sender.
+    route: Route,
 }
+
+impl Routed {
+    /// Returns the source's MLLP document.
+    fn mllp(&self) -> &Mllp {
+        match &self.source.parsed {
+            Document::Mllp(mllp) => mllp,
+            Document::Webhook(_) | Document::FhirSubscription(_) => &EMPTY,
+        }
+    }
+}
+
+/// The document of a source no route takes, which no message reaches.
+static EMPTY: std::sync::LazyLock<Mllp> = std::sync::LazyLock::new(Mllp::default);
 
 impl Face {
-    /// Returns the face over `facade` and `terminology` that `settings`
-    /// describes, running the v2-to-FHIR maps with FerroBRIDGE's corrections
-    /// ([`Maps::corrected`]).
+    /// Returns the face over `facade` and `terminology` routing each message
+    /// through `routes`, running the v2-to-FHIR maps with FerroBRIDGE's
+    /// corrections ([`Maps::corrected`]).
     #[must_use]
     pub fn new(
         facade: Arc<Facade>,
         terminology: Option<ferrobridge_term::client::Client>,
-        settings: &Hl7v2Settings,
+        routes: Arc<dyn Routes>,
     ) -> Self {
-        let mut ingest = facade.settings().clone();
-        if let Some(policy) = settings.ehr_policy {
-            ingest.ehr_policy = policy;
-        }
         let directory = Arc::new(directory::Directory::new(
             Maps::corrected(),
             jiff::Timestamp::now(),
@@ -177,16 +191,7 @@ impl Face {
             facade,
             directory,
             terminology,
-            settings: ingest,
-            charset: settings.default_charset,
-            unmapped: settings.unmapped,
-            profiles: settings.profiles.clone(),
-            log_outcomes: settings.log_outcomes,
-            senders: settings.senders.clone(),
-            devices: settings.devices.clone(),
-            facility_issuer: settings.facility_issuer.clone(),
-            subjects: settings.subjects.clone(),
-            plain: settings.plain.clone(),
+            routes,
             lane: Lane::Tls,
             usage: Arc::new(crate::usage_report::window()),
             access_log: None,
@@ -244,7 +249,12 @@ impl Face {
         let answered = async {
             let stamped = Stamped::now();
             let stamp = stamped.stamp();
-            match inbound::receive(message, self.charset, structure_for, stamp) {
+            let routed = self.route(message).await;
+            let charset = match &routed {
+                Ok(Some(routed)) => routed.mllp().charset(),
+                Ok(None) | Err(()) => ferrobridge_hl7v2::decode::Charset::Ascii,
+            };
+            match inbound::receive(message, charset, structure_for, stamp) {
                 Received::Unanswerable => {
                     tracing::warn!("the message names no readable header and is not answered");
                     None
@@ -254,20 +264,40 @@ impl Face {
                     Some((code, reply))
                 }
                 Received::Parsed(inbound) => {
-                    if !admitted(&self.senders, inbound.parsed().message()) {
+                    let routed = match routed {
+                        Ok(Some(routed)) => routed,
+                        Ok(None) => {
+                            connection.refuse();
+                            return Self::acknowledge(
+                                &inbound,
+                                &Settled::Sender,
+                                &Tally::default(),
+                                &stamped,
+                                false,
+                            );
+                        }
+                        Err(()) => {
+                            return Self::acknowledge(
+                                &inbound,
+                                &Settled::Routes,
+                                &Tally::default(),
+                                &stamped,
+                                false,
+                            );
+                        }
+                    };
+                    if let Some(settled) = self.unbound(&routed.route, connection) {
                         connection.refuse();
-                        return self.acknowledge(
+                        return Self::acknowledge(
                             &inbound,
-                            &Settled::Sender,
+                            &settled,
                             &Tally::default(),
                             &stamped,
+                            false,
                         );
                     }
-                    if let Some(settled) = self.unbound(inbound.parsed().message(), connection) {
-                        connection.refuse();
-                        return self.acknowledge(&inbound, &settled, &Tally::default(), &stamped);
-                    }
-                    self.settle(&inbound, &stamped, connection.peer()).await
+                    self.settle(&inbound, &stamped, connection.peer(), &routed)
+                        .await
                 }
             }
         }
@@ -278,25 +308,61 @@ impl Face {
         answered.map(|(_, reply)| reply)
     }
 
+    /// Returns the enabled MLLP source the sender of the message `bytes` is
+    /// routed to, with its route; `None` when no enabled route takes it, and
+    /// `Err` when the routes cannot be read.
+    async fn route(&self, bytes: &[u8]) -> Result<Option<Routed>, ()> {
+        let Some((application, facility)) = route_of(bytes) else {
+            return Ok(None);
+        };
+        let source = match self.routes.routed(&application, &facility).await {
+            Ok(source) => source,
+            Err(error) => {
+                tracing::error!(error = %error, "the MLLP routes could not be read");
+                return Err(());
+            }
+        };
+        let Some(source) = source.filter(|source| source.enabled) else {
+            return Ok(None);
+        };
+        let Document::Mllp(mllp) = &source.parsed else {
+            return Ok(None);
+        };
+        let route = mllp.routes.iter().find(|route| {
+            route.sending_application == application && route.sending_facility == facility
+        });
+        Ok(route.cloned().map(|route| Routed {
+            source: Arc::clone(&source),
+            route,
+        }))
+    }
+
     /// Maps and ingests one parsed message and returns its acknowledgment.
     async fn settle(
         &self,
         inbound: &Inbound,
         stamped: &Stamped,
         peer: Option<SocketAddr>,
+        routed: &Routed,
     ) -> Option<(Code, Vec<u8>)> {
-        let (settled, tally) = self.ingest(inbound, stamped, peer).await;
-        self.acknowledge(inbound, &settled, &tally, stamped)
+        let (settled, tally) = self.ingest(inbound, stamped, peer, routed).await;
+        Self::acknowledge(
+            inbound,
+            &settled,
+            &tally,
+            stamped,
+            routed.mllp().log_outcomes,
+        )
     }
 
     /// Returns the acknowledgment `settled` owes with its code, logging the
     /// code and the counts.
     fn acknowledge(
-        &self,
         inbound: &Inbound,
         settled: &Settled,
         tally: &Tally,
         stamped: &Stamped,
+        log_outcomes: bool,
     ) -> Option<(Code, Vec<u8>)> {
         let (code, mut errors) = answer::acknowledgment(settled);
         for error in &mut errors {
@@ -309,7 +375,7 @@ impl Face {
             errors = errors.len(),
             "message acknowledged"
         );
-        if self.log_outcomes && code != Code::Accept {
+        if log_outcomes && code != Code::Accept {
             for (kind, count) in &tally.outcomes {
                 tracing::debug!(outcome = kind, count, "counted outcome of the run");
             }
@@ -329,22 +395,27 @@ impl Face {
     ///
     /// # Errors
     ///
-    /// Returns [`Settled::Facility`] for a facility no listed sender names,
-    /// and [`Settled::NoClinician`] for a result naming no clinician from a
-    /// sender that is no device.
-    fn responsible(&self, message: &Message) -> Result<origin::Responsible, Settled> {
-        let facility = origin::facility(message, self.facility_issuer.as_deref());
+    /// Returns [`Settled::Facility`] for a facility no route of the source
+    /// names, and [`Settled::NoClinician`] for a result naming no clinician
+    /// from a source that is no device.
+    fn responsible(message: &Message, mllp: &Mllp) -> Result<origin::Responsible, Settled> {
+        let facility = origin::facility(message, mllp.facility_identifier_issuer.as_deref());
+        let senders: Vec<Sender> = mllp
+            .routes
+            .iter()
+            .map(|route| Sender::of(&route.sending_facility))
+            .collect();
         if let Some(facility) = facility.as_ref()
-            && !facility.listed(&self.senders)
+            && !facility.listed(&senders)
         {
             return Err(Settled::Facility(Box::new(facility.clone())));
         }
-        let device = self
-            .devices
-            .iter()
-            .find(|device| device.sender.names(message));
+        let device = match (mllp.origin, mllp.device_identifier_issuer.as_deref()) {
+            (Origin::Device, Some(issuer)) => Some(issuer),
+            _ => None,
+        };
         let composer = match device {
-            Some(device) => origin::device(message, &device.identifier_issuer),
+            Some(issuer) => origin::device(message, issuer),
             None => origin::clinician(message),
         };
         if composer.is_none() && origin::carries_results(message) {
@@ -367,7 +438,9 @@ impl Face {
         inbound: &Inbound,
         stamped: &Stamped,
         peer: Option<SocketAddr>,
+        routed: &Routed,
     ) -> (Settled, Tally) {
+        let mllp = routed.mllp();
         let mut tally = Tally::default();
         let message = inbound.parsed().message();
         let Some(control) = message
@@ -402,7 +475,7 @@ impl Face {
             return (Settled::Unkeyed, tally);
         };
         let mut bundle = mapped.into_bundle();
-        edit::claim_profiles(&mut bundle, &self.profiles);
+        edit::claim_profiles(&mut bundle, &mllp.profiles);
         edit::link_subjects(&mut bundle);
         let sending = origin::sending_system(message);
         let control_item =
@@ -412,7 +485,7 @@ impl Face {
             facility,
             composer,
             device_id,
-        } = match self.responsible(message) {
+        } = match Self::responsible(message, mllp) {
             Ok(found) => found,
             Err(settled) => return (settled, tally),
         };
@@ -431,9 +504,13 @@ impl Face {
             },
             None => None,
         };
+        let mut settings = self.facade.settings().clone();
+        if let Some(policy) = mllp.policy() {
+            settings.ehr_policy = policy;
+        }
         let mut ingest = self
             .facade
-            .ingest_under(client, &self.settings)
+            .ingest_under(client, &settings)
             .with_originating_system(device_id.or(sending))
             .with_item_ids(orders, vec![control_item])
             .with_parties(
@@ -444,7 +521,7 @@ impl Face {
             ingest = ingest.with_composer(composer);
         }
         let outcome = ingest
-            .ingest_bundle(&bundle, self.unmapped, &provenance)
+            .ingest_bundle(&bundle, mllp.unmapped_entries.into(), &provenance)
             .await;
         match outcome {
             Ok(ingested) => {
@@ -511,14 +588,8 @@ impl Handler for Face {
         self.answer(&message, connection).await
     }
 
-    fn admits(&self, peer: SocketAddr) -> bool {
-        match self.lane {
-            Lane::Tls => true,
-            Lane::Plain => self
-                .plain
-                .as_ref()
-                .is_some_and(|plain| plain.admits(peer.ip())),
-        }
+    fn admits(&self, _peer: SocketAddr) -> bool {
+        true
     }
 
     fn malformed(&self, kind: Malformed, partial: &[u8]) -> Option<Vec<u8>> {
@@ -676,43 +747,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Sender, admitted, printable};
-
-    /// Returns the lexed message whose MSH-4 is `facility`.
-    fn from(facility: &str) -> ferrobridge_hl7v2::parse::Message {
-        let text = format!(
-            "MSH|^~\\&|LAB|{facility}|EHR|SOUTH|20260925120000+0200||ORU^R01^ORU_R01|MSG-1|P|2.5.1\r"
-        );
-        ferrobridge_hl7v2::parse::lex::lex(&text, ferrobridge_hl7v2::decode::Charset::Ascii)
-            .expect("the header lexes")
-            .message
-    }
+    use super::{printable, route_of};
 
     #[test]
-    fn an_empty_allow_list_admits_any_sender() {
-        assert!(admitted(&[], &from("NORTHLAB")));
-    }
-
-    #[test]
-    fn a_sender_is_admitted_by_its_namespace_id_or_its_universal_id() {
-        let senders = [
-            Sender::Namespace(String::from("NORTHLAB")),
-            Sender::Universal {
-                id: String::from("1.2.3.4"),
-                kind: String::from("ISO"),
-            },
-        ];
-        assert!(admitted(&senders, &from("NORTHLAB")));
-        assert!(admitted(&senders, &from("^1.2.3.4^ISO")));
-        assert!(!admitted(&senders, &from("SOUTHLAB")));
-        assert!(
-            !admitted(&senders, &from("^1.2.3.4^DNS")),
-            "the type must match"
+    fn a_route_reads_msh_3_and_msh_4_by_namespace_id_or_universal_id() {
+        let message = b"MSH|^~\\&|MONITOR|WARD-1|EHR|SOUTH|20260925120000+0200||ORU^R01^ORU_R01|MSG-1|P|2.5.1\r";
+        assert_eq!(
+            Some((String::from("MONITOR"), String::from("WARD-1"))),
+            route_of(message)
         );
-        assert!(
-            !admitted(&senders, &from("")),
-            "an empty MSH-4 names no listed sender"
+        let universal =
+            b"MSH|^~\\&|^1.2.3^ISO|^4.5.6^ISO|EHR|SOUTH|20260925120000||ORU^R01|MSG-2|P|2.5.1\r";
+        assert_eq!(
+            Some((String::from("^1.2.3^ISO"), String::from("^4.5.6^ISO"))),
+            route_of(universal)
         );
+        assert_eq!(None, route_of(b"PID|1"));
     }
 
     #[test]

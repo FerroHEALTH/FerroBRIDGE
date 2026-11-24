@@ -33,16 +33,12 @@ ehr_policy = "existing"
 composition_language = "en"
 composition_territory = "GB"
 
+[state]
+url_file = "/run/secrets/state_url"
+
 [hl7v2]
 enabled = true
 listen = "0.0.0.0:2575"
-ehr_policy = "create_on_first_write"
-profiles = [
-  { resource_type = "Observation", profile = "https://example.org/fhir/StructureDefinition/lab-result" },
-]
-senders = [
-  { namespace_id = "NORTHLAB", certificate_subject = "northlab.example.org" },
-]
 
 [hl7v2.tls]
 certificate_file = "/run/secrets/mllp_chain.pem"
@@ -50,40 +46,72 @@ key_file = "/run/secrets/mllp_key.pem"
 client_ca_file = "/run/secrets/mllp_clients_ca.pem"
 ```
 
-## The keys
+The file holds the listeners alone ([configuration](configuration.md#hl7v2)).
+Each sender is an MLLP source in the state store, which one operator API call
+adds, changes, disables or deletes without a restart and without a new port
+([inbound sources](operator-api.md#inbound-sources)); every replica serves a
+change once it hears of it.
 
-Every key is settable as `FERROBRIDGE__HL7V2__<KEY>`, and a list takes TOML
-syntax in the variable. The section holds no secret; the TLS key is read
-from the file `tls.key_file` names.
+## The senders
 
-| Key | Default | Meaning |
+An MLLP source routes one or more senders and says how their messages are
+read and committed. Its document:
+
+| Field | Default | Meaning |
 |---|---|---|
-| `enabled` | `false` | Whether the MLLP listener runs |
-| `listen` | `127.0.0.1:2575` | The socket address the TLS listener binds, when a sender sends over TLS |
-| `default_charset` | `ASCII` | The HL7 table 0211 code a message with an empty MSH-18 is read in: `ASCII`, `UNICODE UTF-8`, `8859/1` to `8859/9` or `8859/15` |
+| `routes` | none, at least one | Each sender: `sending_application` (MSH-3) and `sending_facility` (MSH-4), each a namespace id (HD.1) or `^<universal id>^<type>` (HD.2 and HD.3), bound to the `certificate_subject` its client certificate carries in its subject alternative name, to `source_cidrs` (networks in CIDR notation) for a device on the plain listener, or to both. A sender is routed by one source at a time; a facility a composition names is one of the routes' facilities |
+| `origin` | `clinician` | `device` for an analyser feed with no human, whose results commit as acts of the device |
+| `device_identifier_issuer` | none | The namespace of the device identifiers, one of the CDR client's `device_identifier_issuers`; named with `origin = "device"` and only then |
+| `profiles` | `{}` | Each R4 resource type to the profile a resource of that type claims in `meta.profile` when the guide's maps wrote none |
 | `unmapped_entries` | `skip_and_count` | What an entry no program maps does: `skip_and_count` commits the others, `refuse` refuses the message |
-| `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
-| `profiles` | `[]` | A list of `{ resource_type, profile }`: the profile a resource of that type claims in `meta.profile` when the guide's maps wrote none |
-| `idle_timeout` | `"5min"` | How long a connection may sit between messages before it is closed; `"0s"` keeps it open |
-| `frame_timeout` | `"30s"` | How long one message may take from its first byte to its trailer before it is answered `AR`; `"0s"` waits |
-| `frame_limit` | `"1MiB"` | The largest message one frame may carry |
+| `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the source's messages |
+| `default_charset` | `ASCII` | The HL7 table 0211 code a message with an empty MSH-18 is read in: `ASCII`, `UNICODE UTF-8`, `8859/1` to `8859/9` or `8859/15` |
+| `facility_identifier_issuer` | none | The `DV_IDENTIFIER.issuer` a facility's namespace id (HD.1) is written under, the issuer the CDR client's declared facilities name it by; unset, the identifier names no issuer, and a CDR that checks facilities refuses the commit |
 | `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes of the run, by kind, at debug level |
-| `facility_identifier_issuer` | none | The `DV_IDENTIFIER.issuer` a facility's namespace id (HD.1) is written under: the issuer the CDR client's declared facilities name it by. Unset, the identifier names no issuer, and a CDR that checks facilities refuses the commit |
-| `senders` | none, required | The sending facilities (MSH-4) the face accepts, at least one, each `{ namespace_id = "..." }` (HD.1) or `{ universal_id = "...", universal_id_type = "..." }` (HD.2 and HD.3) with `certificate_subject = "..."`, the DNS name its client certificate carries in its subject alternative name; a facility a composition names is one of them too. A sender may add `origin = "device"` with `device_identifier_issuer = "..."` (the namespace of its device identifiers, one of the CDR client's `device_identifier_issuers`) for an analyser feed with no human |
-| `tls.certificate_file` | none, required with a TLS sender | The PEM certificate chain the listener serves |
-| `tls.key_file` | none, required with a TLS sender | The PEM private key of that chain |
-| `tls.client_ca_file` | none, required with a TLS sender | The PEM authorities a sender's client certificate must chain to |
-| `senders[].transport` | `tls` | How the sender reaches the face: `tls` on the TLS listener, or `plain` on `[hl7v2.plain]` for a device that cannot speak TLS ([Devices without TLS](#devices-without-tls)) |
-| `senders[].source_addresses` | none | The networks a `plain` sender connects from, in CIDR notation (`10.20.0.21/32`); required with `transport = "plain"` and refused otherwise |
-| `plain.bind` | none | The socket address the plain listener binds; required while a sender is `plain`, and never the TLS listener's address |
 
-The TLS listener serves MLLP over TLS and requires a client certificate that
-chains to `tls.client_ca_file`; a peer without one never completes the
-handshake. A message is accepted only on a connection whose certificate
-carries the `certificate_subject` of the sender its MSH-4 names, so a
-sender cannot send as another. The bridge refuses to start without a
-sender, without the `[hl7v2.tls]` files while a sender sends over TLS, or
-with a TLS sender that names no `certificate_subject`.
+```json
+{
+  "name": "northlab-lab",
+  "kind": "mllp",
+  "enabled": true,
+  "document": {
+    "routes": [
+      { "sending_application": "LAB", "sending_facility": "NORTHLAB",
+        "certificate_subject": "northlab.example.org" }
+    ],
+    "profiles": { "Observation": "https://example.org/fhir/StructureDefinition/lab-result" },
+    "ehr_policy": "create_on_first_write"
+  }
+}
+```
+
+Each message is routed by MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) to its source,
+read in the source's character set, and checked against the connection: on
+the TLS listener the client certificate must carry the route's
+`certificate_subject`, on the plain listener the peer address must lie in
+one of the route's `source_cidrs`. A message no enabled route takes, or one
+whose route disagrees with its connection, is answered `AR`; a route that
+disagrees on the plain listener also closes the connection. While the routes
+cannot be read the message is answered `AE`, so the sender sends it again.
+
+```mermaid
+sequenceDiagram
+    participant D as Sender
+    participant F as HL7 v2 face
+    participant S as Sources (snapshot or row)
+    participant C as CDR
+    D->>F: MLLP frame (MSH-3, MSH-4)
+    F->>S: route of MSH-3 and MSH-4
+    S-->>F: the MLLP source and its route
+    F->>F: route against the certificate subject or the peer network
+    F->>C: ingest under the source's settings
+    F-->>D: AA, AE or AR
+```
+
+The TLS listener requires a client certificate that chains to
+`tls.client_ca_file`; a peer without one never completes the handshake. The
+authorities file is read again when its modification time changes, so a
+rotated file is in force for the next handshake without a restart.
 
 ## Devices without TLS
 
@@ -91,64 +119,22 @@ Some lab analysers have no TLS stack, no certificate store and no client
 certificate, so they cannot reach the TLS listener. HL7 MLLP Release 2 defines
 no security layer of its own, and IHE ITI ATNA (ITI TF-2, ITI-19) adds TLS
 for a node that supports it. For such a device the face runs a second
-listener with no TLS, and the device is admitted by the network address it
-connects from. The exception is FerroBRIDGE's own design.
+listener with no TLS, `[hl7v2.plain] bind`, and a device's route names the
+networks it connects from. The exception is FerroBRIDGE's own design.
 
-```toml
-[hl7v2]
-enabled = true
-listen = "0.0.0.0:2575"
-senders = [
-  { namespace_id = "NORTHLAB", certificate_subject = "northlab.example.org" },
-  { namespace_id = "LAB-1", origin = "device", device_identifier_issuer = "urn:example:devices",
-    transport = "plain", source_addresses = ["10.20.0.21/32", "10.20.0.22/32"] },
-]
-
-[hl7v2.plain]
-bind = "10.20.0.5:2576"
-```
-
-- A plain sender is `origin = "device"` and names its `source_addresses`.
-  Each is a network in CIDR notation with no bits set past its prefix; a
-  single analyser is a `/32` (or a `/128` for IPv6).
-- The plain listener accepts a connection only from an address inside some
-  plain sender's networks. Any other connection is closed before a byte is
-  read, and a warning names the peer address.
-- A message is taken only when its MSH-4 names a plain sender whose networks
-  hold the peer address. Otherwise it is answered `AR`, and the connection
-  closes. A TLS sender's facility on the plain listener is refused the same
-  way, and a plain sender's facility on the TLS listener is refused for its
-  missing client certificate.
-- The device identifier in OBX-18 is written under the sender's
+- A device's route names its `source_cidrs`, each a network in CIDR
+  notation; a single analyser is a `/32` (or a `/128` for IPv6).
+- A message on the plain listener is taken only when its route holds a
+  network the peer address lies in. Otherwise it is answered `AR`, and the
+  connection closes. A route bound only to a certificate subject is refused
+  on the plain listener the same way, and a device's route without a
+  certificate subject is refused on the TLS listener.
+- The device identifier in OBX-18 is written under the source's
   `device_identifier_issuer`, as for a device on TLS.
 - The plain listener runs under the same `idle_timeout`, `frame_timeout`,
   `frame_limit` and drain as the TLS listener.
-- The TLS listener runs only while a sender has `transport = "tls"`, and
-  only then does it need `[hl7v2.tls]` and its files. A lab whose only
-  senders are plain devices sets no `[hl7v2.tls]` and gets no TLS listener;
-  `listen` then binds nothing.
-
-A lab with one analyser and nothing else:
-
-```toml
-[hl7v2]
-enabled = true
-senders = [
-  { namespace_id = "LAB-1", origin = "device", device_identifier_issuer = "urn:example:devices",
-    transport = "plain", source_addresses = ["10.20.0.21/32"] },
-]
-
-[hl7v2.plain]
-bind = "10.20.0.5:2575"
-```
-
-The bridge refuses to start with a plain sender that is no device, names no
-networks or names a `certificate_subject`; with a network that does not
-read; with `[hl7v2.plain]` and no plain sender, or a plain sender and no
-`[hl7v2.plain]`; with a `[hl7v2.tls]` that names a file while no sender
-sends over TLS; and with a `plain.bind` on the running TLS listener's port at
-the same address or at an unspecified address (`0.0.0.0`, `[::]`) on either
-side.
+- A lab whose senders are all plain devices sets no `[hl7v2.tls]` and gets
+  no TLS listener; `listen` then binds nothing.
 
 ### The residual risk
 
@@ -157,15 +143,14 @@ the path reads the results and can change them. The sender's identity is its
 network address alone, which any host on that network can claim. Put the
 analyser and the bridge's plain address on an isolated VLAN that carries
 nothing else, and let only the analyser reach the plain port. The bridge logs
-one warning per plain sender at boot, naming its facility and networks, so
-the route is never silent.
+a warning at boot when the plain listener runs, so the route is never silent.
 
 ### The alternative: a TLS sidecar
 
 A TLS-terminating proxy next to each device keeps the TLS listener the only
 way in. The device speaks plain MLLP to the proxy on its own host or cable,
 and the proxy connects to the TLS listener with a client certificate of its
-own, named as the sender's `certificate_subject`. It needs a host per
+own, named as the route's `certificate_subject`. It needs a host per
 analyser, a certificate per proxy and someone to run both. Choose it when you
 can run it, and the plain listener when you cannot.
 
@@ -175,16 +160,17 @@ can run it, and the plain listener when you cannot.
    larger than `frame_limit`, or not complete within `frame_timeout`
    is answered `AR` when a header can be read from it, and the connection
    closes.
-2. The message is decoded in the character set its MSH-18 names, split by
-   position and grouped by its message structure. With `senders` set, a
-   message whose MSH-4 names none of them is answered `AR` here and is never
-   mapped.
+2. The message is routed by MSH-3 and MSH-4 to its source, decoded in the
+   character set its MSH-18 names (the source's `default_charset` when
+   empty), split by position and grouped by its message structure. A message
+   no enabled route takes, or whose route disagrees with its connection, is
+   answered `AR` here and is never mapped.
 3. The guide's message, segment and data type maps, with FerroBRIDGE's
    corrections over them, write an R4 message Bundle, and each table value is
    translated by `ConceptMap/$translate` on the terminology server. Every row
    the run cannot carry is a counted outcome, and every correction the run
    used is counted once as `supplemented`.
-4. Every entry whose resource type is listed under `profiles` and that claims
+4. Every entry whose resource type the source lists under `profiles` and that claims
    no profile gets that profile in `meta.profile`, and every entry with a
    `subject` or `patient` reference and none set references the message's one
    `Patient`. The guide leaves the relationships between the resources of one
@@ -206,7 +192,7 @@ can run it, and the plain listener when you cannot.
    (PV1-3.4), the servicing facility (PV1-39), the ordering facility
    (ORC-21), and the sending facility (MSH-4) last. A composition with no
    `EVENT_CONTEXT` names it as `originating_system_audit.location` instead.
-   With `[[hl7v2.senders]]` set, a facility no sender names is answered `AE`
+   A facility none of the source's routes names is answered `AE`
    with an `ERR` at its field naming it, and nothing is committed. The
    Each facility identifier names its issuer: a namespace id (HD.1)
    `facility_identifier_issuer`, a universal id (HD.2) its type (HD.3), and
@@ -389,9 +375,10 @@ ERR-3 and the text in ERR-8.
 | Delimiters that do not declare themselves, a byte outside the declared character set, a version outside 2.x | `AR` | `207` or `203` |
 | A message structure the definitions or the guide do not carry | `AR` | `200` |
 | A required field or segment missing, an undecoded escape | `AE` | `101`, `100` or `102`, located |
-| MSH-4 names a sending facility `senders` does not list | `AR` | `207` at MSH^1^4 |
-| The connection's client certificate does not carry the `certificate_subject` of the sender MSH-4 names | `AR` | `207` at MSH^1^4 |
-| On the plain listener, MSH-4 names no plain sender whose `source_addresses` hold the peer address; the connection then closes | `AR` | `207` at MSH^1^4 |
+| MSH-3 and MSH-4 name a sender no enabled route takes | `AR` | `207` at MSH^1^4 |
+| The connection's client certificate does not carry the `certificate_subject` of the message's route | `AR` | `207` at MSH^1^4 |
+| On the plain listener, the message's route holds no network the peer address lies in; the connection then closes | `AR` | `207` at MSH^1^4 |
+| The routes cannot be read | `AE` | `207` |
 | MSH-10 empty | `AE` | `101` at MSH-10 |
 | A result whose message names no clinician, from a sender that is no device | `AE` | `101` at OBX^1^16 |
 | A health care facility no listed sender names | `AE` | `207` at its field |
@@ -447,11 +434,10 @@ the CDR and terminology hosts it reaches, and `/health/readiness` carries an
 `/health/info` lists every lane under `lanes`; the `hl7v2` lane carries its
 `listen` address and `up`, whether the TLS listener accepts connections now
 (both absent when no TLS listener runs),
-`plain` with the plain listener's `listen` and `up` when one is configured,
-and `senders`, each with its `facility` and its `transport` (`tls` or
-`plain`). Readiness carries an `hl7v2-plain-listener` indicator beside the
-`hl7v2-listener` of the TLS one, each only while its listener is configured. The operator API's running configuration names each sender's
-`transport` and `source_addresses`. The
+and `plain` with the plain listener's `listen` and `up` when one is
+configured. Readiness carries an `hl7v2-plain-listener` indicator beside the
+`hl7v2-listener` of the TLS one, each only while its listener is configured.
+The senders are listed by `GET /operator/sources`. The
 facade's `CapabilityStatement` adds one sentence to `implementation.description`
 naming the HL7 v2 face as another inbound path under the same identity and
 replay rules, only when the face is configured. On `SIGTERM`

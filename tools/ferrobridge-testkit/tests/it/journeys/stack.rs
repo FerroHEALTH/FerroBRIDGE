@@ -108,9 +108,6 @@ pub(crate) enum Lanes {
     /// whose run history holds two synthetic runs ([`RUN_ID`] refused one
     /// record).
     WithEtl,
-    /// Every lane, and a state store over a PostgreSQL started for the
-    /// stack, so the operator API keeps inbound sources.
-    WithSources,
 }
 
 /// The run the history of a [`Lanes::WithEtl`] stack holds with one refused
@@ -205,9 +202,9 @@ pub(crate) struct Stack {
     access_token: String,
     /// The bridge's own thread and the sender that stops it.
     bridge: Running,
-    /// The PostgreSQL of a [`Lanes::WithEtl`] or a [`Lanes::WithSources`]
-    /// stack, kept so it outlives the bridge.
-    _postgres: Option<ferrobridge_testkit::containers::Postgres>,
+    /// The PostgreSQL of the state store and, for a [`Lanes::WithEtl`]
+    /// stack, of the CDM, kept so it outlives the bridge.
+    _postgres: ferrobridge_testkit::containers::Postgres,
 }
 
 /// A bridge serving on a thread of its own, and the way to stop it.
@@ -252,13 +249,13 @@ impl Stack {
         };
         provider.publish_metadata().await;
         let postgres = match lanes {
-            Lanes::WithEtl => Some(etl_database().await?),
-            Lanes::WithSources => Some(ferrobridge_testkit::containers::postgres().await?),
-            Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => None,
+            Lanes::WithEtl => etl_database().await?,
+            Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => {
+                ferrobridge_testkit::containers::postgres().await?
+            }
         };
-        let cdm = postgres.as_ref().map(|postgres| postgres.url().to_owned());
         let (bridge, running) =
-            bridge(tree.path(), &cdr, &provider, (lanes, cdm.as_deref()), port).await?;
+            bridge(tree.path(), &cdr, &provider, (lanes, postgres.url()), port).await?;
 
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let console = format!("http://{}", listener.local_addr()?);
@@ -453,7 +450,7 @@ async fn bridge(
     tree: &Path,
     cdr: &MockServer,
     provider: &Provider,
-    (lanes, cdm): (Lanes, Option<&str>),
+    (lanes, database): (Lanes, &str),
     port: u16,
 ) -> Result<(String, Running), Box<dyn Error>> {
     let listener = listen(port)?;
@@ -466,17 +463,13 @@ async fn bridge(
         tree.join("console"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
-    let operations = matches!(
-        lanes,
-        Lanes::All | Lanes::WithEvents | Lanes::WithEtl | Lanes::WithSources
-    );
+    let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
     let mllp_tls = mllp_tls(tree)?;
     let events = match lanes {
         Lanes::WithEvents => events_lane(cdr, tree).await?,
-        Lanes::WithSources => format!("\n[state]\nurl = \"{}\"\n", cdm.unwrap_or_default()),
         Lanes::All | Lanes::WithoutOperations | Lanes::WithEtl => String::new(),
     };
-    let cdm = cdm.filter(|_url| lanes == Lanes::WithEtl);
+    let cdm = (lanes == Lanes::WithEtl).then_some(database);
     let etl = cdm.map_or_else(String::new, |cdm| {
         format!(
             "\n[cdm]\nurl = \"{cdm}\"\n\n\
@@ -492,8 +485,8 @@ async fn bridge(
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
-         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n\
-         senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}]\n{mllp_tls}\n\
+         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n{mllp_tls}\n\
+         [state]\nurl = \"{database}\"\n\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
