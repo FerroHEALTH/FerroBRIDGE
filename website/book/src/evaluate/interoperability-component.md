@@ -45,6 +45,12 @@ with what the obligations profiles ask of a producer and a consumer. No
 element is a Rust type of its own, so a new release of the models is a new
 package, never new code.
 
+`draft` sets the data sets of the draft implementing act of 2026-11-23
+(Annexes III to X) beside those models, one row per annex element with its
+Xt-EHR element, the cardinality on both sides and how the two differ. The
+draft leads where they differ, and the crate's tests fail when the annex
+text or the package and the rows disagree.
+
 The crate authors no mapping language and no profile mapping: FHIRconnect
 files are its input. It depends on no logging component and on no
 application, so it and the European logging component stay independent of

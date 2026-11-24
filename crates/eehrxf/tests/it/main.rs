@@ -40,6 +40,8 @@ mod displays;
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod document;
 #[cfg(test)]
+mod draft;
+#[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod eps_mapped;
 #[cfg(test)]
