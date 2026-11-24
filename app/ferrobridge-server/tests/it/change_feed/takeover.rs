@@ -149,7 +149,7 @@ async fn replica(url: &str) -> Result<Store, Box<dyn Error>> {
     Ok(Store::open(&Settings {
         connection: omop_cdm::connection::CdmConnection::new(url, None)?,
         max_connections: 4,
-        acquire_timeout: Duration::from_secs(30),
+        acquire_timeout: Duration::from_secs(5),
         seal: None,
     })
     .await?)

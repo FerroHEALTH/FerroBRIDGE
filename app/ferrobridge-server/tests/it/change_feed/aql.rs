@@ -124,7 +124,12 @@ fn limit() -> PageSize {
 #[tokio::test]
 async fn a_first_read_binds_the_start_and_records_it_as_the_watermark() -> Result<(), Box<dyn Error>>
 {
-    let Some(Kept { store, term, .. }) = store().await? else {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
         return Ok(());
     };
     let server = MockServer::start().await;
@@ -159,7 +164,12 @@ async fn a_first_read_binds_the_start_and_records_it_as_the_watermark() -> Resul
 
 #[tokio::test]
 async fn a_reader_that_starts_at_the_beginning_sends_no_window() -> Result<(), Box<dyn Error>> {
-    let Some(Kept { store, term, .. }) = store().await? else {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
         return Ok(());
     };
     let server = MockServer::start().await;
@@ -185,7 +195,12 @@ async fn a_reader_that_starts_at_the_beginning_sends_no_window() -> Result<(), B
 #[tokio::test]
 async fn each_row_is_one_composition_event_with_the_versions_at_its_instant()
 -> Result<(), Box<dyn Error>> {
-    let Some(Kept { store, term, .. }) = store().await? else {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
         return Ok(());
     };
     let server = MockServer::start().await;
@@ -235,7 +250,12 @@ async fn each_row_is_one_composition_event_with_the_versions_at_its_instant()
 #[tokio::test]
 async fn the_watermark_survives_a_restart_and_a_version_sharing_its_instant_is_still_read()
 -> Result<(), Box<dyn Error>> {
-    let Some(Kept { store, term, .. }) = store().await? else {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
         return Ok(());
     };
     let server = MockServer::start().await;
@@ -292,7 +312,12 @@ async fn the_watermark_survives_a_restart_and_a_version_sharing_its_instant_is_s
 
 #[tokio::test]
 async fn an_acknowledgement_never_moves_the_watermark_backwards() -> Result<(), Box<dyn Error>> {
-    let Some(Kept { store, term, .. }) = store().await? else {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
         return Ok(());
     };
     let server = MockServer::start().await;
@@ -328,7 +353,12 @@ async fn an_acknowledgement_never_moves_the_watermark_backwards() -> Result<(), 
 #[tokio::test]
 async fn each_refusal_of_the_query_leaves_the_watermark_where_it_was() -> Result<(), Box<dyn Error>>
 {
-    let Some(Kept { store, term, .. }) = store().await? else {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
         return Ok(());
     };
     for status in [400_u16, 401, 403, 408, 500, 503] {
@@ -375,7 +405,12 @@ async fn each_refusal_of_the_query_leaves_the_watermark_where_it_was() -> Result
 
 #[tokio::test]
 async fn a_row_before_the_watermark_is_a_malformed_answer() -> Result<(), Box<dyn Error>> {
-    let Some(Kept { store, term, .. }) = store().await? else {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
         return Ok(());
     };
     let server = MockServer::start().await;
