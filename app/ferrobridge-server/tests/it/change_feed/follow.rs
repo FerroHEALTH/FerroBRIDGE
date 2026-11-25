@@ -21,6 +21,7 @@ use ferrobridge_server::change_feed::Position;
 use ferrobridge_server::change_feed::ReaderName;
 use ferrobridge_server::change_feed::Seq;
 use ferrobridge_server::change_feed::ferroehr::FerroEhrFeed;
+use ferrobridge_server::change_feed::follow::Lane;
 use ferrobridge_server::change_feed::follow::Polling;
 use ferrobridge_server::change_feed::follow::follow;
 use ferrobridge_server::change_feed::health::Following;
@@ -33,6 +34,7 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::Recording;
+use super::Unopposed;
 use super::client;
 use super::reader;
 
@@ -61,7 +63,19 @@ async fn follow_until(
     let (stop, stopped) = tokio::sync::watch::channel(false);
     let watched = following.clone();
     let name = reader();
-    let follower = follow(&feed, &name, &consumer, quick(), None, &following, stopped);
+    let lane = Lane {
+        polling: quick(),
+        parking: None,
+        following: following.clone(),
+    };
+    let follower = follow(
+        &feed,
+        &name,
+        &consumer,
+        std::sync::Arc::new(Unopposed),
+        lane,
+        stopped,
+    );
     let waiter = async {
         for _ in 0..500 {
             if until(&watched) {
@@ -206,7 +220,19 @@ async fn follow_for(feed: &Clocked, duration: Duration) {
     let consumer = Recording::default();
     let (stop, stopped) = tokio::sync::watch::channel(false);
     let name = reader();
-    let follower = follow(feed, &name, &consumer, polling, None, &following, stopped);
+    let lane = Lane {
+        polling,
+        parking: None,
+        following,
+    };
+    let follower = follow(
+        feed,
+        &name,
+        &consumer,
+        std::sync::Arc::new(Unopposed),
+        lane,
+        stopped,
+    );
     let deadline = async {
         tokio::time::sleep(duration).await;
         stop.send_replace(true);

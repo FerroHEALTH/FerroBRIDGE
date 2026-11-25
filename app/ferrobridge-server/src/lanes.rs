@@ -137,7 +137,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             .await
             .context("starting the change-feed consumers")?;
         for consumer in &started {
-            state = state.with_following(consumer.following.clone());
+            state = state.with_following(consumer.lane.following.clone());
         }
         state = state.with_change_feed(report);
         feeds = started;
@@ -158,12 +158,10 @@ pub(crate) struct StartedFeed {
     reader: change_feed::ReaderName,
     /// The consumer.
     consumer: Arc<dyn change_feed::follow::Consumer>,
-    /// How the follower paces its reads.
-    polling: change_feed::follow::Polling,
-    /// Where a poisoned event is parked.
-    parking: change_feed::follow::Parking,
-    /// What readiness reports for the consumer.
-    following: change_feed::health::Following,
+    /// The lease of the reader's lane.
+    lease: crate::store::lease::Lease,
+    /// How the follower paces, parks and reports.
+    lane: change_feed::follow::Lane,
 }
 
 impl StartedFeed {
@@ -178,9 +176,8 @@ impl StartedFeed {
                 self.feed.as_ref(),
                 &self.reader,
                 self.consumer.as_ref(),
-                self.polling,
-                Some(self.parking),
-                &self.following,
+                Arc::new(self.lease),
+                self.lane,
                 stopped,
             )
             .await;
@@ -188,8 +185,9 @@ impl StartedFeed {
     }
 }
 
-/// Opens the change-feed source and its dead-letter store once, and starts
-/// every consumer section that is on over them, each under its own reader.
+/// Opens the change-feed source over the state store once, and starts every
+/// consumer section that is on over it, each under its own reader and lane
+/// lease.
 async fn start_change_feed(
     settings: &Settings,
     feed_settings: &change_feed::Settings,
@@ -202,15 +200,17 @@ async fn start_change_feed(
         .as_ref()
         .context("the change feed reads the CDR, and [cdr] is not set")?;
     let client = cdr::CdrClient::new(cdr).context("building the CDR client the feed reads")?;
-    let feed =
-        change_feed::open(feed_settings, client.clone()).context("opening the change feed")?;
-    let dead_letters = Arc::new(
-        change_feed::dead_letter::DeadLetters::open(&feed_settings.dead_letters)
-            .context("opening the dead-letter store of the change feed")?,
-    );
+    let store = state.store().cloned().context(
+        "the change feed keeps its cursors and dead letters in the state store, and [state] is not set",
+    )?;
+    let feed = change_feed::open(feed_settings, client.clone(), &store);
+    let dead_letters = change_feed::dead_letter::DeadLetters::new(store.pool().clone());
     let parking = change_feed::follow::Parking {
-        store: Arc::clone(&dead_letters),
+        store: dead_letters.clone(),
         max_attempts: feed_settings.max_attempts,
+    };
+    let lane_of = |reader: &change_feed::ReaderName, following| {
+        follower_lane(&store, feed_settings, &parking, reader, following)
     };
     let mut report = change_feed::report::Report::new(feed_settings.source.clone(), dead_letters);
     let mut started = Vec::new();
@@ -235,13 +235,13 @@ async fn start_change_feed(
                 following: following.clone(),
             })
             .with_topology(lane.topology());
+        let (lease, follower_lane) = lane_of(&lane.reader, following)?;
         started.push(StartedFeed {
             feed: Arc::clone(&feed),
             reader: lane.reader.clone(),
             consumer: Arc::new(publisher),
-            polling: feed_settings.polling,
-            parking: parking.clone(),
-            following,
+            lease,
+            lane: follower_lane,
         });
     }
     if let Some(load) = settings.omop_incremental.as_ref() {
@@ -262,36 +262,65 @@ async fn start_change_feed(
             reader: load.reader.clone(),
             following: following.clone(),
         });
+        let (lease, follower_lane) = lane_of(&load.reader, following)?;
         started.push(StartedFeed {
             feed: Arc::clone(&feed),
             reader: load.reader.clone(),
             consumer: Arc::new(consumer),
-            polling: feed_settings.polling,
-            parking: parking.clone(),
-            following,
+            lease,
+            lane: follower_lane,
         });
     }
-    if let Some(lane) = settings.fhir_outbound.as_ref() {
-        let outbound = start_outbound(lane, state, &feed, feed_settings, client, parking).await?;
+    if let Some(outbound_lane) = settings.fhir_outbound.as_ref() {
+        let following = follower(
+            &feed,
+            feed_settings,
+            &outbound_lane.reader,
+            crate::outbound::NAME,
+            "fhir_outbound",
+        )
+        .await?;
+        let (lease, follower_lane) = lane_of(&outbound_lane.reader, following.clone())?;
+        let outbound = start_outbound(outbound_lane, state, &feed, client, lease, follower_lane)?;
         report = report.with_follower(change_feed::report::Follower {
             name: crate::outbound::NAME,
-            reader: lane.reader.clone(),
-            following: outbound.following.clone(),
+            reader: outbound_lane.reader.clone(),
+            following,
         });
         started.push(outbound);
     }
     Ok((started, report))
 }
 
+/// Returns the lease of `reader`'s lane on `store` and how its follower
+/// paces, parks and reports.
+fn follower_lane(
+    store: &crate::store::Store,
+    feed_settings: &change_feed::Settings,
+    parking: &change_feed::follow::Parking,
+    reader: &change_feed::ReaderName,
+    following: change_feed::health::Following,
+) -> anyhow::Result<(crate::store::lease::Lease, change_feed::follow::Lane)> {
+    let name = crate::store::lease::Lane::new(format!("change-feed:{reader}"))?;
+    Ok((
+        store.lease(name, feed_settings.lease),
+        change_feed::follow::Lane {
+            polling: feed_settings.polling,
+            parking: Some(parking.clone()),
+            following,
+        },
+    ))
+}
+
 /// Starts the outbound FHIR lane over `feed`, mapping through the facade of
 /// `state`, and warns that it delivers identifiable clinical data.
-async fn start_outbound(
+fn start_outbound(
     lane: &crate::outbound::Settings,
     state: &AppState,
     feed: &Arc<dyn change_feed::ChangeFeed>,
-    feed_settings: &change_feed::Settings,
     client: cdr::CdrClient,
-    parking: change_feed::follow::Parking,
+    lease: crate::store::lease::Lease,
+    follower_lane: change_feed::follow::Lane,
 ) -> anyhow::Result<StartedFeed> {
     use anyhow::Context;
 
@@ -300,10 +329,9 @@ async fn start_outbound(
         .facade()
         .cloned()
         .context("the outbound FHIR lane maps through the facade, and the facade is off")?;
-    let following = follower(feed, feed_settings, &lane.reader, name, "fhir_outbound").await?;
     let consumer = crate::outbound::Outbound::start(lane, facade, client)
         .with_context(|| format!("opening {}", lane.emitted.display()))?
-        .with_following(following.clone());
+        .with_following(follower_lane.following.clone());
     tracing::warn!(
         lane = name,
         reader = %lane.reader,
@@ -314,9 +342,8 @@ async fn start_outbound(
         feed: Arc::clone(feed),
         reader: lane.reader.clone(),
         consumer: Arc::new(consumer),
-        polling: feed_settings.polling,
-        parking,
-        following,
+        lease,
+        lane: follower_lane,
     })
 }
 

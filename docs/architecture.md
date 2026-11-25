@@ -1803,7 +1803,7 @@ because no concept exists. The reference engine has not moved since
   ITS-REST and runs the same per-composition commit. No feature depends on one
   vendor (owner decision 2026-11-02), so the adapter has two sources. The
   vendor-neutral one polls `/query/aql` over `VERSION v[ALL_VERSIONS]` by
-  `commit_audit/time_committed` past a watermark FerroBRIDGE keeps in `redb`,
+  `commit_audit/time_committed` past a watermark FerroBRIDGE keeps in the state store,
   with the version uids finished at the watermark instant so a tie loses
   nothing; it gives no commit order across EHRs and sees a deletion only where
   the CDR answers the deleted version. The reference CDR writes every commit
@@ -2373,7 +2373,12 @@ has one leader across replicas through a row of `lane_lease`: a replica
 takes a free or expired row and its generation moves on, renews at a third
 of the period, and every cursor write locks the row in its own transaction
 and is refused unless it holds the current generation, so a former leader
-paused past its expiry cannot move a cursor. Session advisory locks are not
+paused past its expiry cannot move a cursor. The change feed is the first
+area on the store (`0006`): the watermarks of the AQL source, the dead
+letters with the operator's settlement (who decided, retry or discard, and
+why) and the poisoned-pass counts, every follower write fenced by its
+reader's lease; the reference CDR's feed keeps its cursor in the CDR and
+takes only the lease. Session advisory locks are not
 used for leadership: they carry no fencing token and end with their
 connection while the task may run on
 (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
