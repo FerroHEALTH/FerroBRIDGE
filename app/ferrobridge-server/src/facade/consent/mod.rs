@@ -481,7 +481,8 @@ pub async fn subject(
     compartment::admit_person(facade, access, permission, CONSENT, Some(&person)).await?;
     let ehr = ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing)
         .await
-        .map_err(|error| Refusal::from(crate::facade::ingest::refusal::ehr_refusal(&error)))?;
+        .map_err(|error| Refusal::from(crate::facade::ingest::refusal::ehr_refusal(&error)))?
+        .id;
     Ok(Subject { person, ehr })
 }
 

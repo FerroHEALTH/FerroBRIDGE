@@ -85,7 +85,7 @@ pub(crate) async fn ehr_of_party(
         return Ok(None);
     };
     match ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing).await {
-        Ok(found) => Ok(Some(found)),
+        Ok(found) => Ok(Some(found.id)),
         Err(ehr::EhrError::Absent { .. }) => Ok(None),
         Err(ehr::EhrError::Client { ref source }) => {
             Err(write::refuse(&status::of_client_error(source)))

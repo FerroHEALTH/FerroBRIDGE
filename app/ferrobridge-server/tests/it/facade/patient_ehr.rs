@@ -340,8 +340,8 @@ async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<
         ehr::resolve(&client, &first_store, &person, Policy::CreateOnFirstWrite),
         ehr::resolve(&client, &second_store, &person, Policy::CreateOnFirstWrite),
     );
-    assert_eq!(EHR_ID, first?.as_str());
-    assert_eq!(EHR_ID, second?.as_str());
+    assert_eq!(EHR_ID, first?.id.as_str());
+    assert_eq!(EHR_ID, second?.id.as_str());
     let creates = ehr_calls(&cdr)
         .await
         .into_iter()

@@ -351,10 +351,7 @@ where
 /// Starts the replica's one `LISTEN` session, carrying the channel of every
 /// copy it holds in memory (the inbound sources, the settings registers and
 /// the running mapping revision) and the inbound `workers`' wake channel.
-fn listen(
-    state: &crate::state::AppState,
-    workers: Option<Arc<crate::store::listen::Listened>>,
-) {
+fn listen(state: &crate::state::AppState, workers: Option<Arc<crate::store::listen::Listened>>) {
     let Some(store) = state.store() else {
         return;
     };

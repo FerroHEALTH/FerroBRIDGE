@@ -168,14 +168,12 @@ fn inbound_workers(
         return None;
     };
     let handler = crate::inbound::apply::Apply::new(
-        (
-            Arc::new(crate::inbound::apply::Undeclared),
-            Arc::new(crate::inbound::apply::Unavailable),
-        ),
+        Arc::new(crate::inbound::apply::Undeclared),
         facade.settings().subject.identity_handle(),
         facade.client().clone(),
         facade.store_handle(),
-    );
+    )
+    .with_access_log(state.access_log().cloned());
     Some(Arc::new(crate::inbound::worker::Pool::new(
         crate::inbound::store::InboxStore::new(store.pool().clone()),
         Arc::clone(sources),

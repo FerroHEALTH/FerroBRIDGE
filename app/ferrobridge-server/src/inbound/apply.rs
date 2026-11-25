@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The one [`Handler`] the inbound workers run, where every inbound step is
-//! written: the source's patient resolved, minimised, fed to the identity
-//! source, given its ITI-83 pseudonym and exactly one EHR.
+//! written.
+//!
+//! The source's patient is resolved, minimised, fed to the identity source
+//! over ITI-104, given its ITI-83 pseudonym and exactly one EHR.
 //!
 //! The bridge does no matching, linking or merging of its own; the identity
 //! source does. An inbound event never deletes an EHR: a remove only tells
@@ -16,14 +18,17 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use fhir_types::codec::Value;
+use ihe_atna::balp::{NetworkAddress, Reserved};
 use ihe_atna::user::OnBehalfOf;
 use ihe_iti::pixm::identifier::SourceIdentifier;
+use ihe_iti::pixm::source::error::SourceError as FeedError;
 use secrecy::SecretString;
 
 use super::event::Change;
 use super::retry::Failure;
 use super::store::Claimed;
 use super::worker::{Attempt, Failed, Handler};
+use crate::audit::AccessLog;
 use crate::cdr::CdrClient;
 use crate::facade::ehr::{self, EhrError, Policy};
 use crate::facade::identity::store::Store;
@@ -69,93 +74,111 @@ impl Resolve for Undeclared {
     }
 }
 
-/// How a patient reaches the identity source (ITI-104, `PIXm` 3.1.0
-/// §2:3.104).
-pub trait Feed: std::fmt::Debug + Send + Sync {
-    /// Creates or updates the patient `patient` of `tenant`.
-    fn upsert<'a>(
-        &'a self,
-        tenant: &'a Tenant,
-        entity: &'a str,
-        patient: &'a Value,
-    ) -> Step<'a, ()>;
-
-    /// Marks the patient `entity` of `tenant` inactive (`Patient.active =
-    /// false`).
-    fn deactivate<'a>(&'a self, tenant: &'a Tenant, entity: &'a str) -> Step<'a, ()>;
-}
-
-/// The feed while no published client speaks ITI-104, which parks every
-/// item.
-// TODO(#2048): feed through the ihe-iti Patient Identity Source client of FerroHEALTH/FerroPIX#799.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Unavailable;
-
-impl Unavailable {
-    /// The failure every feed answers.
-    const FAILED: Failed = Failed {
-        failure: Failure::Refusal,
-        reason: "feed-client-unavailable",
-    };
-}
-
-impl Feed for Unavailable {
-    fn upsert<'a>(&'a self, _: &'a Tenant, _: &'a str, _: &'a Value) -> Step<'a, ()> {
-        Box::pin(std::future::ready(Err(Self::FAILED)))
-    }
-
-    fn deactivate<'a>(&'a self, _: &'a Tenant, _: &'a str) -> Step<'a, ()> {
-        Box::pin(std::future::ready(Err(Self::FAILED)))
-    }
-}
-
 /// The handler: what it resolves through, feeds, asks and writes into.
 #[derive(Debug)]
 pub struct Apply {
     /// How an entity is read.
     resolve: Arc<dyn Resolve>,
-    /// How a patient is fed.
-    feed: Arc<dyn Feed>,
-    /// The identity source asked for the pseudonym.
+    /// The identity source fed and asked for the pseudonym.
     identity: Arc<IdentitySource>,
     /// The CDR the EHR is ensured in.
     client: CdrClient,
     /// The identity map.
     store: Arc<dyn Store>,
+    /// The access-record lane each step is recorded in, under `[audit]`.
+    access_log: Option<Arc<AccessLog>>,
 }
 
 impl Apply {
-    /// Returns the handler over its seams, the identity source, the CDR and
-    /// the identity map.
+    /// Returns the handler over `resolve`, the identity source, the CDR and
+    /// the identity map, recording nothing.
     #[must_use]
     pub fn new(
-        (resolve, feed): (Arc<dyn Resolve>, Arc<dyn Feed>),
+        resolve: Arc<dyn Resolve>,
         identity: Arc<IdentitySource>,
         client: CdrClient,
         store: Arc<dyn Store>,
     ) -> Self {
         Self {
             resolve,
-            feed,
             identity,
             client,
             store,
+            access_log: None,
         }
     }
 
-    /// Creates or updates the patient, then ensures its one EHR.
+    /// Returns this handler recording each feed and each EHR it creates in
+    /// `log`.
+    #[must_use]
+    pub fn with_access_log(self, log: Option<Arc<AccessLog>>) -> Self {
+        Self {
+            access_log: log,
+            ..self
+        }
+    }
+
+    /// Creates or updates the patient, or forwards the source's merge, then
+    /// ensures the patient's one EHR.
     async fn upsert(&self, source: &Source, tenant: &Tenant, entity: &str) -> Result<(), Failed> {
         let resolved = self.resolve.patient(source, tenant, entity).await?;
-        let patient = minimised(&resolved, tenant, entity);
-        self.feed.upsert(tenant, entity, &patient).await?;
-        let local = SourceIdentifier::new(
-            tenant.identifier_system.as_str(),
-            SecretString::from(entity),
-        )
-        .map_err(|_invalid| refused("local-identifier-invalid"))?;
+        let local = local_of(tenant, entity)?;
+        let patient = typed(&minimised(&resolved, tenant, entity))?;
+        let survivor = survivor_of(&resolved, tenant)?;
+        let place = self.reserve().await?;
+        match survivor.as_ref() {
+            // NOTE: PIXm 3.1.0 §2:3.104.4.2: the source's own merge goes to the identity
+            // source as Resolve Duplicate; the survivor's own upsert ensures its EHR.
+            Some(survivor) => self
+                .identity
+                .merge((&local, survivor), &patient)
+                .await
+                .map_err(|error| fed_failed(&error))?,
+            None => self
+                .identity
+                .feed(&local, &patient)
+                .await
+                .map_err(|error| fed_failed(&error))?,
+        }
+        self.imported(place, source, tenant, entity).await?;
+        if survivor.is_some() {
+            return Ok(());
+        }
+        self.ensure_ehr(&local).await
+    }
+
+    /// Tells the identity source the patient is no longer active
+    /// (`Patient.active = false`); an EHR is never deleted.
+    async fn deactivate(
+        &self,
+        source: &Source,
+        tenant: &Tenant,
+        entity: &str,
+    ) -> Result<(), Failed> {
+        let local = local_of(tenant, entity)?;
+        let patient = fhir_types::r4::patient::Patient {
+            identifier: vec![fhir_types::r4::identifier::Identifier {
+                system: Some(tenant.identifier_system.as_str().into()),
+                value: Some(entity.into()),
+                ..fhir_types::r4::identifier::Identifier::default()
+            }],
+            active: Some(false.into()),
+            ..fhir_types::r4::patient::Patient::default()
+        };
+        let place = self.reserve().await?;
+        self.identity
+            .feed(&local, &patient)
+            .await
+            .map_err(|error| fed_failed(&error))?;
+        self.imported(place, source, tenant, entity).await
+    }
+
+    /// Asks the pseudonym of `local` and ensures its one EHR, recording a
+    /// create.
+    async fn ensure_ehr(&self, local: &SourceIdentifier) -> Result<(), Failed> {
         let person = self
             .identity
-            .pseudonym(&local, &OnBehalfOf::System)
+            .pseudonym(local, &OnBehalfOf::System)
             .await
             .map_err(|error| Failed {
                 failure: if error.transient() {
@@ -165,15 +188,58 @@ impl Apply {
                 },
                 reason: "pseudonym-refused",
             })?;
-        ehr::resolve(
+        let place = self.reserve().await?;
+        let ensured = ehr::resolve(
             &self.client,
             self.store.as_ref(),
             &person,
             Policy::CreateOnFirstWrite,
         )
         .await
-        .map(drop)
-        .map_err(|error| ehr_failed(&error))
+        .map_err(|error| ehr_failed(&error))?;
+        let Some(log) = self.access_log.as_ref().filter(|_| ensured.created) else {
+            return Ok(());
+        };
+        let exchange = crate::audit::inbound::ehr_created(
+            NetworkAddress::uri(self.client.base_url()),
+            crate::audit::inbound::Patient {
+                system: person.namespace(),
+                value: person.id(),
+            },
+            ensured.id.as_str(),
+        );
+        record(log, place, exchange).await
+    }
+
+    /// Takes the place of one record before a step, so a step whose record
+    /// has no place is not taken.
+    async fn reserve(&self) -> Result<Option<Box<dyn Reserved>>, Failed> {
+        match self.access_log.as_ref() {
+            Some(log) => log.recorder().reserve().await.map_err(|_full| unrecorded()),
+            None => Ok(None),
+        }
+    }
+
+    /// Records the import of the patient `entity` of `tenant` from `source`.
+    async fn imported(
+        &self,
+        place: Option<Box<dyn Reserved>>,
+        source: &Source,
+        tenant: &Tenant,
+        entity: &str,
+    ) -> Result<(), Failed> {
+        let Some(log) = self.access_log.as_ref() else {
+            return Ok(());
+        };
+        let exchange = crate::audit::inbound::imported(
+            &source.name,
+            log.endpoint().clone(),
+            crate::audit::inbound::Patient {
+                system: &tenant.identifier_system,
+                value: entity,
+            },
+        );
+        record(log, place, exchange).await
     }
 }
 
@@ -188,7 +254,7 @@ impl Handler for Apply {
                 .ok_or_else(|| refused("tenant-unknown"))?;
             match item.change {
                 Change::Upsert => self.upsert(source, tenant, &item.key.entity).await,
-                Change::Remove => self.feed.deactivate(tenant, &item.key.entity).await,
+                Change::Remove => self.deactivate(source, tenant, &item.key.entity).await,
             }
         })
     }
@@ -199,6 +265,99 @@ const fn refused(reason: &'static str) -> Failed {
     Failed {
         failure: Failure::Refusal,
         reason,
+    }
+}
+
+/// Records `exchange` in `place` or, with no place, through `log`'s recorder.
+async fn record(
+    log: &AccessLog,
+    place: Option<Box<dyn Reserved>>,
+    exchange: ihe_atna::balp::Exchange,
+) -> Result<(), Failed> {
+    match place {
+        Some(place) => place.record(exchange).await,
+        None => log.recorder().record(exchange).await,
+    }
+    .map_err(|_unrecorded| unrecorded())
+}
+
+/// Returns the failure of a step whose record the outbox could not take,
+/// which runs again.
+const fn unrecorded() -> Failed {
+    Failed {
+        failure: Failure::Transient,
+        reason: "audit-unrecorded",
+    }
+}
+
+/// Returns the identifier `entity` has in `tenant`'s domain.
+fn local_of(tenant: &Tenant, entity: &str) -> Result<SourceIdentifier, Failed> {
+    SourceIdentifier::new(
+        tenant.identifier_system.as_str(),
+        SecretString::from(entity),
+    )
+    .map_err(|_invalid| refused("local-identifier-invalid"))
+}
+
+/// Returns `patient` as an R4 `Patient`.
+fn typed(patient: &Value) -> Result<fhir_types::r4::patient::Patient, Failed> {
+    use fhir_types::codec::Json as _;
+    let Value::Object(object) = patient else {
+        return Err(refused("patient-unreadable"));
+    };
+    fhir_types::r4::patient::Patient::from_json(
+        object,
+        &mut fhir_types::codec::Path::root("Patient"),
+    )
+    .map_err(|_unread| refused("patient-unreadable"))
+}
+
+/// Returns the identifier of the patient a source merged `patient` into, by
+/// its `replaced-by` link, when it carries one (R4 `link-type`).
+fn survivor_of(patient: &Value, tenant: &Tenant) -> Result<Option<SourceIdentifier>, Failed> {
+    let Some(Value::Array(links)) = patient.get("link") else {
+        return Ok(None);
+    };
+    let Some(link) = links
+        .iter()
+        .find(|link| link.get("type").and_then(Value::as_str) == Some("replaced-by"))
+    else {
+        return Ok(None);
+    };
+    let identifier = link.get("other").and_then(|other| other.get("identifier"));
+    let system = identifier
+        .and_then(|identifier| identifier.get("system"))
+        .and_then(Value::as_str);
+    let value = identifier
+        .and_then(|identifier| identifier.get("value"))
+        .and_then(Value::as_str);
+    match (system, value) {
+        (Some(system), Some(value)) if system == tenant.identifier_system => {
+            SourceIdentifier::new(system, SecretString::from(value))
+                .map(Some)
+                .map_err(|_invalid| refused("merge-survivor-invalid"))
+        }
+        _ => Err(refused("merge-survivor-unidentified")),
+    }
+}
+
+/// Returns how a failed ITI-104 message fails the item: `5xx`, `429`, `423`,
+/// no answer or no credential run again, every other answer parks.
+fn fed_failed(error: &FeedError) -> Failed {
+    let failure = match error {
+        FeedError::Rejected { status, .. } => Failure::of(*status),
+        FeedError::Timeout
+        | FeedError::Transport(_)
+        | FeedError::Unauthenticated(_)
+        | FeedError::Audit(_) => Failure::Transient,
+        _ => Failure::Refusal,
+    };
+    match failure {
+        Failure::Transient => Failed {
+            failure,
+            reason: "feed-unavailable",
+        },
+        Failure::Refusal => refused("feed-refused"),
     }
 }
 
