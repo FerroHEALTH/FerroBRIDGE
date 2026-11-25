@@ -32,6 +32,7 @@
 
 pub mod guard;
 pub mod inbound;
+mod lane;
 mod refused;
 pub mod registers;
 pub mod reload;
@@ -64,7 +65,8 @@ use crate::mappings::files;
 use crate::mappings::files::Root;
 use crate::mappings::revisions::Revisions;
 use crate::operator::snapshot::Snapshot;
-use crate::problem::{Kind, refuse};
+use crate::problem::Kind;
+use lane::Lane;
 use refused::Refused;
 
 /// The media type a mapping file is served with.
@@ -299,7 +301,7 @@ async fn settle_parked(
     let (Some(report), Ok(id), Some(decision)) =
         (report, id.parse::<u64>(), Decision::parse(&decision))
     else {
-        return refuse(Kind::NotFound, "no parked event has this number");
+        return Refused::Problem(Kind::NotFound, "no parked event has this number").into_response();
     };
     let settled = settle::settle(
         &access,
@@ -328,39 +330,32 @@ async fn settle_parked(
         Decision::Retry => StatusCode::ACCEPTED,
         Decision::Discard => StatusCode::NO_CONTENT,
     };
-    tracing::info!(
-        target: guard::AUDIT_TARGET,
-        subject = decided.by.as_str(),
-        action = decision.as_str(),
+    guard::audited!(
+        decided.by.as_str(),
+        decision.as_str(),
+        status,
         consumer = consumer.as_str(),
         parked = id,
-        status = status.as_u16(),
-        "operator"
     );
     status.into_response()
 }
 
 /// `GET /operator/etl/runs`: the newest OMOP ETL runs the bridge schema
 /// keeps, newest first; `404` when the bridge has no `[cdm]`.
-async fn etl_runs(State(history): State<Option<Arc<crate::etl::history::Store>>>) -> Response {
-    let Some(history) = history else {
-        return refuse(Kind::NotFound, NO_HISTORY);
-    };
-    match history.runs().await {
-        Ok(runs) => axum::Json(runs).into_response(),
-        Err(error) => history_unavailable(&error),
-    }
+async fn etl_runs(Lane(history): Lane<crate::etl::history::Store>) -> Result<Response, Refused> {
+    let runs = history
+        .runs()
+        .await
+        .map_err(|error| history_unavailable(&error))?;
+    Ok(axum::Json(runs).into_response())
 }
 
 /// `GET /operator/etl/runs/{run_id}`: one OMOP ETL run whole; `404` for a
 /// run the history does not hold.
 async fn etl_run(
-    State(history): State<Option<Arc<crate::etl::history::Store>>>,
+    Lane(history): Lane<crate::etl::history::Store>,
     Path(run_id): Path<String>,
-) -> Response {
-    let Some(history) = history else {
-        return refuse(Kind::NotFound, NO_HISTORY);
-    };
+) -> Result<Response, Refused> {
     // NOTE: no specification governs this: our own design; a run id is a UUID the job
     // formed, so any other path segment names no run and never reaches the database.
     if run_id.is_empty()
@@ -368,23 +363,24 @@ async fn etl_run(
             .chars()
             .all(|character| character.is_ascii_hexdigit() || character == '-')
     {
-        return refuse(Kind::NotFound, "no ETL run has this id");
+        return Err(NO_RUN);
     }
-    match history.run(&run_id).await {
-        Ok(Some(run)) => axum::Json(run).into_response(),
-        Ok(None) => refuse(Kind::NotFound, "no ETL run has this id"),
-        Err(error) => history_unavailable(&error),
-    }
+    let run = history
+        .run(&run_id)
+        .await
+        .map_err(|error| history_unavailable(&error))?
+        .ok_or(NO_RUN)?;
+    Ok(axum::Json(run).into_response())
 }
 
-/// The `404` of a bridge that keeps no run history.
-const NO_HISTORY: &str = "this bridge has no CDM database to keep a run history in";
+/// The `404` of an id no ETL run has.
+const NO_RUN: Refused = Refused::Problem(Kind::NotFound, "no ETL run has this id");
 
 /// Returns the `503` of a run history that could not be read, its cause
 /// logged.
-fn history_unavailable(error: &crate::etl::history::ReadError) -> Response {
+fn history_unavailable(error: &crate::etl::history::ReadError) -> Refused {
     tracing::error!(reason = %crate::indicators::reason(error), "the run history could not be read");
-    refuse(
+    Refused::Problem(
         Kind::RunHistoryUnavailable,
         "the run history could not be read",
     )
@@ -393,12 +389,9 @@ fn history_unavailable(error: &crate::etl::history::ReadError) -> Response {
 /// `GET /operator/hl7v2/concept-maps`: the HL7 v2 face's `ConceptMap`
 /// directory with the messages each map served, `404` when the face is off.
 async fn concept_map_directory(
-    State(directory): State<Option<Arc<crate::hl7v2::directory::Directory>>>,
+    Lane(directory): Lane<crate::hl7v2::directory::Directory>,
 ) -> Response {
-    match directory {
-        Some(directory) => axum::Json(directory.document()).into_response(),
-        None => refuse(Kind::NotFound, "this bridge runs no HL7 v2 face"),
-    }
+    axum::Json(directory.document()).into_response()
 }
 
 /// Returns the `500` of a dead-letter store that refused, its cause logged.
@@ -419,10 +412,11 @@ async fn state(State(operator): State<Arc<Operator>>) -> Response {
 async fn running_configuration(State(operator): State<Arc<Operator>>) -> Response {
     match operator.configuration.as_ref() {
         Some(configuration) => axum::Json(configuration).into_response(),
-        None => refuse(
+        None => Refused::Problem(
             Kind::NotFound,
             "this operator API answers no running configuration",
-        ),
+        )
+        .into_response(),
     }
 }
 
@@ -452,15 +446,15 @@ fn read_mapping(operator: &Operator, path: &str) -> Response {
         Err(files::PathError::UnknownRoot | files::PathError::Absent) => {
             return match operator.snapshot().console().files().get(path) {
                 Some(bytes) => served(bytes.to_vec()),
-                None => refuse(Kind::NotFound, NO_MAPPING_FILE),
+                None => NO_MAPPING_FILE.into_response(),
             };
         }
-        Err(files::PathError::Step) => return refuse(Kind::NotFound, NO_MAPPING_FILE),
+        Err(files::PathError::Step) => return NO_MAPPING_FILE.into_response(),
     };
     match std::fs::read(located.path()) {
         Ok(bytes) => served(bytes),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            refuse(Kind::NotFound, NO_MAPPING_FILE)
+            NO_MAPPING_FILE.into_response()
         }
         Err(error) => unreadable(&crate::walk::Error {
             path: located.path().to_path_buf(),
@@ -492,13 +486,18 @@ async fn blocking(work: impl FnOnce() -> Response + Send + 'static) -> Response 
         Ok(response) => response,
         Err(error) => {
             tracing::error!(%error, "an operator file read did not finish");
-            refuse(Kind::Unreadable, "a mapping directory could not be read")
+            UNREADABLE.into_response()
         }
     }
 }
 
 /// The `404` of a path that names no mapping file.
-const NO_MAPPING_FILE: &str = "no mapping file is at this path";
+const NO_MAPPING_FILE: Refused =
+    Refused::Problem(Kind::NotFound, "no mapping file is at this path");
+
+/// The `500` of a mapping directory that could not be read.
+const UNREADABLE: Refused =
+    Refused::Problem(Kind::Unreadable, "a mapping directory could not be read");
 
 /// Returns the `500` of a mapping directory that could not be read.
 fn unreadable(error: &crate::walk::Error) -> Response {
@@ -507,5 +506,5 @@ fn unreadable(error: &crate::walk::Error) -> Response {
         error = %error.source,
         "a mapping directory could not be read"
     );
-    refuse(Kind::Unreadable, "a mapping directory could not be read")
+    UNREADABLE.into_response()
 }
