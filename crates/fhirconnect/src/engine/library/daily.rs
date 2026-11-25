@@ -44,6 +44,7 @@ use crate::engine::library::primitive;
 use crate::engine::library::quantity_of;
 use crate::engine::library::range_of;
 use crate::engine::library::refused;
+use crate::engine::library::timing::period_unit;
 use crate::engine::library::ucum_amount;
 use crate::engine::library::ucum_quantity;
 use crate::engine::traverse::functions::MappingCodeError;
@@ -170,28 +171,12 @@ fn frequency_ports(
     frequency: Option<u32>,
     frequency_max: Option<u32>,
 ) -> Result<Ports, MappingCodeError> {
-    let unit = repeat
-        .period_unit
-        .as_ref()
-        .map(|unit| {
-            primitive(
-                code,
-                "periodUnit",
-                unit.id.as_ref(),
-                &unit.extension,
-                unit.value.as_ref(),
-            )
-        })
-        .transpose()?
-        .ok_or_else(|| refused(code, "a period has a unit (R4 `tim-2`)"))?;
-    let unit = TimeUnit::from_ucum(unit)
-        .filter(|unit| DAILY_UNITS.contains(unit))
-        .ok_or_else(|| {
-            refused(
-                code,
-                format!("`{unit}` is no unit of a daily period, which is `s`, `min`, `h` or `d`"),
-            )
-        })?;
+    let unit = period_unit(
+        code,
+        repeat,
+        &DAILY_UNITS,
+        "a daily period, which is `s`, `min`, `h` or `d`",
+    )?;
     // NOTE: R4 Timing.repeat.frequency.meaningWhenMissing, with no frequency
     // "the event occurs once per period".
     let events = frequency.unwrap_or(1);

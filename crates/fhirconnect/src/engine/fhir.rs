@@ -151,19 +151,8 @@ impl FhirKind {
     #[must_use]
     pub fn at(location: &Location) -> Option<Self> {
         match *location {
-            Location::Complex(schema) => match schema.path {
-                "Coding" => Some(Self::Coding),
-                "CodeableConcept" => Some(Self::CodeableConcept),
-                "Period" => Some(Self::Period),
-                "Reference" => Some(Self::Reference),
-                "Identifier" => Some(Self::Identifier),
-                "Quantity" => Some(Self::Quantity),
-                "Count" => Some(Self::Count),
-                "Duration" => Some(Self::Duration),
-                "Attachment" => Some(Self::Attachment),
-                "Range" => Some(Self::Range),
-                _ => None,
-            },
+            // A complex type's name is capitalized and no primitive code is.
+            Location::Complex(schema) => Self::of_code(schema.path),
             Location::Primitive(ValueKind::Text) | Location::Attribute => Some(Self::String),
             Location::Primitive(_)
             | Location::PrimitiveElement

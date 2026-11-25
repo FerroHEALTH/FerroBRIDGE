@@ -22,8 +22,8 @@
 //! (<https://hl7.org/fhir/R4/datatypes.html#id>).
 
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
-use sha2::Digest;
 
+use crate::engine::seam::identity::FramedDigest;
 use crate::engine::seam::identity::IdentityRequest;
 
 /// The RFC 4648 §6 base32 alphabet, lowercased.
@@ -55,12 +55,10 @@ pub fn versioned_object_uid(uid: &str) -> String {
 /// `versioned_object_uid`.
 #[must_use]
 pub fn deterministic_id(versioned_object_uid: &str, entry_path: &str) -> String {
-    let mut hasher = sha2::Sha256::new();
-    for field in [versioned_object_uid.as_bytes(), entry_path.as_bytes()] {
-        hasher.update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_be_bytes());
-        hasher.update(field);
-    }
-    base32(hasher.finalize().as_slice())
+    let mut digest = FramedDigest::default();
+    digest.frame(versioned_object_uid.as_bytes());
+    digest.frame(entry_path.as_bytes());
+    base32(&digest.finish())
 }
 
 /// Returns the deterministic id of a resource a run creates beside the one it maps.
@@ -84,11 +82,8 @@ pub fn created_id(
     entry_path: &str,
     request: &IdentityRequest,
 ) -> String {
-    let mut hasher = sha2::Sha256::new();
-    let mut frame = |field: &[u8]| {
-        hasher.update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_be_bytes());
-        hasher.update(field);
-    };
+    let mut digest = FramedDigest::default();
+    let mut frame = |field: &[u8]| digest.frame(field);
     frame(b"created");
     frame(versioned_object_uid.as_bytes());
     frame(entry_path.as_bytes());
@@ -111,7 +106,7 @@ pub fn created_id(
     for value in request.unique() {
         frame(value.as_bytes());
     }
-    base32(hasher.finalize().as_slice())
+    base32(&digest.finish())
 }
 
 /// Renders `bytes` in the lowercase RFC 4648 base32 alphabet, without padding.
