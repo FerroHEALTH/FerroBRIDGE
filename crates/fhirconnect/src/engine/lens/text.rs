@@ -8,13 +8,15 @@
 //! The `string` table pairs `value` with `value`; the `Coding` and
 //! `CodeableConcept` tables put the codings in `mappings`, "in openEHR each
 //! `DV_TEXT` can be annotated with codings using mappings", and pair the
-//! rubric with `display` and with `text`.
+//! rubric with `display` and with `text`. `DV_CODED_TEXT` inherits that
+//! `CodeableConcept` shape, so its cell builds the concept here too.
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::primitives;
 use openehr_base::containers::NonEmptyVec;
 use openehr_rm::v1_2::data_types::text::dv_text::DvTextData;
+use openehr_rm::v1_2::data_types::text::term_mapping::TermMapping;
 
 use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
@@ -84,15 +86,12 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
     }
 
     fn get(&self, source: &DvTextData) -> Result<CodeableConcept, LensError> {
-        let mut codings = Vec::new();
-        for mapping in equivalents(source.mappings.iter().flatten()) {
-            codings.push(coding_of(mapping, CODEABLE_CONCEPT_CELL)?);
-        }
-        Ok(CodeableConcept {
-            coding: codings,
-            text: Some(primitives::String::from(source.value.clone())),
-            ..CodeableConcept::default()
-        })
+        concept_of(
+            Vec::new(),
+            source.mappings.iter().flatten(),
+            &source.value,
+            CODEABLE_CONCEPT_CELL,
+        )
     }
 
     fn put(
@@ -115,15 +114,42 @@ impl Lens<DvTextData, CodeableConcept> for TextLens {
     }
 
     fn fallbacks(&self, view: &CodeableConcept) -> Vec<Fallback> {
-        if text_of(view.text.as_ref().map(|text| &text.value)).is_some() {
-            return Vec::new();
-        }
-        vec![Fallback::new(CODEABLE_CONCEPT_CELL, "DV_TEXT.value")]
+        untexted(view, CODEABLE_CONCEPT_CELL)
     }
 
     fn withheld(&self, source: &DvTextData) -> Vec<Withheld> {
         withheld(source.mappings.iter().flatten())
     }
+}
+
+/// Returns the `CodeableConcept` of `leading`, a coding per `=` mapping and
+/// the rubric as `text`, the shape `DV_TEXT` and `DV_CODED_TEXT` share.
+///
+/// # Errors
+///
+/// Returns [`LensError`] when a mapping names no terminology FHIR can carry.
+pub(crate) fn concept_of<'held>(
+    mut leading: Vec<Coding>,
+    mappings: impl IntoIterator<Item = &'held TermMapping>,
+    rubric: &str,
+    cell: &'static str,
+) -> Result<CodeableConcept, LensError> {
+    for mapping in equivalents(mappings) {
+        leading.push(coding_of(mapping, cell)?);
+    }
+    Ok(CodeableConcept {
+        coding: leading,
+        text: Some(primitives::String::from(rubric.to_owned())),
+        ..CodeableConcept::default()
+    })
+}
+
+/// Returns the one-way `DV_TEXT.value` row a concept without `text` takes.
+pub(crate) fn untexted(view: &CodeableConcept, cell: &'static str) -> Vec<Fallback> {
+    if text_of(view.text.as_ref().map(|text| &text.value)).is_some() {
+        return Vec::new();
+    }
+    vec![Fallback::new(cell, "DV_TEXT.value")]
 }
 
 /// Returns the rubric a `CodeableConcept` gives `DV_TEXT.value`.

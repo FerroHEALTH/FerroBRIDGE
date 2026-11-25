@@ -38,6 +38,7 @@ use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::text_of;
 use crate::engine::lens::number::decimal_text;
 use crate::engine::lens::number::point;
+use crate::engine::lens::quantified;
 use crate::engine::lens::quantity::UCUM;
 use crate::model::ast::keyword::Direction;
 
@@ -160,15 +161,11 @@ impl Lens<DvDuration, Duration> for DurationLens {
             .map(|held| held.value.as_str())
             .filter(|&held| reading(held).is_some_and(|(read, unit)| read == text && unit == code))
             .map_or(written, String::from);
-        Ok(DvDuration {
-            normal_status: existing.and_then(|held| held.normal_status.clone()),
-            normal_range: existing.and_then(|held| held.normal_range.clone()),
-            other_reference_ranges: existing.and_then(|held| held.other_reference_ranges.clone()),
-            magnitude_status: existing.and_then(|held| held.magnitude_status.clone()),
+        Ok(quantified!(DvDuration, existing, {
             accuracy: existing.and_then(|held| held.accuracy),
             accuracy_is_percent: existing.and_then(|held| held.accuracy_is_percent),
             value,
-        })
+        }))
     }
 
     fn fallbacks(&self, view: &Duration) -> Vec<Fallback> {

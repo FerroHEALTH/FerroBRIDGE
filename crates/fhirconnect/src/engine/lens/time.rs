@@ -24,6 +24,7 @@ use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::text_of;
+use crate::engine::lens::quantified;
 use crate::model::ast::keyword::Direction;
 
 /// The name the `time` cell carries in a diagnostic.
@@ -62,14 +63,10 @@ impl Lens<DvTime, Time> for TimeLens {
             .map(|held| held.value.as_str())
             .filter(|&held| extended(held).as_deref() == Some(text))
             .unwrap_or(text);
-        Ok(DvTime {
-            normal_status: existing.and_then(|held| held.normal_status.clone()),
-            normal_range: existing.and_then(|held| held.normal_range.clone()),
-            other_reference_ranges: existing.and_then(|held| held.other_reference_ranges.clone()),
-            magnitude_status: existing.and_then(|held| held.magnitude_status.clone()),
+        Ok(quantified!(DvTime, existing, {
             accuracy: existing.and_then(|held| held.accuracy.clone()),
             value: String::from(value),
-        })
+        }))
     }
 
     fn fallbacks(&self, _view: &Time) -> Vec<Fallback> {
