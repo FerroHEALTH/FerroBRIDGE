@@ -234,7 +234,7 @@ classify() {
     scripts/vendor/kds-*-opt.sh | scripts/vendor/lib/kds-opt.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
     # Write only the CKM archetypes under the testkit's fixtures, which the
     # templates the testkit carries read.
-    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh | scripts/vendor/ckm-highmed.sh)
+    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh | scripts/vendor/ckm-highmed.sh | scripts/vendor/ckm-ehds.sh)
       echo "packages ferrobridge-testkit fhirconnect"
       ;;
     # The corpora only the server's access directive exchange reads, and the
@@ -246,7 +246,8 @@ classify() {
     # The corpora only the eehrxf tests read, and the script that writes them.
     docs/specs/eu-xtehr-models/* | docs/specs/eu-hl7-*/* | docs/specs/fhir-r4/*) echo "only eehrxf" ;;
     docs/specs/ehdsi-mvc/* | docs/specs/fr-ans/*) echo "only eehrxf" ;;
-    scripts/vendor/eehrxf.sh | scripts/vendor/lib/pinned.sh) echo "only eehrxf" ;;
+    docs/specs/ehds-eehrxf-draft/* | docs/specs/ehds-testing-draft/* | docs/specs/xtehr-deliverables/*) echo "only eehrxf" ;;
+    scripts/vendor/eehrxf.sh | scripts/vendor/ehds-drafts.sh | scripts/vendor/lib/pinned.sh) echo "only eehrxf" ;;
     crates/* | app/* | tools/*) echo member ;;
     *) echo global ;;
   esac
@@ -618,6 +619,8 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-testkit +fhirconnect +omocl +omop-cdm +ferrobridge-server -fhir-codegen"
   check "the consent corpora reach the server" "docs/specs/xacml/PROVENANCE.md" false \
     "+ferrobridge-server -fhirconnect -eehrxf"
+  check "the draft EEHRxF act reaches only eehrxf" "docs/specs/ehds-eehrxf-draft/annexes.txt" false \
+    "+eehrxf -ferrobridge-server -fhirconnect"
   check "a vendored corpus reaches everything" "docs/specs/omocl/x.yml" false ALL
   check "a vendor script reaches everything" "scripts/vendor/v2ig.sh" false ALL
   check "an unknown root file reaches everything" "something-new.toml" false ALL

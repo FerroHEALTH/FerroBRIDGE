@@ -18,6 +18,9 @@
 #   `cache` artefact under the git-ignored .vendor-cache/<corpus>/, and
 #   fetches nothing for a `manual` row (a source behind a login or a bot
 #   challenge);
+# - derives each `pdftext` artefact with `pdftotext -layout` from the PDF of
+#   the same corpus its URL field names, beside that PDF and with its mode,
+#   so a cached PDF yields cached text;
 # - writes docs/specs/<corpus>/PROVENANCE.md, which names every artefact, its
 #   URL, version, sha256 and licence, whatever its mode.
 #
@@ -49,8 +52,9 @@ pinned_begin() {
 
 # pin MODE FILE VERSION URL SHA256 LICENCE [NOTE]
 #
-# Adds one artefact to the corpus being declared. MODE is commit, cache or
-# manual; SHA256 is `-` for a manual row. LICENCE is the licence statement as
+# Adds one artefact to the corpus being declared. MODE is commit, cache,
+# manual or pdftext; SHA256 is `-` for a manual or a pdftext row, and the URL
+# of a pdftext row is the file name of the PDF it is extracted from. LICENCE is the licence statement as
 # the publisher makes it (quoted verbatim where it is quoted) or the legal
 # ground on which the text is free.
 pin() {
@@ -59,8 +63,8 @@ pin() {
     commit | cache)
       grep -qE '^[0-9a-f]{64}$' <<< "$sha" || die "$file: '$sha' is not a sha256"
       ;;
-    manual) [ "$sha" = "-" ] || die "$file: a manual row pins no sha256" ;;
-    *) die "$file has mode '$mode', not commit, cache or manual" ;;
+    manual | pdftext) [ "$sha" = "-" ] || die "$file: a $mode row pins no sha256" ;;
+    *) die "$file has mode '$mode', not commit, cache, manual or pdftext" ;;
   esac
   case "$file" in
     */* | .* | '') die "'$file' is not a plain file name" ;;
@@ -158,8 +162,26 @@ pinned_corpus() {
       *) ;;
     esac
   done <<< "$pins"
+  pinned_pdftext "$dir" "$pins"
 
   pinned_provenance "$dir" "$title" "$about" "$pins" "$digest" "$ua" "$read_by"
+}
+
+# Extracts the text of each pdftext row of the pins $2 of the corpus $1 from
+# its source PDF, into the directory that PDF was written to.
+pinned_pdftext() {
+  local dir="$1" pins="$2" mode file version url sha licence note src out
+  while IFS=$'\t' read -r mode file version url sha licence note; do
+    [ "$mode" = "pdftext" ] || continue
+    corpus_require pdftotext
+    src=""
+    for out in "docs/specs/$dir" "$pinned_cache_root/$dir"; do
+      [ -f "$out/$url" ] && src="$out/$url" && break
+    done
+    [ -n "$src" ] || die "$dir: $file extracts from $url, which this corpus does not pin"
+    say "$dir: extracting $file from $url"
+    pdftotext -layout -enc UTF-8 "$src" "$out/$file" || die "$dir: pdftotext failed on $url"
+  done <<< "$pins"
 }
 
 # Writes the PROVENANCE.md of one corpus.
@@ -167,7 +189,7 @@ pinned_provenance() {
   local dir="$1" title="$2" about="$3" pins="$4" digest="$5" ua="$6" read_by="$7"
   local dest="docs/specs/$dir" cache="$pinned_cache_root/$dir"
   local mode file version url sha licence note heading
-  local n_commit=0 n_cache=0 n_manual=0 fetched files tree body=""
+  local n_commit=0 n_cache=0 n_manual=0 n_text=0 fetched files tree body="" tool
 
   while IFS=$'\t' read -r mode file version url sha licence note; do
     [ -n "$mode" ] || continue
@@ -180,18 +202,36 @@ pinned_provenance() {
         n_cache=$((n_cache + 1))
         heading="cache only, not redistributed"
         ;;
+      pdftext)
+        n_text=$((n_text + 1))
+        heading="text extracted from \`$url\`"
+        ;;
       *)
         n_manual=$((n_manual + 1))
         heading="needs manual retrieval"
         ;;
     esac
-    body="$body
+    if [ "$mode" != "pdftext" ]; then
+      body="$body
 
 ### \`$file\` ($heading)
 
 - Source: <$url>
 - Version: $(pinned_md "$version")"
-    if [ "$mode" = "manual" ]; then
+    fi
+    if [ "$mode" = "pdftext" ]; then
+      tool="$(pdftotext -v 2>&1 | head -n1)"
+      body="$body
+
+### \`$file\` ($heading)
+
+- Source: \`$url\` of this corpus, extracted with \`pdftotext -layout -enc UTF-8\`
+  ($tool), kept beside its PDF and with its mode, so that code and
+  documentation can cite a line; the PDF is the authority
+- Version: $(pinned_md "$version")
+- Licence: $(pinned_md "$licence")"
+      continue
+    elif [ "$mode" = "manual" ]; then
       body="$body
 - sha256: none, nothing is fetched"
     else
@@ -238,9 +278,9 @@ the script and the pin-set digest in docs/VERSIONS.md, and re-run the script.
   the pins): \`$digest\`
 - Fetched: $fetched, with the User-Agent \`$ua\`
 - Artefacts: $n_commit committed, $n_cache cache only, $n_manual needing
-  manual retrieval
+  manual retrieval$( [ "$n_text" -eq 0 ] || printf ', %s extracted text' "$n_text")
 - Files in this directory: $files besides this one, each verbatim as the
-  publisher serves it
+  publisher serves it$( [ "$n_text" -eq 0 ] || printf ' or the text extracted from such a file')
 - Tree digest (sha256 over the sorted per-file \`sha256  path\` listing,
   \`PROVENANCE.md\` excluded): \`$tree\`
 - Read by: $read_by

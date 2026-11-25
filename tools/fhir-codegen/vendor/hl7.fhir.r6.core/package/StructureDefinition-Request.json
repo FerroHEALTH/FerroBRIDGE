@@ -14,12 +14,12 @@
     "valueCode" : "fhir"
   }],
   "url" : "http://hl7.org/fhir/StructureDefinition/Request",
-  "version" : "6.0.0-ballot5",
+  "version" : "6.0.0-snapshot1",
   "name" : "Request",
   "title" : "request",
   "status" : "draft",
   "experimental" : false,
-  "date" : "2026-07-17T17:22:54+10:00",
+  "date" : "2026-09-10T16:50:24+10:00",
   "publisher" : "HL7 International / FHIR Infrastructure",
   "contact" : [{
     "telecom" : [{
@@ -41,7 +41,7 @@
       "display" : "World"
     }]
   }],
-  "fhirVersion" : "6.0.0-ballot5",
+  "fhirVersion" : "6.0.0-snapshot1",
   "mapping" : [{
     "identity" : "v2",
     "uri" : "http://hl7.org/v2",
@@ -303,7 +303,7 @@
         }],
         "strength" : "required",
         "description" : "Codes identifying the lifecycle stage of a request.",
-        "valueSet" : "http://hl7.org/fhir/ValueSet/request-status|6.0.0-ballot5"
+        "valueSet" : "http://hl7.org/fhir/ValueSet/request-status|6.0.0-snapshot1"
       },
       "mapping" : [{
         "identity" : "v2",
@@ -401,7 +401,7 @@
         }],
         "strength" : "required",
         "description" : "Codes indicating the degree of authority/intentionality associated with a request.",
-        "valueSet" : "http://hl7.org/fhir/ValueSet/request-intent|6.0.0-ballot5"
+        "valueSet" : "http://hl7.org/fhir/ValueSet/request-intent|6.0.0-snapshot1"
       },
       "mapping" : [{
         "identity" : "v2",
@@ -452,7 +452,7 @@
         }],
         "strength" : "required",
         "description" : "Identifies the level of importance to be assigned to actioning the request.",
-        "valueSet" : "http://hl7.org/fhir/ValueSet/request-priority|6.0.0-ballot5"
+        "valueSet" : "http://hl7.org/fhir/ValueSet/request-priority|6.0.0-snapshot1"
       },
       "mapping" : [{
         "identity" : "v2",
