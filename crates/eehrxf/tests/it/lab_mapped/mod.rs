@@ -44,7 +44,7 @@ use fhirconnect::operations::run::Settings;
 use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
-use super::support::{emit, lab};
+use super::support::{annex_iii, emit, lab};
 
 mod accounted;
 
@@ -321,6 +321,7 @@ fn round_trip() -> Result<(String, String), Box<dyn Error>> {
     )?;
     let results = out.with_mapped_report(run.bundle())?;
     out.with_section(chemistry(results)?)?;
+    out.with_metadata(annex_iii("11502-2"));
     Ok((received, serde_json::to_string(&out.into_bundle()?)?))
 }
 

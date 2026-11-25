@@ -5,7 +5,7 @@ name = "eehrxf"
 description = "The European interoperability software component of an EHR system under Regulation (EU) 2025/327: the format-neutral dataset model of the priority categories read from the Xt-EHR EHDS logical models, and the European electronic health record exchange format in FHIR R4, mapped from openEHR by FHIRconnect"
 # On the crate line, the fhir-types line, since it moved here from FerroFED at
 # 0.0.40 (docs/VERSIONS.md).
-version = "0.28.0"
+version = "0.29.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -47,6 +47,8 @@ discharge = []
 # openEHR-free.
 fhir-r4 = [
   "dep:async-trait",
+  "dep:base64",
+  "dep:sha1",
   "dep:ferrobridge-term",
   "dep:ferrobridge-validator",
   "dep:fhir-types",
@@ -68,6 +70,10 @@ openehr = [
 ]
 
 [dependencies]
+# The base64 encoding of an Attachment's data and hash (FHIR R4 datatypes.html#base64Binary).
+base64 = { workspace = true, optional = true }
+# The SHA-1 an Attachment's hash carries (FHIR R4 datatypes.html#Attachment).
+sha1 = { workspace = true, optional = true }
 # The terminology server seam, an object-safe async trait the system that
 # reaches the server implements.
 async-trait = { workspace = true, optional = true }

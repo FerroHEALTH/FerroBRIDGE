@@ -764,6 +764,7 @@ tools/ferrobridge-testkit/fixtures/ckm/highmed|CKM HiGHmed archetypes (fixture)
 tools/ferrobridge-testkit/fixtures/ckm/imaging|CKM imaging archetypes (fixture)
 tools/ferrobridge-testkit/fixtures/ckm/ehds|CKM EHDS archetypes (fixture)
 tools/ferrobridge-testkit/fixtures/ckm/discharge|CKM discharge archetypes (fixture)
+tools/ferrobridge-testkit/fixtures/ckm/test-report|CKM medical test report archetypes (fixture)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2 definitions (v2ig source of truth, never committed)
 tools/fhir-codegen/vendor/hl7-v2ig|HL7 v2+ licence page
 tools/fhir-codegen/vendor/hl7-v2-legacy|HL7 v2 legacy tables (NIST IGAMT export, never committed)

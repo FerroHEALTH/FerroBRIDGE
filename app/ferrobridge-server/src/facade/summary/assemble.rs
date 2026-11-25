@@ -32,6 +32,7 @@ use eehrxf::mapping::MappingError;
 use eehrxf::terminology::Terminology;
 use eehrxf::terminology::ehn;
 use eehrxf::terminology::system::ARCHETYPE_LOCAL;
+use eehrxf::terminology::translation::Binding;
 use eehrxf::terminology::translation::TranslationError;
 use eehrxf::terminology::translation::Translator;
 use eehrxf::terminology::withheld::Withheld;
@@ -65,6 +66,9 @@ const RECORDED: &str = "This section lists what the record holds.";
 pub(super) struct Inputs<'a> {
     /// The document form.
     pub(super) form: &'static Form,
+    /// The value-set bindings the document's codes meet through the
+    /// terminology server.
+    pub(super) bindings: &'static [Binding],
     /// The absolute FHIR base every entry is named under.
     pub(super) base: &'a str,
     /// The document identifier, a `urn:uuid:` URN.
@@ -143,7 +147,8 @@ pub(super) async fn assemble(
         ..Organization::default()
     })))?;
     let settings = Settings::new(device.clone(), inputs.timestamp);
-    let mut translator = Translator::new(terminology, &ehn::PATIENT_SUMMARY);
+    let mut translator =
+        Translator::new(terminology, &ehn::PATIENT_SUMMARY).with_bindings(inputs.bindings);
     let mut filled: BTreeMap<&'static str, Filled> = BTreeMap::new();
     for composition in inputs.compositions {
         let context = CallContext::new()
@@ -189,6 +194,12 @@ pub(super) async fn assemble(
                 slot.mapped = Some(section);
             }
         }
+    }
+    if !translator.unbound().is_empty() {
+        tracing::warn!(
+            unbound = translator.unbound().len(),
+            "a patient summary holds bound concepts the terminology server maps into no bound system"
+        );
     }
     let fed = fed_slices();
     for slot in inputs.form.slots {

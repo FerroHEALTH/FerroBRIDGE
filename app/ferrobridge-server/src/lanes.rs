@@ -91,17 +91,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         set_counts(&mut lanes, "facade", counts);
     }
     if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
-        let base = url::Url::parse(&mounted.settings().base_url)
-            .context("reading [facade] base_url as the address the access records name")?;
-        let store = state.store().context(
-            "the access-record lane keeps its outbox in the state store, and [state] is not set",
-        )?;
-        let log = crate::audit::AccessLog::open(audit, &base, mounted.client().base_url(), store);
-        tracing::info!(
-            lane = "audit",
-            repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
-            "the facade records every access in the audit trail"
-        );
+        let log = start_audit(audit, mounted, &state).await?;
         state = state.with_access_log(Arc::new(log));
     }
     state = start_links(settings, state)?;
@@ -165,9 +155,28 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
     let Some(store) = state.store() else {
         return Ok(state);
     };
-    let sources = crate::sources::Sources::open(store, settings.secrets.as_ref())
-        .context("opening the [secrets] directory the inbound sources name")?;
-    Ok(state.with_sources(Arc::new(sources)))
+    let sources = Arc::new(
+        crate::sources::Sources::open(store, settings.secrets.as_ref())
+            .context("opening the [secrets] directory the inbound sources name")?,
+    );
+    let intake = settings.inbound.map(|inbound| {
+        // TODO(#2048): start the worker pool with the identity-feed handler.
+        crate::inbound::intake::Intake::new(
+            Arc::clone(&sources),
+            crate::inbound::store::InboxStore::new(store.pool().clone()),
+            inbound.body_limit,
+        )
+        .with_recoverer(Arc::new(crate::inbound::recover::Recoverer::new(
+            store.clone(),
+            Arc::clone(&sources),
+            inbound.workers.lease,
+        )))
+    });
+    let state = state.with_sources(sources);
+    Ok(match intake {
+        Some(intake) => state.with_intake(Arc::new(intake)),
+        None => state,
+    })
 }
 
 /// One change-feed consumer, ready to follow its source.
@@ -203,6 +212,24 @@ impl StartedFeed {
             .await;
         })
     }
+}
+
+/// Spawns every change-feed follower and the inbound recovery of `state`,
+/// each on its own task until `stop` reads `true`.
+pub(crate) fn spawn_followers(
+    feeds: Vec<StartedFeed>,
+    state: &AppState,
+    settings: &Settings,
+    stop: &tokio::sync::watch::Sender<bool>,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let (Some(recoverer), Some(inbound)) = (
+        state.intake().and_then(|intake| intake.recoverer()),
+        settings.inbound,
+    ) {
+        followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    followers
 }
 
 /// Opens the change-feed source over the state store once, and starts every
@@ -574,6 +601,39 @@ fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::
         programs: programs.len(),
         templates: templates.len(),
     }
+}
+
+/// Opens the access-record lane `audit` describes for the facade `mounted`,
+/// its outbox and its category register in the state store of `state`.
+async fn start_audit(
+    audit: &crate::audit::Settings,
+    mounted: &facade::Facade,
+    state: &AppState,
+) -> anyhow::Result<crate::audit::AccessLog> {
+    use anyhow::Context;
+
+    let base = url::Url::parse(&mounted.settings().base_url)
+        .context("reading [facade] base_url as the address the access records name")?;
+    let store = state.store().context(
+        "the access-record lane keeps its outbox in the state store, and [state] is not set",
+    )?;
+    let registers = state.registers().cloned().context(
+        "the access records are classified by a settings register, and [state] is not set",
+    )?;
+    let log = crate::audit::AccessLog::open(
+        audit,
+        (&base, mounted.client().base_url()),
+        store,
+        registers,
+    )
+    .await
+    .context("reading the audit-categories register the access records are classified by")?;
+    tracing::info!(
+        lane = "audit",
+        repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
+        "the facade records every access in the audit trail"
+    );
+    Ok(log)
 }
 
 /// Builds the operator API over the configured mapping directories, with the

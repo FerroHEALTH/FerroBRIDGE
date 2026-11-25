@@ -26,8 +26,9 @@ pub mod outbox;
 use std::sync::Arc;
 
 use ehds_logging::balp::BalpSink;
+use std::sync::{PoisonError, RwLock};
+
 use ehds_logging::label::LabelPolicy;
-use ehds_logging::map::CategoryMap;
 use ehds_logging::retention::RetentionPolicy;
 use ihe_atna::atna::feed::FeedRepository;
 use ihe_atna::atna::forwarder::Forwarder;
@@ -41,6 +42,8 @@ use url::Url;
 use outbox::OutboxRecorder;
 use outbox::StateOutbox;
 
+use crate::settings::{Categories, Register, RegisterError};
+
 /// The access-record lane, resolved from `[audit]`.
 #[derive(Debug, Clone)]
 pub struct Settings {
@@ -50,8 +53,6 @@ pub struct Settings {
     pub source_id: String,
     /// The site the bridge runs at.
     pub site: Option<String>,
-    /// The deployment's category map.
-    pub categories: CategoryMap,
 }
 
 /// The access-record lane: the outbox, its forwarder and what every record
@@ -63,8 +64,11 @@ pub struct AccessLog {
     recorder: Arc<dyn AuditRecorder>,
     /// The sink that writes an access record as a BALP `AuditEvent`.
     sink: BalpSink,
-    /// The deployment's category map.
-    categories: CategoryMap,
+    /// The `audit-categories` register the records are classified by.
+    registers: Arc<crate::settings::Registers>,
+    /// The newest category map this replica compiled, which classifies while
+    /// the register cannot be read.
+    categories: RwLock<Arc<Categories>>,
     /// How long a record is kept.
     retention: RetentionPolicy,
     /// The security labels a record carries.
@@ -87,16 +91,23 @@ impl std::fmt::Debug for AccessLog {
 impl AccessLog {
     /// Returns the lane `settings` names for the facade served at `base`,
     /// whose data come from the CDR at `origin`, keeping its outbox in
-    /// `store`.
+    /// `store` and classifying by the `audit-categories` register of
+    /// `registers`.
     ///
     /// Nothing is delivered until [`AccessLog::spawn`].
-    #[must_use]
-    pub fn open(
+    ///
+    /// # Errors
+    ///
+    /// Returns the register's error when its version in force cannot be read
+    /// or compiled, so a replica never serves without a category map.
+    pub async fn open(
         settings: &Settings,
-        base: &Url,
-        origin: &Url,
+        (base, origin): (&Url, &Url),
         store: &crate::store::Store,
-    ) -> Self {
+        registers: Arc<crate::settings::Registers>,
+    ) -> Result<Self, RegisterError> {
+        let version = registers.current(Register::AuditCategories).await?;
+        let categories = RwLock::new(Arc::new(Categories::compile(&version)?));
         let outbox = Arc::new(StateOutbox::new(store.pool().clone()));
         let forwarder = Forwarder::fhir_feed_from(Arc::clone(&outbox), settings.feed.clone());
         let observer = Observer {
@@ -108,16 +119,17 @@ impl AccessLog {
         let recorder: Arc<dyn AuditRecorder> = Arc::new(OutboxRecorder::new(outbox, observer));
         let endpoint = NetworkAddress::uri(base);
         let sink = BalpSink::new(Arc::clone(&recorder), endpoint.clone());
-        Self {
+        Ok(Self {
             forwarder,
             recorder,
             sink,
-            categories: settings.categories.clone(),
+            registers,
+            categories,
             retention: RetentionPolicy::default(),
             labels: LabelPolicy::default(),
             origin: NetworkAddress::uri(origin).address(),
             endpoint,
-        }
+        })
     }
 
     /// Starts delivering the outbox, oldest record first, until
@@ -157,10 +169,42 @@ impl AccessLog {
         &self.sink
     }
 
-    /// Returns the deployment's category map.
-    #[must_use]
-    pub const fn categories(&self) -> &CategoryMap {
-        &self.categories
+    /// Returns the category map of the `audit-categories` version in force.
+    ///
+    /// When the register cannot be read or its version does not compile, the
+    /// newest map this replica compiled classifies instead, with a warning
+    /// naming its revision; the map's digest names the revision in every
+    /// record, so a record classified during an outage can be found.
+    pub async fn categories(&self) -> Arc<Categories> {
+        let held = Arc::clone(
+            &self
+                .categories
+                .read()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
+        let compiled = match self.registers.current(Register::AuditCategories).await {
+            Ok(version) if version.number == held.number() => return held,
+            Ok(version) => Categories::compile(&version),
+            Err(error) => Err(error),
+        };
+        match compiled {
+            Ok(compiled) => {
+                let compiled = Arc::new(compiled);
+                *self
+                    .categories
+                    .write()
+                    .unwrap_or_else(PoisonError::into_inner) = Arc::clone(&compiled);
+                compiled
+            }
+            Err(error) => {
+                tracing::warn!(
+                    error = ferrohealth_server::run::chain(&error),
+                    revision = held.number(),
+                    "the audit-categories register could not be read; the records are classified under the revision this replica holds"
+                );
+                held
+            }
+        }
     }
 
     /// Returns how long a record is kept.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the electrocardiogram report of draft EEHRxF Annex VIII
+# over FerroBRIDGE's medical test report template, whose archetypes are
+# CKM's. No HL7 Europe guide profiles a non-laboratory test report, so the
+# result becomes an R4 DiagnosticReport that claims no profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ecg_report.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/DiagnosticReport"
+    version: "4.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_test_report.v1.0.0"
+  archetypes:
+    - "OBSERVATION.ecg_result.v1"
+  start: "OBSERVATION.ecg_result.v1"

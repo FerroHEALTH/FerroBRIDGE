@@ -22,14 +22,15 @@
 # sha256, over the profile packages scripts/vendor/profile-packages.sh
 # fetched (hl7.fhir.uv.ips 2.0.1, hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
 # hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0, hl7.fhir.eu.hdr 1.0.0,
-# hl7.fhir.eu.imaging 1.0.0-ballot and hl7.eu.fhir.xshare-yb 0.3.0 with their
-# dependency closure). This
+# hl7.fhir.eu.imaging 1.0.0-ballot, hl7.fhir.eu.imaging-manifest 1.0.0-ballot
+# and hl7.eu.fhir.xshare-yb 0.3.0 with their dependency closure). This
 # script adds the vendored MyHealth@EU Master Value Sets Catalogue, whose
 # value sets the patient summary profiles bind, and the remaining-dispensations
 # extension eehrxf publishes. Each guide's documents run on their own, so no
 # closure reads another guide's documents: a discharge report with
 # hl7.fhir.eu.hdr 1.0.0 and the catalogue loaded, an imaging report with
-# hl7.fhir.eu.imaging 1.0.0-ballot loaded, and every other document with the
+# hl7.fhir.eu.imaging 1.0.0-ballot loaded, an imaging study manifest with
+# hl7.fhir.eu.imaging-manifest 1.0.0-ballot loaded, and every other document with the
 # other four guides, IPS 2.0.1, the catalogue and the extension loaded. Every
 # patient summary also runs once more with the xShare Yellow Button guide
 # 0.3.0 and the catalogue loaded, held to the profile the guide's provider
@@ -50,8 +51,21 @@
 # are admitted (-allow-example-urls true) because the test documents name
 # their entries under example hosts, which RFC 6761 section 6.5 reserves.
 #
+# The --myhealth-eu mode measures the same documents against the MyHealth@EU
+# guides on their CI line (#2083), one conformance corpus per guide, whose
+# results scripts/checks/conformance.sh holds to the pass lists under
+# conformance/myhealth-eu-*/. It reads the component's own documents, those
+# the eehrxf suites write (`eehrxf-*.json`): each laboratory report against the guide's
+# laboratory Bundle profile, each discharge report against its discharge
+# Bundle profile, every document entry of a type the Core guide profiles
+# against that Core profile, and every coded element a Core profile binds
+# to a Master Value Sets Catalogue value set against it. A case passes when the
+# validator reports no error, no fatal issue and no unchecked profile for it;
+# the mode fails only when it cannot measure.
+#
 # Usage:
 #   scripts/checks/fhir-validator.sh DOCUMENTS OUT
+#   scripts/checks/fhir-validator.sh --myhealth-eu DOCUMENTS OUT
 #   scripts/checks/fhir-validator.sh --judge OUTPUT DOCUMENTS OUT
 #   scripts/checks/fhir-validator.sh --self-test
 #
@@ -123,6 +137,10 @@ readonly LAB_BUNDLE="http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu
 # The imaging report document a run validates over the Imaging Report guide.
 readonly IMAGING_BUNDLE="http://hl7.eu/fhir/imaging/StructureDefinition/BundleReportEuImaging"
 readonly IMAGING_IG="hl7.fhir.eu.imaging#1.0.0-ballot"
+
+# The imaging study manifest a run validates over the Imaging Manifest guide.
+readonly MANIFEST_BUNDLE="http://hl7.eu/fhir/imaging-manifest/StructureDefinition/EuMadoBundle"
+readonly MANIFEST_IG="hl7.fhir.eu.imaging-manifest#1.0.0-ballot"
 
 # The discharge report document a run validates over the Hospital Discharge
 # Report guide.
@@ -281,7 +299,8 @@ validate() {
 
 # run DOCUMENTS OUT: prepares the jar and the package cache, runs the
 # validator offline over every document in DOCUMENTS and judges its output.
-# An imaging report and a discharge report are each validated in a run of
+# An imaging report, an imaging study manifest and a discharge report are
+# each validated in a run of
 # their own, over their guide's closure: one validator context holding
 # several closures read the laboratory report against the imaging guide's
 # dependencies too (no specification governs this: our own design).
@@ -299,7 +318,7 @@ run() {
     tar -xzf "$MVC" -C "$CACHE/$name"
   fi
   mkdir -p "$out/xshare-yb"
-  local docs=() general=() imaging=() discharge=() summaries=() doc copies
+  local docs=() general=() imaging=() manifest=() discharge=() summaries=() doc copies
   copies="$(cd "$out/xshare-yb" && pwd)"
   for doc in "$documents"/*.json; do
     [[ -f "$doc" ]] || continue
@@ -311,6 +330,8 @@ run() {
     fi
     if jq -e --arg bundle "$IMAGING_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       imaging+=("$doc")
+    elif jq -e --arg bundle "$MANIFEST_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
+      manifest+=("$doc")
     elif jq -e --arg bundle "$HDR_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       discharge+=("$doc")
     else
@@ -333,6 +354,10 @@ run() {
     validate "$out" imaging "${imaging[@]}" -- "$IMAGING_IG" > "$out/imaging.bundle.json" || return 1
     parts+=("$out/imaging.bundle.json")
   fi
+  if [[ "${#manifest[@]}" -gt 0 ]]; then
+    validate "$out" manifest "${manifest[@]}" -- "$MANIFEST_IG" > "$out/manifest.bundle.json" || return 1
+    parts+=("$out/manifest.bundle.json")
+  fi
   if [[ "${#discharge[@]}" -gt 0 ]]; then
     validate "$out" discharge "${discharge[@]}" -- "$HDR_IG" "$name" > "$out/discharge.bundle.json" || return 1
     parts+=("$out/discharge.bundle.json")
@@ -352,6 +377,182 @@ run() {
     > "$out/validation.json"
   cp "${docs[@]}" "$out/"
   judge "$out/validation.json" "$documents" "$out"
+}
+
+# The version the profile packages table of docs/VERSIONS.md pins for the
+# MyHealth@EU CI build of package $1, or nothing.
+ci_build_version() {
+  awk -F'|' -v want="$1" '
+    NF >= 4 && $3 ~ /tarball `https:\/\/build-fhir\.ehdsi\.eu\// {
+      k = $2; gsub(/[ `]/, "", k)
+      if (k == want) { split($3, t, /[[:space:]]+/); print t[2]; exit }
+    }' docs/VERSIONS.md
+}
+
+# failing_cases TSV: one "file<TAB>first failing issue" line per file of the
+# summary TSV that holds an error, a fatal issue or an unchecked profile.
+failing_cases() {
+  awk -F '\t' '
+    NR > 1 && !($1 in seen) {
+      unknown = ($3 ~ /^(VALIDATION_VAL_PROFILE_UNKNOWN|Validation_VAL_Profile_Unknown|Validation_VAL_Unknown_Profile|VALIDATION_VAL_GLOBAL_PROFILE_UNKNOWN)/) \
+        || ($5 ~ /has not been checked because it could not be found/)
+      if ($2 == "error" || $2 == "fatal" || unknown) { seen[$1] = 1; print $1 "\t" $2 " [" $3 "] at " $4 ": " $5 }
+    }' "$1"
+}
+
+# corpus_result NAME DIR TSV: writes the conformance result of the corpus
+# NAME, one case per document in DIR judged by the summary TSV, to
+# $FERROBRIDGE_CONFORMANCE_OUT/NAME.json.
+corpus_result() {
+  local corpus="$1" dir="$2" tsv="$3" results="${FERROBRIDGE_CONFORMANCE_OUT:-target/conformance}"
+  mkdir -p "$results"
+  failing_cases "$tsv" > "$dir.failing.tsv"
+  find "$dir" -maxdepth 1 -name '*.json' -exec basename {} .json \; | LC_ALL=C sort |
+    jq -R -s --arg corpus "$corpus" --rawfile failing "$dir.failing.tsv" '
+      ($failing | split("\n") | map(select(length > 0) | split("\t") | {key: (.[0] | sub("\\.json$"; "")), value: .[1]}) | from_entries) as $f
+      | (split("\n") | map(select(length > 0))) as $ids
+      | {corpus: $corpus, total: ($ids | length),
+         cases: [$ids[] | if $f[.] then {id: ., passed: false, failure: $f[.]} else {id: ., passed: true} end]}' \
+      > "$results/$corpus.json"
+  echo "myhealth-eu: $corpus $(jq '[.cases[] | select(.passed)] | length' "$results/$corpus.json") / $(jq .total "$results/$corpus.json")"
+}
+
+# measure_guide NAME OUT DIR IG...: validates every document in DIR with the
+# IGs loaded and writes the corpus result NAME.
+measure_guide() {
+  local corpus="$1" out="$2" dir="$3"
+  shift 3
+  local docs=("$dir"/*.json)
+  [[ -f "${docs[0]}" ]] || {
+    echo "::error::$corpus: no document to measure" >&2
+    return 1
+  }
+  validate "$out" "$corpus" "${docs[@]}" -- "$@" > "$out/$corpus.bundle.json" || return 1
+  {
+    printf 'file\tseverity\tmessage-id\twhere\ttext\n'
+    issues "$out/$corpus.bundle.json"
+  } > "$out/$corpus.tsv"
+  corpus_result "$corpus" "$dir" "$out/$corpus.tsv"
+}
+
+# myhealth_eu DOCUMENTS OUT: measures the documents against the MyHealth@EU
+# CI guides as the header describes, writing one conformance result per guide.
+myhealth_eu() {
+  local documents="$1" out="$2" java="${JAVA:-java}" pkg ver doc stem
+  command -v "$java" > /dev/null 2>&1 || {
+    echo "::error::java is not on PATH; the validator needs Java 17 or later" >&2
+    return 1
+  }
+  bash scripts/vendor/hl7-validator-agreement.sh --fetch
+  local core lab hdr mvc
+  for pkg in core laboratory hdr mvc-package; do
+    ver="$(ci_build_version "myhealth.eu.fhir.$pkg")"
+    [[ -n "$ver" ]] || {
+      echo "::error::docs/VERSIONS.md pins no MyHealth@EU CI build of myhealth.eu.fhir.$pkg" >&2
+      return 1
+    }
+    case "$pkg" in
+      core) core="myhealth.eu.fhir.core#$ver" ;;
+      laboratory) lab="myhealth.eu.fhir.laboratory#$ver" ;;
+      hdr) hdr="myhealth.eu.fhir.hdr#$ver" ;;
+      *) mvc="myhealth.eu.fhir.mvc-package#$ver" ;;
+    esac
+  done
+  mkdir -p "$out/core" "$out/laboratory" "$out/hdr"
+  local profiles
+  profiles="$(jq -s -c '[.[] | select(.resourceType == "StructureDefinition" and .kind == "resource" and .derivation == "constraint")]
+    | group_by(.type) | map(select(length == 1) | {key: .[0].type, value: .[0].url}) | from_entries' \
+    "docs/specs/fhir-packages/$core/package/"StructureDefinition-*.json)"
+  for doc in "$documents"/eehrxf-*.json; do
+    [[ -f "$doc" ]] || continue
+    stem="$(basename "$doc" .json)"
+    if jq -e --arg b "$LAB_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+      jq --arg p "http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/laboratory/$stem.json"
+    elif jq -e --arg b "$HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+      jq --arg p "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/hdr/$stem.json"
+    fi
+    jq -c --argjson profiles "$profiles" '
+      select(.resourceType == "Bundle") | .entry // [] | to_entries[]
+      | select(.value.resource.resourceType as $t | $profiles[$t] != null)
+      | [.key, .value.resource.resourceType, (.value.resource | .meta.profile = [$profiles[.resourceType]])]' "$doc" |
+      while IFS= read -r line; do
+        jq '.[2]' <<< "$line" > "$out/core/$stem.$(jq -r '"\(.[0]).\(.[1])"' <<< "$line").json"
+      done
+  done
+  measure_guide myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
+  measure_guide myhealth-eu-laboratory "$out" "$out/laboratory" "$lab" || return 1
+  measure_guide myhealth-eu-hdr "$out" "$out/hdr" "$hdr" || return 1
+  mvc_codes "$out/core" "docs/specs/fhir-packages/$core/package" "docs/specs/fhir-packages/$mvc/package" "$out"
+}
+
+# mvc_codes CASES CORE MVC OUT: one case per coded element of each Core
+# entry under CASES at which its Core profile (from package CORE) binds a
+# value set required or extensible, when that value set and every value set
+# it includes come from the catalogue MVC or the Core guide. The case passes
+# when a coding of the element is in the value set's members. Text alone
+# fails at a required binding and is no case at an extensible one, which
+# admits it (FHIR R4 terminologies §4.1.1.3). An element no catalogue value
+# set binds is no case.
+mvc_codes() {
+  local cases="$1" core="$2" mvc="$3" out="$4" results="${FERROBRIDGE_CONFORMANCE_OUT:-target/conformance}"
+  mkdir -p "$results"
+  jq -s -c '
+    map(select(.resourceType == "ValueSet"))
+    | map({key: .url, value: [.compose.include[]? | {system, codes: [.concept[]?.code],
+        sets: [.valueSet[]? | sub("\\|.*$"; "")], filtered: (.filter != null)}]})
+    | from_entries' "$mvc"/ValueSet-*.json "$core"/ValueSet-*.json > "$out/mvc-valuesets.json"
+  jq -s -c --slurpfile sets "$out/mvc-valuesets.json" '
+    $sets[0] as $m
+    | def members($url; $seen):
+        if ($seen | index($url)) != null then []
+        elif $m[$url] == null then null
+        else [$m[$url][] as $i
+          | if ($i.sets | length) > 0 then ($i.sets[] | members(.; $seen + [$url]))
+            elif $i.filtered then null
+            elif ($i.codes | length) > 0 then ($i.codes | map("\($i.system)|\(.)"))
+            else ["\($i.system)|*"] end]
+          | if any(.[]; . == null) then null else add // [] end
+        end;
+      map(select(.resourceType == "StructureDefinition"))
+      | map({key: .url, value: [.snapshot.element[]
+          | select(.sliceName == null and (.id | test(":|\\.extension|\\.modifierExtension") | not))
+          | select(.binding.valueSet != null and (.binding.strength == "required" or .binding.strength == "extensible"))
+          | (.binding.valueSet | sub("\\|.*$"; "")) as $vs
+          | members($vs; []) as $members
+          | select($members != null)
+          | {path: .path, valueSet: $vs, strength: .binding.strength, members: ($members | map({key: ., value: true}) | from_entries)}]})
+      | from_entries' "$core"/StructureDefinition-*.json > "$out/mvc-bindings.json"
+  local file
+  for file in "$cases"/*.json; do
+    [[ -f "$file" ]] || continue
+    jq -c --arg stem "$(basename "$file" .json)" --slurpfile bindings "$out/mvc-bindings.json" '
+      def at($parts):
+        if type == "array" then .[] | at($parts)
+        elif ($parts | length) == 0 then .
+        elif type == "object" then
+          ($parts[0]) as $p
+          | (if ($p | endswith("[x]")) then ($p | rtrimstr("[x]")) as $pre
+              | to_entries[] | select((.key | startswith($pre)) and ((.key | ltrimstr($pre) | .[0:1]) | test("^[A-Z]$"))) | .value
+            else .[$p] // empty end)
+          | at($parts[1:])
+        else empty end;
+      . as $resource
+      | ($bindings[0][(.meta.profile // [])[0] // ""] // [])[]
+      | . as $binding
+      | $resource | at($binding.path | split(".") | .[1:])
+      | select(type == "object")
+      | (if has("coding") then [.coding[] | select(.system != null and .code != null) | "\(.system)|\(.code)"]
+         elif (.system | type) == "string" and (.code | type) == "string" then ["\(.system)|\(.code)"]
+         else [] end) as $codings
+      | select(($codings | length) > 0 or (has("text") and $binding.strength == "required"))
+      | {id: "\($stem) \($binding.path) \(if ($codings | length) > 0 then ($codings | join(",")) else "(text only)" end)",
+         passed: any($codings[]; . as $c | $binding.members[$c] or $binding.members[($c | split("|")[0]) + "|*"]),
+         valueSet: $binding.valueSet}' "$file"
+  done | jq -s -c 'unique_by(.id)
+    | {corpus: "myhealth-eu-mvc", total: length,
+       cases: map(if .passed then {id, passed} else {id, passed, failure: "no coding is in \(.valueSet)"} end)}' \
+    > "$results/myhealth-eu-mvc.json"
+  echo "myhealth-eu: myhealth-eu-mvc $(jq '[.cases[] | select(.passed)] | length' "$results/myhealth-eu-mvc.json") / $(jq .total "$results/myhealth-eu-mvc.json")"
 }
 
 # self_test: holds judge to its rules over synthetic validator outputs.
@@ -421,6 +622,13 @@ case "${1:-}" in
 --self-test)
   self_test
   ;;
+--myhealth-eu)
+  [[ "$#" -eq 3 ]] || {
+    echo "usage: $0 --myhealth-eu DOCUMENTS OUT" >&2
+    exit 2
+  }
+  myhealth_eu "$2" "$3"
+  ;;
 --judge)
   [[ "$#" -eq 4 ]] || {
     echo "usage: $0 --judge OUTPUT DOCUMENTS OUT" >&2
@@ -429,7 +637,7 @@ case "${1:-}" in
   judge "$2" "$3" "$4"
   ;;
 -* | '')
-  echo "usage: $0 DOCUMENTS OUT | --judge OUTPUT DOCUMENTS OUT | --self-test" >&2
+  echo "usage: $0 DOCUMENTS OUT | --myhealth-eu DOCUMENTS OUT | --judge OUTPUT DOCUMENTS OUT | --self-test" >&2
   exit 2
   ;;
 *)

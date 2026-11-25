@@ -45,6 +45,12 @@ with what the obligations profiles ask of a producer and a consumer. No
 element is a Rust type of its own, so a new release of the models is a new
 package, never new code.
 
+`draft` sets the data sets of the draft implementing act of 2026-11-23
+(Annexes III to X) beside those models, one row per annex element with its
+Xt-EHR element, the cardinality on both sides and how the two differ. The
+draft leads where they differ, and the crate's tests fail when the annex
+text or the package and the rows disagree.
+
 The crate authors no mapping language and no profile mapping: FHIRconnect
 files are its input. It depends on no logging component and on no
 application, so it and the European logging component stay independent of
@@ -86,6 +92,83 @@ four ways:
   document with the validator's outcome and a summary, are the
   `eehrxf-fhir-validation` artifact of the run. They are the evidence for the
   documents the component writes.
+- **The MyHealth@EU guides on their CI line:** the same job measures the
+  component's documents against four MyHealth@EU guides as built on
+  `build-fhir.ehdsi.eu`, each pinned by sha256 because the publisher
+  overwrites a build in place: each laboratory report against Laboratory
+  9.2.0, each discharge report against HDR 9.2.0, every entry of a type Core
+  1.0.1 profiles against that profile, and every coding against the value
+  sets of the Master Value Sets Catalogue 10.1.0. Each guide is a conformance
+  corpus with a pass list under `conformance/myhealth-eu-*/`, so a case that
+  stops passing fails the job, and its README badge shows the count. A badge
+  is a self-test against the named CI build, never a certification.
+
+## The Annex III metadata
+
+Art 4 and Annex III of the draft implementing act put the metadata of
+Table 1 on every document and the metadata of Table 2 on every data group.
+`document::metadata` writes them: `DocumentMetadata` holds what Table 1 asks
+beyond the parts a document already takes, `Document::with_metadata` writes
+it on the `Composition`, and `DocumentMetadata::describe` writes the
+`DocumentReference` describing the document, with the `masterIdentifier`,
+`type`, `subject`, `date` and `description` MyHealth@EU
+DocumentReference-minimal requires. `DocumentMetadata::from_composition`
+reads the version, the language and the period from the openEHR
+composition. With metadata set, every data group takes the document's date
+and language where it carries none, and one with no subject is refused. The
+crate documentation lists where each Table 1 element is written. FHIR R4
+holds one `Composition.language` and one `practiceSetting`, so a second value
+is refused rather than dropped.
+
+Xt-EHR D5.2 Table 3 adds traceability metadata that Annex III does not ask
+for. The draft leads, so each is recorded as followed or not:
+
+| D5.2 Table 3 element | Followed | Where, or why not |
+|---|---|---|
+| `authorRole` | no | Annex III asks for no role; `author[x]` names the author |
+| `sourceSystem` | yes | `meta.source` of the `Composition` and the `DocumentReference`, when the caller sets it |
+| `creationDate` | yes | `Composition.date` and `DocumentReference.date`, Table 1 `date` |
+| `lastModified` | no | Annex III Table 1 has no such element; a server sets `meta.lastUpdated` |
+| `provenanceEvent` | yes | the `Provenance` each mapping run writes |
+
+## The representations
+
+Art 3(1) of the draft implementing act exchanges a document as (a) a PDF
+attachment embedded in a FHIR resource with its metadata, (b) FHIR
+narrative by data group, (c) structured FHIR with its narrative, or (d) for
+imaging, DICOM with a FHIR report and manifest. Annex II admits PDF/A-1a or
+PDF/A-1b alone, and admits (d) for imaging only.
+
+- **(a) PDF:** `PdfA::new` accepts a PDF only when its XMP metadata carries
+  the PDF/A identification schema with part 1 and conformance A or B, and
+  refuses any other with a typed error. `DocumentMetadata::describe_pdf`
+  embeds the bytes unchanged in a `DocumentReference`, `contentType`
+  `application/pdf`, with their size and SHA-1, beside the full Annex III
+  metadata. The `DocumentReference` is the FHIR resource Art 3(1)(a) names,
+  and the one MyHealth@EU searches by content type.
+- **(b) Narrative:** `Document::narrative_only` writes the sections with
+  their narrative and refuses a section given a structured entry. A section
+  rule of the category's profile that asks for an entry or an empty reason
+  still holds, so a category whose profile does not permit a narrative-only
+  section refuses it.
+- **(c) Structured** is what every category's document writes.
+- **(d) DICOM with a FHIR report and manifest:** beside the imaging report,
+  `Manifest` writes the imaging study of Annex VII as an HL7 Europe Imaging
+  Manifest 1.0.0-ballot `EuMadoBundle`. The study's identity, modality,
+  start and procedure come from the `ImagingStudy` the imaging mapping
+  writes. Its series, instances and WADO-RS services are DICOM facts that
+  openEHR does not hold, so the caller passes them in from the image
+  archive (QIDO-RS). A manifest without them is refused with a typed error,
+  and none is ever made up.
+
+Which representations a system declares per category is configuration: a
+`Declarations` map from the category code of HL7 Europe's
+`EEHRxFDocumentPriorityCategoryCS` (`Patient-Summaries`,
+`Laboratory-Reports` and the others) to its representations (`pdf`,
+`narrative`, `structured`, `dicom`), read with serde from the system's
+configuration and held to Annex II by `Declarations::check`.
+`Declarations::structured` declares structured FHIR for every category, and
+DICOM beside it for imaging.
 
 ## The definitions it publishes
 
@@ -117,6 +200,7 @@ the crate's tests:
 | HL7 Europe Medication Prescription and Dispense (`hl7.fhir.eu.mpd`) | 1.0.0 | the prescription and dispensation records |
 | HL7 Europe Laboratory Report (`hl7.fhir.eu.laboratory`) | 2.0.0 | the laboratory report crosswalk and document |
 | HL7 Europe Imaging Report (`hl7.fhir.eu.imaging`) | 1.0.0-ballot | the imaging report and imaging study crosswalks |
+| HL7 Europe Imaging Manifest (`hl7.fhir.eu.imaging-manifest`) | 1.0.0-ballot | the imaging study manifest |
 | HL7 Europe Hospital Discharge Report (`hl7.fhir.eu.hdr`) | 1.0.0 | the discharge report crosswalk and document |
 | MyHealth@EU Master Value Sets Catalogue (`myhealth.eu.fhir.mvc-package`) | 9.1.0 | the preferred system of each terminology |
 
@@ -128,7 +212,11 @@ receipt are built. The prescription and dispensation records are read and
 written in the MPD form, and [mapped from and into openEHR](prescription-mapping.md)
 through FerroBRIDGE's MPD contexts. The laboratory report is
 [mapped from and into openEHR](laboratory-mapping.md) through the shipped
-laboratory project and received as a `Bundle-eu-lab`. The imaging report is
+laboratory project and received as a `Bundle-eu-lab`. A non-laboratory
+medical test report of Annex VIII, a spirometry or an electrocardiogram
+result, is mapped from openEHR through the shipped `test-report` project into
+an R4 `DiagnosticReport` that claims no profile, since no HL7 Europe guide
+profiles one. The imaging report is
 [mapped from and into openEHR](imaging-mapping.md) through the shipped
 imaging project, over FerroBRIDGE's template of published CKM archetypes,
 and received as a `BundleReportEuImaging`. The discharge report is

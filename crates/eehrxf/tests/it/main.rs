@@ -40,6 +40,19 @@ mod displays;
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod document;
 #[cfg(test)]
+mod draft;
+#[cfg(test)]
+#[cfg(all(
+    feature = "fhir-r4",
+    feature = "patient-summary",
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "imaging",
+    feature = "laboratory",
+    feature = "discharge"
+))]
+mod draft_corpus;
+#[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod eps_mapped;
 #[cfg(test)]
@@ -67,6 +80,9 @@ mod lab_mapped;
 #[cfg(feature = "laboratory")]
 mod laboratory;
 #[cfg(test)]
+#[cfg(all(feature = "imaging", feature = "fhir-r4"))]
+mod manifest;
+#[cfg(test)]
 #[cfg(feature = "openehr")]
 mod mapping;
 #[cfg(test)]
@@ -85,6 +101,12 @@ mod mappings;
 #[cfg(any(feature = "prescription", feature = "dispensation"))]
 mod medication;
 #[cfg(test)]
+#[cfg(all(
+    feature = "fhir-r4",
+    any(feature = "laboratory", feature = "imaging", feature = "discharge")
+))]
+mod metadata;
+#[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod own;
 #[cfg(test)]
@@ -97,10 +119,24 @@ mod receive;
 #[cfg(test)]
 mod refusals;
 #[cfg(test)]
+#[cfg(all(
+    feature = "fhir-r4",
+    any(
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging",
+        feature = "discharge"
+    )
+))]
+mod representation;
+#[cfg(test)]
 mod support;
 #[cfg(test)]
 #[cfg(feature = "fhir-r4")]
 mod terminology;
+#[cfg(test)]
+#[cfg(all(feature = "openehr", feature = "laboratory"))]
+mod test_report;
 #[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod transformation;

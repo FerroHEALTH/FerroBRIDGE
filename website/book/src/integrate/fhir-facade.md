@@ -860,9 +860,15 @@ Bundle generated on demand from the latest information the CDR holds.
   `unavailable`, with a narrative saying this server does not supply it. A
   patient with no EHR has an empty record.
 - `profile` selects the `Composition` profile: the IPS
-  `Composition-uv-ips` (2.0.1) by default, or the HL7 Europe Patient Summary
-  `composition-eu-eps` (1.0.0-ballot). Any other profile, and the
-  `identifier` input, answer `400` with `not-supported`.
+  `Composition-uv-ips` (2.0.1) by default, the HL7 Europe Patient Summary
+  `composition-eu-eps` (1.0.0-ballot), or the MyHealth@EU Core
+  `composition-myhealtheu-core` (1.0.1). The MyHealth@EU profile answers
+  the HL7 Europe form, which it constrains, and asks the terminology server
+  for the ICD-10 coding of each problem and the ATC coding of each allergen
+  (the value sets Core binds `Condition.code` and `AllergyIntolerance.code`
+  to), added beside the recorded code. A concept the server maps to neither
+  keeps its recorded codes and is counted in the log. Any other profile, and
+  the `identifier` input, answer `400` with `not-supported`.
 - Before it is served, the document is validated in process against the
   `Bundle` profile of its form over the packages `[facade.summary] packages`
   names. A document that breaks it answers `422` with the validator's

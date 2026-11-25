@@ -595,12 +595,7 @@ async fn each_event_of_a_link_is_recorded_with_its_recipient() -> Result<(), Box
     };
     let arr = crate::audit::repository().await;
     let cdr: url::Url = "http://cdr.invalid/".parse()?;
-    let log = crate::audit::access_log(
-        &arr,
-        &store,
-        &cdr,
-        ehds_logging::map::CategoryMap::default(),
-    )?;
+    let log = crate::audit::access_log(&arr, &store, &cdr, None).await?;
     let Some(case) = case(Some(log)).await? else {
         return Ok(());
     };

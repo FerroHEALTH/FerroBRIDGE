@@ -26,6 +26,8 @@ pub mod laboratory;
 pub mod patient_summary;
 #[cfg(feature = "prescription")]
 pub mod prescription;
+#[cfg(feature = "laboratory")]
+pub mod test_report;
 
 use std::collections::BTreeSet;
 
