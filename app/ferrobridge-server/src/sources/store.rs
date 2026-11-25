@@ -368,13 +368,13 @@ async fn record(
         .bind(&route.sending_application)
         .bind(&route.sending_facility)
         .bind(id)
+        .bind(route.certificate_subject())
         .bind(
             route
-                .certificate_subject
-                .as_deref()
-                .filter(|subject| !subject.is_empty()),
+                .networks()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
         )
-        .bind(&route.source_cidrs)
         .execute(&mut *connection)
         .await?;
     }

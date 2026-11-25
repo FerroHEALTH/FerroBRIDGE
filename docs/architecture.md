@@ -2614,12 +2614,15 @@ TLS with a client certificate per sender (#1638) stays the default and the
 plain listener is an explicit exception for devices.
 
 The senders are `mllp` inbound sources of the state store (#2061), routed by
-MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) through `inbound_route_mllp`. A route
-holds the `certificate_subject` the TLS listener checks against the client
-certificate's subject alternative names, the `source_cidrs` the plain
-listener checks against the peer address, or both, and its source carries
-the per-sender settings. A message whose route the connection does not
-match is answered `AR`, and its plain connection closed
+MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) through `inbound_route_mllp`. A route's
+`certificate_subject` and `source_cidrs` read as `inbound::verify::Verifier`
+proofs (`mtls` against the client certificate's subject alternative names,
+`network` against the peer address), and every proof a route holds must
+hold, through the `Proofs` set the HTTP intake verifies with too. The TLS
+listener needs a route with a certificate proof and the plain listener one
+with a network proof. Its source carries the per-sender settings. A message
+whose connection fails a proof of its route is answered `AR`, and its plain
+connection closed
 (`Connection::close`); a message the store cannot route is answered `AE`.
 The file keeps the listeners alone (`listen`, `[hl7v2.tls]`,
 `[hl7v2.plain] bind`, the timeouts and `frame_limit`), so a new source never

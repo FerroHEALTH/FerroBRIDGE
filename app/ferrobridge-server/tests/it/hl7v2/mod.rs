@@ -580,5 +580,6 @@ mod clinician;
 mod facility;
 mod feeder_audit;
 mod plain;
+mod proofs;
 mod relay;
 mod routes;
