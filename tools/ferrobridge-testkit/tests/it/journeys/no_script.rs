@@ -32,13 +32,14 @@ const WITHHELD: &str = "*/ferrohealth-ui/*/scripts/*";
 
 /// Every navigation entry: its words, the page it leads to, and the words
 /// that page draws in its main region.
-const ENTRIES: [(&str, &str, &str); 9] = [
+const ENTRIES: [(&str, &str, &str); 10] = [
     ("Mapping set", "/mappings", "Mapping set"),
     ("Playground", "/playground", "Playground"),
     ("FHIR facade", "/facade", "FHIR facade"),
     ("HL7 v2", "/hl7v2", "HL7 v2"),
     ("OMOP ETL", "/omop", "OMOP ETL"),
     ("Events", "/events", "Events"),
+    ("Sources", "/sources", "Sources"),
     ("Connections", "/connections", "Connections"),
     ("Configuration", "/configuration", "Configuration"),
     ("About", "/about", "About"),

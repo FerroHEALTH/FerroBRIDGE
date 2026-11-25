@@ -209,6 +209,15 @@ console answers with the page it drew.
   "Standby"; then the exchange, the routing-key grammar and the bound
   queues. The topology changes in the configuration. A bridge with no
   consumer says so in one line.
+- **Sources** (`/sources`, `/sources/new`, `/sources/{id}`): the inbound
+  sources of a bridge with a state store, each with its kind, its state, its
+  version and who wrote it; a source's page shows its facts, every version
+  with its committer, and the edit form (name, kind, Enabled, and the
+  document as JSON) whose Save posts `PUT /operator/sources/{id}` under the
+  `ETag` the page showed and whose Delete posts the `DELETE`; New source
+  posts `POST /operator/sources` and goes to the new source. A stale save
+  draws the bridge's `412`. A bridge without `[state]` says it keeps no
+  sources.
 - **Connections** (`/connections`, `/connections/{name}`,
   `/connections/{name}/settings`): each upstream with its host, how it
   signs in, the lanes that use it and its state from the bridge's
@@ -486,6 +495,21 @@ The Events page of a bridge whose broker cannot be reached: the consumer
 reads degraded with its cause, its cursor stays where it was, and an event
 it parked waits for an operator to retry or discard it.
 [Dark theme](img/console/events-degraded-dark.png).
+
+![The inbound sources](img/console/sources.png)
+
+The Sources page with one MLLP source.
+[Dark theme](img/console/sources-dark.png).
+
+![A new source](img/console/source-new.png)
+
+The form of a new source.
+[Dark theme](img/console/source-new-dark.png).
+
+![One source](img/console/source.png)
+
+One source just disabled, with its versions and its edit form.
+[Dark theme](img/console/source-dark.png).
 
 ![Connections](img/console/connections.png)
 
