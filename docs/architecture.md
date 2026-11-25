@@ -2425,6 +2425,14 @@ due. One replica runs a source's recovery under the lane lease
 `inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
 a transaction that fences the generation that read it. The schedule is our
 own design, since no specification governs it.
+A `fhir-subscription` source receives R4 notifications of the Subscriptions
+R5 Backport IG STU 1.1.0
+(<https://hl7.org/fhir/uv/subscriptions-backport/notifications.html>) on the
+same route, the `rest-hook` channel of the NL Generic Functions notification
+page; each event becomes one work item keyed by the subscription and its
+event number, `fhir_subscription_state` keeps each subscription's status,
+highest event and gap, and the recovery leader recovers a gap through
+`$events` (errors.html).
 
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in

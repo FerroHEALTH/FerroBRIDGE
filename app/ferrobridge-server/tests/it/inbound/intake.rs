@@ -53,9 +53,14 @@ fn post(source: &str, body: Vec<u8>, signature: &str) -> Result<Request<Body>, h
         .body(Body::from(body))
 }
 
-/// Returns `product` in the shipped stack.
+/// Returns `product` in the shipped stack, whose ceiling admits the
+/// notification examples.
 pub(crate) fn app_with(product: axum::Router) -> axum::Router {
-    with_middleware(product, support::state(), &support::settings())
+    let settings = ferrohealth_server::section::ServerSection {
+        body_limit: ferrohealth_config::units::ByteSize::from_bytes(64 * 1024),
+        ..support::settings()
+    };
+    with_middleware(product, support::state(), &settings)
 }
 
 /// The intake over `sources` and the store behind `pool`, in the shipped

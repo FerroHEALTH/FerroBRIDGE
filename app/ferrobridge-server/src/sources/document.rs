@@ -110,10 +110,21 @@ pub struct HeaderAuth {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FhirSubscription {
-    /// The header the sender authenticates with, absent when the TLS client
-    /// certificate alone admits it.
+    /// The header the sender authenticates with (`Subscription.channel.header`).
     #[serde(default)]
     pub header: Option<HeaderAuth>,
+    /// The names the sender's verified TLS client certificate must carry,
+    /// as the NL Generic Functions notification endpoint requires.
+    #[serde(default)]
+    pub mtls: Option<crate::inbound::verify::Mtls>,
+    /// The tenant each subscription serves, by the subscription reference its
+    /// notifications name.
+    #[serde(default)]
+    pub subscriptions: std::collections::BTreeMap<String, String>,
+    /// The FHIR base a relative subscription reference resolves against for
+    /// `$events`.
+    #[serde(default)]
+    pub base: Option<String>,
     /// The tenants.
     #[serde(default)]
     pub tenants: Vec<Tenant>,
@@ -198,6 +209,26 @@ impl Document {
                     && (header.name.trim().is_empty() || header.keys.is_empty())
                 {
                     return Err(Invalid(String::from("header names no header or no key")));
+                }
+                if subscription.header.is_none()
+                    && subscription
+                        .mtls
+                        .as_ref()
+                        .is_none_or(|mtls| mtls.subjects.iter().all(|name| name.trim().is_empty()))
+                {
+                    return Err(Invalid(String::from(
+                        "a FHIR Subscription source names a header or mtls subjects",
+                    )));
+                }
+                if let Some(tenant) = subscription.subscriptions.values().find(|tenant| {
+                    !subscription
+                        .tenants
+                        .iter()
+                        .any(|known| &known.name == *tenant)
+                }) {
+                    return Err(Invalid(format!(
+                        "subscriptions names the unknown tenant {tenant}"
+                    )));
                 }
                 tenants(&subscription.tenants)
             }

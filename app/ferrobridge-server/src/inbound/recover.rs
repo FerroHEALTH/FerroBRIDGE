@@ -370,6 +370,68 @@ impl Recoverer {
         Ok(marked)
     }
 
+    /// Recovers each gap of `source`'s FHIR Subscriptions through `$events`
+    /// under `generation` of the source's lease; returns the events stored.
+    ///
+    /// # Errors
+    /// Returns [`RecoverError`] for the first gap that cannot be recovered.
+    pub async fn catch_up(
+        &self,
+        source: &Source,
+        lease: &Lease,
+        generation: Generation,
+    ) -> Result<u64, RecoverError> {
+        let Document::FhirSubscription(subscription) = &source.parsed else {
+            return Ok(0);
+        };
+        let keeper = super::keeper::Keeper::new(self.store.pool().clone());
+        let mut stored = 0;
+        for gap in keeper
+            .gaps(source.id)
+            .await
+            .map_err(CursorError::Database)?
+        {
+            let credentials = subscription
+                .tenants
+                .iter()
+                .find(|tenant| tenant.name == gap.tenant)
+                .and_then(|tenant| tenant.credentials.as_ref());
+            let client = self.client(source, credentials)?;
+            let mut url = events_url(subscription.base.as_deref(), &gap.subscription)?;
+            url.query_pairs_mut()
+                .append_pair("eventsSinceNumber", &gap.from.to_string())
+                .append_pair("eventsUntilNumber", &gap.to.to_string())
+                .append_pair("content", "id-only");
+            let answer = client
+                .get(url)
+                .header(http::header::ACCEPT, "application/fhir+json")
+                .send()
+                .await
+                .map_err(RecoverError::Call)?;
+            if !answer.status().is_success() {
+                return Err(RecoverError::Status(answer.status()));
+            }
+            let body: serde_json::Value = answer
+                .json()
+                .await
+                .map_err(|_json| RecoverError::Unreadable)?;
+            let notification =
+                super::subscription::read(&body).map_err(|_malformed| RecoverError::Unreadable)?;
+            if notification.subscription != gap.subscription {
+                return Err(RecoverError::Unreadable);
+            }
+            if let super::keeper::Received::Recorded { stored: count, .. } = keeper
+                .receive(source.id, &subscription.subscriptions, &notification)
+                .await
+                .map_err(CursorError::Database)?
+            {
+                stored += u64::try_from(count).unwrap_or(u64::MAX);
+            }
+            keeper.close(lease, generation, source.id, &gap).await?;
+        }
+        Ok(stored)
+    }
+
     /// Returns a client presenting the PEM certificate and key `credentials`
     /// names, or none.
     fn client(
@@ -428,7 +490,12 @@ impl Recoverer {
             }
         };
         for source in sources.into_iter().filter(|source| source.enabled) {
-            if webhook_of(&source).is_none_or(|webhook| webhook.recovery == Recovery::default()) {
+            let recovers = match &source.parsed {
+                Document::Webhook(webhook) => webhook.recovery != Recovery::default(),
+                Document::FhirSubscription(_) => true,
+                Document::Mllp(_) => false,
+            };
+            if !recovers {
                 continue;
             }
             let Ok(lease) = self.lease_of(source.id) else {
@@ -450,6 +517,9 @@ impl Recoverer {
             if let Err(error) = self.reconcile(&source, &lease, generation, false).await {
                 tracing::warn!(%error, source = %source.name, "a reconciliation poll failed");
             }
+            if let Err(error) = self.catch_up(&source, &lease, generation).await {
+                tracing::warn!(%error, source = %source.name, "a subscription gap could not be recovered");
+            }
             if matches!(lease.renew(generation).await, Ok(Renewed::Lost)) {
                 tracing::info!(source = %source.name, "another replica took the recovery lease");
             }
@@ -463,6 +533,25 @@ fn webhook_of(source: &Source) -> Option<&Webhook> {
         Document::Webhook(webhook) => Some(webhook),
         Document::FhirSubscription(_) | Document::Mllp(_) => None,
     }
+}
+
+/// Returns the `$events` URL of `subscription`, resolving a relative
+/// reference against `base` (Subscriptions R5 Backport STU 1.1.0,
+/// `OperationDefinition` `backport-subscription-events`).
+fn events_url(base: Option<&str>, subscription: &str) -> Result<url::Url, RecoverError> {
+    let absolute = match url::Url::parse(subscription) {
+        Ok(url) => url,
+        Err(_relative) => {
+            let base = base.ok_or(RecoverError::Unreadable)?;
+            url::Url::parse(&format!("{}/{subscription}", base.trim_end_matches('/')))
+                .map_err(|_url| RecoverError::Unreadable)?
+        }
+    };
+    url::Url::parse(&format!(
+        "{}/$events",
+        absolute.as_str().trim_end_matches('/')
+    ))
+    .map_err(|_url| RecoverError::Unreadable)
 }
 
 /// Reads the entities `poll` returns since `since`.

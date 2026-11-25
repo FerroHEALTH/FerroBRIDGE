@@ -10,7 +10,8 @@
 -- a worker finishing at an older generation leaves the item pending.
 -- inbound_slot bounds the remote calls in flight per source and tenant
 -- across every replica. inbound_cursor holds where each reconciliation poll
--- reads from. An accepted event notifies ferrobridge_inbound.
+-- reads from, and fhir_subscription_state each FHIR Subscription's status,
+-- highest event and gap. An accepted event notifies ferrobridge_inbound.
 --
 -- No specification governs an inbound intake: our own design.
 
@@ -97,3 +98,25 @@ CREATE TABLE inbound_cursor (
 );
 
 COMMENT ON TABLE inbound_cursor IS 'The since-cursor of each reconciliation poll per inbound source and tenant, moved only under the lease generation of the source''s recovery lane. Our own design.';
+
+CREATE TABLE fhir_subscription_state (
+    source_id uuid REFERENCES inbound_source ON DELETE CASCADE,
+    -- The subscription reference as its notifications name it.
+    subscription text,
+    tenant text NOT NULL,
+    -- The status code the newest notification carried.
+    status text NOT NULL,
+    -- The highest event number stored.
+    last_event bigint NOT NULL DEFAULT 0 CONSTRAINT fhir_subscription_state_last_check
+        CHECK (last_event >= 0),
+    -- The event numbers no notification delivered, which $events recovers.
+    gap_from bigint,
+    gap_to bigint,
+    handshake_at timestamptz,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (source_id, subscription),
+    CONSTRAINT fhir_subscription_state_gap_check
+        CHECK ((gap_from IS NULL) = (gap_to IS NULL) AND (gap_from IS NULL OR gap_from <= gap_to))
+);
+
+COMMENT ON TABLE fhir_subscription_state IS 'Each FHIR Subscription an inbound source notifies: its status, the highest event stored and the gap $events recovers (Subscriptions R5 Backport STU 1.1.0, errors.html). Our own design.';

@@ -388,7 +388,7 @@ A source carries a `name` (`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, at most
 | Kind | Document |
 |---|---|
 | `webhook` | `verify`: the verifier, by `kind` (`hmac` with `algorithm`, `header`, `encoding` and `prefix`; `standard-webhooks` with `schemes`, `tolerance` and `endpoint_id`; `static-header` with `header`; `mtls` with `subjects`); `keys`: the secrets the verifier checks with, any of which verifies, newest first, none for `mtls`; `events`: the event map (`tenant`, `entity`, `rules`, `otherwise`, `dedupe` and `stamp`); `recovery`: the optional `redeliver` and `reconcile` steps; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled`; `limits`: `body_limit` (`65536`), `concurrency` (`4`) and `max_pending` (`100000`). [The inbound intake](../integrate/inbound.md) describes each part |
-| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; `tenants` as above |
+| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; optional `mtls`: the `subjects` its client certificate must carry, at least one of the two; `subscriptions`: the tenant of each subscription reference; optional `base`: the FHIR base a relative reference resolves against; `tenants` as above ([FHIR Subscription notifications](../integrate/inbound.md#fhir-subscription-notifications)) |
 | `mllp` | `routes`: each `sending_application` (MSH-3) and `sending_facility` (MSH-4), bound to a `certificate_subject`, to `source_cidrs`, or to both |
 
 A secret is named, never written: `{"secret": "<name>"}` resolves through

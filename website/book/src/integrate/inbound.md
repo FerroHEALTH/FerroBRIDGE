@@ -119,3 +119,30 @@ runs them per source under the lane lease `inbound-recover:<source id>`:
 Each replica looks for due recovery every `[inbound] recovery_tick`.
 `POST /operator/sources/{id}/reconcile` runs every poll at once, and
 `POST /operator/sources/{id}/redeliver` calls the redelivery step.
+
+## FHIR Subscription notifications
+
+A `fhir-subscription` source receives R4 notifications of the Subscriptions
+R5 Backport IG STU 1.1.0 on the same `POST /inbound/{source}`, the
+`rest-hook` channel the NL Generic Functions notification page asks for.
+The source authenticates with the `header` its `Subscription.channel.header`
+carries, with a verified client certificate carrying one of its `mtls`
+names, or both. A notification is a `history` Bundle whose first entry is the
+`Parameters` subscription status; one that is not answers `400`.
+
+- `subscriptions` maps each subscription reference to the tenant it
+  serves; a notification for another subscription answers `200` unstored.
+- A handshake records the subscription. Every notification records its
+  status.
+- Each event of an `id-only` or `full-resource` notification becomes one
+  work item: the focus when it is a `Patient`, else the carried resource's
+  `subject` or `patient`, else the focus, which the worker reads. The key is
+  the subscription and the event number, so an event sent twice is stored
+  once.
+- An event count beyond the highest event stored, from a heartbeat or a
+  notification, and an `empty` event, which names no focus, are a gap. The
+  replica that leads the source's recovery calls
+  `Subscription/{id}/$events` with `eventsSinceNumber`, `eventsUntilNumber`
+  and `content=id-only` for each gap and stores what it returns. A relative
+  subscription reference resolves against `base`, and the call presents the
+  tenant's `credentials`.

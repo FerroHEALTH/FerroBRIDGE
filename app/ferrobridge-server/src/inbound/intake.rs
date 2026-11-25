@@ -25,11 +25,12 @@ use ferrohealth_server::tls::PeerCertificates;
 use secrecy::ExposeSecret as _;
 
 use super::event::{Event, Reading};
+use super::keeper::Keeper;
 use super::recover::{Recoverer, Unavailable};
 use super::store::InboxStore;
-use super::verify::{Key, Request};
+use super::verify::{Key, Request, StaticHeader, Verifier};
 use crate::problem::{Kind, blank, refuse};
-use crate::sources::document::{Document, Webhook};
+use crate::sources::document::{Document, FhirSubscription, Webhook};
 use crate::sources::{Source, Sources};
 
 /// The intake one replica serves.
@@ -39,6 +40,8 @@ pub struct Intake {
     sources: Arc<Sources>,
     /// The inbox.
     store: InboxStore,
+    /// The state of the FHIR Subscriptions the sources notify.
+    keeper: Keeper,
     /// The largest body any source may send, in bytes.
     body_limit: usize,
     /// The recovery steps, which a run of `503` answers calls for.
@@ -51,9 +54,10 @@ impl Intake {
     /// Returns the intake over `sources` and `store`, reading at most
     /// `body_limit` bytes of any body.
     #[must_use]
-    pub const fn new(sources: Arc<Sources>, store: InboxStore, body_limit: usize) -> Self {
+    pub fn new(sources: Arc<Sources>, store: InboxStore, body_limit: usize) -> Self {
         Self {
             sources,
+            keeper: Keeper::new(store.pool().clone()),
             store,
             body_limit,
             recoverer: None,
@@ -117,12 +121,7 @@ async fn receive(
 ) -> Response {
     let source = match intake.sources.named(&name).await {
         Ok(Some(source)) if source.enabled => source,
-        Ok(_) => {
-            return refuse(
-                Kind::UnknownSource,
-                "no enabled webhook source has this name",
-            );
-        }
+        Ok(_) => return refuse(Kind::UnknownSource, UNKNOWN),
         Err(error) => {
             tracing::warn!(%error, "the inbound sources could not be read");
             return unavailable(
@@ -131,25 +130,16 @@ async fn receive(
             );
         }
     };
-    let Document::Webhook(webhook) = &source.parsed else {
-        return refuse(
-            Kind::UnknownSource,
-            "no enabled webhook source has this name",
-        );
+    let limit = match &source.parsed {
+        Document::Webhook(webhook) => webhook.limits.body_limit.min(intake.body_limit),
+        Document::FhirSubscription(_) => intake.body_limit,
+        Document::Mllp(_) => return refuse(Kind::UnknownSource, UNKNOWN),
     };
-    let limit = webhook.limits.body_limit.min(intake.body_limit);
     let Ok(bytes) = axum::body::to_bytes(body, limit).await else {
         return blank(
             StatusCode::PAYLOAD_TOO_LARGE,
             "the body is larger than the source may send",
         );
-    };
-    let keys = match intake.sources.keys(&source, &webhook.keys) {
-        Ok(keys) => keys
-            .iter()
-            .map(|key| Key::new(key.expose_secret().as_bytes().to_vec()))
-            .collect::<Vec<_>>(),
-        Err(unavailable) => return unavailable.into_response(),
     };
     let request = Request {
         headers: &headers,
@@ -159,17 +149,59 @@ async fn receive(
             .and_then(|axum::Extension(chain)| chain.0.first()),
         now: jiff::Timestamp::now().as_second(),
     };
-    if let Err(reason) = webhook.verify.verify(&request, &keys) {
-        tracing::info!(source = %source.name, %reason, "an inbound request failed verification");
-        return refuse(
-            Kind::Unverified,
-            "the request does not prove it comes from the source",
-        );
+    match &source.parsed {
+        Document::Webhook(webhook) => receive_event(&intake, &source, webhook, &request).await,
+        Document::FhirSubscription(subscription) => {
+            receive_notification(&intake, &source, subscription, &request).await
+        }
+        Document::Mllp(_) => refuse(Kind::UnknownSource, UNKNOWN),
     }
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+}
+
+/// The `404` detail of a name no enabled source of an HTTP kind has.
+const UNKNOWN: &str = "no enabled webhook or FHIR Subscription source has this name";
+
+/// The `401` of a request that failed its verifier, logged with its reason.
+fn unverified(source: &Source, reason: super::verify::Refused) -> Response {
+    tracing::info!(source = %source.name, %reason, "an inbound request failed verification");
+    refuse(
+        Kind::Unverified,
+        "the request does not prove it comes from the source",
+    )
+}
+
+/// Returns the values of `keys` as verifier keys.
+fn keys_of(
+    intake: &Intake,
+    source: &Source,
+    keys: &[crate::sources::document::SecretRef],
+) -> Result<Vec<Key>, crate::sources::SecretUnavailable> {
+    Ok(intake
+        .sources
+        .keys(source, keys)?
+        .iter()
+        .map(|key| Key::new(key.expose_secret().as_bytes().to_vec()))
+        .collect())
+}
+
+/// One webhook event.
+async fn receive_event(
+    intake: &Arc<Intake>,
+    source: &Arc<Source>,
+    webhook: &Webhook,
+    request: &Request<'_>,
+) -> Response {
+    let keys = match keys_of(intake, source, &webhook.keys) {
+        Ok(keys) => keys,
+        Err(unavailable) => return unavailable.into_response(),
+    };
+    if let Err(reason) = webhook.verify.verify(request, &keys) {
+        return unverified(source, reason);
+    }
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(request.body) else {
         return refuse(Kind::UnreadableEvent, "the body is no JSON");
     };
-    let event = match webhook.events.read(&headers, &value) {
+    let event = match webhook.events.read(request.headers, &value) {
         Ok(Reading::Store(event)) => event,
         Ok(Reading::Answer(_)) => return StatusCode::OK.into_response(),
         Err(unreadable) => {
@@ -200,13 +232,68 @@ async fn receive(
     }
     match intake.store.accept(source.id, tenant, &event).await {
         Ok(_) => {
-            redeliver_after_outage(&intake, &source, webhook);
+            redeliver_after_outage(intake, source, webhook);
             StatusCode::OK.into_response()
         }
         Err(error) => {
             tracing::warn!(%error, source = %source.name, "an inbound event could not be stored");
             intake.unavailable.refused(source.id);
             unavailable(Kind::InboundUnavailable, "the event could not be stored")
+        }
+    }
+}
+
+/// One FHIR Subscription notification: verified by the header and the
+/// client certificate the source declares, read as an R4 notification
+/// Bundle, and recorded with one work item per event.
+async fn receive_notification(
+    intake: &Intake,
+    source: &Source,
+    subscription: &FhirSubscription,
+    request: &Request<'_>,
+) -> Response {
+    if let Some(header) = &subscription.header {
+        let keys = match keys_of(intake, source, &header.keys) {
+            Ok(keys) => keys,
+            Err(unavailable) => return unavailable.into_response(),
+        };
+        let verifier = Verifier::StaticHeader(StaticHeader {
+            header: header.name.clone(),
+        });
+        if let Err(reason) = verifier.verify(request, &keys) {
+            return unverified(source, reason);
+        }
+    }
+    if let Some(mtls) = &subscription.mtls
+        && let Err(reason) = Verifier::Mtls(mtls.clone()).verify(request, &[])
+    {
+        return unverified(source, reason);
+    }
+    let notification = match serde_json::from_slice::<serde_json::Value>(request.body)
+        .map_err(|_json| super::subscription::Malformed::NotHistory)
+        .and_then(|value| super::subscription::read(&value))
+    {
+        Ok(notification) => notification,
+        Err(malformed) => {
+            tracing::info!(source = %source.name, %malformed, "a notification could not be read");
+            return refuse(
+                Kind::UnreadableEvent,
+                "the body is no R4 subscription notification",
+            );
+        }
+    };
+    match intake
+        .keeper
+        .receive(source.id, &subscription.subscriptions, &notification)
+        .await
+    {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(error) => {
+            tracing::warn!(%error, source = %source.name, "a notification could not be recorded");
+            unavailable(
+                Kind::InboundUnavailable,
+                "the notification could not be recorded",
+            )
         }
     }
 }

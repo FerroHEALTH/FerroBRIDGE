@@ -152,6 +152,12 @@ impl InboxStore {
         Self { pool }
     }
 
+    /// Returns the pool the rows are read and written through.
+    #[must_use]
+    pub const fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Returns how many items of `source_id` wait or run.
     ///
     /// # Errors
@@ -180,33 +186,17 @@ impl InboxStore {
         event: &Event,
     ) -> Result<Accepted, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
-        let inserted: Option<Uuid> = sqlx::query_scalar(
-            "INSERT INTO inbound_event (source_id, dedupe_key, tenant, entity_key, change, stamp) \
-             VALUES ($1, $2, $3, $4, $5, $6) \
-             ON CONFLICT (source_id, dedupe_key) DO NOTHING RETURNING id",
-        )
-        .bind(source_id)
-        .bind(event.dedupe_key.as_bytes().as_slice())
-        .bind(tenant)
-        .bind(&event.entity)
-        .bind(change_text(event.change))
-        .bind(event.stamp.as_deref())
-        .fetch_optional(&mut *tx)
-        .await?;
-        if inserted.is_none() {
-            tx.commit().await?;
-            return Ok(Accepted::Repeated);
-        }
-        bump(
-            &mut tx,
-            source_id,
-            tenant,
-            std::slice::from_ref(&event.entity),
-            event.change,
-        )
-        .await?;
+        let accepted = store_event(&mut tx, source_id, tenant, event).await?;
         tx.commit().await?;
-        Ok(Accepted::Stored)
+        Ok(accepted)
+    }
+
+    /// Begins a transaction on the store.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when no connection is free.
+    pub async fn begin(&self) -> Result<sqlx::Transaction<'static, sqlx::Postgres>, sqlx::Error> {
+        self.pool.begin().await
     }
 
     /// Claims at most `limit` due items for `holder` until `lease` passes:
@@ -511,6 +501,15 @@ pub enum CursorError {
     Database(#[from] sqlx::Error),
 }
 
+impl From<crate::store::lease::LeaseError> for CursorError {
+    fn from(error: crate::store::lease::LeaseError) -> Self {
+        match error {
+            crate::store::lease::LeaseError::Database(error) => Self::Database(error),
+            other => Self::Fenced(other),
+        }
+    }
+}
+
 impl InboxStore {
     /// Returns the cursor of poll `poll` of `source_id` for `tenant` and when
     /// it last moved, `None` before its first poll.
@@ -558,13 +557,7 @@ impl InboxStore {
         next: jiff::Timestamp,
     ) -> Result<(), CursorError> {
         let mut tx = self.pool.begin().await?;
-        lease
-            .fence(&mut tx, generation)
-            .await
-            .map_err(|error| match error {
-                crate::store::lease::LeaseError::Database(error) => CursorError::Database(error),
-                other => CursorError::Fenced(other),
-            })?;
+        lease.fence(&mut tx, generation).await?;
         sqlx::query(
             "INSERT INTO inbound_cursor (source_id, tenant, poll, cursor, polled_at) \
              VALUES ($1, $2, $3, $4::timestamptz, now()) \
@@ -601,6 +594,45 @@ impl InboxStore {
         tx.commit().await?;
         Ok(marked)
     }
+}
+
+/// Stores `event` of `source_id` for `tenant` in `tx` and moves its entity's
+/// work item to a new generation, notifying [`CHANNEL`] when `tx` commits;
+/// a stored repeat changes nothing.
+///
+/// # Errors
+/// Returns [`sqlx::Error`] when a statement fails.
+pub async fn store_event(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    source_id: Uuid,
+    tenant: &str,
+    event: &Event,
+) -> Result<Accepted, sqlx::Error> {
+    let inserted: Option<Uuid> = sqlx::query_scalar(
+        "INSERT INTO inbound_event (source_id, dedupe_key, tenant, entity_key, change, stamp) \
+         VALUES ($1, $2, $3, $4, $5, $6) \
+         ON CONFLICT (source_id, dedupe_key) DO NOTHING RETURNING id",
+    )
+    .bind(source_id)
+    .bind(event.dedupe_key.as_bytes().as_slice())
+    .bind(tenant)
+    .bind(&event.entity)
+    .bind(change_text(event.change))
+    .bind(event.stamp.as_deref())
+    .fetch_optional(&mut **tx)
+    .await?;
+    if inserted.is_none() {
+        return Ok(Accepted::Repeated);
+    }
+    bump(
+        tx,
+        source_id,
+        tenant,
+        std::slice::from_ref(&event.entity),
+        event.change,
+    )
+    .await?;
+    Ok(Accepted::Stored)
 }
 
 /// Moves the work items of `entities` of `source_id` and `tenant` to a new
