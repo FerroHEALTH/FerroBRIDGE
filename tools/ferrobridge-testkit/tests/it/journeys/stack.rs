@@ -505,6 +505,8 @@ async fn bridge(
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [state]\nurl = \"{state}\"\n\n[state.seal]\nlookup_key = \"{LOOKUP_KEY}\"\n\n\
          [[state.seal.keys]]\nid = \"journey\"\nkey = \"{SEAL_KEY}\"\n\n\
+         [identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\n\
+         endpoint.url = \"{cdr}/identity-source\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
