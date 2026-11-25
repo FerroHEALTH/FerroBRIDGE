@@ -44,7 +44,7 @@ pub(super) fn follow(
     let resource = Value::Object(matched.clone());
     let mut referenced: Vec<(Option<&str>, String)> = Vec::new();
     for include in includes {
-        for reference in references(include.expression, &resource)? {
+        for reference in references(&include.expression, &resource)? {
             referenced.push((include.target.as_deref(), reference));
         }
     }

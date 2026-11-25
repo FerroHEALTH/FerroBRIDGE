@@ -398,4 +398,32 @@ mod tests {
             assert!(matches!(error, DeclarationError::Shape { .. }), "{error:?}");
         }
     }
+
+    #[test]
+    fn an_include_keeps_the_branches_of_its_own_type() {
+        let includes = crate::facade::search::declaration::check_includes(
+            Path::new(FILE),
+            "MedicationStatement",
+            &[String::from("medication")],
+        )
+        .expect("the include checks");
+        assert_eq!(
+            Some("(MedicationStatement.medication as Reference)"),
+            includes
+                .get("medication")
+                .map(|include| include.expression.as_str())
+        );
+        for (resource_type, code) in [("Condition", "code"), ("Condition", "nothing")] {
+            let error = crate::facade::search::declaration::check_includes(
+                Path::new(FILE),
+                resource_type,
+                &[String::from(code)],
+            )
+            .expect_err("no reference parameter of that code");
+            assert!(
+                matches!(error, DeclarationError::Include { .. }),
+                "{error:?}"
+            );
+        }
+    }
 }
