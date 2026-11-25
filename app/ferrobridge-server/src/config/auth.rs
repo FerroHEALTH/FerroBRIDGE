@@ -11,6 +11,7 @@ use ferrohealth_smart::config::BasicGrants;
 use ferrohealth_smart::config::ConfigError;
 
 use super::error::Error;
+use crate::assurance::Minimums;
 use crate::smart::OPERATOR_SCOPE;
 use crate::smart::SmartSettings;
 
@@ -32,10 +33,12 @@ use crate::smart::SmartSettings;
 /// document and its `CapabilityStatement`. The crate refuses a grant
 /// naming a user `[[auth.basic.users]]` does not list, and a grant of a
 /// `system/` scope, naming the user and the scope: a Basic credential is a
-/// person's.
+/// person's. `assurance` is the minimum of each route class, refused when no
+/// issuer's `acr` mapping reaches it.
 pub(super) fn resolve_auth(
     auth: &AuthSection,
     grants: &BasicGrants,
+    assurance: Minimums,
     base_url: &str,
 ) -> Result<Option<SmartSettings>, Error> {
     let resolved = auth
@@ -54,7 +57,7 @@ pub(super) fn resolve_auth(
         });
     }
     let options = resolved.smart_options();
-    Ok(Some(SmartSettings {
+    let settings = SmartSettings {
         issuers: resolved.issuers,
         introspection: resolved.introspection,
         described_issuer: resolved.described_issuer,
@@ -64,7 +67,12 @@ pub(super) fn resolve_auth(
         operator_scope: resolved
             .product_scope
             .unwrap_or_else(|| String::from(OPERATOR_SCOPE)),
-    }))
+        assurance,
+    };
+    settings
+        .assurance_check()
+        .map_err(|source| Error::Assurance { source })?;
+    Ok(Some(settings))
 }
 
 /// Returns the Basic users of `store` with the scopes and roles of `grants`

@@ -145,6 +145,13 @@ pub enum Error {
         #[source]
         source: Box<ferrohealth_smart::config::ConfigError>,
     },
+    /// An `[assurance]` minimum cannot be held to.
+    #[error("[assurance] is refused")]
+    Assurance {
+        /// The rule it breaks.
+        #[source]
+        source: crate::assurance::AssuranceError,
+    },
     /// A `[basic_grants]` table names a user `[[auth.basic.users]]` does
     /// not list, or grants a scope or a role a Basic user may not hold.
     #[error("[basic_grants] is refused")]

@@ -36,6 +36,7 @@ use ehds_logging::record::PatientIdentifier;
 use ehds_logging::record::PatientLookup;
 use ehds_logging::record::Professional;
 use ehds_logging::sink::AccessSink as _;
+use ferrohealth_smart::assurance::AssuranceLevel;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::resource::Caller;
 use http::StatusCode;
@@ -207,7 +208,11 @@ fn accessor(caller: &Caller) -> Accessor {
             })
             .collect(),
         token_id: caller.claim_text("jti").map(str::to_owned),
-        assurance: None,
+        assurance: caller.assurance().level.map(|level| match level {
+            AssuranceLevel::Low => ehds_logging::record::AssuranceLevel::Low,
+            AssuranceLevel::Substantial => ehds_logging::record::AssuranceLevel::Substantial,
+            AssuranceLevel::High => ehds_logging::record::AssuranceLevel::High,
+        }),
         professional: Professional::default(),
         alt_id: None,
         purposes: Vec::new(),
