@@ -299,7 +299,10 @@ the testkit tool crate. Beside it:
   chapter, the FHIRconnect mapping library, OMOCL, the OMOP CDM v5.4
   definitions and PostgreSQL DDL, the ITS-REST OpenAPI documents, and the
   corpora the `eehrxf` tests read (the Xt-EHR models, the HL7 Europe guides,
-  the MyHealth@EU catalogue, FR Core and four FHIR R4 pages), each pinned
+  the MyHealth@EU catalogue, FR Core and four FHIR R4 pages), the draft
+  EEHRxF and testing-environment implementing acts with their extracted
+  text, and the Xt-EHR deliverables D5.2 and D8.2 read from the ignored
+  cache (`scripts/vendor/ehds-drafts.sh`), each pinned
   file by file by URL and sha256 (`scripts/vendor/lib/pinned.sh`). Beside
   them, `fhir-packages/` holds the R4 profile validator's package set (#435),
   one `<package>#<version>` tree per pin, fetched at build time by
