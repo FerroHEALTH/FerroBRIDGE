@@ -465,7 +465,7 @@ fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
 }
 
 #[tokio::test]
-async fn without_a_mapping_dir_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn Error>> {
+async fn without_a_state_store_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let token = case.token(OPERATOR);
     for request in [

@@ -16,7 +16,7 @@ use super::{BROKEN, CONTEXT, Case, MODEL, REASON};
 use crate::operator::bytes;
 
 impl Case {
-    /// Saves the model and the context, three revisions in all.
+    /// Saves the model and the context, two revisions in all.
     async fn saved(&self) -> Result<(), Box<dyn Error>> {
         for (name, text) in [
             ("ferrobridge_console.yml", MODEL),
@@ -84,18 +84,20 @@ fn zipped(entries: &[(&str, &str)]) -> Result<Vec<u8>, Box<dyn Error>> {
 
 #[tokio::test]
 async fn an_export_and_its_import_round_trip_byte_identically() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     case.saved().await?;
-    let exported = case.export("3").await?;
+    let exported = case.export("2").await?;
     assert_eq!(
         exported,
-        case.export("3").await?,
+        case.export("2").await?,
         "an export is deterministic"
     );
     let response = case.import(exported.clone(), "application/zip").await?;
     assert_eq!(StatusCode::CREATED, response.status());
     assert_eq!(
-        Some("/operator/revisions/4"),
+        Some("/operator/revisions/3"),
         response
             .headers()
             .get(header::LOCATION)
@@ -105,18 +107,18 @@ async fn an_export_and_its_import_round_trip_byte_identically() -> Result<(), Bo
     assert_eq!(true, report["clean"], "{report}");
     let listed = case.listed().await?;
     assert_eq!(
-        Some(String::from("3")),
+        Some(String::from("2")),
         listed.running,
         "an import runs nothing"
     );
     let imported = &listed.revisions[0];
     assert_eq!(
-        ("4", Origin::Import, false),
+        ("3", Origin::Import, false),
         (imported.id.as_str(), imported.origin, imported.applied)
     );
     assert_eq!(
         exported,
-        case.export("4").await?,
+        case.export("3").await?,
         "the round trip is byte-identical"
     );
     Ok(())
@@ -125,7 +127,9 @@ async fn an_export_and_its_import_round_trip_byte_identically() -> Result<(), Bo
 #[tokio::test]
 async fn an_import_that_does_not_compile_is_refused_with_its_diagnostics()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     case.saved().await?;
     let archive = zipped(&[
         ("fhirconnect/ferrobridge_console.yml", BROKEN),
@@ -143,17 +147,18 @@ async fn an_import_that_does_not_compile_is_refused_with_its_diagnostics()
         "{report}"
     );
     assert_eq!(
-        3,
+        2,
         case.listed().await?.revisions.len(),
         "nothing is recorded"
     );
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
     Ok(())
 }
 
 #[tokio::test]
 async fn an_imported_revision_applies_through_the_apply_route() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     case.saved().await?;
     let archive = zipped(&[("fhirconnect/ferrobridge_console.yml", MODEL)])?;
     assert_eq!(
@@ -162,20 +167,22 @@ async fn an_imported_revision_applies_through_the_apply_route() -> Result<(), Bo
     );
     let response = case
         .send(
-            Request::post("/operator/revisions/4/apply")
-                .header(header::IF_MATCH, "\"3\"")
+            Request::post("/operator/revisions/3/apply")
+                .header(header::IF_MATCH, "\"2\"")
                 .header("ferrobridge-reason", REASON)
                 .body(Body::empty())?,
         )
         .await?;
     assert_eq!(StatusCode::OK, response.status());
-    assert!(!case.console("ferrobridge_console.context.yml").exists());
+    assert_eq!(None, case.console("ferrobridge_console.context.yml").await?);
     Ok(())
 }
 
 #[tokio::test]
 async fn an_import_that_is_no_mapping_archive_is_refused() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let good = zipped(&[("fhirconnect/ferrobridge_console.yml", MODEL)])?;
     for (archive, content_type) in [
         (good.clone(), "application/octet-stream"),

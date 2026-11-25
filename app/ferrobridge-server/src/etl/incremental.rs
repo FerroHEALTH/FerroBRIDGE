@@ -39,7 +39,7 @@ use crate::change_feed::health::Following;
 use crate::config::CdmSettings;
 use crate::config::{DeletionPolicy, EtlSettings};
 use crate::etl::job::JobError;
-use crate::etl::mapper::{CdmVocabulary, OmoclMapper, read_roots};
+use crate::etl::mapper::{CdmVocabulary, OmoclMapper};
 use crate::etl::report::RunReport;
 use crate::etl::{MappingContext, Read, RunError, Step, Templates, Visited};
 
@@ -138,17 +138,17 @@ impl Incremental {
     /// [`JobError::RunId`] when the run identifier cannot be formed.
     pub async fn start(
         settings: &crate::config::Settings,
+        store: Option<&crate::store::Store>,
         cdr: CdrClient,
     ) -> Result<Self, JobError> {
-        let roots = crate::etl::job::omocl_roots(settings);
-        let (Some(etl), Some(cdm), false) = (
+        let (Some(etl), Some(cdm), true) = (
             settings.etl.as_ref(),
             settings.cdm.as_ref(),
-            roots.is_empty(),
+            crate::etl::job::has_omocl(settings),
         ) else {
             return Err(JobError::Missing("[etl], [cdm] and [mappings] omocl"));
         };
-        let set = read_roots(&roots).map_err(JobError::Mappings)?;
+        let set = crate::etl::job::omocl_set(settings, store).await?;
         let (mapper, _pool) = crate::etl::job::mapper(etl, cdm, set).await?;
         let run_id =
             RunId::new(format!("{NAME}-{}", uuid::Uuid::new_v4())).map_err(JobError::RunId)?;

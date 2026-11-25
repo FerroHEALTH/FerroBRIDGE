@@ -59,9 +59,7 @@ pub fn revision_href(id: &str) -> String {
 /// The words of `origin`.
 const fn origin_words(origin: Origin) -> Msg {
     match origin {
-        Origin::Baseline => Msg::OriginBaseline,
         Origin::Save => Msg::OriginSave,
-        Origin::Reload => Msg::OriginReload,
         Origin::Apply => Msg::OriginApply,
         Origin::Import => Msg::OriginImport,
     }

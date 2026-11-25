@@ -207,11 +207,9 @@ pub struct Hl7v2Profile {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Operator {
-    /// Whether the operator routes are mounted under `/operator`.
+    /// Whether the operator routes are mounted under `/operator`; with
+    /// `[state]`, they save the console's mapping files there.
     pub enabled: bool,
-    /// The writable directory console saves go to; unset, the API saves
-    /// nothing.
-    pub mapping_dir: Option<PathBuf>,
 }
 
 /// The FHIRconnect operations lane.

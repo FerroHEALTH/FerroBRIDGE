@@ -133,7 +133,7 @@ async fn case() -> Result<Case, Box<dyn Error>> {
         ferrobridge_server::config::Config::load(Some(&config), &[])?,
     )
     .resolve(Process::Server)?;
-    let load = Incremental::start(&settings, client.clone()).await?;
+    let load = Incremental::start(&settings, None, client.clone()).await?;
     Ok(Case {
         cdr,
         postgres,

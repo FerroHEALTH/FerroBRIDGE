@@ -5,11 +5,11 @@
 //! `GET /operator/revisions/{id}` and `GET /operator/revisions/{id}/diff`
 //! answer.
 //!
-//! A revision is the whole set of mapping files the console owns under
-//! `[operator] mapping_dir`, each by its wire path and SHA-256 digest, with
-//! who recorded it, when and why. Every save, reload and apply that changes
-//! the running console files records one; the provisioned files belong to the
-//! deployment and are in no revision. No specification governs these
+//! A revision is the whole set of mapping files the console owns, kept in
+//! the state store, each by its wire path and SHA-256 digest, with who
+//! recorded it, when and why. Every save and apply records one, and an
+//! import records one that waits for an apply; the provisioned files belong
+//! to the deployment and are in no revision. No specification governs these
 //! documents: our own design.
 
 use std::collections::BTreeMap;
@@ -31,7 +31,7 @@ pub struct Revisions {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RevisionSummary {
-    /// The revision's id, a decimal number that grows by one per revision.
+    /// The revision's id, a decimal number that grows with each revision.
     pub id: String,
     /// The revision that ran when this one was recorded.
     pub parent: Option<String>,
@@ -54,7 +54,7 @@ pub struct RevisionSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Revision {
-    /// The revision's id, a decimal number that grows by one per revision.
+    /// The revision's id, a decimal number that grows with each revision.
     pub id: String,
     /// The revision that ran when this one was recorded.
     pub parent: Option<String>,
@@ -96,13 +96,8 @@ impl Revision {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Origin {
-    /// The console files the bridge found before it recorded its first
-    /// revision.
-    Baseline,
     /// A save of one file through the operator API.
     Save,
-    /// A reload that found the console files changed on disk.
-    Reload,
     /// An apply of an earlier or an imported revision.
     Apply,
     /// An import of a mapping-set archive, checked and not yet applied.

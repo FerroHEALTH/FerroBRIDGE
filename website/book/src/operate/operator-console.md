@@ -145,8 +145,8 @@ console answers with the page it drew.
   first, with what recorded it, when, who and why
   (`GET /operator/revisions`). The Files tab filters by path, language and
   owner, and pages its rows. More holds Reload the set, which asks first,
-  then compiles the files on disk and replaces the running set when they
-  compile.
+  then compiles the provisioned files and the running revision and replaces
+  the running set when they compile.
 - **A mapping file** (`/mappings/files/{path}`): the file as the bridge
   serves it, byte for byte, with numbered lines, highlighted YAML, its
   SHA-256 and the diagnostics beside it, each linked to its line. The
@@ -220,15 +220,16 @@ console answers with the page it drew.
 - **About** (`/about`): the console's and the bridge's versions, the
   licence and the maker, Cadasto B.V.
 
-The editor changes the console's own mapping files, which live under the
-bridge's `[operator] mapping_dir`:
+The editor changes the console's own mapping files, which live in the
+bridge's state store as revisions:
 
 1. **Check** compiles the whole set with your draft in place of the file
-   and lists every diagnostic. Nothing is written.
+   and lists every diagnostic. Nothing is recorded.
 2. **Save** needs a one-line reason and a confirmation in the bar at the
    foot of the page. The bridge compiles the set with the draft again and
-   writes the file only when it compiles, then reloads, so a refused draft
-   leaves the disk and the running set as they were. The save carries the
+   records it as the running revision only when it compiles, then every
+   replica swaps it in, so a refused draft leaves the revisions and the
+   running set as they were. The save carries the
    digest the file was opened at: when someone changed the file in the
    meantime, the bridge refuses with `412` and your draft stays in the
    editor. The draft is saved with LF line ends, whatever line ends the
@@ -327,8 +328,7 @@ The Revisions tab after a save. [Dark theme](img/console/mappings-revisions-dark
 
 ![A revision](img/console/revision.png)
 
-The baseline revision with its diff against the running one and the
-rollback docked. [Dark theme](img/console/revision-dark.png).
+A revision with its diff against the running one and the rollback docked. [Dark theme](img/console/revision-dark.png).
 
 ![The import page](img/console/mappings-import.png)
 

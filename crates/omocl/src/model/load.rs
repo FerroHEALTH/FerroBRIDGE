@@ -142,11 +142,55 @@ where
     P: AsRef<Path>,
 {
     let paths = in_path_order(files);
+    load_documents(paths.iter().map(|path| read(path)), converters)
+}
 
+/// Loads and validates a whole set of mapping files given as text.
+///
+/// Each entry is a file's name, the path its diagnostics name, and its YAML
+/// text. The set is loaded as [`load_set`] loads files from disk: in the
+/// order of their names, each on its own, then against the rules that need
+/// the set.
+///
+/// # Errors
+///
+/// Returns what [`load_set`] returns.
+pub fn load_set_from_text<I, N, T>(
+    files: I,
+    converters: &dyn ConverterRegistry,
+) -> Result<MappingSet, Vec<Diagnostic>>
+where
+    I: IntoIterator<Item = (N, T)>,
+    N: Into<PathBuf>,
+    T: AsRef<str>,
+{
+    let mut texts: Vec<(PathBuf, T)> = files
+        .into_iter()
+        .map(|(name, text)| (name.into(), text))
+        .collect();
+    texts.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+    load_documents(
+        texts.iter().map(|(name, text)| {
+            openehr_mapping_core::loader::load_str(name.clone(), text.as_ref())
+                .map_err(|error| vec![Diagnostic::from(&error)])
+        }),
+        converters,
+    )
+}
+
+/// Checks each of `documents` on its own, then the set against the rules
+/// that need every file.
+fn load_documents<I>(
+    documents: I,
+    converters: &dyn ConverterRegistry,
+) -> Result<MappingSet, Vec<Diagnostic>>
+where
+    I: IntoIterator<Item = Result<MappingDocument, Vec<Diagnostic>>>,
+{
     let mut set = MappingSet::default();
     let mut diagnostics = Vec::new();
-    for path in paths {
-        let outcome = read(&path).and_then(|document| {
+    for document in documents {
+        let outcome = document.and_then(|document| {
             let file = check(&document, converters)?;
             set.insert(document, file).map_err(|error| vec![*error])
         });

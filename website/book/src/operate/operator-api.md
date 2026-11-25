@@ -22,7 +22,9 @@ issuer = "https://auth.example.org/realms/clinic"
 
 [operator]
 enabled = true
-mapping_dir = "/var/lib/ferrobridge/mappings"
+
+[state]
+url_file = "/run/secrets/ferrobridge_state_url"
 ```
 
 ## The operator scope
@@ -196,7 +198,7 @@ answer never names a host directory.
 | `language` | `fhirconnect` or `omocl` |
 | `kind` | `model`, `extension`, `context` or `search` for FHIRconnect, `mapping` for OMOCL; `null` for a file the running load did not read |
 | `sha256` | The lowercase hexadecimal SHA-256 of the file's bytes |
-| `owner` | `provisioned` for a file under a configured mapping directory, `console` for one the console saved under `[operator] mapping_dir` |
+| `owner` | `provisioned` for a file under a configured mapping directory, `console` for one of the running revision in the state store |
 | `read_only` | `true` for a provisioned file, `false` for a console file |
 | `diagnostics` | The diagnostics the running load raised about the file |
 
@@ -210,21 +212,27 @@ that is not `.yml` or `.yaml`.
 
 ## Saving mapping files
 
-With `[operator] mapping_dir` set, the console checks drafts, saves them and
-reloads the running set. Without it, the three routes below answer `409`.
+With [`[state]`](configuration.md) configured, the console checks drafts,
+saves them and reloads the running set, and every replica runs what one
+saves. Without it, the three routes below answer `409`.
 
 - **One owner per file.** The files under `[mappings] directory` and
-  `[mappings] omocl` are provisioned and never written. A console save goes
-  to `mapping_dir/fhirconnect/<path>` or `mapping_dir/omocl/<path>`, and a
-  save whose path names a provisioned file answers `409`. Console files join
-  the set beside the provisioned ones, at every reload and at start-up, where
-  a set that does not compile refuses the start. A file with the path of a
+  `[mappings] omocl` are provisioned and never written. A console file lives
+  in the state store, in a revision, and a save whose path names a
+  provisioned file answers `409`. Console files join the set beside the
+  provisioned ones, at every save and at start-up, where a running revision
+  that does not compile refuses the start. A file with the path of a
   provisioned one is ignored in favour of the provisioned file.
+- **Every replica runs the running revision.** A save notifies every
+  replica in the transaction that records it, and each replica compiles the
+  new revision and swaps it in. A replica that cannot compile it, or cannot
+  reach the store, keeps its running set and tries again every five seconds.
 - **OMOCL files reach `etl run`.** `serve` checks OMOCL files and does not
-  run them. `etl run` reads `mapping_dir/omocl/` beside `[mappings] omocl`
-  when its configuration turns the operator API on, with the same ownership
-  rule, so a file saved here maps the next run. Two files that define the
-  same mapping refuse the save, the reload and the run.
+  run them. `etl run` reads the running revision's OMOCL files beside
+  `[mappings] omocl` when its configuration turns the operator API on and
+  names `[state]`, with the same ownership rule, so a file saved here maps
+  the next run. Two files that define the same mapping refuse the save and
+  the run.
 - **Search declarations save beside their context.** A `*.search.yml` file
   under `fhirconnect/` is checked against the context it names, with every
   other declaration of the set, and swapped in with the facade's programs, so
@@ -239,7 +247,7 @@ reloads the running set. Without it, the three routes below answer `409`.
 The body is a draft of the file at `path`, under `fhirconnect/` or
 `omocl/`. The bridge compiles it with every other file of the running set,
 for every lane, and answers `200` with `clean`, `counts` and `diagnostics`,
-the draft's diagnostics named by `path`. Nothing is written.
+the draft's diagnostics named by `path`. Nothing is recorded.
 
 ### `PUT /operator/mappings/{path}`
 
@@ -253,56 +261,47 @@ The body is the file's new bytes, saved verbatim. A save carries:
 
 | Answer | When |
 |---|---|
-| `200` | The set compiled with the draft; the file is written and the running set replaced. The body is the new set's report and the `ETag` the new SHA-256 |
+| `200` | The set compiled with the draft; a new running revision holds it and the running set is replaced. The body is the new set's report and the `ETag` the new SHA-256 |
 | `400` | No reason, or a path the console cannot write |
-| `409` | A provisioned file holds the path, or no `mapping_dir` is configured |
+| `409` | A provisioned file holds the path, or no `[state]` is configured |
 | `412` | The file changed since the `ETag` given, or `If-None-Match: *` names an existing file |
-| `422` | The set does not compile with the draft; the body names every diagnostic. Neither the file nor the running set changes |
+| `422` | The set does not compile with the draft; the body names every diagnostic. No revision is recorded and the running set stays |
 | `428` | Neither `If-Match` nor `If-None-Match: *` |
 | `503` | The CDR did not serve a template, so the set could not be compiled |
 
-The draft is written to a hidden file beside its target and synced; only a
-draft that compiles is renamed over the target and the directory synced, so a
-reader sees the old file or the new one. The running set is then compiled
-from disk and swapped in one step: the facade's programs and search
-declarations, the FHIRconnect operations and the operator state, so the
-`CapabilityStatement` names the new set at once. A request in flight finishes
-on the set it started with. Checks, saves and reloads run one at a time.
+A save holds the running revision for its whole transaction, so saves from
+every replica run one at a time. The draft is compiled in memory with the
+running revision's other files and the provisioned ones; only a set that
+compiles is recorded, as one transaction. The set is then swapped in one
+step: the facade's programs and search declarations, the FHIRconnect
+operations and the operator state, so the `CapabilityStatement` names the new
+set at once. A request in flight finishes on the set it started with.
 
 ### `POST /operator/reload`
 
-Compiles the provisioned and console files on disk and swaps them in, with
-the answers of a save: `200` with the report, `422` with the diagnostics and
-the running set unchanged, `503` when an upstream did not answer.
-
-The quickstart `compose.yaml` runs the server with a read-only root file
-system and mounts `./operator-mappings` (or `FERROBRIDGE_OPERATOR_MAPPINGS`)
-at `/var/lib/ferrobridge/mappings`, the `mapping_dir` it sets. The container
-runs as `65532:65532`, so hand that directory to that user before turning
-the API on.
-
-Each replica reloads on its own. With `mapping_dir` on a shared volume, a
-file one replica saved reaches another at that replica's next reload or
-restart; the console reloads the replica behind its configured URL.
+Compiles the provisioned files and the running revision again and swaps
+them in, with the answers of a save: `200` with the report, `422` with the
+diagnostics and the running set unchanged, `503` when an upstream did not
+answer. A reload records no revision; use it after you change a provisioned
+file.
 
 ## Mapping-set revisions
 
-With `[operator] mapping_dir` set, the bridge keeps every state of the
-console's files it ran as a revision, under `mapping_dir/..revisions`. A
-revision holds the whole set of console files, each by its wire path and
-SHA-256 digest, with who recorded it, when and why. The bridge records one
-at start-up, after each save, after a reload that finds the console files
-changed on disk, and after each apply. The provisioned files belong to the
+With `[state]` configured, the bridge keeps every set of console files as a
+revision in the state store. A revision holds the whole set of console
+files, each by its wire path and SHA-256 digest, with who recorded it, when
+and why. Each save and each apply records one that runs, and an import
+records one that waits for an apply. The provisioned files belong to the
 deployment: they are in no revision, and an apply leaves them as they are.
-Without `mapping_dir` the routes below answer `409`.
+Without `[state]` the routes below answer `409`.
 
 ### `GET /operator/revisions`
 
 Answers `running`, the id of the revision the bridge runs, and `revisions`,
-newest first. Each names its `id` (a number that grows by one), its
-`parent` (the revision that ran when it was recorded), the `author` (the
-token's subject, `-` for the bridge), the `time`, the `reason`, the
-`origin` (`baseline`, `save`, `reload`, `apply` or `import`), whether it was
+newest first. Each names its `id` (a number that grows with each revision),
+its `parent` (the revision that ran when it was recorded), the `author` (the
+token's subject), the `time`, the `reason`, the `origin` (`save`, `apply` or
+`import`), whether it was
 `applied`, and how many `files` it holds.
 
 ### `GET /operator/revisions/{id}`
@@ -321,8 +320,8 @@ out.
 
 ### `POST /operator/revisions/{id}/apply`
 
-Replaces the console files by the revision's and reloads. A rollback is the
-apply of an earlier revision. The request carries:
+Runs the revision's files on every replica, recorded as a new revision. A
+rollback is the apply of an earlier revision. The request carries:
 
 | Header | Meaning |
 |---|---|
@@ -331,18 +330,18 @@ apply of an earlier revision. The request carries:
 
 | Answer | When |
 |---|---|
-| `200` | The set compiled with the revision's files; they replaced the console's and the set reloaded. The body is the new set's report and the `ETag` the id of the revision the apply recorded |
+| `200` | The set compiled with the revision's files, which now run. The body is the new set's report and the `ETag` the id of the revision the apply recorded |
 | `400` | No reason |
 | `404` | No revision has the id |
-| `409` | No `mapping_dir` is configured |
+| `409` | No `[state]` is configured |
 | `412` | The running revision is not the one `If-Match` names |
 | `422` | The set does not compile with the revision's files; the body names every diagnostic, and nothing changes |
 | `428` | No `If-Match` |
 | `503` | The CDR did not serve a template, so the set could not be compiled |
 
-The revision's files are written to a staging tree and compiled with the
-provisioned files first. Only a set that compiles replaces the console's
-directories, one rename for each language, and then runs.
+The revision's files are compiled in memory with the provisioned files
+first, while the apply holds the running revision. Only a set that compiles
+is recorded and runs.
 
 ### `GET /operator/revisions/{id}/export`
 
@@ -367,7 +366,7 @@ until an apply.
 |---|---|
 | `201` | The set compiles with the archive's files. The body is the check's report, `Location` the new revision and the `ETag` its id |
 | `400` | No reason, or a body that is no archive the bridge reads (`bad-archive`) |
-| `409` | No `mapping_dir` is configured |
+| `409` | No `[state]` is configured |
 | `422` | The set does not compile with the archive's files; the body names every diagnostic, and nothing is recorded |
 | `503` | The CDR did not serve a template, so the set could not be checked |
 

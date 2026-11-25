@@ -30,7 +30,7 @@ async fn history(bridge: &MockServer) {
             {"id": "2", "parent": "1", "author": "operator-1", "time": "2026-11-03T09:00:00Z",
              "reason": "synthetic first save", "origin": "save", "applied": true, "files": 1},
             {"id": "1", "parent": null, "author": "-", "time": "2026-11-03T08:00:00Z",
-             "reason": "the console files changed on disk", "origin": "baseline", "applied": true, "files": 0}
+             "reason": "synthetic import", "origin": "import", "applied": false, "files": 0}
         ]}),
     )
     .await;
@@ -70,7 +70,7 @@ async fn the_revisions_tab_lists_each_revision_with_its_standing() -> Result<(),
         "2026-11-03T09:05:00Z",
         "Running",
         "Ran before",
-        "Baseline",
+        "Imported, not applied",
     ] {
         assert!(page.contains(words), "{words}: {page}");
     }

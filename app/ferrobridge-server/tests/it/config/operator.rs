@@ -25,9 +25,9 @@ fn the_operator_api_turns_on_beside_auth() -> Result<(), Box<dyn std::error::Err
     let text = format!("{AUTH}\n[operator]\nenabled = true\n");
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     assert_eq!(
-        Some(OperatorSettings { mapping_dir: None }),
+        Some(OperatorSettings),
         settings.operator,
-        "a section without mapping_dir saves nothing"
+        "an enabled section mounts the operator API"
     );
     Ok(())
 }
@@ -117,32 +117,11 @@ fn an_unknown_operator_key_refuses_to_boot() {
 }
 
 #[test]
-fn the_mapping_dir_is_read_from_the_file_and_the_environment()
--> Result<(), Box<dyn std::error::Error>> {
+fn a_mapping_dir_is_refused_as_an_unknown_key() {
     let text = format!(
         "{AUTH}\n[operator]\nenabled = true\nmapping_dir = \"/var/lib/ferrobridge/mappings\"\n"
     );
-    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
-    assert_eq!(
-        Some(OperatorSettings {
-            mapping_dir: Some(std::path::PathBuf::from("/var/lib/ferrobridge/mappings")),
-        }),
-        settings.operator
-    );
-    let environment = BTreeMap::from([
-        (
-            String::from("FERROBRIDGE__OPERATOR__ENABLED"),
-            String::from("true"),
-        ),
-        (
-            String::from("FERROBRIDGE__OPERATOR__MAPPING_DIR"),
-            String::from("/srv/console"),
-        ),
-    ]);
-    let settings = Config::from_sources(Some(AUTH), &environment)?.resolve(Process::Server)?;
-    assert_eq!(
-        Some(std::path::PathBuf::from("/srv/console")),
-        settings.operator.and_then(|operator| operator.mapping_dir)
-    );
-    Ok(())
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())
+        .expect_err("the console's files live in the state store");
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
 }

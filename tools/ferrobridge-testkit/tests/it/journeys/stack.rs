@@ -8,9 +8,9 @@
 //!
 //! The bridge runs `ferrobridge serve`'s own run path,
 //! `ferrobridge_server::boot::serve_settings`. Its mapping tree holds one
-//! provisioned context and model over the testkit's diagnosis template, an
-//! empty directory the console saves into, and a few of the v2-to-FHIR
-//! guide's maps for the HL7 v2 face.
+//! provisioned context and model over the testkit's diagnosis template and a
+//! few of the v2-to-FHIR guide's maps for the HL7 v2 face; the console saves
+//! into the state store.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -455,11 +455,10 @@ async fn bridge(
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, identity, console] = [
+    let [mappings, templates, identity] = [
         tree.join("mappings"),
         tree.join("templates"),
         tree.join("identity.redb"),
-        tree.join("console"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
@@ -482,7 +481,7 @@ async fn bridge(
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
-         [operator]\nenabled = true\nmapping_dir = {console}\n\n\
+         [operator]\nenabled = true\n\n\
          [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n\
          senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}]\n{mllp_tls}\n\
          [usage_report]\nenabled = false\n{events}{etl}",

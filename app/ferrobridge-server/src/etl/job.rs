@@ -3,17 +3,18 @@
 
 //! The `etl run` and `etl fhir` jobs over a resolved configuration.
 //!
-//! The job reads the OMOCL set from `[mappings] omocl` and the console's
-//! `[operator] mapping_dir`, builds the CDR client of `[cdr]`, the concept
-//! resolver and the writer over `[cdm]`, then runs once. The binary calls [`run`] and prints the report; a test calls it with a
+//! The job reads the OMOCL set from `[mappings] omocl` and the running
+//! revision of the console's files, builds the CDR client of `[cdr]`, the
+//! concept resolver and the writer over `[cdm]`, then runs once. The binary calls [`run`] and prints the report; a test calls it with a
 //! configuration of its own, so both drive the same path. No specification
 //! governs the job: our own design.
 
 use crate::config::Settings;
-use crate::etl::mapper::{CdmVocabulary, MapperError, OmoclMapper, read_roots};
+use crate::etl::mapper::{CdmVocabulary, MapperError, OmoclMapper, read_tree};
 use crate::etl::report::RunReport;
 use crate::etl::{RunError, RunOptions};
 use crate::mappings::files::{Language, Root};
+use crate::mappings::revisions::{Console, Revisions};
 use ferrobridge_operator_api::etl::RunKind;
 use omop_cdm::database::{CdmPool, ConnectError};
 use omop_cdm::graph::key::EmptyIdentifier;
@@ -30,6 +31,12 @@ pub enum JobError {
     /// The OMOCL mapping set does not load.
     #[error("reading the OMOCL mapping set")]
     Mappings(#[source] MapperError),
+    /// The state store the console's files are read from did not open.
+    #[error("opening the state store the console's mapping files are read from")]
+    State(#[source] crate::store::StoreError),
+    /// The running revision of the console's files could not be read.
+    #[error("reading the running revision of the console's mapping files")]
+    Revision(#[source] crate::mappings::revisions::RevisionError),
     /// The CDR client could not be built.
     #[error("building the CDR client the run reads through")]
     Client(#[source] crate::cdr::error::CdrError),
@@ -92,37 +99,68 @@ pub fn missing_section(settings: &Settings) -> Option<&'static str> {
         Some("a [cdm] section")
     } else if settings.cdr.is_none() {
         Some("a [cdr] section")
-    } else if omocl_roots(settings).is_empty() {
+    } else if !has_omocl(settings) {
         Some("[mappings] omocl")
     } else {
         None
     }
 }
 
-/// Returns the OMOCL directories `etl run` reads: `[mappings] omocl`, then
-/// the console's `omocl/` under `[operator] mapping_dir` when the operator
-/// API is on.
-///
-/// The provisioned directory comes first, so it owns a path both hold, as it
-/// does in the operator reload (no specification governs this: our own
-/// design).
+/// Whether `settings` name an OMOCL set: `[mappings] omocl`, or the console's
+/// files, which the operator API saves when `[state]` is configured.
 #[must_use]
-pub fn omocl_roots(settings: &Settings) -> Vec<Root> {
-    let provisioned = settings
+pub fn has_omocl(settings: &Settings) -> bool {
+    settings.omocl_directory.is_some() || console_omocl(settings)
+}
+
+/// Whether the console's files join the OMOCL set.
+fn console_omocl(settings: &Settings) -> bool {
+    settings.operator.is_some() && settings.state.is_some()
+}
+
+/// Reads the OMOCL set `etl run` maps with: `[mappings] omocl`, then the
+/// running revision's console files, read through `store` or a store opened
+/// on `[state]`.
+///
+/// The provisioned directory owns a path both hold, as it does in the
+/// operator reload (no specification governs this: our own design).
+///
+/// # Errors
+///
+/// Returns [`JobError::Mappings`] when a directory cannot be read or the set
+/// does not load, [`JobError::State`] when the store does not open and
+/// [`JobError::Revision`] when the running revision cannot be read.
+pub async fn omocl_set(
+    settings: &Settings,
+    store: Option<&crate::store::Store>,
+) -> Result<omocl::model::load::MappingSet, JobError> {
+    let roots: Vec<Root> = settings
         .omocl_directory
-        .as_ref()
-        .map(|directory| Root::new(Language::Omocl, directory.clone()));
-    let console = settings
-        .operator
-        .as_ref()
-        .and_then(|operator| operator.mapping_dir.as_deref())
-        .map(|mapping_dir| {
-            Root::console(
-                Language::Omocl,
-                Language::Omocl.console_directory(mapping_dir),
-            )
-        });
-    provisioned.into_iter().chain(console).collect()
+        .iter()
+        .map(|directory| Root::new(Language::Omocl, directory.clone()))
+        .collect();
+    let console = match (console_omocl(settings), store, settings.state.as_deref()) {
+        (false, _, _) | (true, None, None) => Console::default(),
+        (true, Some(store), _) => Revisions::new(store)
+            .console()
+            .await
+            .map_err(JobError::Revision)?,
+        (true, None, Some(state)) => {
+            let store = crate::store::Store::open(state)
+                .await
+                .map_err(JobError::State)?;
+            Revisions::new(&store)
+                .console()
+                .await
+                .map_err(JobError::Revision)?
+        }
+    };
+    let sources = crate::mappings::files::sources(&roots, console.files(), None).map_err(
+        |crate::walk::Error { path, source }| {
+            JobError::Mappings(MapperError::Read { path, source })
+        },
+    )?;
+    read_tree(&sources.omocl, settings.omocl_directory.as_deref()).map_err(JobError::Mappings)
 }
 
 /// Runs the OMOP ETL once over `settings` and returns its report.
@@ -141,16 +179,15 @@ pub fn omocl_roots(settings: &Settings) -> Vec<Root> {
 /// [`JobError::Run`] when the run stops.
 pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport, JobError> {
     let missing = || JobError::Missing(missing_section(settings).unwrap_or("its configuration"));
-    let roots = omocl_roots(settings);
-    let (Some(etl), Some(cdm), Some(cdr), false) = (
+    let (Some(etl), Some(cdm), Some(cdr), true) = (
         settings.etl.as_ref(),
         settings.cdm.as_ref(),
         settings.cdr.as_ref(),
-        roots.is_empty(),
+        has_omocl(settings),
     ) else {
         return Err(missing());
     };
-    let set = read_roots(&roots).map_err(JobError::Mappings)?;
+    let set = omocl_set(settings, None).await?;
     let client = crate::cdr::CdrClient::new(cdr).map_err(JobError::Client)?;
     let (mapper, pool) = mapper(etl, cdm, set).await?;
     let mut writer = CdmWriter::connect_with(
@@ -272,7 +309,7 @@ pub fn missing_fhir_section(settings: &Settings) -> Option<&'static str> {
         Some("a [cdm] section")
     } else if settings.mappings.is_none() {
         Some("[mappings] directory and templates")
-    } else if omocl_roots(settings).is_empty() {
+    } else if !has_omocl(settings) {
         Some("[mappings] omocl")
     } else {
         None
@@ -297,17 +334,16 @@ pub fn missing_fhir_section(settings: &Settings) -> Option<&'static str> {
 pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<RunReport, JobError> {
     let missing =
         || JobError::MissingFhir(missing_fhir_section(settings).unwrap_or("its configuration"));
-    let roots = omocl_roots(settings);
-    let (Some(etl), Some(cdm), Some(mappings), false) = (
+    let (Some(etl), Some(cdm), Some(mappings), true) = (
         settings.etl.as_ref(),
         settings.cdm.as_ref(),
         settings.mappings.as_ref(),
-        roots.is_empty(),
+        has_omocl(settings),
     ) else {
         return Err(missing());
     };
     let programs = crate::mappings::load(mappings).map_err(JobError::FhirMappings)?;
-    let set = read_roots(&roots).map_err(JobError::Mappings)?;
+    let set = omocl_set(settings, None).await?;
     let resources = crate::etl::fhir::read_input(input).map_err(JobError::Input)?;
     let (mapper, pool) = mapper(etl, cdm, set).await?;
     let mut writer = CdmWriter::connect_with(
