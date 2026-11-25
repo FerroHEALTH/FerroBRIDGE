@@ -59,6 +59,7 @@ eehrxf-manifest-study:description
 eehrxf-manifest-study:encounter
 eehrxf-manifest-study:endpoint
 eehrxf-manifest-study:header
+eehrxf-manifest-study:header.author[x]
 eehrxf-manifest-study:header.date
 eehrxf-manifest-study:header.identifier
 eehrxf-manifest-study:header.language

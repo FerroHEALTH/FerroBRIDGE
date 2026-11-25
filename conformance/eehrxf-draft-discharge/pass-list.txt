@@ -126,5 +126,12 @@ eehrxf-discharge-mapped:header.status
 eehrxf-discharge-mapped:header.subject
 eehrxf-discharge-mapped:header.version
 eehrxf-discharge-mapped:presentedForm
-total 128
-unmapped 4
+eehrxf-narrative-discharge:body.admissionEvaluation
+eehrxf-narrative-discharge:body.alerts
+eehrxf-narrative-discharge:body.carePlan
+eehrxf-narrative-discharge:body.courseOfEncounter
+eehrxf-narrative-discharge:body.dischargeDetails
+eehrxf-narrative-discharge:body.medicationSummary
+eehrxf-narrative-discharge:body.patientHistory
+total 135
+unmapped 5
