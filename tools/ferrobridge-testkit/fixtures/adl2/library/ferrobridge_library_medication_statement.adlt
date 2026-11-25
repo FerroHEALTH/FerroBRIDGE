@@ -58,7 +58,7 @@ template_overlay
     openEHR-EHR-OBSERVATION.medication_statement-ferrobridge.v0.0.0
 
 specialize
-    openEHR-EHR-OBSERVATION.medication_statement.v0
+    openEHR-EHR-OBSERVATION.medication_statement.v0.0.1-alpha
 
 language
     original_language = <[ISO_639-1::en]>

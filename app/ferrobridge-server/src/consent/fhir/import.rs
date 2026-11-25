@@ -443,6 +443,8 @@ impl Reader<'_> {
             relationship,
             organisation_type,
             caller_kind,
+            care_roles: None,
+            care_path: None,
         })
     }
 
@@ -561,7 +563,9 @@ impl Reader<'_> {
             ),
             categories: list(categories),
             sensitivities: list(sensitivities),
+            confidentialities: None,
             origins: list(strings(&rule.extensions, EXT_ORIGIN)),
+            episodes: None,
             recorded: rule.data_period.clone().map(|p| interval(p.start, p.end)),
         };
         let empty = scope.objects.is_none()

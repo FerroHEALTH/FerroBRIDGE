@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::fmt::Write as _;
 
 use base64::Engine as _;
 use ferrobridge_server::config::Config;
@@ -34,6 +35,7 @@ use super::login::SCOPE;
 use super::login::UPSTREAM_ACR;
 use super::login::UPSTREAM_CLIENT;
 use super::record::Patients;
+use super::record::SUBJECT_SYSTEM;
 use crate::facade::summary::NAMESPACE;
 use crate::facade::summary::mount_terminology;
 use crate::facade::summary::package_paths;
@@ -41,6 +43,22 @@ use crate::facade::summary::package_paths;
 /// The mapping set: the `Patient` party context the summary reads its
 /// patient through.
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures_summary");
+
+/// The bridge's client id at FerroSMART, for its own token and the exchange.
+const BRIDGE_CLIENT: &str = "ferrobridge";
+
+/// The `kid` of the bridge's assertion key.
+const BRIDGE_KID: &str = "ferrobridge-1";
+
+/// Whether the bridge reads the CDR under the caller's exchanged token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Onward {
+    /// Under the bridge's own access to the CDR.
+    Off,
+    /// Under the token FerroSMART exchanges the caller's for
+    /// (`[cdr.endpoint.credentials.onward]`, RFC 8693 §2.1).
+    On,
+}
 
 /// The started platform and the bridge's settings over it.
 pub(super) struct Stack {
@@ -74,8 +92,8 @@ impl Stack {
         format!("{}/fhir", self.origin)
     }
 
-    /// Starts the platform.
-    pub(super) async fn start() -> Result<Self, Box<dyn Error>> {
+    /// Starts the platform with the onward lane `onward`.
+    pub(super) async fn start(onward: Onward) -> Result<Self, Box<dyn Error>> {
         let cdr = containers::cdr_main().await?;
         let patients = super::record::seed(cdr.base_url(), cdr.extensions_url()).await?;
         let smart_database = containers::postgres().await?;
@@ -96,11 +114,14 @@ impl Stack {
         let smart_port = std::net::TcpListener::bind("127.0.0.1:0")?
             .local_addr()?
             .port();
+        let assertion = Assertion::new()?;
         let smart = ferrosmart::start(&smart_launch(
             smart_port,
             &smart_database,
             &upstream,
             &facade,
+            cdr.base_url(),
+            &assertion,
         )?)
         .await?;
         let text = bridge_config(&BridgeConfig {
@@ -110,6 +131,7 @@ impl Stack {
             terminology: &terminology.uri(),
             arr: &arr.uri(),
             state: state.url(),
+            onward: (onward == Onward::On).then_some(&assertion),
         })?;
         let settings =
             Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
@@ -129,14 +151,56 @@ impl Stack {
     }
 }
 
-/// Returns FerroSMART's run on `port`: the facade as its resource, the
-/// upstream provider with `client_secret_basic` and its assurance levels,
-/// and the app as its client.
+/// The bridge's assertion key for `private_key_jwt` at FerroSMART (RFC 7523
+/// §2.2), written where the bridge reads it, with its public JWK.
+struct Assertion {
+    /// The directory the key file lives in.
+    directory: tempfile::TempDir,
+    /// The public JWK, as FerroSMART registers it.
+    jwk: serde_json::Value,
+}
+
+impl Assertion {
+    /// Generates the key.
+    fn new() -> Result<Self, Box<dyn Error>> {
+        let pkcs8 = aws_lc_rs::signature::EcdsaKeyPair::generate_pkcs8(
+            &aws_lc_rs::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &aws_lc_rs::rand::SystemRandom::new(),
+        )
+        .map_err(|_unspecified| "an assertion key")?;
+        let encoding = jsonwebtoken::EncodingKey::from_ec_der(pkcs8.as_ref());
+        let mut jwk = serde_json::to_value(jsonwebtoken::jwk::Jwk::from_encoding_key(
+            &encoding,
+            jsonwebtoken::Algorithm::ES256,
+        )?)?;
+        jwk["kid"] = serde_json::json!(BRIDGE_KID);
+        jwk["use"] = serde_json::json!("sig");
+        let pem = ferrosmart::pkcs8_pem(pkcs8.as_ref());
+        let directory = tempfile::tempdir()?;
+        std::fs::write(directory.path().join("bridge.pem"), pem)?;
+        Ok(Self { directory, jwk })
+    }
+
+    /// Returns the key file's path.
+    fn path(&self) -> String {
+        self.directory
+            .path()
+            .join("bridge.pem")
+            .display()
+            .to_string()
+    }
+}
+
+/// Returns FerroSMART's run on `port`: the facade and the CDR as its
+/// resources, the upstream provider with `client_secret_basic` and its
+/// assurance levels, the app and the bridge as clients.
 fn smart_launch(
     port: u16,
     database: &Postgres,
     upstream: &Provider,
     facade: &str,
+    openehr: &str,
+    assertion: &Assertion,
 ) -> Result<ferrosmart::Launch, Box<dyn Error>> {
     let issuer = ferrosmart::issuer_on(port);
     let secret = crate::support::random_secret();
@@ -144,6 +208,8 @@ fn smart_launch(
         "[ferrosmart]\nissuer = {issuer:?}\n\n\
          [ferrosmart.keys]\nprivate_key_files = [\"/etc/ferrosmart/signing.pem\"]\n\n\
          [[ferrosmart.resource]]\nbase = {facade:?}\nkind = \"fhir\"\n\n\
+         [[ferrosmart.resource]]\nbase = {openehr:?}\nkind = \"openehr\"\n\
+         subject_namespace = {NAMESPACE:?}\nfhir_base = {facade:?}\nsubject_system = {SUBJECT_SYSTEM:?}\n\n\
          [[ferrosmart.upstream]]\nname = \"eid\"\n\n\
          [ferrosmart.upstream.oidc]\nissuer = {:?}\nclient_id = {UPSTREAM_CLIENT:?}\n\
          fhir_user_claim = \"fhir_user\"\n\n\
@@ -160,6 +226,15 @@ fn smart_launch(
         "resources": [facade],
         "grant_types": ["authorization_code"]
     });
+    let bridge = serde_json::json!({
+        "client_id": BRIDGE_CLIENT,
+        "client_name": "FerroBRIDGE",
+        "token_endpoint_auth_method": "private_key_jwt",
+        "jwks": {"keys": [assertion.jwk]},
+        "scope": "system/template-*.r system/composition-*.r system/aql-*.s patient/composition-*.r patient/aql-*.s",
+        "resources": [facade, openehr],
+        "grant_types": ["client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"]
+    });
     Ok(ferrosmart::Launch {
         port,
         database_url: format!("{}?sslmode=disable", database.url()),
@@ -171,7 +246,7 @@ fn smart_launch(
             ),
             (String::from("upstream-secret"), secret.into_bytes()),
         ],
-        clients: vec![app],
+        clients: vec![app, bridge],
     })
 }
 
@@ -189,6 +264,8 @@ struct BridgeConfig<'a> {
     arr: &'a str,
     /// The state store's URL.
     state: &'a str,
+    /// The assertion key of the onward lane, when it is on.
+    onward: Option<&'a Assertion>,
 }
 
 /// Returns the bridge's configuration file.
@@ -200,6 +277,7 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
         terminology,
         arr,
         state,
+        onward,
     } = config;
     let packages: Vec<String> = package_paths()?
         .ok_or("the profile packages are not fetched; run scripts/vendor/profile-packages.sh")?
@@ -208,7 +286,7 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
         .collect();
     let seal = key32();
     let lookup = key32();
-    let text = format!(
+    let mut text = format!(
         "[server]\nlisten = {listen:?}\n\n\
          {USAGE_REPORT_OFF}\n\
          [operations]\nenabled = false\n\n\
@@ -229,6 +307,19 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
         listen = origin.trim_start_matches("http://"),
         packages = packages.join(", "),
     );
+    if let Some(assertion) = onward {
+        writeln!(
+            text,
+            "\n[cdr.endpoint.credentials.oauth]\ntoken_endpoint = \"{smart}/token\"\n\
+             client_id = {BRIDGE_CLIENT:?}\nclient_auth = \"private_key_jwt\"\n\
+             private_key_file = {:?}\nkid = {BRIDGE_KID:?}\nresource = {cdr:?}\n\
+             scope = \"system/template-*.r system/composition-*.r system/aql-*.s\"\n\n\
+             [cdr.endpoint.credentials.onward]\nissuer = {smart:?}\ntoken_endpoint = \"{smart}/token\"\n\
+             audiences = [{cdr:?}]\nindicators = [{cdr:?}]\n\n\
+             [cdr.endpoint.credentials.onward.profile]\nmax_onward_lifetime = \"5min\"\n",
+            assertion.path()
+        )?;
+    }
     Ok(text)
 }
 

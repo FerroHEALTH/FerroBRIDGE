@@ -66,7 +66,7 @@ template_overlay
     openEHR-EHR-ADMIN_ENTRY.person_data-ferrobridge.v0.0.0
 
 specialize
-    openEHR-EHR-ADMIN_ENTRY.person_data.v0
+    openEHR-EHR-ADMIN_ENTRY.person_data.v0.0.1-alpha
 
 language
     original_language = <[ISO_639-1::en]>
@@ -87,7 +87,7 @@ definition
     ADMIN_ENTRY[at0000.1] matches {
         /data[at0001]/items matches {
             use_archetype CLUSTER[at0007.1, openEHR-EHR-CLUSTER.person-ferrobridge.v1]
-            use_archetype CLUSTER[at0028.1, openEHR-EHR-CLUSTER.person_birth_data_iso.v0]
+            use_archetype CLUSTER[at0028.1, openEHR-EHR-CLUSTER.person_birth_data_iso.v0.0.1-alpha]
         }
         /data[at0001]/items[at0024]/items matches {
             use_archetype CLUSTER[at0013.1, openEHR-EHR-CLUSTER.death_details.v1]
@@ -174,7 +174,7 @@ template_overlay
     openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen-ferrobridge.v0.0.0
 
 specialize
-    openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0
+    openEHR-EHR-ADMIN_ENTRY.versicherungsinformationen.v0.0.1-alpha
 
 language
     original_language = <[ISO_639-1::en]>
