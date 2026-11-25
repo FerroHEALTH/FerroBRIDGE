@@ -546,20 +546,6 @@ impl DeclarationError {
     }
 }
 
-/// Reads one declaration file.
-///
-/// # Errors
-///
-/// Returns [`DeclarationError::Read`] when the file cannot be read and
-/// [`DeclarationError::Yaml`] when it is not the declaration shape.
-pub fn read(file: &Path) -> Result<DeclarationFile, DeclarationError> {
-    let text = std::fs::read_to_string(file).map_err(|source| DeclarationError::Read {
-        file: file.to_path_buf(),
-        source,
-    })?;
-    file::parse(file, &text)
-}
-
 /// Checks the parameter section of one declaration against the template
 /// `index` its context maps.
 ///

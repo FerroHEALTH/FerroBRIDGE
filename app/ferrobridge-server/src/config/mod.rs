@@ -573,12 +573,10 @@ pub struct OperationsSettings {
     pub composition_territory: Option<String>,
 }
 
-/// The operator API, resolved from `[operator]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OperatorSettings {
-    /// The writable directory console saves go to, when one is configured.
-    pub mapping_dir: Option<PathBuf>,
-}
+/// The operator API, resolved from `[operator]`: mounted, saving the
+/// console's mapping files when `[state]` is configured.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OperatorSettings;
 
 /// The derived visits a run writes before the compositions.
 #[derive(Debug, Clone, PartialEq, Eq)]

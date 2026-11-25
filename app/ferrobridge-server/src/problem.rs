@@ -46,8 +46,7 @@ pub enum Kind {
     NotFound,
     /// `409`: a provisioned file holds the path.
     Provisioned,
-    /// `409`: what the request needs is not configured: `[operator]
-    /// mapping_dir` for a save, `[state]` for a settings register.
+    /// `409`: no `[state]` is configured, so nothing is saved.
     NotConfigured,
     /// `412`: what the request replaces changed since the `ETag` it names.
     PreconditionFailed,

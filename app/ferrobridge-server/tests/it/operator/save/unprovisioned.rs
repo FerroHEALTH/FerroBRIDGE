@@ -3,8 +3,8 @@
 
 //! Saving FHIRconnect files in a deployment that provisions no FHIRconnect
 //! tree: the console's files are the whole set, checked and compiled on
-//! every save. No specification governs the operator surface: our own
-//! design.
+//! every save. The cases run only when `FERROBRIDGE_E2E=1` admits the
+//! harness. No specification governs the operator surface: our own design.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -13,6 +13,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use ferrobridge_server::check::Report;
+use ferrobridge_server::mappings::revisions::Revisions;
 use ferrobridge_server::operator::Operator;
 use ferrobridge_server::operator::reload::Reloader;
 use ferrobridge_server::operator::snapshot::Snapshot;
@@ -29,8 +30,10 @@ use crate::operator::{OPERATOR, bytes, digest};
 
 /// A console-only deployment: no provisioned tree, templates from the CDR.
 struct Unprovisioned {
-    /// The console tree, kept alive for the case.
-    tree: tempfile::TempDir,
+    /// The PostgreSQL the state store runs on, kept alive for the case.
+    _postgres: ferrobridge_testkit::containers::Postgres,
+    /// The mapping revisions of the state store.
+    revisions: Revisions,
     /// The stub CDR, kept alive for the case.
     _cdr: MockServer,
     /// The stub authorization server.
@@ -42,9 +45,13 @@ struct Unprovisioned {
 }
 
 impl Unprovisioned {
-    /// Builds the operator API over an empty console directory.
-    async fn new() -> Result<Self, Box<dyn Error>> {
-        let tree = tempfile::tempdir()?;
+    /// Builds the operator API over an empty state store; `None` unless the
+    /// harness is admitted.
+    async fn new() -> Result<Option<Self>, Box<dyn Error>> {
+        let Some((postgres, store)) = crate::store::store().await? else {
+            return Ok(None);
+        };
+        let revisions = Revisions::new(&store);
         let cdr = MockServer::start().await;
         Mock::given(matchers::method("GET"))
             .and(matchers::path(
@@ -65,20 +72,21 @@ impl Unprovisioned {
             Vec::new(),
             Snapshot::new(Report::default(), BTreeMap::new()),
         )
-        .with_saving(tree.path().join("console"), reloader);
+        .with_saving(revisions.clone(), reloader);
         let key = ec_key("k1", Algorithm::ES256);
         let issuer = Issuer::start(&[&key]).await;
         let state = AppState::with_health(Registry::default())
             .with_auth(authority(issuer.settings()).await)
             .with_operator(Arc::new(operator));
         let app = ferrobridge_server::router(Arc::new(state), &server_settings());
-        Ok(Self {
-            tree,
+        Ok(Some(Self {
+            _postgres: postgres,
+            revisions,
             _cdr: cdr,
             issuer,
             key,
             app,
-        })
+        }))
     }
 
     /// Sends `request` under an operator token.
@@ -108,7 +116,9 @@ impl Unprovisioned {
 #[tokio::test]
 async fn console_files_are_compiled_and_a_broken_draft_is_refused_without_a_provisioned_tree()
 -> Result<(), Box<dyn Error>> {
-    let case = Unprovisioned::new().await?;
+    let Some(case) = Unprovisioned::new().await? else {
+        return Ok(());
+    };
     let created = (header::IF_NONE_MATCH, String::from("*"));
     for (relative, body) in [
         ("ferrobridge_console.yml", MODEL),
@@ -150,14 +160,13 @@ async fn console_files_are_compiled_and_a_broken_draft_is_refused_without_a_prov
             ),
         "{report}"
     );
+    let console = case.revisions.console().await?;
     assert_eq!(
-        MODEL.as_bytes(),
-        std::fs::read(
-            case.tree
-                .path()
-                .join("console/fhirconnect/ferrobridge_console.yml")
-        )?
-        .as_slice(),
+        Some(MODEL.as_bytes()),
+        console
+            .files()
+            .get("fhirconnect/ferrobridge_console.yml")
+            .map(AsRef::as_ref),
         "the saved file keeps its bytes"
     );
     Ok(())
