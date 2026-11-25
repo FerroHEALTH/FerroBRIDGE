@@ -558,8 +558,11 @@ pub(super) fn group_encounter() -> Group {
             "period": { "start": "2026-09-01T08:00:00Z", "end": "2026-09-03T12:00:00Z" },
             "subject": subject()
         }),
-        // R4 Encounter search parameter `patient`.
-        searches: &["patient=Patient/p-1"],
+        // R4 Encounter search parameters `patient` and `date`.
+        searches: &[
+            "patient=Patient/p-1",
+            "patient=Patient/p-1&date=ge2026-08-01",
+        ],
     }
 }
 

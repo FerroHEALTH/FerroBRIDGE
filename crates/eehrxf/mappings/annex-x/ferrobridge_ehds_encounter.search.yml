@@ -1,7 +1,11 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The search of the EHDSEncounter resources: the R4 Encounter `patient`
-# parameter.
+# parameter and the start of the encounter as the R4 `date`.
 context: ferrobridge_ehds_encounter.context
 patient:
   parameters: [patient]
+parameters:
+  date:
+    type: date
+    path: context/start_time/value

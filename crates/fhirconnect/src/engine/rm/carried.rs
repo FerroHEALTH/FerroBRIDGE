@@ -13,7 +13,7 @@ use openehr_rm::v1_2::typing::base_name;
 
 use super::tail_walk;
 use super::tail_walk::concrete_forms;
-use super::{ENTRY_TIMES, FAMILIES, PARTY_ROOTS};
+use super::{ENTRY_TIMES, FAMILIES, FAMILY_TEXTS, PARTY_ROOTS};
 
 /// What the attribute a tail ends on holds.
 ///
@@ -38,6 +38,10 @@ pub enum Carried {
     /// node (`_provider` on an `ENTRY`) and the engine writes through
     /// [`crate::engine::family::provider`].
     Family,
+    /// A string attribute of a structural node, which FLAT writes as the
+    /// node's `_`-prefixed family ([`super::FAMILY_TEXTS`]) and the engine
+    /// reads as text.
+    FamilyText,
     /// A `DV_DATE_TIME` attribute of an entry the Web Template carries no
     /// node for, an `OBSERVATION`'s history origin or an `ACTION`'s time,
     /// which FLAT writes under the entry's node with the key
@@ -76,6 +80,12 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
         .find(|&&(owner, path)| path == wanted && model::is_a(class, owner))
     {
         return Some((owner, Carried::Family));
+    }
+    if let Some(&(owner, _)) = FAMILY_TEXTS
+        .iter()
+        .find(|&&(owner, path)| path == wanted && model::is_a(class, owner))
+    {
+        return Some((owner, Carried::FamilyText));
     }
     if let Some(&(owner, _)) = PARTY_ROOTS
         .iter()
@@ -202,6 +212,15 @@ mod tests {
         assert_eq!(
             carried("DV_INTERVAL", &["lower_included"]),
             Some(("DV_INTERVAL", Carried::Boolean))
+        );
+    }
+
+    #[test]
+    fn the_location_of_an_event_context_is_family_text() {
+        // RM ehr §EVENT_CONTEXT: `location` is a String; master05 §EVENT_CONTEXT `_location`.
+        assert_eq!(
+            carried("EVENT_CONTEXT", &["location"]),
+            Some(("EVENT_CONTEXT", Carried::FamilyText))
         );
     }
 

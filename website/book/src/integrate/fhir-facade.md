@@ -884,8 +884,9 @@ the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
 (`eehrxf::mappings::ANNEX_X`), with a search declaration beside each
 context. Point `[mappings] directory` at a copy of it
 (`ANNEX_X.write_to(dir)` writes one) and load its templates into the
-CDR: FerroBRIDGE's patient summary template, its EHDS record template and
-the published `KDS_Laborbericht` and `KDS_Laborauftrag`. The party groups are party contexts, so
+CDR: FerroBRIDGE's patient summary template, its EHDS record and EHDS
+medication administration templates and the published `KDS_Laborbericht`
+and `KDS_Laborauftrag`. The party groups are party contexts, so
 the project needs `[cdr] demographic` and the reference CDR's patient and
 healthcare professional `PERSON` definitions with an `ORGANISATION`
 template; each party resource claims the profile its context names, as an
@@ -912,10 +913,25 @@ entry's resource does.
 | EHDSAddress | the `address` of a `Patient` | | as its patient |
 | EHDSHealthProfessional | `Practitioner` | `practitioner-eu-core` | read, from the reference CDR's healthcare professional `PERSON` |
 | EHDSOrganisation | `Organization` | `organization-eu-core` | read, from an `ORGANISATION` |
+| EHDSAlert | `Flag` | `flag-patient-eu-core` | `patient`, `date`; from the CKM precaution |
+| EHDSAdvanceDirective | `Consent` | `consent-eu-eps` | `patient` with `scope=adr`, `date` |
+| EHDSAttachment | the `sourceAttachment` of an advance directive's `Consent` | | as its consent |
+| EHDSBodyStructure | `BodyStructure` | `bodyStructure-eu-core` | `patient` |
+| EHDSCarePlan | `CarePlan` | `carePlan-eu-hdr` | `patient`, `date` |
+| EHDSCurrentPregnancyStatus | `Observation` | `Observation-pregnancy-status-uv-ips` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSPregnancyHistory | `Observation` | `Observation-pregnancy-outcome-uv-ips` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSTravelHistory | `Observation` | `observation-travel-eu-eps` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSMedicationAdministration | `MedicationAdministration` | `medicationAdministration-eu-hdr` | `patient`, `effective-time` |
+| EHDSAdministeredDosage | the `dosage` of a `MedicationAdministration` | | as its administration |
+| EHDSEncounter | `Encounter` | `encounter-eu-hdr` | `patient`, `date` |
+| EHDSLocation | `Location` | `location-eu-core` | `name`; read-only from the encounter's context |
 | (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category`, `code` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
 
-The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device
-profiles HL7 Europe Patient Summary 1.0.0-ballot, and the others but
+The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device,
+consent and travel profiles HL7 Europe Patient Summary 1.0.0-ballot, the
+care plan, administration and encounter profiles HL7 Europe Hospital
+Discharge Report 1.0.0, the pregnancy profiles the HL7 International Patient
+Summary 2.0.1 ones the `eehrxf` crosswalk names, and the others but
 `bodyweight` HL7 Europe Base and Core 2.0.1. A group QEDm names no search
 for answers the FHIR R4 base `patient` parameter and `_id`. A laboratory report
 carries the v2-0074 category `LAB` and each analyte the category
@@ -930,7 +946,30 @@ its FHIR base (`hl7-fhir-rest`), and `dicom-wado-rs`, the DICOMweb service
 gives Endpoint no profile. No patient compartment holds an `Endpoint`, so a
 `patient/` token reaches none.
 A body weight observation carries the category `vital-signs` and the LOINC
-code `29463-7` the profile fixes, so both are `fixed` tokens. The
+code `29463-7` the profile fixes, so both are `fixed` tokens. The pregnancy
+and travel observations carry the category `social-history` and their LOINC
+codes, `82810-3`, `11636-8` (live births) and `94651-7`, as `fixed` tokens
+too.
+
+The CKM publishes no alert archetype, so the precaution
+(`EVALUATION.precaution.v1`), a warning to heed in the care of the patient,
+carries EHDSAlert: FerroBRIDGE's own choice. The facade serves the access
+directives of the CDR as `Consent` too, so a `Consent` search that names
+`scope` and a read of an id the access directives never issue reach the
+advance directives, whose scope is `adr`; any other `Consent` request
+reaches the access directives. A medication administration has a template
+of its own, because the EHDS record template holds `ACTION.medication.v1`
+for an immunisation and a template overlay leaves no trace in the data that
+would tell the two apart. openEHR has no party class for a place, so each
+encounter composition gives one read-only Location from its
+`EVENT_CONTEXT`: its `location` as the name and its `health_care_facility`
+as the managing organization, FerroBRIDGE's own design; a write of a
+Location answers `405`, and a type whose contexts only read declares no
+write. Draft Annex X gives `EHDSPatient.identifier.type` the cardinality
+1..1, so a `Patient` write whose identifier has no type answers `422`. NI
+and SS take HL7 v2-0203, and HI, HIN, REGPID and REGION the FerroTERM code
+system `https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type`, since no
+code system for them is published. The
 `conformance/eehrxf-annex-x` pass list records the groups served, and its
 badge counts them out of 33.
 

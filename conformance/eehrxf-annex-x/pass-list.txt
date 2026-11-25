@@ -17,6 +17,7 @@ EHDSHealthProfessional
 EHDSHumanName
 EHDSImmunisation
 EHDSLaboratoryObservation
+EHDSLocation
 EHDSMedication
 EHDSMedicationAdministration
 EHDSMedicationUse

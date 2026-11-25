@@ -507,6 +507,7 @@ pub const ANNEX_X: Project = Project {
         "ferrobridge_ehds_health_professional.context",
         "ferrobridge_ehds_immunisation.context",
         "ferrobridge_ehds_laboratory_observation.context",
+        "ferrobridge_ehds_location.context",
         "ferrobridge_ehds_medication_administration.context",
         "ferrobridge_ehds_medication_use.context",
         "ferrobridge_ehds_observation.context",
@@ -534,6 +535,7 @@ pub const ANNEX_X: Project = Project {
             "annex-x",
             "ferrobridge_ehds_laboratory_observation.search.yml"
         ),
+        shipped!("annex-x", "ferrobridge_ehds_location.search.yml"),
         shipped!(
             "annex-x",
             "ferrobridge_ehds_medication_administration.search.yml"
@@ -643,6 +645,8 @@ pub const ANNEX_X: Project = Project {
         shipped!("annex-x", "ferrobridge_ehds_encounter.context.yml"),
         shipped!("annex-x", "ferrobridge_encounter.v1.Encounter.yml"),
         shipped!("annex-x", "ferrobridge_ehds_encounter.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_location.context.yml"),
+        shipped!("annex-x", "ferrobridge_encounter.v1.Location.yml"),
     ],
     accounted: &[],
     followed: &[],

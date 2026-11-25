@@ -272,3 +272,51 @@ async fn a_report_code_matches_the_test_name_under_any_event() -> Result<(), Box
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_location_is_read_only() -> Result<(), Box<dyn Error>> {
+    // Location derives from EVENT_CONTEXT, which openEHR records only as the
+    // encounter's context, so a write is refused and none is declared.
+    let harness = annex_x().await?;
+    let location = serde_json::json!({
+        "resourceType": "Location",
+        "meta": { "profile": [format!("{BASE}/location-eu-core")] },
+        "name": "Ward 3"
+    });
+    let (status, body) = super::super::super::call(
+        harness.app(),
+        http::Request::post("/fhir/Location")
+            .header(http::header::CONTENT_TYPE, "application/fhir+json")
+            .body(axum::body::Body::from(location.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::METHOD_NOT_ALLOWED, status, "{body}");
+    assert_eq!(
+        Some("not-supported"),
+        body["issue"][0]["code"].as_str(),
+        "{body}"
+    );
+    let (status, statement) = get(&harness, "metadata").await?;
+    assert_eq!(StatusCode::OK, status, "{statement}");
+    let interactions: Vec<&str> = statement["rest"][0]["resource"]
+        .as_array()
+        .and_then(|resources| {
+            resources
+                .iter()
+                .find(|resource| resource["type"] == "Location")
+        })
+        .and_then(|resource| resource["interaction"].as_array())
+        .map(|interactions| {
+            interactions
+                .iter()
+                .filter_map(|interaction| interaction["code"].as_str())
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        vec!["read", "vread", "search-type"],
+        interactions,
+        "{statement}"
+    );
+    Ok(())
+}

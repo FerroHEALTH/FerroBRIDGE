@@ -534,10 +534,57 @@ async fn serve_embedded(embedded: &Embedded) -> Result<(), Box<dyn Error>> {
     })
 }
 
+/// Serves `EHDSLocation`: the context of an encounter composition, searched
+/// by its location's name and read back by the id the search answers.
+async fn serve_location() -> Result<serde_json::Value, Box<dyn Error>> {
+    let harness = annex_x().await?;
+    let mut composition = composition_of(&harness, &group_named("EHDSEncounter")?);
+    composition["context"]["location"] = serde_json::json!("Ward 3");
+    composition["context"]["health_care_facility"] = serde_json::json!({
+        "_type": "PARTY_IDENTIFIED",
+        "name": "Synthetic Hospital"
+    });
+    mount_rows(
+        &harness.cdr,
+        &[entry_row(
+            &composition,
+            "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1",
+        )?],
+    )
+    .await;
+    mount_read(&harness.cdr, VERSION_ONE, &composition).await;
+    let (status, body) = get(&harness, "Location?name=Ward").await?;
+    ensure(status == StatusCode::OK, || {
+        format!("the search answered {status}: {body}")
+    })?;
+    let found = matches(&body);
+    ensure(found.len() == 1, || {
+        format!("the search answered {} matches: {body}", found.len())
+    })?;
+    let id = found[0]["resource"]["id"]
+        .as_str()
+        .ok_or("an id")?
+        .to_owned();
+    let (status, read) = get(&harness, &format!("Location/{id}")).await?;
+    ensure(status == StatusCode::OK, || {
+        format!("the read answered {status}: {read}")
+    })?;
+    ensure(
+        read["meta"]["profile"] == serde_json::json!([format!("{BASE}/location-eu-core")])
+            && read["name"] == "Ward 3"
+            && read["managingOrganization"]["display"] == "Synthetic Hospital",
+        || format!("the read answered {read}"),
+    )?;
+    Ok(read)
+}
+
 /// Returns the verdict on the Annex X group `name`.
 async fn verdict(name: &str) -> Result<(), Box<dyn Error>> {
     if name == "EHDSEndpoint" {
         return serve_endpoint().await;
+    }
+    if name == "EHDSLocation" {
+        return serve_location().await.map(drop);
     }
     if let Some((_, party)) = party_groups().into_iter().find(|(held, _)| *held == name) {
         return serve_party(&party).await.map(drop);

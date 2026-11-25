@@ -405,13 +405,14 @@ pub fn provider(
     ]
 }
 
-/// Returns the family of one `DV_DATE_TIME` written under `family` on
-/// `node`, the `_end_time` of an `EVENT_CONTEXT`.
+/// Returns the family of one text written under `family` on `node`: the
+/// `_end_time` of an `EVENT_CONTEXT`, a `DV_DATE_TIME`, or its `_location`,
+/// a `String`.
 ///
-/// Simplified Formats writes the family as the date-time text itself, with
-/// no attribute suffix (the `EVENT_CONTEXT` table, `/_end_time`).
+/// Simplified Formats writes each family as the text itself, with no
+/// attribute suffix (the `EVENT_CONTEXT` table, `/_end_time`, `/_location`).
 #[must_use]
-pub fn end_time(
+pub fn text(
     node: &ResolvedNode,
     positions: &[RmPosition],
     family: &[Segment],

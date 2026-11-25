@@ -131,6 +131,20 @@ fn rm_instant(index: &WebTemplateIndex, root: &ResolvedNode, path: &str) -> bool
     }
 }
 
+/// Whether `target` names a string attribute of the structural `node` the
+/// Simplified Formats write as its family, such as `EVENT_CONTEXT.location`
+/// ([`fhirconnect::engine::rm::FAMILY_TEXTS`]).
+fn family_text(node: &ResolvedNode, target: &str) -> bool {
+    target
+        .strip_prefix(node.aql_path().as_str())
+        .and_then(|rest| rest.strip_prefix('/'))
+        .is_some_and(|attribute| {
+            fhirconnect::engine::rm::FAMILY_TEXTS
+                .iter()
+                .any(|&(class, held)| class == node.rm_type() && held == attribute)
+        })
+}
+
 /// Places `path` under one placement `root` of the bound node.
 fn place(
     index: &WebTemplateIndex,
@@ -180,6 +194,7 @@ fn place(
                 )),
             }
         }
+        ParameterType::String if family_text(value, &target) => Ok(None),
         ParameterType::String | ParameterType::Date => {
             if value.rm_type().starts_with("DV_") {
                 Ok(None)
