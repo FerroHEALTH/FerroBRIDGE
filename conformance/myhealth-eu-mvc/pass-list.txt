@@ -18,6 +18,8 @@ eehrxf-eps-summary-problem-allergy-procedure.0.Composition Composition.section.c
 eehrxf-eps-summary-problem-allergy-procedure.0.Composition Composition.section.code http://loinc.org|47519-4
 eehrxf-eps-summary-problem-allergy-procedure.0.Composition Composition.section.code http://loinc.org|48765-2
 eehrxf-eps-summary-problem-allergy-procedure.0.Composition Composition.type http://loinc.org|60591-5
+eehrxf-eps-summary-problem-allergy-procedure.3.Condition Condition.code http://snomed.info/sct|38341003,http://hl7.org/fhir/sid/icd-10|I10
+eehrxf-eps-summary-problem-allergy-procedure.4.AllergyIntolerance AllergyIntolerance.code http://snomed.info/sct|764146007,http://www.whocc.no/atc|J01C
 eehrxf-eps-summary-problem-allergy-procedure.5.Procedure Procedure.code http://snomed.info/sct|80146002
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition Composition.section.code http://loinc.org|10160-0
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition Composition.section.code http://loinc.org|11369-6
@@ -31,6 +33,8 @@ eehrxf-ips-summary-problem-allergy-procedure.0.Composition Composition.section.c
 eehrxf-ips-summary-problem-allergy-procedure.0.Composition Composition.section.code http://loinc.org|47519-4
 eehrxf-ips-summary-problem-allergy-procedure.0.Composition Composition.section.code http://loinc.org|48765-2
 eehrxf-ips-summary-problem-allergy-procedure.0.Composition Composition.type http://loinc.org|60591-5
+eehrxf-ips-summary-problem-allergy-procedure.3.Condition Condition.code http://snomed.info/sct|38341003,http://hl7.org/fhir/sid/icd-10|I10
+eehrxf-ips-summary-problem-allergy-procedure.4.AllergyIntolerance AllergyIntolerance.code http://snomed.info/sct|764146007,http://www.whocc.no/atc|J01C
 eehrxf-ips-summary-problem-allergy-procedure.5.Procedure Procedure.code http://snomed.info/sct|80146002
 eehrxf-laboratory-mapped.0.Composition Composition.type http://loinc.org|11502-2
 eehrxf-laboratory-mapped.1.DiagnosticReport DiagnosticReport.code http://loinc.org|24331-1,http://loinc.org|11502-2
