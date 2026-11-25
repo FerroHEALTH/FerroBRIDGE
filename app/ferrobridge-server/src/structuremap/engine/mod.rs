@@ -248,16 +248,13 @@ impl Engine {
 
     /// Returns the default group mapping `source_type` to `target_type`.
     fn default_group(&self, source_type: &str, target_type: &str) -> Option<&Group> {
-        self.maps
-            .iter()
-            .flat_map(|map| &map.groups)
-            .find(|group| {
-                group.type_mode.is_some()
-                    && matches!(group.parameters.as_slice(), [source, target]
+        self.maps.iter().flat_map(|map| &map.groups).find(|group| {
+            group.type_mode.is_some()
+                && matches!(group.parameters.as_slice(), [source, target]
                         if source.type_name.as_deref() == Some(source_type)
                             && (target.type_name.as_deref() == Some(target_type)
                                 || group.type_mode == Some(TypeMode::TypePlus)))
-            })
+        })
     }
 }
 
@@ -273,7 +270,12 @@ type Selected = (Option<String>, Value, Option<String>);
 
 impl Run<'_> {
     /// Runs `group` with `arguments` bound to its parameters in order.
-    fn group(&mut self, group: &Group, arguments: Vec<Bound>, depth: usize) -> Result<(), MapError> {
+    fn group(
+        &mut self,
+        group: &Group,
+        arguments: Vec<Bound>,
+        depth: usize,
+    ) -> Result<(), MapError> {
         if depth > DEPTH {
             return Err(MapError::Depth);
         }
@@ -424,10 +426,9 @@ impl Run<'_> {
                                 .get(variable)
                                 .cloned()
                                 .ok_or_else(|| MapError::UnknownVariable(variable.clone())),
-                            super::syntax::Param::Literal(literal) => Ok(Bound::Source(
-                                transform::literal(literal),
-                                None,
-                            )),
+                            super::syntax::Param::Literal(literal) => {
+                                Ok(Bound::Source(transform::literal(literal), None))
+                            }
                         })
                         .collect::<Result<Vec<_>, _>>()?;
                     self.group(group, arguments, depth + 1)?;
@@ -491,8 +492,12 @@ impl Run<'_> {
         items = match source.list_mode {
             Some(SourceListMode::First) => items.into_iter().take(1).collect(),
             Some(SourceListMode::NotFirst) => items.into_iter().skip(1).collect(),
-            Some(SourceListMode::Last) => items.into_iter().skip(length.saturating_sub(1)).collect(),
-            Some(SourceListMode::NotLast) => items.into_iter().take(length.saturating_sub(1)).collect(),
+            Some(SourceListMode::Last) => {
+                items.into_iter().skip(length.saturating_sub(1)).collect()
+            }
+            Some(SourceListMode::NotLast) => {
+                items.into_iter().take(length.saturating_sub(1)).collect()
+            }
             Some(SourceListMode::OnlyOne) if length > 1 => {
                 return Err(MapError::OnlyOne(rule.to_owned()));
             }
@@ -501,7 +506,9 @@ impl Run<'_> {
         let mut selected = Vec::new();
         for (value, type_name) in items {
             let scoped = match &source.variable {
-                Some(variable) => scope.with(variable, Bound::Source(value.clone(), type_name.clone())),
+                Some(variable) => {
+                    scope.with(variable, Bound::Source(value.clone(), type_name.clone()))
+                }
                 None => scope.clone(),
             };
             if let Some(condition) = &source.condition
@@ -557,13 +564,16 @@ impl Run<'_> {
                     })
             })
             .transpose()?;
-        let many = definition.as_ref().is_some_and(|definition| definition.many);
+        let many = definition
+            .as_ref()
+            .is_some_and(|definition| definition.many);
         let element_type = definition.and_then(|definition| definition.type_name);
         let value = match &target.transform {
             None => Some(self.created(element_type.as_deref(), element)?),
-            Some(Transform::Invocation(invocation)) if invocation.name == "create" => {
-                Some(self.engine.instance(&transform::type_parameter(invocation)?))
-            }
+            Some(Transform::Invocation(invocation)) if invocation.name == "create" => Some(
+                self.engine
+                    .instance(&transform::type_parameter(invocation)?),
+            ),
             Some(transform) => transform::apply(self, transform, scope)?,
         };
         let Some(value) = value else {
@@ -662,7 +672,9 @@ impl Run<'_> {
             .type_name
             .as_deref()
             .and_then(|type_name| self.engine.structures.element(type_name, element));
-        let many = definition.as_ref().is_some_and(|definition| definition.many);
+        let many = definition
+            .as_ref()
+            .is_some_and(|definition| definition.many);
         let target_type = definition.and_then(|definition| definition.type_name);
         if !matches!(value, Value::Object(_)) {
             self.write(&place, element, value.clone(), many, target_type)?;
@@ -712,7 +724,10 @@ fn of_type(value: &Value, type_name: Option<&str>, wanted: &str) -> bool {
     match type_name {
         Some(type_name) => type_name == wanted,
         None => match value {
-            Value::String(_) => matches!(wanted, "string" | "code" | "uri" | "id" | "date" | "dateTime"),
+            Value::String(_) => matches!(
+                wanted,
+                "string" | "code" | "uri" | "id" | "date" | "dateTime"
+            ),
             Value::Bool(_) => wanted == "boolean",
             Value::Number(number) => {
                 wanted == "decimal" || (number.as_i64().is_some() && wanted == "integer")
@@ -724,16 +739,18 @@ fn of_type(value: &Value, type_name: Option<&str>, wanted: &str) -> bool {
 
 /// Returns every combination of one occurrence from each selection.
 fn product(selections: &[Vec<Selected>]) -> Vec<Vec<Selected>> {
-    selections.iter().fold(vec![Vec::new()], |combinations, selection| {
-        combinations
-            .iter()
-            .flat_map(|combination| {
-                selection.iter().map(move |item| {
-                    let mut next = combination.clone();
-                    next.push(item.clone());
-                    next
+    selections
+        .iter()
+        .fold(vec![Vec::new()], |combinations, selection| {
+            combinations
+                .iter()
+                .flat_map(|combination| {
+                    selection.iter().map(move |item| {
+                        let mut next = combination.clone();
+                        next.push(item.clone());
+                        next
+                    })
                 })
-            })
-            .collect()
-    })
+                .collect()
+        })
 }

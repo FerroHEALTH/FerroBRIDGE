@@ -71,7 +71,10 @@ fn structures() -> Result<Known, Box<dyn Error>> {
 }
 
 /// Runs `groups` as the tutorial map over `source` into a `TRight`.
-fn run(groups: &str, source: serde_json::Value) -> Result<(serde_json::Value, Vec<serde_json::Value>), Box<dyn Error>> {
+fn run(
+    groups: &str,
+    source: serde_json::Value,
+) -> Result<(serde_json::Value, Vec<serde_json::Value>), Box<dyn Error>> {
     let map = parse(&format!(
         "map \"http://hl7.org/fhir/StructureMap/tutorial\" = tutorial\n{groups}"
     ))?;

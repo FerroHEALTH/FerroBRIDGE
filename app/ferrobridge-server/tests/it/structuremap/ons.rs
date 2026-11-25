@@ -44,9 +44,13 @@ fn codec(value: serde_json::Value) -> Value {
 fn the_schemas_become_logical_models_with_their_inherited_and_nested_elements()
 -> Result<(), Box<dyn Error>> {
     let known = structures()?;
-    let first = known.element("Client", "firstName").ok_or("firstName from Person")?;
+    let first = known
+        .element("Client", "firstName")
+        .ok_or("firstName from Person")?;
     assert_eq!(Some("string"), first.type_name.as_deref());
-    let born = known.element("Client", "dateOfBirth").ok_or("dateOfBirth")?;
+    let born = known
+        .element("Client", "dateOfBirth")
+        .ok_or("dateOfBirth")?;
     assert_eq!(Some("date"), born.type_name.as_deref());
     let died = known.element("Client", "deathDate").ok_or("deathDate")?;
     assert_eq!(Some("dateTime"), died.type_name.as_deref());
@@ -58,7 +62,11 @@ fn the_schemas_become_logical_models_with_their_inherited_and_nested_elements()
         Some("Client.careAllocations"),
         allocations.type_name.as_deref()
     );
-    assert!(known.element("Client.careAllocations", "beginDate").is_some());
+    assert!(
+        known
+            .element("Client.careAllocations", "beginDate")
+            .is_some()
+    );
     assert_eq!(None, known.element("Client", "number"));
     let document: Value = serde_json::from_str(&fixture("ons-openapi.json")?)?;
     assert_eq!(

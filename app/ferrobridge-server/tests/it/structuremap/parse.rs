@@ -39,7 +39,10 @@ fn the_header_and_a_group_read_as_the_grammar_writes_them() -> Result<(), Box<dy
     assert_eq!(Some("CodeSystemR3"), map.uses[0].alias.as_deref());
     assert_eq!(ModelMode::Source, map.uses[0].mode);
     assert_eq!(ModelMode::Target, map.uses[1].mode);
-    assert_eq!(vec![String::from("http://hl7.org/fhir/StructureMap/*3to4")], map.imports);
+    assert_eq!(
+        vec![String::from("http://hl7.org/fhir/StructureMap/*3to4")],
+        map.imports
+    );
     let group = &map.groups[0];
     assert_eq!(Some("DomainResource"), group.extends.as_deref());
     assert_eq!(Some(TypeMode::TypePlus), group.type_mode);
@@ -110,7 +113,9 @@ fn an_embedded_expression_may_be_parenthesized_and_hold_clause_words_in_strings(
     ))?;
     let rule = &map.groups[0].rules[0];
     assert_eq!(
-        Some(Expression(String::from("a.contains(', where ') and a != 'then'"))),
+        Some(Expression(String::from(
+            "a.contains(', where ') and a != 'then'"
+        ))),
         rule.sources[0].condition
     );
     assert_eq!(
@@ -126,15 +131,29 @@ fn a_text_outside_the_grammar_is_refused_at_its_place() {
     for (text, expected) in [
         ("group g(source s, target t) { s -> t; }", "`map`"),
         ("map \"u\" = n", "at least one group"),
-        ("map \"u\" = n group g(source s, target t) { s.a -> t.a }", "`;` at the end of the rule"),
-        ("map \"u\" = n group g(source s, target t) { }", "at least one rule"),
-        ("map \"u\" = n uses \"x\" as consumer group g(source s, target t) { s -> t; }", "source, queried, target or produced"),
+        (
+            "map \"u\" = n group g(source s, target t) { s.a -> t.a }",
+            "`;` at the end of the rule",
+        ),
+        (
+            "map \"u\" = n group g(source s, target t) { }",
+            "at least one rule",
+        ),
+        (
+            "map \"u\" = n uses \"x\" as consumer group g(source s, target t) { s -> t; }",
+            "source, queried, target or produced",
+        ),
         ("map \"u = n", "a closing quote"),
-        ("map \"u\" = n group g(input s) { s -> t; }", "source or target"),
+        (
+            "map \"u\" = n group g(input s) { s -> t; }",
+            "source or target",
+        ),
     ] {
         let refused = parse(text);
         assert!(
-            refused.as_ref().is_err_and(|error| error.expected == expected),
+            refused
+                .as_ref()
+                .is_err_and(|error| error.expected == expected),
             "{text}: {refused:?}"
         );
     }
