@@ -156,33 +156,44 @@ pub struct Ran {
     pub answer: PlaygroundAnswer,
 }
 
-/// What the Events page's Replay posts: the consumer and the parked event.
+/// What the Events page's settlement of a parked event posts: the consumer,
+/// the parked event, the decision and the operator's reason.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ReplayPost {
+pub struct SettlePost {
     /// The consumer's name.
     pub consumer: String,
     /// The parked event's number, as the form carried it.
     pub id: String,
+    /// The submit button's `decision`: `retry` or `discard`.
+    pub decision: String,
+    /// The reason, as typed.
+    pub reason: String,
 }
 
-impl ReplayPost {
-    /// The post the Replay form body `body` carried.
+impl SettlePost {
+    /// The post the settlement form body `body` carried.
     #[must_use]
     pub fn from_form(body: &str) -> Self {
         Self {
             consumer: field(body, "consumer"),
             id: field(body, "id"),
+            decision: field(body, "decision"),
+            reason: field(body, "reason"),
         }
     }
 }
 
-/// What the bridge answered a replay.
+/// What the bridge answered a settlement.
 #[derive(Debug, Clone, PartialEq)]
-pub enum ReplayAnswer {
-    /// The post names no parked event, so the bridge was not asked.
+pub enum SettleAnswer {
+    /// The post names no parked event or decision, so the bridge was not
+    /// asked.
     Invalid,
-    /// The bridge marked the event, or refused.
-    Answered(Loaded<()>),
+    /// The reason is missing or not one short line, for the reason the
+    /// message names; the bridge was not asked.
+    Reason(Msg),
+    /// The bridge recorded the decision, or refused.
+    Answered(ferrobridge_operator_api::events::Decision, Loaded<()>),
 }
 
 /// What a revision page's Apply posts: the running revision the page

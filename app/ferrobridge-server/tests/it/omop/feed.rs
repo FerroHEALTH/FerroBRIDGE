@@ -19,9 +19,15 @@ use std::sync::Arc;
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::change_feed::follow::{Consumer, Polling};
-use ferrobridge_server::change_feed::{ChangeFeed, Event, PageSize, ReaderName, Settings, Source};
+use ferrobridge_server::change_feed::{
+    ChangeFeed, Event, Ledger, PageSize, ReaderName, Settings, Source,
+};
 use ferrobridge_server::config::Process;
 use ferrobridge_server::etl::incremental::Incremental;
+use ferrobridge_server::store::Settings as StoreSettings;
+use ferrobridge_server::store::Store;
+use ferrobridge_server::store::lease::Lane;
+use ferrobridge_server::store::lease::Term;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures::LABORATORY_REPORT_OPT;
 use openehr_its::rest::generated::ehr::client::CompositionDeleteOutcome;
@@ -54,7 +60,9 @@ async fn drain(
     reader: &ReaderName,
     load: &Incremental,
     wanted: usize,
+    term: &Term,
 ) -> Result<Vec<Event>, Box<dyn Error>> {
+    feed.begin(reader, term).await?;
     let mut seen = Vec::new();
     for _ in 0..PASSES {
         let page = feed
@@ -65,6 +73,9 @@ async fn drain(
         }
         load.settle().await?;
         if let Some(last) = page.events.last() {
+            let mut ledger = Ledger::new(term);
+            feed.record(&mut ledger, reader, &last.position).await?;
+            ledger.commit().await?;
             feed.acknowledge(reader, &last.position).await?;
         }
         seen.extend(page.events);
@@ -133,7 +144,7 @@ async fn case() -> Result<Case, Box<dyn Error>> {
         ferrobridge_server::config::Config::load(Some(&config), &[])?,
     )
     .resolve(Process::Server)?;
-    let load = Incremental::start(&settings, client.clone()).await?;
+    let load = Incremental::start(&settings, None, client.clone()).await?;
     Ok(Case {
         cdr,
         postgres,
@@ -144,19 +155,36 @@ async fn case() -> Result<Case, Box<dyn Error>> {
     })
 }
 
-/// Returns the change feed over `source`, its dead letters in `directory`.
-fn feed(
+/// Returns the change feed over `source`, its cursors in a state store on
+/// the case's PostgreSQL, with the lease of `reader`'s lane.
+async fn feed(
     source: Source,
-    directory: &std::path::Path,
+    postgres: &containers::Postgres,
     client: CdrClient,
-) -> Result<Arc<dyn ChangeFeed>, Box<dyn Error>> {
+    reader: &ReaderName,
+) -> Result<(Arc<dyn ChangeFeed>, Term), Box<dyn Error>> {
     let settings = Settings {
         source,
         polling: Polling::default(),
-        dead_letters: directory.join("dead-letters.redb"),
+        lease: std::time::Duration::from_secs(30),
         max_attempts: NonZeroU32::MIN,
     };
-    Ok(ferrobridge_server::change_feed::open(&settings, client)?)
+    let store = Store::open(&StoreSettings {
+        connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
+        max_connections: 2,
+        acquire_timeout: std::time::Duration::from_secs(5),
+        seal: None,
+    })
+    .await?;
+    let lease = store.lease(
+        Lane::new(format!("change-feed:{reader}"))?,
+        std::time::Duration::from_secs(30),
+    );
+    let generation = lease.claim().await?.ok_or("the lane is free")?;
+    Ok((
+        ferrobridge_server::change_feed::open(&settings, client, &store),
+        Term::new(lease, generation),
+    ))
 }
 
 #[tokio::test]
@@ -166,16 +194,17 @@ async fn the_outbox_feed_drives_the_incremental_load_through_a_deletion()
         return Ok(());
     }
     let case = case().await?;
-    let scratch = tempfile::tempdir()?;
-    let feed = feed(
+    let reader = ReaderName::new(containers::CDR_READERS[0])?;
+    let (feed, term) = feed(
         Source::FerroEhr {
             root: case.cdr.extensions_url().parse()?,
         },
-        scratch.path(),
+        &case.postgres,
         case.client.clone(),
-    )?;
-    let reader = ReaderName::new(containers::CDR_READERS[0])?;
-    let committed = drain(feed.as_ref(), &reader, &case.load, 3).await?;
+        &reader,
+    )
+    .await?;
+    let committed = drain(feed.as_ref(), &reader, &case.load, 3, &term).await?;
     assert_eq!(
         3,
         changed(&committed),
@@ -196,7 +225,7 @@ async fn the_outbox_feed_drives_the_incremental_load_through_a_deletion()
         CompositionDeleteOutcome::NoContent { .. } => {}
         other => return Err(format!("the CDR refused the delete: {other:?}").into()),
     }
-    let deleted = drain(feed.as_ref(), &reader, &case.load, 1).await?;
+    let deleted = drain(feed.as_ref(), &reader, &case.load, 1, &term).await?;
     assert!(
         deleted
             .iter()
@@ -219,17 +248,17 @@ async fn the_aql_source_drives_the_incremental_load_over_the_same_commits()
         return Ok(());
     }
     let case = case().await?;
-    let scratch = tempfile::tempdir()?;
-    let feed = feed(
+    let reader = ReaderName::new("ferrobridge-aql")?;
+    let (feed, term) = feed(
         Source::Aql {
-            watermarks: scratch.path().join("watermarks.redb"),
             start: ferrobridge_server::change_feed::aql::Start::Beginning,
         },
-        scratch.path(),
+        &case.postgres,
         case.client.clone(),
-    )?;
-    let reader = ReaderName::new("ferrobridge-aql")?;
-    let committed = drain(feed.as_ref(), &reader, &case.load, 3).await?;
+        &reader,
+    )
+    .await?;
+    let committed = drain(feed.as_ref(), &reader, &case.load, 3, &term).await?;
     assert_eq!(3, changed(&committed), "one event per committed version");
     assert_eq!(
         "6",

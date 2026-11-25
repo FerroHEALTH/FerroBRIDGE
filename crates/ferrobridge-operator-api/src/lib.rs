@@ -14,7 +14,8 @@
 //! runs the bridge schema keeps; [`hl7v2`] holds `GET /operator/hl7v2/concept-maps`, the HL7 v2 face's
 //! `ConceptMap` directory; [`revisions`] holds `GET /operator/revisions`
 //! and one revision with its diff against the running one, the mapping-set
-//! history; [`capability`] holds
+//! history; [`sources`] holds `GET /operator/sources`, the inbound sources
+//! with their versions; [`capability`] holds
 //! the facade's `CapabilityStatement` reduced to what the console draws;
 //! [`problem`] holds the RFC 9457 problem details every operator refusal
 //! answers with. A change to a document is a compile error on both sides,
@@ -29,6 +30,8 @@ pub mod etl;
 pub mod events;
 pub mod health;
 pub mod hl7v2;
+pub mod inbound;
 pub mod operator;
 pub mod problem;
 pub mod revisions;
+pub mod sources;

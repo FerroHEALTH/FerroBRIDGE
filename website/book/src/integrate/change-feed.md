@@ -29,6 +29,36 @@ event it finished:
   the next pass, so delivery is at least once and a consumer deduplicates;
 - a restart resumes at the first event the consumer had not finished.
 
+## One leader per reader
+
+Every replica of the bridge runs the same consumer sections, and each reader
+has one leader across them, held by a lease in the state store
+([`[state]`](../operate/configuration.md#state)). Only the leader reads; the
+other replicas stand by and report the consumer `up` with the state
+`standby`. The leader renews its lease every third of `[change_feed] lease`,
+and once a lease runs out (the leader stopped, lost its database or paused)
+another replica takes the reader over. Each take moves the lease to a new
+generation, and every write of the reader's watermark or dead letters checks
+it in the same transaction, so a former leader that wakes after its lease ran
+out moves no watermark: its write is refused and it stands by. The new
+leader resumes at the first event the watermark does not cover, so a takeover
+skips no event; an event the former leader finished but had not recorded is
+offered again, as after a restart.
+
+```mermaid
+sequenceDiagram
+    participant A as Replica A (leader)
+    participant S as State store
+    participant B as Replica B
+    A->>S: claim the reader's lease (generation 7)
+    B->>S: claim: held by A, stand by
+    A->>S: renew every third of the period
+    Note over A: A stops before it records its page
+    B->>S: claim once the lease ran out (generation 8)
+    B->>S: read from the watermark, record under generation 8
+    A-->>S: a late write under generation 7 is refused
+```
+
 While a consumer cannot follow (the CDR is down, it refuses the credentials,
 or the consumer's own sink refuses), its health indicator reports `degraded`
 with the reason, and readiness stays up: the events wait at the source.
@@ -37,7 +67,7 @@ with the reason, and readiness stays up: the events wait at the source.
 
 Every consumer section that is on follows the one `[change_feed]` source on
 its own task, under its own reader name: its own cursor on the reference
-CDR's feed, or its own row in the `watermarks` file of the AQL source. Each
+CDR's feed, or its own watermark row in the state store for the AQL source. Each
 consumer acknowledges only the events it finished, so a consumer that stalls
 never holds another one back, and each has its own health indicator. Give
 every consumer a reader name of its own; on FerroEHR, name each one in
@@ -50,24 +80,33 @@ failure (the sink is unreachable, a call timed out) leaves the watermark
 where it was, and the event is offered again on the next pass for as long as
 it takes; it never counts towards parking. A poisoned failure is a fault of
 the event itself, which fails the same way every time it is offered.
-FerroBRIDGE counts the poisoned passes of each event in the `redb` file
-`dead_letters` names. On the pass that reaches `max_attempts` (5 by
-default), the event is parked in that file with its cause and the number of
-passes, and the consumer moves past it. A parked event is never dropped: it
-stays in the store until a replay finishes it.
+FerroBRIDGE counts the poisoned passes of each event in the state store. On
+the pass that reaches `max_attempts` (5 by default), the event is parked
+there with its cause and the number of passes, and the consumer moves past
+it. A parked event is never dropped: it stays open until an operator settles
+it, and the settled row keeps who decided, the decision and the reason.
+
+An operator settles a parked event in one of two ways:
+
+- **Retry** offers it to its consumer again before the consumer's next page:
+  a finished one is settled, one that fails poisoned again is parked again
+  with the new cause and waits for another decision, and a transient failure
+  keeps the retry pending for the next pass. A retry offers the event out of
+  its commit order, so retry an event once whatever made it fail is fixed.
+- **Discard** settles it without offering it again.
 
 The [Events page](../operate/operator-console.md) of the operator console
-lists the parked events of each consumer with their cause, and its Replay
-button asks for one to be offered again. The same is on the operator API:
-`GET /operator/events` lists every consumer with its parked events, and
-`POST /operator/events/{consumer}/parked/{id}/replay` answers `202` once the
-event is marked. Before its next page the consumer offers each marked event
-again: a finished one leaves the store, one that fails poisoned again is
-parked again with the new cause, and a transient failure keeps the request
-for the next pass. A replay offers the event out of its commit order, so
-replay an event once whatever made it fail is fixed. The store holds the
-event's identifiers and provenance as the feed served them, never clinical
-content.
+lists the open parked events of each consumer with their cause, each with a
+reason field and a Retry and a Discard button. The same is on the operator
+API: `GET /operator/events` lists every consumer with its open parked events
+and the last decision on each, and
+`POST /operator/events/{consumer}/parked/{id}/retry` (`202`) or
+`…/discard` (`204`) records the decision, with the operator's reason in the
+`ferrobridge-reason` header (one line, at most 200 characters) and the
+subject of the operator's token as who decided. A settlement without a
+reason answers `400`, and one of an event that is not open answers `404`.
+The store holds the event's identifiers and provenance as the feed served
+them, never clinical content.
 
 ## The AQL source (`source = "aql"`)
 
@@ -85,12 +124,13 @@ ORDER BY v/commit_audit/time_committed/value ASC, v/uid/value ASC
 ```
 
 Each row is one composition version and one event. FerroBRIDGE keeps each
-reader's watermark itself, in the `redb` file `watermarks` names: the last
+reader's watermark itself, in the state store: the last
 commit instant the reader finished, with the version uids it finished at that
 instant. Two versions can share one `time_committed`, so the query reads the
 watermark instant again and skips only the versions already finished; a
 version committed at the same instant after the watermark moved is still read.
-A reader with no watermark starts where `start` says: `now` (the default)
+A reader with no watermark starts where `start` says, recorded when its
+first leader takes it: `now` (the default)
 offers nothing committed before its first read, `beginning` offers every
 version, and an RFC 3339 instant offers what was committed from then on.
 
@@ -133,7 +173,7 @@ erasure arrives as a tombstone, `"event": "erase"`, which names the erased
 EHR or party objects and carries no contribution and no commit instant.
 
 Over this source each outbox cursor on the CDR is the watermark, so
-FerroBRIDGE keeps none of its own, and a consumer acknowledges each outbox
+FerroBRIDGE keeps none of its own and needs only the reader's lease, and a consumer acknowledges each outbox
 over the prefix it finished. The feed adds what the AQL source cannot give:
 one commit order per outbox, every kind of versioned object, deletions and
 erasures. The reader names come from the CDR's own configuration

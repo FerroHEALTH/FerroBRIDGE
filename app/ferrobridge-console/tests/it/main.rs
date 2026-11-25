@@ -32,5 +32,6 @@ mod session;
 mod shell;
 mod sign_in;
 mod sign_out;
+mod sources;
 mod stub;
 mod support;

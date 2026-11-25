@@ -8,6 +8,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use ferrobridge_server::change_feed::ChangeFeed;
 use ferrobridge_server::change_feed::Domain;
 use ferrobridge_server::change_feed::PageSize;
 use ferrobridge_server::change_feed::Position;
@@ -19,7 +20,7 @@ use ferrobridge_server::change_feed::ferroehr::FerroEhrFeed;
 use ferrobridge_server::change_feed::follow::Cursor;
 use ferrobridge_server::change_feed::follow::PassError;
 use ferrobridge_server::change_feed::follow::pass;
-use ferrobridge_server::change_feed::watermark::WatermarkStore;
+use ferrobridge_server::change_feed::watermark::Watermarks;
 use ferrobridge_server::events::Publisher;
 use ferrobridge_testkit::stubs::its_rest;
 use serde_json::json;
@@ -28,6 +29,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::Recording;
 use crate::change_feed::client;
+use crate::change_feed::idle_term;
 use crate::change_feed::reader;
 
 /// The feed path of the test reader.
@@ -121,6 +123,7 @@ async fn each_version_is_one_message_in_seq_order_under_its_routing_key()
         &publisher,
         limit(),
         &mut cursor,
+        &idle_term(),
     )
     .await?;
     let confirmed = broker.confirmed();
@@ -166,6 +169,7 @@ async fn a_broker_refusal_leaves_the_cursor_after_the_last_event_it_confirmed_wh
         &publisher,
         limit(),
         &mut cursor,
+        &idle_term(),
     )
     .await;
     assert!(
@@ -200,6 +204,7 @@ async fn a_broker_that_confirms_nothing_moves_no_cursor() -> Result<(), Box<dyn 
         &publisher,
         limit(),
         &mut cursor,
+        &idle_term(),
     )
     .await;
     assert!(
@@ -233,6 +238,7 @@ async fn a_cdr_refusal_publishes_nothing() -> Result<(), Box<dyn Error>> {
             &publisher,
             limit(),
             &mut cursor,
+            &idle_term(),
         )
         .await;
         assert!(
@@ -246,6 +252,11 @@ async fn a_cdr_refusal_publishes_nothing() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn the_aql_source_publishes_under_the_same_grammar() -> Result<(), Box<dyn Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+    let (state, term) = crate::change_feed::led(postgres.url()).await?;
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/v1/query/aql"))
@@ -270,24 +281,22 @@ async fn the_aql_source_publishes_under_the_same_grammar() -> Result<(), Box<dyn
         ))
         .mount(&server)
         .await;
-    let directory = tempfile::tempdir()?;
-    let store = Arc::new(WatermarkStore::open(
-        &directory.path().join("watermarks.redb"),
-    )?);
+    let store = Watermarks::new(state.pool().clone());
     let feed = AqlFeed::new(
         client(&server)?,
-        Arc::clone(&store),
+        store.clone(),
         Start::At(String::from("2026-11-02T09:00:00Z")),
     );
+    feed.begin(&reader(), &term).await?;
     let broker = Arc::new(Recording::default());
     let publisher = publisher(&broker);
     let mut cursor = Cursor::default();
-    pass(&feed, &reader(), &publisher, limit(), &mut cursor).await?;
+    pass(&feed, &reader(), &publisher, limit(), &mut cursor, &term).await?;
     let confirmed = broker.confirmed();
     let (key, body) = confirmed.first().ok_or("one message")?;
     assert_eq!("COMPOSITION.249.openEHR-EHR-COMPOSITION_encounter_v1", key);
     assert_eq!(json!(0), body["version_index"]);
-    let watermark = store.get(&reader())?.ok_or("the watermark moved")?;
+    let watermark = store.get(&reader()).await?.ok_or("the watermark moved")?;
     assert_eq!("2026-11-02T10:00:00Z", watermark.text());
     Ok(())
 }

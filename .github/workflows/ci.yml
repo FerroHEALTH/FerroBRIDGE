@@ -15,8 +15,11 @@
 #      job reads which packages a pull request reaches
 #      (scripts/checks/affected.sh): a lane whose inputs the change does not
 #      reach is skipped, the test, clippy and msrv lanes run the reached
-#      packages in shards, and a push to main, a merge group and a dispatch
-#      run everything.
+#      packages in shards, and a push to main and a dispatch run everything.
+#      A merge group runs tier 1, rustfmt, cargo-deny, the crate-version guard
+#      and the smoke set of the packages the group reaches (every test target
+#      compiled, the unit tests run); the pull request ran the rest on the
+#      same change.
 #
 # The `conclusion` job is the single required status check on main; it is what
 # makes a mostly-skipped pipeline enforceable (docs/ci-cd.md).
@@ -583,7 +586,8 @@ jobs:
       perf: ${{ steps.affected.outputs.perf }}
     steps:
       # Two commits: a pull request runs on GitHub's merge commit, whose first
-      # parent is the base it merges into, so HEAD^1..HEAD is the change.
+      # parent is the base it merges into, so HEAD^1..HEAD is the change. A
+      # merge group's change runs from the queue base, fetched on its own.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -610,12 +614,16 @@ jobs:
         if: steps.check.outputs.cargo == 'true'
         env:
           EVENT: ${{ github.event_name }}
+          QUEUE_BASE: ${{ github.event.merge_group.base_sha }}
           RUSTUP_TOOLCHAIN: stable
         run: |
           set -euo pipefail
           parents="$(git rev-list --parents -n 1 HEAD | wc -w)"
           if [ "$EVENT" = pull_request ] && [ "$parents" -eq 3 ]; then
             bash scripts/checks/affected.sh --base HEAD^1 --head HEAD | tee -a "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = merge_group ]; then
+            git fetch --no-tags --depth=1 origin "$QUEUE_BASE"
+            bash scripts/checks/affected.sh --base "$QUEUE_BASE" --head HEAD | tee -a "$GITHUB_OUTPUT"
           else
             bash scripts/checks/affected.sh --all | tee -a "$GITHUB_OUTPUT"
           fi
@@ -646,7 +654,7 @@ jobs:
   clippy:
     name: clippy (${{ matrix.packages }})
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -721,7 +729,7 @@ jobs:
   clippy-fhir-types:
     name: clippy-fhir-types (${{ matrix.version }}-resources)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -851,7 +859,8 @@ jobs:
       # the filter scripts/checks/fast.sh applies. The server's Patient/$summary
       # suites write each document they serve under EEHRXF_EMIT_DIR too, for
       # the fhir-validator job.
-      - env:
+      - if: github.event_name != 'merge_group'
+        env:
           PACKAGES: ${{ matrix.packages }}
           EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
@@ -869,6 +878,35 @@ jobs:
           if [ "${#docs[@]}" -gt 0 ]; then
             cargo hack test --doc "${docs[@]}" --locked
           fi
+      # The merge group's smoke set: the pull request ran every suite, so the
+      # queue compiles every test target of the reached packages, with every
+      # feature where a package has more, and runs only the unit tests, the
+      # library's or a binary-only package's.
+      - if: github.event_name == 'merge_group'
+        env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          set -euo pipefail
+          read -ra packages <<<"$PACKAGES"
+          args=()
+          for package in "${packages[@]}"; do args+=(-p "$package"); done
+          cargo hack nextest run "${args[@]}" --no-run --locked
+          for package in $(bash scripts/checks/featured.sh "${packages[@]}"); do
+            cargo nextest run -p "$package" --all-features --no-run --locked
+          done
+          libraries="$(cargo metadata --no-deps --format-version 1 --locked |
+            jq -r '.packages[] | select(any(.targets[]; any(.kind[]; . == "lib" or . == "rlib"))) | .name')"
+          lib=()
+          bin=()
+          for package in "${packages[@]}"; do
+            if grep -qxF "$package" <<<"$libraries"; then lib+=(-p "$package"); else bin+=(-p "$package"); fi
+          done
+          if [ "${#lib[@]}" -gt 0 ]; then
+            cargo hack nextest run "${lib[@]}" --lib --locked --no-tests=pass
+          fi
+          if [ "${#bin[@]}" -gt 0 ]; then
+            cargo hack nextest run "${bin[@]}" --bins --locked --no-tests=pass
+          fi
       # A package with a feature its default set leaves off runs its suites
       # with every feature on as well (scripts/checks/featured.sh); eehrxf has
       # no default feature, so only this step runs its suites. The eehrxf
@@ -876,7 +914,8 @@ jobs:
       # the vendored profiles also write it under EEHRXF_EMIT_DIR, and so does
       # the one that maps a prescription and a dispense to their MPD
       # collections, for the fhir-validator job.
-      - env:
+      - if: github.event_name != 'merge_group'
+        env:
           PACKAGES: ${{ matrix.packages }}
           EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
@@ -906,19 +945,19 @@ jobs:
       # fhir-search keeps jiff behind its default feature, so a token reader
       # compiles no time library (#1730): its suites also run with none.
       - name: Test fhir-search with no default feature
-        if: contains(matrix.packages, 'fhir-search')
+        if: github.event_name != 'merge_group' && contains(matrix.packages, 'fhir-search')
         run: cargo nextest run -p fhir-search --no-default-features --locked
       # ferrobridge-term's suites with each FHIR release alone (#1737); the
       # step above runs them with every release.
       - name: Test ferrobridge-term with each release alone
-        if: contains(matrix.packages, 'ferrobridge-term')
+        if: github.event_name != 'merge_group' && contains(matrix.packages, 'ferrobridge-term')
         run: |
           set -euo pipefail
           for release in stu3 r4 r4b r5 r6; do
             cargo nextest run -p ferrobridge-term --no-default-features --features "$release" --locked --no-tests=pass
           done
       - name: Upload the emitted exchange-format documents
-        if: contains(matrix.packages, 'eehrxf') || contains(matrix.packages, 'ferrobridge-server')
+        if: github.event_name != 'merge_group' && (contains(matrix.packages, 'eehrxf') || contains(matrix.packages, 'ferrobridge-server'))
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: eehrxf-documents-${{ strategy.job-index }}
@@ -940,7 +979,7 @@ jobs:
   fhir-validator:
     name: fhir-validator (eehrxf documents)
     needs: [detect, test]
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && (contains(needs.detect.outputs.test-matrix, 'eehrxf') || contains(needs.detect.outputs.test-matrix, 'ferrobridge-server'))
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && (contains(needs.detect.outputs.test-matrix, 'eehrxf') || contains(needs.detect.outputs.test-matrix, 'ferrobridge-server'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -1039,7 +1078,7 @@ jobs:
   conformance:
     name: conformance
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.conformance == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.conformance == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -1102,7 +1141,7 @@ jobs:
   e2e:
     name: e2e (containers)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.e2e == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1173,7 +1212,7 @@ jobs:
   sqlx-offline:
     name: sqlx-offline
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.sqlx == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.sqlx == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1215,38 +1254,24 @@ jobs:
   journeys:
     name: journeys (browser)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.journeys == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.journeys == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
     env:
       FERROBRIDGE_JOURNEYS: "1"
-    # A non-functional gate: it runs on the pull request and on every push to
-    # main, and in a merge group it passes without starting a browser (#1790).
     steps:
-      - name: Not run in the merge queue
-        if: github.event_name == 'merge_group'
-        run: |
-          {
-            echo "## Browser journeys"
-            echo
-            echo "Not run in the merge queue: the journeys are a non-functional gate that ran on the pull request and run again on the push to main (#1790)."
-          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name != 'merge_group'
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
-        if: github.event_name != 'merge_group'
         with:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
-        if: github.event_name != 'merge_group'
         with:
           tool: cargo-nextest
       - name: Install Chrome and chromedriver
-        if: github.event_name != 'merge_group'
         id: chrome
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
         with:
@@ -1256,7 +1281,6 @@ jobs:
       # stops it with its session, so the journeys run in parallel with no
       # driver shared between them.
       - name: Run the journeys
-        if: github.event_name != 'merge_group'
         env:
           FERROBRIDGE_CHROME: ${{ steps.chrome.outputs.chrome-path }}
           FERROBRIDGE_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
@@ -1267,23 +1291,21 @@ jobs:
   # The performance gate (#1656): ferrohealth-perf's A/B mode, the head
   # judged against its base on the same runner, in perf.yml, which the release
   # lane calls on the release commit too. The base is the merge base with the
-  # pull request's base, or the commit before a push. A non-functional gate:
-  # in a merge group it passes without building or measuring (#1790).
+  # pull request's base, or the commit before a push.
   perf:
     name: perf
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/perf.yml
     with:
       base: ${{ github.event.pull_request.base.sha || github.event.before }}
-      measure: ${{ github.event_name != 'merge_group' }}
 
   doc:
     name: rustdoc
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1309,7 +1331,7 @@ jobs:
   public-surface:
     name: public dependencies
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1377,7 +1399,7 @@ jobs:
   msrv:
     name: msrv (${{ matrix.packages }})
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1413,7 +1435,7 @@ jobs:
   fhir-types-features:
     name: fhir-types-features (cargo-hack)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.fhir-types == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -1443,7 +1465,7 @@ jobs:
   codegen-drift:
     name: codegen-drift
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1502,7 +1524,7 @@ jobs:
   codegen-emit-tests:
     name: codegen-emit-tests
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.codegen == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -1554,7 +1576,7 @@ jobs:
   omop-cdm-codegen-drift:
     name: omop-cdm-codegen-drift
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.omop-codegen == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.omop-codegen == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1704,7 +1726,7 @@ jobs:
   publish-dry-run:
     name: publish-dry-run
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

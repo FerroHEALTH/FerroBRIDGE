@@ -79,7 +79,9 @@ impl Case {
 #[tokio::test]
 async fn a_console_declaration_checks_against_its_context_and_serves_search()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/query/aql"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -106,7 +108,10 @@ async fn a_console_declaration_checks_against_its_context_and_serves_search()
     assert_eq!(serde_json::Value::Bool(true), report["clean"], "{report}");
     assert_eq!(
         SEARCH.as_bytes(),
-        std::fs::read(case.console("ferrobridge_console.search.yml"))?.as_slice()
+        case.console("ferrobridge_console.search.yml")
+            .await?
+            .as_deref()
+            .unwrap_or_default()
     );
     let state = case.state().await?;
     let context = state["contexts"]
@@ -132,14 +137,15 @@ async fn a_console_declaration_checks_against_its_context_and_serves_search()
         .filter(|request| request.url.path() == "/query/aql")
         .count();
     assert!(aql > 0, "the search reaches the CDR");
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
     Ok(())
 }
 
 #[tokio::test]
 async fn a_declaration_that_does_not_bind_is_refused_and_changes_nothing()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     case.map_observation().await?;
     let response = case
         .create("ferrobridge_console.search.yml", UNBOUND)
@@ -157,8 +163,7 @@ async fn a_declaration_that_does_not_bind_is_refused_and_changes_nothing()
         "fhirconnect/ferrobridge_console.search.yml",
         diagnostic["file"]
     );
-    assert!(!case.console("ferrobridge_console.search.yml").exists());
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
+    assert_eq!(None, case.console("ferrobridge_console.search.yml").await?);
     assert_eq!(case.observation_parameters().await?, Vec::<String>::new());
     let types = case.declared_types().await?;
     assert!(types.contains(&String::from("Observation")), "{types:?}");
@@ -168,7 +173,9 @@ async fn a_declaration_that_does_not_bind_is_refused_and_changes_nothing()
 #[tokio::test]
 async fn a_draft_declaration_check_answers_its_diagnostics_and_writes_nothing()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     case.map_observation().await?;
     let check = |body: &str| {
         Request::post("/operator/mappings/check?path=fhirconnect/ferrobridge_console.search.yml")
@@ -181,14 +188,15 @@ async fn a_draft_declaration_check_answers_its_diagnostics_and_writes_nothing()
     let response = case.send(check(SEARCH)?).await?;
     let report: serde_json::Value = serde_json::from_slice(&bytes(response).await?)?;
     assert_eq!(serde_json::Value::Bool(true), report["clean"], "{report}");
-    assert!(!case.console("ferrobridge_console.search.yml").exists());
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
+    assert_eq!(None, case.console("ferrobridge_console.search.yml").await?);
     Ok(())
 }
 
 #[tokio::test]
 async fn a_save_over_a_provisioned_declaration_is_refused() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let response = case
         .send(
             Request::put("/operator/mappings/fhirconnect/ferrobridge_facade.search.yml")
@@ -198,6 +206,6 @@ async fn a_save_over_a_provisioned_declaration_is_refused() -> Result<(), Box<dy
         )
         .await?;
     assert_eq!(StatusCode::CONFLICT, response.status());
-    assert!(!case.console("ferrobridge_facade.search.yml").exists());
+    assert_eq!(None, case.console("ferrobridge_facade.search.yml").await?);
     Ok(())
 }

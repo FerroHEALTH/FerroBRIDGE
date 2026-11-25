@@ -41,17 +41,23 @@ pub(super) const STANDALONE_LAUNCH: &str = r#"{"resourceType":"Task","id":"task-
 
 /// One case: the store's directory and the harness over it.
 pub(super) struct Case {
-    /// The directory the store lives in, removed on drop.
-    _directory: tempfile::TempDir,
+    /// The state store the resources live in, and its PostgreSQL.
+    _state: (
+        ferrobridge_testkit::containers::Postgres,
+        ferrobridge_server::store::Store,
+    ),
     /// The harness, its facade serving launch `Task`s under [`EXAMPLE_BASE`].
     pub(super) harness: Harness,
 }
 
 impl Case {
-    /// Returns a facade with no program, serving launch `Task`s.
-    pub(super) async fn new() -> Result<Self, Box<dyn Error>> {
-        let directory = tempfile::tempdir()?;
-        let owned = OwnedStore::open(&directory.path().join("launch-tasks.redb"))?;
+    /// Returns a facade with no program over a state store, `None` unless the
+    /// harness admits a PostgreSQL, serving launch `Task`s.
+    pub(super) async fn new() -> Result<Option<Self>, Box<dyn Error>> {
+        let Some(state) = crate::store::sealed_store().await? else {
+            return Ok(None);
+        };
+        let owned = OwnedStore::open(&state.1);
         let cdr = MockServer::start().await;
         let store = Arc::new(MemoryStore::default());
         let mut facade_settings = settings();
@@ -63,14 +69,14 @@ impl Case {
             facade_settings,
         )
         .with_launch_tasks(Some(Arc::new(owned)));
-        Ok(Self {
-            _directory: directory,
+        Ok(Some(Self {
+            _state: state,
             harness: Harness {
                 cdr,
                 store,
                 facade: Arc::new(facade),
             },
-        })
+        }))
     }
 
     /// Returns the open router over the facade.
@@ -109,7 +115,9 @@ fn content(mut resource: Value) -> Value {
 
 #[tokio::test]
 async fn the_guide_examples_round_trip() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     for example in [EHR_LAUNCH, STANDALONE_LAUNCH] {
         let sent: Value = serde_json::from_str(example)?;
         let (status, created) = call(case.app(), post_task(example)).await?;
@@ -128,7 +136,9 @@ async fn the_guide_examples_round_trip() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn a_search_finds_the_tasks_by_patient_status_and_code() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     for example in [EHR_LAUNCH, STANDALONE_LAUNCH] {
         let (status, _) = call(case.app(), post_task(example)).await?;
         assert_eq!(StatusCode::CREATED, status);
@@ -164,7 +174,9 @@ async fn a_search_finds_the_tasks_by_patient_status_and_code() -> Result<(), Box
 
 #[tokio::test]
 async fn a_task_of_neither_launch_profile_is_refused() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let mut task: Value = serde_json::from_str(STANDALONE_LAUNCH)?;
     task.as_object_mut().ok_or("an object")?.remove("input");
     let (status, body) = call(case.app(), post_task(&task.to_string())).await?;
@@ -180,7 +192,9 @@ async fn a_task_of_neither_launch_profile_is_refused() -> Result<(), Box<dyn Err
 
 #[tokio::test]
 async fn an_id_never_issued_is_not_found() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let (status, _) = call(case.app(), get("/fhir/Task/never")).await?;
     assert_eq!(StatusCode::NOT_FOUND, status);
     Ok(())
@@ -188,7 +202,9 @@ async fn an_id_never_issued_is_not_found() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn the_capability_statement_declares_both_launch_profiles() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let (_, statement) = call(case.app(), get("/fhir/metadata")).await?;
     let task = statement["rest"][0]["resource"]
         .as_array()

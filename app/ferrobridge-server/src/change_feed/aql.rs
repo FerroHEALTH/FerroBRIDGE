@@ -22,7 +22,6 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::sync::Arc;
 
 use crate::cdr::error::CdrError;
 use crate::cdr::query::QueryPageError;
@@ -37,11 +36,13 @@ use crate::change_feed::ChangedVersion;
 use crate::change_feed::Committed;
 use crate::change_feed::Event;
 use crate::change_feed::FeedError;
+use crate::change_feed::Ledger;
 use crate::change_feed::Page;
 use crate::change_feed::PageSize;
 use crate::change_feed::Position;
 use crate::change_feed::ReaderName;
-use crate::change_feed::watermark::WatermarkStore;
+use crate::change_feed::watermark::Watermarks;
+use crate::store::lease::Term;
 
 /// The projection every query of the source reads, in column order.
 const SELECT: &str = "SELECT e/ehr_id/value, v/uid/value, v/contribution/id/value, \
@@ -76,7 +77,7 @@ pub struct AqlFeed {
     /// The client the queries go through.
     cdr: CdrClient,
     /// The watermarks.
-    store: Arc<WatermarkStore>,
+    store: Watermarks,
     /// Where a reader with no watermark starts.
     start: Start,
 }
@@ -84,18 +85,19 @@ pub struct AqlFeed {
 impl AqlFeed {
     /// Returns the source over `cdr`, keeping its watermarks in `store`.
     #[must_use]
-    pub const fn new(cdr: CdrClient, store: Arc<WatermarkStore>, start: Start) -> Self {
+    pub const fn new(cdr: CdrClient, store: Watermarks, start: Start) -> Self {
         Self { cdr, store, start }
     }
+}
 
-    /// Returns the watermark of `reader`, recording the start of a reader
-    /// that has none and does not start at the beginning.
-    fn watermark(&self, reader: &ReaderName) -> Result<Option<Committed>, FeedError> {
-        if let Some(stored) = self.store.get(reader)? {
-            return Ok(Some(stored));
+#[async_trait::async_trait]
+impl ChangeFeed for AqlFeed {
+    async fn begin(&self, reader: &ReaderName, term: &Term) -> Result<(), FeedError> {
+        if self.store.get(reader).await?.is_some() {
+            return Ok(());
         }
         let text = match &self.start {
-            Start::Beginning => return Ok(None),
+            Start::Beginning => return Ok(()),
             Start::At(text) => text.clone(),
             Start::Now => jiff::Timestamp::now().to_string(),
         };
@@ -105,16 +107,19 @@ impl AqlFeed {
                 reason: format!("the start of reader {reader} names no instant"),
                 source: None,
             })?;
-        let start = Committed::new(at, text, BTreeSet::new());
-        self.store.set(reader, &start)?;
-        Ok(Some(start))
+        self.store
+            .begin(reader, &Committed::new(at, text, BTreeSet::new()), term)
+            .await?;
+        Ok(())
     }
-}
 
-#[async_trait::async_trait]
-impl ChangeFeed for AqlFeed {
     async fn page(&self, reader: &ReaderName, limit: PageSize) -> Result<Page, FeedError> {
-        let watermark = self.watermark(reader)?;
+        let watermark = self.store.get(reader).await?;
+        if watermark.is_none() && self.start != Start::Beginning {
+            return Err(FeedError::NotBegun {
+                reader: reader.clone(),
+            });
+        }
         let seen = watermark.as_ref().map_or(0, |at| at.versions().len());
         // NOTE: no specification governs this: our own design; the versions
         // finished at the watermark instant answer again, so the read asks for them too.
@@ -193,19 +198,26 @@ impl ChangeFeed for AqlFeed {
     async fn positions(&self, reader: &ReaderName) -> Result<Vec<Position>, FeedError> {
         Ok(self
             .store
-            .get(reader)?
+            .get(reader)
+            .await?
             .map(Position::Committed)
             .into_iter()
             .collect())
     }
 
-    async fn acknowledge(&self, reader: &ReaderName, last: &Position) -> Result<(), FeedError> {
-        match last {
-            Position::Committed(watermark) => self.store.set(reader, watermark),
-            Position::Outbox { .. } => Err(FeedError::Foreign {
+    async fn record(
+        &self,
+        ledger: &mut Ledger<'_>,
+        reader: &ReaderName,
+        last: &Position,
+    ) -> Result<(), FeedError> {
+        let Position::Committed(watermark) = last else {
+            return Err(FeedError::Foreign {
                 position: last.clone(),
-            }),
-        }
+            });
+        };
+        let term = ledger.term().clone();
+        Watermarks::set(ledger.connection().await?, reader, watermark, &term).await
     }
 }
 

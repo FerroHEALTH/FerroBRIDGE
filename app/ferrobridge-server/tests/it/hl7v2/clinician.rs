@@ -9,7 +9,6 @@
 use std::error::Error;
 use std::time::Duration;
 
-use ferrobridge_server::config::hl7v2::{Device, Sender};
 use wiremock::ResponseTemplate;
 
 use super::{CONTROL_ID, Running, adt_a01, face_settings, oru_r01, segments};
@@ -141,10 +140,8 @@ async fn a_result_naming_no_clinician_is_answered_ae() -> Result<(), Box<dyn Err
 #[tokio::test]
 async fn a_device_sender_s_result_commits_as_a_device_act() -> Result<(), Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.devices = vec![Device {
-        sender: Sender::Namespace(String::from("NORTHLAB")),
-        identifier_issuer: String::from("urn:example:devices"),
-    }];
+    lane.source()["origin"] = serde_json::json!("device");
+    lane.source()["device_identifier_issuer"] = serde_json::json!("urn:example:devices");
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     let running = Running::start_with(lane, lookup).await?;
     let ack = running
@@ -259,10 +256,8 @@ async fn a_composer_without_an_assigning_authority_carries_no_identifier()
 async fn a_device_composer_carries_its_id_issued_in_the_device_namespace()
 -> Result<(), Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.devices = vec![Device {
-        sender: Sender::Namespace(String::from("NORTHLAB")),
-        identifier_issuer: String::from("urn:example:devices"),
-    }];
+    lane.source()["origin"] = serde_json::json!("device");
+    lane.source()["device_identifier_issuer"] = serde_json::json!("urn:example:devices");
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     let running = Running::start_with(lane, lookup).await?;
     running

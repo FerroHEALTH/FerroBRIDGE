@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+/* A synthetic map from the Client and Bsn models to an R4 Patient. */
+map "http://ferrobridge.example/StructureMap/client-patient" = ClientPatient
+
+uses "http://ferrobridge.example/StructureDefinition/Client" alias Client as source
+uses "http://ferrobridge.example/StructureDefinition/Bsn" alias Bsn as source
+uses "http://hl7.org/fhir/StructureDefinition/Patient" as target
+
+group ClientPatient(source client : Client, source bsn : Bsn, target patient : Patient) {
+  client.id as id -> patient.identifier = id('urn:example:tenant:t1', id) "local";
+  bsn.number as number where bsn.idVerified = true
+    -> patient.identifier = id('http://fhir.nl/fhir/NamingSystem/bsn', number) "bsn";
+  client -> patient.name as name then {
+    client.lastName as family -> name.family = family "family";
+    client.firstName as given -> name.given = given "given";
+  } "name";
+  client.dateOfBirth as born -> patient.birthDate = born "birthDate";
+  client.gender as g where g = 'M' -> patient.gender = 'male' "male";
+  client.gender as g where g = 'F' -> patient.gender = 'female' "female";
+  client.gender as g where g = 'X' -> patient.gender = 'other' "other";
+  client.gender as g where g = 'U' -> patient.gender = 'unknown' "unknown";
+  client.deathDate as died -> patient.deceasedDateTime = died "deceased";
+}

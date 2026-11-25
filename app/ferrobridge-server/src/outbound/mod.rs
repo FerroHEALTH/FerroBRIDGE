@@ -11,15 +11,18 @@
 //! each resource carrying its `id`, `meta.versionId` and `meta.source`. A
 //! `204` (a deletion) and an erasure retract every resource the composition
 //! was last delivered as, and an update retracts the ones its new version no
-//! longer maps to, from the record [`emitted`] keeps. The event's resources
+//! longer maps to, from the record [`delivered`] keeps. The event's resources
 //! travel as one `transaction` Bundle ([`sink`]): a `PUT` per resource and a
-//! `DELETE` per retraction, so a delivery sent again changes nothing, and
-//! the event is acknowledged only once the endpoint accepted it (at least
-//! once). A clinical resource without a subject is never emitted: the event
-//! is refused, and the follower parks it. No specification governs the
+//! `DELETE` per retraction, so a delivery sent again changes nothing (FHIR R4
+//! http.html#transaction). Once the endpoint accepted it the lane stages what
+//! each composition stands at, and the follower writes that record in the
+//! transaction that moves the watermark under the lane's lease, so each
+//! effect lands once at the endpoint however the lane stops. A clinical
+//! resource without a subject is never emitted: the event is refused, and the
+//! follower parks it. No specification governs the
 //! outbound lane: our own design.
 
-pub mod emitted;
+pub mod delivered;
 pub mod sink;
 
 use std::collections::BTreeSet;
@@ -37,13 +40,14 @@ use crate::cdr::CdrClient;
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::EhrId;
 use crate::change_feed::Event;
+use crate::change_feed::Ledger;
 use crate::change_feed::ReaderName;
 use crate::change_feed::follow::Consumer;
 use crate::change_feed::follow::ConsumerError;
 use crate::change_feed::health::Following;
 use crate::facade::Facade;
-use emitted::Emitted;
-use emitted::EmittedError;
+use delivered::Delivered;
+use delivered::DeliveredError;
 use sink::Sink;
 use sink::SinkError;
 
@@ -63,8 +67,6 @@ pub struct Settings {
     pub reader: ReaderName,
     /// The FHIR endpoint.
     pub sink: Sink,
-    /// The file the delivery record is kept in.
-    pub emitted: std::path::PathBuf,
 }
 
 /// Why the lane did not finish an event.
@@ -111,7 +113,7 @@ pub enum OutboundError {
     Sink(#[source] SinkError),
     /// The delivery record could not be read or written.
     #[error("the delivery record could not be read or written")]
-    Emitted(#[source] EmittedError),
+    Delivered(#[source] DeliveredError),
 }
 
 /// Returns the consumer failure `error` is: a fault of the event or of what
@@ -119,7 +121,7 @@ pub enum OutboundError {
 /// transient.
 fn failure(error: OutboundError) -> ConsumerError {
     let transient = match &error {
-        OutboundError::Cdr(_) | OutboundError::Emitted(_) | OutboundError::Identity(_) => true,
+        OutboundError::Cdr(_) | OutboundError::Delivered(_) | OutboundError::Identity(_) => true,
         OutboundError::Sink(sink) => sink.is_transient(),
         OutboundError::Mapping { status } => {
             status.is_server_error() && *status != StatusCode::INTERNAL_SERVER_ERROR
@@ -160,29 +162,28 @@ pub struct Outbound {
     /// The endpoint.
     sink: Sink,
     /// What the lane has delivered.
-    emitted: Emitted,
+    delivered: Delivered,
     /// The status each delivered event is counted in, when reported.
     following: Option<Following>,
 }
 
 impl Outbound {
     /// Returns the lane `settings` describes over `facade`, reading through
-    /// `cdr`.
-    ///
-    /// # Errors
-    /// Returns [`EmittedError`] when the delivery record cannot be opened.
+    /// `cdr` and keeping its delivery record in `store`.
+    #[must_use]
     pub fn start(
         settings: &Settings,
         facade: Arc<Facade>,
         cdr: CdrClient,
-    ) -> Result<Self, EmittedError> {
-        Ok(Self {
+        store: &crate::store::Store,
+    ) -> Self {
+        Self {
             facade,
             cdr,
             sink: settings.sink.clone(),
-            emitted: Emitted::open(&settings.emitted)?,
+            delivered: Delivered::new(store.pool().clone()),
             following: None,
-        })
+        }
     }
 
     /// Returns this lane counting each delivered event in the status
@@ -209,7 +210,9 @@ impl Outbound {
         let headers = match answered.outcome {
             CompositionGetOutcome::Ok { headers, .. } => headers,
             CompositionGetOutcome::NoContent => {
-                return self.retract(delivery, ehr.as_str(), container.value());
+                return self
+                    .retract(delivery, ehr.as_str(), container.value())
+                    .await;
             }
             CompositionGetOutcome::NotFound { .. } => {
                 tracing::debug!(
@@ -265,9 +268,10 @@ impl Outbound {
             delivery.resources.push(resource.body);
         }
         let before = self
-            .emitted
+            .delivered
             .delivered(container.value())
-            .map_err(OutboundError::Emitted)?;
+            .await
+            .map_err(OutboundError::Delivered)?;
         delivery
             .retracted
             .extend(before.difference(&standing).cloned());
@@ -281,16 +285,17 @@ impl Outbound {
 
     /// Retracts every resource the composition `vo_id` of `ehr_id` was last
     /// delivered as.
-    fn retract(
+    async fn retract(
         &self,
         delivery: &mut Delivery,
         ehr_id: &str,
         vo_id: &str,
     ) -> Result<(), OutboundError> {
         let before = self
-            .emitted
+            .delivered
             .delivered(vo_id)
-            .map_err(OutboundError::Emitted)?;
+            .await
+            .map_err(OutboundError::Delivered)?;
         delivery.retracted.extend(before);
         delivery
             .standing
@@ -300,22 +305,24 @@ impl Outbound {
 
     /// Adds the retraction of everything the erasure `event` names: each
     /// erased composition, and every composition of an erased EHR.
-    fn erase(&self, delivery: &mut Delivery, event: &Event) -> Result<(), OutboundError> {
+    async fn erase(&self, delivery: &mut Delivery, event: &Event) -> Result<(), OutboundError> {
         let Some(ehr) = event.ehr_id.as_ref() else {
             return Ok(());
         };
         for version in &event.versions {
             match (version.kind.as_str(), version.vo_id) {
                 (COMPOSITION, Some(vo_id)) => {
-                    self.retract(delivery, ehr.as_str(), &vo_id.to_string())?;
+                    self.retract(delivery, ehr.as_str(), &vo_id.to_string())
+                        .await?;
                 }
                 (EHR, _) => {
                     for vo_id in self
-                        .emitted
+                        .delivered
                         .compositions(ehr.as_str())
-                        .map_err(OutboundError::Emitted)?
+                        .await
+                        .map_err(OutboundError::Delivered)?
                     {
-                        self.retract(delivery, ehr.as_str(), &vo_id)?;
+                        self.retract(delivery, ehr.as_str(), &vo_id).await?;
                     }
                 }
                 _ => {}
@@ -324,8 +331,8 @@ impl Outbound {
         Ok(())
     }
 
-    /// Sends `delivery` and, once the endpoint accepted it, records what
-    /// each composition stands at.
+    /// Sends `delivery` and, once the endpoint accepted it, stages what each
+    /// composition stands at for the follower's commit.
     async fn send(&self, delivery: Delivery) -> Result<(), OutboundError> {
         let retracted: Vec<&String> = delivery
             .retracted
@@ -345,10 +352,8 @@ impl Outbound {
                 .await
                 .map_err(OutboundError::Sink)?;
         }
-        for (ehr_id, vo_id, standing) in &delivery.standing {
-            self.emitted
-                .record(ehr_id, vo_id, standing)
-                .map_err(OutboundError::Emitted)?;
+        for (ehr_id, vo_id, standing) in delivery.standing {
+            self.delivered.stage(&ehr_id, &vo_id, standing);
         }
         Ok(())
     }
@@ -410,7 +415,7 @@ impl Consumer for Outbound {
     async fn process(&self, event: &Event) -> Result<(), ConsumerError> {
         let mut delivery = Delivery::default();
         if event.erasure {
-            self.erase(&mut delivery, event).map_err(failure)?;
+            self.erase(&mut delivery, event).await.map_err(failure)?;
         } else if let Some(ehr) = event.ehr_id.as_ref() {
             for vo_id in event.compositions() {
                 let container = container(vo_id).map_err(failure)?;
@@ -424,5 +429,20 @@ impl Consumer for Outbound {
             following.delivered();
         }
         Ok(())
+    }
+
+    fn discard(&self) {
+        self.delivered.discard();
+    }
+
+    async fn commit(&self, ledger: &mut Ledger<'_>) -> Result<(), ConsumerError> {
+        let connection = ledger
+            .connection()
+            .await
+            .map_err(ConsumerError::transient)?;
+        self.delivered
+            .commit(connection)
+            .await
+            .map_err(ConsumerError::transient)
     }
 }

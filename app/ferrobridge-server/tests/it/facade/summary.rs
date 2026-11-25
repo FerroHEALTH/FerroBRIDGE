@@ -838,23 +838,19 @@ async fn a_patient_s_own_summary_writes_one_access_record_naming_the_person()
     mount_terminology(&term).await;
     mount_record(&harness.cdr, &[composition()?]).await;
     let arr = crate::audit::repository().await;
-    let categories = ehds_logging::map::CategoryMap::declare_with(
-        ehds_logging::map::Matching::OpenEhr,
-        &[],
-        &std::collections::BTreeMap::from([(
-            String::from(FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID),
-            ehds_logging::map::Declared::Codes(vec![String::from("Patient-Summaries")]),
-        )]),
-        &std::collections::BTreeMap::new(),
-    )?;
-    let spool = tempfile::tempdir()?;
+    let categories = serde_json::json!({
+        "templates": {FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID: ["Patient-Summaries"]},
+    });
+    let Some((_postgres, store)) = crate::audit::state().await? else {
+        return Ok(());
+    };
     let log = crate::audit::access_log(
         &arr,
-        spool.path(),
+        &store,
         harness.facade.client().base_url(),
-        categories,
-        64 << 20,
-    )?;
+        Some(categories),
+    )
+    .await?;
     let key = ec_key("k1", jsonwebtoken::Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let token = mint(&key, &patient_claims(&issuer, UID));

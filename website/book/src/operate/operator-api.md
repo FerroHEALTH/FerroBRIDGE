@@ -22,7 +22,9 @@ issuer = "https://auth.example.org/realms/clinic"
 
 [operator]
 enabled = true
-mapping_dir = "/var/lib/ferrobridge/mappings"
+
+[state]
+url_file = "/run/secrets/ferrobridge_state_url"
 ```
 
 ## The operator scope
@@ -90,16 +92,29 @@ lane is off answers `200` with no consumer and a `null` topology.
   reports as), its `source` (`aql` or `ferroehr`), its `reader`, its
   `positions` (one per stream: `clinical` or `party` with the last
   acknowledged `seq` in `at`, or `committed` with the watermark instant in
-  `at` and `versions_at_instant`), its `state` (`starting`, `following` or
-  `stalled`), the messages it `published` since the bridge started, the
-  instant it `last_published`, and its `last_error`, the `at` and `cause` of
-  the last failed pass, kept after it recovers;
+  `at` and `versions_at_instant`), its `state` (`starting`, `standby` while
+  another replica leads its reader, `following` or `stalled`), the messages
+  it `published` since the bridge started, the instant it `last_published`,
+  its `last_error`, the `at` and `cause` of the last failed pass, kept after
+  it recovers, and its open `parked` events, each with its `id`, position,
+  identifiers, `cause`, `attempts`, `at`, `replay_requested` and the last
+  `decision` an operator recorded (`retry` or `discard`, `by` and `reason`);
 - `topology`: the `exchange`, the `routing_key` grammar
   (`<kind>.<change_type>.<template_id>`) and the bound `queues`, each a
   `name` and a `binding`.
 
 The document carries identifiers, instants and counts, never an event body,
 and never the broker URL.
+
+### `POST /operator/events/{consumer}/parked/{id}/{decision}`
+
+Settles one open parked event: `retry` offers it to its consumer again
+before the consumer's next page (`202`), and `discard` settles it without
+offering it again (`204`). The `ferrobridge-reason` header carries why, one
+line of at most 200 characters, and the subject of the operator's token is
+recorded as who decided. A settlement without a reason answers `400`
+[`reason-required`](problems.md#reason-required); a consumer that does not
+run, an event that is not open or another decision answers `404`.
 
 ## `GET /operator/etl/runs`
 
@@ -196,7 +211,7 @@ answer never names a host directory.
 | `language` | `fhirconnect` or `omocl` |
 | `kind` | `model`, `extension`, `context` or `search` for FHIRconnect, `mapping` for OMOCL; `null` for a file the running load did not read |
 | `sha256` | The lowercase hexadecimal SHA-256 of the file's bytes |
-| `owner` | `provisioned` for a file under a configured mapping directory, `console` for one the console saved under `[operator] mapping_dir` |
+| `owner` | `provisioned` for a file under a configured mapping directory, `console` for one of the running revision in the state store |
 | `read_only` | `true` for a provisioned file, `false` for a console file |
 | `diagnostics` | The diagnostics the running load raised about the file |
 
@@ -210,21 +225,27 @@ that is not `.yml` or `.yaml`.
 
 ## Saving mapping files
 
-With `[operator] mapping_dir` set, the console checks drafts, saves them and
-reloads the running set. Without it, the three routes below answer `409`.
+With [`[state]`](configuration.md) configured, the console checks drafts,
+saves them and reloads the running set, and every replica runs what one
+saves. Without it, the three routes below answer `409`.
 
 - **One owner per file.** The files under `[mappings] directory` and
-  `[mappings] omocl` are provisioned and never written. A console save goes
-  to `mapping_dir/fhirconnect/<path>` or `mapping_dir/omocl/<path>`, and a
-  save whose path names a provisioned file answers `409`. Console files join
-  the set beside the provisioned ones, at every reload and at start-up, where
-  a set that does not compile refuses the start. A file with the path of a
+  `[mappings] omocl` are provisioned and never written. A console file lives
+  in the state store, in a revision, and a save whose path names a
+  provisioned file answers `409`. Console files join the set beside the
+  provisioned ones, at every save and at start-up, where a running revision
+  that does not compile refuses the start. A file with the path of a
   provisioned one is ignored in favour of the provisioned file.
+- **Every replica runs the running revision.** A save notifies every
+  replica in the transaction that records it, and each replica compiles the
+  new revision and swaps it in. A replica that cannot compile it, or cannot
+  reach the store, keeps its running set and tries again every five seconds.
 - **OMOCL files reach `etl run`.** `serve` checks OMOCL files and does not
-  run them. `etl run` reads `mapping_dir/omocl/` beside `[mappings] omocl`
-  when its configuration turns the operator API on, with the same ownership
-  rule, so a file saved here maps the next run. Two files that define the
-  same mapping refuse the save, the reload and the run.
+  run them. `etl run` reads the running revision's OMOCL files beside
+  `[mappings] omocl` when its configuration turns the operator API on and
+  names `[state]`, with the same ownership rule, so a file saved here maps
+  the next run. Two files that define the same mapping refuse the save and
+  the run.
 - **Search declarations save beside their context.** A `*.search.yml` file
   under `fhirconnect/` is checked against the context it names, with every
   other declaration of the set, and swapped in with the facade's programs, so
@@ -239,7 +260,7 @@ reloads the running set. Without it, the three routes below answer `409`.
 The body is a draft of the file at `path`, under `fhirconnect/` or
 `omocl/`. The bridge compiles it with every other file of the running set,
 for every lane, and answers `200` with `clean`, `counts` and `diagnostics`,
-the draft's diagnostics named by `path`. Nothing is written.
+the draft's diagnostics named by `path`. Nothing is recorded.
 
 ### `PUT /operator/mappings/{path}`
 
@@ -253,57 +274,50 @@ The body is the file's new bytes, saved verbatim. A save carries:
 
 | Answer | When |
 |---|---|
-| `200` | The set compiled with the draft; the file is written and the running set replaced. The body is the new set's report and the `ETag` the new SHA-256 |
+| `200` | The set compiled with the draft; a new running revision holds it and the running set is replaced. The body is the new set's report and the `ETag` the new SHA-256 |
 | `400` | No reason, or a path the console cannot write |
-| `409` | A provisioned file holds the path, or no `mapping_dir` is configured |
+| `409` | A provisioned file holds the path, or no `[state]` is configured |
 | `412` | The file changed since the `ETag` given, or `If-None-Match: *` names an existing file |
-| `422` | The set does not compile with the draft; the body names every diagnostic. Neither the file nor the running set changes |
+| `422` | The set does not compile with the draft; the body names every diagnostic. No revision is recorded and the running set stays |
 | `428` | Neither `If-Match` nor `If-None-Match: *` |
 | `503` | The CDR did not serve a template, so the set could not be compiled |
 
-The draft is written to a hidden file beside its target and synced; only a
-draft that compiles is renamed over the target and the directory synced, so a
-reader sees the old file or the new one. The running set is then compiled
-from disk and swapped in one step: the facade's programs and search
-declarations, the FHIRconnect operations and the operator state, so the
-`CapabilityStatement` names the new set at once. A request in flight finishes
-on the set it started with. Checks, saves and reloads run one at a time.
+A save holds the running revision for its whole transaction, so saves from
+every replica run one at a time. The draft is compiled in memory with the
+running revision's other files and the provisioned ones; only a set that
+compiles is recorded, as one transaction. The set is then swapped in one
+step: the facade's programs and search declarations, the FHIRconnect
+operations and the operator state, so the `CapabilityStatement` names the new
+set at once. A request in flight finishes on the set it started with.
 
 ### `POST /operator/reload`
 
-Compiles the provisioned and console files on disk and swaps them in, with
-the answers of a save: `200` with the report, `422` with the diagnostics and
-the running set unchanged, `503` when an upstream did not answer.
-
-The quickstart `compose.yaml` runs the server with a read-only root file
-system and mounts `./operator-mappings` (or `FERROBRIDGE_OPERATOR_MAPPINGS`)
-at `/var/lib/ferrobridge/mappings`, the `mapping_dir` it sets. The container
-runs as `65532:65532`, so hand that directory to that user before turning
-the API on.
-
-Each replica reloads on its own. With `mapping_dir` on a shared volume, a
-file one replica saved reaches another at that replica's next reload or
-restart; the console reloads the replica behind its configured URL.
+Compiles the provisioned files and the running revision again and swaps
+them in, with the answers of a save: `200` with the report, `422` with the
+diagnostics and the running set unchanged, `503` when an upstream did not
+answer. A reload records no revision; use it after you change a provisioned
+file.
 
 ## Mapping-set revisions
 
-With `[operator] mapping_dir` set, the bridge keeps every state of the
-console's files it ran as a revision, under `mapping_dir/..revisions`. A
-revision holds the whole set of console files, each by its wire path and
-SHA-256 digest, with who recorded it, when and why. The bridge records one
-at start-up, after each save, after a reload that finds the console files
-changed on disk, and after each apply. The provisioned files belong to the
+With `[state]` configured, the bridge keeps every set of console files as a
+revision in the state store. A revision holds the whole set of console
+files, each by its wire path and SHA-256 digest, with who recorded it, when
+and why. Each save and each apply records one that runs, and an import
+records one that waits for an apply. The provisioned files belong to the
 deployment: they are in no revision, and an apply leaves them as they are.
-Without `mapping_dir` the routes below answer `409`.
+Without `[state]` the routes below answer `409`.
 
 ### `GET /operator/revisions`
 
 Answers `running`, the id of the revision the bridge runs, and `revisions`,
-newest first. Each names its `id` (a number that grows by one), its
-`parent` (the revision that ran when it was recorded), the `author` (the
-token's subject, `-` for the bridge), the `time`, the `reason`, the
-`origin` (`baseline`, `save`, `reload`, `apply` or `import`), whether it was
-`applied`, and how many `files` it holds.
+newest first. Each names its `id` (a number that grows with each revision),
+its `parent` (the revision that ran when it was recorded), the `author` (the
+token's subject), the `time`, the `reason`, the `origin` (`baseline`,
+`save`, `apply` or `import`), whether it was `applied`, and how many `files`
+it holds. The baseline is revision 1: the provisioned tree at the bridge's
+first start, with no console file, recorded once by whichever replica
+starts first on an empty store.
 
 ### `GET /operator/revisions/{id}`
 
@@ -321,8 +335,9 @@ out.
 
 ### `POST /operator/revisions/{id}/apply`
 
-Replaces the console files by the revision's and reloads. A rollback is the
-apply of an earlier revision. The request carries:
+Runs the revision's files on every replica, recorded as a new revision. A
+rollback is the apply of an earlier revision; an apply of the baseline runs
+the provisioned tree alone. The request carries:
 
 | Header | Meaning |
 |---|---|
@@ -331,18 +346,18 @@ apply of an earlier revision. The request carries:
 
 | Answer | When |
 |---|---|
-| `200` | The set compiled with the revision's files; they replaced the console's and the set reloaded. The body is the new set's report and the `ETag` the id of the revision the apply recorded |
+| `200` | The set compiled with the revision's files, which now run. The body is the new set's report and the `ETag` the id of the revision the apply recorded |
 | `400` | No reason |
 | `404` | No revision has the id |
-| `409` | No `mapping_dir` is configured |
+| `409` | No `[state]` is configured |
 | `412` | The running revision is not the one `If-Match` names |
 | `422` | The set does not compile with the revision's files; the body names every diagnostic, and nothing changes |
 | `428` | No `If-Match` |
 | `503` | The CDR did not serve a template, so the set could not be compiled |
 
-The revision's files are written to a staging tree and compiled with the
-provisioned files first. Only a set that compiles replaces the console's
-directories, one rename for each language, and then runs.
+The revision's files are compiled in memory with the provisioned files
+first, while the apply holds the running revision. Only a set that compiles
+is recorded and runs.
 
 ### `GET /operator/revisions/{id}/export`
 
@@ -367,9 +382,160 @@ until an apply.
 |---|---|
 | `201` | The set compiles with the archive's files. The body is the check's report, `Location` the new revision and the `ETag` its id |
 | `400` | No reason, or a body that is no archive the bridge reads (`bad-archive`) |
-| `409` | No `mapping_dir` is configured |
+| `409` | No `[state]` is configured |
 | `422` | The set does not compile with the archive's files; the body names every diagnostic, and nothing is recorded |
 | `503` | The CDR did not serve a template, so the set could not be checked |
+
+## Settings registers
+
+With [`[state]`](configuration.md) configured, operational policy you
+change at runtime lives in a register: every write appends one version with
+its committer, and the change is in force on every replica without a
+restart. A register with no version holds its default, version `0`. Without
+`[state]` the routes below answer `409`.
+
+| Register | Document |
+|---|---|
+| `audit-categories` | The category of the data under each template and archetype (Regulation (EU) 2025/327 Annex II 3.2(c)): `national`, the national categories the map may name, each `<system>\|<code>`, and `templates` and `archetypes`, each id to its Art 14(1) categories or `none`. The default maps nothing |
+
+### `GET /operator/registers/{register}`
+
+The version in force: `register`, `version`, `document`, `committer` and
+`committed_at` (both absent for the default), with the version as the
+`ETag`. A name no register has answers `404`.
+
+### `PUT /operator/registers/{register}`
+
+The body is the whole new document, as JSON. The write names, in
+`If-Match`, the version it replaces, as the read's `ETag` gave it, such as
+`"0"` for the default.
+
+| Answer | When |
+|---|---|
+| `200` | The version is committed and every replica classifies by it from its next request on. The body is the new version and the `ETag` its number |
+| `400` | The document is no JSON, is not the register's shape, or breaks its rules (`bad-register`); the version in force stays |
+| `404` | No register has the name |
+| `409` | No `[state]` is configured |
+| `412` | The register changed since the version `If-Match` names: read it again |
+| `428` | No `If-Match` |
+| `503` | The state store did not answer (`registers-unavailable`) |
+
+A write notifies every replica in the transaction that commits it, and each
+replica drops its copy of the register. While a replica's listener is
+disconnected, every request on it reads the register from the store, so a
+lost notification never leaves an old version in force.
+
+### `GET /operator/registers/{register}/history`
+
+Every committed version, newest first.
+
+## Inbound sources
+
+The systems that send patient events to the bridge are inbound sources, each
+a versioned row of the state store ([`[state]`](configuration.md#state)), so
+an operator adds, changes, disables or deletes one without a restart and
+without a new port. A bridge without `[state]` answers `404` to every route
+below. Every version is kept with its committer, the subject of the
+operator's token, a deletion included, which is the record of who configured
+each flow (GDPR Art 30).
+
+A source carries a `name` (`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, at most
+128 characters, unique), a `kind` (`webhook`, `fhir-subscription` or
+`mllp`), `enabled`, and the kind's `document`:
+
+| Kind | Document |
+|---|---|
+| `webhook` | `verify`: the verifier, by `kind` (`hmac` with `algorithm`, `header`, `encoding` and `prefix`; `standard-webhooks` with `schemes`, `tolerance` and `endpoint_id`; `static-header` with `header`; `mtls` with `subjects`); `keys`: the secrets the verifier checks with, any of which verifies, newest first, none for `mtls`; `events`: the event map (`tenant`, `entity`, `rules`, `otherwise`, `dedupe` and `stamp`); `recovery`: the optional `redeliver` and `reconcile` steps; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled`; `limits`: `body_limit` (`65536`), `concurrency` (`4`) and `max_pending` (`100000`). [The inbound intake](../integrate/inbound.md) describes each part |
+| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; optional `mtls`: the `subjects` its client certificate must carry, at least one of the two; `subscriptions`: the tenant of each subscription reference; optional `base`: the FHIR base a relative reference resolves against; `tenants` as above ([FHIR Subscription notifications](../integrate/inbound.md#fhir-subscription-notifications)) |
+| `mllp` | `routes`: each `sending_application` (MSH-3) and `sending_facility` (MSH-4), bound to a `certificate_subject`, to `source_cidrs`, or to both |
+
+A secret is named, never written: `{"secret": "<name>"}` resolves through
+[`[secrets]`](configuration.md#secrets) when the source uses it.
+
+One write is one transaction: it validates the document, appends the
+version, updates the head row with its tenants and routes, and notifies
+every replica. Each replica's `LISTEN` session reloads the source into its
+snapshot; while the session is down, every lookup reads the row.
+
+```mermaid
+sequenceDiagram
+    participant O as Operator
+    participant A as Replica A
+    participant S as State store
+    participant B as Replica B
+    O->>A: PUT /operator/sources/{id} (If-Match)
+    A->>S: one transaction: validate, append the version, update the head, pg_notify
+    S-->>B: NOTIFY ferrobridge_sources '<id>:<version>'
+    B->>S: reload the source into the snapshot
+```
+
+### `GET /operator/sources`
+
+Every source at its head version, by name.
+
+### `GET /operator/sources/{id}`
+
+One source, with its version as its `ETag` (`"<version>"`).
+
+### `GET /operator/sources/{id}/versions`
+
+Every version of one source, oldest first, a deleted source included.
+
+### `POST /operator/sources`
+
+Creates a source from `{"name", "kind", "enabled", "document"}` as version 1;
+`201` with its `Location` and `ETag`. A document that breaks a rule of its
+kind or names a secret the directory does not hold answers `422`
+[`invalid-source`](problems.md#invalid-source); a name or an MLLP route
+another source holds answers `409` [`source-conflict`](problems.md#source-conflict).
+
+### `PUT /operator/sources/{id}`
+
+Changes a source to its next version; the body is that of a create and keeps
+the kind. `If-Match` names the `ETag` it replaces: a stale one answers `412`
+and a missing one `428`. Disabling is a `PUT` with `"enabled": false`.
+
+### `DELETE /operator/sources/{id}`
+
+Deletes a source under `If-Match`, recording the deletion as its last
+version; `204`.
+
+### `GET /operator/sources/{id}/parked`
+
+The parked inbound work items of one source, oldest first, each with its
+`tenant`, `entity`, fixed `reason`, `attempts` and `since`
+([The inbound intake](../integrate/inbound.md#retry-park-and-replay)). With
+`[inbound]` off it answers `404` [`not-found`](problems.md#not-found).
+
+### `POST /operator/sources/{id}/settle`
+
+Settles one parked item from `{"tenant", "entity", "settlement", "reason"}`,
+`settlement` being `retry` or `discard`; `204`. The subject of the
+operator's token and the reason are recorded with it. A blank reason answers
+`400` [`reason-required`](problems.md#reason-required), and an entity with no
+parked item `404` [`not-parked`](problems.md#not-parked).
+
+### `POST /operator/sources/{id}/replay`
+
+Runs inbound work again at a new generation, for one entity
+(`{"tenant", "entity"}`) or for every entity an event received in a range
+named (`{"from", "to"}`, RFC 3339, `to` exclusive); `202` with
+`{"items": <n>}`. A range whose `from` is not before its `to` answers `400`.
+
+### `POST /operator/sources/{id}/reconcile`
+
+Runs every reconciliation poll of the source now, whatever its cursors'
+schedule, under the source's recovery lease; `202` with `{"items": <n>}`,
+the entities marked due. While another replica holds the lease it answers
+`409` [`recovery-leased`](problems.md#recovery-leased), and a poll the
+source refuses or fails answers `502` [`recovery-failed`](problems.md#recovery-failed).
+
+### `POST /operator/sources/{id}/redeliver`
+
+Calls the source's redelivery step now; `204` once the source accepted it,
+`404` when the source declares none, and `502`
+[`recovery-failed`](problems.md#recovery-failed) when the source refused or
+failed the call.
 
 ## What the log records
 

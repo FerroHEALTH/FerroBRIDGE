@@ -13,10 +13,11 @@ use ferrobridge_server::config::error::Error;
 use super::refusal;
 
 /// A CDR, a change feed and a facade the lane can follow and map through.
-const FEED: &str = "[auth]\nenabled = false\n\n[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
+const FEED: &str = "[auth]\nenabled = false\n\n[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
 
 /// The keys every complete lane names.
-const COMPLETE: &str = "reader = \"fhir-outbound\"\nendpoint.url = \"https://fhir.example.org/r4\"\nemitted = \"/var/lib/ferrobridge/emitted.redb\"\n";
+const COMPLETE: &str =
+    "reader = \"fhir-outbound\"\nendpoint.url = \"https://fhir.example.org/r4\"\n";
 
 /// Returns a configuration whose `[fhir_outbound]` section adds `keys` to an
 /// enabled lane.
@@ -45,11 +46,16 @@ fn an_enabled_lane_resolves_every_key_and_follows_the_change_feed()
     );
     assert_eq!("fhir-outbound", outbound.reader.as_str());
     assert_eq!("https://fhir.example.org/r4", outbound.sink.base().as_str());
-    assert_eq!(
-        std::path::Path::new("/var/lib/ferrobridge/emitted.redb"),
-        outbound.emitted
-    );
     Ok(())
+}
+
+#[test]
+fn the_redb_delivery_record_key_is_gone() {
+    let refused = Config::from_sources(
+        Some("[fhir_outbound]\nemitted = \"/var/lib/ferrobridge/emitted.redb\"\n"),
+        &BTreeMap::new(),
+    );
+    assert!(matches!(refused, Err(Error::Parse { .. })), "{refused:?}");
 }
 
 #[test]
@@ -99,7 +105,7 @@ fn the_lane_needs_the_change_feed_and_the_facade() -> Result<(), Box<dyn std::er
         ),
         (
             format!(
-                "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n\n[fhir_outbound]\nenabled = true\n{COMPLETE}"
+                "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[fhir_outbound]\nenabled = true\n{COMPLETE}"
             ),
             "facade.enabled",
         ),
@@ -115,25 +121,12 @@ fn the_lane_needs_the_change_feed_and_the_facade() -> Result<(), Box<dyn std::er
 
 #[test]
 fn a_missing_key_is_refused_by_name() -> Result<(), Box<dyn std::error::Error>> {
-    for (keys, missing) in [
-        (
-            "endpoint.url = \"https://fhir.example.org/r4\"\nemitted = \"/tmp/e.redb\"\n",
-            "fhir_outbound.reader",
-        ),
-        (
-            "reader = \"fhir-outbound\"\nendpoint.url = \"https://fhir.example.org/r4\"\n",
-            "fhir_outbound.emitted",
-        ),
-    ] {
-        let error = refusal(&lane(keys))?;
-        assert!(
-            matches!(&error, Error::Missing { key } if key == missing),
-            "{missing}: {error:?}"
-        );
-    }
-    let error = refusal(&lane(
-        "reader = \"fhir-outbound\"\nemitted = \"/tmp/e.redb\"\n",
-    ))?;
+    let error = refusal(&lane("endpoint.url = \"https://fhir.example.org/r4\"\n"))?;
+    assert!(
+        matches!(&error, Error::Missing { key } if key == "fhir_outbound.reader"),
+        "{error:?}"
+    );
+    let error = refusal(&lane("reader = \"fhir-outbound\"\n"))?;
     assert!(
         refused_endpoint(&error, "url"),
         "the endpoint url: {error:?}"
@@ -177,7 +170,7 @@ fn another_consumers_reader_is_refused() -> Result<(), Box<dyn std::error::Error
 fn the_facade_itself_is_refused_as_the_endpoint() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
         "{}endpoint.url = \"https://bridge.example.org/fhir\"\n",
-        lane("reader = \"fhir-outbound\"\nemitted = \"/tmp/e.redb\"\n")
+        lane("reader = \"fhir-outbound\"\n")
     )
     .replace(
         "[facade]\nenabled = true\n",

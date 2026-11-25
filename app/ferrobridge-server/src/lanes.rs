@@ -14,7 +14,7 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
-use crate::config::{self, OperatorSettings, Settings};
+use crate::config::{self, Settings};
 use crate::serve_until;
 use crate::state::AppState;
 use crate::terminology::Translator;
@@ -36,8 +36,12 @@ pub(crate) struct Started {
 }
 
 impl Started {
-    /// Logs the boot summary and the indicators readiness runs.
+    /// Logs the boot summary and the indicators readiness runs, and starts
+    /// the replica's `LISTEN` session on the inbound sources.
     pub(crate) fn announce(&self) {
+        if let (Some(store), Some(sources)) = (self.state.store(), self.state.sources()) {
+            store.listeners(&[sources.listened()]).spawn();
+        }
         startup::log(&self.lanes);
         tracing::info!(
             version = crate::build_info::VERSION,
@@ -75,6 +79,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             );
         }
     }
+    state = open_sources(settings, state)?;
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
         let (mounted, counts) =
@@ -86,22 +91,14 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         set_counts(&mut lanes, "facade", counts);
     }
     if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
-        let base = url::Url::parse(&mounted.settings().base_url)
-            .context("reading [facade] base_url as the address the access records name")?;
-        let log = crate::audit::AccessLog::open(audit, &base, mounted.client().base_url())
-            .context("opening the access-record spool")?;
-        tracing::info!(
-            lane = "audit",
-            repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
-            "the facade records every access in the audit trail"
-        );
+        let log = start_audit(audit, mounted, &state).await?;
         state = state.with_access_log(Arc::new(log));
     }
     state = start_links(settings, state)?;
-    if let Some(operator) = settings.operator.as_ref() {
+    if settings.operator.is_some() {
         let operator = build_operator(
             settings,
-            operator,
+            state.store(),
             state.facade().cloned(),
             state.operations_handle().cloned(),
         )
@@ -137,7 +134,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             .await
             .context("starting the change-feed consumers")?;
         for consumer in &started {
-            state = state.with_following(consumer.following.clone());
+            state = state.with_following(consumer.lane.following.clone());
         }
         state = state.with_change_feed(report);
         feeds = started;
@@ -150,6 +147,38 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     })
 }
 
+/// Returns `state` serving the inbound sources of its state store, the
+/// `[secrets]` directory they name opened.
+fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState> {
+    use anyhow::Context;
+
+    let Some(store) = state.store() else {
+        return Ok(state);
+    };
+    let sources = Arc::new(
+        crate::sources::Sources::open(store, settings.secrets.as_ref())
+            .context("opening the [secrets] directory the inbound sources name")?,
+    );
+    let intake = settings.inbound.map(|inbound| {
+        // TODO(#2048): start the worker pool with the identity-feed handler.
+        crate::inbound::intake::Intake::new(
+            Arc::clone(&sources),
+            crate::inbound::store::InboxStore::new(store.pool().clone()),
+            inbound.body_limit,
+        )
+        .with_recoverer(Arc::new(crate::inbound::recover::Recoverer::new(
+            store.clone(),
+            Arc::clone(&sources),
+            inbound.workers.lease,
+        )))
+    });
+    let state = state.with_sources(sources);
+    Ok(match intake {
+        Some(intake) => state.with_intake(Arc::new(intake)),
+        None => state,
+    })
+}
+
 /// One change-feed consumer, ready to follow its source.
 pub(crate) struct StartedFeed {
     /// The source.
@@ -158,12 +187,10 @@ pub(crate) struct StartedFeed {
     reader: change_feed::ReaderName,
     /// The consumer.
     consumer: Arc<dyn change_feed::follow::Consumer>,
-    /// How the follower paces its reads.
-    polling: change_feed::follow::Polling,
-    /// Where a poisoned event is parked.
-    parking: change_feed::follow::Parking,
-    /// What readiness reports for the consumer.
-    following: change_feed::health::Following,
+    /// The lease of the reader's lane.
+    lease: crate::store::lease::Lease,
+    /// How the follower paces, parks and reports.
+    lane: change_feed::follow::Lane,
 }
 
 impl StartedFeed {
@@ -178,9 +205,8 @@ impl StartedFeed {
                 self.feed.as_ref(),
                 &self.reader,
                 self.consumer.as_ref(),
-                self.polling,
-                Some(self.parking),
-                &self.following,
+                Arc::new(self.lease),
+                self.lane,
                 stopped,
             )
             .await;
@@ -188,8 +214,27 @@ impl StartedFeed {
     }
 }
 
-/// Opens the change-feed source and its dead-letter store once, and starts
-/// every consumer section that is on over them, each under its own reader.
+/// Spawns every change-feed follower and the inbound recovery of `state`,
+/// each on its own task until `stop` reads `true`.
+pub(crate) fn spawn_followers(
+    feeds: Vec<StartedFeed>,
+    state: &AppState,
+    settings: &Settings,
+    stop: &tokio::sync::watch::Sender<bool>,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let (Some(recoverer), Some(inbound)) = (
+        state.intake().and_then(|intake| intake.recoverer()),
+        settings.inbound,
+    ) {
+        followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    followers
+}
+
+/// Opens the change-feed source over the state store once, and starts every
+/// consumer section that is on over it, each under its own reader and lane
+/// lease.
 async fn start_change_feed(
     settings: &Settings,
     feed_settings: &change_feed::Settings,
@@ -202,15 +247,17 @@ async fn start_change_feed(
         .as_ref()
         .context("the change feed reads the CDR, and [cdr] is not set")?;
     let client = cdr::CdrClient::new(cdr).context("building the CDR client the feed reads")?;
-    let feed =
-        change_feed::open(feed_settings, client.clone()).context("opening the change feed")?;
-    let dead_letters = Arc::new(
-        change_feed::dead_letter::DeadLetters::open(&feed_settings.dead_letters)
-            .context("opening the dead-letter store of the change feed")?,
-    );
+    let store = state.store().cloned().context(
+        "the change feed keeps its cursors and dead letters in the state store, and [state] is not set",
+    )?;
+    let feed = change_feed::open(feed_settings, client.clone(), &store);
+    let dead_letters = change_feed::dead_letter::DeadLetters::new(store.pool().clone());
     let parking = change_feed::follow::Parking {
-        store: Arc::clone(&dead_letters),
+        store: dead_letters.clone(),
         max_attempts: feed_settings.max_attempts,
+    };
+    let lane_of = |reader: &change_feed::ReaderName, following| {
+        follower_lane(&store, feed_settings, &parking, reader, following)
     };
     let mut report = change_feed::report::Report::new(feed_settings.source.clone(), dead_letters);
     let mut started = Vec::new();
@@ -235,23 +282,24 @@ async fn start_change_feed(
                 following: following.clone(),
             })
             .with_topology(lane.topology());
+        let (lease, follower_lane) = lane_of(&lane.reader, following)?;
         started.push(StartedFeed {
             feed: Arc::clone(&feed),
             reader: lane.reader.clone(),
             consumer: Arc::new(publisher),
-            polling: feed_settings.polling,
-            parking: parking.clone(),
-            following,
+            lease,
+            lane: follower_lane,
         });
     }
     if let Some(load) = settings.omop_incremental.as_ref() {
         let name = crate::etl::incremental::NAME;
         let following =
             follower(&feed, feed_settings, &load.reader, name, "omop_incremental").await?;
-        let consumer = crate::etl::incremental::Incremental::start(settings, client.clone())
-            .await
-            .context("starting the incremental OMOP load")?
-            .with_following(following.clone());
+        let consumer =
+            crate::etl::incremental::Incremental::start(settings, state.store(), client.clone())
+                .await
+                .context("starting the incremental OMOP load")?
+                .with_following(following.clone());
         tracing::info!(
             lane = name,
             reader = %load.reader,
@@ -262,36 +310,65 @@ async fn start_change_feed(
             reader: load.reader.clone(),
             following: following.clone(),
         });
+        let (lease, follower_lane) = lane_of(&load.reader, following)?;
         started.push(StartedFeed {
             feed: Arc::clone(&feed),
             reader: load.reader.clone(),
             consumer: Arc::new(consumer),
-            polling: feed_settings.polling,
-            parking: parking.clone(),
-            following,
+            lease,
+            lane: follower_lane,
         });
     }
-    if let Some(lane) = settings.fhir_outbound.as_ref() {
-        let outbound = start_outbound(lane, state, &feed, feed_settings, client, parking).await?;
+    if let Some(outbound_lane) = settings.fhir_outbound.as_ref() {
+        let following = follower(
+            &feed,
+            feed_settings,
+            &outbound_lane.reader,
+            crate::outbound::NAME,
+            "fhir_outbound",
+        )
+        .await?;
+        let (lease, follower_lane) = lane_of(&outbound_lane.reader, following.clone())?;
+        let outbound = start_outbound(outbound_lane, state, &feed, client, lease, follower_lane)?;
         report = report.with_follower(change_feed::report::Follower {
             name: crate::outbound::NAME,
-            reader: lane.reader.clone(),
-            following: outbound.following.clone(),
+            reader: outbound_lane.reader.clone(),
+            following,
         });
         started.push(outbound);
     }
     Ok((started, report))
 }
 
+/// Returns the lease of `reader`'s lane on `store` and how its follower
+/// paces, parks and reports.
+fn follower_lane(
+    store: &crate::store::Store,
+    feed_settings: &change_feed::Settings,
+    parking: &change_feed::follow::Parking,
+    reader: &change_feed::ReaderName,
+    following: change_feed::health::Following,
+) -> anyhow::Result<(crate::store::lease::Lease, change_feed::follow::Lane)> {
+    let name = crate::store::lease::Lane::new(format!("change-feed:{reader}"))?;
+    Ok((
+        store.lease(name, feed_settings.lease),
+        change_feed::follow::Lane {
+            polling: feed_settings.polling,
+            parking: Some(parking.clone()),
+            following,
+        },
+    ))
+}
+
 /// Starts the outbound FHIR lane over `feed`, mapping through the facade of
 /// `state`, and warns that it delivers identifiable clinical data.
-async fn start_outbound(
+fn start_outbound(
     lane: &crate::outbound::Settings,
     state: &AppState,
     feed: &Arc<dyn change_feed::ChangeFeed>,
-    feed_settings: &change_feed::Settings,
     client: cdr::CdrClient,
-    parking: change_feed::follow::Parking,
+    lease: crate::store::lease::Lease,
+    follower_lane: change_feed::follow::Lane,
 ) -> anyhow::Result<StartedFeed> {
     use anyhow::Context;
 
@@ -300,10 +377,11 @@ async fn start_outbound(
         .facade()
         .cloned()
         .context("the outbound FHIR lane maps through the facade, and the facade is off")?;
-    let following = follower(feed, feed_settings, &lane.reader, name, "fhir_outbound").await?;
-    let consumer = crate::outbound::Outbound::start(lane, facade, client)
-        .with_context(|| format!("opening {}", lane.emitted.display()))?
-        .with_following(following.clone());
+    let store = state.store().context(
+        "the outbound FHIR lane keeps its delivery record in the state store, and [state] is not set",
+    )?;
+    let consumer = crate::outbound::Outbound::start(lane, facade, client, store)
+        .with_following(follower_lane.following.clone());
     tracing::warn!(
         lane = name,
         reader = %lane.reader,
@@ -314,9 +392,8 @@ async fn start_outbound(
         feed: Arc::clone(feed),
         reader: lane.reader.clone(),
         consumer: Arc::new(consumer),
-        polling: feed_settings.polling,
-        parking,
-        following,
+        lease,
+        lane: follower_lane,
     })
 }
 
@@ -408,18 +485,20 @@ async fn start_hl7v2(
                 lane = "hl7v2",
                 listen = %lane.listen,
                 concept_maps = maps,
-                profiles = lane.profiles.len(),
                 "the HL7 v2 face listens for MLLP over TLS"
             );
             Some((socket, hl7v2::Listening::default()))
         }
         None => None,
     };
-    let face = hl7v2::Face::new(facade, terminology, lane)
+    let routes: Arc<dyn crate::sources::Routes> = state.sources().cloned().context(
+        "the HL7 v2 face routes its senders from the state store, and [state] is not set",
+    )?;
+    let face = hl7v2::Face::new(facade, terminology, routes)
         .with_usage(Arc::clone(state.usage_window()))
         .with_access_log(state.access_log().cloned(), lane.listen);
-    let plain = match lane.plain.as_ref() {
-        Some(plain) => Some(hl7v2::plain::bind(plain, &face).await?),
+    let plain = match lane.plain {
+        Some(bind) => Some(hl7v2::plain::bind(bind, &face).await?),
         None => None,
     };
     Ok(StartedFace {
@@ -524,22 +603,57 @@ fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::
     }
 }
 
+/// Opens the access-record lane `audit` describes for the facade `mounted`,
+/// its outbox and its category register in the state store of `state`.
+async fn start_audit(
+    audit: &crate::audit::Settings,
+    mounted: &facade::Facade,
+    state: &AppState,
+) -> anyhow::Result<crate::audit::AccessLog> {
+    use anyhow::Context;
+
+    let base = url::Url::parse(&mounted.settings().base_url)
+        .context("reading [facade] base_url as the address the access records name")?;
+    let store = state.store().context(
+        "the access-record lane keeps its outbox in the state store, and [state] is not set",
+    )?;
+    let registers = state.registers().cloned().context(
+        "the access records are classified by a settings register, and [state] is not set",
+    )?;
+    let log = crate::audit::AccessLog::open(
+        audit,
+        (&base, mounted.client().base_url()),
+        store,
+        registers,
+    )
+    .await
+    .context("reading the audit-categories register the access records are classified by")?;
+    tracing::info!(
+        lane = "audit",
+        repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
+        "the facade records every access in the audit trail"
+    );
+    Ok(log)
+}
+
 /// Builds the operator API over the configured mapping directories, with the
 /// running load as the checker sees it.
 ///
-/// The check runs once here, over the inputs `mapping check` reads, and the
-/// search declaration of each context comes from the facade when it runs
-/// (no specification governs the operator surface: our own design).
+/// With the state store, the running revision's console files join the
+/// provisioned ones here and the start is refused when they do not compile;
+/// without it, the check runs once over the inputs `mapping check` reads.
+/// The search declaration of each context comes from the facade when it
+/// runs (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
-    operator_settings: &OperatorSettings,
+    store: Option<&crate::store::Store>,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<crate::operations::lane::OperationsLane>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 
-    let needs_cdr = settings.mappings.is_none()
-        && (settings.mapping_directory.is_some() || operator_settings.mapping_dir.is_some());
+    let needs_cdr =
+        settings.mappings.is_none() && (settings.mapping_directory.is_some() || store.is_some());
     let cdr = match settings.cdr.as_ref() {
         Some(config) if needs_cdr => Some(
             cdr::CdrClient::new(config)
@@ -564,7 +678,7 @@ async fn build_operator(
         let mappings = facade.mappings();
         operator::reload::searches(mappings.programs(), mappings.search())
     });
-    let built = if let Some(mapping_dir) = operator_settings.mapping_dir.clone() {
+    let built = if let Some(store) = store {
         let reloader = operator::reload::Reloader {
             fhirconnect: settings.mapping_directory.clone(),
             templates: settings
@@ -576,29 +690,22 @@ async fn build_operator(
             facade,
             operations,
         };
+        let revisions = crate::mappings::revisions::Revisions::new(store);
+        revisions
+            .baseline()
+            .await
+            .context("recording the baseline revision of the mapping set")?;
         let operator = Arc::new(
             operator::Operator::new(
                 roots,
                 operator::snapshot::Snapshot::new(check::Report::default(), searches),
             )
-            .with_saving(mapping_dir, reloader),
+            .with_saving(revisions, reloader),
         );
-        // NOTE: no specification governs this: our own design; the console's
-        // saved files join the running set at boot, or the start is refused.
-        let worker = Arc::clone(&operator);
-        operator::save::on_blocking_thread(move |thread| {
-            worker
-                .prepare(thread, None)
-                .map(|prepared| worker.apply(prepared))
-        })
-        .await
-        .context("loading the console's mapping files")?
-        .context("loading the console's mapping files")?;
-        let worker = Arc::clone(&operator);
-        tokio::task::spawn_blocking(move || worker.settle(operator::save::on_disk()))
+        operator
+            .converge(operator::watch::When::Always)
             .await
-            .context("recording the console's mapping files as a revision")?
-            .context("recording the console's mapping files as a revision")?;
+            .context("loading the running revision of the console's mapping files")?;
         Arc::try_unwrap(operator).map_err(|_shared| {
             anyhow::anyhow!("the operator API is still shared after its boot load")
         })?
@@ -620,7 +727,7 @@ async fn build_operator(
         lane = "operator",
         roots = built.roots().len(),
         diagnostics = built.snapshot().report().diagnostics().len(),
-        saving = operator_settings.mapping_dir.is_some(),
+        saving = store.is_some(),
         "the operator API is mounted under /operator"
     );
     Ok(built)
@@ -663,8 +770,8 @@ async fn build_facade(
     facade::programs::check_party_search(&programs, lane.party_search.as_ref())
         .context("checking [facade.party_search] against the party contexts")?;
     let owned: Vec<&str> = [
-        (lane.app_state.is_some(), facade::app_state::BASIC),
-        (lane.launch_task.is_some(), facade::launch_task::TASK),
+        (lane.app_state, facade::app_state::BASIC),
+        (lane.launch_task, facade::launch_task::TASK),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
@@ -693,16 +800,9 @@ async fn build_facade(
     let store = facade::identity::state::StateStore::open(state)
         .await
         .context("opening the identity map in the state store")?;
-    let owned_store = |path: Option<&std::path::PathBuf>| {
-        path.map(|path| {
-            facade::owned::OwnedStore::open(path)
-                .map(Arc::new)
-                .with_context(|| format!("opening {}", path.display()))
-        })
-        .transpose()
-    };
-    let app_state = owned_store(lane.app_state.as_ref())?;
-    let launch_tasks = owned_store(lane.launch_task.as_ref())?;
+    let owned = |on: bool| on.then(|| Arc::new(facade::owned::OwnedStore::open(state)));
+    let app_state = owned(lane.app_state);
+    let launch_tasks = owned(lane.launch_task);
     let summary = match lane.summary.as_ref() {
         Some(summary) => Some(
             build_summary(summary, &programs, &client)
@@ -784,12 +884,16 @@ fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState>
     let (Some(shl), Some(mounted)) = (settings.shl.as_ref(), state.facade()) else {
         return Ok(state);
     };
+    let store = state.store().context(
+        "the links need a [state] section: every replica serves them from the state store",
+    )?;
     let links = crate::shl::Links::open(
+        store,
         shl.clone(),
         Arc::clone(mounted),
         state.access_log().cloned(),
     )
-    .with_context(|| format!("opening the link store {}", shl.store.display()))?;
+    .context("opening the links in the state store")?;
     let links = Arc::new(links);
     drop(links.spawn_sweeper());
     tracing::info!(

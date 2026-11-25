@@ -38,21 +38,40 @@ base ([R4 http.html, transaction](https://hl7.org/fhir/R4/http.html#transaction)
   every resource the lane delivered for it.
 
 The lane keeps a record of what it delivered for each composition in the
-`redb` file `[fhir_outbound] emitted` names, identifiers only, so a deletion
-and an erasure can retract what the content no longer shows.
+state store ([`[state]`](../operate/configuration.md#state)), identifiers
+only, so a deletion and an erasure can retract what the content no longer
+shows.
 
 ## Delivery guarantees
 
-- **At least once:** the event is acknowledged only after the endpoint
-  answered `2xx`. A delivery sent again is the same set of `PUT`s and
-  `DELETE`s, which changes nothing at the endpoint.
+- **Each effect once:** exactly-once delivery to a remote endpoint is not
+  possible, so the lane combines three parts. Every entry is an idempotent
+  `PUT` or `DELETE`, so a delivery sent again changes nothing at the
+  endpoint. One replica leads the lane at a time, under its lease
+  ([one leader per reader](change-feed.md#one-leader-per-reader)). After the
+  endpoint answered `2xx`, one transaction writes the delivery record and
+  moves the lane's watermark under its lease generation. A lane stopped
+  before the endpoint answers, or after it answers and before that
+  transaction, sends the same Bundle again; a lane stopped after it sends
+  nothing again.
+
+```mermaid
+sequenceDiagram
+    participant L as Outbound lane (leader)
+    participant E as FHIR endpoint
+    participant S as State store
+    L->>E: transaction Bundle (PUT and DELETE)
+    E-->>L: 2xx
+    L->>S: one transaction: delivery record and watermark, fenced by the lease
+    Note over L,S: a stop before this commit redelivers the same Bundle
+```
 - **A failure that may pass** (no answer, `401`, `408`, `429`, a `5xx`, the
   CDR or the terminology server not answering) leaves the event to be read
   again on the next pass, and never counts toward parking it.
 - **A refusal of the content** (any other `4xx`, a composition no mapping
   admits) is retried `[change_feed] max_attempts` passes and then parked in
   the dead-letter store, where the operator API and the console can inspect
-  and replay it.
+  it and retry or discard it.
 - **No resource without a subject:** a composition of an EHR the identity map
   binds to no patient, or a resource of a type that names its subject and
   carries none, is refused and parked; nothing of the event reaches the

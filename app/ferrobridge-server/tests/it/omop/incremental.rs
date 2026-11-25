@@ -99,7 +99,7 @@ async fn a_batch_run_after_the_incremental_load_leaves_the_cdm_as_it_was()
         ferrobridge_server::config::Config::load(Some(&config), &[])?,
     )
     .resolve(Process::Server)?;
-    let load = Incremental::start(&settings, client.clone()).await?;
+    let load = Incremental::start(&settings, None, client.clone()).await?;
 
     let mut seq = 0;
     for (ehr, version) in &committed {

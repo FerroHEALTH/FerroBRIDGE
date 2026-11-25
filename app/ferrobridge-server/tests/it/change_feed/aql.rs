@@ -4,16 +4,18 @@
 //! The vendor-neutral source over ITS-REST 1.1.0 `/query/aql`: the query it
 //! sends past the watermark, the events it reads from a result set, the
 //! watermark it keeps across a restart, the versions that share an instant
-//! with the watermark, and the refusals that leave the watermark alone.
+//! with the watermark, and the refusals that leave the watermark alone. The
+//! watermarks live in the state store, so the cases run only when
+//! `FERROBRIDGE_E2E=1` admits the harness.
 
 use std::collections::BTreeSet;
 use std::error::Error;
-use std::sync::Arc;
 
 use ferrobridge_server::cdr::ids::ContributionUid;
 use ferrobridge_server::change_feed::ChangeFeed;
 use ferrobridge_server::change_feed::Committed;
 use ferrobridge_server::change_feed::FeedError;
+use ferrobridge_server::change_feed::Ledger;
 use ferrobridge_server::change_feed::PageSize;
 use ferrobridge_server::change_feed::Position;
 use ferrobridge_server::change_feed::Stream;
@@ -22,7 +24,9 @@ use ferrobridge_server::change_feed::aql::Start;
 use ferrobridge_server::change_feed::follow::Cursor;
 use ferrobridge_server::change_feed::follow::PassError;
 use ferrobridge_server::change_feed::follow::pass;
-use ferrobridge_server::change_feed::watermark::WatermarkStore;
+use ferrobridge_server::change_feed::watermark::Watermarks;
+use ferrobridge_server::store::lease::Term;
+use ferrobridge_testkit::containers;
 use ferrobridge_testkit::stubs::its_rest;
 use serde_json::json;
 use wiremock::matchers::{body_partial_json, body_string_contains, method, path};
@@ -30,6 +34,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::Recording;
 use super::client;
+use super::led;
 use super::reader;
 
 /// The query route.
@@ -69,19 +74,46 @@ fn answer(rows: &[Vec<serde_json::Value>]) -> ResponseTemplate {
 }
 
 /// Returns a source over `server` keeping its watermarks in `store`.
-fn feed(
-    server: &MockServer,
-    store: Arc<WatermarkStore>,
-    start: Start,
-) -> Result<AqlFeed, Box<dyn Error>> {
+fn feed(server: &MockServer, store: Watermarks, start: Start) -> Result<AqlFeed, Box<dyn Error>> {
     Ok(AqlFeed::new(client(server)?, store, start))
 }
 
-/// Returns a store in a fresh directory, with the directory.
-fn store() -> Result<(tempfile::TempDir, Arc<WatermarkStore>), Box<dyn Error>> {
-    let directory = tempfile::tempdir()?;
-    let store = WatermarkStore::open(&directory.path().join("watermarks.redb"))?;
-    Ok((directory, Arc::new(store)))
+/// The watermarks of a state store in a PostgreSQL container, and the lease
+/// of the test reader's lane.
+struct Kept {
+    /// The container, held for the case.
+    _postgres: containers::Postgres,
+    /// The watermarks.
+    store: Watermarks,
+    /// The lease.
+    term: Term,
+}
+
+/// Returns the watermarks of a case, `None` unless `FERROBRIDGE_E2E=1`.
+async fn store() -> Result<Option<Kept>, Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(None);
+    }
+    let postgres = containers::postgres().await?;
+    let (state, term) = led(postgres.url()).await?;
+    Ok(Some(Kept {
+        _postgres: postgres,
+        store: Watermarks::new(state.pool().clone()),
+        term,
+    }))
+}
+
+/// Returns a source over `server` from `start`, its reader's cursor
+/// prepared under `term`.
+async fn begun(
+    server: &MockServer,
+    store: &Watermarks,
+    term: &Term,
+    start: Start,
+) -> Result<AqlFeed, Box<dyn Error>> {
+    let source = feed(server, store.clone(), start)?;
+    source.begin(&reader(), term).await?;
+    Ok(source)
 }
 
 /// Returns the page size every case asks for.
@@ -92,6 +124,14 @@ fn limit() -> PageSize {
 #[tokio::test]
 async fn a_first_read_binds_the_start_and_records_it_as_the_watermark() -> Result<(), Box<dyn Error>>
 {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
+        return Ok(());
+    };
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(QUERY))
@@ -111,12 +151,12 @@ async fn a_first_read_binds_the_start_and_records_it_as_the_watermark() -> Resul
         .expect(1)
         .mount(&server)
         .await;
-    let (_directory, store) = store()?;
-    let read = feed(&server, Arc::clone(&store), Start::At(String::from(START)))?
+    let read = begun(&server, &store, &term, Start::At(String::from(START)))
+        .await?
         .page(&reader(), limit())
         .await?;
     assert!(read.events.is_empty());
-    let watermark = store.get(&reader())?.ok_or("the start is recorded")?;
+    let watermark = store.get(&reader()).await?.ok_or("the start is recorded")?;
     assert_eq!(START, watermark.text());
     assert!(watermark.versions().is_empty());
     Ok(())
@@ -124,14 +164,22 @@ async fn a_first_read_binds_the_start_and_records_it_as_the_watermark() -> Resul
 
 #[tokio::test]
 async fn a_reader_that_starts_at_the_beginning_sends_no_window() -> Result<(), Box<dyn Error>> {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
+        return Ok(());
+    };
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(QUERY))
         .respond_with(answer(&[]))
         .mount(&server)
         .await;
-    let (_directory, store) = store()?;
-    feed(&server, Arc::clone(&store), Start::Beginning)?
+    begun(&server, &store, &term, Start::Beginning)
+        .await?
         .page(&reader(), limit())
         .await?;
     let requests = server.received_requests().await.ok_or("recorded")?;
@@ -140,13 +188,21 @@ async fn a_reader_that_starts_at_the_beginning_sends_no_window() -> Result<(), B
     let query = body["q"].as_str().ok_or("a query")?;
     assert!(!query.contains("WHERE"), "{query}");
     assert!(body.get("query_parameters").is_none(), "{body}");
-    assert_eq!(None, store.get(&reader())?);
+    assert_eq!(None, store.get(&reader()).await?);
     Ok(())
 }
 
 #[tokio::test]
 async fn each_row_is_one_composition_event_with_the_versions_at_its_instant()
 -> Result<(), Box<dyn Error>> {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
+        return Ok(());
+    };
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(QUERY))
@@ -157,8 +213,8 @@ async fn each_row_is_one_composition_event_with_the_versions_at_its_instant()
         ]))
         .mount(&server)
         .await;
-    let (_directory, store) = store()?;
-    let read = feed(&server, store, Start::At(String::from(START)))?
+    let read = begun(&server, &store, &term, Start::At(String::from(START)))
+        .await?
         .page(&reader(), limit())
         .await?;
     assert_eq!(3, read.events.len());
@@ -194,8 +250,15 @@ async fn each_row_is_one_composition_event_with_the_versions_at_its_instant()
 #[tokio::test]
 async fn the_watermark_survives_a_restart_and_a_version_sharing_its_instant_is_still_read()
 -> Result<(), Box<dyn Error>> {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
+        return Ok(());
+    };
     let server = MockServer::start().await;
-    let (directory, store) = store()?;
     let boundary = "2026-11-02T10:00:00Z";
     let finished = row(1, 1, boundary);
     Mock::given(method("POST"))
@@ -207,14 +270,14 @@ async fn the_watermark_survives_a_restart_and_a_version_sharing_its_instant_is_s
     let consumer = Recording::default();
     let mut cursor = Cursor::default();
     pass(
-        &feed(&server, Arc::clone(&store), Start::At(String::from(START)))?,
+        &begun(&server, &store, &term, Start::At(String::from(START))).await?,
         &reader(),
         &consumer,
         limit(),
         &mut cursor,
+        &term,
     )
     .await?;
-    drop(store);
 
     // A version committed at the same instant arrives after the pass.
     let late = row(0, 1, boundary);
@@ -227,12 +290,13 @@ async fn the_watermark_survives_a_restart_and_a_version_sharing_its_instant_is_s
         .expect(1)
         .mount(&server)
         .await;
-    let reopened = Arc::new(WatermarkStore::open(
-        &directory.path().join("watermarks.redb"),
-    )?);
-    let read = feed(&server, reopened, Start::At(String::from(START)))?
-        .page(&reader(), limit())
-        .await?;
+    let read = feed(
+        &server,
+        Watermarks::new(term.pool().clone()),
+        Start::At(String::from(START)),
+    )?
+    .page(&reader(), limit())
+    .await?;
     assert_eq!(
         1,
         read.events.len(),
@@ -248,36 +312,55 @@ async fn the_watermark_survives_a_restart_and_a_version_sharing_its_instant_is_s
 
 #[tokio::test]
 async fn an_acknowledgement_never_moves_the_watermark_backwards() -> Result<(), Box<dyn Error>> {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
+        return Ok(());
+    };
     let server = MockServer::start().await;
-    let (_directory, store) = store()?;
-    let source = feed(&server, Arc::clone(&store), Start::At(String::from(START)))?;
+    let source = begun(&server, &store, &term, Start::At(String::from(START))).await?;
     let later = Committed::new(
         "2026-11-02T11:00:00Z".parse()?,
         String::from("2026-11-02T11:00:00Z"),
         BTreeSet::from([String::from("a::synthetic.cdr::1")]),
     );
+    let mut ledger = Ledger::new(&term);
     source
-        .acknowledge(&reader(), &Position::Committed(later.clone()))
+        .record(&mut ledger, &reader(), &Position::Committed(later.clone()))
         .await?;
+    ledger.commit().await?;
     let earlier = Committed::new(
         "2026-11-02T10:00:00Z".parse()?,
         String::from("2026-11-02T10:00:00Z"),
         BTreeSet::new(),
     );
+    let mut ledger = Ledger::new(&term);
     let refused = source
-        .acknowledge(&reader(), &Position::Committed(earlier))
+        .record(&mut ledger, &reader(), &Position::Committed(earlier))
         .await;
     assert!(
         matches!(refused, Err(FeedError::Behind { .. })),
         "{refused:?}"
     );
-    assert_eq!(Some(later), store.get(&reader())?);
+    drop(ledger);
+    assert_eq!(Some(later), store.get(&reader()).await?);
     Ok(())
 }
 
 #[tokio::test]
 async fn each_refusal_of_the_query_leaves_the_watermark_where_it_was() -> Result<(), Box<dyn Error>>
 {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
+        return Ok(());
+    };
     for status in [400_u16, 401, 403, 408, 500, 503] {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
@@ -285,15 +368,15 @@ async fn each_refusal_of_the_query_leaves_the_watermark_where_it_was() -> Result
             .respond_with(ResponseTemplate::new(status))
             .mount(&server)
             .await;
-        let (_directory, store) = store()?;
         let consumer = Recording::default();
         let mut cursor = Cursor::default();
         let failed = pass(
-            &feed(&server, Arc::clone(&store), Start::At(String::from(START)))?,
+            &begun(&server, &store, &term, Start::At(String::from(START))).await?,
             &reader(),
             &consumer,
             limit(),
             &mut cursor,
+            &term,
         )
         .await;
         let Err(PassError::Feed(error)) = failed else {
@@ -313,7 +396,7 @@ async fn each_refusal_of_the_query_leaves_the_watermark_where_it_was() -> Result
                 "{status}: {error:?}"
             ),
         }
-        let watermark = store.get(&reader())?.ok_or("the start is recorded")?;
+        let watermark = store.get(&reader()).await?.ok_or("the start is recorded")?;
         assert_eq!(START, watermark.text(), "{status}");
         assert_eq!(None, cursor.acknowledged(Stream::Committed), "{status}");
     }
@@ -322,14 +405,22 @@ async fn each_refusal_of_the_query_leaves_the_watermark_where_it_was() -> Result
 
 #[tokio::test]
 async fn a_row_before_the_watermark_is_a_malformed_answer() -> Result<(), Box<dyn Error>> {
+    let Some(Kept {
+        _postgres,
+        store,
+        term,
+    }) = store().await?
+    else {
+        return Ok(());
+    };
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path(QUERY))
         .respond_with(answer(&[row(1, 1, "2026-11-02T08:00:00Z")]))
         .mount(&server)
         .await;
-    let (_directory, store) = store()?;
-    let refused = feed(&server, store, Start::At(String::from(START)))?
+    let refused = begun(&server, &store, &term, Start::At(String::from(START)))
+        .await?
         .page(&reader(), limit())
         .await;
     assert!(

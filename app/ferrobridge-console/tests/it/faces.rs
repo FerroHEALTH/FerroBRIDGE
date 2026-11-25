@@ -385,7 +385,8 @@ fn stalled_events() -> serde_json::Value {
                 "cause": "the consumer met a poisoned failure: the event names no template",
                 "attempts": 5,
                 "at": "2026-11-02T09:00:00Z",
-                "replay_requested": false
+                "replay_requested": false,
+                "decision": null
             }]
         }],
         "topology": {
@@ -419,7 +420,9 @@ async fn the_events_page_draws_a_degraded_consumer_with_its_cause_and_the_topolo
         "the event names no template",
         "name=\"consumer\" value=\"events\"",
         "name=\"id\" value=\"3\"",
-        "Replay parked event 3 of events",
+        "Retry parked event 3 of events",
+        "Discard parked event 3 of events",
+        "name=\"reason\"",
     ] {
         assert!(page.contains(shown), "{shown}: {page}");
     }
@@ -463,16 +466,21 @@ async fn the_events_page_of_a_bridge_without_the_operator_api_says_it_is_off()
     Ok(())
 }
 
-/// Mounts the bridge's answer `status` to the replay of parked event 3 of
-/// the `events` consumer, expected `times` times.
-async fn replay_answer(bridge: &MockServer, status: u16, times: u64) {
+/// Mounts the bridge's answer `status` to the settlement `verb` of parked
+/// event 3 of the `events` consumer with the test's reason, expected `times`
+/// times.
+async fn settle_answer(bridge: &MockServer, verb: &str, status: u16, times: u64) {
     wiremock::Mock::given(wiremock::matchers::method("POST"))
-        .and(wiremock::matchers::path(
-            "/operator/events/events/parked/3/replay",
-        ))
+        .and(wiremock::matchers::path(format!(
+            "/operator/events/events/parked/3/{verb}"
+        )))
         .and(wiremock::matchers::header(
             "authorization",
             format!("Bearer {}", crate::support::OPERATOR_TOKEN).as_str(),
+        ))
+        .and(wiremock::matchers::header(
+            "ferrobridge-reason",
+            "template deployed",
         ))
         .respond_with(wiremock::ResponseTemplate::new(status))
         .expect(times)
@@ -481,21 +489,23 @@ async fn replay_answer(bridge: &MockServer, status: u16, times: u64) {
 }
 
 #[tokio::test]
-async fn a_replay_posts_to_the_bridge_and_answers_on_the_page() -> Result<(), Box<dyn Error>> {
+async fn a_retry_posts_to_the_bridge_and_answers_on_the_page() -> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;
     answer(&bridge, "/operator/events", 200, &stalled_events()).await;
-    replay_answer(&bridge, 202, 1).await;
+    settle_answer(&bridge, "retry", 202, 1).await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (response, page) = send(
         &service,
-        crate::stub::post("/events", "consumer=events&id=3", &cookie)?,
+        crate::stub::post(
+            "/events",
+            "consumer=events&id=3&reason=template+deployed&decision=retry",
+            &cookie,
+        )?,
     )
     .await?;
     assert_eq!(StatusCode::OK, response.status());
     assert!(
-        page.contains(
-            "Replay requested: the consumer offers the event again before its next page."
-        ),
+        page.contains("Retry recorded: the consumer offers the event again before its next page."),
         "{page}"
     );
     assert!(page.contains("FerroEHR outbox feed"), "{page}");
@@ -503,47 +513,90 @@ async fn a_replay_posts_to_the_bridge_and_answers_on_the_page() -> Result<(), Bo
 }
 
 #[tokio::test]
-async fn a_refused_replay_draws_the_refusal() -> Result<(), Box<dyn Error>> {
+async fn a_discard_posts_to_the_bridge_and_answers_on_the_page() -> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;
     answer(&bridge, "/operator/events", 200, &stalled_events()).await;
-    replay_answer(&bridge, 404, 1).await;
+    settle_answer(&bridge, "discard", 204, 1).await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, page) = send(
         &service,
-        crate::stub::post("/events", "consumer=events&id=3", &cookie)?,
+        crate::stub::post(
+            "/events",
+            "consumer=events&id=3&reason=template+deployed&decision=discard",
+            &cookie,
+        )?,
+    )
+    .await?;
+    assert!(
+        page.contains("Discard recorded: the event is settled and never offered again."),
+        "{page}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_settlement_draws_the_refusal() -> Result<(), Box<dyn Error>> {
+    let bridge = bridge().await;
+    answer(&bridge, "/operator/events", 200, &stalled_events()).await;
+    settle_answer(&bridge, "retry", 404, 1).await;
+    let (service, cookie) = signed_in(&bridge).await?;
+    let (_response, page) = send(
+        &service,
+        crate::stub::post(
+            "/events",
+            "consumer=events&id=3&reason=template+deployed&decision=retry",
+            &cookie,
+        )?,
     )
     .await?;
     assert!(page.contains("404"), "{page}");
-    assert!(!page.contains("Replay requested:"), "{page}");
+    assert!(!page.contains("Retry recorded:"), "{page}");
     Ok(())
 }
 
 #[tokio::test]
-async fn a_replay_that_names_no_parked_event_never_asks_the_bridge() -> Result<(), Box<dyn Error>> {
+async fn a_settlement_that_names_no_parked_event_or_reason_never_asks_the_bridge()
+-> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;
     answer(&bridge, "/operator/events", 200, &stalled_events()).await;
-    replay_answer(&bridge, 202, 0).await;
+    settle_answer(&bridge, "retry", 202, 0).await;
+    settle_answer(&bridge, "discard", 204, 0).await;
     let (service, cookie) = signed_in(&bridge).await?;
-    for form in ["consumer=events&id=three", "consumer=&id=3", "id=3"] {
+    for form in [
+        "consumer=events&id=three&reason=x&decision=retry",
+        "consumer=&id=3&reason=x&decision=retry",
+        "id=3&reason=x&decision=discard",
+        "consumer=events&id=3&reason=x&decision=replay",
+    ] {
         let (_response, page) =
             send(&service, crate::stub::post("/events", form, &cookie)?).await?;
         assert!(
-            page.contains("The replay names no parked event."),
+            page.contains("The settlement names no parked event or decision."),
             "{form}: {page}"
         );
     }
+    let (_response, page) = send(
+        &service,
+        crate::stub::post(
+            "/events",
+            "consumer=events&id=3&reason=+&decision=retry",
+            &cookie,
+        )?,
+    )
+    .await?;
+    assert!(!page.contains("Retry recorded:"), "{page}");
     Ok(())
 }
 
 #[tokio::test]
-async fn a_requested_replay_reads_as_requested_with_no_form() -> Result<(), Box<dyn Error>> {
+async fn a_pending_retry_reads_as_pending_with_no_form() -> Result<(), Box<dyn Error>> {
     let bridge = bridge().await;
     let mut events = stalled_events();
     events["consumers"][0]["parked"][0]["replay_requested"] = json!(true);
     answer(&bridge, "/operator/events", 200, &events).await;
     let (service, cookie) = signed_in(&bridge).await?;
     let (_response, page) = send(&service, get_with("/events", &cookie)?).await?;
-    assert!(page.contains("Replay requested"), "{page}");
+    assert!(page.contains("Retry pending"), "{page}");
     assert!(!page.contains("name=\"id\" value=\"3\""), "{page}");
     Ok(())
 }

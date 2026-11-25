@@ -3,24 +3,27 @@
 
 //! The access-record lane: the crate boundary of its two audit crates, the
 //! HL7 v2 face's import record, and the Audit Record Repository stub every
-//! recording case sends to over the ITI-20 ATX: FHIR Feed.
+//! recording case sends to over the ITI-20 ATX: FHIR Feed. The records wait in
+//! the state store's outbox, so the recording cases run only when
+//! `FERROBRIDGE_E2E=1` admits the harness.
 
 mod boundary;
 mod hl7v2;
+mod outbox;
 
 use std::error::Error;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ehds_logging::map::CategoryMap;
 use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::audit::Settings;
+use ferrobridge_server::settings::{Register, Registers};
+use ferrobridge_server::store::Store;
+use ferrobridge_testkit::containers;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::client::outbound::OutboundClient;
 use ferrohealth_smart::config::ServerTls;
 use ferrohealth_smart::config::endpoint::{EndpointSection, RetrySection};
-use ihe_atna::atna::spool::Bounds;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -41,16 +44,44 @@ pub(crate) async fn repository() -> MockServer {
     arr
 }
 
-/// Opens an access-record lane that delivers to `arr` from a spool in
-/// `directory` of at most `max_bytes`, classifying by `categories`, for a
+/// Returns a migrated state store in a PostgreSQL container, `None` unless
+/// `FERROBRIDGE_E2E=1` admits the harness.
+pub(crate) async fn state() -> Result<Option<(containers::Postgres, Store)>, Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(None);
+    }
+    let postgres = containers::postgres().await?;
+    let store = Store::open(&ferrobridge_server::store::Settings {
+        connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
+        max_connections: 4,
+        acquire_timeout: Duration::from_secs(30),
+        seal: None,
+    })
+    .await?;
+    Ok(Some((postgres, store)))
+}
+
+/// Opens an access-record lane that delivers to `arr` from the outbox of
+/// `store`, classifying by the `audit-categories` document `categories`
+/// committed as the register's first version (its default for `None`), for a
 /// facade over the CDR at `cdr`, and starts its delivery.
-pub(crate) fn access_log(
+pub(crate) async fn access_log(
     arr: &MockServer,
-    directory: &Path,
+    store: &Store,
     cdr: &url::Url,
-    categories: CategoryMap,
-    max_bytes: u64,
+    categories: Option<serde_json::Value>,
 ) -> Result<Arc<AccessLog>, Box<dyn Error>> {
+    let registers = Arc::new(Registers::new(store));
+    if let Some(document) = categories {
+        registers
+            .write(
+                Register::AuditCategories,
+                0,
+                &document,
+                "synthetic-client-sub",
+            )
+            .await?;
+    }
     let client = OutboundClient::build(
         &EndpointSection {
             url: SecretUrl::new(arr.uri()),
@@ -67,17 +98,11 @@ pub(crate) fn access_log(
     )?;
     let settings = Settings {
         feed: ferrobridge_server::audit::feed::repository(client, true)?,
-        spool: directory.join("spool"),
-        bounds: Bounds {
-            max_messages: 100,
-            max_bytes,
-            write_timeout: Duration::from_secs(2),
-        },
         source_id: String::from("ferrobridge.test"),
         site: None,
-        categories,
     };
-    let log = Arc::new(AccessLog::open(&settings, &BASE_URL.parse()?, cdr)?);
+    let log =
+        Arc::new(AccessLog::open(&settings, (&BASE_URL.parse()?, cdr), store, registers).await?);
     drop(log.spawn());
     Ok(log)
 }

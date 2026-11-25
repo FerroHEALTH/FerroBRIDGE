@@ -28,8 +28,11 @@ mod concept_maps;
 mod configuration;
 mod etl_runs;
 mod events;
+mod inbound;
 mod problem;
+mod registers;
 mod save;
+mod sources;
 mod templates;
 
 /// The clean mapping set the facade suite runs.
@@ -67,7 +70,7 @@ impl Case {
     async fn answering(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(configuration, None, (None, None)).await
+        Self::build(configuration, None, (None, None), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -75,7 +78,7 @@ impl Case {
     async fn reporting(
         report: ferrobridge_server::change_feed::report::Report,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, Some(report), (None, None)).await
+        Self::build(None, Some(report), (None, None), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -83,7 +86,7 @@ impl Case {
     async fn keeping(
         history: Arc<ferrobridge_server::etl::history::Store>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (Some(history), None)).await
+        Self::build(None, None, (Some(history), None), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -91,17 +94,39 @@ impl Case {
     async fn listing(
         directory: Arc<ferrobridge_server::hl7v2::directory::Directory>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (None, Some(directory))).await
+        Self::build(None, None, (None, Some(directory)), (None, None)).await
+    }
+
+    /// Builds the tree, the issuer and the router, the operator API
+    /// serving the inbound sources `sources`.
+    async fn sourcing(
+        sources: Arc<ferrobridge_server::sources::Sources>,
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::build(None, None, (None, None), (Some(sources), None)).await
+    }
+
+    /// Builds the tree, the issuer and the router, the operator API
+    /// serving the inbound sources `sources` and the intake `intake`.
+    async fn intake(
+        sources: Arc<ferrobridge_server::sources::Sources>,
+        intake: Arc<ferrobridge_server::inbound::intake::Intake>,
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::build(None, None, (None, None), (Some(sources), Some(intake))).await
     }
 
     /// Builds the case over `configuration`, `consumers`, the run history
-    /// `history` and the HL7 v2 face's `concept_maps`.
+    /// `history`, the HL7 v2 face's `concept_maps` and the inbound
+    /// `sources` and the `intake`.
     async fn build(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
         consumers: Option<ferrobridge_server::change_feed::report::Report>,
         (history, concept_maps): (
             Option<Arc<ferrobridge_server::etl::history::Store>>,
             Option<Arc<ferrobridge_server::hl7v2::directory::Directory>>,
+        ),
+        (sources, intake): (
+            Option<Arc<ferrobridge_server::sources::Sources>>,
+            Option<Arc<ferrobridge_server::inbound::intake::Intake>>,
         ),
     ) -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
@@ -159,6 +184,14 @@ impl Case {
             Some(directory) => state.with_concept_maps(directory),
             None => state,
         };
+        let state = match sources {
+            Some(sources) => state.with_sources(sources),
+            None => state,
+        };
+        let state = match intake {
+            Some(intake) => state.with_intake(intake),
+            None => state,
+        };
         let app = ferrobridge_server::router(Arc::new(state), &crate::support::settings());
         Ok(Self {
             tree,
@@ -190,6 +223,50 @@ impl Case {
     /// Sends an empty `POST` of `path` under a token granting `scope`.
     async fn post(&self, path: &str, scope: &str) -> Result<http::Response<Body>, Box<dyn Error>> {
         let request = bearing(Request::post(path).body(Body::empty())?, &self.token(scope));
+        Ok(self.app.clone().oneshot(request).await?)
+    }
+
+    /// Sends `method` of `path` under a token granting `scope`, with
+    /// `if_match` as its `If-Match` and `body` as its JSON body when given.
+    async fn send(
+        &self,
+        method: http::Method,
+        path: &str,
+        scope: &str,
+        if_match: Option<&str>,
+        body: Option<&serde_json::Value>,
+    ) -> Result<http::Response<Body>, Box<dyn Error>> {
+        let mut builder = Request::builder().method(method).uri(path);
+        if let Some(tag) = if_match {
+            builder = builder.header(header::IF_MATCH, tag);
+        }
+        let request = match body {
+            Some(body) => builder
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(body)?))?,
+            None => builder.body(Body::empty())?,
+        };
+        Ok(self
+            .app
+            .clone()
+            .oneshot(bearing(request, &self.token(scope)))
+            .await?)
+    }
+
+    /// Sends an empty `POST` of `path` under a token granting `scope`, with
+    /// `reason` in the `ferrobridge-reason` header.
+    async fn post_reason(
+        &self,
+        path: &str,
+        scope: &str,
+        reason: &str,
+    ) -> Result<http::Response<Body>, Box<dyn Error>> {
+        let request = bearing(
+            Request::post(path)
+                .header("ferrobridge-reason", reason)
+                .body(Body::empty())?,
+            &self.token(scope),
+        );
         Ok(self.app.clone().oneshot(request).await?)
     }
 }
@@ -465,7 +542,7 @@ fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
 }
 
 #[tokio::test]
-async fn without_a_mapping_dir_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn Error>> {
+async fn without_a_state_store_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let token = case.token(OPERATOR);
     for request in [
