@@ -148,7 +148,7 @@ fn diagnosis() -> String {
         element(
             "at0012",
             "Body site",
-            r#"{ "_type": "DV_TEXT", "value": "Synthetic body site" }"#,
+            &coded("http://snomed.info/sct", "Lung structure", "39607008"),
         ),
         element(
             "at0077",
@@ -197,7 +197,7 @@ fn procedure() -> String {
         element(
             "at0063",
             "Body site",
-            r#"{ "_type": "DV_TEXT", "value": "Synthetic body site" }"#,
+            &coded("http://snomed.info/sct", "Appendix structure", "66754008"),
         ),
         element(
             "at0005",
