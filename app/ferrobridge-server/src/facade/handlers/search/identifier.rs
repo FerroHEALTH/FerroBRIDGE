@@ -32,7 +32,7 @@ use fhir_search::token::Token;
 
 /// Returns the EHRs of every patient one identifier value of the chained
 /// parameter `name` names, in the order the identifier query returns them.
-pub(super) async fn ehrs_of(
+pub(crate) async fn ehrs_of(
     facade: &Facade,
     (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
     name: &str,
@@ -74,7 +74,7 @@ pub(super) async fn ehrs_of(
 
 /// Returns the EHR of the patient whose logical id is `party`, `None` when
 /// the CDR holds none.
-async fn ehr_of_party(
+pub(crate) async fn ehr_of_party(
     facade: &Facade,
     (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
     party: &str,

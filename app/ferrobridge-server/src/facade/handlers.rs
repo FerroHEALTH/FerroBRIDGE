@@ -23,7 +23,7 @@ mod complete;
 mod conditional;
 pub(crate) mod emit;
 pub(crate) mod read;
-mod render;
+pub(crate) mod render;
 pub(crate) mod search;
 mod transaction;
 mod validate;
@@ -52,6 +52,7 @@ use crate::facade::endpoint;
 use crate::facade::guard::OperatorScope;
 use crate::facade::launch_task;
 use crate::facade::media;
+use crate::facade::mhd;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
@@ -122,6 +123,11 @@ pub async fn search_route(
         return endpoint::search(&facade, &access, &headers, &uri, &[])
             .unwrap_or_else(Refusal::into_response);
     }
+    if mhd::serves(&facade, &resource_type) {
+        return mhd::search(&facade, &access, &resource_type, &headers, &uri, &[])
+            .await
+            .unwrap_or_else(Refusal::into_response);
+    }
     search::search_get(&facade, &access, &resource_type, &headers, &uri)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -139,6 +145,11 @@ pub async fn search_form_route(
 ) -> Response {
     if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
         return endpoint::search(&facade, &access, &headers, &uri, &body)
+            .unwrap_or_else(Refusal::into_response);
+    }
+    if mhd::serves(&facade, &resource_type) {
+        return mhd::search(&facade, &access, &resource_type, &headers, &uri, &body)
+            .await
             .unwrap_or_else(Refusal::into_response);
     }
     if resource_type == consent::CONSENT
@@ -196,6 +207,11 @@ pub async fn read_route(
         return endpoint::read(&facade, &access, &id, &headers, &uri)
             .unwrap_or_else(Refusal::into_response);
     }
+    if mhd::serves(&facade, &resource_type) {
+        return mhd::read(&facade, &access, (&resource_type, &id), &headers, &uri)
+            .await
+            .unwrap_or_else(Refusal::into_response);
+    }
     read(&facade, &access, (&resource_type, &id), &headers, &uri)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -235,7 +251,10 @@ pub async fn document_type_route(
 /// and `graph`. This server stores no document and reads no `GraphDefinition`,
 /// so `persist=true` and any `graph` are refused rather than ignored, and a
 /// Composition on another server is refused; `persist=false` is honoured
-/// (no specification governs refusing them: our own design).
+/// (no specification governs refusing them: our own design). The document
+/// is the one MHD 4.2.3 Retrieve Document [ITI-68] retrieves, so it answers
+/// in FHIR JSON or XML as the request asks, and `406` for any other media
+/// type (ITI TF-2: 3.68.4.1.3).
 async fn document(
     facade: &Facade,
     access: &Access,
@@ -252,6 +271,7 @@ async fn document(
             )),
         ));
     }
+    let format = format_of(headers, uri)?;
     let invalid = |code: IssueType, text: String| {
         reply::refusal(StatusCode::BAD_REQUEST, Issue::error(code).diagnosing(text))
     };
@@ -315,14 +335,26 @@ async fn document(
         }
     };
     admit_existing(facade, access, Permission::Read, read::COMPOSITION, &id).await?;
-    read::document(
-        facade,
-        access,
-        &facade.client_for(headers, access).await?,
-        (headers, uri),
-        &id,
-    )
-    .await
+    let client = facade.client_for(headers, access).await?;
+    let assembled = read::assembled(facade, access, &client, &id).await?;
+    Ok(reply::formatted(
+        StatusCode::OK,
+        &assembled.bundle,
+        format,
+        &[],
+    ))
+}
+
+/// Returns the format a resource served in both FHIR formats answers in, or
+/// the `406` of a request that asks for neither
+/// (<https://hl7.org/fhir/R4/http.html#mime-type>).
+pub(crate) fn format_of(headers: &HeaderMap, uri: &Uri) -> Result<media::Format, Refusal> {
+    media::Format::negotiate(headers, uri.query()).map_err(|refusal| {
+        reply::refusal(
+            StatusCode::NOT_ACCEPTABLE,
+            Issue::error(IssueType::NotSupported).diagnosing(refusal.to_string()),
+        )
+    })
 }
 
 /// Returns the logical id an `id` parameter names on this server: a bare id,
@@ -695,6 +727,23 @@ fn metadata(
             .resource
             .partition_point(|entry| entry.r#type.value.as_deref() < Some(endpoint::ENDPOINT));
         rest.resource.insert(at, endpoint::capability());
+    }
+    if facade.mhd() {
+        statement.instantiates.push(mhd::RESPONDER.into());
+        if let Some(rest) = statement.rest.first_mut() {
+            rest.resource.retain(|entry| {
+                !matches!(
+                    entry.r#type.value.as_deref(),
+                    Some(mhd::DOCUMENT_REFERENCE | mhd::LIST)
+                )
+            });
+            for resource in mhd::capability() {
+                let at = rest.resource.partition_point(|entry| {
+                    entry.r#type.value.as_deref() < resource.r#type.value.as_deref()
+                });
+                rest.resource.insert(at, resource);
+            }
+        }
     }
     if facade.launch_tasks().is_some()
         && let Some(rest) = statement.rest.first_mut()

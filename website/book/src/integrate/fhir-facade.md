@@ -256,8 +256,9 @@ missing token, with `Location`, `ETag`, `Last-Modified`, `Content-Location`,
 
 The facade reads `application/fhir+json` and `application/json`, which R4 names
 as the JSON media type and its alias, and answers `415` for anything else. Every
-response carries `application/fhir+json`. An `Accept` header that admits neither
-is a `406`.
+response carries `application/fhir+json`, except a `$document` and the MHD
+resources, which answer `application/fhir+xml` when asked. An `Accept` header
+that admits neither is a `406`.
 
 A body is parsed through the strict codec of the generated `fhir-types` crate,
 so an unknown property is a `400` with `structure` rather than a value that is
@@ -839,6 +840,64 @@ is honoured. A Composition named by the URL of another server is refused the
 same way. The operation is declared on `Composition` in the
 `CapabilityStatement`. The R4 `OperationDefinition` describes the document as
 wrapped inside a search Bundle; the facade answers the document Bundle itself.
+The document is the one MHD Retrieve Document [ITI-68] reads, so it answers in
+`application/fhir+xml` when `_format` or `Accept` asks for XML, and `406` for
+a media type that is neither FHIR format (ITI TF-2: 3.68.4.1.3).
+
+## The IHE MHD Document Responder
+
+With `[facade.mhd]` on, the facade is the IHE MHD 4.2.3 Document Responder and
+answers all three of its transactions, each Required (ITI TF-1: Table
+33.1-1). It serves `DocumentReference` and `List` itself, and its
+`CapabilityStatement` instantiates
+`https://profiles.ihe.net/ITI/MHD/CapabilityStatement/IHE.MHD.DocumentResponder`.
+
+```mermaid
+sequenceDiagram
+    participant Consumer as Document Consumer
+    participant Bridge as FerroBRIDGE
+    participant CDR
+    Consumer->>Bridge: GET /fhir/DocumentReference?patient=…&status=current [ITI-67]
+    Bridge->>CDR: AQL: the latest version of each document composition of the EHR
+    CDR-->>Bridge: rows
+    Bridge-->>Consumer: searchset of DocumentReference
+    Consumer->>Bridge: GET content.attachment.url [ITI-68]
+    Bridge-->>Consumer: the document Bundle, JSON or XML
+```
+
+- **The documents** are the compositions of every template a Composition
+  context maps, at their latest version. A `DocumentReference` describes one
+  of them: its `id` is the Composition's, its content the draft EEHRxF Annex
+  III Table 1 description `eehrxf` writes of the document `$document`
+  assembles, its document category the Composition's first `category`, and
+  its `content.attachment.url` the full `$document` URL. A Composition with
+  no `category` cannot be described and answers `500` naming it.
+- **Find Document References [ITI-67]** takes every parameter the Responder
+  SHALL process (ITI TF-2: 3.67.4.1.2.1) by `GET` and by `POST _search`, and
+  matches each against the element the description fills; an element the
+  description leaves empty, such as `content.attachment.creation` or
+  `context.facilityType`, matches no value. `author.given` and
+  `author.family` read the name of each author the document holds.
+- **Find Document Lists [ITI-66]** answers one SubmissionSet per CONTRIBUTION
+  that committed the latest version of a document composition: its `id` the
+  CONTRIBUTION's uid, its `date` the commit time, its `ihe-sourceId` the
+  committing system, and an entry per document. No Folder is kept, so
+  `code=folder` finds none. Mapping a CONTRIBUTION to a SubmissionSet is
+  FerroBRIDGE's own design.
+- **Parameters** this server does not support are ignored, as MHD asks
+  (ITI TF-2: 3.66.4.1.2, 3.67.4.1.2), and named in an `OperationOutcome`
+  entry of the searchset; the `self` link names only the parameters the
+  search applied. `Prefer: handling=strict` refuses them with a `400`
+  (<https://hl7.org/fhir/R4/search.html>). A search names `patient` or
+  `patient.identifier`, or reaches the compartment of a `patient/` token; any
+  other search is a `400`, since documents are listed one EHR at a time.
+- **Both formats.** Each answer is FHIR JSON, or FHIR XML when `_format` or
+  `Accept` asks (ITI TF-2: 3.67.4.1.2.2). The facade's other resources stay
+  JSON only.
+- **The endpoint.** With `[facade.endpoint]` on as well, `Endpoint/mhd` names
+  the Responder, its `payloadType` the IHE format code
+  `urn:ihe:iti:xds:2017:mimeTypeSufficient` and its `payloadMimeType`
+  `application/fhir+json` and `application/fhir+xml`.
 
 ## `Patient/$summary` writes the patient summary
 

@@ -7,7 +7,10 @@
 //! No openEHR content carries a technical endpoint, so the facade serves the
 //! ones it is configured with under `[facade.endpoint]`: its own FHIR base
 //! and, when `dicomweb_wado_rs` names one, the `DICOMweb` WADO-RS service of the
-//! imaging studies it maps. HL7 Europe Base and Core 2.0.1 gives Endpoint no
+//! imaging studies it maps, and, with `[facade.mhd]` on, the IHE MHD
+//! Document Responder, whose payload is the FHIR document in JSON or XML,
+//! coded `urn:ihe:iti:xds:2017:mimeTypeSufficient` since its media type
+//! names its format. HL7 Europe Base and Core 2.0.1 gives Endpoint no
 //! profile, so each is a FHIR R4 `Endpoint`
 //! (<https://hl7.org/fhir/R4/endpoint.html>). No specification governs which
 //! endpoints a bridge publishes: our own design.
@@ -45,6 +48,15 @@ pub const FHIR_BASE: &str = "fhir";
 /// The id of the configured `DICOMweb` WADO-RS service.
 pub const WADO_RS: &str = "dicom-wado-rs";
 
+/// The id of the IHE MHD Document Responder.
+pub const MHD: &str = "mhd";
+
+/// The IHE format code system an MHD payload type is coded in.
+const FORMAT_CODE: &str = "http://ihe.net/fhir/ihe.formatcode.fhir/CodeSystem/formatcode";
+
+/// The IHE format code of a document whose media type names its format.
+const MIME_TYPE_SUFFICIENT: &str = "urn:ihe:iti:xds:2017:mimeTypeSufficient";
+
 /// The R4 code system of `Endpoint.connectionType`.
 const CONNECTION_TYPE: &str = "http://terminology.hl7.org/CodeSystem/endpoint-connection-type";
 
@@ -58,7 +70,7 @@ const STATUS_SYSTEM: &str = "http://hl7.org/fhir/endpoint-status";
 const INTERACTIONS: [&str; 2] = ["read", "search-type"];
 
 /// The `rest.resource.documentation` of `Endpoint`.
-const DOCUMENTATION: &str = "The technical endpoints of this bridge, the draft EEHRxF Annex X group EHDSEndpoint, read-only from its configuration: its FHIR base and its configured DICOMweb WADO-RS service. Read, and search by _id, connection-type and status.";
+const DOCUMENTATION: &str = "The technical endpoints of this bridge, the draft EEHRxF Annex X group EHDSEndpoint, read-only from its configuration: its FHIR base, its IHE MHD Document Responder when served, and its configured DICOMweb WADO-RS service. Read, and search by _id, connection-type and status.";
 
 /// The endpoints one deployment is configured with beside its FHIR base.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -75,8 +87,10 @@ struct Served {
     connection: &'static str,
     /// The human-readable name.
     name: &'static str,
-    /// The payload media type.
-    mime: &'static str,
+    /// The payload type, a code of its system.
+    payload: (&'static str, &'static str),
+    /// The payload media types.
+    mimes: &'static [&'static str],
     /// The address.
     address: String,
 }
@@ -90,8 +104,8 @@ impl Served {
             "status": "active",
             "connectionType": { "system": CONNECTION_TYPE, "code": self.connection },
             "name": self.name,
-            "payloadType": [{ "coding": [{ "system": PAYLOAD_TYPE, "code": "any" }] }],
-            "payloadMimeType": [self.mime],
+            "payloadType": [{ "coding": [{ "system": self.payload.0, "code": self.payload.1 }] }],
+            "payloadMimeType": self.mimes,
             "address": self.address,
         }))
         .map_err(|error| {
@@ -110,9 +124,20 @@ fn served(facade: &Facade) -> Vec<Served> {
         id: FHIR_BASE,
         connection: "hl7-fhir-rest",
         name: "FerroBRIDGE FHIR R4 facade",
-        mime: "application/fhir+json",
+        payload: (PAYLOAD_TYPE, "any"),
+        mimes: &[media::FHIR_JSON],
         address: facade.settings().base_url.clone(),
     }];
+    if facade.mhd() {
+        served.push(Served {
+            id: MHD,
+            connection: "hl7-fhir-rest",
+            name: "IHE MHD 4.2.3 Document Responder",
+            payload: (FORMAT_CODE, MIME_TYPE_SUFFICIENT),
+            mimes: &crate::facade::mhd::FORMATS,
+            address: facade.settings().base_url.clone(),
+        });
+    }
     if let Some(address) = facade
         .endpoints()
         .and_then(|endpoints| endpoints.wado_rs.as_ref())
@@ -121,7 +146,8 @@ fn served(facade: &Facade) -> Vec<Served> {
             id: WADO_RS,
             connection: "dicom-wado-rs",
             name: "DICOMweb WADO-RS",
-            mime: "application/dicom",
+            payload: (PAYLOAD_TYPE, "any"),
+            mimes: &["application/dicom"],
             address: address.clone(),
         });
     }

@@ -1,6 +1,7 @@
 eehrxf-mpd-prescription:header
 eehrxf-mpd-prescription:header.author[x]
 eehrxf-mpd-prescription:header.date
+eehrxf-mpd-prescription:header.identifier
 eehrxf-mpd-prescription:header.language
 eehrxf-mpd-prescription:header.status
 eehrxf-mpd-prescription:header.statusReason[x]

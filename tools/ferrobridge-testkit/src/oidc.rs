@@ -36,6 +36,10 @@ pub const JWKS_PATH: &str = "/jwks.json";
 /// The path the authorization server metadata answers at (RFC 8414 §3).
 pub const METADATA_PATH: &str = "/.well-known/oauth-authorization-server";
 
+/// The path the OpenID Provider metadata answers at (OpenID Connect
+/// Discovery 1.0 §4).
+pub const OPENID_CONFIGURATION_PATH: &str = "/.well-known/openid-configuration";
+
 /// The path of the authorization endpoint.
 pub const AUTHORIZATION_PATH: &str = "/authorize";
 
@@ -261,8 +265,11 @@ impl Provider {
     }
 
     /// Publishes the provider's authorization server metadata (RFC 8414 §3)
-    /// at `/.well-known/oauth-authorization-server`, for a resource server
-    /// that discovers its key set from the issuer.
+    /// at `/.well-known/oauth-authorization-server`, and the same document as
+    /// its OpenID Provider metadata (OpenID Connect Discovery 1.0 §3) at
+    /// `/.well-known/openid-configuration`, for a resource server that
+    /// discovers its key set from the issuer and a relying party that signs a
+    /// person in by `client_secret_basic`.
     pub async fn publish_metadata(&self) {
         let body = serde_json::json!({
             "issuer": self.issuer(),
@@ -271,14 +278,19 @@ impl Provider {
             "token_endpoint": self.token_endpoint(),
             "end_session_endpoint": self.end_session_endpoint(),
             "response_types_supported": ["code"],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["ES256"],
+            "token_endpoint_auth_methods_supported": ["client_secret_basic"],
             "code_challenge_methods_supported": ["S256"],
         })
         .to_string();
-        Mock::given(method("GET"))
-            .and(path(METADATA_PATH))
-            .respond_with(json(200, body))
-            .mount(&self.server)
-            .await;
+        for document in [METADATA_PATH, OPENID_CONFIGURATION_PATH] {
+            Mock::given(method("GET"))
+                .and(path(document))
+                .respond_with(json(200, body.clone()))
+                .mount(&self.server)
+                .await;
+        }
     }
 
     /// Signs an access token in the RFC 9068 profile for `audience`

@@ -877,6 +877,25 @@ ours:
   canonical URL), and an unmapped non-percent proportion is a typed refusal
   naming the element. The gap is reported upstream (the specification's own
   open issue on date and proportion combinations is the place).
+- **The identities of a record go out of openEHR: our own design (#2115).**
+  The data-type chapter has no row for `LOCATABLE.uid` or
+  `INSTRUCTION_DETAILS.instruction_id`, and no template node holds them, so
+  the compiler admits `uid` below any `LOCATABLE` node (`$composition/uid`
+  among them) and `instruction_details/instruction_id` below an `ACTION`
+  (`rm::IDENTITIES`). A `UID_BASED_ID` reads as an `Identifier` that names
+  the object across its versions: an `OBJECT_VERSION_ID` gives its
+  `object_id`, a root with no extension is the `urn:uuid:` or `urn:oid:`
+  value under the `urn:ietf:rfc:3986` system, a root with an extension is
+  the extension's namespace, and an `INTERNET_ID` root, which has no URI
+  form, is refused. A `LOCATABLE_REF` reads as a `Reference` of the one type
+  the element admits, naming the version container by that identifier; its
+  `path` has no counterpart. Both cells run out of openEHR only, since the
+  CDR assigns the uids. The MPD project maps the composition uid to
+  `MedicationRequest.groupIdentifier`, the `INSTRUCTION` uid to
+  `MedicationRequest.identifier`, the `ACTION` uid to
+  `MedicationDispense.identifier`, and the `ACTION`'s `instruction_id` to
+  `MedicationDispense.authorizingPrescription`, which then names the
+  prescription by the identifier its items share.
 - PROGRAMMED mappings (`mappingCode`) are first-party Rust functions in a
   registry with a typed interface over the canonical model; an unknown code is
   a load error. The library depends on eight codes, six of them the Dosage and
@@ -1043,7 +1062,21 @@ expression is a load error: the reference CDR's connector let `where()` and
   each with its read URL as `fullUrl`. The assembly is our own design
   (`facade::document`); `persist=true` and `graph` are refused, never
   ignored. A context whose start is a composition model binds the composition
-  itself as its one entry, under the path `/`.
+  itself as its one entry, under the path `/`. The document answers in FHIR
+  XML when asked, as MHD Retrieve Document [ITI-68] requires (ITI TF-2:
+  3.68.4.1.3).
+- **The facade is the IHE MHD 4.2.3 Document Responder behind `[facade.mhd]`.**
+  ITI-66, ITI-67 and ITI-68 are each Required (ITI TF-1: Table 33.1-1). A
+  `DocumentReference` is the `eehrxf` Annex III description of the document
+  `$document` assembles from the latest version of a composition of a
+  Composition context, under the Composition's id, its
+  `content.attachment.url` the `$document` URL. A `List` is a SubmissionSet,
+  one per CONTRIBUTION that committed such a version, our own design. Every
+  parameter the Responder SHALL process matches the element the description
+  fills, an empty element matching nothing; an unsupported parameter is
+  ignored (ITI TF-2: 3.66.4.1.2, 3.67.4.1.2) and named in the searchset, and
+  refused under `Prefer: handling=strict` (R4 `search.html`). Both answer in
+  FHIR JSON or XML (`facade::mhd`).
 - **`Patient/$summary` answers the patient summary, validated before it is
   served.** `GET [base]/Patient/[id]/$summary` (HL7 IPS 2.0.1,
   `OperationDefinition/summary`) reads the patient through the `Patient`

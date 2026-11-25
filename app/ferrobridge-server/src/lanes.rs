@@ -36,12 +36,8 @@ pub(crate) struct Started {
 }
 
 impl Started {
-    /// Logs the boot summary and the indicators readiness runs, and starts
-    /// the replica's `LISTEN` session on the inbound sources.
+    /// Logs the boot summary and the indicators readiness runs.
     pub(crate) fn announce(&self) {
-        if let (Some(store), Some(sources)) = (self.state.store(), self.state.sources()) {
-            store.listeners(&[sources.listened()]).spawn();
-        }
         startup::log(&self.lanes);
         tracing::info!(
             version = crate::build_info::VERSION,
@@ -774,12 +770,14 @@ async fn build_facade(
         (lane.app_state, facade::app_state::BASIC),
         (lane.launch_task, facade::launch_task::TASK),
         (lane.endpoints.is_some(), facade::endpoint::ENDPOINT),
+        (lane.mhd, facade::mhd::DOCUMENT_REFERENCE),
+        (lane.mhd, facade::mhd::LIST),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
     .collect();
     facade::programs::check_owned(&programs, &owned)
-        .context("checking the contexts against [facade.app_state], [facade.launch_task] and [facade.endpoint]")?;
+        .context("checking the contexts against [facade.app_state], [facade.launch_task], [facade.endpoint] and [facade.mhd]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -829,6 +827,7 @@ async fn build_facade(
             .with_launch_tasks(launch_tasks)
             .with_summary(summary)
             .with_endpoints(lane.endpoints.clone())
+            .with_mhd(lane.mhd)
             .with_cors(lane.cors.clone()),
         counts,
     ))
