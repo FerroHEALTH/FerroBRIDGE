@@ -210,8 +210,8 @@ impl StartedFeed {
     }
 }
 
-/// Spawns every change-feed follower and the inbound recovery of `state`,
-/// each on its own task until `stop` reads `true`.
+/// Spawns every change-feed follower, the inbound recovery and the link
+/// sweeper of `state`, each on its own task until `stop` reads `true`.
 pub(crate) fn spawn_followers(
     feeds: Vec<StartedFeed>,
     state: &AppState,
@@ -224,6 +224,9 @@ pub(crate) fn spawn_followers(
         settings.inbound,
     ) {
         followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    if let Some(links) = state.links() {
+        followers.push(links.spawn_sweeper(&stop.subscribe()));
     }
     followers
 }
@@ -897,7 +900,6 @@ fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState>
     )
     .context("opening the links in the state store")?;
     let links = Arc::new(links);
-    drop(links.spawn_sweeper());
     tracing::info!(
         lane = "shl",
         "the person's SMART Health Links are served under /shl"
