@@ -15,5 +15,6 @@ EHDSObservation
 EHDSOrganisation
 EHDSPatient
 EHDSProcedure
+EHDSServiceRequest
 EHDSSpecimen
 total 33

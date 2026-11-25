@@ -119,9 +119,7 @@ pub async fn search_route(
             .unwrap_or_else(Refusal::into_response);
     }
     if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
-        let parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-        return guard(&headers, &uri, Body::Absent)
-            .and_then(|()| endpoint::search(&facade, &access, &uri, &parameters))
+        return endpoint::search(&facade, &access, &headers, &uri, &[])
             .unwrap_or_else(Refusal::into_response);
     }
     search::search_get(&facade, &access, &resource_type, &headers, &uri)
@@ -140,10 +138,7 @@ pub async fn search_form_route(
     body: Bytes,
 ) -> Response {
     if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
-        let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-        parameters.extend(media::query_pairs(&body));
-        return guard(&headers, &uri, Body::Absent)
-            .and_then(|()| endpoint::search(&facade, &access, &uri, &parameters))
+        return endpoint::search(&facade, &access, &headers, &uri, &body)
             .unwrap_or_else(Refusal::into_response);
     }
     search::search_post(&facade, &access, &resource_type, &headers, &uri, &body)

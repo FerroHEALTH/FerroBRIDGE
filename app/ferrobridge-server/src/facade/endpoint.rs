@@ -26,10 +26,12 @@ use http::Uri;
 use crate::facade::Facade;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::guard;
+use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::owned::answer::Written;
 use crate::facade::owned::answer::answer;
+use crate::facade::owned::answer::invalid;
 use crate::facade::owned::answer::searchset;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
@@ -185,14 +187,7 @@ struct Criteria {
 impl Criteria {
     /// Reads `parameters`.
     fn read(parameters: &[(String, String)]) -> Result<Self, Refusal> {
-        let refused = |name: &str, text: String| {
-            reply::refusal(
-                StatusCode::BAD_REQUEST,
-                Issue::error(IssueType::Invalid)
-                    .diagnosing(text)
-                    .at(name.to_owned()),
-            )
-        };
+        let refused = |name: &str, text: String| invalid(IssueType::Invalid, name, text);
         let mut criteria = Self::default();
         for (name, value) in parameters {
             let parts = fhir_search::escape::split(value, ',');
@@ -258,20 +253,25 @@ fn coded(token: &Token, system: &str, code: &str) -> bool {
     system_matches && token.code().is_none_or(|named| named == code)
 }
 
-/// `GET [base]/Endpoint?…` and `POST [base]/Endpoint/_search`.
+/// `GET [base]/Endpoint?…` and `POST [base]/Endpoint/_search`, its
+/// parameters the query and the form `body` beside it.
 ///
 /// # Errors
-/// Returns `400` for a parameter outside `_id`, `connection-type` and
-/// `status` or a malformed value, and `403` for a caller without `Endpoint`
-/// search.
+/// Returns the guard's refusals, `400` for a parameter outside `_id`,
+/// `connection-type` and `status` or a malformed value, and `403` for a
+/// caller without `Endpoint` search.
 pub fn search(
     facade: &Facade,
     access: &Access,
+    headers: &HeaderMap,
     uri: &Uri,
-    parameters: &[(String, String)],
+    body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
+    guard(headers, uri, Body::Absent)?;
     admit(access, Permission::Search)?;
-    let criteria = Criteria::read(parameters)?;
+    let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    parameters.extend(media::query_pairs(body));
+    let criteria = Criteria::read(&parameters)?;
     let matched = served(facade)
         .iter()
         .filter(|endpoint| criteria.matches(endpoint))

@@ -505,6 +505,7 @@ pub const ANNEX_X: Project = Project {
         "ferrobridge_ehds_organisation.context",
         "ferrobridge_ehds_patient.context",
         "ferrobridge_ehds_procedure.context",
+        "ferrobridge_ehds_service_request.context",
         "ferrobridge_ehds_specimen.context",
     ],
     searches: &[
@@ -520,6 +521,7 @@ pub const ANNEX_X: Project = Project {
         shipped!("annex-x", "ferrobridge_ehds_medication_use.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_observation.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_procedure.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_service_request.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_specimen.search.yml"),
     ],
     files: &[
@@ -570,6 +572,11 @@ pub const ANNEX_X: Project = Project {
         shipped!("annex-x", "ferrobridge_ehds_health_professional.yml"),
         shipped!("annex-x", "ferrobridge_ehds_organisation.context.yml"),
         shipped!("annex-x", "ferrobridge_ehds_organisation.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_service_request.context.yml"),
+        shipped!("annex-x", "ferrobridge_service_request.v1.yml"),
+        shipped!("annex-x", "ferrobridge_request.v1.ServiceRequest.yml"),
+        shipped!("annex-x", "ferrobridge_organisation.v1.yml"),
+        shipped!("annex-x", "ferrobridge_kds_laborauftrag.yml"),
     ],
     accounted: &[],
     followed: &[],

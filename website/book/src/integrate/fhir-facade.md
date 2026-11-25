@@ -883,9 +883,9 @@ individual resources as well as inside documents. The `eehrxf` crate ships
 the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
 (`eehrxf::mappings::ANNEX_X`), with a search declaration beside each
 context. Point `[mappings] directory` at a copy of it
-(`ANNEX_X.write_to(dir)` writes one) and load its two templates into the
+(`ANNEX_X.write_to(dir)` writes one) and load its templates into the
 CDR: FerroBRIDGE's patient summary template, its EHDS record template and
-the published `KDS_Laborbericht`. The party groups are party contexts, so
+the published `KDS_Laborbericht` and `KDS_Laborauftrag`. The party groups are party contexts, so
 the project needs `[cdr] demographic` and the reference CDR's patient and
 healthcare professional `PERSON` definitions with an `ORGANISATION`
 template; each party resource claims the profile its context names, as an
@@ -902,6 +902,7 @@ entry's resource does.
 | EHDSProcedure | `Procedure` | `procedure-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.7) |
 | EHDSLaboratoryObservation | `Observation` | `Observation-resultslab-eu-lab` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
 | EHDSSpecimen | `Specimen` | `Specimen-eu-lab` | `patient` |
+| EHDSServiceRequest | `ServiceRequest` | `ServiceRequest-eu-lab` | `patient` |
 | EHDSDeviceUse | `DeviceUseStatement` | `deviceUseStatement-eu-eps` | `patient` with `_include=DeviceUseStatement:device` |
 | EHDSDevice | `Device` | `device-eu-eps` | read, and included by the statement that names it |
 | EHDSDosage | the `dosage` of a `MedicationStatement` | | as its statement |
