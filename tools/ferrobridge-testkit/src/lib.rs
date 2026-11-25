@@ -12,7 +12,8 @@
 //! [`fixtures`] holds the synthetic documents the suites commit and map;
 //! [`laws`] compares the two ends of a round trip; [`net`] reserves a port
 //! no server answers on; [`oidc`] is the test OpenID Provider the operator
-//! console signs in at;
+//! console signs in at; [`post_quantum`] holds the peers of the
+//! post-quantum key exchange cases;
 //! [`stubs`] carries the upstream response shapes for `wiremock`;
 //! [`tls`] generates the throwaway certificates a TLS-only PostgreSQL starts
 //! with; and [`vocabulary`] holds the synthetic OHDSI vocabulary in the shape of
@@ -30,6 +31,7 @@ pub mod laws;
 pub mod mllp_tls;
 pub mod net;
 pub mod oidc;
+pub mod post_quantum;
 pub mod stubs;
 pub mod tls;
 pub mod vocabulary;

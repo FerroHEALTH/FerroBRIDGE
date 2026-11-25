@@ -40,6 +40,9 @@ pub(crate) struct Parts<'a> {
     pub(crate) source: &'a Url,
     /// The instant the document is assembled, as an R4 `instant`.
     pub(crate) timestamp: &'a str,
+    /// The custodian the document names: the healthcare provider that
+    /// holds the records behind the CDR.
+    pub(crate) custodian: &'a Object,
 }
 
 /// Returns the document Bundle of `parts`.
@@ -49,9 +52,26 @@ pub(crate) struct Parts<'a> {
 pub(crate) fn assemble(parts: Parts<'_>) -> Object {
     let identifier =
         uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, parts.source.as_str().as_bytes());
-    let entries = std::iter::once(parts.composition)
+    // NOTE: FHIR R4 Bundle bdl-7: the custodian is an entry of its own, named by a URN the
+    // document derives, since this server serves no read of it.
+    let custodian_url = format!("urn:uuid:{}", uuid::Uuid::new_v5(&identifier, b"custodian"));
+    let mut composition = parts.composition;
+    let mut reference = Object::new();
+    reference.insert(
+        String::from("reference"),
+        Value::String(custodian_url.clone()),
+    );
+    composition.insert(String::from("custodian"), Value::Object(reference));
+    let mut custodian = Object::new();
+    custodian.insert(String::from("fullUrl"), Value::String(custodian_url));
+    custodian.insert(
+        String::from("resource"),
+        Value::Object(parts.custodian.clone()),
+    );
+    let entries = std::iter::once(composition)
         .chain(parts.created)
         .map(|resource| entry(parts.base, resource))
+        .chain(std::iter::once(Value::Object(custodian)))
         .collect();
     let mut bundle = Object::new();
     bundle.insert(
@@ -128,6 +148,7 @@ mod tests {
             base: &base,
             source,
             timestamp: "2026-03-02T09:30:00Z",
+            custodian: &resource("Organization", "custodian"),
         });
         Value::Object(bundle)
             .to_serde_json(&mut fhir_types::codec::Path::root("Bundle"))
@@ -146,13 +167,25 @@ mod tests {
             .iter()
             .map(|entry| entry["fullUrl"].as_str().expect("a fullUrl"))
             .collect();
+        let [composition, report, observation, custodian] = urls.as_slice() else {
+            panic!("four entries: {urls:?}");
+        };
         assert_eq!(
-            urls,
+            [*composition, *report, *observation],
             [
                 "https://bridge.example/fhir/Composition/c-1",
                 "https://bridge.example/fhir/DiagnosticReport/d-1",
                 "https://bridge.example/fhir/Observation/o-1",
             ]
+        );
+        assert!(custodian.starts_with("urn:uuid:"), "{custodian}");
+        assert_eq!(
+            bundle["entry"][0]["resource"]["custodian"]["reference"], *custodian,
+            "the Composition names the custodian entry"
+        );
+        assert_eq!(
+            bundle["entry"][3]["resource"]["resourceType"],
+            "Organization"
         );
         assert_eq!(
             bundle["entry"][0]["resource"]["resourceType"],
