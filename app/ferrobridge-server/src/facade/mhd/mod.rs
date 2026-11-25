@@ -1,0 +1,321 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! The IHE MHD 4.2.3 Document Responder over the documents the Composition
+//! contexts assemble.
+//!
+//! The Document Responder answers Find Document Lists [ITI-66], Find
+//! Document References [ITI-67] and Retrieve Document [ITI-68], all three
+//! Required (ITI TF-1: Table 33.1-1). Each document is the Bundle
+//! `Composition/[id]/$document` assembles from one composition of a
+//! Composition context, so a `DocumentReference` is the draft `EEHRxF`
+//! Annex III description of that document under the Composition's id
+//! ([`reference`]), its `content.attachment.url` the `$document` URL ITI-68
+//! retrieves (ITI TF-2: 3.67.4.2.2.1). A `List` is a submission set, one per
+//! CONTRIBUTION that committed the latest version of a document composition
+//! ([`list`]); no specification maps a CONTRIBUTION to a submission set: our
+//! own design.
+//!
+//! A search ignores a parameter it does not support, as MHD asks ("should be
+//! ignored", ITI TF-2: 3.66.4.1.2, 3.67.4.1.2) and FHIR R4 does under
+//! lenient handling, and refuses it under `Prefer: handling=strict`
+//! (<https://hl7.org/fhir/R4/search.html#errors>). The `self` link names the
+//! parameters the search applied (§3.1.1.6). Every parameter the Responder
+//! SHALL process is matched against the element the description fills; an
+//! element the description leaves empty matches no value.
+
+mod list;
+mod listing;
+mod params;
+mod reference;
+
+use axum::response::Response;
+use ferrohealth_smart::resource::Access;
+use ferrohealth_smart::resource::Compartment;
+use ferrohealth_smart::scope::Permission;
+use fhir_types::codec::Object;
+use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
+use http::HeaderMap;
+use http::StatusCode;
+use http::Uri;
+
+use crate::cdr::ids::EhrId;
+use crate::facade::Facade;
+use crate::facade::handlers::format_of;
+use crate::facade::media;
+use crate::facade::outcome::Issue;
+use crate::facade::outcome::IssueType;
+use crate::facade::reply;
+use crate::facade::reply::Refusal;
+
+/// The resource type of a document's description.
+pub const DOCUMENT_REFERENCE: &str = "DocumentReference";
+
+/// The resource type of a submission set.
+pub const LIST: &str = "List";
+
+/// The `CapabilityStatement` of the MHD Document Responder.
+pub const RESPONDER: &str =
+    "https://profiles.ihe.net/ITI/MHD/CapabilityStatement/IHE.MHD.DocumentResponder";
+
+/// The profile the Document Responder serves `DocumentReference` under.
+const DOCUMENT_REFERENCE_PROFILE: &str =
+    "https://profiles.ihe.net/ITI/MHD/StructureDefinition/IHE.MHD.Minimal.DocumentReference";
+
+/// The profile the Document Responder serves `List` under.
+const LIST_PROFILE: &str = "https://profiles.ihe.net/ITI/MHD/StructureDefinition/IHE.MHD.List";
+
+/// The profile a submission set this server writes is.
+const SUBMISSION_SET_PROFILE: &str =
+    "https://profiles.ihe.net/ITI/MHD/StructureDefinition/IHE.MHD.Minimal.SubmissionSet";
+
+/// The interactions both types answer.
+const INTERACTIONS: [&str; 2] = ["read", "search-type"];
+
+/// Whether the Document Responder serves `resource_type` on `facade`.
+#[must_use]
+pub fn serves(facade: &Facade, resource_type: &str) -> bool {
+    facade.mhd() && matches!(resource_type, DOCUMENT_REFERENCE | LIST)
+}
+
+/// `GET [base]/{DocumentReference|List}/{id}`.
+///
+/// # Errors
+///
+/// Returns `406` for a format neither FHIR JSON nor XML, `403` for a caller
+/// without read on the type, `404` for an id that names nothing served, and
+/// the refusal a CDR answer renders as.
+pub async fn read(
+    facade: &Facade,
+    access: &Access,
+    (resource_type, id): (&str, &str),
+    headers: &HeaderMap,
+    uri: &Uri,
+) -> Result<Response, Refusal> {
+    let format = format_of(headers, uri)?;
+    let client = facade.client_for(headers, access).await?;
+    let resource = match resource_type {
+        DOCUMENT_REFERENCE => reference::read(facade, access, &client, id).await?,
+        _ => list::read(facade, access, &client, id).await?,
+    };
+    Ok(reply::formatted(StatusCode::OK, &resource, format, &[]))
+}
+
+/// `GET [base]/{DocumentReference|List}?…` and `POST …/_search`, its
+/// parameters the query and the form `body` beside it.
+///
+/// # Errors
+///
+/// Returns `406` for a format neither FHIR JSON nor XML, `400` for a
+/// malformed value or, under `Prefer: handling=strict`, a parameter this
+/// server does not support, `403` for a caller without search on the type,
+/// and the refusal a CDR answer renders as.
+pub async fn search(
+    facade: &Facade,
+    access: &Access,
+    resource_type: &str,
+    headers: &HeaderMap,
+    uri: &Uri,
+    body: &[u8],
+) -> Result<Response, Refusal> {
+    let format = format_of(headers, uri)?;
+    if !body.is_empty() {
+        crate::facade::handlers::search::form::check_form(headers)?;
+    }
+    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    pairs.extend(media::query_pairs(body));
+    let strict = params::strict(headers);
+    let client = facade.client_for(headers, access).await?;
+    let found = match resource_type {
+        DOCUMENT_REFERENCE => reference::search(facade, access, &client, &pairs, strict).await?,
+        _ => list::search(facade, access, &client, &pairs, strict).await?,
+    };
+    let bundle = found.searchset(facade, resource_type)?;
+    Ok(reply::formatted(StatusCode::OK, &bundle, format, &[]))
+}
+
+/// What one search found: the matches of the page, the parameters it
+/// applied and ignored, and where the page sits.
+#[derive(Debug)]
+struct Found {
+    /// The matches of the page, in order.
+    page: Vec<Object>,
+    /// Every match, the page among them.
+    total: usize,
+    /// What the request asked of the search.
+    read: params::Read,
+}
+
+impl Found {
+    /// Returns the matches of the page `read` asks for out of `matches`.
+    fn paged(matches: Vec<Object>, read: params::Read) -> Self {
+        let total = matches.len();
+        let page = matches
+            .into_iter()
+            .skip(read.offset)
+            .take(read.count)
+            .collect();
+        Self { page, total, read }
+    }
+
+    /// Returns the `searchset` Bundle of this page of `resource_type`
+    /// (<https://hl7.org/fhir/R4/bundle.html>), with an `OperationOutcome`
+    /// entry naming the ignored parameters (ITI TF-2: 3.67.4.2.2).
+    fn searchset(&self, facade: &Facade, resource_type: &str) -> Result<Object, Refusal> {
+        let base = facade.settings().base_url.trim_end_matches('/');
+        let link = |offset: usize| {
+            format!(
+                "{base}/{resource_type}?{}",
+                self.read.query(offset, self.read.count)
+            )
+        };
+        let mut links =
+            vec![serde_json::json!({"relation": "self", "url": link(self.read.offset)})];
+        let next = self.read.offset.saturating_add(self.page.len());
+        if next < self.total {
+            links.push(serde_json::json!({"relation": "next", "url": link(next)}));
+        }
+        let mut entries: Vec<serde_json::Value> = self
+            .page
+            .iter()
+            .map(|resource| {
+                let id = resource
+                    .get("id")
+                    .and_then(fhir_types::codec::Value::as_str)
+                    .unwrap_or_default();
+                serde_json::json!({
+                    "fullUrl": format!("{base}/{resource_type}/{id}"),
+                    "resource": resource,
+                    "search": {"mode": "match"},
+                })
+            })
+            .collect();
+        if !self.read.ignored.is_empty() {
+            let issues: Vec<serde_json::Value> = self
+                .read
+                .ignored
+                .iter()
+                .map(|name| {
+                    serde_json::json!({
+                        "severity": "warning",
+                        "code": "not-supported",
+                        "diagnostics": format!("{name} is not supported here and was ignored"),
+                        "expression": [name],
+                    })
+                })
+                .collect();
+            entries.push(serde_json::json!({
+                "resource": {"resourceType": "OperationOutcome", "issue": issues},
+                "search": {"mode": "outcome"},
+            }));
+        }
+        serde_json::from_value(serde_json::json!({
+            "resourceType": "Bundle",
+            "type": "searchset",
+            "total": self.total,
+            "link": links,
+            "entry": entries,
+        }))
+        .map_err(|error| {
+            internal(format!(
+                "the {resource_type} searchset could not be written: {error}"
+            ))
+        })
+    }
+}
+
+/// Returns the EHRs a search may reach: the ones its patient parameters
+/// name, held to the patient compartment of a `patient/` token.
+///
+/// A search names `patient` or `patient.identifier` (ITI TF-2:
+/// 3.66.4.1.2, 3.67.4.1.2). One that names neither reaches the compartment
+/// of a `patient/` token and is refused for any other caller, since this
+/// server lists documents one EHR at a time (no specification governs this:
+/// our own design).
+async fn reach(
+    facade: &Facade,
+    access: &Access,
+    resource_type: &str,
+    named: Option<Vec<EhrId>>,
+) -> Result<Vec<EhrId>, Refusal> {
+    match access.reach(Permission::Search, resource_type) {
+        Some(Compartment::Any) => named.ok_or_else(|| {
+            reply::refusal(
+                StatusCode::BAD_REQUEST,
+                Issue::error(IssueType::Required).diagnosing(format!(
+                    "a {resource_type} search names patient or patient.identifier"
+                )),
+            )
+        }),
+        Some(Compartment::Patient(patient)) => {
+            let own = compartment_ehr(facade, &patient).await?;
+            Ok(match named {
+                Some(named) => own.into_iter().filter(|ehr| named.contains(ehr)).collect(),
+                None => own,
+            })
+        }
+        None => Err(crate::facade::guard::forbidden()),
+    }
+}
+
+/// Returns the EHR the identity map binds to `Patient/<patient>`, the
+/// compartment of a `patient/` token.
+async fn compartment_ehr(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
+    // NOTE: no specification governs this: our own design, a patient id no
+    // person key can hold names no EHR the map binds, so the token reaches none.
+    let Ok(person) = facade.settings().subject.person_of_patient(patient) else {
+        return Ok(Vec::new());
+    };
+    Ok(facade
+        .store()
+        .ehr_of(&person)
+        .await
+        .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?
+        .into_iter()
+        .collect())
+}
+
+/// Returns the `404` of an id that names nothing served as `resource_type`.
+fn unknown(resource_type: &str, id: &str) -> Refusal {
+    reply::refusal(
+        StatusCode::NOT_FOUND,
+        Issue::error(IssueType::NotFound).diagnosing(format!("no {resource_type}/{id} is served")),
+    )
+}
+
+/// Returns the `500` of a failure inside this server.
+fn internal(text: String) -> Refusal {
+    reply::refusal(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Issue::error(IssueType::Exception).diagnosing(text),
+    )
+}
+
+/// Returns the `rest.resource` entries of the two types.
+#[must_use]
+pub fn capability() -> [CapabilityStatementRestResource; 2] {
+    let declared = crate::facade::capability::declared_params;
+    [
+        CapabilityStatementRestResource {
+            r#type: DOCUMENT_REFERENCE.into(),
+            profile: Some(DOCUMENT_REFERENCE_PROFILE.into()),
+            documentation: Some(reference::DOCUMENTATION.into()),
+            interaction: crate::facade::capability::interactions(INTERACTIONS),
+            search_param: declared(reference::DECLARED),
+            ..CapabilityStatementRestResource::default()
+        },
+        CapabilityStatementRestResource {
+            r#type: LIST.into(),
+            profile: Some(LIST_PROFILE.into()),
+            supported_profile: vec![SUBMISSION_SET_PROFILE.into()],
+            documentation: Some(list::DOCUMENTATION.into()),
+            interaction: crate::facade::capability::interactions(INTERACTIONS),
+            search_param: declared(list::DECLARED),
+            ..CapabilityStatementRestResource::default()
+        },
+    ]
+}
+
+/// The formats a served resource is written in, as an `Endpoint` names
+/// them.
+pub const FORMATS: [&str; 2] = [media::FHIR_JSON, media::FHIR_XML];

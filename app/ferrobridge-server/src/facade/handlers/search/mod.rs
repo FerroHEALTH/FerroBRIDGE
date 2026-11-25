@@ -15,7 +15,7 @@
 //! (no specification governs this: our own design).
 
 pub(crate) mod form;
-mod identifier;
+pub(crate) mod identifier;
 mod include;
 mod party;
 mod total;

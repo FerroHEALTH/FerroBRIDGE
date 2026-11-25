@@ -774,12 +774,14 @@ async fn build_facade(
         (lane.app_state, facade::app_state::BASIC),
         (lane.launch_task, facade::launch_task::TASK),
         (lane.endpoints.is_some(), facade::endpoint::ENDPOINT),
+        (lane.mhd, facade::mhd::DOCUMENT_REFERENCE),
+        (lane.mhd, facade::mhd::LIST),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
     .collect();
     facade::programs::check_owned(&programs, &owned)
-        .context("checking the contexts against [facade.app_state], [facade.launch_task] and [facade.endpoint]")?;
+        .context("checking the contexts against [facade.app_state], [facade.launch_task], [facade.endpoint] and [facade.mhd]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -829,6 +831,7 @@ async fn build_facade(
             .with_launch_tasks(launch_tasks)
             .with_summary(summary)
             .with_endpoints(lane.endpoints.clone())
+            .with_mhd(lane.mhd)
             .with_cors(lane.cors.clone()),
         counts,
     ))

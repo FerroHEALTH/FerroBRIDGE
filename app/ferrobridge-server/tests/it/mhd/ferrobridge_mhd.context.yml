@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored Composition context over the synthetic diagnose
+# template whose Composition carries a coded type and category, the shape
+# the MHD Document Responder describes as a DocumentReference.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_mhd.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://example.org/fhir/StructureDefinition/ferrobridge-mhd"
+  template:
+    id: "ferrobridge.diagnose.v1"
+  archetypes:
+    - "COMPOSITION.ferrobridge_report.v1.Composition"
+    - "ferrobridge_document_problem"
+  start: "COMPOSITION.ferrobridge_report.v1.Composition"
