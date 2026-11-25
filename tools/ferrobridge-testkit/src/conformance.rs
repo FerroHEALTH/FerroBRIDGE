@@ -76,11 +76,14 @@ pub enum Corpus {
     /// The draft `EEHRxF` annexes against the Xt-EHR models 1.0.0, one case
     /// per annex element, passing when the two agree.
     XtehrCrosswalk,
+    /// The data groups of draft `EEHRxF` Annex X the facade serves as
+    /// individual resources, one case per group.
+    EehrxfAnnexX,
 }
 
 impl Corpus {
     /// Every corpus, in the order the gate reports them.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::FhirconnectMappingLib,
         Self::Omocl,
         Self::Roundtrip,
@@ -97,6 +100,7 @@ impl Corpus {
         Self::FhirpathR4Stu3,
         Self::ValidatorAgreement,
         Self::XtehrCrosswalk,
+        Self::EehrxfAnnexX,
     ];
 
     /// Returns the corpus identifier, which names its directory under
@@ -120,6 +124,7 @@ impl Corpus {
             Self::FhirpathR4Stu3 => "fhirpath-r4-stu3",
             Self::ValidatorAgreement => "validator-agreement",
             Self::XtehrCrosswalk => "xtehr-crosswalk",
+            Self::EehrxfAnnexX => "eehrxf-annex-x",
         }
     }
 

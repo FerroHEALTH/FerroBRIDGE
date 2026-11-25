@@ -16,6 +16,7 @@
 
 mod form;
 mod identifier;
+mod include;
 mod party;
 mod total;
 
@@ -65,6 +66,7 @@ use crate::facade::search::bundle::Match;
 use crate::facade::search::criteria;
 use crate::facade::search::criteria::Criteria;
 use crate::facade::search::criteria::Handling;
+use crate::facade::search::criteria::Included;
 use crate::facade::search::criteria::Subject;
 use crate::facade::search::cursor;
 use crate::facade::search::cursor::Position;
@@ -227,6 +229,8 @@ struct Plan<'a> {
     conditions: Option<Conditions>,
     /// The `ORDER BY`.
     order: Vec<OrderKey>,
+    /// The `_include`s of the request.
+    includes: &'a [Included],
     /// The terminology session of the request, which the page and the total
     /// share, so a code repeated across their entries is translated once (no
     /// specification governs this: our own design).
@@ -238,7 +242,7 @@ struct Plan<'a> {
 fn plans_of<'a>(
     facade: &Facade,
     declarations: &'a [Declared],
-    criteria: &Criteria,
+    criteria: &'a Criteria,
     resolved: &Resolved,
     session: &'a Session<'a>,
 ) -> Result<Vec<Plan<'a>>, Refusal> {
@@ -253,6 +257,7 @@ fn plans_of<'a>(
             order: plan::order(declared, criteria),
             ids: ids_of(resolved, declared),
             named: named_of(criteria),
+            includes: &criteria.includes,
             session,
         });
     }
@@ -708,13 +713,15 @@ async fn render_entry(
         plan.session,
     )
     .await?;
-    let mut matches = Vec::with_capacity(units.len());
-    for (unit, rendered) in units {
+    let mut matches = Vec::with_capacity(units.own.len());
+    for (unit, rendered) in units.own {
         render::log_outcome(&rendered);
         if plan.named.iter().all(|named| named.contains(unit.as_str())) {
+            let included = include::follow(plan.includes, &rendered.body, &units.others)?;
             matches.push(Match {
                 id: unit,
                 resource: rendered.body,
+                included,
             });
         }
     }

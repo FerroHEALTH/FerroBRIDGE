@@ -38,15 +38,16 @@ fn embeds_its_directory(project: &Project) -> Result<(), Box<dyn Error>> {
     let embedded: BTreeSet<String> = project
         .files()
         .iter()
+        .chain(project.searches())
         .map(|file| file.name.to_owned())
         .collect();
     assert_eq!(embedded, on_disk, "{}", project.directory());
     assert_eq!(
         embedded.len(),
-        project.files().len(),
+        project.files().len() + project.searches().len(),
         "no file is listed twice"
     );
-    for file in project.files() {
+    for file in project.files().iter().chain(project.searches()) {
         let text = std::fs::read_to_string(directory(project).join(file.name))?;
         assert_eq!(file.text, text, "{}", file.name);
     }
@@ -70,6 +71,12 @@ fn writes_its_files(project: &Project) -> Result<(), Box<dyn Error>> {
     assert_eq!(written, expected);
     for (path, file) in written.iter().zip(project.files()) {
         assert_eq!(std::fs::read_to_string(path)?, file.text);
+    }
+    for search in project.searches() {
+        assert_eq!(
+            std::fs::read_to_string(target.join(search.name))?,
+            search.text
+        );
     }
     std::fs::remove_dir_all(&target)?;
     Ok(())
@@ -108,4 +115,10 @@ fn the_hdr_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
 fn the_test_report_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
     embeds_its_directory(&eehrxf::mappings::TEST_REPORT)?;
     writes_its_files(&eehrxf::mappings::TEST_REPORT)
+}
+
+#[test]
+fn the_annex_x_project_embeds_its_directory() -> Result<(), Box<dyn Error>> {
+    embeds_its_directory(&eehrxf::mappings::ANNEX_X)?;
+    writes_its_files(&eehrxf::mappings::ANNEX_X)
 }

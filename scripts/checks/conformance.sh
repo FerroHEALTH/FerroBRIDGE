@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the sixteen corpus tests, compares what they
+# The conformance gate (#24): runs the seventeen corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
@@ -71,6 +71,7 @@ readonly CORPUS_TESTS=(
   'fhirpath-r4-stu3 ferrobridge-fhirpath conformance_fhirpath_r4_stu3'
   'validator-agreement ferrobridge-validator conformance_the_validator_agrees_with_the_hl7_validator_on_its_corpus'
   'xtehr-crosswalk eehrxf conformance_the_xtehr_crosswalk_holds_its_pass_list'
+  'eehrxf-annex-x ferrobridge-server conformance_the_annex_x_groups_hold_their_pass_list'
 )
 # The corpora measured outside this script, whose results it reads and never
 # produces: the MyHealth@EU corpora HL7's FHIR Validator measures
@@ -205,6 +206,7 @@ label_of() {
     myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
     myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
     myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI)" ;;
+    eehrxf-annex-x) echo "EEHRxF Annex X groups served" ;;
     *) return 1 ;;
   esac
 }
@@ -499,7 +501,7 @@ render_block() {
   printf '%s\n' "${QUALITY_BADGES[@]}"
   echo
   echo '**Conformance and compliance**<br>'
-  for name in fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke; do
+  for name in fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade eehrxf-annex-x fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
   echo '<br>'

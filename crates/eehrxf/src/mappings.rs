@@ -19,12 +19,14 @@ use std::path::Path;
 use std::path::PathBuf;
 
 /// One shipped FHIRconnect project: its directory, its files, the context
-/// mappings to compile from them and the received elements it accounts for.
+/// mappings to compile from them, the search declarations beside them and the
+/// received elements it accounts for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Project {
     directory: &'static str,
     contexts: &'static [&'static str],
     files: &'static [File],
+    searches: &'static [File],
     accounted: &'static [&'static str],
     followed: &'static [&'static str],
 }
@@ -96,6 +98,15 @@ impl Project {
         self.files
     }
 
+    /// Returns the search declarations the project ships beside its contexts,
+    /// the `*.search.yml` files a FHIR facade reads to search the resources
+    /// each context serves. They are no FHIRconnect files, so
+    /// [`crate::mapping::Mapping::compile_project`] never reads them.
+    #[must_use]
+    pub const fn searches(&self) -> &'static [File] {
+        self.searches
+    }
+
     /// Returns the received elements the project accounts for, each a
     /// FHIRPath of element names rooted at a resource type: a received
     /// instance of one that the run carries into no structured element is
@@ -113,14 +124,18 @@ impl Project {
         self.followed
     }
 
-    /// Writes every file of the project into `directory`, which must exist,
-    /// and answers the paths written, in loading order, the `files` a
-    /// [`crate::mapping::Mapping`] compiles from.
+    /// Writes every file of the project and every search declaration into
+    /// `directory`, which must exist, and answers the paths of the files
+    /// written, in loading order, the `files` a [`crate::mapping::Mapping`]
+    /// compiles from.
     ///
     /// # Errors
     ///
     /// Returns the I/O error of the first file that cannot be written.
     pub fn write_to(&self, directory: &Path) -> io::Result<Vec<PathBuf>> {
+        for search in self.searches {
+            std::fs::write(directory.join(search.name), search.text)?;
+        }
         self.files
             .iter()
             .map(|file| {
@@ -132,14 +147,6 @@ impl Project {
 }
 
 /// Embeds the file `name` of the shipped project `directory`.
-#[cfg(any(
-    feature = "prescription",
-    feature = "dispensation",
-    feature = "imaging",
-    feature = "laboratory",
-    feature = "patient-summary",
-    feature = "discharge"
-))]
 macro_rules! shipped {
     ($directory:literal, $name:literal) => {
         File {
@@ -168,6 +175,7 @@ pub const MPD: Project = Project {
         "ferrobridge_eu_mpd_request.context",
         "ferrobridge_eu_mpd_dispense.context",
     ],
+    searches: &[],
     files: &[
         shipped!("mpd", "ferrobridge_eu_mpd_request.context.yml"),
         shipped!("mpd", "ferrobridge_medication_order.v3.yml"),
@@ -198,6 +206,7 @@ pub const MPD: Project = Project {
 pub const IMAGING: Project = Project {
     directory: "imaging",
     contexts: &["ferrobridge_eu_imaging.context"],
+    searches: &[],
     files: &[
         shipped!("imaging", "ferrobridge_eu_imaging.context.yml"),
         shipped!("imaging", "ferrobridge_imaging_exam_result.v1.yml"),
@@ -269,6 +278,7 @@ pub const LABORATORY: Project = Project {
         "ferrobridge_eu_laboratory.context",
         "ferrobridge_eu_lab_composition.context",
     ],
+    searches: &[],
     files: &[
         shipped!("laboratory", "ferrobridge_eu_laboratory.context.yml"),
         shipped!("laboratory", "ferrobridge_laboratory_test_result.v1.yml"),
@@ -323,6 +333,7 @@ pub const LABORATORY: Project = Project {
 pub const EPS: Project = Project {
     directory: "eps",
     contexts: &["ferrobridge_eu_eps.context"],
+    searches: &[],
     files: &[
         shipped!("eps", "ferrobridge_eu_eps.context.yml"),
         shipped!("eps", "ferrobridge_health_summary.v1.Composition.yml"),
@@ -379,6 +390,7 @@ pub const EPS: Project = Project {
 pub const HDR: Project = Project {
     directory: "hdr",
     contexts: &["ferrobridge_eu_hdr.context"],
+    searches: &[],
     files: &[
         shipped!("hdr", "ferrobridge_eu_hdr.context.yml"),
         shipped!("hdr", "ferrobridge_transfer_summary.v1.Composition.yml"),
@@ -481,11 +493,68 @@ pub const TEST_REPORT: Project = Project {
         "ferrobridge_spirometry_report.context",
         "ferrobridge_ecg_report.context",
     ],
+    searches: &[],
     files: &[
         shipped!("test-report", "ferrobridge_spirometry_report.context.yml"),
         shipped!("test-report", "ferrobridge_spirometry_result.v2.yml"),
         shipped!("test-report", "ferrobridge_ecg_report.context.yml"),
         shipped!("test-report", "ferrobridge_ecg_result.v1.yml"),
+    ],
+    accounted: &[],
+    followed: &[],
+};
+
+/// The draft `EEHRxF` Annex X project: the common data groups served as
+/// individual resources (draft act Art 7(2)).
+///
+/// Each context maps one group over FerroBRIDGE's patient summary template
+/// or its EHDS record template, to the profile HL7 Europe Base and Core
+/// 2.0.1 gives the group (the FHIR R4 `bodyweight` profile for a simple
+/// observation), with the search declaration a FHIR facade reads beside it:
+/// the IHE `QEDm` 3.0.0 PCC-44 searches of the group's option
+/// (2:3.44.4.1.2.1). Its contexts map more than one template, so a
+/// [`crate::mapping::Mapping`] compiles it one context at a time
+/// ([`Project::with_context`]).
+pub const ANNEX_X: Project = Project {
+    directory: "annex-x",
+    contexts: &[
+        "ferrobridge_ehds_allergy_intolerance.context",
+        "ferrobridge_ehds_condition.context",
+        "ferrobridge_ehds_immunisation.context",
+        "ferrobridge_ehds_medication_use.context",
+        "ferrobridge_ehds_observation.context",
+        "ferrobridge_ehds_procedure.context",
+    ],
+    searches: &[
+        shipped!("annex-x", "ferrobridge_ehds_allergy_intolerance.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_condition.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_immunisation.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_medication_use.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_observation.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_procedure.search.yml"),
+    ],
+    files: &[
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_allergy_intolerance.context.yml"
+        ),
+        shipped!(
+            "annex-x",
+            "ferrobridge_adverse_reaction_risk.v2.AllergyIntolerance.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_condition.context.yml"),
+        shipped!("annex-x", "ferrobridge_problem_diagnosis.v1.Condition.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_immunisation.context.yml"),
+        shipped!("annex-x", "ferrobridge_medication.v1.Immunization.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_medication_use.context.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_medication_order.v3.MedicationStatement.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_observation.context.yml"),
+        shipped!("annex-x", "ferrobridge_body_weight.v2.Observation.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_procedure.context.yml"),
+        shipped!("annex-x", "ferrobridge_procedure.v1.Procedure.yml"),
     ],
     accounted: &[],
     followed: &[],

@@ -11,7 +11,7 @@
 //! Some fixtures name systems outside that domain. [`KDS_DIAGNOSE_OPT`],
 //! [`KDS_PERSON_OPT`], [`KDS_LABORAUFTRAG_OPT`] and [`KDS_LABORBERICHT_OPT`]
 //! are published operational templates and [`CKM_MEDICATION_ARCHETYPES`],
-//! [`CKM_DISCHARGE_ARCHETYPES`], [`CKM_IMAGING_ARCHETYPES`], [`CKM_LIBRARY_ARCHETYPES`]
+//! [`CKM_DISCHARGE_ARCHETYPES`], [`CKM_IMAGING_ARCHETYPES`], [`CKM_EHDS_ARCHETYPES`], [`CKM_LIBRARY_ARCHETYPES`]
 //! and [`CKM_HIGHMED_ARCHETYPES`] published archetypes, vendored verbatim
 //! with their provenance beside them: a template or an archetype carries
 //! constraints, never patient content.
@@ -47,6 +47,14 @@ macro_rules! ckm_test_report {
             $file,
             include_str!(concat!("../fixtures/ckm/test-report/", $file)),
         )
+    };
+}
+
+/// One vendored CKM archetype of the EHDS record template as
+/// `(file name, source)`.
+macro_rules! ckm_ehds {
+    ($file:literal) => {
+        ($file, include_str!(concat!("../fixtures/ckm/ehds/", $file)))
     };
 }
 
@@ -739,6 +747,31 @@ pub const CKM_TEST_REPORT_ARCHETYPES: [(&str, &str); 2] = [
     ckm_test_report!("openEHR-EHR-OBSERVATION.ecg_result.v1.adl"),
     ckm_test_report!("openEHR-EHR-OBSERVATION.spirometry_result.v2.adl"),
 ];
+
+/// FerroBRIDGE's ADL 2 EHDS record template.
+///
+/// An encounter `COMPOSITION` whose content holds, once per archetype, each
+/// entry a draft `EEHRxF` Annex X data group takes from no other template:
+/// `ACTION.medication.v1` for an immunisation and
+/// `OBSERVATION.body_weight.v2` for a simple observation. A suite builds the
+/// ADL 2 operational template from it, [`CKM_MEDICATION_ARCHETYPES`] and
+/// [`CKM_EHDS_ARCHETYPES`] at test time. The template identifier is
+/// [`FERROBRIDGE_EHDS_RECORD_TEMPLATE_ID`].
+pub const FERROBRIDGE_EHDS_RECORD_TEMPLATE: &str =
+    include_str!("../fixtures/adl2/ferrobridge_ehds_record.adlt");
+
+/// The template identifier [`FERROBRIDGE_EHDS_RECORD_TEMPLATE`] declares.
+pub const FERROBRIDGE_EHDS_RECORD_TEMPLATE_ID: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0";
+
+/// The published CKM archetypes [`FERROBRIDGE_EHDS_RECORD_TEMPLATE`] adds to
+/// [`CKM_MEDICATION_ARCHETYPES`], as `(file name, ADL 1.4 source)`.
+///
+/// `scripts/vendor/ckm-ehds.sh` fetches them at the CKM mirror commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
+/// source and licence.
+pub const CKM_EHDS_ARCHETYPES: [(&str, &str); 1] =
+    [ckm_ehds!("openEHR-EHR-OBSERVATION.body_weight.v2.adl")];
 
 #[cfg(test)]
 mod tests {
