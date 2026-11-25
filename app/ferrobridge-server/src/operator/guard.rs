@@ -31,23 +31,22 @@ use crate::smart::Smart;
 /// beside the layer's audit line, so a deployment can route it apart.
 pub const AUDIT_TARGET: &str = "ferrobridge::audit";
 
-/// Logs one operator write on a source under [`AUDIT_TARGET`]: the subject,
-/// the action, the source id and the status, never a value of the request.
-pub(crate) fn source_audited(
-    subject: &str,
-    action: &str,
-    source: uuid::Uuid,
-    status: http::StatusCode,
-) {
-    tracing::info!(
-        target: AUDIT_TARGET,
-        subject,
-        action,
-        source = %source,
-        status = status.as_u16(),
-        "operator"
-    );
+/// Logs one operator change under [`AUDIT_TARGET`]: the subject, the
+/// action, the fields that name what changed, and the status, never a value
+/// of the request.
+macro_rules! audited {
+    ($subject:expr, $action:expr, $status:expr $(, $field:ident = $value:expr)* $(,)?) => {
+        ::tracing::info!(
+            target: $crate::operator::guard::AUDIT_TARGET,
+            subject = $subject,
+            action = $action,
+            $($field = $value,)*
+            status = $status.as_u16(),
+            "operator"
+        )
+    };
 }
+pub(crate) use audited;
 
 /// The interaction the audit line records for every operator route.
 const OPERATOR: &str = "operator";

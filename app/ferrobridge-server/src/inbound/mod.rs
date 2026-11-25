@@ -11,6 +11,7 @@
 //! the standard of each step.
 
 pub mod apply;
+mod clients;
 pub mod event;
 pub mod intake;
 pub mod keeper;

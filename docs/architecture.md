@@ -1039,8 +1039,9 @@ expression is a load error: the reference CDR's connector let `where()` and
   identity map and the CDR; an absolute one is fetched only from a base on
   the `[facade.references] fetch_bases` allow-list (empty by default, so by
   default nothing is fetched and no client can make the bridge call a URL it
-  names), with redirects refused, a timeout, `max_depth` levels and each
-  literal resolved once, every fetch logged by type, id, base and upstream
+  names), through one `ferrohealth-smart` `OutboundClient` with redirects
+  refused, a timeout and one try, `max_depth` levels and each literal
+  resolved once, every fetch logged by type, id, base and upstream
   status. No specification governs that policy: our own design.
 - **A read-side Bundle is well formed.** One entry per composition per
   resource type (two programs over one template do not double an entry), a
@@ -2580,8 +2581,11 @@ leads the source and after a run of `503` answers, and `reconcile` polls
 that read the entities changed since a cursor per tenant and mark each one
 due. One replica runs a source's recovery under the lane lease
 `inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
-a transaction that fences the generation that read it. The schedule is our
-own design, since no specification governs it.
+a transaction that fences the generation that read it. Every recovery call
+goes through a `ferrohealth-smart` `OutboundClient`, one per source version
+and credential, which presents the credential's client certificate, gives a
+call 30 seconds and one try, and follows no redirect. The schedule and these
+limits are our own design, since no specification governs them.
 A `fhir-subscription` source receives R4 notifications of the Subscriptions
 R5 Backport IG STU 1.1.0
 (<https://hl7.org/fhir/uv/subscriptions-backport/notifications.html>) on the
