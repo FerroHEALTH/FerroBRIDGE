@@ -12,11 +12,12 @@
 //! refuses an entry whose name is no console mapping file. No specification
 //! governs the archive: our own design.
 
-use std::collections::BTreeMap;
 use std::io::{Cursor, Read as _, Write as _};
+use std::sync::Arc;
 
 use crate::mappings::files;
 use crate::mappings::files::Language;
+use crate::mappings::revisions::Files;
 
 /// The most entries an import reads.
 pub const MAX_ENTRIES: usize = 4096;
@@ -60,7 +61,7 @@ pub enum ArchiveError {
 ///
 /// Returns [`ArchiveError::Zip`] or [`ArchiveError::Io`] when the writer
 /// refuses.
-pub fn export(contents: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, ArchiveError> {
+pub fn export(contents: &Files) -> Result<Vec<u8>, ArchiveError> {
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .compression_level(Some(LEVEL))
@@ -85,12 +86,12 @@ pub fn export(contents: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, ArchiveEr
 /// ceilings, [`ArchiveError::BadEntry`] for an entry that names no console
 /// mapping file, and [`ArchiveError::Duplicate`] for two entries of one
 /// file.
-pub fn import(archive: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, ArchiveError> {
+pub fn import(archive: &[u8]) -> Result<Files, ArchiveError> {
     let mut reader = zip::ZipArchive::new(Cursor::new(archive)).map_err(ArchiveError::Zip)?;
     if reader.len() > MAX_ENTRIES {
         return Err(ArchiveError::TooManyEntries);
     }
-    let mut contents = BTreeMap::new();
+    let mut contents = Files::new();
     let mut left = MAX_BYTES;
     for index in 0..reader.len() {
         let entry = reader.by_index(index).map_err(ArchiveError::Zip)?;
@@ -115,7 +116,7 @@ pub fn import(archive: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, ArchiveError>
             return Err(ArchiveError::TooLarge);
         }
         left = left.saturating_sub(read);
-        if contents.insert(wire, bytes).is_some() {
+        if contents.insert(wire, Arc::from(bytes)).is_some() {
             return Err(ArchiveError::Duplicate);
         }
     }
@@ -124,14 +125,18 @@ pub fn import(archive: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, ArchiveError>
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     use super::{ArchiveError, export, import};
+    use crate::mappings::revisions::Files;
 
-    fn set() -> BTreeMap<String, Vec<u8>> {
-        BTreeMap::from([
-            (String::from("omocl/b.yml"), b"b: 1\n".to_vec()),
-            (String::from("fhirconnect/a/c.yml"), b"c: 2\n".to_vec()),
+    fn set() -> Files {
+        Files::from([
+            (String::from("omocl/b.yml"), Arc::from(&b"b: 1\n"[..])),
+            (
+                String::from("fhirconnect/a/c.yml"),
+                Arc::from(&b"c: 2\n"[..]),
+            ),
         ])
     }
 
@@ -150,7 +155,7 @@ mod tests {
             "fhirconnect/../x.yml",
             "fhirconnect/x.txt",
         ] {
-            let archive = export(&BTreeMap::from([(String::from(name), b"x".to_vec())]))
+            let archive = export(&Files::from([(String::from(name), Arc::from(&b"x"[..]))]))
                 .expect("the archive writes");
             assert!(
                 matches!(import(&archive), Err(ArchiveError::BadEntry)),

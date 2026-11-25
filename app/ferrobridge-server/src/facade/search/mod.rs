@@ -225,22 +225,32 @@ impl Catalog {
 /// type and template another declaration answers, or states another parameter
 /// set than its type's first declaration.
 pub fn load(directory: &Path, programs: &Programs) -> Result<Catalog, DeclarationError> {
-    let files = crate::walk::files(directory, crate::walk::is_declaration).map_err(
-        |crate::walk::Error { path, source }| DeclarationError::Read { file: path, source },
-    )?;
-    load_files(&files, programs)
+    let tree = crate::walk::files(directory, crate::walk::is_declaration)
+        .and_then(crate::mappings::tree::Tree::read)
+        .map_err(
+            |crate::walk::Error { path, source }| DeclarationError::Read { file: path, source },
+        )?;
+    load_tree(&tree, programs)
 }
 
-/// Reads the declarations `files` names, in order, and binds each to its
+/// Parses the declarations of `tree`, in path order, and binds each to its
 /// program.
 ///
 /// # Errors
 ///
-/// Returns what [`load`] returns, apart from a directory that cannot be read.
-pub fn load_files(files: &[PathBuf], programs: &Programs) -> Result<Catalog, DeclarationError> {
+/// Returns what [`load`] returns, a file that is not UTF-8 as
+/// [`DeclarationError::Read`].
+pub fn load_tree(
+    tree: &crate::mappings::tree::Tree,
+    programs: &Programs,
+) -> Result<Catalog, DeclarationError> {
     let mut catalog = Catalog::default();
-    for file in files {
-        let written = declaration::read(file)?;
+    for (file, bytes) in tree.iter() {
+        let text = std::str::from_utf8(bytes).map_err(|error| DeclarationError::Read {
+            file: file.to_path_buf(),
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+        })?;
+        let written = declaration::file::parse(file, text)?;
         let declared = bind(file, written, programs)?;
         insert(&mut catalog, declared)?;
     }

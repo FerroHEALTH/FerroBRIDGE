@@ -1,18 +1,27 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The mapping files the operator API serves: the configured directories,
-//! each under a root name, and the confinement of every path to one of them.
+//! The mapping files the operator API serves, provisioned and console.
+//!
+//! The configured directories each sit under a root name, every path is
+//! confined to one of them, and the console's files of the running revision
+//! sit beside them.
 //!
 //! A path on the wire is `<root>/<relative path>`, the root `fhirconnect` or
 //! `omocl`. A relative path is plain names only, never `..`, `.`, a
 //! `..`-prefixed name or an absolute form, and the file it names must resolve
 //! inside its root once every symlink is followed, so a link that points out
-//! of the tree serves nothing. No specification governs this: our own design.
+//! of the tree serves nothing. A console file is keyed by its wire path in a
+//! load's tree, and a provisioned file by its path on disk. No specification
+//! governs this: our own design.
 
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
+
+use crate::mappings::revisions::Files;
+use crate::mappings::tree::Tree;
 
 /// The language of the files under one root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -41,13 +50,6 @@ impl Language {
             .into_iter()
             .find(|language| language.root() == root)
     }
-
-    /// Returns the directory under `mapping_dir` the console saves files of
-    /// this language in.
-    #[must_use]
-    pub fn console_directory(self, mapping_dir: &Path) -> PathBuf {
-        mapping_dir.join(self.root())
-    }
 }
 
 /// Who owns a file, and so who may change it.
@@ -55,7 +57,7 @@ impl Language {
 pub enum Owner {
     /// The deployment provisioned it; the operator API never writes it.
     Provisioned,
-    /// The console saved it under `[operator] mapping_dir`.
+    /// The console saved it in the state store.
     Console,
 }
 
@@ -77,15 +79,13 @@ impl From<Owner> for ferrobridge_operator_api::operator::Owner {
     }
 }
 
-/// One configured directory and the root name a wire path reaches it by.
+/// One provisioned directory and the root name a wire path reaches it by.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Root {
     /// The language of its files.
     language: Language,
     /// The directory.
     directory: PathBuf,
-    /// Who owns its files.
-    owner: Owner,
 }
 
 impl Root {
@@ -96,25 +96,7 @@ impl Root {
         Self {
             language,
             directory,
-            owner: Owner::Provisioned,
         }
-    }
-
-    /// Returns the console root over `directory`, the writable tree console
-    /// saves of `language` go to.
-    #[must_use]
-    pub const fn console(language: Language, directory: PathBuf) -> Self {
-        Self {
-            language,
-            directory,
-            owner: Owner::Console,
-        }
-    }
-
-    /// Returns who owns its files.
-    #[must_use]
-    pub const fn owner(&self) -> Owner {
-        self.owner
     }
 
     /// Returns the language of its files.
@@ -163,11 +145,25 @@ pub struct Located {
     owner: Owner,
     /// Its path on the wire, `<root>/<relative path>` with `/` separators.
     wire: String,
-    /// Its path on disk.
+    /// Its path on disk, or its wire path for a console file.
     path: PathBuf,
 }
 
 impl Located {
+    /// Returns the console file at `wire`, or `None` for a wire path that
+    /// names no mapping file under a root.
+    #[must_use]
+    pub fn console(wire: &str) -> Option<Self> {
+        let (root, relative) = relative(wire).ok()?;
+        let language = Language::of_root(root)?;
+        is_mapping(&relative).then(|| Self {
+            language,
+            owner: Owner::Console,
+            wire: wire.to_owned(),
+            path: PathBuf::from(wire),
+        })
+    }
+
     /// Returns the language of its root.
     #[must_use]
     pub const fn language(&self) -> Language {
@@ -186,7 +182,8 @@ impl Located {
         &self.wire
     }
 
-    /// Returns its path on disk.
+    /// Returns its path on disk, or its wire path for a console file: the
+    /// path its diagnostics name.
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
@@ -215,9 +212,6 @@ pub fn is_mapping(path: &Path) -> bool {
 pub fn list(roots: &[Root]) -> Result<Vec<Located>, crate::walk::Error> {
     let mut found: Vec<Located> = Vec::new();
     for root in roots {
-        if root.owner == Owner::Console && !root.directory.exists() {
-            continue;
-        }
         for path in crate::walk::files(&root.directory, is_mapping)? {
             let Some(wire) = wire_path(root, &path) else {
                 continue;
@@ -229,13 +223,105 @@ pub fn list(roots: &[Root]) -> Result<Vec<Located>, crate::walk::Error> {
             }
             found.push(Located {
                 language: root.language,
-                owner: root.owner,
+                owner: Owner::Provisioned,
                 wire,
                 path,
             });
         }
     }
     Ok(found)
+}
+
+/// The files of one set, by the load that reads them.
+#[derive(Debug, Clone, Default)]
+pub struct Sources {
+    /// The FHIRconnect mapping files.
+    pub fhirconnect: Tree,
+    /// The search declarations.
+    pub declarations: Tree,
+    /// The OMOCL files.
+    pub omocl: Tree,
+}
+
+/// A file standing in for the one at its wire path.
+#[derive(Debug, Clone)]
+pub struct Draft {
+    /// The wire path it stands for.
+    pub wire: String,
+    /// Its bytes.
+    pub bytes: Arc<[u8]>,
+}
+
+/// Returns every file of `roots` and every one of the console files
+/// `console`, by the load that reads it, with `draft` standing in for the
+/// file at its wire path.
+///
+/// A provisioned file owns its wire path, so a console file at the same
+/// path is left out.
+///
+/// # Errors
+///
+/// Returns the walk's [`crate::walk::Error`] when a directory or a file
+/// cannot be read.
+pub fn sources(
+    roots: &[Root],
+    console: &Files,
+    draft: Option<&Draft>,
+) -> Result<Sources, crate::walk::Error> {
+    let mut sources = Sources::default();
+    let replaced = |wire: &str| draft.is_some_and(|draft| draft.wire == wire);
+    let mut provisioned = std::collections::BTreeSet::new();
+    for located in list(roots)? {
+        provisioned.insert(located.wire.clone());
+        if replaced(&located.wire) {
+            continue;
+        }
+        let bytes = std::fs::read(&located.path).map_err(|source| crate::walk::Error {
+            path: located.path.clone(),
+            source,
+        })?;
+        sources
+            .tree(&located)
+            .insert(located.path.clone(), Arc::from(bytes));
+    }
+    for (wire, bytes) in console {
+        if provisioned.contains(wire) || replaced(wire) {
+            continue;
+        }
+        if let Some(located) = Located::console(wire) {
+            sources
+                .tree(&located)
+                .insert(located.path.clone(), Arc::clone(bytes));
+        }
+    }
+    if let Some(draft) = draft {
+        let located = match resolve(roots, &draft.wire) {
+            Ok(located) => Some(Located {
+                path: PathBuf::from(&draft.wire),
+                ..located
+            }),
+            Err(_) => Located::console(&draft.wire),
+        };
+        if let Some(located) = located {
+            sources
+                .tree(&located)
+                .insert(located.path.clone(), Arc::clone(&draft.bytes));
+        }
+    }
+    Ok(sources)
+}
+
+impl Sources {
+    /// Returns the tree the load of `located` reads.
+    fn tree(&mut self, located: &Located) -> &mut Tree {
+        match located.language {
+            Language::Omocl => &mut self.omocl,
+            Language::Fhirconnect if crate::walk::is_declaration(Path::new(&located.wire)) => {
+                &mut self.declarations
+            }
+            Language::Fhirconnect => &mut self.fhirconnect,
+        }
+    }
 }
 
 /// Returns the wire path of `path` under `root`, or `None` when `path` is not
@@ -282,7 +368,7 @@ pub fn resolve(roots: &[Root], wire: &str) -> Result<Located, PathError> {
             Ok(()) => {
                 return Ok(Located {
                     language: root.language,
-                    owner: root.owner,
+                    owner: Owner::Provisioned,
                     wire: wire.to_owned(),
                     path,
                 });

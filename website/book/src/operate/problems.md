@@ -58,7 +58,7 @@ the process is not ready.
 | [`not-permitted`](#not-permitted) | `403` | The token does not carry the operator scope. |
 | [`not-found`](#not-found) | `404` | The mapping file, the revision or the configuration does not exist. |
 | [`provisioned`](#provisioned) | `409` | A provisioned file holds the path. |
-| [`not-configured`](#not-configured) | `409` | No `[operator] mapping_dir` is configured. |
+| [`not-configured`](#not-configured) | `409` | No `[state]` is configured, so nothing is saved. |
 | [`precondition-failed`](#precondition-failed) | `412` | What the request replaces changed since the `ETag` it names. |
 | [`precondition-required`](#precondition-required) | `428` | The write sends no precondition. |
 | [`no-example`](#no-example) | `422` | The template has no example composition. |
@@ -129,8 +129,8 @@ file under another path.
 
 ## not-configured
 
-`409`. No `[operator] mapping_dir` is configured, so the operator API checks,
-saves and reloads nothing. Set `mapping_dir` to turn on editing.
+`409`. No `[state]` is configured, so the operator API checks, saves and
+reloads nothing. Configure the state store to turn on editing.
 
 ## precondition-failed
 
@@ -171,8 +171,8 @@ directory and the cause.
 
 ## unwritable
 
-`500`. The mapping directory could not be written. The server log names the
-cause; check that the server's user owns `mapping_dir`.
+`500`. The mapping revisions could not be read or written in the state
+store. The server log names the cause.
 
 ## dead-letters-unavailable
 

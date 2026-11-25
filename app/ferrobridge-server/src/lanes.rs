@@ -14,7 +14,7 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
-use crate::config::{self, OperatorSettings, Settings};
+use crate::config::{self, Settings};
 use crate::serve_until;
 use crate::state::AppState;
 use crate::terminology::Translator;
@@ -105,10 +105,10 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_access_log(Arc::new(log));
     }
     state = start_links(settings, state)?;
-    if let Some(operator) = settings.operator.as_ref() {
+    if settings.operator.is_some() {
         let operator = build_operator(
             settings,
-            operator,
+            state.store(),
             state.facade().cloned(),
             state.operations_handle().cloned(),
         )
@@ -305,10 +305,11 @@ async fn start_change_feed(
         let name = crate::etl::incremental::NAME;
         let following =
             follower(&feed, feed_settings, &load.reader, name, "omop_incremental").await?;
-        let consumer = crate::etl::incremental::Incremental::start(settings, client.clone())
-            .await
-            .context("starting the incremental OMOP load")?
-            .with_following(following.clone());
+        let consumer =
+            crate::etl::incremental::Incremental::start(settings, state.store(), client.clone())
+                .await
+                .context("starting the incremental OMOP load")?
+                .with_following(following.clone());
         tracing::info!(
             lane = name,
             reader = %load.reader,
@@ -494,18 +495,20 @@ async fn start_hl7v2(
                 lane = "hl7v2",
                 listen = %lane.listen,
                 concept_maps = maps,
-                profiles = lane.profiles.len(),
                 "the HL7 v2 face listens for MLLP over TLS"
             );
             Some((socket, hl7v2::Listening::default()))
         }
         None => None,
     };
-    let face = hl7v2::Face::new(facade, terminology, lane)
+    let routes: Arc<dyn crate::sources::Routes> = state.sources().cloned().context(
+        "the HL7 v2 face routes its senders from the state store, and [state] is not set",
+    )?;
+    let face = hl7v2::Face::new(facade, terminology, routes)
         .with_usage(Arc::clone(state.usage_window()))
         .with_access_log(state.access_log().cloned(), lane.listen);
-    let plain = match lane.plain.as_ref() {
-        Some(plain) => Some(hl7v2::plain::bind(plain, &face).await?),
+    let plain = match lane.plain {
+        Some(bind) => Some(hl7v2::plain::bind(bind, &face).await?),
         None => None,
     };
     Ok(StartedFace {
@@ -613,19 +616,21 @@ fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::
 /// Builds the operator API over the configured mapping directories, with the
 /// running load as the checker sees it.
 ///
-/// The check runs once here, over the inputs `mapping check` reads, and the
-/// search declaration of each context comes from the facade when it runs
-/// (no specification governs the operator surface: our own design).
+/// With the state store, the running revision's console files join the
+/// provisioned ones here and the start is refused when they do not compile;
+/// without it, the check runs once over the inputs `mapping check` reads.
+/// The search declaration of each context comes from the facade when it
+/// runs (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
-    operator_settings: &OperatorSettings,
+    store: Option<&crate::store::Store>,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<crate::operations::lane::OperationsLane>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 
-    let needs_cdr = settings.mappings.is_none()
-        && (settings.mapping_directory.is_some() || operator_settings.mapping_dir.is_some());
+    let needs_cdr =
+        settings.mappings.is_none() && (settings.mapping_directory.is_some() || store.is_some());
     let cdr = match settings.cdr.as_ref() {
         Some(config) if needs_cdr => Some(
             cdr::CdrClient::new(config)
@@ -650,7 +655,7 @@ async fn build_operator(
         let mappings = facade.mappings();
         operator::reload::searches(mappings.programs(), mappings.search())
     });
-    let built = if let Some(mapping_dir) = operator_settings.mapping_dir.clone() {
+    let built = if let Some(store) = store {
         let reloader = operator::reload::Reloader {
             fhirconnect: settings.mapping_directory.clone(),
             templates: settings
@@ -662,29 +667,22 @@ async fn build_operator(
             facade,
             operations,
         };
+        let revisions = crate::mappings::revisions::Revisions::new(store);
+        revisions
+            .baseline()
+            .await
+            .context("recording the baseline revision of the mapping set")?;
         let operator = Arc::new(
             operator::Operator::new(
                 roots,
                 operator::snapshot::Snapshot::new(check::Report::default(), searches),
             )
-            .with_saving(mapping_dir, reloader),
+            .with_saving(revisions, reloader),
         );
-        // NOTE: no specification governs this: our own design; the console's
-        // saved files join the running set at boot, or the start is refused.
-        let worker = Arc::clone(&operator);
-        operator::save::on_blocking_thread(move |thread| {
-            worker
-                .prepare(thread, None)
-                .map(|prepared| worker.apply(prepared))
-        })
-        .await
-        .context("loading the console's mapping files")?
-        .context("loading the console's mapping files")?;
-        let worker = Arc::clone(&operator);
-        tokio::task::spawn_blocking(move || worker.settle(operator::save::on_disk()))
+        operator
+            .converge(operator::watch::When::Always)
             .await
-            .context("recording the console's mapping files as a revision")?
-            .context("recording the console's mapping files as a revision")?;
+            .context("loading the running revision of the console's mapping files")?;
         Arc::try_unwrap(operator).map_err(|_shared| {
             anyhow::anyhow!("the operator API is still shared after its boot load")
         })?
@@ -706,7 +704,7 @@ async fn build_operator(
         lane = "operator",
         roots = built.roots().len(),
         diagnostics = built.snapshot().report().diagnostics().len(),
-        saving = operator_settings.mapping_dir.is_some(),
+        saving = store.is_some(),
         "the operator API is mounted under /operator"
     );
     Ok(built)

@@ -5,7 +5,6 @@
 //! checked and saved as a revision that does not run, and its page applies
 //! it.
 
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -22,7 +21,10 @@ use crate::journeys::stack::Stack;
 /// Writes a ZIP of one context `slug` names into `directory`, as an export
 /// writes it, and returns its path.
 pub(crate) fn archive(directory: &std::path::Path, slug: &str) -> Result<PathBuf, Box<dyn Error>> {
-    let contents = BTreeMap::from([(context_path(slug), context(slug, TEMPLATE).into_bytes())]);
+    let contents = ferrobridge_server::mappings::revisions::Files::from([(
+        context_path(slug),
+        std::sync::Arc::from(context(slug, TEMPLATE).into_bytes()),
+    )]);
     let bytes = ferrobridge_server::operator::revisions::archive::export(&contents)?;
     let path = directory.join(format!("{slug}.zip"));
     std::fs::write(&path, bytes)?;

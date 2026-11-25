@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The state store over a PostgreSQL 19 container: the migrations at start,
-//! the lane lease with its fencing generation, and the `LISTEN` session.
+//! The state store over a PostgreSQL 19 container: the migrations and the
+//! mapping set's baseline at start, the lane lease with its fencing
+//! generation, and the `LISTEN` session.
 //! The cases run only when `FERROBRIDGE_E2E=1` admits the harness.
 
+mod baseline;
 mod identity;
 mod lease;
 mod listen;
@@ -28,7 +30,7 @@ fn settings(url: &str) -> Result<Settings, Box<dyn std::error::Error>> {
 }
 
 /// A store on `url`, migrated.
-async fn open(url: &str) -> Result<Store, Box<dyn std::error::Error>> {
+pub(crate) async fn open(url: &str) -> Result<Store, Box<dyn std::error::Error>> {
     Ok(Store::open(&settings(url)?).await?)
 }
 
@@ -52,6 +54,18 @@ async fn open_sealed(url: &str, lookup: &str) -> Result<Store, Box<dyn std::erro
     let mut settings = settings(url)?;
     settings.seal = Some(sealed(lookup)?);
     Ok(Store::open(&settings).await?)
+}
+
+/// A migrated store over a PostgreSQL started for the caller, kept alive
+/// beside it; `None` unless `FERROBRIDGE_E2E=1` admits the harness.
+pub(crate) async fn store()
+-> Result<Option<(ferrobridge_testkit::containers::Postgres, Store)>, Box<dyn std::error::Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(None);
+    }
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+    let store = open(postgres.url()).await?;
+    Ok(Some((postgres, store)))
 }
 
 /// A migrated store with sealing keys over a PostgreSQL started for the

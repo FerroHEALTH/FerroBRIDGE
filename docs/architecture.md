@@ -1521,47 +1521,69 @@ listener, and the writes change mapping files, never clinical data. The
 request log names the actor and the file of a write, never its content.
 
 **A mapping file has one owner.** The files under the configured mapping
-directories are provisioned and read-only in the console. A console save goes
-to `[operator] mapping_dir`, a separate writable directory (a volume, since
-`compose.yaml` runs the server with a read-only root file system), and a save
-whose relative path names a provisioned file is refused. The save writes the
-verbatim bytes the editor sent to a temporary file in that directory, syncs
-it and renames it over the target, so a reader sees the old file or the new
-one and never a mix. Nothing writes back to a provisioned directory.
+directories are provisioned and read-only in the console. A console file
+lives in the state store (`0011_baseline_mappings.sql`, §7), and a save whose
+wire path names a provisioned file is refused. The store keeps every set of
+console files as a revision: each file by its wire path and the SHA-256 of
+its verbatim bytes in `mapping_revision`, the bytes once per digest in
+`mapping_blob`, and the revision every replica runs in the one row of
+`mapping_running`. Nothing writes back to a provisioned directory, so the
+server keeps its read-only root file system. Without `[state]`, the operator
+API checks and saves nothing.
 
-**A reload checks the whole set, then swaps.** A save is checked first: the
-draft is compiled with every other file of the set, and a draft that would
-not compile is refused with its diagnostics and never written. A reload
-compiles the provisioned files and the console's files together. Any error
-leaves the running set in place and answers every diagnostic. A clean set
-replaces the running one in a single pointer swap: each request takes the
-set at entry and finishes on it, so a request in flight completes on the old
-set. An ETL run reads the set when it starts.
+**The load path compiles a tree in memory.** Every FHIRconnect, search
+declaration and OMOCL load reads a tree of file bytes by path, keeping each
+file's path for the source positions its diagnostics carry. A provisioned
+directory is one producer of that tree, keyed by path on disk; the running
+revision is the other, keyed by wire path. No file is staged on disk to be
+read back.
 
-**A console OMOCL file reaches `etl run` through the console directory.**
-The bridge runs no OMOCL lane, so a reload only checks OMOCL files; `etl
-run` is a separate process that reads `[mappings] omocl` once at start (#757).
-When the run's configuration turns the operator API on, it also reads
-`mapping_dir/omocl/`, through the file listing and the OMOCL load the reload
-uses, so the run and the reload see the same set. A path has one owner,
-the provisioned file winning a path both directories hold, and two files that
-define one mapping are a clash the load refuses: a save is refused with its
+**A save checks the whole set, then records and swaps.** A save holds the
+`mapping_running` row for its whole transaction, so saves from every replica
+run one at a time. It compiles the running revision's files with the draft
+in place, beside the provisioned files, for every lane. A draft that would
+not compile is refused with its diagnostics, and nothing is recorded or
+moved. A clean set is recorded as a new revision, `mapping_running` moves to
+it, and `pg_notify('ferrobridge_mappings', <id>)` runs in the same
+transaction. The replica then replaces its running set in a single pointer
+swap: each request takes the set at entry and finishes on it, so a request
+in flight completes on the old set. An apply of an earlier or an imported
+revision runs the same way, and an import records a revision that waits for
+an apply. The first start on an empty store records the baseline, revision 1
+with no console file: the provisioned tree at first start, in the same
+transaction that holds `mapping_running`, so replicas starting together
+record it once, and an apply of it runs the provisioned tree alone. A reload compiles the provisioned files and the running revision
+again and records nothing. An ETL run reads the set when it starts.
+
+**Every replica runs the running revision.** Each replica reads the running
+revision at start, and a revision that does not compile refuses the start.
+Its `LISTEN` session (§7) wakes one task on every notification and on every
+connect; the task reads `mapping_running` and, when it names a revision this
+replica does not run, compiles it and swaps it in as a save does. A revision
+that does not compile on a replica, or a store that does not answer, leaves
+that replica's running set in place and is tried again after five seconds.
+
+**A console OMOCL file reaches `etl run` through the running revision.**
+The bridge runs no OMOCL lane, so a save only checks OMOCL files; `etl run`
+is a separate process that reads `[mappings] omocl` once at start (#757).
+When the run's configuration turns the operator API on and names `[state]`,
+it also reads the running revision's OMOCL files, through the same tree the
+save checks, so the run and the save see the same set. A path has one owner,
+the provisioned file winning a path both hold, and two files that define one
+mapping are a clash the load refuses: a save is refused with its
 diagnostics, and a run stops before it calls an upstream.
 
 **A search declaration is checked and swapped with its context.** A
 `*.search.yml` file is part of the set like any FHIRconnect file: the console
-saves it under `mapping_dir/fhirconnect/`, and a reload binds every
+saves it in a revision like any other, and every load binds every
 declaration, provisioned and console, to the programs it compiled (#766). A
 declaration that does not bind is an error diagnostic on its file, so a save
 is refused with it and the running set stays. The facade's programs and its
 search declarations swap in the same pointer swap, so a request never sees a
 declaration of one set over the programs of another.
 
-**Each replica reloads on its own.** With `mapping_dir` on a shared volume, a
-file another replica saved is visible to this one at its next reload or
-restart. The console's reload acts on the replica behind its configured URL.
-Revisions shared across replicas, with history and rollback, are the console
-breadth of v0.0.16.
+No specification governs how the bridge stores and distributes its mapping
+revisions: our own design.
 
 **An operation that commits nothing admits the operator scope.** `$validate`
 is a dry run, and `$tofhir` and `$toopenehr` transform without writing, so
@@ -2387,7 +2409,12 @@ are versioned rows: one write validates the kind's document, appends the
 version with its committer, derives the tenants and MLLP routes and
 notifies `ferrobridge_sources`, and each replica reloads the named source
 into a snapshot behind one pointer swap; a source names its secrets, which
-resolve through the `[secrets]` directory of `ferrohealth-secret`. The audit outbox (`0010`)
+resolve through the `[secrets]` directory of `ferrohealth-secret`. The
+HL7 v2 face routes each message by MSH-3 and MSH-4 to its MLLP source
+through that snapshot, checks the route against the connection's client
+certificate subject or peer network, and reads the source's settings; the
+file keeps only the listeners, and the TLS listener reads its client
+authorities file again when it changes. The audit outbox (`0010`)
 holds each BALP `AuditEvent` until the Audit Record Repository takes it:
 the recorder commits the row before the answer, and each replica's
 `ihe-atna` forwarder claims the oldest unclaimed row for a lease with
@@ -2495,29 +2522,25 @@ other v2 crates stay out.
 
 The plain MLLP lane for devices without TLS (#1918) takes `ipnet` 2.12.2,
 verified against crates.io on 2026-11-12 and already in the lock through
-`ferrohealth-server` and `hyper-util`, for the CIDR networks a plain sender
+`ferrohealth-server` and `hyper-util`, for the CIDR networks a device
 connects from. Its ground and its rules are our own design, since no
-specification governs them. HL7
-MLLP Release 2 defines no security layer, and IHE ITI ATNA (ITI TF-2, ITI-19)
-adds TLS for a node that supports it, so TLS with a client certificate per
-sender (#1638) stays the default and plain MLLP is an explicit per-sender
-exception for `origin = "device"` alone. A plain sender is served on its own
-`[hl7v2.plain] bind`, which boot refuses on the TLS listener's port at the
-same or an unspecified address, and names its `source_addresses`; boot
-refuses a plain sender that is no device or names no network, a network with
-host bits set, and one side of the listener-and-sender pair without the
-other. The listener closes a connection from outside every plain sender's
-networks before reading a byte (`Handler::admits`), and a message whose MSH-4
-names no plain sender whose networks hold the peer address (#1220) is
-answered `AR` and its connection closed (`Connection::close`); a TLS
-sender's facility is refused there the same way. OBX-18 stays under the
-sender's `device_identifier_issuer`. The TLS listener and its `[hl7v2.tls]`
-files are required only while a sender has `transport = "tls"`, so a lab of
-plain devices alone runs no TLS listener, and a `[hl7v2.tls]` with no TLS
-sender is refused at boot. The plain listener shares the face, the
-drain, the timeouts and the frame limit with the TLS one; boot warns once per
-plain sender, and `/health/info` and the operator API's running
-configuration show the lane and each sender's transport.
+specification governs them. HL7 MLLP Release 2 defines no security layer,
+and IHE ITI ATNA (ITI TF-2, ITI-19) adds TLS for a node that supports it, so
+TLS with a client certificate per sender (#1638) stays the default and the
+plain listener is an explicit exception for devices.
+
+The senders are `mllp` inbound sources of the state store (#2061), routed by
+MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) through `inbound_route_mllp`. A route
+holds the `certificate_subject` the TLS listener checks against the client
+certificate's subject alternative names, the `source_cidrs` the plain
+listener checks against the peer address, or both, and its source carries
+the per-sender settings. A message whose route the connection does not
+match is answered `AR`, and its plain connection closed
+(`Connection::close`); a message the store cannot route is answered `AE`.
+The file keeps the listeners alone (`listen`, `[hl7v2.tls]`,
+`[hl7v2.plain] bind`, the timeouts and `frame_limit`), so a new source never
+adds a port, and the TLS acceptor reads its client CA file again when the
+file's modification time changes. The routing store is our own design.
 
 The profile validator (#437), verified against crates.io on 2026-10-15,
 takes `flate2` 1.1.10 on its pure-Rust `rust_backend` and `tar` 0.4.46
@@ -3338,8 +3361,8 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Operator console shape | `app/ferrobridge-console`, every page drawn on its server from FerroUI's components with FerroUI's script modules on top (#1355), with a backend-for-frontend, its own binary and image; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
 | Console crate boundary | the server half links `openehr-mapping-core`, `fhir-types` (`r4`, `terminology`) and `ferrobridge-operator-api` (the serde types of the health and operator documents, #777) and no other workspace crate, and the browser half `openehr-mapping-core` and `ferrobridge-operator-api` alone, enforced by a dependency-closure test | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`, and the bridge's own documents); one contract crate both sides compile against turns a renamed field into a build failure; excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the console reading the bridge's documents by field name; the engine crates linked so the console compiles mappings itself |
 | Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring the operator scope (`[auth] product_scope`); the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |
-| Mapping ownership and saving | provisioned directories read-only; console saves go to `[operator] mapping_dir`, written to a temporary file, synced and renamed; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a rename is atomic within one file system, so a reader sees the old file or the new one | writing back into the provisioned tree; saving without a check |
-| Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; each replica reloads on its own call or restart | requests in flight finish on the set they started with; a half-loaded set is never served; shared revisions are v0.0.16 | per-file hot reload; a file watcher; reload on save across replicas |
+| Mapping ownership and saving | provisioned directories read-only; console saves recorded as revisions in the state store, one transaction that holds `mapping_running`; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a transaction commits whole, so a replica reads the old revision or the new one | writing back into the provisioned tree; saving without a check |
+| Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; every replica compiles the running revision on the notification of a save | requests in flight finish on the set they started with; a half-loaded set is never served | per-file hot reload; a file watcher |
 | Scope of non-committing operations | `$validate`, `$tofhir` and `$toopenehr` admit the operator scope beside their SMART scopes (#598) | none of them writes to the CDR, so an operator testing a mapping needs no clinical write scope | a SMART write scope for the console's dry runs |
 | CORS on the facade | `GET [base]/metadata` and the SMART discovery document answer any origin with `*`; the REST routes under `/fhir` answer the origins `[facade.cors] allowed_origins` lists, by name with `Vary: Origin`, never `*` and never `Access-Control-Allow-Credentials`; the layer runs outside the guard and answers an admitted preflight itself (#1950) | SMART App Launch 2.2.0, App Launch, Considerations for CORS support (any origin on the discovery endpoints, registered origins on the REST API); FHIR R4 Security §6.1.0.3; a resource server holds no client registry, so the list is configuration: our own design | a wildcard on the REST routes; CORS inside the guard, which would hide a `401` from the app |
 

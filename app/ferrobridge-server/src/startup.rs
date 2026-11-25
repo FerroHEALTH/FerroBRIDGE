@@ -34,8 +34,6 @@ pub struct Lane {
     /// The socket address a face's plain listener binds, for a face with
     /// one.
     pub plain_listen: Option<String>,
-    /// The senders a face accepts, each with its transport.
-    pub senders: Vec<ferrobridge_operator_api::health::Sender>,
     /// Whether the configuration switches it on.
     pub enabled: bool,
     /// Whether it carries identifiable data.
@@ -108,8 +106,7 @@ pub fn lanes(settings: &Settings) -> Vec<Lane> {
                 .map(|face| face.listen.to_string()),
             plain_listen: hl7v2
                 .and_then(|face| face.plain.as_ref())
-                .map(|plain| plain.bind.to_string()),
-            senders: hl7v2.map(senders_of).unwrap_or_default(),
+                .map(ToString::to_string),
             cdr_host: cdr_host.clone().filter(|_| hl7v2.is_some()),
             terminology_host: terminology_host.clone().filter(|_| hl7v2.is_some()),
             ..Lane::default()
@@ -147,29 +144,6 @@ pub fn lanes(settings: &Settings) -> Vec<Lane> {
             ..Lane::default()
         },
     ]
-}
-
-/// Returns every sender `face` accepts with the transport it sends on, in
-/// the order the configuration lists them.
-fn senders_of(
-    face: &crate::config::Hl7v2Settings,
-) -> Vec<ferrobridge_operator_api::health::Sender> {
-    let plain = face
-        .plain
-        .as_ref()
-        .map(|plain| plain.senders.as_slice())
-        .unwrap_or_default();
-    face.senders
-        .iter()
-        .map(|sender| ferrobridge_operator_api::health::Sender {
-            facility: sender.facility(),
-            transport: if plain.iter().any(|device| device.sender == *sender) {
-                ferrobridge_operator_api::health::Transport::Plain
-            } else {
-                ferrobridge_operator_api::health::Transport::Tls
-            },
-        })
-        .collect()
 }
 
 /// Returns `url`'s host, with its port when the URL names one.

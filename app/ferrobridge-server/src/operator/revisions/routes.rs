@@ -32,14 +32,9 @@ use crate::problem::{Kind, refuse};
 /// `GET /operator/revisions`: every revision, newest first, with the id of
 /// the running one.
 pub async fn list(State(operator): State<Arc<Operator>>) -> Response {
-    let listed = blocking(Arc::clone(&operator), |operator, _thread| {
+    let listed = blocking(Arc::clone(&operator), |operator, thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
-        let revisions = store.list().map_err(Failure::Store)?;
-        let running = revisions
-            .iter()
-            .rev()
-            .find(|revision| revision.applied)
-            .map(|revision| revision.id.clone());
+        let (running, revisions) = thread.wait(store.list()).map_err(Failure::Store)?;
         Ok(Revisions {
             running,
             revisions: revisions
@@ -58,10 +53,10 @@ pub async fn list(State(operator): State<Arc<Operator>>) -> Response {
 
 /// `GET /operator/revisions/{id}`: one revision whole.
 pub async fn one(State(operator): State<Arc<Operator>>, Path(id): Path<String>) -> Response {
-    let found = blocking(Arc::clone(&operator), move |operator, _thread| {
+    let found = blocking(Arc::clone(&operator), move |operator, thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
-        store
-            .get(&id)
+        thread
+            .wait(store.get(&id))
             .map_err(Failure::Store)?
             .ok_or(Failure::UnknownRevision)
     })
@@ -78,14 +73,24 @@ pub async fn differences(
     State(operator): State<Arc<Operator>>,
     Path(id): Path<String>,
 ) -> Response {
-    let found = blocking(Arc::clone(&operator), move |operator, _thread| {
+    let found = blocking(Arc::clone(&operator), move |operator, thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
-        let to = store
-            .get(&id)
+        let to = thread
+            .wait(store.get(&id))
             .map_err(Failure::Store)?
             .ok_or(Failure::UnknownRevision)?;
-        let running = store.running().map_err(Failure::Store)?;
-        diff(store, running.as_ref(), &to).map_err(Failure::Store)
+        let to_files = thread.wait(store.contents(&to)).map_err(Failure::Store)?;
+        let running = thread.wait(store.running()).map_err(Failure::Store)?;
+        let running_files = match running.as_ref() {
+            Some(running) => thread
+                .wait(store.contents(running))
+                .map_err(Failure::Store)?,
+            None => crate::mappings::revisions::Files::new(),
+        };
+        Ok(diff(
+            running.as_ref().map(|running| (running, &running_files)),
+            (&to, &to_files),
+        ))
     })
     .await;
     match found {
@@ -96,8 +101,8 @@ pub async fn differences(
 
 /// `POST /operator/revisions/{id}/apply`: applies the revision.
 ///
-/// It replaces the console files by the revision's when `If-Match` names the running revision and the set
-/// compiles with them, and reloads; `200` with the new set's report and the
+/// It runs the revision's files on every replica when `If-Match` names the
+/// running revision and the set compiles with them; `200` with the new set's report and the
 /// recorded revision's id as the `ETag`, `422` with the diagnostics when it
 /// does not compile.
 pub async fn apply(

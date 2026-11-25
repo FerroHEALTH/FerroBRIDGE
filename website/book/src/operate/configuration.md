@@ -1300,33 +1300,29 @@ scopes = ["user/Condition.rs", "user/Observation.rs"]
 
 ### `[hl7v2]`
 
-The HL7 v2 face: an MLLP listener whose messages are written into the CDR
-through the facade's ingest service. It is off until `enabled` is true, and an
-enabled face with the facade off is a boot error naming `hl7v2.enabled` and
-`facade.enabled`. This lane reaches identifiable data. The
+The HL7 v2 face's listeners: MLLP whose messages are written into the CDR
+through the facade's ingest service. It is off until `enabled` is true, and
+an enabled face needs `[facade] enabled`, [`[state]`](#state) and at least
+one listener. This lane reaches identifiable data. The senders are MLLP
+sources the operator API writes ([inbound sources](operator-api.md#inbound-sources)),
+each with its routes by MSH-3 and MSH-4 and how its messages are read and
+committed, so adding a device needs no restart and no new port. The
 [HL7 v2 face](hl7v2-face.md) page states what it does with a message and how
 it answers.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `false` | Whether the MLLP listener runs |
-| `listen` | `127.0.0.1:2575` | The socket address the listener binds |
-| `default_charset` | `ASCII` | The HL7 table 0211 code a message with an empty MSH-18 is read in |
-| `unmapped_entries` | `skip_and_count` | `skip_and_count` or `refuse`, for an entry no program maps |
-| `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
-| `profiles` | `[]` | `{ resource_type, profile }` pairs: the profile a resource of that R4 type claims when the guide wrote none |
+| `enabled` | `false` | Whether the MLLP listeners run |
+| `listen` | `127.0.0.1:2575` | The socket address the TLS listener binds |
 | `idle_timeout` | `"5min"` | How long a connection may sit between messages; `"0s"` keeps it open |
 | `frame_timeout` | `"30s"` | How long one frame may take to arrive whole; `"0s"` waits |
 | `frame_limit` | `"1MiB"` | The largest message one frame may carry |
-| `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes by kind at debug level |
-| `facility_identifier_issuer` | none | The issuer a facility's namespace id (HD.1) is written under, the issuer the CDR client's declared facilities name it by |
-| `senders` | none, required | The MSH-4 sending facilities accepted, at least one: `{ namespace_id }` or `{ universal_id, universal_id_type }`, each with its `certificate_subject` and an optional `origin = "device"` with its `device_identifier_issuer` |
-| `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none, required | The PEM chain and key the MLLP listener serves over TLS, and the authorities a sender's client certificate must chain to |
+| `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none | The PEM chain and key the TLS listener serves, and the authorities a sender's client certificate must chain to; the TLS listener runs when they are set. The authorities file is read again when its modification time changes, so a rotated file is in force for the next handshake without a restart |
+| `plain.bind` | none | The socket address of a second listener with no TLS, for the devices that cannot speak it; never the TLS listener's port |
 
-A resource type the R4 element table does not name, a profile that is not a
-URL, a resource type listed twice, and a sender that names neither a
-namespace id alone nor a universal id with its type are each a boot error
-naming the key.
+A table that names some TLS files and not others, a `frame_limit` of
+`"0B"`, and a plain listener on the TLS listener's port are each a boot
+error naming the key.
 
 ### `[change_feed]`
 
@@ -1423,7 +1419,7 @@ The incremental OMOP load: a consumer of the change feed that commits each
 changed composition to the CDM database through the same step `etl run`
 commits it with. It is off until `enabled` is true, and an enabled load is a
 boot error without `[change_feed] enabled`, `[etl]`, `[cdm]` and an OMOCL
-directory (`[mappings] omocl`, or `[operator] mapping_dir`). It reads the
+directory (`[mappings] omocl`, or `[operator] enabled` with `[state]`). It reads the
 `[etl]` concepts, visits, derived-table scope and deletion policy, and leaves
 `[etl] aql` unused. The [OMOP ETL](../integrate/omop-etl.md#the-incremental-load)
 page states what it reads and writes. No specification governs the
@@ -1504,13 +1500,14 @@ the key.
 The operator API under `/operator`, which an operator console reads the
 engine state and the mapping files through. It is off until `enabled` is
 true, and it needs `[auth]`: an `[operator]` section turned on while
-`[auth]` is off, or names no issuer, refuses the start. The [operator API](operator-api.md) page
+`[auth]` is off, or names no issuer, refuses the start. With `[state]`, it
+saves the console's mapping files as revisions in the state store; without
+it, it checks and saves nothing. The [operator API](operator-api.md) page
 has the routes and the scope.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries the operator scope, `[auth] product_scope` |
-| `mapping_dir` | none | The writable directory console saves go to (`<mapping_dir>/fhirconnect/`); unset, the API checks and saves nothing. Keep it on its own volume when the root file system is read-only |
 
 ### `[operations]`
 
