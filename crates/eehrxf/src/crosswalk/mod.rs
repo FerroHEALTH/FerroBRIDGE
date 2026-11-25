@@ -86,11 +86,26 @@ impl Populate {
     }
 }
 
+#[cfg(any(
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "vaccination"
+))]
 /// The shall obligation of a row.
 pub(crate) const SHALL: Option<Populate> = Some(Populate::Shall);
+#[cfg(any(
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "vaccination"
+))]
 /// The should obligation of a row.
 pub(crate) const SHOULD: Option<Populate> = Some(Populate::Should);
 
+#[cfg(any(
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "vaccination"
+))]
 /// The row of `path`, its eHealth Network ids, its producer obligation and
 /// the profile element that carries it, fed by no context.
 pub(crate) const fn uncontexted(
