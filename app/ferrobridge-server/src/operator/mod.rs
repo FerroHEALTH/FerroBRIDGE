@@ -19,14 +19,16 @@
 //! directory, `GET /operator/events` the change-feed consumers, their
 //! parked events and the AMQP topology, and `POST
 //! /operator/events/{consumer}/parked/{id}/replay` a replay of one
-//! (`crate::change_feed::report`). With `[operator] mapping_dir`, `POST
+//! (`crate::change_feed::report`). With `[state]`, `POST
 //! /operator/mappings/check` checks a draft over the running set, `PUT
-//! /operator/mappings/{path}` saves one and reloads, and `POST
-//! /operator/reload` reloads the files on disk ([`save`], [`reload`]), and
-//! `GET /operator/revisions`, one revision, its `/diff` and `POST
-//! /operator/revisions/{id}/apply` read and apply the history of the console
-//! files ([`revisions`]), with the export of a revision as a ZIP and the
-//! import of one as an unapplied revision. No specification governs the operator surface: our own design.
+//! /operator/mappings/{path}` saves one as a new running revision, and `POST
+//! /operator/reload` compiles the provisioned files and the running revision
+//! again ([`save`], [`reload`]), and `GET /operator/revisions`, one revision,
+//! its `/diff` and `POST /operator/revisions/{id}/apply` read and apply the
+//! history of the console files ([`revisions`]), with the export of a
+//! revision as a ZIP and the import of one as an unapplied revision. Every
+//! replica runs the running revision ([`watch`]). No specification governs
+//! the operator surface: our own design.
 
 pub mod guard;
 pub mod reload;
@@ -35,8 +37,8 @@ pub mod save;
 pub mod snapshot;
 pub mod sources;
 pub mod templates;
+pub mod watch;
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use ferrohealth_health::lifecycle::Lifecycle;
@@ -56,6 +58,7 @@ use http::header;
 
 use crate::mappings::files;
 use crate::mappings::files::Root;
+use crate::mappings::revisions::Revisions;
 use crate::operator::snapshot::Snapshot;
 use crate::problem::{Kind, refuse};
 
@@ -65,21 +68,19 @@ const YAML: &str = "application/yaml";
 /// What the operator routes read and write.
 #[derive(Debug)]
 pub struct Operator {
-    /// The provisioned mapping directories, then the console's.
+    /// The provisioned mapping directories.
     roots: Vec<Root>,
     /// The running load, swapped whole on a reload.
     snapshot: RwLock<Arc<Snapshot>>,
     /// What a reload compiles against, when saving is configured.
     reloader: Option<reload::Reloader>,
-    /// The writable directory console saves go to.
-    mapping_dir: Option<PathBuf>,
     /// Held for the whole of a check, a save or a reload, so they never
-    /// interleave.
+    /// interleave on this replica.
     saving: tokio::sync::Mutex<()>,
     /// The configuration the bridge started on, when it is answered.
     configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
     /// The mapping-set revisions, when saving is configured.
-    revisions: Option<revisions::Store>,
+    revisions: Option<Revisions>,
 }
 
 impl Operator {
@@ -91,7 +92,6 @@ impl Operator {
             roots,
             snapshot: RwLock::new(Arc::new(snapshot)),
             reloader: None,
-            mapping_dir: None,
             saving: tokio::sync::Mutex::new(()),
             configuration: None,
             revisions: None,
@@ -109,39 +109,28 @@ impl Operator {
         self
     }
 
-    /// Returns this surface saving into `mapping_dir` and reloading through
-    /// `reloader`.
+    /// Returns this surface saving revisions into `revisions` and reloading
+    /// through `reloader`.
     ///
-    /// The console's files live under `mapping_dir/fhirconnect` and
-    /// `mapping_dir/omocl` and join the set beside the provisioned ones.
+    /// The running revision's files join the set beside the provisioned
+    /// ones.
     #[must_use]
-    pub fn with_saving(mut self, mapping_dir: PathBuf, reloader: reload::Reloader) -> Self {
-        for language in [files::Language::Fhirconnect, files::Language::Omocl] {
-            self.roots.push(Root::console(
-                language,
-                language.console_directory(&mapping_dir),
-            ));
-        }
-        self.revisions = Some(revisions::Store::new(&mapping_dir));
-        self.mapping_dir = Some(mapping_dir);
+    pub fn with_saving(mut self, revisions: Revisions, reloader: reload::Reloader) -> Self {
+        self.revisions = Some(revisions);
         self.reloader = Some(reloader);
         self
     }
 
-    /// Returns the mapping directories, provisioned first.
+    /// Returns the provisioned mapping directories.
     #[must_use]
     pub fn roots(&self) -> &[Root] {
         &self.roots
     }
 
-    /// Returns the provisioned mapping directories alone.
+    /// Returns the mapping-set revisions, when saving is configured.
     #[must_use]
-    pub fn provisioned_roots(&self) -> Vec<Root> {
-        self.roots
-            .iter()
-            .filter(|root| root.owner() == files::Owner::Provisioned)
-            .cloned()
-            .collect()
+    pub const fn revisions(&self) -> Option<&Revisions> {
+        self.revisions.as_ref()
     }
 
     /// Returns the running load, taken once per request.
@@ -165,39 +154,26 @@ impl Operator {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::new(snapshot);
     }
 
-    /// Returns `report` as a check answers it, each file by its wire path and
-    /// `draft` by the path it stands for.
+    /// Returns `report` as a check answers it, each file by its wire path.
     #[must_use]
     pub fn load_report(
         &self,
         report: &crate::check::Report,
-        draft: Option<&reload::Draft>,
     ) -> ferrobridge_operator_api::operator::LoadReport {
-        load_report_over(report, &self.roots, draft)
-    }
-}
-
-/// Returns `report` as a check answers it, each file by its wire path under
-/// `roots` and `draft` by the path it stands for.
-#[must_use]
-pub fn load_report_over(
-    report: &crate::check::Report,
-    roots: &[Root],
-    draft: Option<&reload::Draft>,
-) -> ferrobridge_operator_api::operator::LoadReport {
-    ferrobridge_operator_api::operator::LoadReport {
-        clean: report.is_clean(),
-        counts: report.counts(),
-        diagnostics: report
-            .diagnostics()
-            .iter()
-            .map(|diagnostic| {
-                crate::check::shown_diagnostic(
-                    diagnostic,
-                    &reload::shown(roots, draft, diagnostic.file()),
-                )
-            })
-            .collect(),
+        ferrobridge_operator_api::operator::LoadReport {
+            clean: report.is_clean(),
+            counts: report.counts(),
+            diagnostics: report
+                .diagnostics()
+                .iter()
+                .map(|diagnostic| {
+                    crate::check::shown_diagnostic(
+                        diagnostic,
+                        &snapshot::shown(&self.roots, diagnostic.file()),
+                    )
+                })
+                .collect(),
+        }
     }
 }
 
@@ -450,30 +426,25 @@ async fn mapping(State(operator): State<Arc<Operator>>, Path(path): Path<String>
     blocking(move || read_mapping(&operator, &path)).await
 }
 
-/// Resolves and reads the file `path` names, on a blocking thread.
+/// Resolves and reads the file `path` names, on a blocking thread: a
+/// provisioned file from disk, otherwise a console file of the running
+/// revision.
 fn read_mapping(operator: &Operator, path: &str) -> Response {
     let located = match files::resolve(&operator.roots, path) {
         Ok(located) => located,
         Err(files::PathError::Read { path, source }) => {
             return unreadable(&crate::walk::Error { path, source });
         }
-        Err(files::PathError::UnknownRoot | files::PathError::Step | files::PathError::Absent) => {
-            return refuse(Kind::NotFound, NO_MAPPING_FILE);
+        Err(files::PathError::UnknownRoot | files::PathError::Absent) => {
+            return match operator.snapshot().console().files().get(path) {
+                Some(bytes) => served(bytes.to_vec()),
+                None => refuse(Kind::NotFound, NO_MAPPING_FILE),
+            };
         }
+        Err(files::PathError::Step) => return refuse(Kind::NotFound, NO_MAPPING_FILE),
     };
     match std::fs::read(located.path()) {
-        Ok(bytes) => {
-            let etag = format!("\"{}\"", files::sha256(&bytes));
-            (
-                StatusCode::OK,
-                [
-                    (header::CONTENT_TYPE, YAML.to_owned()),
-                    (header::ETAG, etag),
-                ],
-                bytes,
-            )
-                .into_response()
-        }
+        Ok(bytes) => served(bytes),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             refuse(Kind::NotFound, NO_MAPPING_FILE)
         }
@@ -482,6 +453,21 @@ fn read_mapping(operator: &Operator, path: &str) -> Response {
             source: error,
         }),
     }
+}
+
+/// Returns the answer that serves one mapping file's `bytes`, its digest as
+/// the `ETag`.
+fn served(bytes: Vec<u8>) -> Response {
+    let etag = format!("\"{}\"", files::sha256(&bytes));
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, YAML.to_owned()),
+            (header::ETAG, etag),
+        ],
+        bytes,
+    )
+        .into_response()
 }
 
 /// Runs `work`, which reads the file system, off the async runtime.

@@ -139,11 +139,13 @@ the testkit tool crate. Beside it:
   read-only operator API behind `[operator]` and `[auth]` (#596): the guard
   that admits only a token carrying `auth.product_scope`, the mapping roots
   with every wire path confined to its directory, and the running load as
-  the `check` module reports it; with `[operator] mapping_dir` it checks a
-  draft, saves it beside the provisioned tree and reloads (#597), swapping the
-  facade's and the operations lane's programs, which every request reads once
-  at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
-  lanes, `mapping check` and the reload share (#725).
+  the `check` module reports it; with `[state]` it checks a draft, records it
+  as the running revision in the state store and reloads (#597, #2058),
+  swapping the facade's and the operations lane's programs, which every
+  request reads once at entry, and `operator::watch` swaps in a revision
+  another replica recorded on its notification. `src/mappings/compile.rs` is
+  the one FHIRconnect load path the lanes, `mapping check` and the reload
+  share (#725), compiling the in-memory tree of `src/mappings/tree.rs`.
   `src/store/` is the PostgreSQL state store behind `[state]` (#2053): one
   pool, the PostgreSQL 19 floor, the baselines under `migrations/state/`
   (`NNNN_baseline_<area>.sql`, grants last) run at start under the advisory

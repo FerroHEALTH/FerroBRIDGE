@@ -43,7 +43,7 @@ pub enum Kind {
     NotFound,
     /// `409`: a provisioned file holds the path.
     Provisioned,
-    /// `409`: no `[operator] mapping_dir` is configured.
+    /// `409`: no `[state]` is configured, so nothing is saved.
     NotConfigured,
     /// `412`: what the request replaces changed since the `ETag` it names.
     PreconditionFailed,
@@ -147,7 +147,7 @@ impl Kind {
             ),
             Self::NotConfigured => (
                 "not-configured",
-                "No mapping directory is configured",
+                "What the request needs is not configured",
                 StatusCode::CONFLICT,
             ),
             Self::PreconditionFailed => (

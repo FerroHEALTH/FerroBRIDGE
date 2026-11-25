@@ -1392,7 +1392,7 @@ The incremental OMOP load: a consumer of the change feed that commits each
 changed composition to the CDM database through the same step `etl run`
 commits it with. It is off until `enabled` is true, and an enabled load is a
 boot error without `[change_feed] enabled`, `[etl]`, `[cdm]` and an OMOCL
-directory (`[mappings] omocl`, or `[operator] mapping_dir`). It reads the
+directory (`[mappings] omocl`, or `[operator] enabled` with `[state]`). It reads the
 `[etl]` concepts, visits, derived-table scope and deletion policy, and leaves
 `[etl] aql` unused. The [OMOP ETL](../integrate/omop-etl.md#the-incremental-load)
 page states what it reads and writes. No specification governs the
@@ -1473,13 +1473,14 @@ the key.
 The operator API under `/operator`, which an operator console reads the
 engine state and the mapping files through. It is off until `enabled` is
 true, and it needs `[auth]`: an `[operator]` section turned on while
-`[auth]` is off, or names no issuer, refuses the start. The [operator API](operator-api.md) page
+`[auth]` is off, or names no issuer, refuses the start. With `[state]`, it
+saves the console's mapping files as revisions in the state store; without
+it, it checks and saves nothing. The [operator API](operator-api.md) page
 has the routes and the scope.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries the operator scope, `[auth] product_scope` |
-| `mapping_dir` | none | The writable directory console saves go to (`<mapping_dir>/fhirconnect/`); unset, the API checks and saves nothing. Keep it on its own volume when the root file system is read-only |
 
 ### `[operations]`
 

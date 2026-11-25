@@ -27,13 +27,14 @@ use http::StatusCode;
 use http::header;
 
 use crate::mappings::files;
+use crate::mappings::revisions::{Entry, Recording};
 use crate::operator::Operator;
 use crate::operator::guard::AUDIT_TARGET;
 use crate::operator::reload::ReloadError;
-use crate::operator::revisions::Entry;
-use crate::operator::revisions::apply::{Checked, Staged};
 use crate::operator::revisions::archive;
-use crate::operator::save::{Failure, OnBlockingThread, blocking, reason, subject_of, unavailable};
+use crate::operator::save::{
+    Failure, OnBlockingThread, Refused, blocking, reason, subject_of, unavailable,
+};
 use crate::problem::{Kind, refuse};
 
 /// The media type of a mapping-set archive.
@@ -42,13 +43,15 @@ pub const ZIP: &str = "application/zip";
 /// `GET /operator/revisions/{id}/export`: the revision's console files as
 /// one ZIP, the same bytes at every export of the same files.
 pub async fn export(State(operator): State<Arc<Operator>>, Path(id): Path<String>) -> Response {
-    let exported = blocking(Arc::clone(&operator), move |operator, _thread| {
+    let exported = blocking(Arc::clone(&operator), move |operator, thread| {
         let store = operator.revisions().ok_or(Failure::Unconfigured)?;
-        let revision = store
-            .get(&id)
+        let revision = thread
+            .wait(store.get(&id))
             .map_err(Failure::Store)?
             .ok_or(Failure::UnknownRevision)?;
-        let contents = store.contents(&revision).map_err(Failure::Store)?;
+        let contents = thread
+            .wait(store.contents(&revision))
+            .map_err(Failure::Store)?;
         let bytes = archive::export(&contents).map_err(Failure::Archive)?;
         Ok((revision.id, bytes))
     })
@@ -176,31 +179,22 @@ impl Operator {
         author: &str,
         reason: &str,
     ) -> Result<Imported, Failure> {
-        let (Some(mapping_dir), Some(store)) = (self.mapping_dir.as_deref(), self.revisions())
-        else {
-            return Err(Failure::Unconfigured);
-        };
+        let store = self.revisions().ok_or(Failure::Unconfigured)?;
         let contents = archive::import(archive).map_err(Failure::Archive)?;
-        let staged = Staged::write(mapping_dir, &contents)?;
-        let report = match self.check_staged(thread, &staged) {
-            Ok(prepared) => {
-                crate::operator::load_report_over(prepared.report(), &staged.roots(self), None)
-            }
-            Err(Checked::Rejected(report)) => return Ok(Imported::Rejected { report }),
-            Err(Checked::Unavailable(error)) => return Ok(Imported::Unavailable { error }),
+        let report = match self.compile(thread, &contents) {
+            Ok(prepared) => self.load_report(prepared.report()),
+            Err(Refused::Rejected(report)) => return Ok(Imported::Rejected { report }),
+            Err(Refused::Unavailable(error)) => return Ok(Imported::Unavailable { error }),
         };
-        drop(staged);
-        let revision = store
-            .record(
-                Entry {
-                    origin: Origin::Import,
-                    author: author.to_owned(),
-                    reason: reason.to_owned(),
-                    applied: false,
-                    source: None,
-                },
-                &contents,
-            )
+        let change = thread.wait(store.change()).map_err(Failure::Store)?;
+        let entry = Entry {
+            origin: Origin::Import,
+            author: author.to_owned(),
+            reason: reason.to_owned(),
+            source: None,
+        };
+        let revision = thread
+            .wait(change.record(entry, &contents, Recording::Keep))
             .map_err(Failure::Store)?;
         Ok(Imported::Recorded { revision, report })
     }

@@ -349,7 +349,7 @@ pub const MAPPINGS: [Row; 3] = [
 ];
 
 /// The Server and access tab of the Configuration page.
-pub const CORE: [Row; 7] = [
+pub const CORE: [Row; 6] = [
     row(
         Msg::RowListener,
         Msg::RowListenerDesc,
@@ -377,11 +377,6 @@ pub const CORE: [Row; 7] = [
         Msg::RowOperatorApi,
         Msg::RowOperatorApiDesc,
         &[("operator.enabled", Shape::Switch)],
-    ),
-    row(
-        Msg::RowConsoleDirectory,
-        Msg::RowConsoleDirectoryDesc,
-        &[("operator.mapping_dir", Shape::Code)],
     ),
     row(
         Msg::RowUsageReport,
