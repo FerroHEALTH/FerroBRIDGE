@@ -24,7 +24,7 @@
 //! | author\[x\] | `author` | `author` |
 //! | date | `date` | `date` |
 //! | attestation | `attester`, mode `professional` | none in R4 |
-//! | status | `status` | `docStatus` |
+//! | status | `status` | none: `EehrxfMhdDocumentReference` holds `docStatus` to 0 |
 //! | language | `language` | `content.attachment.language` |
 //! | documentCategory | `category`, and the report's `category` on a laboratory or test report; not on an imaging report, whose form fixes it | `category`, one concept with the Art 14(1) priority category beside it |
 //! | documentType | `type` | `type` |
@@ -380,10 +380,13 @@ impl DocumentMetadata {
                 ..Meta::default()
             }),
             extension: vec![version_extension(DOCUMENT_REFERENCE_VERSION, &self.version)],
-            master_identifier: Some(header.identifier.clone()),
+            // NOTE: IHE MHD 4.2.2 IHE.MHD.UniqueIdIdentifier: the unique id's use is `usual`.
+            master_identifier: Some(Identifier {
+                r#use: Some("usual".into()),
+                ..header.identifier.clone()
+            }),
             identifier: header.composition.iter().cloned().collect(),
             status: "current".into(),
-            doc_status: Some(header.status.as_str().into()),
             r#type: Some(header.kind.clone()),
             category: vec![category],
             subject: Some(header.subject.clone()),
@@ -423,14 +426,12 @@ pub struct Header {
     kind: CodeableConcept,
     title: String,
     custodian: Option<Reference>,
-    status: String,
 }
 
 impl Header {
     /// Creates the header of the document `identifier` about `subject`,
     /// issued at `date`, a FHIR `instant`, of the type `kind` (Table 1
-    /// `documentType`), titled `title`, by `author`, with the status
-    /// `final`.
+    /// `documentType`), titled `title`, by `author`.
     #[must_use]
     pub fn new(
         identifier: Identifier,
@@ -449,7 +450,6 @@ impl Header {
             kind,
             title,
             custodian: None,
-            status: String::from("final"),
         }
     }
 
@@ -517,11 +517,6 @@ impl Header {
                 .filter(|title| !title.is_empty())
                 .ok_or_else(|| missing("documentTitle"))?,
             custodian: composition.custodian.clone(),
-            status: composition
-                .status
-                .value
-                .clone()
-                .unwrap_or_else(|| String::from("final")),
         })
     }
 }

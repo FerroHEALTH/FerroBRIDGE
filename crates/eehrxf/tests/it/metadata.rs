@@ -104,13 +104,23 @@ fn holds_table_1(metadata: &DocumentMetadata, bundle: &Bundle) -> Result<(), Box
     // DocumentReference-minimal: masterIdentifier, type, subject, date and
     // description, 1..1 each.
     assert_eq!(reference["resourceType"], "DocumentReference");
-    assert_eq!(reference["masterIdentifier"], bundle["identifier"]);
+    assert_eq!(
+        reference["masterIdentifier"]["system"],
+        bundle["identifier"]["system"]
+    );
+    assert_eq!(
+        reference["masterIdentifier"]["value"],
+        bundle["identifier"]["value"]
+    );
     assert_eq!(reference["type"], composition["type"]);
     assert_eq!(reference["subject"], composition["subject"]);
     assert_eq!(reference["date"], bundle["timestamp"]);
     assert_eq!(reference["description"], composition["title"]);
     assert_eq!(reference["status"], "current");
-    assert_eq!(reference["docStatus"], composition["status"]);
+    // EehrxfMhdDocumentReference, on IHE MHD 4.2.2 Minimal: masterIdentifier.use is
+    // `usual`, and docStatus is held to 0.
+    assert_eq!(reference["masterIdentifier"]["use"], "usual");
+    assert!(reference.get("docStatus").is_none());
     // EehrxfMhdDocumentReference: the claim, one category holding the Annex III
     // documentCategory and the Art 14(1) priority category, a custodian and the format.
     assert_eq!(
