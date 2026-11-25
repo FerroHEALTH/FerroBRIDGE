@@ -60,11 +60,15 @@ pub(crate) async fn create(
     let inbound = parse(body, resource_type)?;
     let built = build(facade, loaded, inbound.document()).await?;
     party::unbound(facade, resource_type, built.value())?;
+    let person =
+        party::provision::pseudonym(facade, access, resource_type, inbound.document()).await?;
     let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
     let commit = commit(facade, loaded, Change::Creation)?;
     let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
-    party::provision::provision(facade, &client, resource_type, &version).await?;
+    if let Some(person) = person {
+        party::provision::provision(facade, &client, &version, &person).await?;
+    }
     respond(
         facade,
         loaded,
@@ -96,6 +100,8 @@ pub(crate) async fn update(
     same_id(&inbound, id)?;
     let built = build(facade, loaded, inbound.document()).await?;
     party::unbound(facade, resource_type, built.value())?;
+    let person =
+        party::provision::pseudonym(facade, access, resource_type, inbound.document()).await?;
     let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
@@ -112,6 +118,9 @@ pub(crate) async fn update(
         Some((uid.value(), &preceding)),
     )
     .await?;
+    if let Some(person) = person {
+        party::provision::provision(facade, &client, &version, &person).await?;
+    }
     respond(
         facade,
         loaded,

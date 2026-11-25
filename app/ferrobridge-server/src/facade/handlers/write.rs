@@ -79,14 +79,15 @@ pub(crate) async fn create(
     crate::facade::handlers::guard(headers, uri, Body::Present)?;
     crate::facade::handlers::supported(facade, resource_type)?;
     let inbound = read::parse(body, resource_type)?;
-    compartment::admit_inbound(facade, access, Permission::Create, &inbound)?;
+    compartment::admit_inbound(facade, access, Permission::Create, &inbound).await?;
     let program = &select_program(facade, &inbound, headers)?;
     let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_originating_system(crate::facade::commit::originating_system(access));
+        .with_originating_system(crate::facade::commit::originating_system(access))
+        .with_on_behalf(crate::facade::subject::on_behalf(access));
     let claim = ingest.claim_resource(&inbound)?;
 
     match ingest
@@ -182,14 +183,15 @@ pub(crate) async fn update(
     }
     let inbound = read::parse(body, resource_type)?;
     same_id(&inbound, id)?;
-    compartment::admit_inbound(facade, access, Permission::Update, &inbound)?;
+    compartment::admit_inbound(facade, access, Permission::Update, &inbound).await?;
     let program = &select_program(facade, &inbound, headers)?;
     let client = facade.client_for(headers, access).await?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
     let ingest = facade
         .ingest(client)
         .with_references(&resolved)
-        .with_originating_system(crate::facade::commit::originating_system(access));
+        .with_originating_system(crate::facade::commit::originating_system(access))
+        .with_on_behalf(crate::facade::subject::on_behalf(access));
     resend(
         facade,
         &ingest,

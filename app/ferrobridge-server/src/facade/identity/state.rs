@@ -95,6 +95,12 @@ impl StateStore {
         Ok(Self { pool, keys })
     }
 
+    /// Returns the associated data a Patient party's sealed person is bound
+    /// to.
+    fn party_context(party: &str) -> Vec<u8> {
+        format!("party_person\u{1f}{party}").into_bytes()
+    }
+
     /// Returns the associated data an EHR's sealed person is bound to.
     fn subject_context(ehr: &str) -> Vec<u8> {
         format!("ehr_subject\u{1f}{ehr}").into_bytes()
@@ -222,6 +228,80 @@ impl Store for StateStore {
                 value: subject.namespace,
                 source: Box::new(source),
             })
+    }
+
+    async fn person_of_party(&self, party: &str) -> Result<Option<PersonId>, StoreError> {
+        let row = sqlx::query("SELECT key_id, person_sealed FROM party_person WHERE party_uid = $1")
+            .bind(party)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(database)?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let key_id: String = row.try_get("key_id").map_err(database)?;
+        let sealed: Vec<u8> = row.try_get("person_sealed").map_err(database)?;
+        let key_id = checked(party, "sealing key id", key_id, KeyId::new)?;
+        let plain = self
+            .keys
+            .open(&key_id, &Self::party_context(party), &sealed)
+            .map_err(|source| StoreError::Seal { source })?;
+        let subject: EhrSubject =
+            serde_json::from_slice(&plain).map_err(|source| StoreError::Record {
+                key: party.to_owned(),
+                source: Box::new(source),
+            })?;
+        PersonId::new(&subject.namespace, &subject.id)
+            .map(Some)
+            .map_err(|source| StoreError::Identifier {
+                key: party.to_owned(),
+                kind: "person id",
+                value: subject.namespace,
+                source: Box::new(source),
+            })
+    }
+
+    async fn party_of(&self, person: &PersonId) -> Result<Option<String>, StoreError> {
+        let digest = self.keys.lookup().digest(PERSON, person.id());
+        sqlx::query_scalar(
+            "SELECT party_uid FROM party_person WHERE namespace = $1 AND id_hmac = $2",
+        )
+        .bind(person.namespace())
+        .bind(&digest)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(database)
+    }
+
+    async fn record_party(&self, party: &str, person: &PersonId) -> Result<(), StoreError> {
+        let digest = self.keys.lookup().digest(PERSON, person.id());
+        let plain = serde_json::to_vec(&EhrSubject {
+            namespace: person.namespace().to_owned(),
+            id: person.id().to_owned(),
+        })
+        .map_err(|source| StoreError::Record {
+            key: party.to_owned(),
+            source: Box::new(source),
+        })?;
+        let (key_id, sealed) = self
+            .keys
+            .seal(&Self::party_context(party), &plain)
+            .map_err(|source| StoreError::Seal { source })?;
+        sqlx::query(
+            "INSERT INTO party_person (party_uid, namespace, id_hmac, key_id, person_sealed) \
+             VALUES ($1, $2, $3, $4, $5) ON CONFLICT (party_uid) DO UPDATE SET \
+             namespace = EXCLUDED.namespace, id_hmac = EXCLUDED.id_hmac, \
+             key_id = EXCLUDED.key_id, person_sealed = EXCLUDED.person_sealed",
+        )
+        .bind(party)
+        .bind(person.namespace())
+        .bind(&digest)
+        .bind(key_id.as_str())
+        .bind(&sealed)
+        .execute(&self.pool)
+        .await
+        .map_err(database)?;
+        Ok(())
     }
 
     async fn internal_of(

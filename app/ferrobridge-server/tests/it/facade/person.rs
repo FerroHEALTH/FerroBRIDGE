@@ -9,8 +9,6 @@ use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::Settings;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
-use ferrobridge_server::facade::subject::IdForm;
-use ferrobridge_server::facade::subject::SubjectLink;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -48,6 +46,7 @@ async fn person_harness_with(
     facade_settings: Settings,
 ) -> Result<(Harness, tempfile::TempDir), Box<dyn Error>> {
     let cdr = MockServer::start().await;
+    let facade_settings = crate::support::served_identity(&cdr, facade_settings).await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(format!(
             "/definition/template/adl1.4/{}",
@@ -229,24 +228,22 @@ async fn a_stored_kds_person_composition_reads_back_as_the_patient() -> Result<(
     Ok(())
 }
 
-/// A UUID invented for the tests.
-const PATIENT_UUID: &str = "7c1d2e3f-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
-
-/// The facade settings with the subject link in the settings' namespace
-/// keyed by the id form `form`.
-fn settings_in(form: IdForm) -> Result<Settings, Box<dyn Error>> {
-    let base = settings();
-    let subject = SubjectLink::new(base.subject.namespace(), form, "PERSON")?;
-    Ok(Settings { subject, ..base })
-}
-
-/// Posts `resource` under the id form `form` and returns the status, the
-/// body, and the query of the EHR lookup by subject when there was one.
-async fn post_under(
-    form: IdForm,
+/// Posts `resource` and returns the status, the body, and the query of the
+/// EHR lookup by subject when there was one, with the identity source
+/// answering as `pix` says when it is set.
+async fn post_patient_with(
     resource: &serde_json::Value,
-) -> Result<(StatusCode, serde_json::Value, Vec<(String, String)>), Box<dyn Error>> {
-    let (harness, _directory) = person_harness_with(settings_in(form)?).await?;
+    pix: Option<ResponseTemplate>,
+) -> Result<(Harness, StatusCode, serde_json::Value, Vec<(String, String)>), Box<dyn Error>> {
+    let (harness, _directory) = person_harness().await?;
+    if let Some(answer) = pix {
+        Mock::given(matchers::method("POST"))
+            .and(matchers::path(crate::support::PIX_PATH))
+            .respond_with(answer)
+            .with_priority(1)
+            .mount(&harness.cdr)
+            .await;
+    }
     mount_ehr(&harness.cdr).await;
     mount_create(
         &harness.cdr,
@@ -264,7 +261,7 @@ async fn post_under(
         .find(|request| request.method.as_str() == "GET" && request.url.path() == "/ehr")
         .map(|lookup| lookup.url.query_pairs().into_owned().collect())
         .unwrap_or_default();
-    Ok((status, body, query))
+    Ok((harness, status, body, query))
 }
 
 /// The `subject_id` and `subject_namespace` of an EHR lookup query.
@@ -279,48 +276,75 @@ fn subject_of(query: &[(String, String)]) -> (Option<&str>, Option<&str>) {
 }
 
 #[tokio::test]
-async fn under_logical_id_a_patient_keys_its_ehr_by_its_logical_id() -> Result<(), Box<dyn Error>> {
-    let (status, body, query) = post_under(IdForm::LogicalId, &patient()?).await?;
+async fn a_patient_keys_its_ehr_by_its_iti_83_pseudonym() -> Result<(), Box<dyn Error>> {
+    let (harness, status, body, query) = post_patient_with(&patient()?, None).await?;
     assert_eq!(StatusCode::CREATED, status, "{body}");
     assert_eq!(
         (
-            Some("ferrobridge-kds-patient-1"),
+            Some(crate::support::PSEUDONYM),
             Some(settings().subject.namespace())
         ),
         subject_of(&query),
         "{query:?}"
     );
+    let asked = harness
+        .cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .find(|request| request.url.path() == crate::support::PIX_PATH)
+        .ok_or("the identity source is asked")?;
+    assert_eq!("POST", asked.method.as_str());
+    assert_eq!(None, asked.url.query(), "no identifier sits in the URL");
+    let parameters: serde_json::Value = serde_json::from_slice(&asked.body)?;
+    let text = parameters.to_string();
+    assert!(text.contains("synthetic-patient-0001"), "{text}");
+    assert!(text.contains(settings().subject.namespace()), "{text}");
     Ok(())
 }
 
 #[tokio::test]
-async fn under_uuid_a_patient_keys_its_ehr_by_its_uuid_logical_id() -> Result<(), Box<dyn Error>> {
-    let mut resource = patient()?;
-    resource["id"] = serde_json::json!(PATIENT_UUID);
-    let (status, body, query) = post_under(IdForm::Uuid, &resource).await?;
-    assert_eq!(StatusCode::CREATED, status, "{body}");
-    assert_eq!(
-        (Some(PATIENT_UUID), Some(settings().subject.namespace())),
-        subject_of(&query),
-        "{query:?}"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn under_an_owner_link_form_a_patient_without_a_logical_id_is_refused_naming_the_key()
+async fn a_patient_with_no_identifier_in_an_accepted_domain_is_refused_naming_the_domains()
 -> Result<(), Box<dyn Error>> {
-    for form in [IdForm::LogicalId, IdForm::Uuid] {
-        let mut resource = patient()?;
-        resource
-            .as_object_mut()
-            .ok_or("the Patient is an object")?
-            .remove("id");
-        let (status, body, query) = post_under(form, &resource).await?;
-        assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    let mut resource = patient()?;
+    resource["identifier"] = serde_json::json!([
+        {"system": "urn:oid:2.999.77", "value": "elsewhere-1"}
+    ]);
+    let (_harness, status, body, query) = post_patient_with(&resource, None).await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    assert!(
+        body.to_string().contains(crate::support::SOURCE_DOMAIN),
+        "the refusal names the accepted domains: {body}"
+    );
+    assert!(query.is_empty(), "no EHR is looked up: {query:?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_identifier_without_a_system_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut resource = patient()?;
+    resource["identifier"] = serde_json::json!([{"value": "bare-1"}]);
+    let (_harness, status, body, query) = post_patient_with(&resource, None).await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    assert!(query.is_empty(), "no EHR is looked up: {query:?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_identity_source_failure_is_a_typed_refusal_and_never_another_subject()
+-> Result<(), Box<dyn Error>> {
+    for (answer, expected) in [
+        (500, StatusCode::SERVICE_UNAVAILABLE),
+        (503, StatusCode::SERVICE_UNAVAILABLE),
+        (401, StatusCode::BAD_GATEWAY),
+    ] {
+        let (_harness, status, body, query) =
+            post_patient_with(&patient()?, Some(ResponseTemplate::new(answer))).await?;
+        assert_eq!(expected, status, "{answer}: {body}");
         assert!(
-            body.to_string().contains("facade.subject_id_form"),
-            "the refusal names the key: {body}"
+            body.to_string().contains(&answer.to_string()),
+            "the refusal names the upstream status: {body}"
         );
         assert!(query.is_empty(), "no EHR is looked up: {query:?}");
     }
@@ -328,30 +352,24 @@ async fn under_an_owner_link_form_a_patient_without_a_logical_id_is_refused_nami
 }
 
 #[tokio::test]
-async fn under_uuid_a_patient_whose_logical_id_is_no_uuid_is_refused_naming_the_key()
--> Result<(), Box<dyn Error>> {
-    let (status, body, query) = post_under(IdForm::Uuid, &patient()?).await?;
+async fn a_patient_the_identity_source_does_not_know_is_refused() -> Result<(), Box<dyn Error>> {
+    let not_found = ResponseTemplate::new(404).set_body_json(serde_json::json!({
+        "resourceType": "OperationOutcome",
+        "issue": [{"severity": "error", "code": "not-found"}]
+    }));
+    let (_harness, status, body, query) = post_patient_with(&patient()?, Some(not_found)).await?;
     assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
-    assert!(
-        body.to_string().contains("facade.subject_id_form"),
-        "the refusal names the key: {body}"
-    );
     assert!(query.is_empty(), "no EHR is looked up: {query:?}");
     Ok(())
 }
 
-#[tokio::test]
-async fn under_reference_a_patient_still_keys_its_ehr_by_its_first_identifier()
--> Result<(), Box<dyn Error>> {
-    let (status, body, query) = post_under(IdForm::Reference, &patient()?).await?;
-    assert_eq!(StatusCode::CREATED, status, "{body}");
-    assert_eq!(
-        (
-            Some("synthetic-patient-0001"),
-            Some("http://example.org/fhir/sid/ferrobridge-patient")
-        ),
-        subject_of(&query),
-        "{query:?}"
-    );
+#[test]
+fn the_first_accepted_domain_in_list_order_is_asked() -> Result<(), Box<dyn Error>> {
+    let identity = crate::support::identity_source("http://127.0.0.1:9/fhir", "urn:oid:2.999.9");
+    let source = identity.source_of(&[
+        (Some("urn:oid:2.999.9"), "second"),
+        (Some(crate::support::SOURCE_DOMAIN), "first"),
+    ])?;
+    assert_eq!(crate::support::SOURCE_DOMAIN, source.system());
     Ok(())
 }

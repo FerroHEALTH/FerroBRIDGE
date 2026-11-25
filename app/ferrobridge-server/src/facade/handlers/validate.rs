@@ -71,8 +71,9 @@ pub(crate) async fn validate(
     crate::facade::handlers::supported(facade, resource_type)?;
     let inbound = read::parse(body, resource_type)?;
     let program = &write::select_program(facade, &inbound, headers)?;
-    let person = match inbound.subject(&facade.settings().subject) {
-        Ok(person) => person,
+    let link = &facade.settings().subject;
+    let subject = match inbound.subject(link) {
+        Ok(subject) => subject,
         Err(refusal) => {
             return Ok(reply::issues(
                 StatusCode::OK,
@@ -84,9 +85,13 @@ pub(crate) async fn validate(
             ));
         }
     };
+    let access = admission.access;
+    let person = link
+        .person(subject, &crate::facade::subject::on_behalf(access))
+        .await
+        .map_err(|error| Refusal::from(crate::facade::subject::refused(&error)))?;
     // NOTE: no specification governs this: our own design, a dry run commits
     // nothing, so the operator scope admits it like the guard does.
-    let access = admission.access;
     let admitted = admission
         .operator
         .is_some_and(|operator| access.has_scope(operator))

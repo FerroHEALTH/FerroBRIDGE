@@ -34,15 +34,91 @@ pub(crate) fn basic_authorization(user: &str, password: &str) -> String {
     )
 }
 
-/// Returns the subject link in `namespace` with the reference id form and the
-/// `PERSON` type, the facade's defaults.
-pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subject::SubjectLink {
-    ferrobridge_server::facade::subject::SubjectLink::new(
-        namespace,
-        ferrobridge_server::facade::subject::IdForm::Reference,
-        "PERSON",
+/// The identifier system the test patients' source identifiers are in.
+pub(crate) const SOURCE_DOMAIN: &str = "urn:oid:2.999.1";
+
+/// The identifier system of the testkit's synthetic patients.
+pub(crate) const PATIENT_SYSTEM: &str = "http://example.org/fhir/sid/ferrobridge-patient";
+
+/// Returns the identity source at `base` whose pseudonyms are in `domain`,
+/// accepting source identifiers in [`SOURCE_DOMAIN`], [`PATIENT_SYSTEM`] and
+/// `domain`, in that order.
+pub(crate) fn identity_source(
+    base: &str,
+    domain: &str,
+) -> Arc<ferrobridge_server::identity_source::IdentitySource> {
+    let section = ferrobridge_server::config::section::identity_source::IdentitySource {
+        endpoint: ferrohealth_smart::config::endpoint::EndpointSection {
+            url: ferrohealth_secret::secret_url::SecretUrl::new(base),
+            ..ferrohealth_smart::config::endpoint::EndpointSection::default()
+        },
+        pseudonym_domain: String::from(domain),
+        source_domains: [SOURCE_DOMAIN, PATIENT_SYSTEM, domain]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    };
+    Arc::new(
+        ferrobridge_server::config::identity_source::resolve(&section)
+            .expect("a legal identity source"),
     )
-    .expect("a legal subject link")
+}
+
+/// Returns the subject link whose pseudonyms are in `namespace`, over an
+/// identity source no case reaches.
+pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subject::SubjectLink {
+    subject_link_at("http://127.0.0.1:9/fhir", namespace)
+}
+
+/// Returns the subject link whose pseudonyms are in `namespace`, over the
+/// identity source at `base`.
+pub(crate) fn subject_link_at(
+    base: &str,
+    namespace: &str,
+) -> ferrobridge_server::facade::subject::SubjectLink {
+    ferrobridge_server::facade::subject::SubjectLink::new(identity_source(base, namespace))
+}
+
+/// The pseudonym the stub identity source answers every patient with.
+pub(crate) const PSEUDONYM: &str = "synthetic-pseudonym-1";
+
+/// The path of the stub identity source's `$ihe-pix` operation.
+pub(crate) const PIX_PATH: &str = "/pix/Patient/$ihe-pix";
+
+/// Returns the ITI-83 answer naming `pseudonym` in `domain`
+/// (PIXm 3.1.0 §2:3.83.4.2.2.1).
+pub(crate) fn pseudonym_answer(domain: &str, pseudonym: &str) -> wiremock::ResponseTemplate {
+    wiremock::ResponseTemplate::new(200)
+        .insert_header("Content-Type", "application/fhir+json")
+        .set_body_json(serde_json::json!({
+            "resourceType": "Parameters",
+            "parameter": [
+                {
+                    "name": "targetIdentifier",
+                    "valueIdentifier": {"system": domain, "value": pseudonym}
+                },
+                {"name": "targetId", "valueReference": {"reference": format!("Patient/{pseudonym}")}}
+            ]
+        }))
+}
+
+/// Returns `settings` asking the identity source served by `server` under
+/// `/pix`, which answers every patient with [`PSEUDONYM`].
+pub(crate) async fn served_identity(
+    server: &wiremock::MockServer,
+    settings: ferrobridge_server::facade::Settings,
+) -> ferrobridge_server::facade::Settings {
+    let domain = settings.subject.namespace().to_owned();
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path(PIX_PATH))
+        .respond_with(pseudonym_answer(&domain, PSEUDONYM))
+        .with_priority(10)
+        .mount(server)
+        .await;
+    ferrobridge_server::facade::Settings {
+        subject: subject_link_at(&format!("{}/pix", server.uri()), &domain),
+        ..settings
+    }
 }
 
 /// A `tracing` writer that keeps every line in memory.

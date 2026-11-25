@@ -59,12 +59,15 @@ pub fn admit_person(
     }
 }
 
-/// Checks that `access` lets `permission` reach the subject `inbound` names.
+/// Checks that `access` lets `permission` reach the subject `inbound` names,
+/// asking the identity source for the pseudonym of a subject named by
+/// identifier.
 ///
 /// # Errors
 ///
-/// Returns the `403` refusal of [`admit_person`].
-pub fn admit_inbound(
+/// Returns the `403` refusal of [`admit_person`], and the refusal of a
+/// failed pseudonym query.
+pub async fn admit_inbound(
     facade: &Facade,
     access: &Access,
     permission: Permission,
@@ -76,9 +79,17 @@ pub fn admit_inbound(
     ) {
         return Ok(());
     }
+    let link = &facade.settings().subject;
     // NOTE: a resource naming no usable subject is legitimately outside every
     // patient's compartment, so the failed lookup becomes the refusal below.
-    let person = inbound.subject(&facade.settings().subject).ok();
+    let person = match inbound.subject(link).ok() {
+        Some(subject) => Some(
+            link.person(subject, &crate::facade::subject::on_behalf(access))
+                .await
+                .map_err(|error| Refusal::from(crate::facade::subject::refused(&error)))?,
+        ),
+        None => None,
+    };
     admit_person(
         facade,
         access,

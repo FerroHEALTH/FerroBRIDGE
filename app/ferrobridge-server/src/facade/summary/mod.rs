@@ -279,7 +279,6 @@ async fn record(
         client,
         facade.store(),
         person,
-        &facade.settings().subject,
         ehr::Policy::Existing,
     )
     .await

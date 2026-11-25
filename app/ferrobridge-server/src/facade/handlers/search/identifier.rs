@@ -85,7 +85,7 @@ async fn ehr_of_party(
     let Ok(person) = link.person_of_patient(party) else {
         return Ok(None);
     };
-    match ehr::resolve(client, facade.store(), &person, link, ehr::Policy::Existing).await {
+    match ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing).await {
         Ok(found) => Ok(Some(found)),
         Err(ehr::EhrError::Absent { .. }) => Ok(None),
         Err(ehr::EhrError::Client { ref source }) => {

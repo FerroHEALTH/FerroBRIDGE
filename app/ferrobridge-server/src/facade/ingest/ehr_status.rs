@@ -138,7 +138,7 @@ impl Ingest<'_> {
         let Wanted::Reference(reference) = wanted(
             offered,
             self.settings.ehr_status_system.as_deref(),
-            self.settings.subject.party_type(),
+            crate::facade::subject::PARTY_TYPE,
         )?
         else {
             return Ok(());

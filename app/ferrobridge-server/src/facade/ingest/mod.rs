@@ -471,6 +471,8 @@ pub struct Ingest<'a> {
     provider: Option<Party>,
     /// The composer every composition names, when the face named one.
     composer: Option<Composer>,
+    /// Whom the identity source is asked for on behalf of.
+    on_behalf: ihe_atna_next::user::OnBehalfOf,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -508,7 +510,29 @@ impl<'a> Ingest<'a> {
             facility: None,
             provider: None,
             composer: None,
+            on_behalf: ihe_atna_next::user::OnBehalfOf::System,
         }
+    }
+
+    /// Returns this ingest asking the identity source on behalf of
+    /// `on_behalf`; the default asks for the bridge itself.
+    #[must_use]
+    pub fn with_on_behalf(mut self, on_behalf: ihe_atna_next::user::OnBehalfOf) -> Self {
+        self.on_behalf = on_behalf;
+        self
+    }
+
+    /// Returns the person `subject` is, its pseudonym asked of the identity
+    /// source when it is named by identifier.
+    pub(super) async fn person_of(
+        &self,
+        subject: crate::facade::subject::Subject,
+    ) -> Result<crate::facade::identity::PersonId, Refused> {
+        self.settings
+            .subject
+            .person(subject, &self.on_behalf)
+            .await
+            .map_err(|error| crate::facade::subject::refused(&error))
     }
 
     /// Returns this ingest naming `originating` as the system every

@@ -182,6 +182,10 @@ ferrohealth-usage-report = { version = "=0.5.0", default-features = false }
 # only the server links them.
 ehds-logging = { version = "=0.23.0", default-features = false }
 ihe-atna = { version = "=0.23.0", default-features = false }
+# The IHE ITI identity profiles (FerroPIX): the PIXm Consumer that asks the
+# identity source for a patient's pseudonym (ITI-83). Pinned exactly.
+ihe-iti = { version = "=0.21.1", default-features = false }
+ihe-atna-next = { package = "ihe-atna", version = "=0.25.0", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.

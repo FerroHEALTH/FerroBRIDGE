@@ -90,7 +90,7 @@ pub(crate) async fn transaction(
                 .at("Bundle.type"),
         ));
     }
-    admit_entries(facade, access, bundle.document())?;
+    admit_entries(facade, access, bundle.document()).await?;
     let client = facade.client_for(headers, access).await?;
     let resolved =
         crate::facade::references::resolve_bundle(facade, &client, bundle.document()).await;
@@ -102,6 +102,7 @@ pub(crate) async fn transaction(
         .ingest(client)
         .with_references(&bundled)
         .with_originating_system(crate::facade::commit::originating_system(access))
+        .with_on_behalf(crate::facade::subject::on_behalf(access))
         .ingest_bundle(
             bundle.document(),
             UnmappedEntries::Refuse,
@@ -130,7 +131,7 @@ pub(crate) async fn transaction(
 /// permission of the method its `request` names, `create` for a `POST` and a
 /// request-less entry, and a `patient/` grant reaches only an entry whose
 /// subject is the patient in the launch context.
-fn admit_entries(facade: &Facade, access: &Access, bundle: &Value) -> Result<(), Refusal> {
+async fn admit_entries(facade: &Facade, access: &Access, bundle: &Value) -> Result<(), Refusal> {
     let entries = bundle
         .get("entry")
         .and_then(Value::as_array)
@@ -156,7 +157,7 @@ fn admit_entries(facade: &Facade, access: &Access, bundle: &Value) -> Result<(),
         else {
             continue;
         };
-        compartment::admit_inbound(facade, access, permission, &inbound)?;
+        compartment::admit_inbound(facade, access, permission, &inbound).await?;
     }
     Ok(())
 }

@@ -263,6 +263,7 @@ impl Ingest<'_> {
                     .at(format!("{}.subject", inbound.resource_type())),
             )
         })?;
+        let subject = self.person_of(subject).await?;
         if let Some(written) = self
             .reconcile_resource(inbound, program, provenance)
             .await?
@@ -273,7 +274,6 @@ impl Ingest<'_> {
             &self.client,
             self.store,
             &subject,
-            &self.settings.subject,
             self.settings.ehr_policy,
         )
         .await

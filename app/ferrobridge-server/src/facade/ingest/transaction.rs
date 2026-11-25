@@ -301,7 +301,10 @@ impl Ingest<'_> {
             .get("entry")
             .and_then(Value::as_array)
             .unwrap_or_default();
-        let partition = self.map_entries(entries, unmapped, provenance).await;
+        let mut partition = self.map_entries(entries, unmapped, provenance).await;
+        if let Some(refused) = partition.refused.take() {
+            return Err(refused);
+        }
         if !partition.failures.is_empty() {
             // NOTE: no specification governs this: our own design, an entry that failed
             // upstream (a reference fetch) answers the bundle as the `UPSTREAM` row does.
@@ -357,7 +360,6 @@ impl Ingest<'_> {
             &self.client,
             self.store,
             subject,
-            &self.settings.subject,
             self.settings.ehr_policy,
         )
         .await

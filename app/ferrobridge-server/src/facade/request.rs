@@ -13,65 +13,12 @@ use fhir_types::codec::Value;
 
 use crate::facade::identity::ExternalResourceId;
 use crate::facade::identity::IdError;
-use crate::facade::identity::PersonId;
-use crate::facade::subject::IdForm;
+use crate::facade::subject::Subject;
 use crate::facade::subject::SubjectError;
 use crate::facade::subject::SubjectLink;
 
 /// The resource type that is the subject of its own EHR.
 const PATIENT: &str = "Patient";
-
-/// Returns the person a Patient document names itself by: the first
-/// `identifier` with a `value`, in the namespace of its `system` or, when it
-/// carries none, `namespace`.
-///
-/// `None` when the document carries no identifier with a value.
-// NOTE: no specification governs this: our own design; the first identifier
-// in document order keys the person, as PID-3's first repetition does.
-pub(crate) fn person_by_identifier(
-    document: &Value,
-    namespace: &str,
-) -> Option<Result<PersonId, IdError>> {
-    let identifier = document
-        .get("identifier")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .find(|identifier| identifier.get("value").and_then(Value::as_str).is_some())?;
-    let value = identifier.get("value").and_then(Value::as_str)?;
-    let system = identifier
-        .get("system")
-        .and_then(Value::as_str)
-        .unwrap_or(namespace);
-    Some(PersonId::new(system, value))
-}
-
-/// Returns the person the Patient `document` is, as `link` keys a Patient.
-///
-/// Under [`IdForm::Reference`] a Patient keys its EHR by its first
-/// `identifier` with a value ([`person_by_identifier`]), `None` when it
-/// carries none. Under [`IdForm::LogicalId`] and [`IdForm::Uuid`] it keys its
-/// EHR by its logical id in the link's namespace, the id a `Patient/<id>`
-/// reference of another resource names, so the Patient and the resources
-/// about it find one EHR.
-// NOTE: BASE §5.4.14 leaves namespaces "not yet standardised"; no specification governs this:
-// our own design, a Patient keys its EHR the way the configured link keys a reference to it.
-pub(crate) fn patient_person(
-    document: &Value,
-    link: &SubjectLink,
-) -> Option<Result<PersonId, RequestError>> {
-    match link.form() {
-        IdForm::Reference => person_by_identifier(document, link.namespace())
-            .map(|person| person.map_err(|source| RequestError::Subject { source })),
-        form @ (IdForm::LogicalId | IdForm::Uuid) => {
-            let person = match document.get("id").and_then(Value::as_str) {
-                Some(id) => link.person_of_patient(id),
-                None => Err(SubjectError::NoPatientId { form }),
-            };
-            Some(person.map_err(|source| RequestError::Link { source }))
-        }
-    }
-}
 
 /// Why one inbound document is not a resource this facade can take.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -123,15 +70,8 @@ pub enum RequestError {
         "the resource names no subject; a clinical resource is written into the EHR of its subject"
     )]
     NoSubject,
-    /// The subject the resource names cannot be a person key.
-    #[error("the subject the resource names cannot be a person key")]
-    Subject {
-        /// What the identifier's constructor reported.
-        #[source]
-        source: IdError,
-    },
-    /// The literal subject reference does not fit the configured subject link.
-    #[error("the subject reference does not fit the configured subject link")]
+    /// The subject cannot be read as the identity source keys it.
+    #[error("the subject cannot be keyed by its pseudonym")]
     Link {
         /// What the link reported.
         #[source]
@@ -270,50 +210,43 @@ impl Inbound {
 
     /// Returns the subject the resource names.
     ///
-    /// The EHR one composition is written into is resolved by subject id and
-    /// namespace, the pair the ITS-REST EHR lookup takes
-    /// (`ehr-codegen.openapi.yaml`, `ehr_get_by_subject`). A
-    /// `subject.identifier` carries both halves; a literal
-    /// `subject.reference` is read through `link`, which gives the namespace a
-    /// deployment gives its own references and the form of the id. A `Patient` is the subject itself
-    /// and is keyed as `patient_person` keys it. No specification
-    /// fixes the mapping from a FHIR subject to an openEHR subject: our own
-    /// design.
+    /// A `subject.identifier` names an identifier whose pseudonym the
+    /// identity source holds; a literal `subject.reference` is a
+    /// `Patient/<pseudonym>`; a `Patient` is the subject itself, by its
+    /// identifier in the first accepted domain. No specification fixes the
+    /// mapping from a FHIR subject to an openEHR subject: our own design.
     ///
     /// # Errors
     ///
     /// Returns [`RequestError::NoSubject`] when the resource names none and
-    /// [`RequestError::Subject`] when the value cannot be a person key, and
-    /// [`RequestError::Link`] when a literal reference does not fit `link`.
-    pub fn subject(&self, link: &SubjectLink) -> Result<PersonId, RequestError> {
-        let fallback = link.namespace();
+    /// [`RequestError::Link`] when what it names cannot be keyed.
+    pub fn subject(&self, link: &SubjectLink) -> Result<Subject, RequestError> {
+        let link_error = |source: SubjectError| RequestError::Link { source };
         let named = self
             .document
             .get("subject")
             .or_else(|| self.document.get("patient"));
         let Some(reference) = named else {
             if self.resource_type == PATIENT {
-                return patient_person(&self.document, link).ok_or(RequestError::NoSubject)?;
+                return link.patient(&self.document).map_err(link_error);
             }
             return Err(RequestError::NoSubject);
         };
         if let Some(identifier) = reference.get("identifier") {
-            let system = identifier
-                .get("system")
-                .and_then(Value::as_str)
-                .unwrap_or(fallback);
             let value = identifier
                 .get("value")
                 .and_then(Value::as_str)
                 .ok_or(RequestError::NoSubject)?;
-            return PersonId::new(system, value).map_err(|source| RequestError::Subject { source });
+            let system = identifier.get("system").and_then(Value::as_str);
+            return link.identified(system, value).map_err(link_error);
         }
         let literal = reference
             .get("reference")
             .and_then(Value::as_str)
             .ok_or(RequestError::NoSubject)?;
         link.person_of_reference(literal)
-            .map_err(|source| RequestError::Link { source })
+            .map(Subject::Person)
+            .map_err(link_error)
     }
 }
 

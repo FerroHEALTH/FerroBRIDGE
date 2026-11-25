@@ -12,8 +12,6 @@ use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::facade::ehr::status_of;
 use ferrobridge_server::facade::identity::PersonId;
-use ferrobridge_server::facade::subject::IdForm;
-use ferrobridge_server::facade::subject::SubjectLink;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::ehr::client::EhrStatusGetAtTimeOutcome;
 use openehr_its::rest::generated::ehr::client::EhrStatusUpdateOutcome;
@@ -42,9 +40,8 @@ fn status_path() -> String {
 
 /// Returns a synthetic `EHR_STATUS`.
 fn status() -> Result<EhrStatus, Box<dyn Error>> {
-    let link = SubjectLink::new("http://example.org/fhir", IdForm::Reference, "PERSON")?;
     let person = PersonId::new("urn:oid:2.999.1", "synthetic-pseudonym-1")?;
-    Ok(status_of(&person, &link))
+    Ok(status_of(&person))
 }
 
 /// Returns the canonical JSON of [`status`].

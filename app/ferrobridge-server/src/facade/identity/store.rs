@@ -108,6 +108,12 @@ pub enum StoreError {
         /// The key that was written.
         key: String,
     },
+    /// The person is recorded for another Patient party.
+    #[error("the person of {key} is recorded for another Patient party")]
+    Taken {
+        /// The party that was to be recorded.
+        key: String,
+    },
     /// The in-memory store's lock was poisoned by a panicking writer.
     #[error("the in-memory identity store is poisoned")]
     Poisoned,
@@ -142,6 +148,31 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// Returns [`StoreError`] when the store cannot be read or holds a person
     /// key this version cannot read.
     async fn person_of(&self, ehr: &EhrId) -> Result<Option<PersonId>, StoreError>;
+
+    /// Returns the person the Patient party `party` was recorded as, when the
+    /// map knows.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] when the store cannot be read.
+    async fn person_of_party(&self, party: &str) -> Result<Option<PersonId>, StoreError>;
+
+    /// Returns the Patient party `person` was recorded for, when the map
+    /// knows.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] when the store cannot be read.
+    async fn party_of(&self, person: &PersonId) -> Result<Option<String>, StoreError>;
+
+    /// Records `person` as the person of the Patient party `party`, in place
+    /// of any it was recorded as before.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] when the store cannot be written, or `person` is
+    /// recorded for another party.
+    async fn record_party(&self, party: &str, person: &PersonId) -> Result<(), StoreError>;
 
     /// Returns the internal id recorded for a sender's id, when one is.
     ///
@@ -296,6 +327,8 @@ struct Tables {
     contributions: BTreeMap<String, CommittedSource>,
     /// Resource type, identifier and logical id to that logical id.
     identifiers: BTreeMap<String, String>,
+    /// Patient party uid to its person.
+    parties: BTreeMap<String, PersonId>,
 }
 
 /// The identity map a test drives, held in memory and lost with the process.
@@ -351,6 +384,36 @@ impl Store for MemoryStore {
 
     async fn person_of(&self, ehr: &EhrId) -> Result<Option<PersonId>, StoreError> {
         self.with(|tables| tables.subjects.get(ehr.as_str()).cloned())
+    }
+
+    async fn person_of_party(&self, party: &str) -> Result<Option<PersonId>, StoreError> {
+        self.with(|tables| tables.parties.get(party).cloned())
+    }
+
+    async fn party_of(&self, person: &PersonId) -> Result<Option<String>, StoreError> {
+        self.with(|tables| {
+            tables
+                .parties
+                .iter()
+                .find(|(_, held)| *held == person)
+                .map(|(party, _)| party.clone())
+        })
+    }
+
+    async fn record_party(&self, party: &str, person: &PersonId) -> Result<(), StoreError> {
+        self.with(|tables| {
+            if tables
+                .parties
+                .iter()
+                .any(|(other, held)| held == person && other != party)
+            {
+                return Err(StoreError::Taken {
+                    key: party.to_owned(),
+                });
+            }
+            tables.parties.insert(party.to_owned(), person.clone());
+            Ok(())
+        })?
     }
 
     async fn internal_of(
