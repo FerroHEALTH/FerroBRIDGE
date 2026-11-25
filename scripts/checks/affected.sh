@@ -16,8 +16,7 @@
 #   --local        the local gate: the CI configuration under .github and
 #                  this script's own pair change no cargo result, so they
 #                  are inert; in CI they run everything
-#   --all          every package, every lane (a push to main, a merge group,
-#                  a dispatch)
+#   --all          every package, every lane (a push to main, a dispatch)
 #   --self-test    checks the classification on synthetic paths against the
 #                  real workspace graph
 #
@@ -234,7 +233,7 @@ classify() {
     scripts/vendor/kds-*-opt.sh | scripts/vendor/lib/kds-opt.sh) echo "packages ferrobridge-testkit fhirconnect" ;;
     # Write only the CKM archetypes under the testkit's fixtures, which the
     # templates the testkit carries read.
-    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh | scripts/vendor/ckm-highmed.sh)
+    scripts/vendor/ckm-medication.sh | scripts/vendor/ckm-imaging.sh | scripts/vendor/ckm-discharge.sh | scripts/vendor/ckm-library.sh | scripts/vendor/ckm-highmed.sh | scripts/vendor/ckm-ehds.sh)
       echo "packages ferrobridge-testkit fhirconnect"
       ;;
     # The corpora only the server's access directive exchange reads, and the

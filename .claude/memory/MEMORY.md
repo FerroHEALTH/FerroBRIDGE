@@ -151,3 +151,4 @@
 - [hosted-ops-approved](hosted-ops-approved.md) — The orchestrator may operate the hosted sandbox and its database server over SSH when work needs it, plan and rollback first (owner, 2026-11-22)
 - [Lean comments, no history](lean-comments-no-history.md) — comments rare and short, describe only the current code, rewrite whole on change; never the old way (owner hard rule 2026-11-23)
 - [Family memories in every repo](family-memories-every-repo.md) — a family-wide owner rule goes into every FerroHEALTH repo's .claude/memory through a merged PR (owner 2026-11-23)
+- [Merge queue is light](merge-queue-light.md): the merge-group run is the guards, rustfmt, cargo-deny and the reached packages' unit tests; the full suite runs on the pull request and on main (owner 2026-11-25)

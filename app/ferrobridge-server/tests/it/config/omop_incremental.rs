@@ -19,8 +19,9 @@ endpoint.url = "http://cdr.invalid/v1"
 
 [change_feed]
 enabled = true
-watermarks = "/tmp/feed.redb"
-dead_letters = "/tmp/dead-letters.redb"
+
+[state]
+url = "postgres://bridge@db.invalid/state?sslmode=disable"
 
 [cdm]
 url = "postgres://db.invalid/cdm?sslmode=disable"

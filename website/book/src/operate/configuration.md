@@ -639,6 +639,28 @@ id = "2026-05"
 key_file = "/run/secrets/state_seal_2026_05"
 ```
 
+### `[secrets]`
+
+The directory the secrets an inbound source names are read from: one file
+per secret, named by the secret's name, read at start and read again every
+`poll_seconds`, so a secret added or rotated reaches every replica without a
+restart. A source names a secret (`{"secret": "nedap-ons-prod-hmac"}`) and
+never holds its value; a write that names a secret the directory does not
+hold is refused, and a secret missing at runtime fails the source closed with
+`503`. On Kubernetes, mount one Secret as a volume without `subPath`, since a
+`subPath` mount never updates; in compose, write a new file beside the old one
+and rename it over it.
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `dir` | none, required when the section is present | no | The directory |
+| `poll_seconds` | `10` | no | Seconds between two reads of the directory, at least 1 |
+
+```toml
+[secrets]
+dir = "/run/secrets/ferrobridge-sources"
+```
+
 ### `[etl]`
 
 The OMOP ETL jobs `ferrobridge etl run` and `ferrobridge etl fhir` run. Both queries are parsed and
@@ -904,11 +926,11 @@ maps `Basic` is then a boot error, and a reload that adds one is refused.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Basic` is the SMART App State endpoint |
-| `store` | `app-state.redb` | The file the App State resources are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. App State can
-hold an app's keys, so keep the file on storage you protect as you protect the
-CDR's. The store and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. The resources
+live in the state store, so the endpoint needs `[state]`. App State can hold an
+app's keys, so protect the state database as you protect the CDR's. The store
+is FerroBRIDGE's own design.
 
 ### `[facade.launch_task]`
 
@@ -922,10 +944,10 @@ SMART launch), served as `Task` at the facade's base (the Integrate page,
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Task` is the launch endpoint |
-| `store` | `launch-tasks.redb` | The file the launch `Task`s are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
-and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The `Task`s
+live in the state store, so the endpoint needs `[state]`. The store is
+FerroBRIDGE's own design.
 
 ### `[facade.summary]`
 
@@ -1283,8 +1305,10 @@ naming the key.
 
 The source the change-feed consumers follow: the commits of the CDR, read
 after each consumer's own watermark. It is off until `enabled` is true, and
-an enabled feed is a boot error without a `[cdr]` section, and while no
-consumer section is switched on. The [change feed](../integrate/change-feed.md)
+an enabled feed is a boot error without a `[cdr]` section, without a
+[`[state]`](#state) section, which keeps the watermarks of the `aql` source,
+the dead letters and the reader leases, and while no consumer section is
+switched on. The [change feed](../integrate/change-feed.md)
 page states what each source reads and what it cannot guarantee. No
 specification governs the change feed: it is FerroBRIDGE's own design.
 
@@ -1293,17 +1317,16 @@ specification governs the change feed: it is FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the consumers follow the source |
 | `source` | `aql` | `aql`, the poll of `/query/aql` that works against any CDR, or `ferroehr`, the reference CDR's outbox feed |
 | `url` | none | `ferroehr` only, required: the root of the CDR's extensions, the path `/admin/outbox` lives under |
-| `watermarks` | none | `aql` only, required: the `redb` file each reader's watermark is kept in |
 | `start` | `now` | `aql` only: where a reader with no watermark starts, `now`, `beginning` or an RFC 3339 instant |
-| `dead_letters` | none, required | The `redb` file the consumers park a poisoned event in and count its poisoned passes in; keep it beside `watermarks` |
 | `max_attempts` | `5` | How many passes an event may fail with a poisoned failure before it is parked, 1 to 1000 |
 | `page_size` | `100` | How many events one read asks for, 1 to 1000 |
 | `poll_interval` | `"1s"` | How long a consumer waits after a read that found no full page |
 | `backoff` | `"1s"` | How long a consumer waits after its first failed read, doubled per failure |
 | `max_backoff` | `"1min"` | The longest wait after a failed read, at least `backoff` |
+| `lease` | `"30s"` | How long a replica's lease on a reader holds; the leader renews it every third of the period, and another replica takes the reader over once it runs out |
 
-A missing `dead_letters`, an unknown `source`, a `start` that names no
-instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `"0s"`,
+An unknown `source`, a `start` that names no
+instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait or a `lease` of `"0s"`,
 and a `url` that is no http or https base without a query or a fragment are
 each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
@@ -1396,14 +1419,17 @@ concept resolver cannot reach refuse the start. Over `[change_feed] source =
 The person's SMART Health Links, the one-time share of their patient
 summary (SMART Health Cards and Links 1.0.0; the Integrate page,
 [The Yellow Button API](../integrate/yellow-button.md)). On, the server needs
-`[facade.summary]` and `[auth]`, and opens the store at boot; a store that
-cannot be opened refuses the start. The store is one `redb` file, so the lane
-runs on one replica.
+`[facade.summary]`, `[auth]`, `[state]` and `[state.seal]`. The links live in
+the state store, so every replica serves and revokes the same ones: each
+change of a link holds its row, so a file location is served once and the
+passcode attempts and the answers are counted across replicas. A link's
+manifest id, its handle and each location token are stored as their SHA-256,
+the handle also sealed so its owner can list it, and the sweep of expired
+links runs on one replica at a time.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the `/shl` routes are served |
-| `store` | none | The `redb` file the links are kept in. Required when on |
 | `base_url` | none | The public origin a receiver reaches the bridge at, such as `https://bridge.example.org`. A link's URL is this origin, `/shl/m/` and 43 characters, and the start is refused when that passes 128 characters. Required when on |
 | `default_expiry` | `"24h"` | How long a link lives when its creator names no `exp` |
 | `max_expiry` | `"7d"` | The longest a link may live |

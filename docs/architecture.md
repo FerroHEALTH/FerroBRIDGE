@@ -1095,7 +1095,12 @@ expression is a load error: the reference CDR's connector let `where()` and
   the total count those resources, the count reads the rows, and an `_id`
   naming a created resource answers it alone (#731). One resource type
   answers one parameter set, and two declarations of one type over one
-  template are refused at load. A parameter outside the set is refused unless the client
+  template are refused at load. A `token` the mapping writes as a constant
+  is declared `fixed` with its one coding and compared without a query, and
+  an `include` list names the standard reference parameters `_include` may
+  follow to the resources the match's own run creates, each answered once
+  with `search.mode` `include` (R4 search §3.1.1.5.4; the IHE QEDm 3.0.0
+  PCC-44 category and `_include` searches, #2087). A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
   modifier is always refused (§3.1.1.4.4); `_count=0` answers the total
   alone, as R4 treats it as `_summary=count` (§3.1.1.5.3). The one chain
@@ -1108,6 +1113,13 @@ expression is a load error: the reference CDR's connector let `where()` and
   of the value of the system property" (§3.1.1.4.10). The
   `CapabilityStatement` documents the chain on each subject parameter while
   it is on (our own design).
+- **The draft EEHRxF Annex X groups are served as resources** (draft act
+  Art 7(2)) through the `eehrxf` Annex X project: one context per group
+  over FerroBRIDGE's patient summary and EHDS record templates, each with
+  the profile HL7 Europe Base and Core 2.0.1 gives the group and the IHE
+  QEDm 3.0.0 PCC-44 searches of its option as a search declaration beside
+  it (#2087). A date search may read `ACTION.time` and `HISTORY.origin`,
+  which the RM defines and the Web Template leaves out.
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a
@@ -1791,7 +1803,7 @@ because no concept exists. The reference engine has not moved since
   ITS-REST and runs the same per-composition commit. No feature depends on one
   vendor (owner decision 2026-11-02), so the adapter has two sources. The
   vendor-neutral one polls `/query/aql` over `VERSION v[ALL_VERSIONS]` by
-  `commit_audit/time_committed` past a watermark FerroBRIDGE keeps in `redb`,
+  `commit_audit/time_committed` past a watermark FerroBRIDGE keeps in the state store,
   with the version uids finished at the watermark instant so a tie loses
   nothing; it gives no commit order across EHRs and sees a deletion only where
   the CDR answers the deleted version. The reference CDR writes every commit
@@ -2361,7 +2373,17 @@ has one leader across replicas through a row of `lane_lease`: a replica
 takes a free or expired row and its generation moves on, renews at a third
 of the period, and every cursor write locks the row in its own transaction
 and is refused unless it holds the current generation, so a former leader
-paused past its expiry cannot move a cursor. Session advisory locks are not
+paused past its expiry cannot move a cursor. The change feed is the first
+area on the store (`0006`): the watermarks of the AQL source, the dead
+letters with the operator's settlement (who decided, retry or discard, and
+why) and the poisoned-pass counts, every follower write fenced by its
+reader's lease; the reference CDR's feed keeps its cursor in the CDR and
+takes only the lease. The inbound sources (`0008`)
+are versioned rows: one write validates the kind's document, appends the
+version with its committer, derives the tenants and MLLP routes and
+notifies `ferrobridge_sources`, and each replica reloads the named source
+into a snapshot behind one pointer swap; a source names its secrets, which
+resolve through the `[secrets]` directory of `ferrohealth-secret`. Session advisory locks are not
 used for leadership: they carry no fencing token and end with their
 connection while the task may run on
 (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
@@ -2371,8 +2393,10 @@ whole, and while the session is down every request reads the store;
 PostgreSQL delivers a `NOTIFY` at commit and never on rollback
 (<https://www.postgresql.org/docs/current/sql-notify.html>). `[state.seal]`
 lists the keys stored bodies are sealed under, each named by the id a sealed
-row carries, the first one sealing. The `redb` files stay until each area
-has moved. No specification governs where the bridge keeps its state: our
+row carries, the first one sealing, and the lookup key identifier values are
+stored as an HMAC under. The identity map (section 9), the SMART Health Links
+and the facade's own App State and launch `Task`s live there; the change-feed
+and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
 own design on family precedent.
 
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and

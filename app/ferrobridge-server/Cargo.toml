@@ -46,6 +46,7 @@ eehrxf = { workspace = true, features = ["openehr", "patient-summary"] }
 ferrobridge-validator.workspace = true
 # The FHIR R4 search value grammar the facade reads its search values with.
 fhir-search.workspace = true
+ferrobridge-fhirpath.workspace = true
 # The generated FHIR R4 model the facade authors its wire bodies with: every R4
 # resource, and no resource of the releases the terminology client adds.
 # R5 for the `Consent` exchange (`consent::fhir`), beside the R4 the facade speaks.

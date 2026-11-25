@@ -320,11 +320,10 @@ async fn created(
         }],
         outstanding: 0,
     };
-    let held = Arc::clone(&links.store);
-    let stored_id = id.clone();
-    tokio::task::spawn_blocking(move || held.create(&stored_id, &link, &[jwe]))
+    links
+        .store
+        .create(&id, &link, &[jwe])
         .await
-        .map_err(|_error| unsealed())?
         .map_err(|error| unstored(&error))?;
     place
         .store(record::exchange(
@@ -415,11 +414,11 @@ pub(super) async fn list(State(links): State<Arc<Links>>, access: Access) -> Res
 /// The work of [`list`].
 async fn listed(links: &Links, access: &Access) -> Result<Response, Refusal> {
     let (owner, _actor) = person(access)?;
-    let held = Arc::clone(&links.store);
     let now = jiff::Timestamp::now().as_second();
-    let listed = tokio::task::spawn_blocking(move || held.list(&owner, now))
+    let listed = links
+        .store
+        .list(&owner, now)
         .await
-        .map_err(|_error| unsealed())?
         .map_err(|error| unstored(&error))?;
     let listing = Listing {
         links: listed
@@ -450,10 +449,10 @@ pub(super) async fn revoke(
 async fn revoked(links: &Links, access: &Access, handle: String) -> Result<Response, Refusal> {
     let (owner, actor) = person(access)?;
     let place = links.reserve().await.map_err(|error| unrecorded(&error))?;
-    let held = Arc::clone(&links.store);
-    let gone = tokio::task::spawn_blocking(move || held.revoke(&owner, &handle))
+    let gone = links
+        .store
+        .revoke(&owner, &handle)
         .await
-        .map_err(|_error| unsealed())?
         .map_err(|error| unstored(&error))?
         .ok_or_else(|| {
             refused(
@@ -499,16 +498,18 @@ async fn manifested(links: &Links, id: String, body: &[u8]) -> Result<Response, 
         return Err(refused(StatusCode::NOT_FOUND, INACTIVE));
     }
     let place = links.reserve().await.map_err(|error| unrecorded(&error))?;
-    let held = Arc::clone(&links.store);
     let now = jiff::Timestamp::now().as_second();
     let lifetime = i64::try_from(links.settings.location_lifetime.as_secs()).unwrap_or(i64::MAX);
-    let (passcode, embedded) = (asked.passcode, asked.embedded_length_max);
-    let answered = tokio::task::spawn_blocking(move || {
-        held.answer(&id, passcode.as_deref(), embedded, (now, lifetime))
-    })
-    .await
-    .map_err(|_error| unsealed())?
-    .map_err(|error| unstored(&error))?;
+    let answered = links
+        .store
+        .answer(
+            &id,
+            asked.passcode.as_deref(),
+            asked.embedded_length_max,
+            (now, lifetime),
+        )
+        .await
+        .map_err(|error| unstored(&error))?;
     match answered {
         Answer::Inactive { gone } => {
             if let Some(gone) = gone {
@@ -633,18 +634,12 @@ async fn fetched(
         Some(_) => Some(links.reserve().await.map_err(|error| unrecorded(&error))?),
         None => None,
     };
-    let held = Arc::clone(&links.store);
     let now = jiff::Timestamp::now().as_second();
-    let direct = recipient.is_some();
-    let fetched = tokio::task::spawn_blocking(move || {
-        if direct {
-            held.direct(&token, now)
-        } else {
-            held.fetch(&token, now)
-        }
-    })
-    .await
-    .map_err(|_error| unsealed())?
+    let fetched = if recipient.is_some() {
+        links.store.direct(&token, now).await
+    } else {
+        links.store.fetch(&token, now).await
+    }
     .map_err(|error| unstored(&error))?;
     match fetched {
         Fetched::Inactive { gone } => {

@@ -152,7 +152,7 @@ ferrohealth-smart = { version = "0.34.0", default-features = false, features = [
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
 # `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
 # query masked. Pinned exactly, as a product pins every shared crate.
-ferrohealth-secret = "=0.2.1"
+ferrohealth-secret = "=0.2.2"
 # The family's configuration loader (FerroSYS): the file, the `FERROBRIDGE__`
 # environment and its aliases, `--set`, strict with the closest known key, the
 # provenance of every key and the `config check` rendering.

@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The search of the EHDSImmunisation resources: the patient, as IHE QEDm
+# 3.0.0 PCC-44 2:3.44.4.1.2.1.6 asks of the Immunizations option, and the
+# time of the administration as the R4 `date`.
+context: ferrobridge_ehds_immunisation.context
+patient:
+  parameters: [patient]
+parameters:
+  date:
+    type: date
+    node: { class: ACTION, archetype: openEHR-EHR-ACTION.medication.v1 }
+    path: time/value

@@ -87,6 +87,20 @@ pub fn conditions(
         let Some(parameter) = declared.parameters().get(&filter.name) else {
             continue;
         };
+        if let Some(fixed) = parameter.fixed() {
+            // NOTE: no specification governs a fixed token: every resource the
+            // context answers carries the coding, so a value matches all or none.
+            match &filter.test {
+                Test::Token(values) if values.iter().any(|token| fixed.matches(token)) => continue,
+                Test::Token(_) => return Ok(None),
+                Test::Text { .. } | Test::Date(_) => {
+                    return Err(CriteriaError::Invalid {
+                        name: filter.name.clone(),
+                        reason: String::from("the parameter's declarations disagree on its type"),
+                    });
+                }
+            }
+        }
         let clause = condition(&mut conditions, filter, parameter)?;
         conditions.push(clause);
     }
@@ -113,8 +127,9 @@ pub fn order(declared: &Declared, criteria: &Criteria) -> Vec<OrderKey> {
                 .parameters()
                 .get(name)
                 .filter(|parameter| parameter.sortable())
-                .map(|parameter| OrderKey {
-                    path: parameter.value_path("c"),
+                .and_then(|parameter| parameter.value_path("c"))
+                .map(|path| OrderKey {
+                    path,
                     descending: *descending,
                 })
         })
@@ -136,7 +151,12 @@ fn condition(
     parameter: &Parameter,
 ) -> Result<WhereExpr, CriteriaError> {
     let alias = conditions.alias(parameter.node());
-    let path = parameter.value_path(&alias);
+    let path = parameter
+        .value_path(&alias)
+        .ok_or_else(|| CriteriaError::Invalid {
+            name: filter.name.clone(),
+            reason: String::from("the parameter reads no path"),
+        })?;
     let alternatives: Vec<WhereExpr> = match (&filter.test, parameter.kind()) {
         (Test::Token(values), ParameterType::Token) => {
             let system = parameter.system_path(&alias);
