@@ -416,14 +416,6 @@ impl Registers {
     }
 }
 
-/// Listens on [`CHANNEL`] through `store` on this replica's behalf, when
-/// both are present, so each register's copy is dropped at every write.
-pub fn listen(registers: Option<&Arc<Registers>>, store: Option<&crate::store::Store>) {
-    if let (Some(registers), Some(store)) = (registers, store) {
-        store.listeners(&[registers.listened()]).spawn();
-    }
-}
-
 /// Returns the version of `register` a `settings_register` row holds.
 fn version(register: Register, row: &PgRow) -> Result<Version, RegisterError> {
     let number: i64 = row.try_get("version").map_err(database)?;

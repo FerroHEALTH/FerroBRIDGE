@@ -167,7 +167,7 @@ async fn a_write_on_one_replica_is_in_force_on_another_after_the_notification()
     let writer = Registers::new(&store);
     let reader = Arc::new(Registers::new(&other));
     let listened = reader.listened();
-    ferrobridge_server::settings::listen(Some(&reader), Some(&other));
+    other.listeners(&[Arc::clone(&listened)]).spawn();
     assert!(
         listened.listening_within(WAIT).await,
         "the listener connects"
