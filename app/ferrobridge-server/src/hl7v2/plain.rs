@@ -3,8 +3,10 @@
 
 //! The face's two lanes and the check that binds a route to its connection.
 //!
-//! The client certificate's subject binds a route on the TLS lane, and the
-//! peer's network on the plain lane for the devices that cannot speak TLS.
+//! A route's proofs are the client certificate's subject and the peer's
+//! networks, and every proof a route holds must hold. The TLS lane needs a
+//! route bound to a subject, and the plain lane, for the devices that cannot
+//! speak TLS, one bound to networks.
 //!
 //! HL7 MLLP Release 2 defines no security layer, and IHE ITI ATNA (ITI TF-2,
 //! ITI-19) adds TLS for a node that supports it. A device that cannot is
@@ -19,6 +21,7 @@ use tokio::net::TcpListener;
 
 use crate::hl7v2::answer::Settled;
 use crate::hl7v2::{Face, Listening};
+use crate::inbound::verify::{Proofs, Request, Unproven, Verifier};
 use crate::sources::document::Route;
 
 /// The listener a face answers on.
@@ -33,32 +36,46 @@ pub enum Lane {
     Plain,
 }
 
-/// Returns whether `peer` lies in one of the networks `route` names, an
-/// IPv4 peer seen as an IPv4-mapped IPv6 address included.
+/// Returns why a message routed by `route` may not be sent on `connection`
+/// of `lane`, `None` when every proof of the route holds.
+///
+/// A route the lane cannot bind, one with no certificate subject on the TLS
+/// listener or no network on the plain one, is refused as the lane's own
+/// proof failing.
 #[must_use]
-pub fn addressed(route: &Route, peer: Option<SocketAddr>) -> bool {
-    let Some(peer) = peer else {
-        return false;
+pub fn unproven(lane: Lane, route: &Route, connection: &Connection) -> Option<Settled> {
+    let bound = route.proofs.iter().any(|proof| match lane {
+        Lane::Tls => matches!(proof, Verifier::Mtls(_)),
+        Lane::Plain => matches!(proof, Verifier::Network(_)),
+    });
+    if !bound {
+        return Some(match lane {
+            Lane::Tls => Settled::Certificate,
+            Lane::Plain => Settled::Address,
+        });
+    }
+    let headers = http::HeaderMap::new();
+    let request = Request {
+        headers: &headers,
+        body: &[],
+        peer: connection.certificate(),
+        now: 0,
     };
-    let peer = peer.ip().to_canonical();
-    route
-        .source_cidrs
+    let proofs = route
+        .proofs
         .iter()
-        .filter_map(|network| network.parse::<ipnet::IpNet>().ok())
-        .any(|network| network.contains(&peer))
-}
-
-/// Returns whether the client certificate of `connection` names the subject
-/// `route` is bound to.
-#[must_use]
-pub fn certified(route: &Route, connection: &Connection) -> bool {
-    let (Some(certificate), Some(subject)) = (
-        connection.certificate(),
-        route.certificate_subject.as_deref(),
-    ) else {
-        return false;
-    };
-    ferrobridge_hl7v2::mllp::tls::names(certificate, subject)
+        .fold(Proofs::default(), |proofs, proof| {
+            proofs.with(proof, Vec::new())
+        });
+    let address = connection.peer().map(|peer| peer.ip());
+    match proofs.verify(&request, address) {
+        Ok(()) => None,
+        Err(Some(Unproven {
+            proof: Verifier::Network(_),
+            ..
+        })) => Some(Settled::Address),
+        Err(_) => Some(Settled::Certificate),
+    }
 }
 
 impl Face {
@@ -83,25 +100,19 @@ impl Face {
     /// Returns why a message routed by `route` may not be sent on
     /// `connection`, `None` when it may.
     ///
-    /// On the TLS listener the client certificate must name the subject the
-    /// route is bound to. On the plain listener the peer address must lie in
-    /// one of the route's networks, and a refused connection is closed after
-    /// its answer, since its peer sent as a sender it is not.
+    /// Every proof the route holds must hold for the connection. On the
+    /// plain listener a refused connection is closed after its answer, since
+    /// its peer sent as a sender it is not.
     pub(super) fn unbound(&self, route: &Route, connection: &Connection) -> Option<Settled> {
-        match self.lane {
-            Lane::Tls => (!certified(route, connection)).then_some(Settled::Certificate),
-            Lane::Plain => {
-                if addressed(route, connection.peer()) {
-                    return None;
-                }
-                tracing::warn!(
-                    peer = connection.peer().map(|peer| peer.ip().to_string()),
-                    "a message on the plain listener names a route that holds none of its peer's networks; the connection closes"
-                );
-                connection.close();
-                Some(Settled::Address)
-            }
+        let settled = unproven(self.lane, route, connection)?;
+        if self.lane == Lane::Plain {
+            tracing::warn!(
+                peer = connection.peer().map(|peer| peer.ip().to_string()),
+                "a message on the plain listener names a route its connection does not prove; the connection closes"
+            );
+            connection.close();
         }
+        Some(settled)
     }
 }
 
