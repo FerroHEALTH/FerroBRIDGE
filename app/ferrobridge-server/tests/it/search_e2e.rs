@@ -68,6 +68,7 @@ async fn a_patient_search_pages_the_committed_conditions_back_from_a_real_cdr()
                 language: String::from("en"),
                 territory: String::from("GB"),
                 ehr_status_system: None,
+                custodian: crate::facade::custodian(),
             },
         )
         .with_search(catalog, search::Limits::default()),
@@ -157,6 +158,7 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
                 language: String::from("de"),
                 territory: String::from("DE"),
                 ehr_status_system: None,
+                custodian: crate::facade::custodian(),
             },
         )
         .with_search(catalog, search::Limits::default()),

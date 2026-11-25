@@ -4,8 +4,10 @@
 //! The wait and the verdict of the bridge's own loops.
 //!
 //! The [`Backoff`] spaces two attempts, the [`Failure`] says whether a repeat
-//! may succeed, the [`Statuses`] read a failure from an HTTP answer, and the
-//! [`Policy`] turns a failure and an attempt count into a retry or a park.
+//! may succeed, the [`Statuses`] read a failure from an HTTP answer, the
+//! [`Policy`] turns a failure and an attempt count into a retry or a park,
+//! and the [`Decided`] record is an operator's settlement of parked work, in
+//! the change feed's dead letters and the inbound engine's work items alike.
 //!
 //! Each loop keeps its own numbers and its own park rule: the start and the
 //! change-feed follower double a wait up to a ceiling, and the inbound
@@ -13,6 +15,7 @@
 //! (the generated ITS-REST client, `ferrobridge-term`, `ferrohealth-smart`)
 //! belongs to its crate. No specification governs this: our own design.
 
+use std::fmt;
 use std::time::Duration;
 
 use http::StatusCode;
@@ -175,6 +178,71 @@ impl Policy {
         }
         Next::Retry(self.backoff.jittered(attempts, random))
     }
+}
+
+/// How an operator settles parked work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Decision {
+    /// Run it again.
+    Retry,
+    /// Settle it without running it again.
+    Discard,
+}
+
+impl Decision {
+    /// Returns the decision as the stores and the operator API write it.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Retry => "retry",
+            Self::Discard => "discard",
+        }
+    }
+
+    /// Returns the decision `text` names, `None` for any other text.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "retry" => Some(Self::Retry),
+            "discard" => Some(Self::Discard),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Decision {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<ferrobridge_operator_api::events::Decision> for Decision {
+    fn from(decision: ferrobridge_operator_api::events::Decision) -> Self {
+        match decision {
+            ferrobridge_operator_api::events::Decision::Retry => Self::Retry,
+            ferrobridge_operator_api::events::Decision::Discard => Self::Discard,
+        }
+    }
+}
+
+impl From<Decision> for ferrobridge_operator_api::events::Decision {
+    fn from(decision: Decision) -> Self {
+        match decision {
+            Decision::Retry => Self::Retry,
+            Decision::Discard => Self::Discard,
+        }
+    }
+}
+
+/// An operator's settlement of parked work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Decided {
+    /// Retry or discard.
+    pub decision: Decision,
+    /// Who decided: the subject of the operator's token.
+    pub by: String,
+    /// Why, in the operator's words.
+    pub reason: String,
 }
 
 /// Returns a random `u32` for [`Policy::next`].

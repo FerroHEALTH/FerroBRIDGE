@@ -32,6 +32,7 @@ use ferrobridge_server::hl7v2::Listener;
 use ferrobridge_server::hl7v2::Listening;
 use ferrobridge_server::sources::{Fixed, Routes, Source};
 use ferrobridge_testkit::mllp_tls::{ClientIdentity, Pki};
+use ferrobridge_testkit::post_quantum::Peer;
 use ferrobridge_testkit::stubs::terminology;
 use ferrohealth_usage_report::window::{Counts, Window};
 use std::error::Error;
@@ -251,7 +252,7 @@ static NORTHLAB: LazyLock<ClientIdentity> =
 pub(crate) async fn connect(
     address: SocketAddr,
 ) -> Result<tokio_rustls::client::TlsStream<tokio::net::TcpStream>, Box<dyn Error>> {
-    let connector = PKI.connector(Some(&NORTHLAB))?;
+    let connector = PKI.connector(Some(&NORTHLAB), Peer::Hybrid)?;
     Ok(ferrobridge_testkit::mllp_tls::connect(address, &connector).await?)
 }
 

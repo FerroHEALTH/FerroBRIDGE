@@ -17,11 +17,10 @@ use crate::change_feed::ReaderName;
 use crate::change_feed::Source;
 use crate::change_feed::dead_letter::DeadLetterError;
 use crate::change_feed::dead_letter::DeadLetters;
-use crate::change_feed::dead_letter::Decided;
-use crate::change_feed::dead_letter::Decision;
 use crate::change_feed::dead_letter::Parked;
 use crate::change_feed::health::Following;
 use crate::change_feed::health::State;
+use crate::retry::Decided;
 
 /// One running consumer.
 #[derive(Debug, Clone)]
@@ -47,9 +46,9 @@ pub struct Report {
     topology: Option<document::Topology>,
 }
 
-/// What a settlement found.
+/// What a decision on a parked event found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Settlement {
+pub enum Ruled {
     /// The settlement is recorded: a retried event is offered again before
     /// its consumer's next page, a discarded one never again.
     Recorded,
@@ -111,9 +110,9 @@ impl Report {
         name: &str,
         id: u64,
         decided: &Decided,
-    ) -> Result<Settlement, DeadLetterError> {
+    ) -> Result<Ruled, DeadLetterError> {
         let Some(follower) = self.followers.iter().find(|follower| follower.name == name) else {
-            return Ok(Settlement::UnknownConsumer);
+            return Ok(Ruled::UnknownConsumer);
         };
         Ok(
             if self
@@ -121,9 +120,9 @@ impl Report {
                 .decide(&follower.reader, id, decided)
                 .await?
             {
-                Settlement::Recorded
+                Ruled::Recorded
             } else {
-                Settlement::UnknownEvent
+                Ruled::UnknownEvent
             },
         )
     }
@@ -190,10 +189,7 @@ fn parked(entry: &Parked) -> document::Parked {
         at: entry.at.to_string(),
         replay_requested: entry.replay,
         decision: entry.decided.as_ref().map(|decided| document::Decided {
-            decision: match decided.decision {
-                Decision::Retry => document::Decision::Retry,
-                Decision::Discard => document::Decision::Discard,
-            },
+            decision: decided.decision.into(),
             by: decided.by.clone(),
             reason: decided.reason.clone(),
         }),

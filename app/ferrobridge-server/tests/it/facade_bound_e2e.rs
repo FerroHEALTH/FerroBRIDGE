@@ -97,6 +97,7 @@ async fn a_facade_write_and_a_transaction_commit_under_the_committer_the_cdr_wri
             language: String::from("en"),
             territory: String::from("GB"),
             ehr_status_system: None,
+            custodian: crate::facade::custodian(),
         },
     ));
 

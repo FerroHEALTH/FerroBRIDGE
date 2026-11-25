@@ -12,9 +12,13 @@
 //! next write is refused. Session advisory locks carry no fencing token and
 //! end with their connection while the task may run on
 //! (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
-//! No specification governs leadership: our own design on family precedent.
+//! [`Leader`] is the one loop a singleton runs its work inside: the
+//! change-feed followers, the inbound recovery and the SHL sweep. No
+//! specification governs leadership: our own design on family precedent.
 
 use std::fmt;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use sqlx::PgConnection;
@@ -352,6 +356,133 @@ impl Leadership for Lease {
 
     fn renew_every(&self) -> Duration {
         Self::renew_every(self)
+    }
+}
+
+/// One replica's sticky leadership of one lane.
+///
+/// It claims the lane once, renews the term on its own task every
+/// [`Leadership::renew_every`], and keeps the term until it is lost or given
+/// up, so the generation moves only on a takeover and every write under the
+/// term stays fenced by it.
+#[derive(Debug)]
+pub struct Leader {
+    /// How the lane is claimed, renewed and released.
+    leadership: Arc<dyn Leadership>,
+    /// The term this replica holds, while it holds one.
+    held: Option<Held>,
+}
+
+/// A term and the task that renews it.
+#[derive(Debug)]
+struct Held {
+    /// The term.
+    term: Term,
+    /// Set once a renewal finds the term taken by another replica.
+    lost: Arc<AtomicBool>,
+    /// The renewal task.
+    renewer: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for Held {
+    fn drop(&mut self) {
+        self.renewer.abort();
+    }
+}
+
+impl Leader {
+    /// Returns a leader over `leadership` that holds no term yet.
+    #[must_use]
+    pub fn new(leadership: Arc<dyn Leadership>) -> Self {
+        Self {
+            leadership,
+            held: None,
+        }
+    }
+
+    /// Returns the term this replica holds, claiming the lane when it holds
+    /// none or lost the last; `None` while another replica leads.
+    ///
+    /// # Errors
+    /// Returns [`LeaseError`] when the claim cannot be made.
+    pub async fn lead(&mut self) -> Result<Option<Term>, LeaseError> {
+        if let Some(held) = &self.held {
+            if !held.lost.load(Ordering::Acquire) {
+                return Ok(Some(held.term.clone()));
+            }
+            self.held = None;
+        }
+        let Some(term) = self.leadership.claim().await? else {
+            return Ok(None);
+        };
+        let lost = Arc::new(AtomicBool::new(false));
+        let renewer = tokio::spawn(renew(
+            Arc::clone(&self.leadership),
+            term.clone(),
+            Arc::clone(&lost),
+        ));
+        self.held = Some(Held {
+            term: term.clone(),
+            lost,
+            renewer,
+        });
+        Ok(Some(term))
+    }
+
+    /// Returns whether the term this replica held is gone: lost to another
+    /// replica, or never taken.
+    #[must_use]
+    pub fn is_lost(&self) -> bool {
+        self.held
+            .as_ref()
+            .is_none_or(|held| held.lost.load(Ordering::Acquire))
+    }
+
+    /// Drops the term after a fenced write was refused, so the next
+    /// [`Leader::lead`] claims the lane again.
+    pub fn lost(&mut self) {
+        self.held = None;
+    }
+
+    /// Gives the term up, so another replica takes the lane at once.
+    ///
+    /// # Errors
+    /// Returns [`LeaseError`] when the release cannot be made; the lease
+    /// then runs out on its own.
+    pub async fn release(&mut self) -> Result<(), LeaseError> {
+        let Some(held) = self.held.take() else {
+            return Ok(());
+        };
+        held.renewer.abort();
+        if held.lost.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        self.leadership.release(&held.term).await
+    }
+
+    /// Returns how often the term is renewed.
+    #[must_use]
+    pub fn renew_every(&self) -> Duration {
+        self.leadership.renew_every()
+    }
+}
+
+/// Renews `term` every renewal period until it is lost, then flags `lost`.
+async fn renew(leadership: Arc<dyn Leadership>, term: Term, lost: Arc<AtomicBool>) {
+    loop {
+        tokio::time::sleep(leadership.renew_every()).await;
+        match leadership.renew(&term).await {
+            Ok(Renewed::Held) => {}
+            Ok(Renewed::Lost) => {
+                lost.store(true, Ordering::Release);
+                return;
+            }
+            Err(error) => tracing::warn!(
+                lane = %term.lease().lane(),
+                reason = %crate::indicators::reason(&error),
+                "the lease could not be renewed; the next renewal tries again"
+            ),
+        }
     }
 }
 

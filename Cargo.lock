@@ -1507,7 +1507,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.36.1"
+version = "0.37.1"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -1536,9 +1536,9 @@ dependencies = [
 
 [[package]]
 name = "ehds-logging"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd3d4ba7cb312b0c99c542c8fe198fdbc429b0e643abe5f3190e7d0d87bd21ab"
+checksum = "0595ae20c8fae9c1892db05bb3acbee4c9230305e6d705d9c2504c841718b8e5"
 dependencies = [
  "async-trait",
  "ihe-atna",
@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.34.0"
+version = "0.34.1"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1822,7 +1822,6 @@ dependencies = [
  "openehr-term",
  "quick-xml",
  "rcgen",
- "redb",
  "reqwest",
  "rustls",
  "secrecy",
@@ -1850,7 +1849,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.19.1"
+version = "0.20.1"
 dependencies = [
  "async-trait",
  "backon",
@@ -1913,7 +1912,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.20.1"
+version = "0.21.1"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -1969,9 +1968,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.12.1"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b81adde7764e4b10b55c7bd4579ad0dd60b584320df0ba9a8d09f2c52f2dcb1"
+checksum = "b70fdd6d5e2c17d72b91fe98d92a66f6c37f9292867b3a3bf3a691084ea5dd4e"
 dependencies = [
  "axum",
  "clap",
@@ -3055,9 +3054,9 @@ dependencies = [
 
 [[package]]
 name = "ihe-atna"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d544ed26e17fac60c46b469097981478fc5231ef18cc29889d38da8437ee6f9c"
+checksum = "e80c1964088be423a90645f4c67b62b8b833238e7988f1f5eb4a42010ae003fc"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -3076,9 +3075,9 @@ dependencies = [
 
 [[package]]
 name = "ihe-iti"
-version = "0.22.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0d7ffc156b745bf5818545c029ae50009f44d2bde0ad5263144521b1b94e978"
+checksum = "f6610e6ad1ae8c9636e4d6f43e82b230b198a43bb79c9bddbe02ac665b54cff4"
 dependencies = [
  "ferrohealth-smart",
  "fhir-search",
@@ -4779,15 +4778,6 @@ dependencies = [
  "time",
  "x509-parser",
  "yasna",
-]
-
-[[package]]
-name = "redb"
-version = "4.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "096b1dd5ec053c9c2a5a26a93aafeadf73ebcb710ea54dc3151f17a8e20535ef"
-dependencies = [
- "libc",
 ]
 
 [[package]]

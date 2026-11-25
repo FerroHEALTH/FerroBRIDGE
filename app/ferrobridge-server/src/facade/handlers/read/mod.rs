@@ -195,6 +195,14 @@ pub(crate) async fn assemble(
         )
         .await?;
     }
+    let custodian = fhir_types::codec::Json::to_json(&facade.settings().custodian.organization())
+        .map_err(|error| {
+        reply::refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception)
+                .diagnosing(format!("the custodian does not encode: {error}")),
+        )
+    })?;
     let base = url::Url::parse(&facade.settings().base_url).map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -209,6 +217,7 @@ pub(crate) async fn assemble(
             base: &base,
             source: &source,
             timestamp: &jiff::Timestamp::now().to_string(),
+            custodian: &custodian,
         },
     ))
 }
