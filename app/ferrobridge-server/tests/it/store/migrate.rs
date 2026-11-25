@@ -27,12 +27,16 @@ async fn replicas_starting_together_migrate_once() -> Result<(), Box<dyn Error>>
         sqlx::query_scalar("SELECT version FROM _sqlx_migrations ORDER BY version")
             .fetch_all(first.pool())
             .await?;
-    assert_eq!(vec![1, 2, 12], versions);
+    let carried: Vec<i64> = sqlx::migrate!("./migrations/state")
+        .iter()
+        .map(|migration| migration.version)
+        .collect();
+    assert_eq!(carried, versions);
     first.migrate().await?;
     let again: i64 = sqlx::query_scalar("SELECT count(*) FROM _sqlx_migrations")
         .fetch_one(first.pool())
         .await?;
-    assert_eq!(3, again);
+    assert_eq!(i64::try_from(carried.len())?, again);
     Ok(())
 }
 

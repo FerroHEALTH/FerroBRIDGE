@@ -179,12 +179,12 @@ impl Links {
         }
     }
 
-    /// Returns the place of one record: reserved in the spool, or taken at
+    /// Returns the place of one record: reserved in the outbox, or taken at
     /// store time from a recorder that reserves none.
     ///
     /// # Errors
     ///
-    /// Returns the [`AuditError`] of a spool with no room.
+    /// Returns the [`AuditError`] of an outbox that cannot take a record.
     async fn reserve(&self) -> Result<Place<'_>, AuditError> {
         match self.log.as_ref() {
             None => Ok(Place::Off),
@@ -200,7 +200,7 @@ impl Links {
 enum Place<'a> {
     /// No access-record lane runs.
     Off,
-    /// A place reserved in the spool.
+    /// A place reserved in the outbox.
     Reserved(Box<dyn Reserved>),
     /// The recorder takes the record when it is stored.
     Later(&'a Arc<AccessLog>),
