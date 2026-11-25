@@ -42,8 +42,8 @@ pub enum WireVersion {
     /// FHIR R5 (<https://hl7.org/fhir/R5/>).
     #[cfg(feature = "r5")]
     R5,
-    /// The FHIR R6 ballot, 6.0.0-ballot5
-    /// (<https://hl7.org/fhir/6.0.0-ballot5/>).
+    /// FHIR R6 at its snapshot 6.0.0-snapshot1
+    /// (<https://hl7.org/fhir/6.0.0-snapshot1/>).
     #[cfg(feature = "r6")]
     R6,
 }

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSObservation (Table 24), served by the facade as an individual resource
+# (draft act Art 7(2), #2087): each OBSERVATION.body_weight.v2 entry of the
+# template becomes one Observation with the
+# http://hl7.org/fhir/StructureDefinition/bodyweight profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_observation.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/bodyweight"
+    version: "4.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "OBSERVATION.body_weight.v2"
+  start: "OBSERVATION.body_weight.v2"

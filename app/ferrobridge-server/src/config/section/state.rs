@@ -48,12 +48,17 @@ impl Default for State {
     }
 }
 
-/// The sealing keys: the first seals, every one opens what it sealed.
+/// The sealing keys, the first sealing and every one opening what it
+/// sealed, and the lookup key identifier values are digested under.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSeal {
     /// The keys, newest first.
     pub keys: Vec<SealKey>,
+    /// The base64 of the lookup key's 32 bytes; it never rotates.
+    pub lookup_key: Option<Secret>,
+    /// A file holding that base64, read at boot.
+    pub lookup_key_file: Option<PathBuf>,
 }
 
 /// One sealing key and the id a sealed row names it by.

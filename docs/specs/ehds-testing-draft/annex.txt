@@ -1,0 +1,458 @@
+                                                                   Ref. Ares(2026)10805685 - 19/11/2026
+
+
+
+
+                     EUROPEAN
+                     COMMISSION
+
+
+
+
+                                             Brussels, XXX
+                                             […](2026) XXX draft
+
+                                             ANNEXES 1 to 2
+
+
+
+
+                                  ANNEXES
+                                    to the
+
+           Commission Implementing Regulation (EU) 20XX/XXXX
+
+     on common specifications for the European digital testing environment
+
+
+
+
+EN                                                                                          EN
+                                                        ANNEX I
+                        Functional requirements of the European digital testing environment
+
+
+ GEN       Generic assessment scope
+
+ GEN-010   The European digital testing environment (‘EU DTE’) shall create logically separated workspaces for each testing
+           organisation, to enable the testing of systems under test belonging to each such testing organisation.
+
+ GEN-020   The EU DTE shall allow testing organisations to test specific versions of their systems.
+
+ GEN-030   The EU DTE shall implement the latest technical specifications based on the requirements of Regulation (EU) 2025/327 and
+           its implementing acts applicable to the testing process without any alteration of their content.
+
+ GEN-040   The EU DTE shall provide an effective version control system to be used across the testing process. The version control
+           system shall support the versioning of the following:
+              •   digital testing environment;
+              •   system under test;
+              •   technical specifications.
+           The version identifiers implemented by the version control system shall be complemented by the reference to the deployment
+           environment lifecycle of systems under test, e.g. playground/development, pre-release, acceptance. The system under test
+           shall not be tested in its production environment. The EU DTE shall not be used with real personal electronic health data.
+
+ GEN-050   Test cases integrated in the EU DTE shall include clear references to the requirements of Regulation (EU) 2025/327 and
+           those of implementing acts adopted on the basis of that Regulation with which conformity is assessed, such as [OP please add
+           the number to the implementing act adopted pursuant to Article 36 of Regulation (EU) 2025/327]
+
+ GEN-060   The EU DTE shall be maintainable and extensible to support updates of the requirements of Implementing Regulation
+           (EU)…[OP please add the number of the implementing act under Article 15 of Regulation (EU) 2025/327], any related
+           implementation guides adopted by the ‘EHDS Board’, the requirements of implementing act to be adopted pursuant to Article
+
+
+
+EN                                                          0                                                                        EN
+           36 of Regulation (EU) 2025/327 and the requirements laid down in this Regulation. A traceability matrix shall be used for
+           this purpose.
+
+ USR       User roles and permissions
+
+ USR-010   The EU DTE shall allow at least the following roles to be created, read, updated, and deleted:
+           -   system administrator, which concerns the environment provider side, e.g. Member State entities);
+           -   testing organisation administrator, which concerns the testing environment user side, e.g. ‘EHR system’ manufacturers);
+           -   tester.
+
+ USR-020   The system administrator shall be able to:
+               a) configure system settings (see SET) including the qualified electronic seal certificate;
+               b) register and manage test domains;
+               c) register and manage details of technical specifications used for testing;
+               d) register and manage test suites for each technical specification;
+               e) create, read, update, and delete other system administrators;
+               f) create, read, update, and delete the testing organisations;
+               g) create, read, update, and delete the relation between the testing organisations and testing organisation administrators;
+               h) configure validators and simulators
+               i) monitor the test history of testing organisations;
+               j) access the audit trail of testing organisations;
+               k) access the audit trail of the EU DTE.
+
+ USR-030   The testing organisation administrator, within the organisation, shall be able to:
+               a) create, read, update, and delete systems under test (name, version, type);
+               b) create, read, update, and delete conformity statements;
+               c) create, read, update, and delete other testing organisation administrators;
+               d) create, read, update, and delete testers;
+               e) request and download the conformity report;
+               f) generate API keys for automatic testing;
+
+
+
+EN                                                            1                                                                              EN
+               g) monitor test history of the testing organisation.
+               h) configure the test history sharing rights;
+               i) access audit trail of the organisation workspace.
+
+ USR-040    The tester shall be able to:
+               a) execute assigned test cases;
+               b) request and download the conformity report;
+               c) monitor testing progress, including its history;
+               d) access the audit trail of test sessions performed by the tester.
+
+ USR-050    The system administrator shall be able to configure at least the following test domains and test specifications details:
+               a) its name;
+               b) its version;
+               c) one or more priority categories of personal electronic health data referred to in Article 14(1) of Regulation (EU)
+                  2025/327, or their main characteristics thereof, to which the technical specification is applicable;
+               d) test suites and associated test cases (read-only);
+               e) the validator and/or the simulator to be used, if applicable.
+
+ USR-060    The testing organisation administrator shall be able to specify in the conformity statement details:
+               a) the system under test, including its version and the classification based on implementing act to be adopted pursuant to
+                  Article 36 of Regulation (EU) 2025/327;
+               b) the technical specifications, compliance with which is claimed for the system under test.
+
+ USR-1070   The EU DTE users shall be able to manage their user profile and information on the basis of their authorisations.
+
+ USR-080    The EU DTE shall support an automatic user logout after a period of inactivity.
+
+ SET        Configuration settings
+
+ SET-010    The EU DTE shall allow configuration settings to be managed, such as system properties, supported login mechanisms,
+            landing page, legal notice, error templates, themes, retention period for testing history, timeout for the automatic user logout,
+
+
+EN                                                            2                                                                            EN
+           and help pages.
+
+ SET-020   The EU DTE shall enable the configuration of the secure API, such as a REST API. The API configuration shall include,
+           where appropriate, enabling or disabling asynchronous testing, setting usage limits, and the definition of endpoint details.
+
+ SET-030   The EU DTE shall support the update of technical specification details and related validators and simulators without the need
+           to re-deploy the EU DTE.
+
+ TST       Test execution
+
+ TST-010   The EU DTE shall assign to EHR system manufacturer, on the basis of the conformity statement for the system under test
+           and depending on the EHR system classification pursuant to implementing act to be adopted pursuant to Article 36 of
+           Regulation (EU) 2025/327, the test cases to be executed by the system under test.
+
+ TST-020   The EU DTE shall support the testing process of the system under test regardless of its maturity and readiness level.
+
+ TST-030   The EU DTE shall support the import and export of common test suites in an open, standardised machine-readable format.
+           The test cases shall be read-only and shall not be modified.
+
+ TST-040   The EU DTE shall support the execution of different types of predefined test cases relevant to the self-assessment of
+           harmonised software components of EHR systems (e.g. data content-related validation, data exchange validation and
+           requirements-related check list validation).
+
+ TST-050   The EU DTE shall enable the manual validation of content through the upload of files and manual download of validation
+           results.
+
+ TST-060   The EU DTE shall support the execution of test cases by different means such as:
+              a) validating content;
+              b) filling in a checklist;
+              c) sending or receiving data.
+
+
+
+
+EN                                                          3                                                                         EN
+ TST-070   The EU DTE shall enable the validation of the content for each priority category, including data groups, of personal
+           electronic health data referred to in Article 14(1) of Regulation (EU) 2025/327) at document level, at resource level or both.
+
+ TST-080   The EU DTE shall perform data content validation at different levels (syntax and semantic), including validation rules that
+           consider interdependencies between data element values. The validation shall be performed on the basis of the data fields,
+           value sets and coding systems set out in Implementing Regulation (EU) [OP please add the number of the Implementing
+           Regulation adopted further to Article 15 of Regulation (EU) 2025/327]
+
+ TST-090   The EU DTE shall enable users to access and monitor test step results and test results when running a test session.
+
+ TST-100   The EU DTE shall support incremental testing of the system under test by one of the following:
+              a) providing a list of all test results of the different versions of the same system under test;
+              b) providing a list of all test results of the same version of the system under test using different versions of technical
+                 specifications.
+
+ TST-110   The EU DTE shall ensure that each test session is executed in isolation and not affected by any other test session. The test
+           session shall be reproducible under the same conditions.
+
+ TST-120   The EU DTE shall support the parallel and sequential execution of test sessions.
+
+ TST-130   In addition to the on-demand real-time execution of test sessions the EU DTE shall support the asynchronous execution of
+           test sessions.
+           Testers shall be able to submit test executions, monitor their status, retrieve their results once completed, and cancel pending
+           or running executions.
+
+ TST-140   The EU DTE shall provide users with synthetic test data, including positive and negative examples for each test case, to
+           enable the validation of the correct behaviours of the associated test cases in the testing environment.
+
+ REP       Reporting
+
+
+
+
+EN                                                           4                                                                            EN
+ REP-010   Each test result produced by the EU DTE shall be assigned with one of the following statuses:
+              •   SUCCESS when all the steps defined in the test case have been completed successfully following the test logic;
+              •   FAILURE when at least one step defined in the test case has failed due to existing errors;
+              •   UNDEFINED when the test case has either not been fully executed or was interrupted before completion and need to
+                  be re-executed.
+           The test result shall provide a list of any warnings and errors, that occurred during the testing including the pass/fail criteria
+           defined for each test case. For check-list based testing, if an item on the checklist is not answered, the result status is
+           UNDEFINED.
+
+ REP-020   The EU DTE shall automatically generate a conformity report when the test session is completed. The conformity report shall
+           contain at least the following:
+              a) the EU DTE version including details of the technical specification, the test suites and the validation configuration;
+              b) the operator;
+              c) the details of the system under test;
+              d) the testing organisation;
+              e) the conformity statement;
+              f) a list of all test cases executed to confirm the correctness of the conformity statement;
+              g) the recorded start and end times and test results for all executed test sessions.
+
+ REP-030   The EU DTE shall generate, at the user’s request, the conformity certificates according to a common template where all
+           required test cases have been executed and have the result status ‘SUCCESS’. The conformity certificate shall contain at
+           least:
+              a) the certificate identifier;
+              b) the date of issuance;
+              c) the EU DTE version including details of the technical specification, the test suites and the validation configuration;
+              d) the operator;
+              e) the details of the system under test;
+              f) the testing organisation;
+              g) the conformity statement;
+
+
+
+EN                                                            5                                                                            EN
+              h) a list of all test cases executed to confirm the correctness of the conformity statement;
+              i) the recorded start and end times and test results for all executed test sessions.
+              j) a statement that all the test cases, executed to confirm the correctness of the conformity statement, have the result
+                 status ‘SUCCESS’.
+
+ REP-040   The EU DTE shall provide a mechanism for ensuring the integrity and authenticity of conformity certificates. Each
+           conformity certificate shall be uniquely identified and electronically sealed with a qualified electronic seal of the operator
+           pursuant to Regulation (EU) No 910/2014.
+
+ REP-050   The EU DTE shall enable the provision of other conformity certificates that are clearly distinguished from the conformity
+           certificate for the requirements set out in Anex II to Regulation (EU) 2025/327 for additional test cases added by Member
+           States through national extensions. Such extensions may be used by Member States to verify compliance with national
+           requirements.
+
+ REP-060   The EU DTE shall maintain a registry of conformity certificates. The registry shall contain the minimum information to
+           identify the authenticity of the conformity certificate, e.g. date and tested requirements.
+
+ REP-070   The conformity certificates provided by the EU DTE shall be structured and exportable in both human-readable (e.g. PDF)
+           and machine-readable formats. The machine-readable format shall be open and standardised. The conformity certificate shall
+           be provided at least in English
+
+ REP-080   The EU DTE shall support the automatic notification for test failures.
+
+ REP-090   The EU DTE shall report test results in an open, standardised machine-readable format.
+
+ SIT       System integration
+
+ SIT-010   The EU DTE shall enable the testing organisation to generate for each conformity certificate issued, a public URI/URL
+           through which the conformity certificate shall be accessible by external systems.
+
+ SIT-020   The architecture of the EU DTE reference software shall be modular, providing the possibility to add or extend functionalities
+           allowing Member States to use that reference software to assess the conformity of other aspects than the harmonised software
+
+
+
+EN                                                          6                                                                          EN
+           components with national requirements or to easily integrate the reference software in their existing national testing systems
+           for the assessment of the harmonised software components.
+
+
+ SIT-030   The EU DTE shall offer a validation API for the automatic validation of content through the machine-to-machine interaction
+           for submitting files and receiving validation results.
+
+ SIT-040   The EU DTE shall securely identify the user of the validation API, using a reliable mechanism.
+
+ SIT-050   The EU DTE shall allow for the integration of the simulators for all content transmission APIs referred to in Annex I to
+           Implementing Regulation (EU) [OP please add the number of the implementing act adopted under Article 15 of Regulation
+           (EU) 2025/327]. The simulators shall include client and server simulators functionalities.
+
+ SIT-060   In the simulators, the EU DTE shall securely identify the user of the simulator, such as a system under test or a continuous
+           integration pipeline used to develop it, using a reliable mechanism such as API keys or public-key cryptography.
+
+ SIT-070   The EU DTE shall include validators and simulators as distinct modules.
+
+ SIT-080   The EU DTE shall display to its users its version and the level of the environment in which the EU DTE is operated, e.g.
+           development, pre-release, acceptance, production, playground for demonstration and training purposes.
+
+
+
+
+EN                                                          7                                                                          EN
+                                                                                        ANNEX I
+                                               Non-functional requirements of the European digital testing environment
+
+     PRF             Performance
+
+     PRF-010         The EU DTE shall support concurrent test sessions by different users without any significant impact on its performance.
+
+     PRF-020         The EU DTE shall perform according to measurable key performance indicators defined by the EHDS Board.
+
+     PRF-030         The EU DTE shall produce analytics of usage, including the numbers of test sessions performed and related test results, execution
+                     timing.
+
+     SEC             Security
+
+     SEC-010         The EU DTE shall implement security measures to protect data and system integrity against unauthorised access, data alteration and
+                     misuse in compliance with the relevant legislation such as Directive (EU) 2022/2555 of the European Parliament and of the Council1,
+                     Regulation (EU) 2016/679 of the European Parliament and of the Council 2,and relevant international standards.
+
+     SEC-020         Access to the EU DTE shall be restricted to electronically identified, authenticated and authorised users. Personal data required for
+                     authorisation and authentication process shall be limited to the EU DTE scope in accordance with the principle of data minimisation.
+
+     SEC-030         The EU DTE shall enable secure login using strong user authentication as defined in Article 3(51) of Regulation (EU) No 910/2014,
+                     including using European Digital Identity Wallets and European Business Wallets established pursuant to [OP: Please add Business
+                     Wallets Regulation. It shall also support alternative means of strong user authentication.
+
+
+
+     1
+       Directive (EU) 2022/2555 of the European Parliament and of the Council of 14 December 2022 on measures for a high common level of cybersecurity across the Union, amending
+              Regulation (EU) No 910/2014 and Directive (EU) 2018/1972, and repealing Directive (EU) 2016/1148 (NIS 2 Directive)(OJ L 333, 27.12.2022, p. 80, ELI:
+              http://data.europa.eu/eli/dir/2022/2555/oj).
+     2
+       Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and
+              on the free movement of such data, and repealing Directive 95/46/EC (General Data Protection Regulation) (OJ L 119, 4.5.2016, p. 1, ELI:
+              http://data.europa.eu/eli/reg/2016/679/oj). In particular, Articles 5(1)(c), (f), 29 and 32(4) GDPR.
+
+
+
+EN                                                         8                                                         EN
+     SEC-040            The EU DTE shall enable the configuration of retention periods defined by the EHDS Board for:
+                            a) test session details;
+                            b) conformity certificates;
+                            c) user data;
+                            d) audit trails.
+                        Where user identifiers enabling the identification of natural person are stored (e.g. user data, audit trails) the data retention shall not be
+                        longer than necessary for the purpose of the self-assessment process carried out in the EU DTE and in any event no longer than five
+                        years.
+
+     SEC-050            The EU DTE shall include appropriate security measures to ensure sufficient level of user data protection, such as data encryption in
+                        transit and at rest.
+
+     SEC-060            The EU DTE shall enable the publication of terms and conditions for the use of the EU DTE. The EU DTE shall ensure that during the
+                        first login of each user, the user accepts the applicable terms and conditions.
+
+     SEC-070            Before each new release the EU DTE software shall undergo cybersecurity checks including vulnerability scanning.
+
+     USB                Usability
+
+     USB-010            The EU DTE shall provide user interfaces that enable users to execute and monitor testing activities without requiring specialised
+                        technical knowledge of the internal system architecture.
+
+     USB-020            The EU DTE shall provide user interfaces that enable accessibility pursuant to Directive (EU) 2016/2102 of the European Parliament
+                        and of the Council 3.
+
+     USB-030            The EU DTE shall include a mechanism to collect feedback from its users for existing issues or for future development.
+
+     USB-040            The EU DTE shall provide the user interface at least in English.
+
+     3
+         Directive (EU) 2016/2102 of the European Parliament and of the Council of 26 October 2016 on the accessibility of the websites and mobile applications of public sector bodies(OJ
+                 L 327, 2.12.2016, ELI: http://data.europa.eu/eli/dir/2016/2102/oj).
+
+
+
+EN                                                            9                                                         EN
+     USB-050   The users shall be able to access clear information on the scope, status and outcome(s) of their testing activities. This shall include as a
+               minimum: the tested requirement, a link to the technical specification from which the requirement stems, test steps, and the expected and
+               observed outcomes.
+
+     USB-060   Error messages and warnings provided during the test execution shall be fit for purpose and actionable for the EU DTE users.
+               Error messages and warnings shall clearly identify the specific requirement being violated and, where possible, remediation guidance.
+               Error codes shall be stable across different EU DTE versions to enable consistency and increase usability.
+               Error messages and warnings shall be provided at least in English.
+
+     USB-070   The EU DTE shall include a functionality to display an advance notice of an upcoming update that might affect an ongoing testing
+               process.
+
+     USB-080   The EU DTE shall provide contextual user guidance, at least in English, using user-friendly mechanisms such as tooltips and info boxes.
+
+     USB-090   The EU DTE shall provide a functionality to insert translations of user interface and inline user guidance to other EU languages.
+
+     USB-100   The EU DTE shall facilitate the onboarding of new testing organisations and users through minimal manual steps.
+
+     RLB       Reliability
+
+     RLB-010   The EU DTE shall have measures in place to prevent the loss or corruption of test sessions and associated test results.
+
+     AUD       Auditability
+
+     AUD-010   The EU DTE shall keep a secure and immutable audit trail of all user accesses and performed test sessions.
+               The audit trail shall include the following information on accesses:
+                  a) user identifier;
+                  b) time of access.
+               The audit trail shall include the following information on all test sessions:
+                  a) system under test;
+
+
+
+EN                                              10                                                EN
+                  b) test session identifier, start and end time, and test results;
+                  c) test session status (complete, incomplete, interrupted, re-run);
+                  d) information on whether manual or automatic validation of content was used.
+
+     AUD-020   The EU DTE shall ensure that the audit trail is accessible by the authorised users immediately after the logged event has taken place.
+
+     SCL       Scalability and portability
+
+     SCL-010   The EU DTE shall be scalable in terms of compute capacity and storage resources to accommodate an increasing number of users, test
+               cases and systems under test over time, including where these run in parallel.
+
+     SCL-020   The EU DTE reference software shall use containerisation, e.g. Docker and Kubernetes, to minimise environment-specific dependencies
+               when deployed..
+
+     MNT       Maintainability
+
+     MNT-010   Due to the availability of new technical specification and associated test cases, the EU DTE updates shall not invalidate previously
+               generated conformity certificates.
+
+     MNT-020   Following the introduction of support for a new version of a technical specification and associated test cases, the EU DTE shall maintain
+               support for the previous versions of the technical specification and associated test cases, for the purposes of backward compatibility and
+               reproducibility of test results. The default testing version shall be the most recent version of the relevant technical specification and
+               associated test cases. There shall be a transition period during which the previous and new version can both be considered valid for
+               performing the testing and obtaining a conformity certificate. The old version of the technical specification shall be discontinued when
+               declared deprecated by the EHDS Board.
+
+     MNT-030   Changes to the EU DTE shall be described in the maintenance plan and be versioned and duly documented in the release note providing
+               the change request reference and the associated reason.
+
+     DOC       Documentation
+
+     DOC-010   The EU DTE documentation shall be made publicly available at least in English and kept up to date whenever a change is made to the
+
+
+
+EN                                            11                                                 EN
+               digital testing environment software.
+
+     DOC-020   The EU DTE documentation shall include a list of supported technical specifications, test cases, and APIs, and known limitations.
+
+     DOC-030   The EU DTE documentation shall include an installation and operation manual. The installation and operation manual shall include a
+               description of the technical architecture, infrastructure requirements, installation guide, configuration options, and an operational
+               runbook, including the applicable security requirements for each of these elements.
+
+     DOC-040   The EU DTE documentation shall include a manual for the users of all supported user roles.
+
+     DOC-050   The EU DTE shall enable a public notification mechanism each time a new EU DTE version is ready for deployment or support for new
+               technical specifications is made available.
+
+
+
+
+EN                                            12                                                EN
+

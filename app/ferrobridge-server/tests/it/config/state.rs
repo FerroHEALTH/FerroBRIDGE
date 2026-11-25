@@ -107,7 +107,7 @@ fn the_first_sealing_key_seals_and_every_one_opens() -> Result<(), Box<dyn std::
     let mut file = tempfile::NamedTempFile::new()?;
     writeln!(file, "{KEY_B}")?;
     let text = with_state(&format!(
-        "[[state.seal.keys]]\nid = \"2026-11\"\nkey_file = \"{}\"\n\n[[state.seal.keys]]\nid = \"2026-05\"\nkey = \"{KEY_A}\"\n",
+        "[state.seal]\nlookup_key = \"{KEY_A}\"\n\n[[state.seal.keys]]\nid = \"2026-11\"\nkey_file = \"{}\"\n\n[[state.seal.keys]]\nid = \"2026-05\"\nkey = \"{KEY_A}\"\n",
         file.path().display()
     ));
     let state = resolve(&text)?.state.ok_or("the store is configured")?;
@@ -150,6 +150,20 @@ fn a_sealing_key_that_is_not_32_bytes_or_named_twice_is_refused() {
     assert!(matches!(
         resolve(&with_state("[state.seal]\n")),
         Err(Error::Missing { key }) if key == "state.seal.keys"
+    ));
+    let lookupless = with_state(&format!(
+        "[[state.seal.keys]]\nid = \"a\"\nkey = \"{KEY_A}\"\n"
+    ));
+    assert!(matches!(
+        resolve(&lookupless),
+        Err(Error::Missing { key }) if key == "state.seal.lookup_key"
+    ));
+    let short_lookup = with_state(&format!(
+        "[state.seal]\nlookup_key = \"QUFB\"\n\n[[state.seal.keys]]\nid = \"a\"\nkey = \"{KEY_A}\"\n"
+    ));
+    assert!(matches!(
+        resolve(&short_lookup),
+        Err(Error::SealKey { key, .. }) if key == "state.seal.lookup_key"
     ));
 }
 

@@ -118,8 +118,9 @@ essential functionalities and information about the security properties;"
   face plain MLLP, so a reverse proxy or the network terminates TLS and
   limits who reaches them. An authorization server issues the access tokens
   `[auth]` checks. The CDR, the terminology server and the CDM database are
-  yours, each reached with the credentials you configure. The disks that hold
-  the identity store and the mapping files are yours to protect
+  yours, each reached with the credentials you configure. The state database
+  that holds the identity map, its keys and the disks that hold the mapping
+  files are yours to protect
   ([the container image](../operate/container.md#running-it-with-compose);
   [what FerroBRIDGE stores](../operate/deployment-shape.md#what-ferrobridge-stores)).
 - **Security properties:** the ones that ship with every release.
@@ -168,9 +169,9 @@ The ones to know before you deploy:
   stolen client key sends as that sender until its authority revokes it.
   Keep the keys of `[[hl7v2.senders]]` with the senders
   ([the HL7 v2 face](../operate/hl7v2-face.md)).
-- **A lost or shared identity store.** A lost file makes the next create of
-  a resource the CDR already holds write a second composition, and two
-  processes with a file each keep two maps that disagree
+- **A lost identity store or lookup key.** A lost state database makes the
+  next create of a resource the CDR already holds write a second composition,
+  and a lost `[state.seal] lookup_key` leaves every stored digest unreadable
   ([the identity store](../operate/container.md#the-identity-store)).
 - **The operator scope rewrites mappings.** With `[operator] mapping_dir` set,
   a token that carries `[auth] product_scope` can save and reload the
@@ -231,7 +232,7 @@ lifetime of the product with digital elements to ensure its secure use;"
   TLS. Name your authorization server in `[auth]` before you turn on the
   facade, the operations or the operator API, and pass every secret through
   its `_file` sibling ([configuring the server](../operate/configuration.md)).
-  Put the identity store on a persistent volume and back it up with the CDR
+  Back the state database and its keys up with the CDR
   ([the identity store](../operate/container.md#the-identity-store)). Connect
   to the CDM database with `sslmode=verify-full`
   ([`[cdm]`](../operate/configuration.md#cdm)). Check the mapping set with
@@ -297,8 +298,8 @@ directories and schemas you name. To take a deployment out of service and
 remove its data, stop the server, the console and every ETL job, then
 delete:
 
-- the file `[facade] identity_store` names, which maps subject identifiers to
-  `ehr_id`s and FHIR ids to compositions;
+- the identity map in the `[state]` database (its `0003` tables), which maps
+  subject identifiers to `ehr_id`s and FHIR ids to compositions;
 - the directory `[usage_report] state_dir` names, which holds the usage
   report's instance id;
 - the mapping directory, `[operator] mapping_dir` if you set it, and the

@@ -61,10 +61,11 @@ pub(crate) struct Rendered {
 /// # Errors
 ///
 /// The refusal an identity-store failure renders as.
-pub(crate) fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value>, Refusal> {
+pub(crate) async fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value>, Refusal> {
     let person = facade
         .store()
         .person_of(ehr_id)
+        .await
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
     Ok(person.map(|person| complete::reference_to(&person, &facade.settings().subject)))
 }
@@ -208,16 +209,25 @@ pub(crate) async fn render_created(
     decorate(body, resource_type, id, &origin, None, warnings)
 }
 
+/// What one outbound run answers a search with.
+pub(crate) struct Units {
+    /// Every resource of the program's own type, the entry's own first.
+    pub(crate) own: Vec<(FhirResourceId, Rendered)>,
+    /// Every resource of another type the run creates, with its type, which
+    /// an `_include` may add.
+    pub(crate) others: Vec<(String, FhirResourceId, Rendered)>,
+}
+
 /// Returns every resource of the program's own type the outbound run over
 /// `composition` answers: the entry's own resource first, then each one the
 /// run creates beside it (a further `hierarchy.split` occurrence), in the
 /// order the run creates them, each decorated as [`render`] decorates the
-/// entry's own.
+/// entry's own; and beside them every created resource of another type.
 ///
-/// A search lists all of them, because each is a resource of the searched
-/// type this server serves (no specification governs how a created resource
-/// is reached from a row: our own design). The declared losses of the run
-/// travel with the entry's own resource alone.
+/// A search lists all of the own type, because each is a resource of the
+/// searched type this server serves (no specification governs how a created
+/// resource is reached from a row: our own design). The declared losses of
+/// the run travel with the entry's own resource alone.
 ///
 /// # Errors
 ///
@@ -229,7 +239,7 @@ pub(crate) async fn render_units(
     composition: &CanonicalComposition,
     origin: Origin<'_>,
     session: &Session<'_>,
-) -> Result<Vec<(FhirResourceId, Rendered)>, Refusal> {
+) -> Result<Units, Refusal> {
     let resource_type = program.resource().as_str();
     let (value, created, warnings) = produce(program, index, composition, &origin, session).await?;
     let body = resource_object(value, resource_type)?;
@@ -241,12 +251,19 @@ pub(crate) async fn render_units(
         Some(program.profile().url().as_str()),
         warnings,
     )?;
-    let mut units = vec![(origin.id.clone(), own)];
+    let mut units = Units {
+        own: vec![(origin.id.clone(), own)],
+        others: Vec::new(),
+    };
     for resource in created {
-        if resource.get("resourceType").and_then(Value::as_str) != Some(resource_type) {
-            continue;
-        }
         let Value::Object(body) = resource else {
+            continue;
+        };
+        let Some(created_type) = body
+            .get("resourceType")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
             continue;
         };
         let text = body.get("id").and_then(Value::as_str).unwrap_or_default();
@@ -254,12 +271,16 @@ pub(crate) async fn render_units(
             reply::refusal(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(format!(
-                    "a {resource_type} the mapping created carries an id outside the R4 grammar: {error}"
+                    "a {created_type} the mapping created carries an id outside the R4 grammar: {error}"
                 )),
             )
         })?;
-        let rendered = decorate(body, resource_type, &id, &origin, None, Vec::new())?;
-        units.push((id, rendered));
+        let rendered = decorate(body, &created_type, &id, &origin, None, Vec::new())?;
+        if created_type == resource_type {
+            units.own.push((id, rendered));
+        } else {
+            units.others.push((created_type, id, rendered));
+        }
     }
     Ok(units)
 }
@@ -340,7 +361,9 @@ async fn produce(
             )
         })
         .await;
-    let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id);
+    let identities = CreatedIdentities::new(origin.store, program.resource().as_str(), origin.id)
+        .await
+        .map_err(|error| created_refusal(&error))?;
     let produced = engine::outbound(
         program,
         index,
@@ -353,9 +376,24 @@ async fn produce(
         crate::usage_report::record_mapping_failure(origin.usage);
         Refusal::from(Refused::of_answer(&status::of_outbound_refusal(&error)))
     })?;
+    identities
+        .persist()
+        .await
+        .map_err(|error| created_refusal(&error))?;
     let warnings = produced.warnings().to_vec();
     let (value, created) = produced.into_parts();
     Ok((value, created, warnings))
+}
+
+/// Returns the `500` a created resource whose identity cannot be recorded
+/// answers.
+fn created_refusal(error: &crate::facade::identity::created::CreatedError) -> Refusal {
+    reply::refusal(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Issue::error(IssueType::Exception).diagnosing(format!(
+            "a resource the mapping created has no identity: {error}"
+        )),
+    )
 }
 
 /// Writes the identity of one rendered resource onto `body` and checks it

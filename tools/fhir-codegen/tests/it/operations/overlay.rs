@@ -87,7 +87,7 @@ fn the_overlay_pre_adopts_the_r6_parameters_every_earlier_version_lacks() {
                 .documentation
                 .as_deref()
                 .unwrap()
-                .starts_with("Pre-adopted from the FHIR R6 ballot"),
+                .starts_with("Pre-adopted from FHIR R6"),
             "{module}: {:?}",
             documented.documentation
         );

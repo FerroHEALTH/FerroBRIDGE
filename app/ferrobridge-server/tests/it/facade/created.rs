@@ -192,7 +192,8 @@ async fn a_created_resource_answers_a_read_of_its_own() -> Result<(), Box<dyn Er
     );
     let binding = harness
         .store
-        .binding_of("Observation", &FhirResourceId::new(&id)?)?
+        .binding_of("Observation", &FhirResourceId::new(&id)?)
+        .await?
         .ok_or("the created Observation is bound")?;
     let created = binding.created.ok_or("the binding names its parent")?;
     assert_eq!("Condition", created.parent_type);
@@ -246,7 +247,8 @@ async fn a_further_split_occurrence_answers_a_read_of_its_own() -> Result<(), Bo
     let parent_id = FhirResourceId::new(parent["id"].as_str().ok_or("the parent has an id")?)?;
     let binding = harness
         .store
-        .binding_of("Condition", &parent_id)?
+        .binding_of("Condition", &parent_id)
+        .await?
         .ok_or("the parent is bound")?;
     let request = IdentityRequest::new("Condition", "Condition", "ferrobridge_created_split")
         .with_occurrence(vec![2]);
@@ -278,7 +280,8 @@ async fn an_update_of_a_created_resource_is_refused() -> Result<(), Box<dyn Erro
     let parent_id = FhirResourceId::new(parent["id"].as_str().ok_or("the parent has an id")?)?;
     let binding = harness
         .store
-        .binding_of("Condition", &parent_id)?
+        .binding_of("Condition", &parent_id)
+        .await?
         .ok_or("the parent is bound")?;
     let request = IdentityRequest::new("Condition", "Condition", "ferrobridge_created_split")
         .with_occurrence(vec![2]);
@@ -392,7 +395,8 @@ async fn a_further_split_occurrence_takes_one_id_on_the_facade_and_on_tofhir()
     let parent_id = FhirResourceId::new(parent["id"].as_str().ok_or("the parent has an id")?)?;
     let binding = harness
         .store
-        .binding_of("Condition", &parent_id)?
+        .binding_of("Condition", &parent_id)
+        .await?
         .ok_or("the parent is bound")?;
     let request = IdentityRequest::new("Condition", "Condition", "ferrobridge_created_split")
         .with_occurrence(vec![2]);

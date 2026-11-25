@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The search of the include and fixed-token cases: the subject, the
+# category the mapping writes as a constant, and the evidence Observation a
+# search may include.
+context: ferrobridge_included.context
+patient:
+  parameters: [patient, subject]
+parameters:
+  category:
+    type: token
+    fixed:
+      system: "http://terminology.hl7.org/CodeSystem/condition-category"
+      code: problem-list-item
+include:
+  - evidence-detail
