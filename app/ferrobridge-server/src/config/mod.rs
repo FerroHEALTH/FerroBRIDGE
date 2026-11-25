@@ -140,6 +140,9 @@ pub struct Config {
     /// granted, by user-id: the table `ferrohealth-smart` defines for a
     /// product to compose into its own tree.
     pub basic_grants: ferrohealth_smart::config::BasicGrants,
+    /// The eIDAS assurance level each guarded route class requires, over
+    /// the `acr` mapping of each `[auth.issuer.<name>.assurance]`.
+    pub assurance: crate::assurance::Minimums,
     /// The FHIRconnect operations.
     pub operations: Operations,
     /// The HL7 v2 face, off until its section turns it on.
@@ -279,6 +282,20 @@ impl Config {
         Ok(())
     }
 
+    /// Refuses an `[assurance]` minimum on a server that authenticates no
+    /// caller, because `[auth]` is off.
+    fn assurance_guarded(&self, serves: bool) -> Result<(), Error> {
+        // NOTE: no specification governs this: our own design; with `[auth]` off no caller
+        // carries a level, so the minimum would hold no request.
+        if serves && !self.auth.enabled && self.assurance.any() {
+            return Err(Error::Needs {
+                key: String::from("assurance"),
+                needs: String::from("auth.enabled"),
+            });
+        }
+        Ok(())
+    }
+
     /// Refuses the access directive exchange without an onward lane: the
     /// directives are read and written for the facade's caller, under the
     /// token exchanged for it, so the CDR decides for the patient or the
@@ -315,7 +332,9 @@ impl Config {
     /// the fault, [`Error::Auth`] and [`Error::Credentials`] naming the rule
     /// of `ferrohealth-smart` a section breaks, and [`Error::BasicGrants`]
     /// when `[basic_grants]` names a user `[[auth.basic.users]]` does not
-    /// list or grants a Basic user a `system/` scope. Returns [`Error::Mappings`]
+    /// list or grants a Basic user a `system/` scope, [`Error::Assurance`]
+    /// for an `[assurance]` minimum no issuer's `acr` mapping reaches, and
+    /// [`Error::Needs`] for one set while `[auth]` is off. Returns [`Error::Mappings`]
     /// over [`error::NoTemplateSource`] when the operations
     /// are enabled and `[mappings] directory` is set with neither
     /// `[mappings] templates` nor `[cdr]`, so the refusal comes before any
@@ -327,6 +346,7 @@ impl Config {
             return Err(Error::CallerRate);
         }
         self.onward_guarded(serves)?;
+        self.assurance_guarded(serves)?;
         self.consent_onward()?;
         Ok(Settings {
             server: self.server.clone(),
@@ -358,7 +378,7 @@ impl Config {
                 None
             },
             auth: if serves && self.guards_a_surface() {
-                auth::resolve_auth(&self.auth, &self.basic_grants, &self.facade.base_url)?
+                auth::resolve_auth(self)?
             } else {
                 None
             },
