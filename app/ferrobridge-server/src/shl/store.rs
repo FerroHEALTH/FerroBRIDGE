@@ -14,8 +14,9 @@
 //! in one transaction that holds the link's row (`SELECT … FOR UPDATE`), so
 //! replicas count its answers and passcode attempts exactly and serve a
 //! location once (SMART Health Cards and Links 1.0.0, `links-specification`).
-//! The sweep runs under a transaction-level advisory lock, on one replica at
-//! a time. No specification governs the storage: our own design.
+//! The sweep runs under the `shl-sweep` lane lease, on one replica at a
+//! time, and every sweep is fenced by the lease generation it holds. No
+//! specification governs the storage: our own design.
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -24,10 +25,8 @@ use sqlx::postgres::{PgPool, PgRow};
 use sqlx::{PgConnection, Row as _};
 
 use super::seal;
+use crate::store::lease::{LeaseError, Term};
 use crate::store::seal::{KeyId, SealKeys};
-
-/// The advisory lock the sweep holds, so one replica sweeps at a time.
-const SWEEP_LOCK: i64 = 0x6662_7368_6c73; // "fbshls"
 
 /// Why the store could not answer.
 #[derive(Debug, thiserror::Error)]
@@ -57,11 +56,24 @@ pub enum StoreError {
     /// The passcode check did not finish.
     #[error("the passcode check did not finish")]
     Joined(#[source] tokio::task::JoinError),
+    /// Another replica leads the sweep since this one took its term.
+    #[error("the sweep lease moved on")]
+    Fenced(#[source] LeaseError),
 }
 
-/// Returns the error a database failure is.
-fn database(source: sqlx::Error) -> StoreError {
-    StoreError::Database(Box::new(source))
+impl From<LeaseError> for StoreError {
+    fn from(error: LeaseError) -> Self {
+        match error {
+            LeaseError::Database(error) => Self::from(error),
+            other => Self::Fenced(other),
+        }
+    }
+}
+
+impl From<sqlx::Error> for StoreError {
+    fn from(source: sqlx::Error) -> Self {
+        Self::Database(Box::new(source))
+    }
 }
 
 /// Returns the SHA-256 a manifest id, a handle or a token is stored as.
@@ -233,15 +245,6 @@ pub struct Listed {
     pub answers_left: u32,
 }
 
-/// What a sweep did.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Swept {
-    /// Another replica holds the sweep, so this one did nothing.
-    Busy,
-    /// The links that left the store.
-    Done(Vec<Gone>),
-}
-
 /// The links of this deployment, in the state store.
 #[derive(Debug, Clone)]
 pub struct LinkStore {
@@ -275,7 +278,7 @@ impl LinkStore {
             .keys
             .seal(&handle_context(&id_hash), link.handle.as_bytes())
             .map_err(StoreError::Handle)?;
-        let mut tx = self.pool.begin().await.map_err(database)?;
+        let mut tx = self.pool.begin().await?;
         sqlx::query(
             "INSERT INTO shl_link (id_hash, handle_hash, handle_key_id, handle_sealed, owner, \
              expires, record) VALUES ($1, $2, $3, $4, $5, $6, $7)",
@@ -288,18 +291,16 @@ impl LinkStore {
         .bind(link.expires)
         .bind(record_of(link)?)
         .execute(&mut *tx)
-        .await
-        .map_err(database)?;
+        .await?;
         for (position, jwe) in (0_u32..).zip(files) {
             sqlx::query("INSERT INTO shl_file (id_hash, position, jwe) VALUES ($1, $2, $3)")
                 .bind(&id_hash)
                 .bind(position_of(position))
                 .bind(jwe)
                 .execute(&mut *tx)
-                .await
-                .map_err(database)?;
+                .await?;
         }
-        tx.commit().await.map_err(database)
+        tx.commit().await.map_err(StoreError::from)
     }
 
     /// Returns the active links of `owner` at `now`, oldest first.
@@ -313,8 +314,7 @@ impl LinkStore {
         )
         .bind(owner)
         .fetch_all(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let mut listed = Vec::new();
         for row in &rows {
             let (_, link) = self.link_of(row)?;
@@ -340,12 +340,12 @@ impl LinkStore {
     ///
     /// Returns [`StoreError`] when the write does not commit.
     pub async fn revoke(&self, owner: &str, handle: &str) -> Result<Option<Gone>, StoreError> {
-        let mut tx = self.pool.begin().await.map_err(database)?;
+        let mut tx = self.pool.begin().await?;
         let row = sqlx::query("SELECT id_hash, handle_key_id, handle_sealed, record FROM shl_link WHERE handle_hash = $1 FOR UPDATE")
         .bind(hashed(handle))
         .fetch_optional(&mut *tx)
         .await
-        .map_err(database)?;
+        ?;
         let gone = match row {
             Some(row) => {
                 let (id_hash, link) = self.link_of(&row)?;
@@ -357,7 +357,7 @@ impl LinkStore {
             }
             None => None,
         };
-        tx.commit().await.map_err(database)?;
+        tx.commit().await?;
         Ok(gone)
     }
 
@@ -377,7 +377,7 @@ impl LinkStore {
     ) -> Result<Answer, StoreError> {
         let id_hash = hashed(id);
         let checked = self.check(&id_hash, passcode).await?;
-        let mut tx = self.pool.begin().await.map_err(database)?;
+        let mut tx = self.pool.begin().await?;
         let Some(mut link) = self.locked(&mut tx, &id_hash).await? else {
             return Ok(Answer::Inactive { gone: None });
         };
@@ -410,7 +410,7 @@ impl LinkStore {
                 used,
             }
         };
-        tx.commit().await.map_err(database)?;
+        tx.commit().await?;
         Ok(answer)
     }
 
@@ -430,8 +430,7 @@ impl LinkStore {
         )
         .bind(id_hash)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let Some(row) = row else {
             return Ok(None);
         };
@@ -450,13 +449,12 @@ impl LinkStore {
     /// Returns [`StoreError`] when the store fails.
     pub async fn fetch(&self, token: &str, now: i64) -> Result<Fetched, StoreError> {
         let token_hash = hashed(token);
-        let mut tx = self.pool.begin().await.map_err(database)?;
+        let mut tx = self.pool.begin().await?;
         let owner: Option<Vec<u8>> =
             sqlx::query_scalar("SELECT id_hash FROM shl_location WHERE token_hash = $1")
                 .bind(&token_hash)
                 .fetch_optional(&mut *tx)
-                .await
-                .map_err(database)?;
+                .await?;
         let Some(id_hash) = owner else {
             return Ok(Fetched::Inactive { gone: None });
         };
@@ -468,16 +466,15 @@ impl LinkStore {
         )
         .bind(&token_hash)
         .fetch_optional(&mut *tx)
-        .await
-        .map_err(database)?;
+        .await?;
         let fetched = match location {
             None => Fetched::Inactive { gone: None },
             Some(_) if link.expired(now) => Fetched::Inactive {
                 gone: Some(remove(&mut tx, &id_hash, &link, Ending::Expired).await?),
             },
             Some(location) => {
-                let position: i32 = location.try_get("position").map_err(database)?;
-                let lapses: i64 = location.try_get("lapses").map_err(database)?;
+                let position: i32 = location.try_get("position")?;
+                let lapses: i64 = location.try_get("lapses")?;
                 link.outstanding = link.outstanding.saturating_sub(1);
                 if now >= lapses {
                     let used = finish(&mut tx, &id_hash, &link).await?;
@@ -496,7 +493,7 @@ impl LinkStore {
                 }
             }
         };
-        tx.commit().await.map_err(database)?;
+        tx.commit().await?;
         Ok(fetched)
     }
 
@@ -507,7 +504,7 @@ impl LinkStore {
     /// Returns [`StoreError`] when the store fails.
     pub async fn direct(&self, id: &str, now: i64) -> Result<Fetched, StoreError> {
         let id_hash = hashed(id);
-        let mut tx = self.pool.begin().await.map_err(database)?;
+        let mut tx = self.pool.begin().await?;
         let fetched = match self.locked(&mut tx, &id_hash).await? {
             None => Fetched::Inactive { gone: None },
             Some(link) if link.expired(now) => Fetched::Inactive {
@@ -528,33 +525,27 @@ impl LinkStore {
                 }
             }
         };
-        tx.commit().await.map_err(database)?;
+        tx.commit().await?;
         Ok(fetched)
     }
 
     /// Removes every link past its expiry at `now` and every lapsed
-    /// location, on one replica at a time, and returns the links that left
-    /// the store; [`Swept::Busy`] while another replica sweeps.
+    /// location under `term` of the sweep's lease, and returns the links that
+    /// left the store.
     ///
     /// # Errors
     ///
-    /// Returns [`StoreError`] when the store fails.
-    pub async fn sweep(&self, now: i64) -> Result<Swept, StoreError> {
-        let mut tx = self.pool.begin().await.map_err(database)?;
-        let held: bool = sqlx::query_scalar("SELECT pg_try_advisory_xact_lock($1)")
-            .bind(SWEEP_LOCK)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(database)?;
-        if !held {
-            return Ok(Swept::Busy);
-        }
+    /// Returns [`StoreError::Fenced`] when another replica took the sweep
+    /// since `term`, and [`StoreError`] when the store fails.
+    pub async fn sweep(&self, term: &Term, now: i64) -> Result<Vec<Gone>, StoreError> {
+        let mut tx = self.pool.begin().await?;
+        term.fence(&mut tx).await?;
         let mut ended = Vec::new();
         let expired = sqlx::query("SELECT id_hash, handle_key_id, handle_sealed, record FROM shl_link WHERE expires <= $1 FOR UPDATE SKIP LOCKED")
         .bind(now)
         .fetch_all(&mut *tx)
         .await
-        .map_err(database)?;
+        ?;
         for row in &expired {
             let (id_hash, link) = self.link_of(row)?;
             ended.push(remove(&mut tx, &id_hash, &link, Ending::Expired).await?);
@@ -565,8 +556,7 @@ impl LinkStore {
         )
         .bind(now)
         .fetch_all(&mut *tx)
-        .await
-        .map_err(database)?;
+        .await?;
         for row in &lapsed {
             let (id_hash, mut link) = self.link_of(row)?;
             let removed =
@@ -574,8 +564,7 @@ impl LinkStore {
                     .bind(&id_hash)
                     .bind(now)
                     .execute(&mut *tx)
-                    .await
-                    .map_err(database)?
+                    .await?
                     .rows_affected();
             let removed = u32::try_from(removed).unwrap_or(u32::MAX);
             link.outstanding = link.outstanding.saturating_sub(removed);
@@ -583,8 +572,8 @@ impl LinkStore {
                 ended.push(gone(&link, Ending::Used));
             }
         }
-        tx.commit().await.map_err(database)?;
-        Ok(Swept::Done(ended))
+        tx.commit().await?;
+        Ok(ended)
     }
 
     /// Returns the link `id_hash` names, holding its row until `tx` ends.
@@ -597,7 +586,7 @@ impl LinkStore {
         .bind(id_hash)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(database)?;
+        ?;
         row.map(|row| self.link_of(&row).map(|(_, link)| link))
             .transpose()
     }
@@ -605,10 +594,10 @@ impl LinkStore {
     /// Returns the manifest id hash and the link a row holds, its handle
     /// opened.
     fn link_of(&self, row: &PgRow) -> Result<(Vec<u8>, Link), StoreError> {
-        let id_hash: Vec<u8> = row.try_get("id_hash").map_err(database)?;
-        let key_id: String = row.try_get("handle_key_id").map_err(database)?;
-        let sealed: Vec<u8> = row.try_get("handle_sealed").map_err(database)?;
-        let record: serde_json::Value = row.try_get("record").map_err(database)?;
+        let id_hash: Vec<u8> = row.try_get("id_hash")?;
+        let key_id: String = row.try_get("handle_key_id")?;
+        let sealed: Vec<u8> = row.try_get("handle_sealed")?;
+        let record: serde_json::Value = row.try_get("record")?;
         let key_id = KeyId::new(&key_id)
             .map_err(|_refused| StoreError::Handle(crate::store::seal::SealError::UnknownKey))?;
         let handle = self
@@ -715,7 +704,7 @@ async fn served(
         .bind(now.saturating_add(lifetime))
         .execute(&mut *tx)
         .await
-        .map_err(database)?;
+        ?;
         link.outstanding = link.outstanding.saturating_add(1);
         files.push(Served {
             entry,
@@ -741,8 +730,7 @@ async fn put_link(tx: &mut PgConnection, id_hash: &[u8], link: &Link) -> Result<
         .bind(record_of(link)?)
         .bind(link.expires)
         .execute(&mut *tx)
-        .await
-        .map_err(database)?;
+        .await?;
     Ok(())
 }
 
@@ -752,8 +740,7 @@ async fn file(tx: &mut PgConnection, id_hash: &[u8], position: i32) -> Result<St
         .bind(id_hash)
         .bind(position)
         .fetch_optional(&mut *tx)
-        .await
-        .map_err(database)?
+        .await?
         .ok_or(StoreError::Missing)
 }
 
@@ -788,8 +775,7 @@ async fn remove(
     sqlx::query("DELETE FROM shl_link WHERE id_hash = $1")
         .bind(id_hash)
         .execute(&mut *tx)
-        .await
-        .map_err(database)?;
+        .await?;
     Ok(gone(link, ending))
 }
 
@@ -798,6 +784,7 @@ mod tests {
     use std::time::Duration;
 
     use super::{Ending, FileEntry, Link, LinkStore, Resolution, StoreError, record_of};
+    use crate::store::lease::{Generation, Holder, Lane, Lease, Term};
     use crate::store::seal::{KeyId, LookupKey, SealKeys, SealingKey};
 
     /// The base64 of 32 bytes of `A`, made for the tests.
@@ -858,7 +845,16 @@ mod tests {
         ));
         assert!(refused(&store.fetch("t", 0).await));
         assert!(refused(&store.direct("m", 0).await));
-        assert!(refused(&store.sweep(0).await));
+        let term = Term::new(
+            Lease::new(
+                store.pool.clone(),
+                Lane::new("shl-sweep").expect("a named lane"),
+                Holder::new(),
+                Duration::from_secs(30),
+            ),
+            Generation::new(1),
+        );
+        assert!(refused(&store.sweep(&term, 0).await));
     }
 
     #[test]
