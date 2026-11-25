@@ -402,19 +402,7 @@ impl Recoverer {
                 .append_pair("eventsSinceNumber", &gap.from.to_string())
                 .append_pair("eventsUntilNumber", &gap.to.to_string())
                 .append_pair("content", "id-only");
-            let answer = client
-                .get(url)
-                .header(http::header::ACCEPT, "application/fhir+json")
-                .send()
-                .await
-                .map_err(RecoverError::Call)?;
-            if !answer.status().is_success() {
-                return Err(RecoverError::Status(answer.status()));
-            }
-            let body: serde_json::Value = answer
-                .json()
-                .await
-                .map_err(|_json| RecoverError::Unreadable)?;
+            let body = get_json(&client, url, "application/fhir+json").await?;
             let notification =
                 super::subscription::read(&body).map_err(|_malformed| RecoverError::Unreadable)?;
             if notification.subscription != gap.subscription {
@@ -554,6 +542,28 @@ fn events_url(base: Option<&str>, subscription: &str) -> Result<url::Url, Recove
     .map_err(|_url| RecoverError::Unreadable)
 }
 
+/// Reads the JSON answer of a `GET` of `url` accepting `accept`, refusing a
+/// failure status with the status.
+async fn get_json(
+    client: &reqwest::Client,
+    url: url::Url,
+    accept: &'static str,
+) -> Result<serde_json::Value, RecoverError> {
+    let answer = client
+        .get(url)
+        .header(http::header::ACCEPT, accept)
+        .send()
+        .await
+        .map_err(RecoverError::Call)?;
+    if !answer.status().is_success() {
+        return Err(RecoverError::Status(answer.status()));
+    }
+    answer
+        .json()
+        .await
+        .map_err(|_json| RecoverError::Unreadable)
+}
+
 /// Reads the entities `poll` returns since `since`.
 async fn fetch(
     client: &reqwest::Client,
@@ -563,19 +573,7 @@ async fn fetch(
     let mut url = url::Url::parse(&poll.url).map_err(|_url| RecoverError::Unreadable)?;
     url.query_pairs_mut()
         .append_pair(&poll.cursor, &since.to_string());
-    let answer = client
-        .get(url)
-        .header(http::header::ACCEPT, "application/json")
-        .send()
-        .await
-        .map_err(RecoverError::Call)?;
-    if !answer.status().is_success() {
-        return Err(RecoverError::Status(answer.status()));
-    }
-    let body: serde_json::Value = answer
-        .json()
-        .await
-        .map_err(|_json| RecoverError::Unreadable)?;
+    let body = get_json(client, url, "application/json").await?;
     let items = body
         .pointer(&poll.items)
         .and_then(serde_json::Value::as_array)
