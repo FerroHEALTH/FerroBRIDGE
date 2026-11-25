@@ -6,7 +6,9 @@
 //! `EVALUATION.problem_diagnosis.v1`, `EVALUATION.adverse_reaction_risk.v2`,
 //! `ACTION.procedure.v1` and `EVALUATION.device_summary.v0` each held by the
 //! ad hoc section named for it, with their SNOMED CT codes kept (xShare
-//! Yellow Button Bronze statement 9).
+//! Yellow Button Bronze statement 9), and the ICD-10 and ATC codings the
+//! MyHealth@EU Core bindings take added beside them through a stubbed
+//! terminology server.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -14,6 +16,7 @@
 )]
 
 use std::error::Error;
+use std::sync::Arc;
 
 use eehrxf::document::Document;
 use eehrxf::document::IPS_BUNDLE;
@@ -22,6 +25,10 @@ use eehrxf::document::form::PATIENT_SUMMARY_FORM;
 use eehrxf::document::form::{Form, SectionRule};
 use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::receive::ReceivedDocument;
+use eehrxf::terminology::Terminology;
+use eehrxf::terminology::ehn;
+use eehrxf::terminology::translation::{MYHEALTH_EU_CORE, Translator};
+use fhir_types::r4::bundle::{Bundle, BundleEntry};
 use fhir_types::r4::device::Device;
 use fhir_types::r4::resource::Resource;
 
@@ -30,6 +37,7 @@ use super::eps_mapped::{
     summary,
 };
 use super::support::{emit, profile_set};
+use super::terminology::{Script, Scripted};
 
 /// The SNOMED CT system.
 const SNOMED: &str = "http://snomed.info/sct";
@@ -65,6 +73,14 @@ pub(crate) const HYPERTENSION: &str = "38341003";
 
 /// SNOMED CT 764146007 |Penicillin|.
 pub(crate) const PENICILLIN: &str = "764146007";
+
+/// ICD-10 I10 |Essential (primary) hypertension|, in MVC 9.1.0
+/// `eHDSIIllnessandDisorder`.
+const HYPERTENSION_ICD_10: &str = "I10";
+
+/// ATC J01C |Beta-lactam antibacterials, penicillins|, in MVC 9.1.0
+/// `eHDSIActiveIngredient`.
+const PENICILLINS_ATC: &str = "J01C";
 
 /// SNOMED CT 80146002 |Appendectomy|.
 pub(crate) const APPENDECTOMY: &str = "80146002";
@@ -270,9 +286,107 @@ fn a_device_summary_is_a_device_use_statement_of_its_snomed_ct_device() -> Resul
     Ok(())
 }
 
-/// Returns the document of `form` over [`one_of_each`] and every other section the form requires
+/// The terminology server stub that maps the problem to ICD-10 and the
+/// allergen to ATC.
+fn mapping_server() -> Terminology {
+    Terminology::server(Arc::new(Scripted(Script::Map(vec![
+        (SNOMED, HYPERTENSION, ehn::ICD_10, HYPERTENSION_ICD_10),
+        (SNOMED, PENICILLIN, ehn::ATC, PENICILLINS_ATC),
+    ]))))
+}
+
+/// Returns the entries of `bundle` with each resource other than the
+/// composition translated for the MyHealth@EU Core bindings, through
+/// [`mapping_server`].
+async fn bound_for_myhealth_eu(bundle: &Bundle) -> Result<Bundle, Box<dyn Error>> {
+    let terminology = mapping_server();
+    let mut translator =
+        Translator::new(&terminology, &ehn::PATIENT_SUMMARY).with_bindings(&MYHEALTH_EU_CORE);
+    let mut entry = Vec::with_capacity(bundle.entry.len());
+    for held in &bundle.entry {
+        let resource = match &held.resource {
+            Some(Resource::Composition(_)) | None => held.resource.clone(),
+            Some(resource) => Some(
+                translator
+                    .translate(resource, |system| ehn::PATIENT_SUMMARY.contains(&system))
+                    .await?,
+            ),
+        };
+        entry.push(BundleEntry {
+            resource,
+            ..held.clone()
+        });
+    }
+    assert_eq!(translator.unbound().len(), 0, "{:?}", translator.unbound());
+    Ok(Bundle {
+        entry,
+        ..bundle.clone()
+    })
+}
+
+/// The codings of `resource`'s `code`, each as system and code.
+fn codings(resource: &Resource) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    Ok(serde_json::to_value(resource)?["code"]["coding"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|coding| {
+            (
+                coding["system"].as_str().unwrap_or_default().to_owned(),
+                coding["code"].as_str().unwrap_or_default().to_owned(),
+            )
+        })
+        .collect())
+}
+
+#[tokio::test]
+async fn the_problem_and_the_allergen_gain_the_myhealth_eu_codings() -> Result<(), Box<dyn Error>> {
+    // NOTE: MyHealth@EU Core 1.0.1 binds Condition.code and AllergyIntolerance.code required
+    // to eHDSI value sets of ICD-10 and ATC; draft EEHRxF Art 6(2) keeps the original coding.
+    let answer =
+        summary()?.to_fhir_with(&one_of_each(), &settings(), call("Patient/p", "Device/d"))?;
+    let bound = bound_for_myhealth_eu(answer.bundle()).await?;
+    let mut seen = Vec::new();
+    for resource in bound.entry.iter().filter_map(|held| held.resource.as_ref()) {
+        match resource {
+            Resource::Condition(_) => {
+                seen.push("Condition");
+                assert_eq!(
+                    codings(resource)?,
+                    [
+                        (SNOMED.to_owned(), HYPERTENSION.to_owned()),
+                        (ehn::ICD_10.to_owned(), HYPERTENSION_ICD_10.to_owned())
+                    ]
+                );
+            }
+            Resource::AllergyIntolerance(_) => {
+                seen.push("AllergyIntolerance");
+                assert_eq!(
+                    codings(resource)?,
+                    [
+                        (SNOMED.to_owned(), PENICILLIN.to_owned()),
+                        (ehn::ATC.to_owned(), PENICILLINS_ATC.to_owned())
+                    ]
+                );
+            }
+            Resource::Procedure(_) => {
+                assert_eq!(
+                    codings(resource)?,
+                    [(SNOMED.to_owned(), APPENDECTOMY.to_owned())],
+                    "no binding of the issue asks for another procedure coding"
+                );
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(seen, ["Condition", "AllergyIntolerance"]);
+    Ok(())
+}
+
+/// Returns the document of `form` over [`one_of_each`], bound for the
+/// MyHealth@EU Core profiles, and every other section the form requires
 /// `nilknown`.
-fn document_of(form: &'static Form) -> Result<String, Box<dyn Error>> {
+async fn document_of(form: &'static Form) -> Result<String, Box<dyn Error>> {
     let mut document = Document::of(
         form,
         BASE,
@@ -286,8 +400,9 @@ fn document_of(form: &'static Form) -> Result<String, Box<dyn Error>> {
         ..Device::default()
     })))?;
     let answer = summary()?.to_fhir_with(&one_of_each(), &settings(), call(&subject, &device))?;
+    let bound = bound_for_myhealth_eu(answer.bundle()).await?;
     let mut placed = Vec::new();
-    for mapped in document.with_mapped_composition(answer.bundle())? {
+    for mapped in document.with_mapped_composition(&bound)? {
         placed.push(mapped.slot.slice);
         document.with_section(mapped.into_section(vec![String::from("One synthetic entry.")]))?;
     }
@@ -337,7 +452,7 @@ fn the_summary_with_one_of_each_validates_in_both_forms() -> Result<(), Box<dyn 
             "eehrxf-eps-summary-problem-allergy-procedure",
         ),
     ] {
-        let text = document_of(form)?;
+        let text = runtime.block_on(document_of(form))?;
         runtime
             .block_on(ReceivedDocument::read(&text)?.validate(
                 set,

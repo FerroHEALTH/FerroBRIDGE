@@ -21,6 +21,15 @@
 //! A bare `Coding` element holds one code and has no room for a second, so
 //! it is left as recorded. The resource's `meta` and the resources it
 //! contains are not translated.
+//!
+//! A translator given [`Binding`]s ([`Translator::with_bindings`]) also asks,
+//! for each concept at a bound element that carries no coding in the
+//! binding's systems, for a translation into them, whether or not the
+//! concept is in a preferred system. A document bound for the MyHealth@EU
+//! Core profiles ([`MYHEALTH_EU_CORE`]) so carries the source's SNOMED CT
+//! coding and the ICD-10 or ATC coding the server maps it to, the original
+//! and the mapped coding draft `EEHRxF` Art 6(2) keeps side by side. A bound
+//! concept no translation reaches is an [`Unbound`] outcome.
 
 use std::collections::BTreeMap;
 
@@ -36,6 +45,7 @@ use fhir_types::r4::resource::Resource;
 use crate::terminology::Terminology;
 use crate::terminology::TerminologyError;
 use crate::terminology::Translated;
+use crate::terminology::ehn;
 use crate::terminology::walk;
 use crate::terminology::walk::Coded;
 use crate::terminology::walk::Step;
@@ -73,11 +83,59 @@ pub enum TranslationError {
 /// The R4 extension that carries a translation of a string element.
 pub const TRANSLATION: &str = "http://hl7.org/fhir/StructureDefinition/translation";
 
-/// A concept to translate: where it is, and its codings as system and code.
-struct Pending {
+/// A required binding of a target profile that names the code systems its
+/// value set takes: the element, the value set and those systems.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Binding {
+    /// The R4 element path the binding is on, such as `Condition.code`.
+    pub element: &'static str,
+    /// The canonical URL of the bound value set.
+    pub value_set: &'static str,
+    /// The system URIs the value set's members are drawn from.
+    pub systems: &'static [&'static str],
+}
+
+/// The MyHealth@EU Core 1.0.1 required bindings that take no SNOMED CT code.
+///
+/// Each names the system its members come from in the Master Value Sets
+/// Catalogue 9.1.0 Core depends on.
+// NOTE: MyHealth@EU Core 1.0.1 binds Condition.code to eHDSIProblemWithExceptions (ICD-10
+// members) and AllergyIntolerance.code to eHDSIAllergenWithExceptions (ATC drug members).
+pub const MYHEALTH_EU_CORE: [Binding; 2] = [
+    Binding {
+        element: "Condition.code",
+        value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSIProblemWithExceptions",
+        systems: &[ehn::ICD_10],
+    },
+    Binding {
+        element: "AllergyIntolerance.code",
+        value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSIAllergenWithExceptions",
+        systems: &[ehn::ATC],
+    },
+];
+
+/// A concept at a bound element that carries no coding in the binding's
+/// systems after translation: the typed outcome of a mapping the server
+/// does not make.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unbound {
+    /// Where the concept is, as an element path.
+    pub location: String,
+    /// The binding the concept does not meet.
+    pub binding: Binding,
+    /// The concept's codings, as system and code.
+    pub originals: Vec<(String, String)>,
+}
+
+/// A concept to translate: where it is, its codings as system and code, the
+/// systems to ask for, and the binding it must meet, when bound.
+struct Pending<'t> {
     location: String,
     steps: Vec<Step>,
     originals: Vec<(String, String)>,
+    targets: Vec<&'t str>,
+    preferred: bool,
+    binding: Option<Binding>,
 }
 
 /// The translator of the resources of one document: the configured
@@ -87,10 +145,12 @@ struct Pending {
 pub struct Translator<'t> {
     terminology: &'t Terminology,
     targets: &'t [&'t str],
+    bindings: &'t [Binding],
     asked: BTreeMap<(String, String, String), Vec<Translated>>,
     english: bool,
     mapped: Vec<Mapping>,
     unmapped: Vec<(String, String)>,
+    unbound: Vec<Unbound>,
 }
 
 /// One coding a translation added, with its mapping provenance (draft
@@ -113,11 +173,30 @@ impl<'t> Translator<'t> {
         Self {
             terminology,
             targets,
+            bindings: &[],
             asked: BTreeMap::new(),
             english: false,
             mapped: Vec::new(),
             unmapped: Vec::new(),
+            unbound: Vec::new(),
         }
+    }
+
+    /// Returns the translator that also meets each of `bindings`: a concept
+    /// at a bound element with no coding in the binding's systems is asked
+    /// for a translation into them, such as [`MYHEALTH_EU_CORE`] for a
+    /// document bound for the MyHealth@EU Core profiles.
+    #[must_use]
+    pub const fn with_bindings(mut self, bindings: &'t [Binding]) -> Self {
+        self.bindings = bindings;
+        self
+    }
+
+    /// Returns each concept at a bound element that no translation brought
+    /// into its binding's systems.
+    #[must_use]
+    pub fn unbound(&self) -> &[Unbound] {
+        &self.unbound
     }
 
     /// Returns the translator for content not written in English: a concept
@@ -144,7 +223,8 @@ impl<'t> Translator<'t> {
 
     /// Returns `resource` with every `equivalent` or `equal` translation of
     /// each of its concepts that has no coding whose system `preferred`
-    /// admits added after the concept's own codings.
+    /// admits, or that sits at a bound element with no coding in the
+    /// binding's systems, added after the concept's own codings.
     ///
     /// With no server configured, `resource` is answered as it is.
     ///
@@ -172,22 +252,39 @@ impl<'t> Translator<'t> {
             .and_then(Value::as_str)
             .unwrap_or("Resource")
             .to_owned();
-        let pending = untranscoded(&object, &kind, &preferred)?;
+        let pending = untranscoded(&object, &kind, &preferred, self.targets, self.bindings)?;
         if pending.is_empty() {
             return Ok(resource.clone());
         }
         let mut changed = false;
         for concept in pending {
-            let added = self.equivalents(&concept.originals).await?;
+            let added = self
+                .equivalents(&concept.originals, &concept.targets)
+                .await?;
+            if let Some(binding) = concept.binding {
+                let met = added.iter().any(|(_, held)| {
+                    identity(&held.coding)
+                        .is_some_and(|(system, _)| binding.systems.contains(&system))
+                });
+                if !met {
+                    self.unbound.push(Unbound {
+                        location: concept.location.clone(),
+                        binding,
+                        originals: concept.originals.clone(),
+                    });
+                }
+            }
             let codings = codings_at(&mut object, &concept.steps).ok_or_else(|| {
                 TranslationError::Unwalkable {
                     location: concept.location.clone(),
                 }
             })?;
             if added.is_empty() {
-                self.unmapped.extend(concept.originals.iter().cloned());
-                if self.english {
-                    changed |= self.designate(codings).await?;
+                if !concept.preferred {
+                    self.unmapped.extend(concept.originals.iter().cloned());
+                    if self.english {
+                        changed |= self.designate(codings).await?;
+                    }
                 }
                 continue;
             }
@@ -267,16 +364,17 @@ impl<'t> Translator<'t> {
         Ok(changed)
     }
 
-    /// Returns every accepted translation of `originals` into the targets,
-    /// in order, leaving out a coding the originals or an earlier
-    /// translation already carry.
+    /// Returns every accepted translation of `originals` into `targets`, in
+    /// order, leaving out a coding the originals or an earlier translation
+    /// already carry.
     async fn equivalents(
         &mut self,
         originals: &[(String, String)],
+        targets: &[&str],
     ) -> Result<Vec<((String, String), Translated)>, TerminologyError> {
         let mut added: Vec<((String, String), Translated)> = Vec::new();
         for (system, code) in originals {
-            for target in self.targets {
+            for target in targets {
                 let key = (system.clone(), code.clone(), (*target).to_owned());
                 if !self.asked.contains_key(&key) {
                     let found = self.terminology.translate(system, code, target).await?;
@@ -299,14 +397,17 @@ impl<'t> Translator<'t> {
     }
 }
 
-/// Returns every concept of `object` none of whose codings has a system
-/// `preferred` admits and which carries at least one coding with a system
-/// and a code.
-fn untranscoded(
+/// Returns every concept of `object` that carries at least one coding with a
+/// system and a code and either has no coding whose system `preferred`
+/// admits, asked of `targets`, or sits at an element one of `bindings` is on
+/// with no coding in its systems, asked of those systems.
+fn untranscoded<'t>(
     object: &Object,
     kind: &str,
     preferred: &impl Fn(&str) -> bool,
-) -> Result<Vec<Pending>, TranslationError> {
+    targets: &[&'t str],
+    bindings: &[Binding],
+) -> Result<Vec<Pending<'t>>, TranslationError> {
     let found =
         walk::coded(object, kind, false).map_err(|unwalkable| TranslationError::Unwalkable {
             location: unwalkable.location,
@@ -324,13 +425,32 @@ fn untranscoded(
             .and_then(Value::as_array)
             .map(|codings| codings.iter().filter_map(Value::as_object).collect())
             .unwrap_or_default();
-        let carried = codings.iter().any(|coding| {
-            coding
-                .get("system")
-                .and_then(Value::as_str)
-                .is_some_and(preferred)
-        });
-        if carried {
+        let carried = |admits: &dyn Fn(&str) -> bool| {
+            codings.iter().any(|coding| {
+                coding
+                    .get("system")
+                    .and_then(Value::as_str)
+                    .is_some_and(admits)
+            })
+        };
+        let is_preferred = carried(preferred);
+        let binding = bindings
+            .iter()
+            .find(|binding| binding.element == occurrence.element)
+            .filter(|binding| !carried(&|system| binding.systems.contains(&system)))
+            .copied();
+        let mut asked: Vec<&'t str> = Vec::new();
+        if !is_preferred {
+            asked.extend(targets);
+        }
+        if let Some(binding) = binding {
+            for system in binding.systems {
+                if !asked.contains(system) {
+                    asked.push(system);
+                }
+            }
+        }
+        if asked.is_empty() {
             continue;
         }
         let originals: Vec<(String, String)> = codings
@@ -348,6 +468,9 @@ fn untranscoded(
             location: occurrence.location,
             steps: occurrence.steps,
             originals,
+            targets: asked,
+            preferred: is_preferred,
+            binding,
         });
     }
     Ok(pending)

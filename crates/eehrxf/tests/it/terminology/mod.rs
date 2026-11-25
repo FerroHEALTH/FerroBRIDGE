@@ -50,6 +50,10 @@ pub(crate) enum Script {
     /// `$translate` answers these matches, each an equivalence, a system
     /// and a code.
     Translate(Vec<(&'static str, &'static str, &'static str)>),
+    /// `$translate` answers each entry whose source system, source code and
+    /// target system are asked as an `equivalent` match to its code, and no
+    /// match to anything else.
+    Map(Vec<Mapped>),
     /// `$lookup` answers this display.
     Display(&'static str),
     /// `$validate-code` answers this result.
@@ -60,6 +64,10 @@ pub(crate) enum Script {
     /// Every operation is refused with this status.
     Refuse(StatusCode),
 }
+
+/// One entry of [`Script::Map`]: the source system, the source code, the
+/// target system and the target code.
+pub(crate) type Mapped = (&'static str, &'static str, &'static str, &'static str);
 
 /// A terminology server that answers from a script.
 #[derive(Debug, Clone)]
@@ -81,12 +89,23 @@ impl Scripted {
 impl TerminologyServer for Scripted {
     async fn translate(
         &self,
-        _system: &str,
-        _code: &str,
-        _target: &str,
+        system: &str,
+        code: &str,
+        target: &str,
     ) -> Result<Vec<Match>, TerminologyError> {
         if matches!(self.0, Script::Unmapped(_)) {
             return Ok(Vec::new());
+        }
+        if let Script::Map(entries) = &self.0 {
+            return Ok(entries
+                .iter()
+                .filter(|(from, value, to, _)| *from == system && *value == code && *to == target)
+                .map(|(_, _, to, mapped)| Match {
+                    equivalence: Some(String::from("equivalent")),
+                    concept: Some(coding(to, mapped)),
+                    source: Some(MAP.to_owned()),
+                })
+                .collect());
         }
         let Script::Translate(matches) = &self.0 else {
             return Err(self.refusal(Operation::Translate));
