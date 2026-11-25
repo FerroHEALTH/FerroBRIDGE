@@ -467,7 +467,16 @@ for manifest in crates/*/Cargo.toml; do
     echo "::error::root Cargo.toml requires $name $req, its manifest is at $new_ver." >&2
     fail=1
   fi
-  locked="$(awk -v n="\"$name\"" '$1 == "name" && $3 == n { hit = 1; next } hit && $1 == "version" { gsub(/"/, "", $3); print $3; exit }' Cargo.lock)"
+  # The workspace member's entry is the one with no `source`: a registry copy
+  # of the same crate, which a crates.io dependency still on an older line
+  # pulls in, sits beside it.
+  locked="$(awk -v n="\"$name\"" '
+    function flush() { if (hit && !src && !done) { print ver; done = 1 } hit = 0; src = 0 }
+    /^\[\[package\]\]/ { flush(); next }
+    $1 == "name" && $3 == n { hit = 1; next }
+    hit && $1 == "version" { ver = $3; gsub(/"/, "", ver); next }
+    hit && $1 == "source" { src = 1 }
+    END { flush() }' Cargo.lock)"
   if [[ "$locked" != "$new_ver" ]]; then
     echo "::error::Cargo.lock records $name ${locked:-nothing}, its manifest is at $new_ver; run cargo update -w and commit the lock." >&2
     fail=1

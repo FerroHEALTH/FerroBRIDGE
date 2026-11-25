@@ -140,7 +140,7 @@ pub struct ValueSetExpandRequest {
     /// is override, the version used SHALL explicitly be represented in the
     /// expansion parameters
     pub force_system_version: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// supplement must be used when performing an expansion. Use of this
     /// parameter should result in $expand behaving the same way as if the
@@ -148,7 +148,7 @@ pub struct ValueSetExpandRequest {
     /// \[ValueSet
     /// Supplement\](<https://build.fhir.org/ig/HL7/fhir-extensions/StructureDefinition-valueset-supplement.html>)
     pub use_supplement: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A
     /// request to return a particular property in the expansion. The returned
     /// property may include subproperties. May be either a code from the code
@@ -157,7 +157,7 @@ pub struct ValueSetExpandRequest {
     /// recommended. The special value '\*' means all properties and their
     /// sub-properties known to the server
     pub property: Vec<super::super::primitives::String>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>).
     /// Specifies a version to use for a valueset, if the reference to the value
     /// set does not specify which version to use. The format is the same as a
@@ -165,7 +165,7 @@ pub struct ValueSetExpandRequest {
     /// <http://example.org/ValueSet/example|1.0.0>. Note that this is similar
     /// to the force-system-version parameter but applied to valuesets
     pub default_valueset_version: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Edge
     /// Case: Specifies a version to use for a valueset. If a reference to a
     /// value set specifies a different version, an error is returned instead of
@@ -174,7 +174,7 @@ pub struct ValueSetExpandRequest {
     /// <http://example.org/ValueSet/example|1.0.0>. Note that this is similar
     /// to the force-system-version parameter but applied to valuesets
     pub check_valueset_version: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Edge
     /// Case: Specifies a version to use for a valueset. This parameter
     /// overrides any specified version in the reference to the value set (and

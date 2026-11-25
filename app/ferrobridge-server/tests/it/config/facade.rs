@@ -23,13 +23,12 @@ fn the_facade_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn an_enabled_facade_resolves_its_policy_and_its_store() -> Result<(), Box<dyn std::error::Error>> {
+fn an_enabled_facade_resolves_its_policy() -> Result<(), Box<dyn std::error::Error>> {
     let text = concat!(
         "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
         "[auth]\nenabled = false\n\n[facade]\nenabled = true\n",
         "base_url = \"https://bridge.invalid/fhir\"\n",
         "ehr_policy = \"create_on_first_write\"\n",
-        "identity_store = \"/var/lib/ferrobridge/identity.redb\"\n",
         "composition_language = \"en\"\ncomposition_territory = \"GB\"\n",
     );
 
@@ -42,10 +41,6 @@ fn an_enabled_facade_resolves_its_policy_and_its_store() -> Result<(), Box<dyn s
     );
     assert_eq!("en", facade.settings.language);
     assert_eq!("GB", facade.settings.territory);
-    assert_eq!(
-        std::path::Path::new("/var/lib/ferrobridge/identity.redb"),
-        facade.identity_store
-    );
     assert_eq!(
         Some(std::path::Path::new("/srv/mappings")),
         settings.mapping_directory.as_deref()

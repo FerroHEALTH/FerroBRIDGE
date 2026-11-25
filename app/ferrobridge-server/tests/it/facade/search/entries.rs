@@ -394,7 +394,8 @@ async fn a_later_entry_is_bound_by_the_positional_path_of_its_place_in_content()
     let id = FhirResourceId::new(id_of(entry).ok_or("the match has an id")?)?;
     let binding = harness
         .store
-        .binding_of("Condition", &id)?
+        .binding_of("Condition", &id)
+        .await?
         .ok_or("the entry is bound")?;
     assert_eq!("/content[2]", binding.entry_path);
     assert_eq!(Some(derive::DERIVATION), binding.derivation);

@@ -454,6 +454,18 @@ impl IdentifierQuery {
         }
     }
 
+    /// Returns which system the search admits.
+    #[must_use]
+    pub const fn system(&self) -> &SystemMatch {
+        &self.system
+    }
+
+    /// Returns the value the search matches exactly.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
     /// Returns the range of storage keys that holds every identifier of
     /// `resource_type` this query matches.
     ///

@@ -34,6 +34,7 @@ mod facade_person_e2e;
 mod facade_professional_e2e;
 mod hl7v2;
 mod http;
+mod inbound;
 mod ingest;
 mod kds;
 mod lane_templates;

@@ -98536,7 +98536,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "r5-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "Provenance",
             path: "Provenance",
@@ -98828,7 +98828,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "r5-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "ProvenanceAgent",
             path: "Provenance.agent",
@@ -98941,7 +98941,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "r5-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "ProvenanceEntity",
             path: "Provenance.entity",
@@ -131245,7 +131245,7 @@ pub static SCHEMAS: Schemas = Schemas {
         "PractitionerRole",
         #[cfg(any(feature = "resources", feature = "r5-resources"))]
         "Procedure",
-        #[cfg(any(feature = "resources", feature = "r5-resources"))]
+        #[cfg(feature = "terminology")]
         "Provenance",
         #[cfg(any(feature = "resources", feature = "r5-resources"))]
         "Questionnaire",
