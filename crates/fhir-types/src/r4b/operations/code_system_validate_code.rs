@@ -84,23 +84,23 @@ pub struct CodeSystemValidateCodeResponse {
     /// A valid display for the concept if the system wishes to display this to
     /// a user
     pub display: Option<super::super::primitives::String>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The code
     /// that was validated
     pub code: Option<super::super::primitives::Code>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// system for the code that was validated
     pub system: Option<super::super::primitives::Uri>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// version of the system of the code that was validated
     pub version: Option<super::super::primitives::String>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A
     /// codeableConcept containing codings for all the validated codes
     pub codeable_concept: Option<super::super::codeable_concept::CodeableConcept>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). List of
     /// itemised issues with paths constrained to simple FHIRPath. Examples are
     /// CodeableConcept, CodeableConcept.coding\[0\],

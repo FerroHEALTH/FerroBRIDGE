@@ -1,0 +1,31 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://ferrobridge.eu/vex/ferrobridge-console",
+  "author": "Cadasto B.V.",
+  "role": "vendor",
+  "timestamp": "2026-11-24T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "RUSTSEC-2026-0594",
+        "aliases": [
+          "GHSA-8wcq-xq25-7fhm"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/ferrobridge-console",
+          "subcomponents": [
+            {
+              "@id": "pkg:cargo/cookie"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "In cookie 0.14.0 up to 0.18.2 a private cookie added in more than one process after a fork() could reuse an AES-GCM nonce. The operator console reaches cookie only through ferrohealth-session, which seals its session cookie in a private jar. The console is one process: neither its own code nor the ferrohealth-session it links calls fork() or spawns a process, so no second process ever adds a private cookie from the same state, and the nonce reuse the advisory describes cannot arise in any console image built with cookie 0.18.2. Releases from v0.0.29 ship cookie 0.18.3, which carries the fix (#2012)."
+    }
+  ]
+}

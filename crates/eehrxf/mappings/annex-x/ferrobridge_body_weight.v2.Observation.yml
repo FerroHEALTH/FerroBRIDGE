@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM OBSERVATION.body_weight.v2 to the
+# FHIR R4 bodyweight profile, the draft EEHRxF Annex X data group
+# EHDSObservation as a vital sign: the weight of each event, the time it was
+# measured and its comment. The profile fixes the category vital-signs and
+# the LOINC code 29463-7 (R4 observation-vitalsigns.html), which the mapping
+# writes on every Observation (no specification governs which elements: our
+# own design).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: OBSERVATION.body_weight.v2
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.body_weight.v2
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "status"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  - name: "category"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "vitalSigns"
+        fhir:
+          - path: "category.coding.system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "category.coding.code"
+            value: "vital-signs"
+
+  - name: "code"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "bodyWeight"
+        fhir:
+          - path: "code.coding.system"
+            value: "http://loinc.org"
+          - path: "code.coding.code"
+            value: "29463-7"
+          - path: "code.coding.display"
+            value: "Body weight"
+
+  # The event repeats (0..*), so one mapping holds it and its elements run
+  # below it.
+  - name: "event"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0002]/events[at0003]"
+    followedBy:
+      mappings:
+        - name: "eventTime"
+          with:
+            fhir: "effective.as(DateTime)"
+            openehr: "time"
+
+        - name: "weight"
+          with:
+            fhir: "value.as(Quantity)"
+            openehr: "data[at0001]/items[at0004]"
+
+        - name: "comment"
+          with:
+            fhir: "note.text"
+            openehr: "data[at0001]/items[at0024]"

@@ -100,16 +100,19 @@ pub(crate) async fn create(
                 Permission::Create,
                 resource_type,
                 &written.ehr_id,
-            )?;
+            )
+            .await?;
             return answer(facade, program, &written, headers, StatusCode::OK).await;
         }
         Recognised::Revised(known) => {
             let ehr_id = known.ehr().map_err(|error| store_identifier(&error))?;
-            compartment::admit_ehr(facade, access, Permission::Create, resource_type, &ehr_id)?;
+            compartment::admit_ehr(facade, access, Permission::Create, resource_type, &ehr_id)
+                .await?;
             // NOTE: SMART App Launch 2.x scopes-and-launch-context maps `u` to update, and a
             // create that revises a known resource is an update in effect (our own design).
-            compartment::admit_ehr(facade, access, Permission::Update, resource_type, &ehr_id)?;
-            let (internal, binding) = binding_of(facade, resource_type, &known)?;
+            compartment::admit_ehr(facade, access, Permission::Update, resource_type, &ehr_id)
+                .await?;
+            let (internal, binding) = binding_of(facade, resource_type, &known).await?;
             return resend(
                 facade,
                 &ingest,
@@ -155,7 +158,7 @@ pub(crate) async fn update(
     crate::facade::handlers::guard(headers, uri, Body::Present)?;
     crate::facade::handlers::supported(facade, resource_type)?;
     let internal = read::internal_id(id)?;
-    let binding = read::binding(facade, resource_type, &internal)?.ok_or_else(|| {
+    let binding = read::binding(facade, resource_type, &internal).await?.ok_or_else(|| {
         // NOTE: `updateCreate` is false in the CapabilityStatement, so a PUT
         // to an unknown id is a 404 rather than a create
         // (<https://hl7.org/fhir/R4/http.html#update>).
@@ -228,13 +231,13 @@ pub(crate) fn same_id(inbound: &Inbound, id: &str) -> Result<(), Refusal> {
 
 /// Returns the resource id and the binding of the resource a consumed source
 /// produced.
-fn binding_of(
+async fn binding_of(
     facade: &Facade,
     resource_type: &str,
     known: &ConsumedSource,
 ) -> Result<(FhirResourceId, CompositionBinding), Refusal> {
     let id = FhirResourceId::new(&known.internal_id).map_err(|error| store_identifier(&error))?;
-    let binding = read::binding(facade, resource_type, &id)?.ok_or_else(|| {
+    let binding = read::binding(facade, resource_type, &id).await?.ok_or_else(|| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(format!(
@@ -326,7 +329,7 @@ async fn answer(
             Ok(reply::built(status, &reported, &response_headers))
         }
         media::Prefer::Representation => {
-            let subject = render::subject_of(facade, &written.ehr_id)?;
+            let subject = render::subject_of(facade, &written.ehr_id).await?;
             let rendered = render::render(
                 program.program(),
                 program.index(),

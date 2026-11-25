@@ -50,6 +50,7 @@ async fn splitting(limits: Limits) -> Harness {
             &person,
             &EhrId::new(super::super::EHR_ID).expect("a legal ehr_id"),
         )
+        .await
         .expect("the subject records");
     harness
 }
@@ -235,7 +236,8 @@ async fn a_code_shared_by_the_entries_of_a_page_and_its_total_is_translated_once
     let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
     harness
         .store
-        .record_ehr(&person, &EhrId::new(super::super::EHR_ID)?)?;
+        .record_ehr(&person, &EhrId::new(super::super::EHR_ID)?)
+        .await?;
     let second = format!("{OTHER_CONTAINER}::ferrobridge.test::1");
     mount_rows(
         &harness.cdr,

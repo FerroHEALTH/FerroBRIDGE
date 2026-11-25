@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group EHDSProcedure
+# (Table 28), served by the facade as an individual resource (draft act Art
+# 7(2), #2087): each ACTION.procedure.v1 entry of the template becomes one
+# Procedure with the http://hl7.eu/fhir/base/StructureDefinition/procedure-eu-
+# core profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_procedure.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/procedure-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "ACTION.procedure.v1"
+  start: "ACTION.procedure.v1"

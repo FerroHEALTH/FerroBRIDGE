@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The identity map: the seam, and the in-memory implementation tests use.
+//! The identity map: the seam, and the in-memory implementation tests use;
+//! [`crate::facade::identity::state`] holds it in the state store.
 //!
 //! No specification governs the identity map: our own design. Four tables
 //! relate a patient identifier to an `ehr_id`, an external resource id to the
@@ -46,35 +47,38 @@ use crate::facade::identity::record::internal_key;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum StoreError {
-    /// The store file could not be opened or created.
-    #[error("the identity store at {path} could not be opened")]
-    Open {
-        /// The path that was tried.
-        path: String,
-        /// What the storage layer reported.
+    /// The state store refused or failed a statement.
+    #[error("the identity map's statement failed")]
+    Database {
+        /// What the database reported.
         #[source]
-        source: Box<redb::DatabaseError>,
+        source: Box<sqlx::Error>,
     },
-    /// The store file carries a schema this build does not read.
+    /// The identity map runs without `[state.seal]`, so it can neither seal
+    /// a person nor digest an identifier.
+    #[error("the identity map needs [state.seal]: it seals persons and digests identifiers")]
+    Unsealed,
+    /// The store was written by another identity derivation.
     #[error(
-        "the identity store at {path} carries schema {found}, and this build reads schemas {oldest} to {newest}; a store of an older schema is reset by removing the file, which the bridge then creates anew"
+        "the identity map was written by identity derivation {found}, and this build derives {expected}; a map of another derivation is reset by emptying its tables"
     )]
-    Schema {
-        /// The path that was opened.
-        path: String,
-        /// The schema the file records.
-        found: String,
-        /// The oldest schema this build reads.
-        oldest: u32,
-        /// The schema this build writes.
-        newest: u32,
+    Derivation {
+        /// The derivation the store records.
+        found: i64,
+        /// The derivation this build writes.
+        expected: u32,
     },
-    /// A transaction could not be started or committed.
-    #[error("an identity store transaction did not complete")]
-    Transaction {
-        /// What the storage layer reported.
+    /// The store was written under another lookup key.
+    #[error(
+        "the identity map was written under another [state.seal] lookup_key; the key never changes once a map is written"
+    )]
+    LookupKey,
+    /// A sealed person could not be sealed or opened.
+    #[error("a person in the identity map could not be sealed or opened")]
+    Seal {
+        /// What the cipher reported.
         #[source]
-        source: Box<redb::Error>,
+        source: crate::store::seal::SealError,
     },
     /// A stored record is not the shape this version writes.
     #[error("the identity store holds a record under {key} that this version cannot read")]
@@ -111,23 +115,21 @@ pub enum StoreError {
 
 /// The identity map the facade resolves every request through.
 ///
-/// The trait is synchronous: `redb` is an embedded store with no I/O wait of
-/// its own, and a handler calls it between two awaits rather than across one,
-/// so no blocking call hides inside an await.
+#[async_trait::async_trait]
 pub trait Store: fmt::Debug + Send + Sync {
     /// Returns the EHR recorded for `patient`, when one is.
     ///
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read.
-    fn ehr_of(&self, patient: &PersonId) -> Result<Option<EhrId>, StoreError>;
+    async fn ehr_of(&self, patient: &PersonId) -> Result<Option<EhrId>, StoreError>;
 
     /// Records `ehr` as the EHR of `patient`, and returns the one that stands.
     ///
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read or written.
-    fn record_ehr(&self, patient: &PersonId, ehr: &EhrId) -> Result<EhrId, StoreError>;
+    async fn record_ehr(&self, patient: &PersonId, ehr: &EhrId) -> Result<EhrId, StoreError>;
 
     /// Returns the person `ehr` was first recorded for, when the map knows.
     ///
@@ -139,14 +141,14 @@ pub trait Store: fmt::Debug + Send + Sync {
     ///
     /// Returns [`StoreError`] when the store cannot be read or holds a person
     /// key this version cannot read.
-    fn person_of(&self, ehr: &EhrId) -> Result<Option<PersonId>, StoreError>;
+    async fn person_of(&self, ehr: &EhrId) -> Result<Option<PersonId>, StoreError>;
 
     /// Returns the internal id recorded for a sender's id, when one is.
     ///
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read.
-    fn internal_of(
+    async fn internal_of(
         &self,
         resource_type: &str,
         external: &ExternalResourceId,
@@ -158,7 +160,7 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read or written.
-    fn record_internal(
+    async fn record_internal(
         &self,
         resource_type: &str,
         external: &ExternalResourceId,
@@ -170,7 +172,7 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read.
-    fn binding_of(
+    async fn binding_of(
         &self,
         resource_type: &str,
         internal: &FhirResourceId,
@@ -181,7 +183,7 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read or written.
-    fn record_binding(
+    async fn record_binding(
         &self,
         resource_type: &str,
         internal: &FhirResourceId,
@@ -193,7 +195,7 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read.
-    fn consumed(&self, source: &SourceVersion) -> Result<Option<ConsumedSource>, StoreError>;
+    async fn consumed(&self, source: &SourceVersion) -> Result<Option<ConsumedSource>, StoreError>;
 
     /// Returns what consumed every version of the `id` `source` names, with
     /// a `meta.versionId` or without one, in storage-key order.
@@ -201,14 +203,17 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read.
-    fn consumed_versions(&self, source: &SourceVersion) -> Result<Vec<ConsumedSource>, StoreError>;
+    async fn consumed_versions(
+        &self,
+        source: &SourceVersion,
+    ) -> Result<Vec<ConsumedSource>, StoreError>;
 
     /// Records what consumed `source`, and returns the record that stands.
     ///
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read or written.
-    fn record_consumed(
+    async fn record_consumed(
         &self,
         source: &SourceVersion,
         consumed: &ConsumedSource,
@@ -220,7 +225,10 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read.
-    fn committed(&self, source: &SourceVersion) -> Result<Option<CommittedSource>, StoreError>;
+    async fn committed(
+        &self,
+        source: &SourceVersion,
+    ) -> Result<Option<CommittedSource>, StoreError>;
 
     /// Records the contribution `source` was committed in, and returns the
     /// record that stands.
@@ -228,7 +236,7 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be read or written.
-    fn record_committed(
+    async fn record_committed(
         &self,
         source: &SourceVersion,
         committed: &CommittedSource,
@@ -241,7 +249,7 @@ pub trait Store: fmt::Debug + Send + Sync {
     ///
     /// Returns [`StoreError`] when the store cannot be read or holds an id
     /// this version cannot read.
-    fn identified(
+    async fn identified(
         &self,
         resource_type: &str,
         query: &IdentifierQuery,
@@ -252,7 +260,7 @@ pub trait Store: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`StoreError`] when the store cannot be written.
-    fn record_identifier(
+    async fn record_identifier(
         &self,
         resource_type: &str,
         identifier: &Identifier,
@@ -308,8 +316,9 @@ impl MemoryStore {
     }
 }
 
+#[async_trait::async_trait]
 impl Store for MemoryStore {
-    fn ehr_of(&self, patient: &PersonId) -> Result<Option<EhrId>, StoreError> {
+    async fn ehr_of(&self, patient: &PersonId) -> Result<Option<EhrId>, StoreError> {
         let key = patient.to_string();
         let found = self.with(|tables| tables.patients.get(&key).cloned())?;
         found
@@ -324,8 +333,8 @@ impl Store for MemoryStore {
             .transpose()
     }
 
-    fn record_ehr(&self, patient: &PersonId, ehr: &EhrId) -> Result<EhrId, StoreError> {
-        if let Some(stored) = self.ehr_of(patient)? {
+    async fn record_ehr(&self, patient: &PersonId, ehr: &EhrId) -> Result<EhrId, StoreError> {
+        if let Some(stored) = self.ehr_of(patient).await? {
             return Ok(stored);
         }
         let key = patient.to_string();
@@ -340,11 +349,11 @@ impl Store for MemoryStore {
         Ok(ehr.clone())
     }
 
-    fn person_of(&self, ehr: &EhrId) -> Result<Option<PersonId>, StoreError> {
+    async fn person_of(&self, ehr: &EhrId) -> Result<Option<PersonId>, StoreError> {
         self.with(|tables| tables.subjects.get(ehr.as_str()).cloned())
     }
 
-    fn internal_of(
+    async fn internal_of(
         &self,
         resource_type: &str,
         external: &ExternalResourceId,
@@ -363,13 +372,13 @@ impl Store for MemoryStore {
             .transpose()
     }
 
-    fn record_internal(
+    async fn record_internal(
         &self,
         resource_type: &str,
         external: &ExternalResourceId,
         internal: &FhirResourceId,
     ) -> Result<FhirResourceId, StoreError> {
-        if let Some(stored) = self.internal_of(resource_type, external)? {
+        if let Some(stored) = self.internal_of(resource_type, external).await? {
             return Ok(stored);
         }
         let key = external_key(resource_type, external);
@@ -378,7 +387,7 @@ impl Store for MemoryStore {
         Ok(internal.clone())
     }
 
-    fn binding_of(
+    async fn binding_of(
         &self,
         resource_type: &str,
         internal: &FhirResourceId,
@@ -387,7 +396,7 @@ impl Store for MemoryStore {
         self.with(|tables| tables.bindings.get(&key).cloned())
     }
 
-    fn record_binding(
+    async fn record_binding(
         &self,
         resource_type: &str,
         internal: &FhirResourceId,
@@ -403,12 +412,15 @@ impl Store for MemoryStore {
         })
     }
 
-    fn consumed(&self, source: &SourceVersion) -> Result<Option<ConsumedSource>, StoreError> {
+    async fn consumed(&self, source: &SourceVersion) -> Result<Option<ConsumedSource>, StoreError> {
         let key = source.storage_key();
         self.with(|tables| tables.sources.get(&key).cloned())
     }
 
-    fn consumed_versions(&self, source: &SourceVersion) -> Result<Vec<ConsumedSource>, StoreError> {
+    async fn consumed_versions(
+        &self,
+        source: &SourceVersion,
+    ) -> Result<Vec<ConsumedSource>, StoreError> {
         let range = source.every_version();
         self.with(|tables| {
             tables
@@ -419,7 +431,7 @@ impl Store for MemoryStore {
         })
     }
 
-    fn record_consumed(
+    async fn record_consumed(
         &self,
         source: &SourceVersion,
         consumed: &ConsumedSource,
@@ -434,12 +446,15 @@ impl Store for MemoryStore {
         })
     }
 
-    fn committed(&self, source: &SourceVersion) -> Result<Option<CommittedSource>, StoreError> {
+    async fn committed(
+        &self,
+        source: &SourceVersion,
+    ) -> Result<Option<CommittedSource>, StoreError> {
         let key = source.storage_key();
         self.with(|tables| tables.contributions.get(&key).cloned())
     }
 
-    fn record_committed(
+    async fn record_committed(
         &self,
         source: &SourceVersion,
         committed: &CommittedSource,
@@ -454,7 +469,7 @@ impl Store for MemoryStore {
         })
     }
 
-    fn identified(
+    async fn identified(
         &self,
         resource_type: &str,
         query: &IdentifierQuery,
@@ -472,7 +487,7 @@ impl Store for MemoryStore {
             .collect()
     }
 
-    fn record_identifier(
+    async fn record_identifier(
         &self,
         resource_type: &str,
         identifier: &Identifier,
@@ -508,45 +523,57 @@ mod tests {
         }
     }
 
-    #[test]
-    fn an_empty_store_knows_nothing() {
+    #[tokio::test]
+    async fn an_empty_store_knows_nothing() {
         let store = MemoryStore::default();
         let patient = PersonId::new("http://example.org/ns", "p-1").expect("a legal person id");
         assert!(
             store
                 .ehr_of(&patient)
+                .await
                 .expect("a read of an empty store")
                 .is_none()
         );
     }
 
-    #[test]
-    fn the_map_wins_once_written() {
+    #[tokio::test]
+    async fn the_map_wins_once_written() {
         let store = MemoryStore::default();
         let internal = FhirResourceId::new("abc").expect("a legal FHIR id");
         let first = store
             .record_binding("Condition", &internal, &binding("uid-1"))
+            .await
             .expect("the first write");
         let second = store
             .record_binding("Condition", &internal, &binding("uid-2"))
+            .await
             .expect("the second write");
         assert_eq!(first, second, "a second write does not move the binding");
         assert_eq!("uid-1", second.versioned_object_uid);
     }
 
-    #[test]
-    fn a_recorded_ehr_and_internal_id_read_back() {
+    #[tokio::test]
+    async fn a_recorded_ehr_and_internal_id_read_back() {
         let store = MemoryStore::default();
         let patient = PersonId::new("http://example.org/ns", "p-1").expect("a legal person id");
         let ehr = EhrId::new("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11").expect("a legal ehr_id");
-        assert_eq!(ehr, store.record_ehr(&patient, &ehr).expect("the write"));
-        assert_eq!(Some(ehr.clone()), store.ehr_of(&patient).expect("the read"));
+        assert_eq!(
+            ehr,
+            store.record_ehr(&patient, &ehr).await.expect("the write")
+        );
+        assert_eq!(
+            Some(ehr.clone()),
+            store.ehr_of(&patient).await.expect("the read")
+        );
         assert_eq!(
             Some(patient),
-            store.person_of(&ehr).expect("the reverse read")
+            store.person_of(&ehr).await.expect("the reverse read")
         );
         let unknown = EhrId::new("0f4b3a0c-9f11-4a4a-9e0b-bd6b1e5a3b9b").expect("a legal ehr_id");
-        assert_eq!(None, store.person_of(&unknown).expect("the reverse read"));
+        assert_eq!(
+            None,
+            store.person_of(&unknown).await.expect("the reverse read")
+        );
 
         let external = ExternalResourceId::new("sender-1").expect("a legal external id");
         let internal = FhirResourceId::new("abc").expect("a legal FHIR id");
@@ -554,16 +581,20 @@ mod tests {
             internal,
             store
                 .record_internal("Condition", &external, &internal)
+                .await
                 .expect("the write")
         );
         assert_eq!(
             Some(internal),
-            store.internal_of("Condition", &external).expect("the read")
+            store
+                .internal_of("Condition", &external)
+                .await
+                .expect("the read")
         );
     }
 
-    #[test]
-    fn a_consumed_source_resolves_a_re_sent_resource() {
+    #[tokio::test]
+    async fn a_consumed_source_resolves_a_re_sent_resource() {
         let store = MemoryStore::default();
         let external = ExternalResourceId::new("sender-1").expect("a legal external id");
         let source = SourceVersion::new("Condition", external, Some(String::from("1")));
@@ -573,18 +604,25 @@ mod tests {
             internal_id: String::from("abc"),
             context: String::from("ferrobridge_diagnosis.context"),
         };
-        assert!(store.consumed(&source).expect("an empty read").is_none());
+        assert!(
+            store
+                .consumed(&source)
+                .await
+                .expect("an empty read")
+                .is_none()
+        );
         store
             .record_consumed(&source, &consumed)
+            .await
             .expect("the write");
         assert_eq!(
             Some(consumed),
-            store.consumed(&source).expect("the read back")
+            store.consumed(&source).await.expect("the read back")
         );
     }
 
-    #[test]
-    fn every_consumed_version_of_one_id_reads_back_and_no_other_id() {
+    #[tokio::test]
+    async fn every_consumed_version_of_one_id_reads_back_and_no_other_id() {
         let store = MemoryStore::default();
         let source = |id: &str, version: Option<&str>| {
             SourceVersion::new(
@@ -606,12 +644,14 @@ mod tests {
         ] {
             store
                 .record_consumed(&source(id, version), &consumed(uid))
+                .await
                 .expect("the write");
         }
         assert_eq!(
             vec![consumed("uid-2"), consumed("uid-1")],
             store
                 .consumed_versions(&source("c-1", Some("9")))
+                .await
                 .expect("the read")
         );
     }

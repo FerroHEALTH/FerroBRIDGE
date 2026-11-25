@@ -22,7 +22,7 @@ edit one: change the pin in docs/VERSIONS.md, run the script with
   `PROVENANCE.md` excluded): `51f5c093f9f197fcab683ac1bc3380e44b1c7e37c6c74baeefff7fa3eb8b7c1e`
 - Contents: 5309 resources of 140 resource types, one JSON file each,
   beside `package.json` and `.index.json`
-- Stamped: 2026-09-26
+- Stamped: 2026-11-24
 
 ## Why build time
 

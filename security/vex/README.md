@@ -48,6 +48,7 @@ reasoning, which decays into a list nobody can re-evaluate.
 | File | Subject | Authored |
 |---|---|---|
 | `rust-advisories.openvex.json` | The Rust dependency advisories the advisory gate accepts. Each statement also carries a `ferrobridge:reachability` block, our own extension since OpenVEX defines none, naming the crates the affected package is reached through. | **generated** |
+| `ferrobridge-console.openvex.json` | The operator console's findings that a dependency upgrade closed, judged for the console images that shipped before it: RUSTSEC-2026-0594 in `cookie` 0.18.2. | hand-written |
 
 There is no OS document. Both images are built on
 `gcr.io/distroless/static-debian13:nonroot` and carry one statically linked

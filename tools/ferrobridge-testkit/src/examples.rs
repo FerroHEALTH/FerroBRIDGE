@@ -33,8 +33,8 @@ pub enum Package {
     R4b,
     /// `hl7.fhir.r5.examples`, the examples of FHIR 5.0.0.
     R5,
-    /// `hl7.fhir.r6.examples`, the examples of the R6 ballot the core package
-    /// pin names.
+    /// `hl7.fhir.r6.examples`, the examples of the R6 release the core
+    /// package pin names.
     R6,
 }
 

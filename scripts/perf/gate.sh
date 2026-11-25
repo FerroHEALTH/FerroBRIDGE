@@ -102,8 +102,8 @@ die() {
   exit 2
 }
 
-# The loopback ports of each arm: the facade, the MLLP listener, the CDR and
-# its database.
+# The loopback ports of each arm: the facade, the MLLP listener, the CDR, its
+# database and the bridge's state store.
 port() {
   case "$1:$2" in
     head:facade) echo 18080 ;;
@@ -114,15 +114,16 @@ port() {
     base:cdr) echo 18091 ;;
     head:db) echo 15432 ;;
     base:db) echo 15433 ;;
+    head:state) echo 15442 ;;
+    base:state) echo 15443 ;;
     *) die "no port $2 for $1" ;;
   esac
 }
 
 facade() { echo "http://127.0.0.1:$(port "$1" facade)"; }
 cdr_origin() { echo "http://127.0.0.1:$(port "$1" cdr)"; }
+state_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" state)/postgres?sslmode=disable"; }
 admin_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" db)/ferroehr?sslmode=disable"; }
-# state_url ARM: the bridge's state store, a database of ARM's CDR server.
-state_url() { echo "postgresql://postgres:postgres@127.0.0.1:$(port "$1" db)/postgres?sslmode=disable"; }
 
 # pin ITEM [MATRIX]: the pin of the docs/VERSIONS.md row whose first cell is
 # ITEM, backticks off.
@@ -300,7 +301,8 @@ cleanup() {
     [[ -n "$pid" ]] && wait "$pid" 2> /dev/null || true
   done
   for arm in head base; do
-    "$engine" rm --force "ferrobridge-perf-$arm-cdr" "ferrobridge-perf-$arm-db" > /dev/null 2>&1 || true
+    "$engine" rm --force "ferrobridge-perf-$arm-cdr" "ferrobridge-perf-$arm-db" \
+      "ferrobridge-perf-$arm-state" > /dev/null 2>&1 || true
   done
   "$engine" rm --force "$BROKER_NAME" "$TERMINOLOGY_NAME" > /dev/null 2>&1 || true
   "$engine" network rm "$NETWORK" > /dev/null 2>&1 || true
@@ -341,6 +343,16 @@ cdr() {
     --env FERROEHR__AUTH__ENABLED=false --env FERROEHR__RECORD__SUBJECT_INDEX=local \
     --env FERROEHR__USAGE_REPORT__ENABLED=false --env "FERROEHR__RECORD__CHANGE_FEED__READERS=${READER}" \
     "$cdr_image" > /dev/null
+}
+
+# state ARM IMAGE: starts ARM's state store, a PostgreSQL of IMAGE.
+state() {
+  local arm="$1" image="$2" name="ferrobridge-perf-$1-state"
+  "$engine" run --quiet --detach --name "$name" \
+    --publish "127.0.0.1:$(port "$arm" state):5432" --env POSTGRES_PASSWORD=postgres \
+    "$image" > /dev/null
+  wait_for "the $arm state store" 120 "$engine" exec "$name" \
+    pg_isready --host 127.0.0.1 --username postgres --dbname postgres
 }
 
 # templates ARM TREE: loads TREE's synthetic templates into ARM's CDR.
@@ -468,13 +480,14 @@ terminology() {
 }
 
 start() {
-  local cdr_image db_image broker_image terminology_image arm
+  local cdr_image db_image broker_image terminology_image state_image arm
   cdr_image="$(pin "FerroEHR CDR image")"
+  state_image="$(pin "PostgreSQL image")"
   db_image="$(pin "FerroEHR CDR database image")"
   broker_image="$(pin "RabbitMQ image")"
   terminology_image="$(pin "FerroTERM terminology server image")"
-  [[ -n "$cdr_image" && -n "$db_image" && -n "$broker_image" && -n "$terminology_image" ]] ||
-    die "docs/VERSIONS.md pins no FerroEHR CDR, CDR database, RabbitMQ or FerroTERM image"
+  [[ -n "$cdr_image" && -n "$db_image" && -n "$broker_image" && -n "$terminology_image" && -n "$state_image" ]] ||
+    die "docs/VERSIONS.md pins no FerroEHR CDR, CDR database, RabbitMQ, FerroTERM or PostgreSQL image"
   [[ -x target/release/ferrobridge ]] || die "target/release/ferrobridge is not built"
   [[ -x "$BASE_TREE/ferrobridge" ]] || die "$BASE_TREE/ferrobridge is not built: run gate.sh build first"
   rm -rf "$WORK"
@@ -488,6 +501,7 @@ start() {
   terminology "$terminology_image"
   for arm in head base; do
     cdr "$arm" "$db_image" "$cdr_image"
+    state "$arm" "$state_image"
   done
   for arm in head base; do
     wait_for "the $arm CDR" 120 curl --fail --silent "$(cdr_origin "$arm")/health/readiness"
@@ -606,7 +620,7 @@ self_test() {
   check "a pin is read without its backticks" "rabbitmq:1@sha256:00" "$(pin "RabbitMQ image" "$work/matrix.md")"
   check "a missing row reads empty" "" "$(pin "Nothing" "$work/matrix.md")"
   local item
-  for item in "FerroEHR CDR image" "FerroEHR CDR database image" "RabbitMQ image" "FerroTERM terminology server image"; do
+  for item in "FerroEHR CDR image" "FerroEHR CDR database image" "RabbitMQ image" "FerroTERM terminology server image" "PostgreSQL image"; do
     check "the $item is pinned by digest" 1 "$([[ "$(pin "$item")" == *@sha256:* ]] && echo 1 || echo 0)"
   done
   printf "path = \"/x/@READ_ID@/@A_1@\"\nbody = 'a@b.org @lower@ @READ_ID@'\n" > "$work/plan.toml"
@@ -671,12 +685,13 @@ GATE
       FERROBRIDGE__EVENTS__EXCHANGE=ferrobridge.perf.base "FERROBRIDGE__HL7V2__CONCEPT_MAPS=$old/fixtures/old" \
       "FERROBRIDGE__TERMINOLOGY__BASE_URL=$TERMINOLOGY/r4")" \
     "$(arm_env base "$old")"
-  printf '# a note\n\nFERROBRIDGE__CDR__ENDPOINT__URL=@CDR@/v1\nFERROBRIDGE__X__LISTEN=127.0.0.1:@MLLP_PORT@\nFERROBRIDGE__Y__DIR=@DIR@/a @TLS@ @FACADE@ @FACADE_PORT@ @ARM@ @TERMINOLOGY@\n' \
+  printf '# a note\n\nFERROBRIDGE__CDR__ENDPOINT__URL=@CDR@/v1\nFERROBRIDGE__X__LISTEN=127.0.0.1:@MLLP_PORT@\nFERROBRIDGE__Y__DIR=@DIR@/a @TLS@ @FACADE@ @FACADE_PORT@ @ARM@ @TERMINOLOGY@\nFERROBRIDGE__STATE__URL=@STATE@\n' \
     > "$layout/$ARM_ENV"
   printf 'FERROBRIDGE__NOT__USED=1\n' > "$layout/$GATE"
   check "a tree's perf/arm.env is filled for the arm, before its gate" \
     "$(printf '%s\n' FERROBRIDGE__CDR__ENDPOINT__URL=http://127.0.0.1:18090/v1 FERROBRIDGE__X__LISTEN=127.0.0.1:12575 \
-      "FERROBRIDGE__Y__DIR=$root/$WORK/head/a $root/$WORK/tls http://127.0.0.1:18080 18080 head $TERMINOLOGY")" \
+      "FERROBRIDGE__Y__DIR=$root/$WORK/head/a $root/$WORK/tls http://127.0.0.1:18080 18080 head $TERMINOLOGY" \
+      "FERROBRIDGE__STATE__URL=postgresql://postgres:postgres@127.0.0.1:15442/postgres?sslmode=disable")" \
     "$(arm_env head "$layout")"
   printf 'FERROBRIDGE__CDR__URL=@NOPE@\n' > "$layout/$ARM_ENV"
   check "an unknown placeholder is refused" 2 "$( (arm_env head "$layout") > /dev/null 2>&1; echo $?)"

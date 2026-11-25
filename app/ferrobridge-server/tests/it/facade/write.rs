@@ -88,7 +88,8 @@ async fn a_create_records_the_identity_it_assigned() -> Result<(), Box<dyn Error
     let internal = ferrobridge_server::facade::identity::FhirResourceId::new(&id)?;
     let binding = harness
         .store
-        .binding_of("Condition", &internal)?
+        .binding_of("Condition", &internal)
+        .await?
         .expect("the create recorded where the resource lives");
     assert_eq!(EHR_ID, binding.ehr_id);
     assert_eq!(CONTAINER, binding.versioned_object_uid);
@@ -516,13 +517,18 @@ async fn invalid_mapped_content_stores_nothing() -> Result<(), Box<dyn Error>> {
                     source.clone(),
                     None,
                 )
-            )?
+            )
+            .await?
             .is_none(),
         "a refused commit recorded the source as consumed"
     );
-    if let Some(internal) = harness.store.internal_of("Condition", &source)? {
+    if let Some(internal) = harness.store.internal_of("Condition", &source).await? {
         assert!(
-            harness.store.binding_of("Condition", &internal)?.is_none(),
+            harness
+                .store
+                .binding_of("Condition", &internal)
+                .await?
+                .is_none(),
             "a refused commit bound the resource to a composition"
         );
     }

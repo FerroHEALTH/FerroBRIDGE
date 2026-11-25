@@ -14,12 +14,12 @@
     "valueCode" : "fhir"
   }],
   "url" : "http://hl7.org/fhir/StructureDefinition/Participant",
-  "version" : "6.0.0-ballot5",
+  "version" : "6.0.0-snapshot1",
   "name" : "Participant",
   "title" : "participant",
   "status" : "draft",
   "experimental" : false,
-  "date" : "2026-07-17T17:22:54+10:00",
+  "date" : "2026-09-10T16:50:24+10:00",
   "publisher" : "HL7 International / FHIR Infrastructure",
   "contact" : [{
     "telecom" : [{
@@ -41,7 +41,7 @@
       "display" : "World"
     }]
   }],
-  "fhirVersion" : "6.0.0-ballot5",
+  "fhirVersion" : "6.0.0-snapshot1",
   "mapping" : [{
     "identity" : "rim",
     "uri" : "http://hl7.org/v3",

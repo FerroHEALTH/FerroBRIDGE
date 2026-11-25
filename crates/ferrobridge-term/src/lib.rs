@@ -55,7 +55,7 @@ mod wire;
 /// The HL7 FHIR release this crate targets.
 ///
 /// The release is published at <https://hl7.org/fhir/R4/>. STU3, R4B, R5 and
-/// the R6 ballot are accepted on the wire as well
+/// R6 are accepted on the wire as well
 /// ([`WireVersion`](config::WireVersion)), each behind the feature of its name.
 pub const FHIR_VERSION: &str = "R4";
 

@@ -66,12 +66,12 @@ async fn a_cdr_that_serves_no_feed_for_the_reader_refuses_the_start() -> Result<
         .respond_with(ResponseTemplate::new(404))
         .mount(&cdr)
         .await;
-    let outcome = serve_settings(
+    let outcome = Box::pin(serve_settings(
         &settings(&cdr, closed_port()?, &store)?,
         || async { Ok(TcpListener::bind("127.0.0.1:0").await?) },
         BACKOFF,
         std::future::pending::<()>(),
-    )
+    ))
     .await;
     let error = outcome.err().ok_or("the start is refused")?;
     assert!(

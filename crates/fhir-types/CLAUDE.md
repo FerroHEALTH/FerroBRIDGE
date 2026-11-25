@@ -71,7 +71,7 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   Two ids follow the published definitions over that extension: `Element.id`
   and its copies take `string`, and `Resource.id` and its copies take `id` in
   every version (R4 resource-definitions.html#Resource.id), where 4.0.1 and
-  6.0.0-ballot5 state `string`.
+  6.0.0-snapshot1 state `string`.
   A primitive carried as a JSON number or a boolean keeps its scalar parse.
   STU3 states a primitive value's type in its `_code` JSON-type extension and
   its form in `structuredefinition-regex`; the emitter reads both.

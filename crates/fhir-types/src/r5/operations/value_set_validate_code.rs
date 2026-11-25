@@ -95,7 +95,7 @@ pub struct ValueSetValidateCodeRequest {
     /// the supplements were included in the value set definition using the
     /// \[<http://hl7.org/fhir/StructureDefinition/valueset-supplement>\](<http://hl7.org/fhir/extensions/StructureDefinition-valueset-supplement.html>)
     pub use_supplement: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). When the
     /// 'lenient-display-validation' parameter is true, an invalid display
     /// string will not cause the 'result' output parameter to be 'false'. If
@@ -103,34 +103,34 @@ pub struct ValueSetValidateCodeRequest {
     /// invalid display will cause the 'result' output parameter to be 'false',
     /// i.e. the validation will fail.
     pub lenient_display_validation: Option<super::super::primitives::Boolean>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). When
     /// 'true', the server will not perform the additional validation tasks
     /// beyond validating membership in the value set (e.g. the server won't
     /// check displays, etc.)
     pub valueset_membership_only: Option<super::super::primitives::Boolean>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). If true,
     /// the terminology server is required to infer the system from evaluation
     /// of the value set definition. The inferSystem parameter is only to be
     /// used with the code parameter, and not with the coding nor
     /// codeableConcept parameters.
     pub infer_system: Option<super::super::primitives::Boolean>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>).
     /// Specifies a version to use for a system, if the value set does not
     /// specify which one to use. The format is the same as a canonical URL:
     /// \[system\]|\[version\] - e.g. <http://loinc.org|2.56>. Note that this is
     /// a different parameter to systemVersion
     pub system_version_canonical: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Edge
     /// Case: Specifies a version to use for a system. If a value set specifies
     /// a different version, an error is returned instead of the expansion. The
     /// format is the same as a canonical URL: \[system\]|\[version\] - e.g.
     /// <http://loinc.org|2.56>
     pub check_system_version: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Edge
     /// Case: Specifies a version to use for a system. This parameter overrides
     /// any specified version in the value set (and any it depends on). The
@@ -143,7 +143,7 @@ pub struct ValueSetValidateCodeRequest {
     /// is overridden, the version used SHALL explicitly be represented in the
     /// expansion parameters
     pub force_system_version: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>).
     /// Specifies a version to use for a valueset, if the reference to the value
     /// set does not specify which version to use. The format is the same as a
@@ -151,7 +151,7 @@ pub struct ValueSetValidateCodeRequest {
     /// <http://example.org/ValueSet/example|1.0.0>. Note that this is similar
     /// to the force-system-version parameter but applied to valuesets
     pub default_valueset_version: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Edge
     /// Case: Specifies a version to use for a valueset. If a reference to a
     /// value set specifies a different version, an error is returned instead of
@@ -160,7 +160,7 @@ pub struct ValueSetValidateCodeRequest {
     /// <http://example.org/ValueSet/example|1.0.0>. Note that this is similar
     /// to the force-system-version parameter but applied to valuesets
     pub check_valueset_version: Vec<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Edge
     /// Case: Specifies a version to use for a valueset. This parameter
     /// overrides any specified version in the reference to the value set (and
