@@ -107,6 +107,10 @@ pub struct Report {
     templates: Vec<TemplateEntry>,
     /// The OMOCL files read.
     omocl_files: Vec<PathBuf>,
+    /// The FHIR Mapping Language files read.
+    structuremap_files: Vec<PathBuf>,
+    /// The maps they parsed into, when every one parsed.
+    structuremaps: Vec<crate::structuremap::syntax::StructureMap>,
     /// The Web Template indices the contexts compiled against, by identifier.
     indexes: BTreeMap<String, Arc<WebTemplateIndex>>,
 }
@@ -152,6 +156,19 @@ impl Report {
     #[must_use]
     pub fn omocl_files(&self) -> &[PathBuf] {
         &self.omocl_files
+    }
+
+    /// Returns the FHIR Mapping Language files read.
+    #[must_use]
+    pub fn structuremap_files(&self) -> &[PathBuf] {
+        &self.structuremap_files
+    }
+
+    /// Returns the maps the FHIR Mapping Language files parsed into, empty
+    /// when one did not parse.
+    #[must_use]
+    pub fn structuremaps(&self) -> &[crate::structuremap::syntax::StructureMap] {
+        &self.structuremaps
     }
 
     /// Returns the report with `diagnostic` raised after every other.
@@ -314,7 +331,7 @@ pub async fn check(inputs: Inputs<'_>) -> Result<Report, Error> {
         Some(directory) => Some(Tree::read(omocl_files(directory)?).map_err(read_error)?),
         None => None,
     };
-    check_files(fhirconnect.as_ref(), inputs.templates, omocl.as_ref()).await
+    check_files(fhirconnect.as_ref(), inputs.templates, omocl.as_ref(), None).await
 }
 
 /// Returns the OMOCL files under `directory`, sorted.
@@ -329,8 +346,9 @@ pub fn omocl_files(directory: &Path) -> Result<Vec<PathBuf>, Error> {
     .map_err(read_error)
 }
 
-/// Checks the FHIRconnect files of `fhirconnect` and the OMOCL files of
-/// `omocl`, each when given, and returns every diagnostic.
+/// Checks the FHIRconnect files of `fhirconnect`, the OMOCL files of
+/// `omocl` and the FHIR Mapping Language maps of `structuremap`, each when
+/// given, and returns every diagnostic.
 ///
 /// This is [`check`] over trees in memory, so a caller checks a set that is
 /// not a directory on disk, such as the provisioned files with the running
@@ -343,6 +361,7 @@ pub async fn check_files(
     fhirconnect: Option<&Tree>,
     templates: Option<Templates<'_>>,
     omocl: Option<&Tree>,
+    structuremap: Option<&Tree>,
 ) -> Result<Report, Error> {
     let mut report = Report::default();
     if let Some(tree) = fhirconnect {
@@ -362,6 +381,13 @@ pub async fn check_files(
             report.diagnostics.append(&mut diagnostics);
         }
         report.omocl_files = tree.paths().map(Path::to_path_buf).collect();
+    }
+    if let Some(tree) = structuremap {
+        match crate::mappings::tree::structuremap_set(tree) {
+            Ok(maps) => report.structuremaps = maps,
+            Err(mut diagnostics) => report.diagnostics.append(&mut diagnostics),
+        }
+        report.structuremap_files = tree.paths().map(Path::to_path_buf).collect();
     }
     Ok(report)
 }

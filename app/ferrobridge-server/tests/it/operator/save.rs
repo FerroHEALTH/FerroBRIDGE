@@ -25,6 +25,7 @@ use ferrobridge_server::operator::Operator;
 use ferrobridge_server::operator::reload::Reloader;
 use ferrobridge_server::operator::snapshot::Snapshot;
 use ferrobridge_server::state::AppState;
+use ferrobridge_server::structuremap::Running;
 use ferrohealth_health::registry::Registry;
 use http::{Request, StatusCode, header};
 use jsonwebtoken::Algorithm;
@@ -38,6 +39,7 @@ mod archive;
 mod replicas;
 mod revisions;
 mod search;
+mod structuremap;
 mod unprovisioned;
 
 /// The analyte file of the OMOCL corpus, provisioned beside the FHIRconnect
@@ -125,6 +127,8 @@ struct Case {
     revisions: Revisions,
     /// The operator API under test.
     operator: Arc<Operator>,
+    /// The FHIR Mapping Language maps a reload swaps in.
+    structuremaps: Arc<Running>,
     /// The stub CDR, kept alive for the case.
     cdr: MockServer,
     /// The stub authorization server.
@@ -207,6 +211,7 @@ impl Case {
             .with_facade(Arc::clone(&facade))
             .serving_operations(lane)
             .with_auth(authority(issuer.settings()).await);
+        let structuremaps = Arc::new(Running::default());
         let reloader = Reloader {
             fhirconnect: Some(provisioned.clone()),
             templates: None,
@@ -214,6 +219,7 @@ impl Case {
             omocl: true,
             facade: Some(facade),
             operations: state.operations_handle().cloned(),
+            structuremaps: Some(Arc::clone(&structuremaps)),
         };
         let operator = Operator::new(
             vec![
@@ -231,6 +237,7 @@ impl Case {
             _postgres: postgres,
             revisions,
             operator,
+            structuremaps,
             cdr,
             issuer,
             key,

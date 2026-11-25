@@ -55,3 +55,4 @@ mod support;
 mod telemetry;
 mod terminology_oauth;
 mod usage_report;
+mod yellow_button_e2e;

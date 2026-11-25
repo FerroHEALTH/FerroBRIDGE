@@ -266,6 +266,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 self.reference_of_party(mapping, target, party)?,
                 Dropped::default(),
             ),
+            Leaf::Value(ref value) if let RmValue::LocatableRef(ref order) = **value => (
+                self.reference_of_locatable(mapping, target, order)?,
+                Dropped::default(),
+            ),
             Leaf::Value(ref value) => {
                 let terminology = self.binding_of(openehr.node());
                 self.read_value(value, kind, terminology.as_deref())

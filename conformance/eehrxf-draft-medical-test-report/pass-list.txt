@@ -38,6 +38,23 @@ eehrxf-laboratory-mapped:header.subject
 eehrxf-laboratory-mapped:header.version
 eehrxf-laboratory-mapped:intendedRecipient[x]
 eehrxf-laboratory-mapped:presentedForm
+eehrxf-pdf-laboratory:attachment
+eehrxf-pdf-laboratory:author[x]
+eehrxf-pdf-laboratory:custodian
+eehrxf-pdf-laboratory:date
+eehrxf-pdf-laboratory:documentCategory
+eehrxf-pdf-laboratory:documentTitle
+eehrxf-pdf-laboratory:documentType
+eehrxf-pdf-laboratory:eventCategory
+eehrxf-pdf-laboratory:identifier
+eehrxf-pdf-laboratory:language
+eehrxf-pdf-laboratory:legalAuthentication
+eehrxf-pdf-laboratory:legalAuthentication.legalAuthenticator[x]
+eehrxf-pdf-laboratory:period
+eehrxf-pdf-laboratory:serviceSpecialty
+eehrxf-pdf-laboratory:status
+eehrxf-pdf-laboratory:subject
+eehrxf-pdf-laboratory:version
 eehrxf-test-report-ecg:attachment
 eehrxf-test-report-ecg:body
 eehrxf-test-report-ecg:body.orderInformation
@@ -118,5 +135,5 @@ eehrxf-test-report-spirometry:header.subject
 eehrxf-test-report-spirometry:header.version
 eehrxf-test-report-spirometry:intendedRecipient[x]
 eehrxf-test-report-spirometry:presentedForm
-total 120
-unmapped 3
+total 137
+unmapped 7

@@ -86,6 +86,41 @@ Art 9). The bridge reads it as `ferrohealth-smart` classifies it
 stays a professional held to the launch context. For the patient's own
 token, the facade's access record carries the binding `self`.
 
+## The assurance level
+
+FerroSMART writes the eIDAS level of each login into the token as `acr`:
+`http://eidas.europa.eu/LoA/low`, `/substantial` or `/high`. Map the three
+values on the issuer table and set the level each route class requires in
+[`[assurance]`](configuration.md#assurance):
+
+```toml
+[auth.issuer.ferrosmart.assurance]
+levels = { "http://eidas.europa.eu/LoA/low" = "low", "http://eidas.europa.eu/LoA/substantial" = "substantial", "http://eidas.europa.eu/LoA/high" = "high" }
+
+[assurance]
+fhir = "substantial"
+shl = "substantial"
+```
+
+The facade then checks the level of every token itself, beside the minimum
+FerroSMART holds each client to and the check FerroEHR makes of the
+exchanged token. A token below the level, or with no `acr`, answers `401`
+with the RFC 9470 §3 step-up challenge, whose `acr_values` name the values
+that meet it:
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Bridge as FerroBRIDGE
+    participant AS as FerroSMART
+    App->>Bridge: GET /fhir/Patient/p/$summary (acr LoA/low)
+    Bridge-->>App: 401 insufficient_user_authentication, acr_values
+    App->>AS: authorize with acr_values=LoA/substantial
+    AS-->>App: token (acr LoA/substantial)
+    App->>Bridge: GET /fhir/Patient/p/$summary
+    Bridge-->>App: 200 Bundle
+```
+
 ## The patient summary reads FerroEHR as the patient
 
 `Patient/$summary` ([`[facade.summary]`](configuration.md#facadesummary))
@@ -113,6 +148,16 @@ with no `act`; it carries `fhirUser`, `patient`, `ehrId`, the scopes
 `patient/composition-*.r` and `patient/aql-*.s`, and the subject token's
 `acr` and `auth_time`, and lives at most five minutes. FerroEHR trusts
 FerroSMART the same way, with an issuer table that names only the issuer.
+
+FerroSMART reads the launch patient at the bridge during a standalone
+launch as a SMART Backend Services client (SMART App Launch 2.2.0, Backend
+Services): its token carries `system/Patient.rs`, and its `sub` equals its
+`client_id` (IHE IUA ITI-71 §3.71.4.2.2.1). Such a token names no user, so
+the bridge exchanges nothing for it (RFC 8693 §2.1) and records the access
+with the client alone (IHE BALP 1.1.4, 3:5.7.5.4). The bridge then reaches
+FerroEHR under its own credential of `[cdr.endpoint.credentials.oauth]`, as
+it does for every machine. No specification governs that last step: it is
+FerroHEALTH's own design.
 
 ## The discovery document
 

@@ -27,6 +27,7 @@ use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::imaging_study::ImagingStudy;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
+use fhir_types::r4::reference::Reference;
 use serde_json::Value;
 
 use super::support::profile_set;
@@ -89,6 +90,10 @@ fn study() -> ImagingStudy {
             ..Coding::default()
         }],
         started: Some("2026-11-20T09:00:00Z".into()),
+        interpreter: vec![Reference {
+            display: Some("Synthetic Radiologist".into()),
+            ..Reference::default()
+        }],
         procedure_code: vec![CodeableConcept {
             text: Some("Synthetic MR of the head".into()),
             ..CodeableConcept::default()
@@ -190,6 +195,10 @@ fn the_manifest_carries_the_annex_vii_study_with_its_series_and_endpoint()
     assert_eq!(
         study["identifier"][0]["type"]["coding"][0]["code"],
         "110180"
+    );
+    assert_eq!(
+        study["interpreter"][0]["display"], "Synthetic Radiologist",
+        "Annex VII header.author[x], the composer of the imaging report"
     );
     assert_eq!(study["numberOfSeries"], 2);
     assert_eq!(study["numberOfInstances"], 5);

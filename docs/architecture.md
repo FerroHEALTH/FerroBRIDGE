@@ -877,6 +877,25 @@ ours:
   canonical URL), and an unmapped non-percent proportion is a typed refusal
   naming the element. The gap is reported upstream (the specification's own
   open issue on date and proportion combinations is the place).
+- **The identities of a record go out of openEHR: our own design (#2115).**
+  The data-type chapter has no row for `LOCATABLE.uid` or
+  `INSTRUCTION_DETAILS.instruction_id`, and no template node holds them, so
+  the compiler admits `uid` below any `LOCATABLE` node (`$composition/uid`
+  among them) and `instruction_details/instruction_id` below an `ACTION`
+  (`rm::IDENTITIES`). A `UID_BASED_ID` reads as an `Identifier` that names
+  the object across its versions: an `OBJECT_VERSION_ID` gives its
+  `object_id`, a root with no extension is the `urn:uuid:` or `urn:oid:`
+  value under the `urn:ietf:rfc:3986` system, a root with an extension is
+  the extension's namespace, and an `INTERNET_ID` root, which has no URI
+  form, is refused. A `LOCATABLE_REF` reads as a `Reference` of the one type
+  the element admits, naming the version container by that identifier; its
+  `path` has no counterpart. Both cells run out of openEHR only, since the
+  CDR assigns the uids. The MPD project maps the composition uid to
+  `MedicationRequest.groupIdentifier`, the `INSTRUCTION` uid to
+  `MedicationRequest.identifier`, the `ACTION` uid to
+  `MedicationDispense.identifier`, and the `ACTION`'s `instruction_id` to
+  `MedicationDispense.authorizingPrescription`, which then names the
+  prescription by the identifier its items share.
 - PROGRAMMED mappings (`mappingCode`) are first-party Rust functions in a
   registry with a typed interface over the canonical model; an unknown code is
   a load error. The library depends on eight codes, six of them the Dosage and
@@ -1556,7 +1575,8 @@ server keeps its read-only root file system. Without `[state]`, the operator
 API checks and saves nothing.
 
 **The load path compiles a tree in memory.** Every FHIRconnect, search
-declaration and OMOCL load reads a tree of file bytes by path, keeping each
+declaration, OMOCL and FHIR Mapping Language load reads a tree of file bytes
+by path, keeping each
 file's path for the source positions its diagnostics carry. A provisioned
 directory is one producer of that tree, keyed by path on disk; the running
 revision is the other, keyed by wire path. No file is staged on disk to be
@@ -2589,13 +2609,23 @@ source's own JSON as FHIR R4: a map in the R4 language
 (<https://hl7.org/fhir/R4/mapping-language.html>, grammar `mapping.g4`)
 runs over an instance of a logical model, a `StructureDefinition` of `kind =
 logical`, which `structuremap::openapi` generates from the schema a
-source's `OpenAPI` document publishes. FHIRconnect maps openEHR to FHIR and
+source's `OpenAPI` document publishes. The maps are console files of the
+mapping revision under the `structuremap` root, one `.map` file per map: a
+save or an apply parses every one, refuses a map outside the grammar or a
+URL two maps carry, and a reload on any replica swaps the parsed maps in
+with the rest of the set. FHIRconnect maps openEHR to FHIR and
 cannot describe another source, so this second language serves the inbound
 sources. The grammar leaves `fhirPath` a placeholder, so an embedded
 expression is parenthesized or runs to the next clause, as the tutorial
 writes it, and `ferrobridge-fhirpath` evaluates it with the map's variables
-bound by name over untyped logical-model nodes. `translate` waits on the
-terminology client (#2118); `dateOp` and `escape`, which R4 leaves
+bound by name over untyped logical-model nodes. `translate` (#2118) sends
+a `Coding`, or each coding of a `CodeableConcept` in order, with the map URL
+to `ConceptMap/$translate` through `ferrobridge-term`, since R4 takes a code
+only with its system; the first coding with exactly one accepted concept
+answers, and a refusal, no translation or two concepts stop the map. The
+engine stays synchronous behind a `Translate` seam: the lane runs it with
+`Engine::transform_blocking` on a blocking thread, where the terminology
+call waits with `Handle::block_on`. `dateOp` and `escape`, which R4 leaves
 undocumented, are refused.
 
 ## 8. What each seam carries
