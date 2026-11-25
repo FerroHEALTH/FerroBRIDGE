@@ -4,7 +4,6 @@
 //! The engine run over one resource, the strict re-read of what it built,
 //! and the identity record of one committed composition.
 
-use fhir_types::codec::Value;
 use fhirconnect::engine::library::Library;
 use fhirconnect::engine::linked::LinkedCompositions;
 use fhirconnect::engine::outcome::Warning;
@@ -65,17 +64,9 @@ pub(super) fn resource_source(inbound: &Inbound) -> Option<SourceVersion> {
 /// (<https://hl7.org/fhir/R4/search.html#token>), so an `Identifier` with no
 /// `value` can answer no search and has nothing to record.
 fn identifiers_of(inbound: &Inbound) -> Vec<Identifier> {
-    inbound
-        .document()
-        .get("identifier")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|identifier| {
-            let value = identifier.get("value").and_then(Value::as_str)?;
-            let system = identifier.get("system").and_then(Value::as_str);
-            Some(Identifier::new(system, value))
-        })
+    crate::facade::subject::identifiers_of(inbound.document())
+        .into_iter()
+        .map(|(system, value)| Identifier::new(system, value))
         .collect()
 }
 

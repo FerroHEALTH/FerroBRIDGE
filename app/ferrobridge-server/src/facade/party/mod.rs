@@ -135,16 +135,16 @@ pub(crate) fn party_id(resource_type: &str, id: &str) -> Result<HierObjectId, Re
 /// Returns the refusal a CDR answer outside the documented successes renders
 /// as: its row in the Demographic table, or the undocumented row.
 pub(crate) fn refused(upstream: &Upstream) -> Refused {
-    match status::demographic::of_demographic_refusal(upstream) {
-        Some(answer) => Refused::of_answer(&answer),
-        None => Refused::of_answer(&status::Answer::new(
+    let answer = status::demographic::of_demographic_refusal(upstream).unwrap_or_else(|| {
+        status::Answer::new(
             status::UNDOCUMENTED,
             format!(
                 "the {LABEL} answered {} outside the operation's documented answers",
                 upstream.status()
             ),
-        )),
-    }
+        )
+    });
+    Refused::of_answer(&answer)
 }
 
 /// Returns the refusal a call that reached no documented answer renders as.
@@ -186,7 +186,7 @@ pub(crate) async fn get(
                     version: version_of(stringify!($call), &upstream, headers.etag.as_deref())?,
                 },
                 $outcome::NoContent => return Err(gone(resource_type, uid)),
-                _ => return Err(refused(&upstream)),
+                _ => return Err(refused(&upstream).into()),
             }
         }};
     }

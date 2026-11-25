@@ -3,10 +3,13 @@
 
 //! Create, update and delete of a party resource.
 //!
-//! A create maps the resource to a party and commits its first version; an
-//! update commits a new version over the one `If-Match` names, or over the
-//! latest when the request names none, so a concurrent writer still meets the
-//! `412` the CDR answers; a delete removes the latest version
+//! A create maps the resource to a party and commits its first version, and
+//! for a party holding relationships a second version that sources them at
+//! the uid the CDR assigned, deleting the party again when that second write
+//! fails; an update commits a new version over the one
+//! `If-Match` names, or over the latest when the request names none, so a
+//! concurrent writer still meets the `412` the CDR answers; a delete removes
+//! the latest version
 //! (<https://hl7.org/fhir/R4/http.html>). Each answers from the party it sent,
 //! under the version the CDR's `ETag` names, and writes no identity-map entry.
 //! ITS-REST 1.1.0 Demographic API, DEVELOPMENT. No specification governs the
@@ -14,6 +17,8 @@
 
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
+use fhirconnect::engine::lens::party_ref::NAMESPACE;
+use fhirconnect::engine::traverse::error::EngineError;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -35,6 +40,8 @@ use crate::facade::commit::Change;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::read::parse;
 use crate::facade::handlers::write::same_id;
+use crate::facade::identity::PersonId;
+use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
@@ -57,25 +64,39 @@ pub(crate) async fn create(
 ) -> Result<axum::response::Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Present)?;
     party::admit(access, Permission::Create, resource_type, None)?;
-    let inbound = parse(body, resource_type)?;
-    let built = build(facade, loaded, inbound.document()).await?;
-    party::unbound(facade, resource_type, built.value())?;
-    let client = facade.client_for(headers, access).await?;
-    let person =
-        party::provision::pseudonym(facade, (access, &client), resource_type, inbound.document())
-            .await?;
+    let Prepared {
+        built,
+        client,
+        person,
+    } = prepared(
+        facade,
+        (access, headers),
+        loaded,
+        (resource_type, None),
+        body,
+    )
+    .await?;
     let demographic = party::demographic(&client)?;
-    let commit = commit(facade, loaded, Change::Creation)?;
-    let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
-    if let Some(person) = person {
-        party::provision::provision(facade, &client, &version, &person).await?;
-    }
+    let class = class_of(loaded)?;
+    let creation = commit(facade, loaded, Change::Creation)?;
+    let modification = commit(facade, loaded, Change::Modification)?;
+    let deletion = commit(facade, loaded, Change::Deleted)?;
+    let first = commit_party(demographic, class, &built, &creation, None).await?;
+    let (built, version) =
+        match relate(loaded, (demographic, class), &built, &modification, &first).await {
+            Ok(related) => related,
+            Err(relating) => {
+                let unrelated = withdraw((demographic, class), &first, &deletion, relating).await;
+                return Err(unrelated.into_refusal(resource_type));
+            }
+        };
+    let written = (&built, &version);
     respond(
         facade,
         loaded,
         resource_type,
-        &built,
-        &version,
+        written,
+        (&client, person),
         StatusCode::CREATED,
     )
     .await
@@ -97,19 +118,24 @@ pub(crate) async fn update(
     crate::facade::handlers::guard(headers, uri, Body::Present)?;
     party::admit(access, Permission::Update, resource_type, Some(id))?;
     let uid = party::party_id(resource_type, id)?;
-    let inbound = parse(body, resource_type)?;
-    same_id(&inbound, id)?;
-    let built = build(facade, loaded, inbound.document()).await?;
-    party::unbound(facade, resource_type, built.value())?;
-    let client = facade.client_for(headers, access).await?;
-    let person =
-        party::provision::pseudonym(facade, (access, &client), resource_type, inbound.document())
-            .await?;
+    let Prepared {
+        built,
+        client,
+        person,
+    } = prepared(
+        facade,
+        (access, headers),
+        loaded,
+        (resource_type, Some(id)),
+        body,
+    )
+    .await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
+    let built = sourced(loaded, &built, uid.value())?;
     let preceding = preceding(headers, &latest.version)?;
     let commit = commit(facade, loaded, Change::Modification)?;
     let version = commit_party(
@@ -120,15 +146,13 @@ pub(crate) async fn update(
         Some((uid.value(), &preceding)),
     )
     .await?;
-    if let Some(person) = person {
-        party::provision::provision(facade, &client, &version, &person).await?;
-    }
+    let written = (&built, &version);
     respond(
         facade,
         loaded,
         resource_type,
-        &built,
-        &version,
+        written,
+        (&client, person),
         StatusCode::OK,
     )
     .await
@@ -154,17 +178,30 @@ pub(crate) async fn delete(
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
     let commit = commit(facade, loaded, Change::Deleted)?;
+    delete_version((demographic, class), &latest.version, &commit).await?;
+    Ok(reply::minimal(StatusCode::NO_CONTENT, &[]))
+}
+
+/// Deletes the party version `version` names, which must be its latest
+/// (ITS-REST 1.1.0 Demographic API, `person_delete` and its siblings: "The
+/// `uid_based_id` MUST be in a form of an `OBJECT_VERSION_ID` identifier taken
+/// from the last (most recent) `VERSION.uid.value`").
+async fn delete_version(
+    (demographic, class): (Demographic<'_>, PartyClass),
+    version: &ObjectVersionId,
+    commit: &CommitContext,
+) -> Result<(), Refused> {
     macro_rules! delete_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
             let Answered { outcome, upstream } = demographic
-                .$call(&latest.version, &commit)
+                .$call(version, commit)
                 .await
                 .map_err(|error| party::client_refusal(&error))?
                 .answered;
             match outcome {
-                $outcome::NoContent { .. } => {}
-                _ => return Err(party::refused(&upstream).into()),
+                $outcome::NoContent { .. } => Ok(()),
+                _ => Err(party::refused(&upstream)),
             }
         }};
     }
@@ -173,10 +210,46 @@ pub(crate) async fn delete(
         PartyClass::Organisation => delete_as!(organisation_delete, OrganisationDeleteOutcome),
         PartyClass::Role => delete_as!(role_delete, RoleDeleteOutcome),
     }
-    Ok(reply::minimal(StatusCode::NO_CONTENT, &[]))
 }
 
 /// Maps one inbound resource to its party.
+/// The party a create or an update writes, the caller's CDR client and, for
+/// a `Patient`, the person its ITI-83 pseudonym names.
+struct Prepared {
+    /// The party built from the body.
+    built: CanonicalParty,
+    /// The caller's CDR client.
+    client: crate::cdr::CdrClient,
+    /// The person, for a `Patient`.
+    person: Option<PersonId>,
+}
+
+/// Reads `body` as a `resource_type`, the id `id` names for an update, and
+/// builds the party it describes, refused while it names a bound party.
+async fn prepared(
+    facade: &Facade,
+    (access, headers): (&Access, &HeaderMap),
+    loaded: &Loaded,
+    (resource_type, id): (&str, Option<&str>),
+    body: &[u8],
+) -> Result<Prepared, Refusal> {
+    let inbound = parse(body, resource_type)?;
+    if let Some(id) = id {
+        same_id(&inbound, id)?;
+    }
+    let built = build(facade, loaded, inbound.document()).await?;
+    party::unbound(facade, resource_type, built.value())?;
+    let client = facade.client_for(headers, access).await?;
+    let person =
+        party::provision::pseudonym(facade, (access, &client), resource_type, inbound.document())
+            .await?;
+    Ok(Prepared {
+        built,
+        client,
+        person,
+    })
+}
+
 async fn build(
     facade: &Facade,
     loaded: &Loaded,
@@ -197,6 +270,121 @@ async fn build(
         .await
         .map(fhirconnect::engine::outcome::Outcome::into_value)
         .map_err(|error| Refusal::from(crate::facade::ingest::refusal::engine_refusal(&error)))
+}
+
+/// Commits the relationships `built` awaits the source of as a second
+/// version over `first`, sourced at the party the CDR created, and returns
+/// the party and version the create answers with.
+///
+/// Every relationship a party holds has the party as its source (RM
+/// Demographic IM, the `PARTY` class, invariant `Relationships_validity`),
+/// and the CDR assigns the uid when it commits the first version.
+async fn relate(
+    loaded: &Loaded,
+    (demographic, class): (Demographic<'_>, PartyClass),
+    built: &CanonicalParty,
+    commit: &CommitContext,
+    first: &ObjectVersionId,
+) -> Result<(CanonicalParty, ObjectVersionId), Refused> {
+    if !built.awaits_source() {
+        return Ok((built.clone(), first.clone()));
+    }
+    let uid = first.versioned_object_id();
+    let related = loaded
+        .index()
+        .source_relationships(built, uid.value(), NAMESPACE)
+        .map_err(unbuilt)?;
+    let version = commit_party(
+        demographic,
+        class,
+        &related,
+        commit,
+        Some((uid.value(), first)),
+    )
+    .await?;
+    Ok((related, version))
+}
+
+/// A create whose party the CDR committed and whose relationships it refused.
+///
+/// The create is one interaction (<https://hl7.org/fhir/R4/http.html#create>),
+/// so it leaves no party behind: the party is deleted again. No specification
+/// governs the compensation: our own design.
+#[derive(Debug)]
+enum Unrelated {
+    /// The party was deleted, and the create answers the relationships'
+    /// refusal.
+    Withdrawn(Refused),
+    /// The deletion was refused as well, so the party stands at `version`
+    /// without its relationships.
+    Stranded {
+        /// The refusal of the relationships.
+        relating: Refused,
+        /// The refusal of the deletion.
+        withdrawing: Refused,
+        /// The version of the party that stands.
+        version: ObjectVersionId,
+    },
+}
+
+impl Unrelated {
+    /// Returns the refusal the create answers with.
+    fn into_refusal(self, resource_type: &str) -> Refusal {
+        match self {
+            Self::Withdrawn(relating) => Refusal::from(relating),
+            Self::Stranded {
+                relating,
+                withdrawing,
+                version,
+            } => {
+                let stands = Issue::error(IssueType::Exception).diagnosing(format!(
+                    "the {} refused the relationships of the {resource_type} it created as \
+                     `{}`, and then refused its deletion: it stands without its relationships. \
+                     The issues that follow are the two refusals, in that order",
+                    party::LABEL,
+                    version.value()
+                ));
+                let issues = std::iter::once(stands)
+                    .chain(relating.issues().iter().cloned())
+                    .chain(withdrawing.issues().iter().cloned())
+                    .collect();
+                Refusal::from(Refused::of(StatusCode::INTERNAL_SERVER_ERROR, issues))
+            }
+        }
+    }
+}
+
+/// Deletes the party `first` names after the CDR refused its relationships.
+async fn withdraw(
+    target: (Demographic<'_>, PartyClass),
+    first: &ObjectVersionId,
+    commit: &CommitContext,
+    relating: Refused,
+) -> Unrelated {
+    match delete_version(target, first, commit).await {
+        Ok(()) => Unrelated::Withdrawn(relating),
+        Err(withdrawing) => Unrelated::Stranded {
+            relating,
+            withdrawing,
+            version: first.clone(),
+        },
+    }
+}
+
+/// Returns `built` with the relationships it awaits sourced at the party
+/// `uid` names.
+fn sourced(loaded: &Loaded, built: &CanonicalParty, uid: &str) -> Result<CanonicalParty, Refusal> {
+    loaded
+        .index()
+        .source_relationships(built, uid, NAMESPACE)
+        .map_err(|error| Refusal::from(unbuilt(error)))
+}
+
+/// Returns the refusal of a party whose relationships do not build.
+fn unbuilt(error: openehr_mapping_core::party::PartyError) -> Refused {
+    crate::facade::ingest::refusal::engine_refusal(&EngineError::PartyBuild {
+        source: Box::new(error),
+    })
 }
 
 /// Returns the commit headers one party write carries.
@@ -253,7 +441,7 @@ async fn commit_party(
     party: &CanonicalParty,
     commit: &CommitContext,
     over: Option<(&str, &ObjectVersionId)>,
-) -> Result<ObjectVersionId, Refusal> {
+) -> Result<ObjectVersionId, Refused> {
     let touch = if over.is_some() {
         crate::cdr::reach::Touch::Updated
     } else {
@@ -266,7 +454,7 @@ async fn commit_party(
             use openehr_its::rest::generated::demographic::client::$updated;
             let typed: $typed =
                 openehr_its::json::from_canonical_value(party.value()).map_err(|error| {
-                    reply::refusal(
+                    Refused::new(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Issue::error(IssueType::Exception)
                             .diagnosing(format!("the built party does not decode: {error}")),
@@ -342,15 +530,19 @@ async fn commit_party(
 }
 
 /// Answers a write from the party it sent, under `version`, as `Prefer`
-/// asks (<https://hl7.org/fhir/R4/http.html#return>).
+/// asks (<https://hl7.org/fhir/R4/http.html#return>), once the EHR of
+/// `person`, a `Patient`'s, is provisioned through `client`.
 async fn respond(
     facade: &Facade,
     loaded: &Loaded,
     resource_type: &str,
-    party: &CanonicalParty,
-    version: &ObjectVersionId,
+    (party, version): (&CanonicalParty, &ObjectVersionId),
+    (client, person): (&crate::cdr::CdrClient, Option<PersonId>),
     status: StatusCode,
 ) -> Result<axum::response::Response, Refusal> {
+    if let Some(person) = person {
+        party::provision::provision(facade, client, version, &person).await?;
+    }
     let headers = [
         Header::location(&party::location(facade, resource_type, version)),
         Header::entity_tag(version.version_tree_id().value()),

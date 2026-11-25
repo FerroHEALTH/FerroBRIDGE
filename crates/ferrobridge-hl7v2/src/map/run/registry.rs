@@ -11,7 +11,6 @@ use std::collections::BTreeMap;
 use ferrobridge_term::client::Client;
 
 use crate::map::maps::Row;
-use crate::map::notation::Target;
 use crate::map::run::datum::Datum;
 use crate::map::run::{Base, Lookup, Pending, Run, Scope};
 use crate::map::{MapError, Outcome, RowRef};
@@ -51,17 +50,8 @@ impl<'a> Run<'a> {
         let Some(authority) = text(1).or_else(|| text(2)).map(String::from) else {
             return Ok(());
         };
-        let (instance, steps) = match &row.target {
-            Ok(Target::Path { instance, steps }) => (instance.as_ref(), steps.as_slice()),
-            Ok(Target::Value { instance }) => (instance.as_ref(), &[][..]),
-            Err(error) => {
-                self.outcomes.push(Outcome::UnsupportedTarget {
-                    at: scope.at.clone(),
-                    row: reference.clone(),
-                    error: error.clone(),
-                });
-                return Ok(());
-            }
+        let Some((instance, steps)) = self.target(scope, row, reference) else {
+            return Ok(());
         };
         if steps.iter().any(|step| step.reference.is_some()) {
             self.outcomes.push(Outcome::UnsupportedShape {

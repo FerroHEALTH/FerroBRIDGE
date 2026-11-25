@@ -84,7 +84,7 @@ readonly CORPUS_TESTS=(
 # eehrxf suites emitted (EEHRXF_DRAFT_CORPUS_DIR), each after those suites run.
 readonly DRAFT_CORPORA=(eehrxf-draft-patient-summary eehrxf-draft-eprescription eehrxf-draft-edispensation
   eehrxf-draft-medical-test-report eehrxf-draft-imaging eehrxf-draft-discharge)
-readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc "${DRAFT_CORPORA[@]}")
+readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac "${DRAFT_CORPORA[@]}")
 
 # Whether $1 equals one of the remaining arguments.
 contains() {
@@ -212,6 +212,7 @@ label_of() {
     myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
     myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
     myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI)" ;;
+    myhealth-eu-euvac) echo "MyHealth@EU EuVAC $(pinned_version myhealth.eu.fhir.euvac)" ;;
     eehrxf-annex-x) echo "EEHRxF Annex X groups served" ;;
     *) return 1 ;;
   esac
@@ -235,7 +236,7 @@ logo_of() {
 # for a corpus whose label says it.
 unit_of() {
   case "$1" in
-    myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr) echo " valid" ;;
+    myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr | myhealth-eu-euvac) echo " valid" ;;
     myhealth-eu-mvc) echo " codes in bound value sets" ;;
     xtehr-crosswalk) echo " elements aligned" ;;
     eehrxf-draft-*) echo " annex elements held" ;;
@@ -253,6 +254,18 @@ draft_label() {
 ci_build_version() {
   awk -F'|' -v want="$1" '
     NF >= 4 && $3 ~ /tarball `https:\/\/build-fhir\.ehdsi\.eu\// {
+      k = $2; gsub(/[ `]/, "", k)
+      if (k == want) { split($3, t, /[[:space:]]+/); print t[2]; exit }
+    }' docs/VERSIONS.md
+}
+
+# The version the profile packages table of docs/VERSIONS.md pins for
+# package $1, read from its row, so a re-pin moves the badge label; a preview
+# keeps its label in the version.
+pinned_version() {
+  awk -F'|' -v want="$1" '
+    /^## / { on = ($0 ~ /^## Profile packages/); next }
+    on && NF >= 4 {
       k = $2; gsub(/[ `]/, "", k)
       if (k == want) { split($3, t, /[[:space:]]+/); print t[2]; exit }
     }' docs/VERSIONS.md
@@ -530,7 +543,7 @@ render_block() {
   printf '%s\n' "${COMPLIANCE_BADGES[@]}"
   echo
   echo '**EHDS and EEHRxF**<br>'
-  for name in "${DRAFT_CORPORA[@]}" xtehr-crosswalk myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc; do
+  for name in "${DRAFT_CORPORA[@]}" xtehr-crosswalk myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
   # The per-family and per-version badges fold into a collapsed block, so the

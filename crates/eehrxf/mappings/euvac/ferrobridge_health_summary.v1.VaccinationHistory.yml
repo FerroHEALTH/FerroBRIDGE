@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM COMPOSITION.health_summary.v1 to the
+# FHIR R4 Composition of a MyHealth@EU vaccination history. The template's
+# immunisations section, the CKM vaccination list, is entered through its
+# sub-context by its section path (FHIRconnect 1.0.0,
+# types-of-mapping-files/sub-contexts.adoc, §slotContext); the other sections
+# of the template are no part of the history.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.health_summary.v1.VaccinationHistory
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.health_summary.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Composition
+
+mappings:
+  - name: "status"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  # NOTE: composition-euvac-myhealtheu 10.0.0-preview fixes Composition.type to LOINC 11369-6.
+  - name: "type"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.type.coding"
+    manual:
+      - name: "vaccinationHistory"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "11369-6"
+
+  - name: "title"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "vaccinationHistory"
+        fhir:
+          - path: "title"
+            value: "Vaccination history"
+
+  - name: "date"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.date"
+      openehr: "$composition/context/start_time"
+
+  - name: "author"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.author"
+      openehr: "$composition/composer"
+
+  - name: "sectionImmunisations"
+    with:
+      fhir: "$resource.section"
+      openehr: "$composition/content[openEHR-EHR-SECTION.immunisation_list.v0]"
+    slotContext: "ferrobridge_myhealtheu_euvac_immunisation.context"
+    fhirCondition:
+      targetRoot: "$resource.section"
+      targetAttribute: "code.coding.code"
+      operator: "one of"
+      criteria: "11369-6"

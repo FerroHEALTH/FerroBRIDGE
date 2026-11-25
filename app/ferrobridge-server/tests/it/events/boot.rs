@@ -10,10 +10,11 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::time::Duration;
 
-use ferrobridge_server::boot::{Backoff, serve_settings};
+use ferrobridge_server::boot::serve_settings;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::config::Settings;
+use ferrobridge_server::retry::Backoff;
 use ferrobridge_testkit::containers;
 use serde_json::json;
 use tokio::net::TcpListener;

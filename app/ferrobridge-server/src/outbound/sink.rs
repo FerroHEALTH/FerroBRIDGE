@@ -20,8 +20,21 @@ use http::StatusCode;
 use http::header::CONTENT_TYPE;
 use url::Url;
 
+use crate::retry::{Failure, Statuses};
+
 /// The media type a Bundle is sent as (<https://hl7.org/fhir/R4/http.html#mime-type>).
 const FHIR_JSON: &str = "application/fhir+json";
+
+/// How a failed delivery reads the endpoint's answer: `401`, `408` and `429`
+/// may pass, as may every status a transaction gives no meaning to.
+const STATUSES: Statuses = Statuses {
+    transient: &[
+        StatusCode::UNAUTHORIZED,
+        StatusCode::REQUEST_TIMEOUT,
+        StatusCode::TOO_MANY_REQUESTS,
+    ],
+    other: Failure::Transient,
+};
 
 /// Why a delivery was not accepted.
 #[derive(Debug, thiserror::Error)]
@@ -107,17 +120,10 @@ fn outcome(status: StatusCode) -> Result<(), SinkError> {
     if status.is_success() {
         return Ok(());
     }
-    if status.is_client_error()
-        && ![
-            StatusCode::UNAUTHORIZED,
-            StatusCode::REQUEST_TIMEOUT,
-            StatusCode::TOO_MANY_REQUESTS,
-        ]
-        .contains(&status)
-    {
-        return Err(SinkError::Refused { status });
+    match STATUSES.failure(status) {
+        Failure::Poisoned => Err(SinkError::Refused { status }),
+        Failure::Transient => Err(SinkError::Unavailable { status }),
     }
-    Err(SinkError::Unavailable { status })
 }
 
 #[cfg(test)]

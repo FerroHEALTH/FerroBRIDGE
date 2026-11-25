@@ -42,6 +42,7 @@ pub mod outbound;
 pub mod panic;
 pub mod problem;
 pub mod quality;
+pub mod retry;
 pub mod settings;
 pub mod shl;
 pub mod smart;
@@ -439,7 +440,7 @@ async fn serve_command(settings: Settings) -> anyhow::Result<()> {
     Box::pin(boot::serve_settings(
         &settings,
         bind,
-        boot::Backoff::default(),
+        retry::Backoff::default(),
         ferrohealth_server::serve::shutdown_signal(),
     ))
     .await?;

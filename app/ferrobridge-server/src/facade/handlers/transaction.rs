@@ -98,11 +98,7 @@ pub(crate) async fn transaction(
         crate::facade::references::entries_of(bundle.document()),
         &resolved,
     );
-    let ingested = facade
-        .ingest(client)
-        .with_references(&bundled)
-        .with_originating_system(crate::facade::commit::originating_system(access))
-        .with_on_behalf(crate::facade::subject::on_behalf(access))
+    let ingested = crate::facade::handlers::write::ingest_for(facade, access, client, &bundled)
         .ingest_bundle(
             bundle.document(),
             UnmappedEntries::Refuse,

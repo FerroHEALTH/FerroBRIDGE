@@ -135,19 +135,27 @@ impl SubjectLink {
     ///
     /// Returns [`SubjectError::Source`] when it carries none.
     pub fn patient(&self, document: &Value) -> Result<Subject, SubjectError> {
-        let identifiers: Vec<(Option<&str>, &str)> = document
-            .get("identifier")
-            .and_then(Value::as_array)
-            .unwrap_or_default()
-            .iter()
-            .filter_map(|identifier| {
-                let value = identifier.get("value").and_then(Value::as_str)?;
-                let system = identifier.get("system").and_then(Value::as_str);
-                Some((system, value))
-            })
-            .collect();
-        Ok(Subject::Identified(self.identity.source_of(&identifiers)?))
+        Ok(Subject::Identified(
+            self.identity.source_of(&identifiers_of(document))?,
+        ))
     }
+}
+
+/// Returns the system and the value of every `identifier` of `document`
+/// that carries a `value`, in document order.
+#[must_use]
+pub fn identifiers_of(document: &Value) -> Vec<(Option<&str>, &str)> {
+    document
+        .get("identifier")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|identifier| {
+            let value = identifier.get("value").and_then(Value::as_str)?;
+            let system = identifier.get("system").and_then(Value::as_str);
+            Some((system, value))
+        })
+        .collect()
 }
 
 /// What resolving a subject to its person reaches: the identity source, the
