@@ -31,14 +31,27 @@ fn with_visit(text: &str) -> String {
     text.replace("\rORC|", "\rPV1|1|O|ROOM-1^^^NORTHWARD\rORC|")
 }
 
-/// Starts the face with the facilities the cases name listed beside the
-/// sending facility, since every facility a composition names is a sender's.
+/// Adds a route of the laboratory system at `facility` to the face's
+/// source, so `facility` is one of its facilities.
+fn list(lane: &mut super::Lane, facility: &str) -> Result<(), Box<dyn Error>> {
+    lane.source()["routes"]
+        .as_array_mut()
+        .ok_or("the routes")?
+        .push(super::route(
+            "LAB",
+            facility,
+            Some(super::NORTHLAB_SUBJECT),
+            &[],
+        ));
+    Ok(())
+}
+
+/// Starts the face with the facilities the cases name routed beside the
+/// sending facility, since every facility a composition names is a route's.
 async fn listing_facilities() -> Result<Running, Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.senders.extend([
-        Sender::Namespace(String::from("NORTHWARD")),
-        Sender::Namespace(String::from("ORDERDESK")),
-    ]);
+    list(&mut lane, "NORTHWARD")?;
+    list(&mut lane, "ORDERDESK")?;
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     Running::start_with(lane, lookup).await
 }
@@ -153,10 +166,9 @@ async fn the_sending_facility_is_named_last() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn a_facility_outside_the_senders_list_is_answered_ae_naming_it() -> Result<(), Box<dyn Error>>
-{
-    let mut lane = face_settings(true);
-    lane.senders = vec![Sender::Namespace(String::from("NORTHLAB"))];
+async fn a_facility_no_route_of_the_source_names_is_answered_ae_naming_it()
+-> Result<(), Box<dyn Error>> {
+    let lane = face_settings(true);
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     let running = Running::start_with(lane, lookup).await?;
     let ack = running
@@ -280,12 +292,12 @@ const FACILITY_ISSUER: &str = "urn:oid:2.999.1";
 /// namespace id under [`FACILITY_ISSUER`], with `universal` listed too.
 async fn issuing(universal: Option<Sender>) -> Result<Running, Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.facility_issuer = Some(String::from(FACILITY_ISSUER));
-    lane.senders.extend([
-        Sender::Namespace(String::from("NORTHWARD")),
-        Sender::Namespace(String::from("ORDERDESK")),
-    ]);
-    lane.senders.extend(universal);
+    lane.source()["facility_identifier_issuer"] = serde_json::json!(FACILITY_ISSUER);
+    list(&mut lane, "NORTHWARD")?;
+    list(&mut lane, "ORDERDESK")?;
+    if let Some(universal) = universal {
+        list(&mut lane, &universal.facility())?;
+    }
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     Running::start_with(lane, lookup).await
 }

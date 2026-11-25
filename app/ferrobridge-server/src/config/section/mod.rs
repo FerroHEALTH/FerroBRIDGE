@@ -58,20 +58,9 @@ pub struct Mappings {
 pub struct Hl7v2 {
     /// Whether the MLLP listener runs.
     pub enabled: bool,
-    /// The socket address the TLS listener binds, when a sender sends over
-    /// TLS.
+    /// The socket address the TLS listener binds, when `[hl7v2.tls]` is
+    /// set.
     pub listen: String,
-    /// The HL7 table 0211 code a message with an empty MSH-18 is read in.
-    pub default_charset: String,
-    /// What an entry no program maps does to the message: `skip_and_count`
-    /// or `refuse`.
-    pub unmapped_entries: String,
-    /// The EHR policy of the face, `existing` or `create_on_first_write`;
-    /// unset, the facade's.
-    pub ehr_policy: Option<String>,
-    /// The profile each resource type claims when the message map wrote none,
-    /// so the facade's program selection reaches the context that claims it.
-    pub profiles: Vec<Hl7v2Profile>,
     /// How long a connection may sit between frames before it is closed; `0`
     /// never closes it.
     pub idle_timeout: Duration,
@@ -80,25 +69,16 @@ pub struct Hl7v2 {
     pub frame_timeout: Duration,
     /// The largest message one frame may carry, in bytes.
     pub frame_limit: ByteSize,
-    /// Whether an `AE` or an `AR` also logs, at debug level, the counted
-    /// outcomes of the run by kind.
-    pub log_outcomes: bool,
-    /// The `DV_IDENTIFIER.issuer` of a facility's namespace id (HD.1), the
-    /// issuer the CDR client's `facilities` name it under; empty, the
-    /// identifier names no issuer.
-    pub facility_identifier_issuer: String,
-    /// The sending facilities (MSH-4) the face accepts, at least one.
-    pub senders: Vec<Hl7v2Sender>,
     /// The TLS the MLLP listener serves, with the client certificates it
-    /// requires; set only while a sender has `transport = "tls"`.
+    /// requires; unset, no TLS listener runs.
     pub tls: Hl7v2Tls,
-    /// The plain MLLP listener for the senders declared `transport =
-    /// "plain"`; absent, the face serves TLS alone.
+    /// The plain MLLP listener for the devices that cannot speak TLS;
+    /// absent, no plain listener runs.
     pub plain: Option<Hl7v2Plain>,
 }
 
 /// The `[hl7v2.plain]` table: a second MLLP listener with no TLS, for the
-/// devices that cannot speak it, each bound to its network addresses.
+/// devices that cannot speak it, each message held to its route's networks.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Hl7v2Plain {
@@ -128,74 +108,13 @@ impl Default for Hl7v2 {
         Self {
             enabled: false,
             listen: String::from("127.0.0.1:2575"),
-            default_charset: String::from("ASCII"),
-            unmapped_entries: String::from("skip_and_count"),
-            ehr_policy: None,
-            profiles: Vec::new(),
             idle_timeout: Duration::from_secs(300),
             frame_timeout: Duration::from_secs(30),
             frame_limit: ByteSize::from_mib(1),
-            log_outcomes: false,
-            facility_identifier_issuer: String::new(),
-            senders: Vec::new(),
             tls: Hl7v2Tls::default(),
             plain: None,
         }
     }
-}
-
-/// One sending facility the HL7 v2 face accepts: a namespace id alone, or a
-/// universal id with its type.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Hl7v2Sender {
-    /// HD.1 of MSH-4.
-    pub namespace_id: String,
-    /// HD.2 of MSH-4.
-    pub universal_id: String,
-    /// HD.3 of MSH-4, such as `ISO`.
-    pub universal_id_type: String,
-    /// What stands behind the sender: empty for a system that names its
-    /// clinicians, `device` for an analyser feed with no human.
-    pub origin: String,
-    /// The `PARTY_REF.namespace` a device sender's device identifiers are
-    /// issued in, one of the CDR client's `device_identifier_issuers`;
-    /// required with `origin = "device"`.
-    pub device_identifier_issuer: String,
-    /// The DNS name the sender's client certificate carries in its subject
-    /// alternative name; required with `transport = "tls"`.
-    pub certificate_subject: String,
-    /// How the sender reaches the face: `tls` on the TLS listener, or
-    /// `plain` on `[hl7v2.plain]`, for a device alone.
-    pub transport: String,
-    /// The networks a plain sender connects from, in CIDR notation
-    /// (`10.20.0.21/32`); required with `transport = "plain"`.
-    pub source_addresses: Vec<String>,
-}
-
-impl Default for Hl7v2Sender {
-    fn default() -> Self {
-        Self {
-            namespace_id: String::new(),
-            universal_id: String::new(),
-            universal_id_type: String::new(),
-            origin: String::new(),
-            device_identifier_issuer: String::new(),
-            certificate_subject: String::new(),
-            transport: String::from("tls"),
-            source_addresses: Vec::new(),
-        }
-    }
-}
-
-/// The profile one resource type of a mapped message claims.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Hl7v2Profile {
-    /// The R4 resource type, such as `Observation`.
-    pub resource_type: String,
-    /// The canonical URL written into `meta.profile`.
-    pub profile: String,
 }
 
 /// The operator API: the engine state and the mapping files, read under the

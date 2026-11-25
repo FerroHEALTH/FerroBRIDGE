@@ -11,8 +11,8 @@ use std::error::Error;
 use std::time::Duration;
 
 use ferrobridge_operator_api::sources::{Kind, Write};
-use ferrobridge_server::sources::Sources;
 use ferrobridge_server::sources::document::Document;
+use ferrobridge_server::sources::{Routes, Sources};
 use ferrobridge_server::store::Store;
 use ferrobridge_testkit::containers;
 use secrecy::ExposeSecret as _;

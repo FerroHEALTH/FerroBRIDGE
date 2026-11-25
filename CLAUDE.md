@@ -108,7 +108,9 @@ the testkit tool crate. Beside it:
   `ferrobridge-validator` before it is served. `src/hl7v2/` is the HL7 v2
   face (#255), behind
   `[hl7v2]` and beside the facade: the MLLP listener under the same drain,
-  each message mapped by `ferrobridge-hl7v2` and written through the facade's
+  each message routed by MSH-3 and MSH-4 to its MLLP source in the state
+  store (`src/sources/`, the inbound sources the operator API writes, #2060),
+  mapped by `ferrobridge-hl7v2` and written through the facade's
   `ingest` service as one transaction, and the acknowledgment chosen from the
   commit outcome (`hl7v2::answer`). `src/smart.rs` makes the facade and the
   operator API a SMART App Launch 2.x resource server behind `[auth]` (#400,

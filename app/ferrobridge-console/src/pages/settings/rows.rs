@@ -73,7 +73,7 @@ pub const FACADE: [Row; 8] = [
 ];
 
 /// The HL7 v2 face.
-pub const HL7V2: [Row; 9] = [
+pub const HL7V2: [Row; 4] = [
     row(
         Msg::RowHl7v2,
         Msg::RowHl7v2Desc,
@@ -83,26 +83,6 @@ pub const HL7V2: [Row; 9] = [
         Msg::RowAddress,
         Msg::RowAddressDesc,
         &[("hl7v2.listen", Shape::Code)],
-    ),
-    row(
-        Msg::RowCharset,
-        Msg::RowCharsetDesc,
-        &[("hl7v2.default_charset", Shape::Word)],
-    ),
-    row(
-        Msg::RowEhrs,
-        Msg::RowHl7v2EhrsDesc,
-        &[("hl7v2.ehr_policy", Shape::Word)],
-    ),
-    row(
-        Msg::RowProfiles,
-        Msg::RowProfilesDesc,
-        &[("hl7v2.profiles", Shape::Count)],
-    ),
-    row(
-        Msg::RowUnmapped,
-        Msg::RowUnmappedDesc,
-        &[("hl7v2.unmapped_entries", Shape::Word)],
     ),
     row(
         Msg::RowTimeouts,
@@ -116,11 +96,6 @@ pub const HL7V2: [Row; 9] = [
         Msg::RowLargestFrame,
         Msg::RowLargestFrameDesc,
         &[("hl7v2.frame_limit", Shape::Bytes)],
-    ),
-    row(
-        Msg::RowSenders,
-        Msg::RowSendersDesc,
-        &[("hl7v2.senders", Shape::Count)],
     ),
 ];
 

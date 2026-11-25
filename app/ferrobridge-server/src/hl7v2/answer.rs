@@ -48,9 +48,11 @@ pub enum Settled {
     /// The message's import record could not be stored, so its commit is not
     /// acknowledged.
     Unrecorded,
-    /// On the plain listener, MSH-4 names no plain sender whose networks hold
-    /// the connection's peer address.
+    /// On the plain listener, the route of the sender holds no network the
+    /// connection's peer address lies in.
     Address,
+    /// The routes could not be read, so the message may be sent again.
+    Routes,
 }
 
 /// What one settled message produced, for the log.
@@ -93,7 +95,7 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
             Some(("MSH", 4)),
             ErrorCode::Application,
             String::from(
-                "the connection's client certificate does not name the sender MSH-4 names",
+                "the connection's client certificate does not name the subject the route of MSH-3 and MSH-4 is bound to",
             ),
         ),
         Settled::Address => one(
@@ -101,17 +103,23 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
             Some(("MSH", 4)),
             ErrorCode::Application,
             String::from(
-                "MSH-4 names no plain sender this connection's network address belongs to",
+                "the route of MSH-3 and MSH-4 holds no network this connection's address belongs to",
             ),
         ),
         Settled::Sender => one(
             Code::Reject,
             Some(("MSH", 4)),
             ErrorCode::Application,
-            String::from("MSH-4 names a sending facility this receiver does not accept"),
+            String::from("MSH-3 and MSH-4 name a sender no enabled route of this receiver takes"),
         ),
         // NOTE: HL7 v2.5.1 §2.9.2.2: AR is the answer a reason unrelated to the content earns,
         // and a resend is safe, since the identity map recognises a committed MSH-10.
+        Settled::Routes => one(
+            Code::Error,
+            None,
+            ErrorCode::Application,
+            String::from("the receiver's routes could not be read; send the message again"),
+        ),
         Settled::Unrecorded => one(
             Code::Reject,
             None,

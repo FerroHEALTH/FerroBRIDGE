@@ -508,8 +508,7 @@ async fn bridge(
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
          [operator]\nenabled = true\n\n\
-         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n\
-         senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}]\n{mllp_tls}\n\
+         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n{mllp_tls}\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
