@@ -54,7 +54,6 @@ use fhir_types::codec::Json;
 use fhir_types::codec::Value;
 use fhir_types::r4::patient::Patient;
 use fhir_types::r4::resource::Resource;
-use futures_util::TryStreamExt as _;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -64,19 +63,16 @@ use openehr_mapping_core::template::TemplateSource;
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::cdr::query::PageSize;
-use crate::cdr::query::QueryPageError;
 use crate::facade::Facade;
 use crate::facade::compartment;
 use crate::facade::ehr;
 use crate::facade::handlers::Body;
-use crate::facade::handlers::write::refuse;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
-use crate::facade::status;
 
 /// The resource type the operation is defined on.
 pub const PATIENT: &str = "Patient";
@@ -435,14 +431,7 @@ async fn compositions(client: &CdrClient, ehr_id: &EhrId) -> Result<Vec<String>,
         additional_properties: BTreeMap::new(),
     };
     let page = PageSize::new(PAGE).map_err(|error| internal(error.to_string()))?;
-    let rows: Vec<_> = client
-        .query_aql_rows(request, page)
-        .try_collect()
-        .await
-        .map_err(|error| match error {
-            QueryPageError::Refused(upstream) => refuse(&status::of_query_refusal(&upstream)),
-            QueryPageError::Call(error) => refuse(&status::of_client_error(&error)),
-        })?;
+    let rows = crate::facade::handlers::search::every_row(client, request, page).await?;
     let mut held = Vec::with_capacity(rows.len());
     for row in rows {
         let Some(composition) = row.first() else {

@@ -1062,7 +1062,21 @@ expression is a load error: the reference CDR's connector let `where()` and
   each with its read URL as `fullUrl`. The assembly is our own design
   (`facade::document`); `persist=true` and `graph` are refused, never
   ignored. A context whose start is a composition model binds the composition
-  itself as its one entry, under the path `/`.
+  itself as its one entry, under the path `/`. The document answers in FHIR
+  XML when asked, as MHD Retrieve Document [ITI-68] requires (ITI TF-2:
+  3.68.4.1.3).
+- **The facade is the IHE MHD 4.2.3 Document Responder behind `[facade.mhd]`.**
+  ITI-66, ITI-67 and ITI-68 are each Required (ITI TF-1: Table 33.1-1). A
+  `DocumentReference` is the `eehrxf` Annex III description of the document
+  `$document` assembles from the latest version of a composition of a
+  Composition context, under the Composition's id, its
+  `content.attachment.url` the `$document` URL. A `List` is a SubmissionSet,
+  one per CONTRIBUTION that committed such a version, our own design. Every
+  parameter the Responder SHALL process matches the element the description
+  fills, an empty element matching nothing; an unsupported parameter is
+  ignored (ITI TF-2: 3.66.4.1.2, 3.67.4.1.2) and named in the searchset, and
+  refused under `Prefer: handling=strict` (R4 `search.html`). Both answer in
+  FHIR JSON or XML (`facade::mhd`).
 - **`Patient/$summary` answers the patient summary, validated before it is
   served.** `GET [base]/Patient/[id]/$summary` (HL7 IPS 2.0.1,
   `OperationDefinition/summary`) reads the patient through the `Patient`

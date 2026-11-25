@@ -993,6 +993,22 @@ program may map. On, `Endpoint/fhir` is the FHIR base and
 
 Each key is settable as `FERROBRIDGE__FACADE__ENDPOINT__<KEY>`.
 
+### `[facade.mhd]`
+
+The IHE MHD 4.2.3 Document Responder over the documents the Composition
+contexts assemble (the Integrate page,
+[The IHE MHD Document Responder](../integrate/fhir-facade.md#the-ihe-mhd-document-responder)).
+Off, `DocumentReference` and `List` are ordinary resource types a program may
+map. On, the facade serves them itself, a context that maps either is a boot
+error, and `[facade.identifier_search]` must be on, since both searches take a
+chained `patient.identifier`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether the facade is the MHD Document Responder |
+
+Each key is settable as `FERROBRIDGE__FACADE__MHD__<KEY>`.
+
 ### `[facade.summary]`
 
 The patient summary, `GET /fhir/Patient/{id}/$summary` (HL7 IPS 2.0.1,
