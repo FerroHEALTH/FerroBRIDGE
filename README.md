@@ -28,6 +28,7 @@
 [![SLSA Build L3](https://slsa.dev/images/gh-badge-level3.svg)](SECURITY.md#verifying-a-release)
 
 **Conformance and compliance**<br>
+<sub>(self-tested and self-assessed counts; none is a certification)</sub><br>
 [![FHIRconnect mapping library](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Ffhirconnect-mapping-lib.json)](conformance/fhirconnect-mapping-lib/pass-list.txt)
 [![FHIRconnect REST API](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Frest-api.json)](conformance/rest-api/pass-list.txt)
 [![OMOCL mapping library](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fomocl.json)](conformance/omocl/pass-list.txt)
@@ -47,7 +48,7 @@
 <br>
 [![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
 
-**EHDS and EEHRxF**: self-tests against the named build, never a certification<br>
+**EHDS and EEHRxF**<br>
 [![EEHRxF draft 2026-11-23, Patient Summary](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Feehrxf-draft-patient-summary.json)](conformance/eehrxf-draft-patient-summary/pass-list.txt)
 [![EEHRxF draft 2026-11-23, ePrescription](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Feehrxf-draft-eprescription.json)](conformance/eehrxf-draft-eprescription/pass-list.txt)
 [![EEHRxF draft 2026-11-23, eDispensation](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Feehrxf-draft-edispensation.json)](conformance/eehrxf-draft-edispensation/pass-list.txt)

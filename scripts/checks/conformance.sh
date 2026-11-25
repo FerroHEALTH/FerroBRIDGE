@@ -34,7 +34,9 @@
 # counts, and a README block that disagrees with the badges fail too, because
 # the list is what the ratchet protects. Every badge file, and every static
 # badge in the README, carries a logo from scripts/checks/badge-logos/, and a
-# badge without one fails --check.
+# badge without one fails --check, as does a README without the caption
+# under the conformance heading that says once what the badges count (owner
+# decision, 2026-11-25).
 #
 # The family and version badges count the cases of both HL7 v2 corpora by the
 # family (MSH-9.1) and the version (MSH-12) the corpus test records per case:
@@ -520,13 +522,14 @@ render_block() {
   printf '%s\n' "${QUALITY_BADGES[@]}"
   echo
   echo '**Conformance and compliance**<br>'
+  echo "$badge_caption<br>"
   for name in fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade eehrxf-annex-x fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
   echo '<br>'
   printf '%s\n' "${COMPLIANCE_BADGES[@]}"
   echo
-  echo '**EHDS and EEHRxF**: self-tests against the named build, never a certification<br>'
+  echo '**EHDS and EEHRxF**<br>'
   for name in "${DRAFT_CORPORA[@]}" xtehr-crosswalk myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
@@ -580,7 +583,7 @@ elif [[ "$(sed -n '/^<!-- badges:begin -->$/,/^<!-- badges:end -->$/p' README.md
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
-if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md; then
+if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md || ! badge_caption_check README.md; then
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
