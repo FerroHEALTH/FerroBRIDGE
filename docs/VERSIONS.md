@@ -26,6 +26,8 @@ records why the value is what it is. The guard compares the first token of each
 | OMOP CDM | v5.4 | `docs/architecture.md`, `tools/omop-cdm-codegen` and the `omop-cdm` crate constant, and its embedded DDL |
 | openEHR ITS-REST | 1.1.0 | `docs/architecture.md`, the `ferrobridge-server` CDR module constant |
 | openEHR RM | 1.1.0 (compiled as `openehr_rm::v1_2`) | `docs/architecture.md`, every hand-written `openehr_rm::v1_N` path under `app/`, `crates/` and `tools/`, which names the generation this row records |
+| Standard Webhooks | v1.3.0 (the `v1` and `v1a` signature schemes) | `docs/architecture.md` §2, `app/ferrobridge-server/src/inbound/verify.rs` |
+| Standard Webhooks v2a | `standard-webhooks/standard-webhooks` commit `4a8ee40c5bcb6157f856905cc8871040d41a78ce` (the unreleased `v2a` scheme, whose text has not changed since `3d65b1824` introduced it) | `docs/architecture.md` §2, `app/ferrobridge-server/src/inbound/verify.rs` |
 
 ## Corpora and machine-readable inputs
 
@@ -76,6 +78,7 @@ fails when it names a different commit, tag or pin-set digest.
 | CKM discharge archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `d46b60528c41db623f5aada90b6a2b2d51aa494d21451626ddb56b12e2ad9930` (`COMPOSITION.transfer_summary.v1`, `EVALUATION.problem_diagnosis.v1`, `ACTION.procedure.v1`) | `scripts/vendor/ckm-discharge.sh`, `tools/ferrobridge-testkit/fixtures/ckm/discharge/PROVENANCE.md` |
 | CKM library archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `2a6f31341c9ae2addbf46a8bded54e3f1288a50fb7de2504f6e76525c0ea373d` (`COMPOSITION.report.v1`, `COMPOSITION.report-result.v1`, `COMPOSITION.medication_list.v1`, `EVALUATION.absence.v2`, `EVALUATION.exclusion_global.v1`, `EVALUATION.gender.v1`, `EVALUATION.adverse_reaction_risk.v2`, `EVALUATION.device_summary.v0`, `CLUSTER.device.v1`, `CLUSTER.case_identification.v0`, `CLUSTER.adverse_reaction_event.v1`, `CLUSTER.clinical_evidence.v1`, `CLUSTER.organisation.v1`, `OBSERVATION.medication_statement.v0`, `CLUSTER.timing_nondaily.v1`, `CLUSTER.person.v1`, `CLUSTER.address.v1`, `CLUSTER.structured_name.v1`, `CLUSTER.anatomical_location.v1`, `CLUSTER.problem_qualifier.v2`, `CLUSTER.laboratory_test_analyte.v1`, `CLUSTER.specimen.v1`, `INSTRUCTION.service_request.v1`, `OBSERVATION.laboratory_test_result.v1`, `ACTION.informed_consent.v0`) | `scripts/vendor/ckm-library.sh`, `tools/ferrobridge-testkit/fixtures/ckm/library/PROVENANCE.md` |
 | CKM imaging archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `e53e09672873105cd90a2503f96049159a520b797ad5458076a2630fb49ba6ca` (`OBSERVATION.imaging_exam_result.v1`) | `scripts/vendor/ckm-imaging.sh`, `tools/ferrobridge-testkit/fixtures/ckm/imaging/PROVENANCE.md` |
+| CKM EHDS archetypes (fixture) | `openEHR/CKM-mirror` commit `c3fdc43dcf0eb7ef0cfe60f548fcdebc24c70094` sha256 `f6b1aa21784c5b36d02dd18a35e3645454a1642fc9c444a73ea9f6cdbe3ca5c1` (`OBSERVATION.body_weight.v2`) | `scripts/vendor/ckm-ehds.sh`, `tools/ferrobridge-testkit/fixtures/ckm/ehds/PROVENANCE.md` |
 | CKM HiGHmed archetypes (fixture) | `openEHR-de/CKM-mirror` commit `adc22deddb96d5e557186fe595f52ef287510633` sha256 `68cdc0829dcf9dc6bfc30a8f2b03fa67625c955b663f1bfded953a58ef644d0a` (`COMPOSITION.fall.v1`, `COMPOSITION.person.v0`, `CLUSTER.entry_category.v0`, `CLUSTER.identifier_fhir.v0`, `CLUSTER.medication_status_fhir.v0`, `CLUSTER.observation_status_fhir.v1`, `CLUSTER.organization.v0`, `ADMIN_ENTRY.person_data.v0`, `ADMIN_ENTRY.versicherungsinformationen.v0`, `ADMIN_ENTRY.episode_institution_local.v0`, `CLUSTER.death_details.v1`, `CLUSTER.person_birth_data_iso.v0`, `CLUSTER.location.v1`, `CLUSTER.multiple_coding_icd10gm.v1`, `EVALUATION.vital_status.v1`) | `scripts/vendor/ckm-highmed.sh`, `tools/ferrobridge-testkit/fixtures/ckm/highmed/PROVENANCE.md` |
 | HL7 v2 definitions (v2ig source of truth, never committed) | `HL7/v2ig` commit `9c307dadb0bb3f99de399d30cd80c24b47bb08da` path `input/sourceOfTruth` files `1694` digest `9a1fb2b974b69f575bcd9b30fa66d2ff7f13ef7869c1350eca7462067e974f93` | `scripts/vendor/v2ig.sh`, `tools/fhir-codegen/vendor/hl7-v2ig/PROVENANCE.md`, the `codegen-drift` job of `.github/workflows/ci.yml` (its cache key) |
 | HL7 v2 legacy tables (NIST IGAMT export, never committed) | `usnistgov/igamt-hl7Tools-service` commit `83322dffdac18cb129a1bd80149f5439cf5686fd` path `src/main/resources/hl7db` files `169` digest `967715c682b43383ba28894e171fd1e5c2a5980b16b5676a1c60f3fd0a5c2c92` | `scripts/vendor/v2-legacy.sh`, `tools/fhir-codegen/vendor/hl7-v2-legacy/PROVENANCE.md`, the `codegen-drift` and `test` jobs of `.github/workflows/ci.yml` and the coverage job of `.github/workflows/sonar.yml` (their cache key) |
@@ -99,6 +102,9 @@ fails when it names a different commit, tag or pin-set digest.
 | MyHealth@EU Master Value Sets Catalogue | package `myhealth.eu.fhir.mvc-package` 9.1.0, pin-set digest `06f68a58f7382db396f029b1c0a420fcac6cbf53d8a948df47594937b0886749`, tarball sha256 `3f99350f36a2a1ea17b7fde37c39ff766bd5c3bc9a29c6183af1acfd07b78ce1` | `scripts/vendor/eehrxf.sh`, `docs/specs/ehdsi-mvc/PROVENANCE.md` |
 | HL7 France FR Core | package `hl7.fhir.fr.core` 2.2.0, pin-set digest `a2806a8c83c2b0b85a4b8c2cfd12effc5d37c3c2c0c2670406b840532698510a`, tarball sha256 `085e61bf579829a6d5520c6f388d763d27ba400f9f6ca548bc88da5545ba13f9` | `scripts/vendor/eehrxf.sh`, `docs/specs/fr-ans/PROVENANCE.md` |
 | FHIR R4 core specification pages | `hl7.org/fhir/R4/` 4.0.1, pin-set digest `f83b3f5adeb29f74a8c465292689bbdbbf7c6b609b9d5a643ab6954b483244a7`, the Extensibility (2.5.0), Defining Extensions (2.5.1), StructureDefinition and License and Legal Terms (2.20) pages | `scripts/vendor/eehrxf.sh`, `docs/specs/fhir-r4/PROVENANCE.md` |
+| EHDS draft EEHRxF implementing act | `090166e5374c0181` (act) and `090166e5374c0182` (Annexes I to X), Have your say initiative 17512, Ares(2026)10884928, published 2026-11-23, a draft for feedback until 2026-12-21 and not adopted, pin-set digest `1703a4ae9eab9f4d5759ba14c6e2c2b9335c127f99214b979dc12ba42125470f`, act sha256 `58bcf64645fda2cf0e0914d3035afbbc27af4e98dee0ebe73f42c436eb85954a`, annexes sha256 `7e3db6da13c7760b122691f466423dd57c5eb519457e3ca0dcae60f3565c00fb` | `scripts/vendor/ehds-drafts.sh`, `docs/specs/ehds-eehrxf-draft/PROVENANCE.md`, `scripts/checks/pin-freshness.sh` |
+| EHDS draft testing environment implementing act | `090166e537270100` (act) and `090166e537270101` (annex), Have your say initiative 17513, Ares(2026)10805685, published 2026-11-19, a draft for feedback until 2026-12-17 and not adopted, pin-set digest `5864d994c9e1a8b73318c0df95c3e4eb366b6468205c429a28c8546c8f7cf85d`, act sha256 `d970e4eb3705991b9bee18d44d5bea2375bf7977fb0753f56da0edfb18d0c9ca`, annex sha256 `c28a667e0d6a666f908f00ad50e50345795a7cfc1d6d88b71bb4028a3749c8c7` | `scripts/vendor/ehds-drafts.sh`, `docs/specs/ehds-testing-draft/PROVENANCE.md`, `scripts/checks/pin-freshness.sh` |
+| Xt-EHR deliverables D5.2 and D8.2 | D5.2 Ares(2026)3690435 of 2026-04-09 and D8.2 Ares(2026)5060558 of 2026-05-19 from `www.xt-ehr.eu`, pin-set digest `53eea9a3ab2fd9a458eb211706d146fb999fcf335ed6f580c7ab7450ef76544d`, D5.2 sha256 `5d2bb693af07646a506f831854166fcd4d6a3ebf4f092b6937d2a9976410333a`, D8.2 sha256 `a8cd93d994bceb1c7de952b006384d2c638a038907bba48325985ed7d851fbf4`; no licence stated, so read from the git-ignored cache | `scripts/vendor/ehds-drafts.sh`, `docs/specs/xtehr-deliverables/PROVENANCE.md` |
 | FHIR NPM Packages page | `hl7.org/fhir/` R5 5.0.0 and 6.0.0-ballot4, pin-set digest `cb1fd95460134009903b35dfaefe08f9ab09f28ae754a5faeea4c325f5733499`, the FHIR NPM Packages (2.1.10) and License and Legal Terms pages of each | `scripts/vendor/fhir-package-spec.sh`, `docs/specs/fhir-package-spec/PROVENANCE.md` |
 | UCUM essence | `ucum-org/ucum` tag `v2.2` commit `d060c6d3dfe3b0deb196c190b8024d95385e0b92` path `ucum-essence.xml` sha256 `dfccea1b5dc284245ebae97edd1dc03c45864da4e87df55bc9851797b4fd0b61` | `scripts/vendor/ucum.sh`, `crates/ferrobridge-fhirpath/vendor/ucum/PROVENANCE.md` (embedded whole in the `ferrobridge-fhirpath` crate) |
 | FerroPULSE report envelope v2 | `FerroHEALTH/FerroPULSE` commit `f83df34cc968f5e0f916834508336c8eeb4c9e41` path `schemas/report-envelope.v2.json` sha256 `e609f17a5bfa78c6c08bdd3a28025889e20e0fde5c72fa881e7ed47b6abc8bc7`, with the examples under `schemas/examples/report-envelope.v2/` | `scripts/vendor/ferropulse-schemas.sh`, `app/ferrobridge-server/tests/fixtures/ferropulse/PROVENANCE.md` (the usage report contract is `docs/report-v2.md` at the same commit) |
@@ -237,7 +243,7 @@ of every `PROVENANCE.md` below back against its row.
 | `hl7.fhir.r4.core` | 4.0.1 | `tools/fhir-codegen/vendor/hl7.fhir.r4.core/PROVENANCE.md` |
 | `hl7.fhir.r4b.core` | 4.3.0 | `tools/fhir-codegen/vendor/hl7.fhir.r4b.core/PROVENANCE.md` |
 | `hl7.fhir.r5.core` | 5.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.r5.core/PROVENANCE.md` |
-| `hl7.fhir.r6.core` | 6.0.0-ballot5, held: 6.0.0-snapshot1 drops public types, which moves fhir-types to 0.2, and ihe-atna 0.23.0 still requires fhir-types 0.1 (#2072) | `tools/fhir-codegen/vendor/hl7.fhir.r6.core/PROVENANCE.md` |
+| `hl7.fhir.r6.core` | 6.0.0-snapshot1 | `tools/fhir-codegen/vendor/hl7.fhir.r6.core/PROVENANCE.md` |
 | `hl7.terminology` (THO) | 7.5.0 | `tools/fhir-codegen/vendor/hl7.terminology/PROVENANCE.md` |
 | `hl7.fhir.uv.v2mappings` (the v2-to-FHIR IG) | 1.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md` (FHIR 4.0.1; the package declares CC0-1.0, its source repository `HL7/v2-to-fhir` Apache-2.0) |
 
@@ -246,7 +252,7 @@ of every `PROVENANCE.md` below back against its row.
 HL7's examples package per FHIR version is the corpus of the five `fhir-types`
 conformance tests and of the R4 facade test (#373, #454). Each is the version
 of the core package the table above pins, from the same registry: STU3, R4,
-R4B and R5 from packages.fhir.org, the R6 ballot from packages2.fhir.org. At
+R4B and R5 from packages.fhir.org, R6 from packages2.fhir.org. At
 about 680 MB
 unpacked they are fetched at build time by
 `scripts/vendor/fhir-packages.sh --build-time` into the ignored
@@ -263,7 +269,7 @@ against the registry's `latest`.
 | `hl7.fhir.r4.examples` | 4.0.1 files `5311` digest `51f5c093f9f197fcab683ac1bc3380e44b1c7e37c6c74baeefff7fa3eb8b7c1e` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r4.examples/PROVENANCE.md`, the `test` and `conformance` jobs of `.github/workflows/ci.yml` and the coverage job of `.github/workflows/sonar.yml` (their cache key) |
 | `hl7.fhir.r4b.examples` | 4.3.0 files `2842` digest `7c42275e73bff53eef52c9f48e3bd82d3eaef66275ac00975a259828086be6b9` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r4b.examples/PROVENANCE.md`, the same cache key |
 | `hl7.fhir.r5.examples` | 5.0.0 files `2824` digest `afddb711d22bbf8c45158cb4be0a8936ecd458df1a2a99cf5debd5274a7bee47` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r5.examples/PROVENANCE.md`, the same cache key |
-| `hl7.fhir.r6.examples` | 6.0.0-ballot5 files `2488` digest `4654c0fa42180b2ef3abec208458482cb1092fe3c63ef4ec4661a3feb50a7b3f`, held: 6.0.0-snapshot1 drops public types, which moves fhir-types to 0.2, and ihe-atna 0.23.0 still requires fhir-types 0.1 (#2072) | `tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/PROVENANCE.md`, the same cache key |
+| `hl7.fhir.r6.examples` | 6.0.0-snapshot1 files `2323` digest `cde674bd7b53b7030c8d4d7f012ed66f7f934e82a7e41f6aea8d8a705a19636a` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/PROVENANCE.md`, the same cache key |
 
 ## Profile packages (the profile validator's package set, build time, never committed)
 
@@ -419,7 +425,7 @@ at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.131 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.2.0 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 

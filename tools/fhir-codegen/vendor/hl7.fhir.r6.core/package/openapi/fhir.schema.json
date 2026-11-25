@@ -43004,7 +43004,10 @@
         },
         "type": {
           "description": "The type of adult or pediatric enteral feeding such as an adult standard formula with fiber or a soy-based infant feeding.",
-          "$ref": "#/definitions/CodeableReference"
+          "items": {
+            "$ref": "#/definitions/CodeableReference"
+          },
+          "type": "array"
         },
         "productName": {
           "description": "The product or brand name of the enteral feeding product such as \"ACME Adult Standard Formula\".",

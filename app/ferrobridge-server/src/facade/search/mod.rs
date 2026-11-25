@@ -38,6 +38,7 @@ use crate::facade::programs::Programs;
 use crate::facade::search::aql::Conditions;
 use crate::facade::search::aql::OrderKey;
 use crate::facade::search::declaration::DeclarationError;
+use crate::facade::search::declaration::Include;
 use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::template::Placement;
@@ -110,6 +111,8 @@ pub struct Declared {
     /// Where the template places the context's entry, which an entry count
     /// reads.
     placement: Option<Placement>,
+    /// The reference parameters `_include` may name, by code.
+    includes: BTreeMap<String, Include>,
 }
 
 impl Declared {
@@ -160,6 +163,12 @@ impl Declared {
     #[must_use]
     pub const fn placement(&self) -> Option<&Placement> {
         self.placement.as_ref()
+    }
+
+    /// Returns the reference parameters `_include` may name, by code.
+    #[must_use]
+    pub const fn includes(&self) -> &BTreeMap<String, Include> {
+        &self.includes
     }
 
     /// Returns the parameter names with their types, the patient section
@@ -292,6 +301,7 @@ pub fn bind(
     for name in &patient_names {
         declaration::check_standard(file, resource_type, name, ParameterType::Reference)?;
     }
+    let includes = declaration::check_includes(file, resource_type, &written.include)?;
     let written_order = written.order.unwrap_or_else(|| {
         aql::DEFAULT_ORDER
             .iter()
@@ -327,6 +337,7 @@ pub fn bind(
         parameters,
         placement: engine::entry::archetype_of(loaded.program())
             .and_then(|archetype| template::placement(loaded.index(), &archetype)),
+        includes,
     };
     check_paths(&declared)?;
     Ok(declared)
@@ -374,9 +385,11 @@ fn check_paths(declared: &Declared) -> Result<(), DeclarationError> {
             conditions.push(aql::compare(path.clone(), CompOp::Eq, &bound));
             conditions.push(aql::not(aql::exists(path)));
         }
-        if parameter.sortable() {
+        if parameter.sortable()
+            && let Some(path) = parameter.value_path("c")
+        {
             order.push(OrderKey {
-                path: parameter.value_path("c"),
+                path,
                 descending: true,
             });
         }
@@ -423,6 +436,7 @@ fn insert(catalog: &mut Catalog, declared: Declared) -> Result<(), DeclarationEr
     if let Some(first) = entries.first()
         && (first.surface() != declared.surface()
             || sortability(first) != sortability(&declared)
+            || first.includes.keys().ne(declared.includes.keys())
             || first.patient.as_ref().map(PatientScope::required)
                 != declared.patient.as_ref().map(PatientScope::required))
     {

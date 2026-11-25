@@ -73,7 +73,7 @@ static R4: LazyLock<Package> = LazyLock::new(|| {
         .expect("the vendored hl7.fhir.r4.core package should load")
 });
 
-/// The vendored R6 ballot package, loaded once for every test.
+/// The vendored R6 package, loaded once for every test.
 static R6: LazyLock<Package> = LazyLock::new(|| {
     Package::open(vendor_dir().join("hl7.fhir.r6.core"))
         .expect("the vendored hl7.fhir.r6.core package should load")

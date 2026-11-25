@@ -24,7 +24,9 @@
 # against the current release its guide's `package-list.json` names when the
 # pin comes from the guide's canonical site, and
 # the Chrome for Testing release against the newest Stable version its JSON
-# endpoint lists. Needs an authenticated `gh`, curl and jq. `--self-test` runs
+# endpoint lists, and a draft implementing act of Regulation (EU) 2025/327
+# against the first document of the newest publication on its Have your say
+# initiative, which moves when a new draft or the adopted act is published. Needs an authenticated `gh`, curl and jq. `--self-test` runs
 # the Chrome for Testing reader and the product image readers over fixtures
 # and needs no network.
 #
@@ -60,7 +62,8 @@ cargo-semver-checks	obi1kenobi/cargo-semver-checks
 trivy	aquasecurity/trivy
 mdBook	rust-lang/mdBook
 mdbook-toc	badboy/mdbook-toc
-mdbook-mermaid	badboy/mdbook-mermaid"
+mdbook-mermaid	badboy/mdbook-mermaid
+Standard Webhooks	standard-webhooks/standard-webhooks"
 
 # The second cell of the matrix row whose first cell is $1, with the backticks
 # stripped.
@@ -116,6 +119,13 @@ registry_newest() {
 # entry is marked.
 package_list_current() {
   jq -er '[.list[]? | select(.current == true) | .version] | select(length == 1) | .[0]'
+}
+
+# The document id of the first attachment of the newest publication that
+# carries any, in a Have your say initiative document on stdin.
+initiative_newest() {
+  jq -er '[.publications[]? | select((.attachments // []) | length > 0)]
+    | sort_by(.publishedDate) | last | .attachments[0].documentId | select(type == "string")'
 }
 
 # The Chrome for Testing release the browser journeys run Chrome and
@@ -352,6 +362,10 @@ self_test() {
   expect "1.0.0-ballot" "$got" "the highest version of a ballot-only package"
   got="$(package_list_current <<< '{"list":[{"version":"current"},{"version":"0.3.0","current":true},{"version":"0.2.0"}]}')"
   expect "0.3.0" "$got" "the current release of a package list"
+  got="$(initiative_newest <<< '{"publications":[{"publishedDate":"2026/03/30 18:08:00","attachments":[]},{"publishedDate":"2026/11/23 09:17:20","attachments":[{"documentId":"090166e5374c0181"},{"documentId":"090166e5374c0182"}]},{"publishedDate":null,"attachments":[]}]}')"
+  expect "090166e5374c0181" "$got" "the newest draft of an initiative"
+  got="$(initiative_newest <<< '{"publications":[{"publishedDate":"2026/11/23 09:17:20","attachments":[{"documentId":"a"}]},{"publishedDate":"2027/05/02 10:00:00","attachments":[{"documentId":"b"}]}]}')"
+  expect "b" "$got" "the adopted act of an initiative"
   got="$(package_list_current <<< '{"list":[{"version":"0.2.0"}]}' || echo none)"
   expect "none" "$got" "a package list that marks no current release"
   local fixture d1 d2
@@ -472,7 +486,8 @@ HL7 v2 samples: NIST LRI (build time, never committed)	usnistgov/hit-mu-tools-re
 HL7 v2 samples: NIST LOI (build time, never committed)	usnistgov/hit-mu-tools-resource-bundles	loi-r1
 HL7 v2 samples: NIST syndromic surveillance (build time, never committed)	usnistgov/hit-mu-tools-resource-bundles	ss-r2
 HL7 v2 samples: AIRA MQE (build time, never committed)	immregistries/mqe	master
-HL7 v2 legacy tables (NIST IGAMT export, never committed)	usnistgov/igamt-hl7Tools-service	master"
+HL7 v2 legacy tables (NIST IGAMT export, never committed)	usnistgov/igamt-hl7Tools-service	master
+Standard Webhooks v2a	standard-webhooks/standard-webhooks	main"
 
 # The first 40-hex commit in the second cell of the matrix row whose first cell
 # is $1.
@@ -575,6 +590,30 @@ while IFS=$'\t' read -r label url; do
     stale=1
   fi
 done <<< "$WATCHED_PACKAGES"
+
+# One "matrix label<TAB>initiative id" record per line: a draft implementing
+# act pinned by the document ids Have your say serves it under.
+readonly WATCHED_INITIATIVES="\
+EHDS draft EEHRxF implementing act	17512
+EHDS draft testing environment implementing act	17513"
+
+while IFS=$'\t' read -r label initiative; do
+  [[ -n "$label" ]] || continue
+  url="https://ec.europa.eu/info/law/better-regulation/brpapi/groupInitiatives/$initiative"
+  pinned="$(matrix_pin "$label")"
+  if [[ -z "$pinned" ]]; then
+    printf 'UNREADABLE %s: no pin row in %s\n' "$label" "$MATRIX"
+    unreadable=1
+    continue
+  fi
+  if ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$url" | initiative_newest 2>&1)"; then
+    printf 'UNREADABLE %s: could not read the newest publication at %s (%s)\n' "$label" "$url" "$latest"
+    unreadable=1
+    continue
+  fi
+  verdict "$label" "$pinned" "$latest" "$url"
+  [[ "$pinned" = "$latest" ]] || stale=1
+done <<< "$WATCHED_INITIATIVES"
 
 pinned="$(matrix_pin "$CHROME_LABEL")"
 if [[ -z "$pinned" ]]; then

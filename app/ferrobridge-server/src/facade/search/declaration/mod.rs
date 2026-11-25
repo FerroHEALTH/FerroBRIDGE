@@ -50,6 +50,10 @@ pub struct DeclarationFile {
     /// The declared search parameters, by name.
     #[serde(default)]
     pub parameters: BTreeMap<String, ParameterFile>,
+    /// The standard reference parameters of the type a search may name in
+    /// `_include`.
+    #[serde(default)]
+    pub include: Vec<String>,
 }
 
 /// The `patient` section: the reference parameters that scope a search to
@@ -123,15 +127,56 @@ pub enum Coded {
 pub struct Parameter {
     /// The FHIR type.
     kind: ParameterType,
-    /// The node the path is read under, `None` for the composition.
-    node: Option<Node>,
-    /// The path, relative to the node or to the composition, parsed when
-    /// the declaration loaded.
-    path: ObjectPath,
-    /// The coded value's type, for a `token`.
-    coded: Option<Coded>,
+    /// Where its value is read.
+    source: Source,
     /// The FHIR system URI to openEHR terminology id table of a `token`.
     systems: BTreeMap<String, String>,
+}
+
+/// Where a parameter's value is read.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Source {
+    /// A path in the composition.
+    Path {
+        /// The node the path is read under, `None` for the composition.
+        node: Option<Node>,
+        /// The path, relative to the node or to the composition, parsed
+        /// when the declaration loaded.
+        path: ObjectPath,
+        /// The coded value's type, for a `token`.
+        coded: Option<Coded>,
+    },
+    /// The one coding the mapping writes on every resource of the context.
+    Fixed(FixedToken),
+}
+
+/// The coding a `fixed` token parameter compares.
+///
+/// A mapping that writes a constant, as the category of an observation, has
+/// no openEHR path to search, and every resource the context answers carries
+/// the coding, so a value either matches them all or none (no specification
+/// governs this: our own design).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixedToken {
+    /// The code system URI.
+    pub system: String,
+    /// The code.
+    pub code: String,
+}
+
+impl FixedToken {
+    /// Whether the search token `token` matches this coding
+    /// (<https://hl7.org/fhir/R4/search.html#token>).
+    #[must_use]
+    pub fn matches(&self, token: &fhir_search::token::Token) -> bool {
+        use fhir_search::token::System;
+        let system = match token.system() {
+            System::Any => true,
+            System::Absent => false,
+            System::Is(uri) => uri == self.system,
+        };
+        system && token.code().is_none_or(|code| code == self.code)
+    }
 }
 
 impl Parameter {
@@ -142,10 +187,22 @@ impl Parameter {
     }
 
     /// Returns the node the paths are read under, `None` for the
-    /// composition.
+    /// composition and for a fixed token.
     #[must_use]
     pub const fn node(&self) -> Option<&Node> {
-        self.node.as_ref()
+        match &self.source {
+            Source::Path { node, .. } => node.as_ref(),
+            Source::Fixed(_) => None,
+        }
+    }
+
+    /// Returns the coding of a fixed token.
+    #[must_use]
+    pub const fn fixed(&self) -> Option<&FixedToken> {
+        match &self.source {
+            Source::Fixed(fixed) => Some(fixed),
+            Source::Path { .. } => None,
+        }
     }
 
     /// Returns the FHIR system URI to openEHR terminology id table.
@@ -157,43 +214,147 @@ impl Parameter {
     /// Whether `_sort` may order by this parameter.
     ///
     /// A parameter read under a repeated node has a value per node, so it
-    /// gives a composition no single position in an order.
+    /// gives a composition no single position in an order, and a fixed token
+    /// gives every composition the same one.
     #[must_use]
     pub const fn sortable(&self) -> bool {
-        self.node.is_none()
+        matches!(self.source, Source::Path { node: None, .. })
     }
 
     /// Returns the compared path relative to `alias`: the one path of a
-    /// `string` or a `date`, the code path of a `token`.
+    /// `string` or a `date`, the code path of a `token`; `None` for a fixed
+    /// token.
     #[must_use]
-    pub fn value_path(&self, alias: &str) -> IdentifiedPath {
-        match self.coded {
-            Some(Coded::Text) => below(alias, &self.path, &["defining_code", "code_string"]),
-            Some(Coded::Phrase) => below(alias, &self.path, &["code_string"]),
-            None => below(alias, &self.path, &[]),
-        }
+    pub fn value_path(&self, alias: &str) -> Option<IdentifiedPath> {
+        let Source::Path { path, coded, .. } = &self.source else {
+            return None;
+        };
+        Some(match coded {
+            Some(Coded::Text) => below(alias, path, &["defining_code", "code_string"]),
+            Some(Coded::Phrase) => below(alias, path, &["code_string"]),
+            None => below(alias, path, &[]),
+        })
     }
 
     /// Returns the system path of a `token` relative to `alias`.
     #[must_use]
     pub fn system_path(&self, alias: &str) -> Option<IdentifiedPath> {
-        match self.coded? {
-            Coded::Text => Some(below(
-                alias,
-                &self.path,
-                &["defining_code", "terminology_id", "value"],
-            )),
-            Coded::Phrase => Some(below(alias, &self.path, &["terminology_id", "value"])),
-        }
+        let Source::Path {
+            path,
+            coded: Some(coded),
+            ..
+        } = &self.source
+        else {
+            return None;
+        };
+        Some(match coded {
+            Coded::Text => below(alias, path, &["defining_code", "terminology_id", "value"]),
+            Coded::Phrase => below(alias, path, &["terminology_id", "value"]),
+        })
     }
 
     /// Returns every path this parameter compares, relative to `alias`.
     #[must_use]
     pub fn paths(&self, alias: &str) -> Vec<IdentifiedPath> {
-        std::iter::once(self.value_path(alias))
+        self.value_path(alias)
+            .into_iter()
             .chain(self.system_path(alias))
             .collect()
     }
+}
+
+/// One reference parameter a search may name in `_include`: the standard R4
+/// parameter of its code, whose expression selects the references followed
+/// (<https://hl7.org/fhir/R4/search.html#include>).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Include {
+    /// The parameter code.
+    pub code: String,
+    /// The branches of the standard parameter's FHIRPath expression that
+    /// select from the type.
+    pub expression: String,
+}
+
+/// Returns the union branches of a standard parameter's `expression` that
+/// start from `resource_type`, joined again by `|`.
+///
+/// A parameter several types share writes one branch per type, and a branch
+/// naming another type is an error on this one's instances (FHIRPath N1
+/// §4.1).
+fn own_branches(expression: &str, resource_type: &str) -> String {
+    let mut branches = Vec::new();
+    let mut depth = 0_usize;
+    let mut start = 0;
+    for (at, character) in expression.char_indices() {
+        match character {
+            '(' => depth = depth.saturating_add(1),
+            ')' => depth = depth.saturating_sub(1),
+            '|' if depth == 0 => {
+                branches.push(expression.get(start..at).unwrap_or_default());
+                start = at.saturating_add(1);
+            }
+            _ => {}
+        }
+    }
+    branches.push(expression.get(start..).unwrap_or_default());
+    branches
+        .into_iter()
+        .map(str::trim)
+        .filter(|branch| {
+            branch
+                .trim_start_matches('(')
+                .strip_prefix(resource_type)
+                .is_some_and(|rest| rest.starts_with('.'))
+        })
+        .collect::<Vec<&str>>()
+        .join(" | ")
+}
+
+/// Checks the `include` list of one declaration against the standard R4
+/// reference parameters of `resource_type`.
+///
+/// # Errors
+///
+/// Returns [`DeclarationError::Include`] for a code R4 defines no reference
+/// parameter with on the type and for a code named twice, and
+/// [`DeclarationError::IncludeExpression`] for a standard expression the
+/// evaluator does not parse.
+pub fn check_includes(
+    file: &Path,
+    resource_type: &str,
+    codes: &[String],
+) -> Result<BTreeMap<String, Include>, DeclarationError> {
+    let mut checked = BTreeMap::new();
+    for code in codes {
+        let refuse = |reason: &'static str| DeclarationError::Include {
+            file: file.to_path_buf(),
+            code: code.clone(),
+            reason,
+        };
+        let standard = standard(resource_type, code)
+            .filter(|parameter| parameter.r#type.code() == ParameterType::Reference.as_str())
+            .ok_or_else(|| refuse("R4 defines no reference parameter of this code on the type"))?;
+        let expression = standard
+            .expression
+            .map(|expression| own_branches(expression, resource_type))
+            .filter(|expression| !expression.is_empty())
+            .ok_or_else(|| refuse("the standard parameter states no expression for the type"))?;
+        ferrobridge_fhirpath::expression::Expression::parse(&expression).map_err(|source| {
+            DeclarationError::IncludeExpression {
+                file: file.to_path_buf(),
+                code: code.clone(),
+                source,
+            }
+        })?;
+        let include = Include {
+            code: code.clone(),
+            expression,
+        };
+        if checked.insert(code.clone(), include).is_some() {
+            return Err(refuse("the include list names it twice"));
+        }
+    }
+    Ok(checked)
 }
 
 /// Why a declaration file is refused.
@@ -331,6 +492,27 @@ pub enum DeclarationError {
         /// Why it is refused.
         reason: String,
     },
+    /// An `include` code that names no standard reference parameter.
+    #[error("the search declaration {} includes `{code}`: {reason}", file.display())]
+    Include {
+        /// The file.
+        file: PathBuf,
+        /// The code.
+        code: String,
+        /// Why it is refused.
+        reason: &'static str,
+    },
+    /// The expression of an `include` code does not parse as FHIRPath.
+    #[error("the search declaration {} includes `{code}`, whose standard expression does not parse", file.display())]
+    IncludeExpression {
+        /// The file.
+        file: PathBuf,
+        /// The code.
+        code: String,
+        /// What the parser reported.
+        #[source]
+        source: ferrobridge_fhirpath::parse::ParseError,
+    },
     /// The query the declaration builds does not parse as AQL.
     #[error("the search declaration {} builds a query that does not parse as AQL", file.display())]
     Query {
@@ -356,6 +538,8 @@ impl DeclarationError {
             | Self::Shape { file, .. }
             | Self::Template { file, .. }
             | Self::Path { file, .. }
+            | Self::Include { file, .. }
+            | Self::IncludeExpression { file, .. }
             | Self::Query { file, .. } => file,
             Self::Duplicate { second, .. } | Self::Inconsistent { second, .. } => second,
         }
