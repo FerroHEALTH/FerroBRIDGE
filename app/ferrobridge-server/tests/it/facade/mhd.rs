@@ -37,6 +37,9 @@ const MHD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/mhd");
 /// The profile the Composition context maps.
 const PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobridge-mhd";
 
+/// The pseudonym the suite's EHR is keyed by.
+const PSEUDONYM: &str = "p-1";
+
 /// The patient the suite's EHR belongs to.
 const SUBJECT: &str = "Patient/p-1";
 
@@ -77,7 +80,7 @@ async fn responder_over(fixtures: &str, context: &str) -> Result<Harness, Box<dy
     harness
         .store
         .record_ehr(
-            &PersonId::new("http://example.org/fhir", SUBJECT)?,
+            &PersonId::new("http://example.org/fhir", PSEUDONYM)?,
             &EhrId::new(EHR_ID)?,
         )
         .await?;
