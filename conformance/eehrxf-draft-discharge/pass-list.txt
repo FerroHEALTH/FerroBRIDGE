@@ -17,6 +17,7 @@ eehrxf-discharge-full:body.courseOfEncounter.conditionSummary
 eehrxf-discharge-full:body.courseOfEncounter.generatedNarrative
 eehrxf-discharge-full:body.courseOfEncounter.medicalDevicesAndImplants
 eehrxf-discharge-full:body.courseOfEncounter.note
+eehrxf-discharge-full:body.courseOfEncounter.objectiveFindings
 eehrxf-discharge-full:body.courseOfEncounter.pharmacotherapy
 eehrxf-discharge-full:body.courseOfEncounter.procedures
 eehrxf-discharge-full:body.courseOfEncounter.testResults[x]
@@ -78,6 +79,7 @@ eehrxf-discharge-mapped:body.courseOfEncounter.conditionSummary
 eehrxf-discharge-mapped:body.courseOfEncounter.generatedNarrative
 eehrxf-discharge-mapped:body.courseOfEncounter.medicalDevicesAndImplants
 eehrxf-discharge-mapped:body.courseOfEncounter.note
+eehrxf-discharge-mapped:body.courseOfEncounter.objectiveFindings
 eehrxf-discharge-mapped:body.courseOfEncounter.pharmacotherapy
 eehrxf-discharge-mapped:body.courseOfEncounter.procedures
 eehrxf-discharge-mapped:body.courseOfEncounter.testResults[x]
@@ -120,5 +122,5 @@ eehrxf-discharge-mapped:header.serviceSpecialty
 eehrxf-discharge-mapped:header.status
 eehrxf-discharge-mapped:header.subject
 eehrxf-discharge-mapped:presentedForm
-total 122
-unmapped 10
+total 128
+unmapped 4

@@ -42,6 +42,10 @@ use eehrxf::document::laboratory::LAB_SLOTS;
 use eehrxf::draft::{Annex, AnnexCrosswalk, Row, SHIPPED};
 use serde_json::{Value, json};
 
+use paths::{PATHS, Path as Tabled};
+
+mod paths;
+
 /// The variable naming the directory of the documents the suites emitted.
 const CORPUS_DIR: &str = "EEHRXF_DRAFT_CORPUS_DIR";
 
@@ -182,6 +186,15 @@ fn carried(row: &Row, crosswalks: &[&Crosswalk<'_>]) -> Option<(&'static str, bo
         .filter(|(eps, _)| !eps.is_empty())
 }
 
+/// The row of [`paths::PATHS`] that names the annex `row`.
+fn tabled(row: &Row) -> Option<&'static Tabled> {
+    PATHS.iter().find(|path| {
+        path.annex == row.annex()
+            && path.model == row.xtehr_model()
+            && Some(path.element) == row.draft_element()
+    })
+}
+
 /// Whether every parent of the annex element `element` among `rows` passes
 /// `test`.
 fn parents(rows: &[&Row], element: &str, test: impl Fn(&Row) -> bool) -> bool {
@@ -234,7 +247,11 @@ fn measure(category: &Category, dir: &Path) -> Result<Value, Box<dyn Error>> {
             else {
                 continue;
             };
-            let Some((eps, grouping)) = carried(row, category.crosswalks) else {
+            let Some((eps, grouping)) = carried(row, category.crosswalks).or_else(|| {
+                tabled(row)
+                    .and_then(|path| path.eps)
+                    .map(|eps| (eps, eps == "Composition.section"))
+            }) else {
                 unmapped += 1;
                 continue;
             };
@@ -321,4 +338,120 @@ fn an_element_id_finds_its_section_slice() {
         0
     );
     assert_eq!(values(&bundle, "Composition.section").len(), 2);
+}
+
+/// The JSON snapshot of the profile `url` among the fetched profile packages.
+fn snapshot(url: &str) -> Result<Value, Box<dyn Error>> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages");
+    for package in std::fs::read_dir(&root)? {
+        let package = package?.path();
+        let guide = package
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("hl7.fhir.eu."));
+        if !guide {
+            continue;
+        }
+        let directory = package.join("package");
+        let Ok(files) = std::fs::read_dir(&directory) else {
+            continue;
+        };
+        for file in files {
+            let file = file?.path();
+            let is_definition = file
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("StructureDefinition-"));
+            if !is_definition {
+                continue;
+            }
+            let text = std::fs::read_to_string(&file)?;
+            if !text.contains(url) {
+                continue;
+            }
+            let definition: Value = serde_json::from_str(&text)?;
+            if definition["url"] == url {
+                return Ok(definition);
+            }
+        }
+    }
+    Err(format!("no fetched package defines {url}").into())
+}
+
+/// The profile of the category of `annex` whose root is `resource`.
+fn profile_of(annex: Annex, resource: &str) -> Option<&'static str> {
+    Some(match (annex, resource) {
+        (Annex::Iv, "Composition") => {
+            "http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps"
+        }
+        (Annex::V, "MedicationRequest") => {
+            "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationRequest-eu-mpd"
+        }
+        (Annex::Vi, "MedicationDispense") => {
+            "http://hl7.eu/fhir/mpd/StructureDefinition/MedicationDispense-eu-mpd"
+        }
+        (Annex::Vii, "Composition") => {
+            "http://hl7.eu/fhir/imaging/StructureDefinition/CompositionEuImaging"
+        }
+        (Annex::Vii, "ImagingStudy") => {
+            "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging"
+        }
+        (Annex::Viii, "Composition") => {
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab"
+        }
+        (Annex::Ix, "Composition") => {
+            "http://hl7.eu/fhir/hdr/StructureDefinition/composition-eu-hdr"
+        }
+        _ => return None,
+    })
+}
+
+#[test]
+fn every_path_is_an_element_of_its_profile() -> Result<(), Box<dyn Error>> {
+    if std::env::var("FERROBRIDGE_SKIP_PROFILE_PACKAGES").is_ok_and(|value| value == "1") {
+        return Ok(());
+    }
+    let mut definitions: BTreeMap<&str, Value> = BTreeMap::new();
+    for path in PATHS {
+        let Some(eps) = path.eps else { continue };
+        let resource = eps.split('.').next().ok_or("an element id")?;
+        let url = profile_of(path.annex, resource)
+            .ok_or_else(|| format!("{eps}: no profile for its resource in its annex"))?;
+        if !definitions.contains_key(url) {
+            definitions.insert(url, snapshot(url)?);
+        }
+        let definition = definitions.get(url).ok_or("a read definition")?;
+        let held = definition["snapshot"]["element"]
+            .as_array()
+            .ok_or("a snapshot")?
+            .iter()
+            .any(|element| element["id"] == eps);
+        assert!(held, "{}: {eps} is no element of {url}", path.element);
+    }
+    Ok(())
+}
+
+#[test]
+fn every_row_the_crosswalks_miss_has_a_path() -> Result<(), Box<dyn Error>> {
+    let crosswalk: AnnexCrosswalk = SHIPPED.parse()?;
+    let mut missing = Vec::new();
+    for category in &CATEGORIES {
+        for row in crosswalk.annex(category.annex) {
+            let Some(element) = row.draft_element() else {
+                continue;
+            };
+            if carried(row, category.crosswalks).is_none() && tabled(row).is_none() {
+                missing.push(format!(
+                    "{} {} {element}",
+                    row.annex().numeral(),
+                    row.xtehr_model()
+                ));
+            }
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "annex elements with no path: {missing:?}"
+    );
+    Ok(())
 }

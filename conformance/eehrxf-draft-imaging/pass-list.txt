@@ -62,6 +62,7 @@ eehrxf-imaging-mapped:header.status
 eehrxf-imaging-mapped:header.status
 eehrxf-imaging-mapped:header.subject
 eehrxf-imaging-mapped:header.subject
+eehrxf-imaging-mapped:header.version
 eehrxf-imaging-mapped:modality
 eehrxf-imaging-mapped:numberOfInstances
 eehrxf-imaging-mapped:numberOfSeries
@@ -79,7 +80,8 @@ eehrxf-imaging-mapped:series.instanceInTheSeries.numberOfFrames
 eehrxf-imaging-mapped:series.instanceInTheSeries.sopClass
 eehrxf-imaging-mapped:series.number
 eehrxf-imaging-mapped:series.numberOfInstances
+eehrxf-imaging-mapped:series.specimen
 eehrxf-imaging-mapped:series.started
 eehrxf-imaging-mapped:started
-total 88
-unmapped 11
+total 91
+unmapped 8

@@ -1,3 +1,4 @@
+eehrxf-mpd-prescription:header
 eehrxf-mpd-prescription:header.author[x]
 eehrxf-mpd-prescription:header.date
 eehrxf-mpd-prescription:header.language
@@ -21,5 +22,5 @@ eehrxf-mpd-prescription:prescriptionItem.substitution
 eehrxf-mpd-prescription:prescriptionItem.substitution.allowed[x]
 eehrxf-mpd-prescription:prescriptionItem.substitution.reason[x]
 eehrxf-mpd-prescription:prescriptionItem.validityPeriod
-total 24
-unmapped 5
+total 25
+unmapped 4

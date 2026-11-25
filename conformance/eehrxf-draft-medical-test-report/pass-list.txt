@@ -34,7 +34,8 @@ eehrxf-laboratory-mapped:header.period
 eehrxf-laboratory-mapped:header.serviceSpecialty
 eehrxf-laboratory-mapped:header.status
 eehrxf-laboratory-mapped:header.subject
+eehrxf-laboratory-mapped:header.version
 eehrxf-laboratory-mapped:intendedRecipient[x]
 eehrxf-laboratory-mapped:presentedForm
-total 38
-unmapped 3
+total 40
+unmapped 1
