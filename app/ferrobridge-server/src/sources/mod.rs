@@ -56,6 +56,25 @@ pub struct Source {
 }
 
 impl Source {
+    /// Returns the source `write` describes at version 1, its document read,
+    /// as a fixed route table holds it.
+    ///
+    /// # Errors
+    /// Returns [`Invalid`] when the document is no document of its kind.
+    pub fn fixed(write: &ferrobridge_operator_api::sources::Write) -> Result<Self, Invalid> {
+        Ok(Self {
+            id: Uuid::new_v4(),
+            name: write.name.clone(),
+            kind: write.kind,
+            enabled: write.enabled,
+            version: 1,
+            document: write.document.clone(),
+            parsed: Document::read(write.kind, &write.document)?,
+            updated_by: String::new(),
+            updated_at: String::new(),
+        })
+    }
+
     /// Returns the source as the operator API writes it.
     #[must_use]
     pub fn document(&self) -> ferrobridge_operator_api::sources::Source {
@@ -215,6 +234,71 @@ impl Subscriber for Held {
     }
 }
 
+/// Where the HL7 v2 face finds the source an MLLP sender is routed to.
+#[async_trait::async_trait]
+pub trait Routes: std::fmt::Debug + Send + Sync {
+    /// Returns the source the sender `application` at `facility` (MSH-3 and
+    /// MSH-4, as their namespace id or `^<universal id>^<type>`) is routed
+    /// to.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the routes cannot be read.
+    async fn routed(
+        &self,
+        application: &str,
+        facility: &str,
+    ) -> Result<Option<Arc<Source>>, sqlx::Error>;
+}
+
+#[async_trait::async_trait]
+impl Routes for Sources {
+    async fn routed(
+        &self,
+        application: &str,
+        facility: &str,
+    ) -> Result<Option<Arc<Source>>, sqlx::Error> {
+        if self.trusted() {
+            return Ok(self.held.current().routed(application, facility));
+        }
+        Ok(self
+            .held
+            .store
+            .routed(application, facility)
+            .await?
+            .map(Arc::new))
+    }
+}
+
+/// A route table that never changes, for a test of the face.
+#[derive(Debug, Clone, Default)]
+pub struct Fixed(Vec<Arc<Source>>);
+
+impl Fixed {
+    /// Returns the table of `sources`.
+    #[must_use]
+    pub fn new(sources: Vec<Source>) -> Self {
+        Self(sources.into_iter().map(Arc::new).collect())
+    }
+}
+
+#[async_trait::async_trait]
+impl Routes for Fixed {
+    async fn routed(
+        &self,
+        application: &str,
+        facility: &str,
+    ) -> Result<Option<Arc<Source>>, sqlx::Error> {
+        Ok(Snapshot {
+            by_id: self
+                .0
+                .iter()
+                .map(|source| (source.id, Arc::clone(source)))
+                .collect(),
+        }
+        .routed(application, facility))
+    }
+}
+
 /// Every source this replica serves, the rows behind them and the secrets
 /// they name.
 #[derive(Debug)]
@@ -301,28 +385,6 @@ impl Sources {
             return Ok(self.held.current().named(name));
         }
         Ok(self.held.store.named(name).await?.map(Arc::new))
-    }
-
-    /// Returns the source the MLLP sender `application` at `facility` is
-    /// routed to: from the snapshot while the listener is connected, from
-    /// its row otherwise.
-    ///
-    /// # Errors
-    /// Returns [`sqlx::Error`] when the row must be read and cannot be.
-    pub async fn routed(
-        &self,
-        application: &str,
-        facility: &str,
-    ) -> Result<Option<Arc<Source>>, sqlx::Error> {
-        if self.trusted() {
-            return Ok(self.held.current().routed(application, facility));
-        }
-        Ok(self
-            .held
-            .store
-            .routed(application, facility)
-            .await?
-            .map(Arc::new))
     }
 
     /// Reads `value` as a document of `kind`, every secret it names held by

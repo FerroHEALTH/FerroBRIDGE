@@ -2387,7 +2387,12 @@ are versioned rows: one write validates the kind's document, appends the
 version with its committer, derives the tenants and MLLP routes and
 notifies `ferrobridge_sources`, and each replica reloads the named source
 into a snapshot behind one pointer swap; a source names its secrets, which
-resolve through the `[secrets]` directory of `ferrohealth-secret`. The audit outbox (`0010`)
+resolve through the `[secrets]` directory of `ferrohealth-secret`. The
+HL7 v2 face routes each message by MSH-3 and MSH-4 to its MLLP source
+through that snapshot, checks the route against the connection's client
+certificate subject or peer network, and reads the source's settings; the
+file keeps only the listeners, and the TLS listener reads its client
+authorities file again when it changes. The audit outbox (`0010`)
 holds each BALP `AuditEvent` until the Audit Record Repository takes it:
 the recorder commits the row before the answer, and each replica's
 `ihe-atna` forwarder claims the oldest unclaimed row for a lease with
@@ -2450,29 +2455,25 @@ other v2 crates stay out.
 
 The plain MLLP lane for devices without TLS (#1918) takes `ipnet` 2.12.2,
 verified against crates.io on 2026-11-12 and already in the lock through
-`ferrohealth-server` and `hyper-util`, for the CIDR networks a plain sender
+`ferrohealth-server` and `hyper-util`, for the CIDR networks a device
 connects from. Its ground and its rules are our own design, since no
-specification governs them. HL7
-MLLP Release 2 defines no security layer, and IHE ITI ATNA (ITI TF-2, ITI-19)
-adds TLS for a node that supports it, so TLS with a client certificate per
-sender (#1638) stays the default and plain MLLP is an explicit per-sender
-exception for `origin = "device"` alone. A plain sender is served on its own
-`[hl7v2.plain] bind`, which boot refuses on the TLS listener's port at the
-same or an unspecified address, and names its `source_addresses`; boot
-refuses a plain sender that is no device or names no network, a network with
-host bits set, and one side of the listener-and-sender pair without the
-other. The listener closes a connection from outside every plain sender's
-networks before reading a byte (`Handler::admits`), and a message whose MSH-4
-names no plain sender whose networks hold the peer address (#1220) is
-answered `AR` and its connection closed (`Connection::close`); a TLS
-sender's facility is refused there the same way. OBX-18 stays under the
-sender's `device_identifier_issuer`. The TLS listener and its `[hl7v2.tls]`
-files are required only while a sender has `transport = "tls"`, so a lab of
-plain devices alone runs no TLS listener, and a `[hl7v2.tls]` with no TLS
-sender is refused at boot. The plain listener shares the face, the
-drain, the timeouts and the frame limit with the TLS one; boot warns once per
-plain sender, and `/health/info` and the operator API's running
-configuration show the lane and each sender's transport.
+specification governs them. HL7 MLLP Release 2 defines no security layer,
+and IHE ITI ATNA (ITI TF-2, ITI-19) adds TLS for a node that supports it, so
+TLS with a client certificate per sender (#1638) stays the default and the
+plain listener is an explicit exception for devices.
+
+The senders are `mllp` inbound sources of the state store (#2061), routed by
+MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) through `inbound_route_mllp`. A route
+holds the `certificate_subject` the TLS listener checks against the client
+certificate's subject alternative names, the `source_cidrs` the plain
+listener checks against the peer address, or both, and its source carries
+the per-sender settings. A message whose route the connection does not
+match is answered `AR`, and its plain connection closed
+(`Connection::close`); a message the store cannot route is answered `AE`.
+The file keeps the listeners alone (`listen`, `[hl7v2.tls]`,
+`[hl7v2.plain] bind`, the timeouts and `frame_limit`), so a new source never
+adds a port, and the TLS acceptor reads its client CA file again when the
+file's modification time changes. The routing store is our own design.
 
 The profile validator (#437), verified against crates.io on 2026-10-15,
 takes `flate2` 1.1.10 on its pure-Rust `rust_backend` and `tar` 0.4.46

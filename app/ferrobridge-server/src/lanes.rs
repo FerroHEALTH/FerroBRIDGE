@@ -447,18 +447,20 @@ async fn start_hl7v2(
                 lane = "hl7v2",
                 listen = %lane.listen,
                 concept_maps = maps,
-                profiles = lane.profiles.len(),
                 "the HL7 v2 face listens for MLLP over TLS"
             );
             Some((socket, hl7v2::Listening::default()))
         }
         None => None,
     };
-    let face = hl7v2::Face::new(facade, terminology, lane)
+    let routes: Arc<dyn crate::sources::Routes> = state.sources().cloned().context(
+        "the HL7 v2 face routes its senders from the state store, and [state] is not set",
+    )?;
+    let face = hl7v2::Face::new(facade, terminology, routes)
         .with_usage(Arc::clone(state.usage_window()))
         .with_access_log(state.access_log().cloned(), lane.listen);
-    let plain = match lane.plain.as_ref() {
-        Some(plain) => Some(hl7v2::plain::bind(plain, &face).await?),
+    let plain = match lane.plain {
+        Some(bind) => Some(hl7v2::plain::bind(bind, &face).await?),
         None => None,
     };
     Ok(StartedFace {
