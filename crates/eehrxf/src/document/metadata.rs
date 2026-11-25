@@ -23,7 +23,7 @@
 //! | attestation | `attester`, mode `professional` | none in R4 |
 //! | status | `status` | `docStatus` |
 //! | language | `language` | `content.attachment.language` |
-//! | documentCategory | `category`, where the form leaves it free | `category` |
+//! | documentCategory | `category`, and the report's `category` on a laboratory or test report; not on an imaging report, whose form fixes it | `category` |
 //! | documentType | `type` | `type` |
 //! | documentTitle | `title` | `description` |
 //! | period | `event.period` | `context.period` |
@@ -43,6 +43,7 @@ use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::composition::{Composition, CompositionAttester, CompositionEvent};
+use fhir_types::r4::diagnostic_report::DiagnosticReport;
 use fhir_types::r4::document_reference::{
     DocumentReference, DocumentReferenceContent, DocumentReferenceContext,
 };
@@ -589,6 +590,19 @@ impl Document {
         Ok(())
     }
 
+    /// Writes the Annex III document category on `report`, which the
+    /// composition then carries with the report's own categories.
+    // NOTE: Bundle-eu-lab dr-comp-category asks the two to share a category, and
+    // DiagnosticReport-eu-lab 2.0.0 slices category open.
+    pub(super) fn categorise_report(&self, report: &mut DiagnosticReport) {
+        if let Some(metadata) = &self.metadata
+            && self.form.categories.is_empty()
+            && !report.category.contains(&metadata.category)
+        {
+            report.category.push(metadata.category.clone());
+        }
+    }
+
     /// Writes the metadata on `composition`, the document's own, refusing a
     /// value R4 has no place for.
     pub(super) fn write_metadata(
@@ -610,12 +624,8 @@ impl Document {
         if let Some(language) = at_most_one("language", &metadata.languages)? {
             composition.language = Some(language.as_str().into());
         }
-        // NOTE: Bundle-eu-lab dr-comp-category and the imaging form fix Composition.category;
-        // the DocumentReference carries the Annex III category for every form.
-        if self.form.categories.is_empty()
-            && self.form.report.is_none()
-            && !composition.category.contains(&metadata.category)
-        {
+        // NOTE: Composition-eu-lab 2.0.0 slices category open; the imaging form fixes it (#2120).
+        if self.form.categories.is_empty() && !composition.category.contains(&metadata.category) {
             composition.category.push(metadata.category.clone());
         }
         let attester = |mode: &str, attestation: &Attestation| CompositionAttester {

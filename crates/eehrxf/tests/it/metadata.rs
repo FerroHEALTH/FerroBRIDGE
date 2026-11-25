@@ -144,7 +144,21 @@ fn written(document: Document, code: &str) -> Result<(Bundle, DocumentMetadata),
 #[cfg(feature = "laboratory")]
 fn the_laboratory_report_carries_the_annex_iii_document_metadata() -> Result<(), Box<dyn Error>> {
     let (bundle, metadata) = written(super::lab_document::document()?, "11502-2")?;
-    holds_table_1(&metadata, &bundle)
+    holds_table_1(&metadata, &bundle)?;
+    // Bundle-eu-lab dr-comp-category: the composition and the report share the category.
+    let bundle = serde_json::to_value(bundle)?;
+    for entry in [&bundle["entry"][0], &bundle["entry"][1]] {
+        let categories = entry["resource"]["category"]
+            .as_array()
+            .ok_or("categories")?;
+        assert!(
+            categories
+                .iter()
+                .any(|category| category["coding"][0]["code"] == "11502-2"),
+            "{entry}"
+        );
+    }
+    Ok(())
 }
 
 #[test]
