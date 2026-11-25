@@ -773,3 +773,25 @@ fn a_passcode_hash_is_argon2id_and_matches_only_its_passcode() -> Result<(), Box
     assert!(!passcode::matches("4321", &stored)?);
     Ok(())
 }
+
+#[tokio::test]
+async fn the_sweeper_ends_on_the_stop_signal() -> Result<(), Box<dyn Error>> {
+    let Some(stored) = crate::store::sealed_store().await? else {
+        return Ok(());
+    };
+    let term = MockServer::start().await;
+    let Some(harness) = harness(&term).await? else {
+        return Ok(());
+    };
+    let links = Arc::new(Links::open(
+        &stored.1,
+        settings(),
+        Arc::clone(&harness.facade),
+        None,
+    )?);
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    let sweeper = links.spawn_sweeper(&stopped);
+    stop.send_replace(true);
+    tokio::time::timeout(std::time::Duration::from_secs(10), sweeper).await??;
+    Ok(())
+}

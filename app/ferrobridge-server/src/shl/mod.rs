@@ -126,15 +126,25 @@ impl Links {
     }
 
     /// Sweeps the store every minute on its own task, recording each link
-    /// that ends.
+    /// that ends, until `stop` reads `true`; a sweep under way finishes
+    /// first.
     #[must_use]
-    pub fn spawn_sweeper(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
+    pub fn spawn_sweeper(
+        self: &Arc<Self>,
+        stop: &tokio::sync::watch::Receiver<bool>,
+    ) -> tokio::task::JoinHandle<()> {
         let links = Arc::clone(self);
+        let mut stop = stop.clone();
         tokio::spawn(async move {
             let mut ticks = tokio::time::interval(SWEEP);
             loop {
-                ticks.tick().await;
-                links.sweep().await;
+                tokio::select! {
+                    biased;
+                    () = async {
+                        let _settled = stop.wait_for(|stopped| *stopped).await.is_ok();
+                    } => break,
+                    _tick = ticks.tick() => links.sweep().await,
+                }
             }
         })
     }
