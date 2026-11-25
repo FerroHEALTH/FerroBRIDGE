@@ -3,11 +3,13 @@
 
 //! Checking, saving and reloading mapping files through the operator API,
 //! over a facade and an operations lane whose CDR serves the testkit
-//! template. No specification governs the operator surface: our own design.
+//! template, the revisions in a PostgreSQL state store. The cases run only
+//! when `FERROBRIDGE_E2E=1` admits the harness. No specification governs the
+//! operator surface: our own design.
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use axum::Router;
@@ -17,6 +19,7 @@ use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
 use ferrobridge_server::mappings::files::{Language, Root};
+use ferrobridge_server::mappings::revisions::{Entry, Files, Recording, Revisions};
 use ferrobridge_server::operations::lane::OperationsLane;
 use ferrobridge_server::operator::Operator;
 use ferrobridge_server::operator::reload::Reloader;
@@ -32,6 +35,7 @@ use super::{FIXTURES, OMOCL_FILE, OPERATOR, bytes, digest};
 use crate::facade::auth::{Issuer, SigningKey, authority, bearing, ec_key, mint};
 
 mod archive;
+mod replicas;
 mod revisions;
 mod search;
 mod unprovisioned;
@@ -109,10 +113,18 @@ mappings:
 /// The reason every save of these cases gives.
 const REASON: &str = "synthetic reason for the test";
 
-/// One case: the trees, the CDR, the issuer and the router.
+/// One case: the provisioned tree, the state store, the CDR, the issuer and
+/// the router.
 struct Case {
-    /// The provisioned tree and the console's, kept alive for the case.
-    tree: tempfile::TempDir,
+    /// The provisioned tree, kept alive for the case.
+    _tree: tempfile::TempDir,
+    /// The PostgreSQL the state store runs on, kept alive by the case that
+    /// started it.
+    _postgres: Option<ferrobridge_testkit::containers::Postgres>,
+    /// The mapping revisions of the state store.
+    revisions: Revisions,
+    /// The operator API under test.
+    operator: Arc<Operator>,
     /// The stub CDR, kept alive for the case.
     cdr: MockServer,
     /// The stub authorization server.
@@ -125,8 +137,22 @@ struct Case {
 
 impl Case {
     /// Builds a facade and an operations lane over the provisioned fixtures,
-    /// with the operator API saving into an empty console directory.
-    async fn new() -> Result<Self, Box<dyn Error>> {
+    /// with the operator API saving into an empty state store; `None` unless
+    /// the harness is admitted.
+    async fn new() -> Result<Option<Self>, Box<dyn Error>> {
+        let Some((postgres, store)) = crate::store::store().await? else {
+            return Ok(None);
+        };
+        Ok(Some(Self::over(&store, Some(postgres)).await?))
+    }
+
+    /// Builds the case as [`Self::new`] does over `store`, keeping
+    /// `postgres` alive when this case started it.
+    async fn over(
+        store: &ferrobridge_server::store::Store,
+        postgres: Option<ferrobridge_testkit::containers::Postgres>,
+    ) -> Result<Self, Box<dyn Error>> {
+        let revisions = Revisions::new(store);
         let tree = tempfile::tempdir()?;
         let provisioned = tree.path().join("mappings");
         std::fs::create_dir_all(&provisioned)?;
@@ -196,11 +222,15 @@ impl Case {
             ],
             Snapshot::new(Report::default(), BTreeMap::new()),
         )
-        .with_saving(tree.path().join("console"), reloader);
-        let state = state.with_operator(Arc::new(operator));
+        .with_saving(revisions.clone(), reloader);
+        let operator = Arc::new(operator);
+        let state = state.with_operator(Arc::clone(&operator));
         let app = ferrobridge_server::router(Arc::new(state), &server_settings());
         Ok(Self {
-            tree,
+            _tree: tree,
+            _postgres: postgres,
+            revisions,
+            operator,
             cdr,
             issuer,
             key,
@@ -208,9 +238,50 @@ impl Case {
         })
     }
 
-    /// Returns the console file `relative` names.
-    fn console(&self, relative: &str) -> PathBuf {
-        self.tree.path().join("console/fhirconnect").join(relative)
+    /// Returns the bytes of the FHIRconnect console file `relative` in the
+    /// running revision, `None` when it holds none.
+    async fn console(&self, relative: &str) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
+        self.console_at(&format!("fhirconnect/{relative}")).await
+    }
+
+    /// Returns the bytes of the console file at the wire path `wire` in the
+    /// running revision, `None` when it holds none.
+    async fn console_at(&self, wire: &str) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
+        let console = self.revisions.console().await?;
+        Ok(console.files().get(wire).map(|bytes| bytes.to_vec()))
+    }
+
+    /// Records `files`, each a wire path and its text, as a revision the
+    /// way another replica would.
+    async fn record(
+        &self,
+        files: &[(&str, &str)],
+        recording: Recording,
+    ) -> Result<ferrobridge_operator_api::revisions::Revision, Box<dyn Error>> {
+        let files: Files = files
+            .iter()
+            .map(|(wire, text)| ((*wire).to_owned(), Arc::from(text.as_bytes())))
+            .collect();
+        let entry = Entry {
+            origin: match recording {
+                Recording::Run => ferrobridge_operator_api::revisions::Origin::Save,
+                Recording::Keep => ferrobridge_operator_api::revisions::Origin::Import,
+            },
+            author: String::from("synthetic-client-sub"),
+            reason: String::from(REASON),
+            source: None,
+        };
+        Ok(self
+            .revisions
+            .change()
+            .await?
+            .record(entry, &files, recording)
+            .await?)
+    }
+
+    /// Returns how many revisions the store holds.
+    async fn recorded(&self) -> Result<usize, Box<dyn Error>> {
+        Ok(self.revisions.list().await?.1.len())
     }
 
     /// Sends `request` under an operator token.
@@ -273,35 +344,6 @@ impl Case {
             .filter_map(|entry| entry["type"].as_str().map(str::to_owned))
             .collect())
     }
-
-    /// Returns every `..`-prefixed staging entry left under the console tree,
-    /// the revision store aside.
-    fn staging_left(&self) -> Vec<PathBuf> {
-        let mut left = Vec::new();
-        let mut stack = vec![self.tree.path().join("console")];
-        while let Some(directory) = stack.pop() {
-            let Ok(entries) = std::fs::read_dir(&directory) else {
-                continue;
-            };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if entry.file_name() == "..revisions" {
-                    continue;
-                }
-                if entry.file_name().to_string_lossy().starts_with("..") {
-                    let empty_drafts = path.is_dir()
-                        && std::fs::read_dir(&path).is_ok_and(|mut inner| inner.next().is_none());
-                    if !empty_drafts {
-                        left.push(path.clone());
-                    }
-                }
-                if path.is_dir() {
-                    stack.push(path);
-                }
-            }
-        }
-        left
-    }
 }
 
 /// Returns server settings whose body ceiling admits a mapping file.
@@ -315,7 +357,9 @@ fn server_settings() -> ferrohealth_server::section::ServerSection {
 #[tokio::test]
 async fn a_saved_file_is_byte_identical_and_the_capability_statement_follows()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     assert!(
         !case
             .declared_types()
@@ -338,23 +382,30 @@ async fn a_saved_file_is_byte_identical_and_the_capability_statement_follows()
     assert_eq!(serde_json::Value::Bool(true), report["clean"], "{report}");
     assert_eq!(
         CONTEXT.as_bytes(),
-        std::fs::read(case.console("ferrobridge_console.context.yml"))?.as_slice()
+        case.console("ferrobridge_console.context.yml")
+            .await?
+            .as_deref()
+            .unwrap_or_default()
     );
     assert_eq!(
         MODEL.as_bytes(),
-        std::fs::read(case.console("ferrobridge_console.yml"))?.as_slice()
+        case.console("ferrobridge_console.yml")
+            .await?
+            .as_deref()
+            .unwrap_or_default()
     );
     let types = case.declared_types().await?;
     assert!(types.contains(&String::from("Observation")), "{types:?}");
     assert!(types.contains(&String::from("Condition")), "{types:?}");
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
     Ok(())
 }
 
 #[tokio::test]
 async fn the_listing_and_the_file_route_serve_a_saved_file_as_the_consoles()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     assert_eq!(
         StatusCode::OK,
         case.create("ferrobridge_console.yml", MODEL)
@@ -388,7 +439,9 @@ async fn the_listing_and_the_file_route_serve_a_saved_file_as_the_consoles()
 #[tokio::test]
 async fn a_failing_draft_is_refused_and_leaves_disk_and_programs_unchanged()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     assert_eq!(
         StatusCode::OK,
         case.create("ferrobridge_console.yml", MODEL)
@@ -402,6 +455,7 @@ async fn a_failing_draft_is_refused_and_leaves_disk_and_programs_unchanged()
             .status()
     );
     let before = case.declared_types().await?;
+    let running = case.revisions.running().await?;
     let response = case
         .send(
             Request::put("/operator/mappings/fhirconnect/ferrobridge_console.yml")
@@ -425,10 +479,14 @@ async fn a_failing_draft_is_refused_and_leaves_disk_and_programs_unchanged()
     assert_eq!("fhirconnect/ferrobridge_console.yml", diagnostic["file"]);
     assert_eq!(
         MODEL.as_bytes(),
-        std::fs::read(case.console("ferrobridge_console.yml"))?.as_slice(),
+        case.console("ferrobridge_console.yml")
+            .await?
+            .as_deref()
+            .unwrap_or_default(),
         "the saved file keeps its bytes"
     );
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
+    assert_eq!(2, case.recorded().await?, "no revision is written");
+    assert_eq!(running, case.revisions.running().await?, "nothing moves");
     assert_eq!(before, case.declared_types().await?);
     assert!(before.contains(&String::from("Observation")), "{before:?}");
     Ok(())
@@ -436,7 +494,9 @@ async fn a_failing_draft_is_refused_and_leaves_disk_and_programs_unchanged()
 
 #[tokio::test]
 async fn a_stale_if_match_answers_412_and_the_current_one_saves() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     assert_eq!(
         StatusCode::OK,
         case.create("ferrobridge_console.yml", MODEL)
@@ -454,7 +514,10 @@ async fn a_stale_if_match_answers_412_and_the_current_one_saves() -> Result<(), 
     assert_eq!(StatusCode::PRECONDITION_FAILED, stale.status());
     assert_eq!(
         MODEL.as_bytes(),
-        std::fs::read(case.console("ferrobridge_console.yml"))?.as_slice()
+        case.console("ferrobridge_console.yml")
+            .await?
+            .as_deref()
+            .unwrap_or_default()
     );
     let current = case
         .send(update(format!("\"{}\"", digest(MODEL.as_bytes())))?)
@@ -462,7 +525,10 @@ async fn a_stale_if_match_answers_412_and_the_current_one_saves() -> Result<(), 
     assert_eq!(StatusCode::OK, current.status());
     assert_eq!(
         revised.as_bytes(),
-        std::fs::read(case.console("ferrobridge_console.yml"))?.as_slice()
+        case.console("ferrobridge_console.yml")
+            .await?
+            .as_deref()
+            .unwrap_or_default()
     );
     let again = case.create("ferrobridge_console.yml", MODEL).await?;
     assert_eq!(
@@ -475,7 +541,9 @@ async fn a_stale_if_match_answers_412_and_the_current_one_saves() -> Result<(), 
 
 #[tokio::test]
 async fn a_save_without_a_precondition_or_a_reason_is_refused() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let unconditional = case
         .send(
             Request::put("/operator/mappings/fhirconnect/ferrobridge_console.yml")
@@ -492,13 +560,15 @@ async fn a_save_without_a_precondition_or_a_reason_is_refused() -> Result<(), Bo
         )
         .await?;
     assert_eq!(StatusCode::BAD_REQUEST, reasonless.status());
-    assert!(!case.console("ferrobridge_console.yml").exists());
+    assert_eq!(None, case.console("ferrobridge_console.yml").await?);
     Ok(())
 }
 
 #[tokio::test]
 async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let response = case
         .send(
             Request::put("/operator/mappings/fhirconnect/ferrobridge_facade.yml")
@@ -508,7 +578,7 @@ async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn Error
         )
         .await?;
     assert_eq!(StatusCode::CONFLICT, response.status());
-    assert!(!case.console("ferrobridge_facade.yml").exists());
+    assert_eq!(None, case.console("ferrobridge_facade.yml").await?);
     for path in [
         "/operator/mappings/fhirconnect/../escape.yml",
         "/operator/mappings/fhirconnect/notes.txt",
@@ -528,7 +598,9 @@ async fn a_save_over_a_provisioned_path_is_refused() -> Result<(), Box<dyn Error
 
 #[tokio::test]
 async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let check = |body: &str| {
         Request::post("/operator/mappings/check?path=fhirconnect/ferrobridge_facade.yml")
             .body(Body::from(body.to_owned()))
@@ -553,17 +625,29 @@ async fn a_draft_check_answers_its_diagnostics_and_writes_nothing() -> Result<()
     let response = case.send(check(&fixture)?).await?;
     let report: serde_json::Value = serde_json::from_slice(&bytes(response).await?)?;
     assert_eq!(serde_json::Value::Bool(true), report["clean"], "{report}");
-    assert!(!case.console("ferrobridge_console.yml").exists());
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
+    assert_eq!(None, case.console("ferrobridge_console.yml").await?);
     Ok(())
 }
 
 #[tokio::test]
-async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
-    std::fs::create_dir_all(case.console(""))?;
-    std::fs::write(case.console("ferrobridge_console.yml"), MODEL)?;
-    std::fs::write(case.console("ferrobridge_console.context.yml"), CONTEXT)?;
+async fn a_reload_compiles_the_revision_another_replica_recorded() -> Result<(), Box<dyn Error>> {
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
+    case.record(
+        &[
+            ("fhirconnect/ferrobridge_console.yml", MODEL),
+            ("fhirconnect/ferrobridge_console.context.yml", CONTEXT),
+        ],
+        Recording::Run,
+    )
+    .await?;
+    assert!(
+        !case
+            .declared_types()
+            .await?
+            .contains(&String::from("Observation"))
+    );
     let response = case
         .send(Request::post("/operator/reload").body(Body::empty())?)
         .await?;
@@ -579,7 +663,9 @@ async fn a_reload_picks_up_a_file_placed_in_the_console_directory() -> Result<()
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_check_save_and_reload_handlers_prepare_the_set_from_a_runtime_worker()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let response = case
         .send(
             Request::post("/operator/mappings/check?path=fhirconnect/ferrobridge_console.yml")
@@ -610,6 +696,9 @@ async fn the_check_save_and_reload_handlers_prepare_the_set_from_a_runtime_worke
 #[test]
 fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
 -> Result<(), Box<dyn Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(());
+    }
     let logs = crate::support::Logs::default();
     let capture = crate::support::subscriber(
         ferrohealth_telemetry::section::Rendering::Json,
@@ -622,7 +711,9 @@ fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
         .build()?;
     tracing::subscriber::with_default(capture, || {
         runtime.block_on(async {
-            let case = Case::new().await?;
+            let Some(case) = Case::new().await? else {
+                return Ok(());
+            };
             let response = case.create("ferrobridge_console.yml", MODEL).await?;
             assert_eq!(StatusCode::OK, response.status());
             Ok::<(), Box<dyn Error>>(())
@@ -659,7 +750,9 @@ fn the_save_audit_line_names_the_caller_file_digests_and_reason_and_no_content()
 #[tokio::test]
 async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set() -> Result<(), Box<dyn Error>>
 {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let specimen = std::fs::read_to_string(OMOCL_FILE)?;
     let response = case.create_at("omocl/Specimen_v1.yml", &specimen).await?;
     assert_eq!(StatusCode::OK, response.status());
@@ -667,7 +760,10 @@ async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set() -> Resul
     assert_eq!(serde_json::Value::Bool(true), report["clean"], "{report}");
     assert_eq!(
         specimen.as_bytes(),
-        std::fs::read(case.tree.path().join("console/omocl/Specimen_v1.yml"))?.as_slice()
+        case.console_at("omocl/Specimen_v1.yml")
+            .await?
+            .as_deref()
+            .unwrap_or_default()
     );
     let state = case.state().await?;
     assert_eq!(
@@ -689,14 +785,15 @@ async fn an_omocl_file_saves_under_the_console_tree_and_joins_the_set() -> Resul
         .ok_or("the saved file is listed")?;
     assert_eq!("console", saved["owner"]);
     assert_eq!("mapping", saved["kind"]);
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
     Ok(())
 }
 
 #[tokio::test]
 async fn an_omocl_draft_that_does_not_load_is_refused_and_writes_nothing()
 -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let response = case
         .create_at("omocl/broken.yml", "grammar: [unclosed\n")
         .await?;
@@ -710,14 +807,15 @@ async fn an_omocl_draft_that_does_not_load_is_refused_and_writes_nothing()
             .any(|diagnostic| diagnostic["file"] == "omocl/broken.yml"),
         "{report}"
     );
-    assert!(!case.tree.path().join("console/omocl/broken.yml").exists());
-    assert!(case.staging_left().is_empty(), "{:?}", case.staging_left());
+    assert_eq!(None, case.console_at("omocl/broken.yml").await?);
     Ok(())
 }
 
 #[tokio::test]
 async fn an_omocl_clash_with_a_provisioned_file_is_refused() -> Result<(), Box<dyn Error>> {
-    let case = Case::new().await?;
+    let Some(case) = Case::new().await? else {
+        return Ok(());
+    };
     let analyte = std::fs::read_to_string(PROVISIONED_OMOCL)?;
     let response = case
         .send(
@@ -738,8 +836,6 @@ async fn an_omocl_clash_with_a_provisioned_file_is_refused() -> Result<(), Box<d
         response.status(),
         "a second file defining a provisioned mapping is refused"
     );
-    let console = case.tree.path().join("console/omocl");
-    assert!(!console.join("Laboratory_test_analyte_v1.yml").exists());
-    assert!(!console.join("analyte_copy.yml").exists());
+    assert_eq!(0, case.recorded().await?);
     Ok(())
 }

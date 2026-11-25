@@ -12,7 +12,7 @@ use ferrobridge_server::config::Process;
 /// An enabled facade with `launch_task` as its `[facade.launch_task]` table.
 fn with_launch_task(launch_task: &str) -> String {
     format!(
-        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[facade.launch_task]\n{launch_task}"
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[facade.launch_task]\n{launch_task}"
     )
 }
 

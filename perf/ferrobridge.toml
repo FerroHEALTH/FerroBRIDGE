@@ -47,10 +47,8 @@ enabled = false
 [hl7v2]
 enabled = true
 listen = "127.0.0.1:12575"
-senders = [{ namespace_id = "PERFLAB", certificate_subject = "perflab.example.org" }]
-# The profile of the face's Observation context in
-# app/ferrobridge-server/tests/it/hl7v2_fixtures, so an OBX reaches it.
-profiles = [{ resource_type = "Observation", profile = "http://example.org/fhir/StructureDefinition/ferrobridge-hl7v2-observation" }]
+# The PERFLAB sender is an MLLP source the gate writes to the state store
+# (scripts/perf/gate.sh, route).
 
 [hl7v2.tls]
 certificate_file = "target/perf-run/tls/mllp-chain.pem"

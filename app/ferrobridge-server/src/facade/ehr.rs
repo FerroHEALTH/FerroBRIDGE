@@ -131,9 +131,7 @@ pub async fn resolve(
                     subject: person.to_string(),
                 });
             }
-            Policy::CreateOnFirstWrite => {
-                create(client, person, &subject_id, &namespace).await?
-            }
+            Policy::CreateOnFirstWrite => create(client, person, &subject_id, &namespace).await?,
         },
     };
     store.record_ehr(person, &ehr_id).await.map_err(store_error)

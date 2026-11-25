@@ -4,9 +4,9 @@
 //! The identity source every EHR subject comes from.
 //!
 //! The bridge keeps no patient identity of its own. It asks the identity
-//! source (a PIXm Manager such as FerroPIX) for the patient's pseudonym in
+//! source (a `PIXm` Manager such as `FerroPIX`) for the patient's pseudonym in
 //! one domain over ITI-83 by `POST`, so the source identifier never sits in a
-//! URL (PIXm 3.1.0 §2:3.83.4.1.2.2,
+//! URL (`PIXm` 3.1.0 §2:3.83.4.1.2.2,
 //! <https://profiles.ihe.net/ITI/PIXm/3.1.0/ITI-83.html>), and every EHR's
 //! `EHR_STATUS.subject.external_ref` names that pseudonym.
 
@@ -24,7 +24,7 @@ use crate::facade::identity::PersonId;
 /// The identity source, resolved from `[identity_source]`.
 #[derive(Clone)]
 pub struct IdentitySource {
-    /// The PIXm Consumer bound to the identity source.
+    /// The `PIXm` Consumer bound to the identity source.
     pixm: PixmClient,
     /// The domain the pseudonym is asked in.
     pseudonym_domain: TargetSystem,
@@ -238,13 +238,10 @@ impl IdentitySource {
             )
             .await
             .map_err(|error| PseudonymError::Upstream(Box::new(error)))?;
-        let found = match answer {
-            CrossReference::Matched(found) => found,
-            _ => {
-                return Err(PseudonymError::NotFound {
-                    system: source.system().to_owned(),
-                });
-            }
+        let CrossReference::Matched(found) = answer else {
+            return Err(PseudonymError::NotFound {
+                system: source.system().to_owned(),
+            });
         };
         let domain = self.pseudonym_domain.as_str();
         let mut held = found.in_domain(domain);

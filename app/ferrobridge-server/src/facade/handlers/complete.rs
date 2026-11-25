@@ -238,8 +238,8 @@ mod tests {
     const MARKER: &str = "ferrobridge-synthetic-clinical-marker";
 
     /// Returns the literal `Patient` reference to `id`.
-    fn literal(id: &str) -> Option<String> {
-        Some(format!("Patient/{id}"))
+    fn literal(id: &str) -> String {
+        format!("Patient/{id}")
     }
 
     /// Returns `literal` as a resource object.
@@ -284,7 +284,7 @@ mod tests {
             "subject": mapped
         }));
         let person = PersonId::new("ferrobridge", "bound").expect("a person");
-        let subject = reference_to(&person, literal("bound"));
+        let subject = reference_to(&person, Some(literal("bound")));
         assert_eq!(None, fill_subject(&mut body, "Condition", Some(&subject)));
         assert_eq!(Some(&Value::from_serde_json(mapped)), body.get("subject"));
     }
@@ -294,7 +294,7 @@ mod tests {
         // R4 allergyintolerance.html: AllergyIntolerance.patient is 1..1.
         let mut body = object(serde_json::json!({ "resourceType": "AllergyIntolerance" }));
         let person = PersonId::new("ferrobridge", "p-1").expect("a person");
-        let subject = reference_to(&person, literal("p-1"));
+        let subject = reference_to(&person, Some(literal("p-1")));
         assert_eq!(
             Some("AllergyIntolerance.patient"),
             fill_subject(&mut body, "AllergyIntolerance", Some(&subject))
@@ -312,7 +312,7 @@ mod tests {
         let named = PersonId::new("ferrobridge", "pseudonym-1").expect("a person");
         assert_eq!(
             Value::from_serde_json(serde_json::json!({ "reference": "Patient/p-1" })),
-            reference_to(&named, literal("p-1"))
+            reference_to(&named, Some(literal("p-1")))
         );
         let logical = PersonId::new("http://example.org/fhir/sid/mrn", "p-1").expect("a person");
         assert_eq!(
@@ -329,7 +329,7 @@ mod tests {
         let bare = PersonId::new("ferrobridge", "p-1").expect("a person");
         assert_eq!(
             Value::from_serde_json(serde_json::json!({ "reference": "Patient/p-1" })),
-            reference_to(&bare, literal(bare.id()))
+            reference_to(&bare, Some(literal(bare.id())))
         );
     }
 

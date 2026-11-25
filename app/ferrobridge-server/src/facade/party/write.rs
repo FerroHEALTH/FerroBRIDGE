@@ -61,13 +61,9 @@ pub(crate) async fn create(
     let built = build(facade, loaded, inbound.document()).await?;
     party::unbound(facade, resource_type, built.value())?;
     let client = facade.client_for(headers, access).await?;
-    let person = party::provision::pseudonym(
-        facade,
-        (access, &client),
-        resource_type,
-        inbound.document(),
-    )
-    .await?;
+    let person =
+        party::provision::pseudonym(facade, (access, &client), resource_type, inbound.document())
+            .await?;
     let demographic = party::demographic(&client)?;
     let commit = commit(facade, loaded, Change::Creation)?;
     let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
@@ -106,13 +102,9 @@ pub(crate) async fn update(
     let built = build(facade, loaded, inbound.document()).await?;
     party::unbound(facade, resource_type, built.value())?;
     let client = facade.client_for(headers, access).await?;
-    let person = party::provision::pseudonym(
-        facade,
-        (access, &client),
-        resource_type,
-        inbound.document(),
-    )
-    .await?;
+    let person =
+        party::provision::pseudonym(facade, (access, &client), resource_type, inbound.document())
+            .await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;

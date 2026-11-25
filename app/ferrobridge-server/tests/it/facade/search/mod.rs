@@ -40,9 +40,11 @@ use super::call;
 /// `query_execute_adhoc_query_body`).
 const AQL: &str = "/query/aql";
 
-/// The subject every case binds to [`EHR_ID`], as the identity map keys a
-/// literal reference.
+/// The subject every case binds to [`EHR_ID`], as a literal reference.
 const SUBJECT: &str = "Patient/p-1";
+
+/// The pseudonym [`SUBJECT`] names, the person the identity map keys.
+const PSEUDONYM: &str = "p-1";
 
 /// A second version container, for a second composition.
 const OTHER_CONTAINER: &str = "a1d0c6e8-0000-4000-8000-0000000000b2";
@@ -57,7 +59,7 @@ async fn searching() -> Harness {
 /// [`EHR_ID`].
 async fn searching_with(limits: Limits) -> Harness {
     let harness = super::search_harness(limits).await;
-    let person = PersonId::new("http://example.org/fhir", SUBJECT).expect("a legal person key");
+    let person = PersonId::new("http://example.org/fhir", PSEUDONYM).expect("a legal person key");
     harness
         .store
         .record_ehr(&person, &EhrId::new(EHR_ID).expect("a legal ehr_id"))

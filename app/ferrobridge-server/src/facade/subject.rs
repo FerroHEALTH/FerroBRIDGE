@@ -7,7 +7,7 @@
 //! `PARTY_REF` into an identity service (RM Common IM §4.2.1.1,
 //! <https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html>).
 //! Every subject is the patient's pseudonym in the identity source's
-//! pseudonym domain, asked over ITI-83 (PIXm 3.1.0 §2:3.83.4.1.2.2,
+//! pseudonym domain, asked over ITI-83 (`PIXm` 3.1.0 §2:3.83.4.1.2.2,
 //! <https://profiles.ihe.net/ITI/PIXm/3.1.0/ITI-83.html>), so no direct
 //! identifier reaches the CDR (GDPR Art 4(5), Art 25(1)). The `Patient`
 //! logical id is the party's `versioned_object_uid` where a `Patient` party
@@ -92,17 +92,6 @@ impl SubjectLink {
     #[must_use]
     pub fn identity(&self) -> &IdentitySource {
         &self.identity
-    }
-
-    /// Returns the subject a literal `Patient/<id>` reference names.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SubjectError::NotPatient`] for any other reference.
-    pub fn patient_of_reference(&self, literal: &str) -> Result<Subject, SubjectError> {
-        logical_id(literal)
-            .map(|id| Subject::Patient(id.to_owned()))
-            .ok_or(SubjectError::NotPatient)
     }
 
     /// Returns the person whose pseudonym is `id`.
@@ -335,10 +324,11 @@ pub fn on_behalf(access: &ferrohealth_smart::resource::Access) -> OnBehalfOf {
     })
 }
 
-/// Returns the refusal a failed pseudonym query answers with: a `422` when
-/// the identity source answered and holds no single pseudonym, a `503` when
-/// a repeat may succeed, and a `502` for any other upstream failure, each
-/// naming the upstream status it answered.
+/// Returns the refusal a failed pseudonym query answers with.
+///
+/// It is a `422` when the identity source answered and holds no single
+/// pseudonym, a `503` when a repeat may succeed, and a `502` for any other
+/// upstream failure, each naming the upstream status it answered.
 // NOTE: R4 http.html leaves an upstream failure to the server; no specification governs this:
 // our own design, never an EHR under another subject.
 #[must_use]
@@ -356,6 +346,17 @@ pub fn refused(error: &PseudonymError) -> Refused {
         _ => (StatusCode::UNPROCESSABLE_ENTITY, IssueType::Processing),
     };
     Refused::new(status, Issue::error(kind).diagnosing(text))
+}
+
+/// Returns the subject a literal `Patient/<id>` reference names.
+///
+/// # Errors
+///
+/// Returns [`SubjectError::NotPatient`] for any other reference.
+pub fn patient_of_reference(literal: &str) -> Result<Subject, SubjectError> {
+    logical_id(literal)
+        .map(|id| Subject::Patient(id.to_owned()))
+        .ok_or(SubjectError::NotPatient)
 }
 
 /// Returns the logical id of a relative `Patient/<id>` reference.

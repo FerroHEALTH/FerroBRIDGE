@@ -43,14 +43,22 @@ pub(crate) const SOURCE_DOMAIN: &str = "urn:oid:2.999.1";
 /// The identifier system of the testkit's synthetic patients.
 pub(crate) const PATIENT_SYSTEM: &str = "http://example.org/fhir/sid/ferrobridge-patient";
 
+/// The identifier system the testkit's synthetic resources name their
+/// subject in.
+pub(crate) const SUBJECT_SYSTEM: &str = "http://example.org/fhir/sid/ferrobridge-subject";
+
 /// Returns the identity source at `base` whose pseudonyms are in `domain`,
-/// accepting source identifiers in [`SOURCE_DOMAIN`], [`PATIENT_SYSTEM`] and
-/// `domain`, in that order.
+/// accepting source identifiers in [`SOURCE_DOMAIN`], [`PATIENT_SYSTEM`],
+/// [`SUBJECT_SYSTEM`] and `domain`, in that order.
 pub(crate) fn identity_source(
     base: &str,
     domain: &str,
 ) -> Arc<ferrobridge_server::identity_source::IdentitySource> {
-    identity_source_accepting(base, domain, &[SOURCE_DOMAIN, PATIENT_SYSTEM, domain])
+    identity_source_accepting(
+        base,
+        domain,
+        &[SOURCE_DOMAIN, PATIENT_SYSTEM, SUBJECT_SYSTEM, domain],
+    )
 }
 
 /// Returns the identity source at `base` whose pseudonyms are in `domain`,
@@ -96,7 +104,7 @@ pub(crate) const PSEUDONYM: &str = "synthetic-pseudonym-1";
 pub(crate) const PIX_PATH: &str = "/pix/Patient/$ihe-pix";
 
 /// Returns the ITI-83 answer naming `pseudonym` in `domain`
-/// (PIXm 3.1.0 §2:3.83.4.2.2.1).
+/// (`PIXm` 3.1.0 §2:3.83.4.2.2.1).
 pub(crate) fn pseudonym_answer(domain: &str, pseudonym: &str) -> wiremock::ResponseTemplate {
     wiremock::ResponseTemplate::new(200)
         .insert_header("Content-Type", "application/fhir+json")
@@ -115,14 +123,19 @@ pub(crate) fn pseudonym_answer(domain: &str, pseudonym: &str) -> wiremock::Respo
 /// Returns `settings` asking the identity source served by `server` under
 /// `/pix`, which answers every patient with [`PSEUDONYM`].
 pub(crate) async fn served_identity(
-    server: &wiremock::MockServer,
+    server: &MockServer,
     settings: ferrobridge_server::facade::Settings,
 ) -> ferrobridge_server::facade::Settings {
     let domain = settings.subject.namespace().to_owned();
     served_identity_accepting(
         server,
         settings,
-        &[SOURCE_DOMAIN, PATIENT_SYSTEM, domain.as_str()],
+        &[
+            SOURCE_DOMAIN,
+            PATIENT_SYSTEM,
+            SUBJECT_SYSTEM,
+            domain.as_str(),
+        ],
     )
     .await
 }
@@ -131,7 +144,7 @@ pub(crate) async fn served_identity(
 /// `/pix`, which answers every patient with [`PSEUDONYM`] and accepts source
 /// identifiers in `accepted`.
 pub(crate) async fn served_identity_accepting(
-    server: &wiremock::MockServer,
+    server: &MockServer,
     settings: ferrobridge_server::facade::Settings,
     accepted: &[&str],
 ) -> ferrobridge_server::facade::Settings {

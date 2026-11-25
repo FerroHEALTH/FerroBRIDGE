@@ -140,7 +140,7 @@ fn reference(url: &str) -> Reference {
 
 /// A synthetic imaging report document, its report coded `code` and
 /// performed by the radiology department.
-fn document(code: Option<&str>) -> Result<Document, Box<dyn Error>> {
+pub(crate) fn document(code: Option<&str>) -> Result<Document, Box<dyn Error>> {
     let mut document = Document::of(
         &IMAGING_REPORT_FORM,
         BASE,

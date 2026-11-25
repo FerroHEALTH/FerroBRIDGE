@@ -14,7 +14,7 @@ use super::refusal;
 
 /// A guarded facade the lane can record, and the state store its outbox
 /// lives in.
-const FACADE: &str = "[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
+const FACADE: &str = "[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
 
 /// The keys every complete lane names.
 const COMPLETE: &str = "endpoint.url = \"https://arr.example.org/fhir/\"\n";
@@ -43,7 +43,7 @@ fn the_audit_lane_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> 
 #[test]
 fn an_enabled_lane_resolves_every_key() -> Result<(), Box<dyn std::error::Error>> {
     let text = lane(&format!(
-        "{COMPLETE}endpoint.retry.max_backoff = \"5s\"\nsource_id = \"bridge-1\"\nsite = \"ward-4\"\n\n[audit.categories.templates]\n\"Synthetic Summary.v1\" = [\"Patient-Summaries\"]\n\"Synthetic Admin.v1\" = \"none\"\n\n[audit.categories.archetypes]\n\"openEHR-EHR-COMPOSITION.report.v1\" = [\"Laboratory-Reports\"]\n"
+        "{COMPLETE}endpoint.retry.max_backoff = \"5s\"\nsource_id = \"bridge-1\"\nsite = \"ward-4\"\n"
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let audit = settings.audit.ok_or("the lane is on")?;
@@ -53,8 +53,6 @@ fn an_enabled_lane_resolves_every_key() -> Result<(), Box<dyn std::error::Error>
     );
     assert_eq!("bridge-1", audit.source_id);
     assert_eq!(Some("ward-4"), audit.site.as_deref());
-    assert_eq!(2, audit.categories.templates().count());
-    assert_eq!(1, audit.categories.archetypes().count());
     Ok(())
 }
 
@@ -116,7 +114,7 @@ fn the_lane_needs_the_facade() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn the_lane_needs_authenticated_callers() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
-        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[audit]\nenabled = true\n{COMPLETE}"
+        "[auth]\nenabled = false\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[audit]\nenabled = true\n{COMPLETE}"
     );
     let error = refusal(&text)?;
     assert!(
@@ -185,16 +183,13 @@ fn a_cleartext_repository_is_refused_unless_accepted() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn a_category_map_naming_no_category_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+fn an_audit_categories_table_is_refused_as_an_unknown_key() {
     let text = lane(&format!(
-        "{COMPLETE}\n[audit.categories.templates]\n\"Synthetic.v1\" = [\"No-Such-Category\"]\n"
+        "{COMPLETE}\n[audit.categories.templates]\n\"Synthetic.v1\" = [\"Patient-Summaries\"]\n"
     ));
-    let error = refusal(&text)?;
-    assert!(
-        matches!(&error, Error::Categories { key, .. } if key == "audit.categories"),
-        "{error:?}"
-    );
-    Ok(())
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())
+        .expect_err("the category map is the audit-categories register");
+    assert!(matches!(error, Error::Parse { .. }), "{error:?}");
 }
 
 #[test]

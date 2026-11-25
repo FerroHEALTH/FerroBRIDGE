@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `[identity_source]` section: the PIXm Manager every EHR subject is
-//! asked of (PIXm 3.1.0 ITI-83), which the facade and the inbound engine
+//! The `[identity_source]` section: the `PIXm` Manager every EHR subject is
+//! asked of (`PIXm` 3.1.0 ITI-83), which the facade and the inbound engine
 //! both read.
 
 use ferrohealth_config::units::Duration;
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct IdentitySource {
-    /// The PIXm Manager: its FHIR base as `url`, the timeouts, the retry,
+    /// The `PIXm` Manager: its FHIR base as `url`, the timeouts, the retry,
     /// the TLS and the credentials.
     pub endpoint: EndpointSection,
     /// The identifier system of the pseudonym every EHR subject is, the

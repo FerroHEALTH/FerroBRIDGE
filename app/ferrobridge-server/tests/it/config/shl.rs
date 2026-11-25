@@ -15,7 +15,7 @@ use ferrobridge_server::config::Process;
 /// table.
 fn with_shl(shl: &str) -> String {
     format!(
-        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[facade.summary]\nenabled = true\npackages = [\"/var/lib/ferrobridge/packages\"]\noperator = \"Synthetic operator\"\n\n[shl]\n{shl}"
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[facade.summary]\nenabled = true\npackages = [\"/var/lib/ferrobridge/packages\"]\noperator = \"Synthetic operator\"\n\n[shl]\n{shl}"
     )
 }
 
@@ -69,7 +69,7 @@ fn a_lane_outside_its_limits_refuses_to_boot() {
 
 #[test]
 fn a_lane_without_the_patient_summary_refuses_to_boot() {
-    let text = "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[shl]\nenabled = true\nbase_url = \"https://b.example\"\n";
+    let text = "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[shl]\nenabled = true\nbase_url = \"https://b.example\"\n";
     let refused = resolve(text).err().unwrap_or_default();
     assert!(refused.contains("facade.summary.enabled"), "{refused}");
 }

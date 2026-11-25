@@ -714,7 +714,5 @@ pub(super) fn resolve_operator(
             needs: String::from("auth.enabled"),
         });
     }
-    Ok(operator.enabled.then(|| super::OperatorSettings {
-        mapping_dir: operator.mapping_dir.clone(),
-    }))
+    Ok(operator.enabled.then_some(super::OperatorSettings))
 }

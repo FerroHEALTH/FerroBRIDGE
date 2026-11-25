@@ -28,7 +28,7 @@ fn request<'a>(headers: &'a HeaderMap, body: &'a [u8], now: i64) -> Request<'a> 
     Request {
         headers,
         body,
-        peer_subject: None,
+        peer: None,
         now,
     }
 }
@@ -330,20 +330,27 @@ fn a_static_header_admits_only_a_listed_value() {
 }
 
 #[test]
-fn mtls_admits_only_a_listed_subject() {
-    let verifier = Verifier::Mtls(Mtls {
-        subjects: vec![String::from("CN=sender.example")],
+fn mtls_admits_only_a_certificate_carrying_a_listed_name() {
+    let key = rcgen::KeyPair::generate().expect("a key");
+    let certificate = rcgen::CertificateParams::new(vec![String::from("sender.example")])
+        .expect("parameters")
+        .self_signed(&key)
+        .expect("a certificate");
+    let der = certificate.der().clone();
+    let listed = Verifier::Mtls(Mtls {
+        subjects: vec![String::from("sender.example")],
+    });
+    let other = Verifier::Mtls(Mtls {
+        subjects: vec![String::from("someone.example")],
     });
     let map = HeaderMap::new();
-    let mut admitted = request(&map, b"", 0);
-    admitted.peer_subject = Some("CN=sender.example");
-    assert_eq!(Ok(()), verifier.verify(&admitted, &[]));
-    let mut other = request(&map, b"", 0);
-    other.peer_subject = Some("CN=someone.example");
-    assert_eq!(Err(Refused::Mismatch), verifier.verify(&other, &[]));
+    let mut presented = request(&map, b"", 0);
+    presented.peer = Some(&der);
+    assert_eq!(Ok(()), listed.verify(&presented, &[]));
+    assert_eq!(Err(Refused::Mismatch), other.verify(&presented, &[]));
     assert_eq!(
         Err(Refused::Mismatch),
-        verifier.verify(&request(&map, b"", 0), &[])
+        listed.verify(&request(&map, b"", 0), &[])
     );
 }
 

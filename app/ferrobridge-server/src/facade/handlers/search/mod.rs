@@ -339,7 +339,7 @@ async fn resolve(
                     // NOTE: no specification governs this: our own design, a reference the
                     // identity map records no person for matches none.
                     let Ok(crate::facade::subject::Subject::Patient(id)) =
-                        link.patient_of_reference(reference)
+                        crate::facade::subject::patient_of_reference(reference)
                     else {
                         continue;
                     };
@@ -375,9 +375,14 @@ async fn resolve(
                     let Ok(person) = PersonId::new(system, value) else {
                         continue;
                     };
-                    if crate::facade::subject::reference_of(link, facade.store(), &programs, &person)
-                        .await?
-                        .is_some()
+                    if crate::facade::subject::reference_of(
+                        link,
+                        facade.store(),
+                        &programs,
+                        &person,
+                    )
+                    .await?
+                    .is_some()
                     {
                         continue;
                     }

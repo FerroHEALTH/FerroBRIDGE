@@ -9,7 +9,11 @@
 //! `Composition-uv-ips` when none is named (HL7 IPS 2.0.1,
 //! `OperationDefinition/summary`). This server answers the IPS 2.0.1 form by
 //! default and the HL7 Europe Patient Summary form when `profile` names
-//! `composition-eu-eps`.
+//! `composition-eu-eps`. When `profile` names the MyHealth@EU Core 1.0.1
+//! `composition-myhealtheu-core`, it answers the HL7 Europe form, which that
+//! profile constrains, with each concept at a Core required binding
+//! translated into the binding's system on the terminology server
+//! ([`MYHEALTH_EU_CORE`]).
 //!
 //! The patient is the party the `Patient` context renders. The record is
 //! every patient summary composition of the patient's EHR, read as the
@@ -41,6 +45,8 @@ use eehrxf::mapping::MappingError;
 use eehrxf::mappings::EPS;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::validation::ValidationError;
+use eehrxf::terminology::translation::Binding;
+use eehrxf::terminology::translation::MYHEALTH_EU_CORE;
 use ferrobridge_validator::set::PackageSet;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
@@ -88,6 +94,49 @@ const IPS_VERSION: &str = "2.0.1";
 /// The version of the HL7 Europe Patient Summary guide whose
 /// `composition-eu-eps` this server writes.
 const EPS_VERSION: &str = "1.0.0-ballot";
+
+/// The canonical URL of the MyHealth@EU Core `Composition` profile.
+pub const MYHEALTH_EU_COMPOSITION: &str =
+    "http://fhir.ehdsi.eu/core/StructureDefinition/composition-myhealtheu-core";
+
+/// The version of MyHealth@EU Core whose bindings this server meets.
+const MYHEALTH_EU_VERSION: &str = "1.0.1";
+
+/// The document a `profile` input asks for: the profile it names, the form
+/// the document is written in, and the bindings its codes meet.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Requested {
+    /// The canonical URL of the `Composition` profile asked for.
+    profile: &'static str,
+    /// The form the document is written in.
+    form: &'static Form,
+    /// The value-set bindings its codes meet through the terminology server.
+    bindings: &'static [Binding],
+}
+
+impl Requested {
+    /// The IPS 2.0.1 document.
+    const IPS: Self = Self {
+        profile: IPS_COMPOSITION,
+        form: &IPS_PATIENT_SUMMARY_FORM,
+        bindings: &[],
+    };
+
+    /// The HL7 Europe Patient Summary document.
+    const EPS: Self = Self {
+        profile: EPS_COMPOSITION,
+        form: &PATIENT_SUMMARY_FORM,
+        bindings: &[],
+    };
+
+    /// The HL7 Europe Patient Summary document with the MyHealth@EU Core
+    /// bindings met.
+    const MYHEALTH_EU: Self = Self {
+        profile: MYHEALTH_EU_COMPOSITION,
+        form: &PATIENT_SUMMARY_FORM,
+        bindings: &MYHEALTH_EU_CORE,
+    };
+}
 
 /// The patient summary compositions of one EHR, every current version.
 // NOTE: AQL 1.1.0 §6 `versionPredicate`: under `VERSION [LATEST_VERSION]` no superseded or deleted
@@ -171,8 +220,8 @@ async fn summarize(
         )));
     }
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    let form = form_of(uri)?;
-    let object = document(facade, access, id, headers, form).await?;
+    let requested = requested_of(uri)?;
+    let object = document(facade, access, id, headers, requested).await?;
     Ok(reply::resource(StatusCode::OK, &object, &[]))
 }
 
@@ -190,8 +239,9 @@ pub(crate) async fn document(
     access: &Access,
     id: &str,
     headers: &HeaderMap,
-    form: &'static Form,
+    requested: Requested,
 ) -> Result<fhir_types::codec::Object, Refusal> {
+    let form = requested.form;
     let Some(summary) = facade.summary() else {
         return Err(unsupported(String::from(
             "this server serves no patient summary; GET /fhir/metadata names its operations",
@@ -205,7 +255,10 @@ pub(crate) async fn document(
     })?;
     party::party_id(PATIENT, id).map_err(|_refused| unknown(id))?;
     let client = facade.client_for(headers, access).await?;
-    let person = facade.patients(&client, access).person_of_patient(id).await?;
+    let person = facade
+        .patients(&client, access)
+        .person_of_patient(id)
+        .await?;
     let (patient, compositions) = record(facade, &client, &loaded, (id, &person)).await?;
     let timestamp = jiff::Timestamp::now().to_string();
     let base = facade.settings().base_url.trim_end_matches('/').to_owned();
@@ -213,7 +266,7 @@ pub(crate) async fn document(
         &uuid::Uuid::NAMESPACE_URL,
         format!(
             "{base}/Patient/{id}/$summary?profile={}&at={timestamp}",
-            form.composition
+            requested.profile
         )
         .as_bytes(),
     );
@@ -226,6 +279,7 @@ pub(crate) async fn document(
     let assembled = assemble::assemble(
         assemble::Inputs {
             form,
+            bindings: requested.bindings,
             base: &base,
             identifier: format!("urn:uuid:{identifier}"),
             timestamp,
@@ -272,41 +326,35 @@ async fn record(
     )
     .await?;
     let patient = patient_of(&rendered)?;
-    let compositions = match ehr::resolve(
-        client,
-        facade.store(),
-        person,
-        ehr::Policy::Existing,
-    )
-    .await
-    {
-        Ok(ehr_id) => {
-            crate::cdr::reach::touched(
-                crate::cdr::reach::Touch::Read,
-                Some(&ehr_id),
-                crate::cdr::reach::canonical(&held.value),
-            );
-            compositions(client, &ehr_id).await?
-        }
-        // NOTE: no specification governs this: our own design; a patient with no EHR has an
-        // empty record, so every section the project feeds is `nilknown`.
-        Err(ehr::EhrError::Absent { .. }) => Vec::new(),
-        Err(error) => {
-            return Err(Refusal::from(crate::facade::ingest::refusal::ehr_refusal(
-                &error,
-            )));
-        }
-    };
+    let compositions =
+        match ehr::resolve(client, facade.store(), person, ehr::Policy::Existing).await {
+            Ok(ehr_id) => {
+                crate::cdr::reach::touched(
+                    crate::cdr::reach::Touch::Read,
+                    Some(&ehr_id),
+                    crate::cdr::reach::canonical(&held.value),
+                );
+                compositions(client, &ehr_id).await?
+            }
+            // NOTE: no specification governs this: our own design; a patient with no EHR has an
+            // empty record, so every section the project feeds is `nilknown`.
+            Err(ehr::EhrError::Absent { .. }) => Vec::new(),
+            Err(error) => {
+                return Err(Refusal::from(crate::facade::ingest::refusal::ehr_refusal(
+                    &error,
+                )));
+            }
+        };
     Ok((patient, compositions))
 }
 
-/// Returns the form the `profile` input names, the IPS form when it names
-/// none.
-fn form_of(uri: &Uri) -> Result<&'static Form, Refusal> {
-    let mut form = &IPS_PATIENT_SUMMARY_FORM;
+/// Returns the document the `profile` input names, the IPS document when it
+/// names none.
+fn requested_of(uri: &Uri) -> Result<Requested, Refusal> {
+    let mut requested = Requested::IPS;
     for (name, value) in media::query_pairs(uri.query().unwrap_or_default().as_bytes()) {
         match name.as_str() {
-            "profile" => form = form_named(&value)?,
+            "profile" => requested = profile_named(&value)?,
             "identifier" => {
                 return Err(bad_request(
                     IssueType::NotSupported,
@@ -324,38 +372,40 @@ fn form_of(uri: &Uri) -> Result<&'static Form, Refusal> {
             }
         }
     }
-    Ok(form)
+    Ok(requested)
 }
 
-/// Returns the form the `profile` canonical `value` names, with or without
-/// its version.
+/// Returns the document the `profile` canonical `value` names, with or
+/// without its version.
 ///
 /// # Errors
 ///
 /// The `400` of a profile this server does not write.
-pub(crate) fn form_named(value: &str) -> Result<&'static Form, Refusal> {
+pub(crate) fn profile_named(value: &str) -> Result<Requested, Refusal> {
     let (url, version) = match value.split_once('|') {
         Some((url, version)) => (url, Some(version)),
         None => (value, None),
     };
     match (url, version) {
-        (IPS_COMPOSITION, None | Some(IPS_VERSION)) => Ok(&IPS_PATIENT_SUMMARY_FORM),
-        (EPS_COMPOSITION, None | Some(EPS_VERSION)) => Ok(&PATIENT_SUMMARY_FORM),
+        (IPS_COMPOSITION, None | Some(IPS_VERSION)) => Ok(Requested::IPS),
+        (EPS_COMPOSITION, None | Some(EPS_VERSION)) => Ok(Requested::EPS),
+        (MYHEALTH_EU_COMPOSITION, None | Some(MYHEALTH_EU_VERSION)) => Ok(Requested::MYHEALTH_EU),
         _ => Err(bad_request(
             IssueType::NotSupported,
             format!(
-                "this server writes {IPS_COMPOSITION}|{IPS_VERSION} and \
-                 {EPS_COMPOSITION}|{EPS_VERSION}, not {value}"
+                "this server writes {IPS_COMPOSITION}|{IPS_VERSION}, \
+                 {EPS_COMPOSITION}|{EPS_VERSION} and \
+                 {MYHEALTH_EU_COMPOSITION}|{MYHEALTH_EU_VERSION}, not {value}"
             ),
         )),
     }
 }
 
-/// Returns the form a patient summary is written in when none is named:
-/// IPS 2.0.1, the content specification the Yellow Button declares.
+/// Returns the document a patient summary is written as when none is
+/// named: IPS 2.0.1, the content specification the Yellow Button declares.
 #[must_use]
-pub(crate) const fn default_form() -> &'static Form {
-    &IPS_PATIENT_SUMMARY_FORM
+pub(crate) const fn default_profile() -> Requested {
+    Requested::IPS
 }
 
 /// Returns the canonical JSON of every patient summary composition the EHR

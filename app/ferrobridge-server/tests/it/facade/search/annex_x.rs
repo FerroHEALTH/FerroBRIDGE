@@ -133,8 +133,8 @@ async fn annex_x() -> Result<Harness, Box<dyn Error>> {
     let built = Facade::new(compiled, handle(&store), client(&cdr), settings());
     let catalog = ferrobridge_server::facade::search::load(directory, &built.programs())?;
     let facade = Arc::new(built.with_search(catalog, Limits::default()));
-    let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
-    store.record_ehr(&person, &EhrId::new(EHR_ID)?)?;
+    let person = PersonId::new("http://example.org/fhir", super::PSEUDONYM)?;
+    store.record_ehr(&person, &EhrId::new(EHR_ID)?).await?;
     Ok(Harness { cdr, store, facade })
 }
 

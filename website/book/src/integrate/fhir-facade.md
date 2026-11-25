@@ -377,10 +377,10 @@ outbound row for the subject, because the ingest reads the subject to find the
 EHR and the composition does not hold it. When the rendered resource has no
 `subject` (or `patient`, on a type that names its subject so), the facade
 writes it from the identity map: the person the map recorded for the
-composition's EHR, as a literal reference when the person was keyed by one in
-`subject_namespace` (`Patient/<id>` again under every `subject_id_form`), and
-otherwise as a logical reference with `type: Patient`
-and the person's `identifier`. That is the form a create reads back into the
+composition's EHR, as the literal `Patient/<id>` reference the deployment
+reads it from (the party uid the state store recorded under a `Patient` party
+context, the pseudonym otherwise), and otherwise as a logical reference with
+`type: Patient` and the person's `identifier`. That is the form a create reads back into the
 same EHR, so you can send a read body back as an update unchanged. A subject
 the mapping wrote is kept. The log line of the request counts the elements the
 facade filled and names their paths, never a value. When a required element
@@ -474,8 +474,9 @@ ITS-REST contribution so the CDR makes it atomic. The facade uses `fullUrl`
 in two places. It names each entry by its `fullUrl` in every refusal, or by
 its position when it has none. And a `subject` or
 `patient` reference whose value is another entry's `fullUrl` is read through
-that entry: the person is that entry's first `identifier` with a value, or under `subject_id_form` `logical_id` and
-`uuid` its logical id when the entry carries one. The
+that entry: the person is the pseudonym the identity source holds for that
+entry's identifier in the first accepted domain, asked once per identifier
+for the whole Bundle. The
 facade resolves no other reference. A reference is mapped as the resource
 carries it, and the facade never fetches a referenced resource from anywhere.
 Any failure answers one `OperationOutcome` naming every failing entry, and
@@ -609,8 +610,8 @@ for example `Patient` and `Practitioner` onto a `PERSON`, `PractitionerRole`
 onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
 
 - **Identity.** The id is the party's `versioned_object_uid` and
-  `meta.versionId` its version tree id; the identity map holds no entry for
-  it. One `PERSON` reads as a `Patient` and as a `Practitioner` under the same
+  `meta.versionId` its version tree id; the identity map holds only a
+  `Patient` party's pseudonym. One `PERSON` reads as a `Patient` and as a `Practitioner` under the same
   id, because FHIR scopes an id to its type.
 - **Interactions.** `read`, `vread`, `history-instance`, `create`, `update`
   (over the version `If-Match` names, or the latest) and `delete` (the latest
@@ -621,13 +622,15 @@ onto a `ROLE`, and `Organization` onto an `ORGANISATION`.
   experimental AQL demographic extension, or by `_id`, and the statement
   declares `search-type` and exactly those parameters on that type. A CDR that does not
   serve the extension answers the search with `501 not-supported`.
-- **The patient's EHR.** With `ehr_policy = "create_on_first_write"`, a
-  `Patient` create also gives the new party its EHR: the facade looks the
-  party's id up through the subject link (`subject_namespace`,
-  `subject_id_form`, `subject_type`) and creates the EHR when the CDR holds
-  none, so the clinical resources that name `Patient/<id>` find it. Under
-  `existing` the create sends no EHR call, and a `Practitioner` never gets
-  one. When the EHR call fails after the party committed, the answer is the
+- **The patient's EHR.** A `Patient` create or update first asks
+  [`[identity_source]`](../operate/configuration.md#identity_source) for the
+  pseudonym of its identifier in the first accepted domain, and refuses
+  before anything is committed when it gets none. After the commit the state
+  store records the party's id against the pseudonym, so the clinical
+  resources that name `Patient/<id>` find the EHR keyed by it. With
+  `ehr_policy = "create_on_first_write"` the facade also looks that EHR up
+  and creates it when the CDR holds none. Under `existing` the write sends no
+  EHR call, and a `Practitioner` never gets one. When the EHR call fails after the party committed, the answer is the
   EHR refusal with a warning that names the stored `Patient`.
 - **Template.** A party built against another template than the context's
   answers `404`. The template may be an ADL 1.4 OPT or an ADL 2 operational
@@ -860,9 +863,15 @@ Bundle generated on demand from the latest information the CDR holds.
   `unavailable`, with a narrative saying this server does not supply it. A
   patient with no EHR has an empty record.
 - `profile` selects the `Composition` profile: the IPS
-  `Composition-uv-ips` (2.0.1) by default, or the HL7 Europe Patient Summary
-  `composition-eu-eps` (1.0.0-ballot). Any other profile, and the
-  `identifier` input, answer `400` with `not-supported`.
+  `Composition-uv-ips` (2.0.1) by default, the HL7 Europe Patient Summary
+  `composition-eu-eps` (1.0.0-ballot), or the MyHealth@EU Core
+  `composition-myhealtheu-core` (1.0.1). The MyHealth@EU profile answers
+  the HL7 Europe form, which it constrains, and asks the terminology server
+  for the ICD-10 coding of each problem and the ATC coding of each allergen
+  (the value sets Core binds `Condition.code` and `AllergyIntolerance.code`
+  to), added beside the recorded code. A concept the server maps to neither
+  keeps its recorded codes and is counted in the log. Any other profile, and
+  the `identifier` input, answer `400` with `not-supported`.
 - Before it is served, the document is validated in process against the
   `Bundle` profile of its form over the packages `[facade.summary] packages`
   names. A document that breaks it answers `422` with the validator's

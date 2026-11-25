@@ -431,6 +431,7 @@ async fn translated(
     for (system, code) in &originals {
         for target in preferred.iter() {
             for found in terminology.translate(system, code, target).await? {
+                let found = found.coding;
                 if !transcoded.codings.contains(&found) && !added.contains(&found) {
                     added.push(found);
                 }

@@ -1,0 +1,26 @@
+eehrxf-mpd-prescription:header
+eehrxf-mpd-prescription:header.author[x]
+eehrxf-mpd-prescription:header.date
+eehrxf-mpd-prescription:header.language
+eehrxf-mpd-prescription:header.status
+eehrxf-mpd-prescription:header.statusReason[x]
+eehrxf-mpd-prescription:header.subject
+eehrxf-mpd-prescription:prescriptionItem
+eehrxf-mpd-prescription:prescriptionItem.dosageInstructions
+eehrxf-mpd-prescription:prescriptionItem.identifier
+eehrxf-mpd-prescription:prescriptionItem.indication[x]
+eehrxf-mpd-prescription:prescriptionItem.medication
+eehrxf-mpd-prescription:prescriptionItem.minimumDispenseInterval
+eehrxf-mpd-prescription:prescriptionItem.note
+eehrxf-mpd-prescription:prescriptionItem.numberOfRepeats
+eehrxf-mpd-prescription:prescriptionItem.offLabel
+eehrxf-mpd-prescription:prescriptionItem.periodOfUse
+eehrxf-mpd-prescription:prescriptionItem.quantityPrescribed
+eehrxf-mpd-prescription:prescriptionItem.status
+eehrxf-mpd-prescription:prescriptionItem.statusReason[x]
+eehrxf-mpd-prescription:prescriptionItem.substitution
+eehrxf-mpd-prescription:prescriptionItem.substitution.allowed[x]
+eehrxf-mpd-prescription:prescriptionItem.substitution.reason[x]
+eehrxf-mpd-prescription:prescriptionItem.validityPeriod
+total 25
+unmapped 4

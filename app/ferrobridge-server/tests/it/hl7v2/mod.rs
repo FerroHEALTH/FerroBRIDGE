@@ -19,22 +19,21 @@ use crate::facade::handle;
 use crate::facade::settings;
 use crate::facade::stub::Echo;
 use crate::facade::stub::mount_echo;
-use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::mllp::listener::Timeouts;
+use ferrobridge_operator_api::sources::{Kind, Write};
 use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::config::Hl7v2Settings;
-use ferrobridge_server::config::hl7v2::{Sender, Subject, Tls};
+use ferrobridge_server::config::hl7v2::Tls;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::identity::store::MemoryStore;
-use ferrobridge_server::facade::ingest::UnmappedEntries;
 use ferrobridge_server::facade::programs;
 use ferrobridge_server::hl7v2::Face;
 use ferrobridge_server::hl7v2::Listener;
 use ferrobridge_server::hl7v2::Listening;
+use ferrobridge_server::sources::{Fixed, Routes, Source};
 use ferrobridge_testkit::mllp_tls::{ClientIdentity, Pki};
 use ferrobridge_testkit::stubs::terminology;
 use ferrohealth_usage_report::window::{Counts, Window};
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -75,7 +74,7 @@ pub(crate) fn oru_r01(control_id: &str) -> Vec<u8> {
             "MSH|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925143000+0200||ORU^R01^ORU_R01|{control_id}|P|2.5.1"
         ),
         String::from(
-            "PID|1||synthetic-subject-0001^^^NORTHLAB^MR||Synthetic^Sam^^^^^L||19800101|M",
+            "PID|1||synthetic-subject-0001^^^NORTHLAB&2.999.1&ISO^MR||Synthetic^Sam^^^^^L||19800101|M",
         ),
         String::from("ORC|RE|PLC-1|FIL-1"),
         String::from(
@@ -103,7 +102,7 @@ fn adt_a01(control_id: &str) -> Vec<u8> {
         ),
         String::from("EVN||20260925143000+0200|||OP-1^Operator^Olive^^^^^^NORTHLAB"),
         String::from(
-            "PID|1||synthetic-subject-0001^^^NORTHLAB^MR||Synthetic^Sam^^^^^L||19800101|M",
+            "PID|1||synthetic-subject-0001^^^NORTHLAB&2.999.1&ISO^MR||Synthetic^Sam^^^^^L||19800101|M",
         ),
         String::from("PV1|1|I|WARD-1^ROOM-1^BED-1"),
         String::from(
@@ -236,30 +235,62 @@ pub(crate) async fn connect(
     Ok(ferrobridge_testkit::mllp_tls::connect(address, &connector).await?)
 }
 
-/// Returns the face's settings, claiming [`PROFILE`] for an Observation when
-/// `claim` is set.
-pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
-    let profiles = if claim {
-        BTreeMap::from([(String::from("Observation"), String::from(PROFILE))])
-    } else {
-        BTreeMap::new()
-    };
+/// The face's listeners and the documents of its MLLP sources, one source
+/// each.
+pub(crate) struct Lane {
+    /// The listeners.
+    pub(crate) listeners: Hl7v2Settings,
+    /// The MLLP documents.
+    pub(crate) sources: Vec<serde_json::Value>,
+}
+
+impl Lane {
+    /// Returns the document of the first source.
+    pub(crate) fn source(&mut self) -> &mut serde_json::Value {
+        &mut self.sources[0]
+    }
+
+    /// Returns the route table of the sources.
+    fn routes(&self) -> Result<Arc<dyn Routes>, Box<dyn Error>> {
+        let sources = self
+            .sources
+            .iter()
+            .enumerate()
+            .map(|(index, document)| {
+                Source::fixed(&Write {
+                    name: format!("source-{index}"),
+                    kind: Kind::Mllp,
+                    enabled: true,
+                    document: document.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Arc::new(Fixed::new(sources)))
+    }
+}
+
+/// Returns the route of `application` at `facility`, bound to the client
+/// certificate `subject` or to `networks`.
+pub(crate) fn route(
+    application: &str,
+    facility: &str,
+    subject: Option<&str>,
+    networks: &[&str],
+) -> serde_json::Value {
+    serde_json::json!({
+        "sending_application": application,
+        "sending_facility": facility,
+        "certificate_subject": subject,
+        "source_cidrs": networks,
+    })
+}
+
+/// Returns the TLS listener's settings over the test PKI.
+pub(crate) fn listeners() -> Hl7v2Settings {
     Hl7v2Settings {
         listen: "127.0.0.1:0".parse().expect("a socket address"),
-        default_charset: Charset::Ascii,
-        unmapped: UnmappedEntries::SkipAndCount,
-        ehr_policy: None,
-        profiles,
         timeouts: Timeouts::default(),
         frame_limit: 1024 * 1024,
-        log_outcomes: true,
-        facility_issuer: None,
-        senders: vec![Sender::Namespace(String::from("NORTHLAB"))],
-        devices: Vec::new(),
-        subjects: vec![Subject {
-            sender: Sender::Namespace(String::from("NORTHLAB")),
-            name: String::from(NORTHLAB_SUBJECT),
-        }],
         tls: Some(Tls {
             acceptor: ferrobridge_hl7v2::mllp::tls::acceptor(
                 PKI.server_certificate().as_bytes(),
@@ -269,6 +300,28 @@ pub(crate) fn face_settings(claim: bool) -> Hl7v2Settings {
             .expect("the acceptor builds"),
         }),
         plain: None,
+    }
+}
+
+/// Returns the face's listeners and one source routing NORTHLAB's
+/// laboratory and admission systems over its client certificate, claiming
+/// [`PROFILE`] for an Observation when `claim` is set.
+pub(crate) fn face_settings(claim: bool) -> Lane {
+    let profiles = if claim {
+        serde_json::json!({ "Observation": PROFILE })
+    } else {
+        serde_json::json!({})
+    };
+    Lane {
+        listeners: listeners(),
+        sources: vec![serde_json::json!({
+            "routes": [
+                route("LAB", "NORTHLAB", Some(NORTHLAB_SUBJECT), &[]),
+                route("ADT", "NORTHLAB", Some(NORTHLAB_SUBJECT), &[]),
+            ],
+            "profiles": profiles,
+            "log_outcomes": true,
+        })],
     }
 }
 
@@ -295,19 +348,30 @@ impl Serving {
     /// through `log` when one is given.
     async fn start(
         facade: Arc<Facade>,
-        lane: Hl7v2Settings,
+        lane: Lane,
+        log: Option<Arc<AccessLog>>,
+    ) -> Result<Self, Box<dyn Error>> {
+        let routes = lane.routes()?;
+        Self::start_routed(facade, lane.listeners, routes, log).await
+    }
+
+    /// Starts the face over `facade` on `listeners`, routing each message
+    /// through `routes`, recording each commit through `log` when one is
+    /// given.
+    async fn start_routed(
+        facade: Arc<Facade>,
+        listeners: Hl7v2Settings,
+        routes: Arc<dyn Routes>,
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, Box<dyn Error>> {
         let (terminology_server, terminology) = terminology_stub().await;
         let usage = Arc::new(ferrobridge_server::usage_report::window());
-        let face = Face::new(facade, Some(terminology), &lane)
+        let face = Face::new(facade, Some(terminology), routes)
             .with_usage(Arc::clone(&usage))
-            .with_access_log(log, lane.listen);
+            .with_access_log(log, listeners.listen);
         // A configured plain listener is the one the case drives.
-        let face = Arc::new(match lane.plain.as_ref() {
-            Some(plain) => face
-                .on_plain(plain.bind)
-                .ok_or("a face on the plain lane")?,
+        let face = Arc::new(match listeners.plain {
+            Some(bind) => face.on_plain(bind),
             None => face,
         });
         let directory = Arc::clone(face.directory());
@@ -318,7 +382,7 @@ impl Serving {
         let task = tokio::spawn(ferrobridge_server::hl7v2::serve_until(
             socket,
             face,
-            Listener::of(&lane, Duration::from_secs(10)),
+            Listener::of(&listeners, Duration::from_secs(10)),
             listening.clone(),
             async {
                 let _signal = stopped.await;
@@ -384,7 +448,7 @@ impl Running {
     /// Starts the face under `lane` over a CDR whose EHR lookup answers
     /// `lookup`.
     pub(crate) async fn start_with(
-        lane: Hl7v2Settings,
+        lane: Lane,
         lookup: ResponseTemplate,
     ) -> Result<Self, Box<dyn Error>> {
         Self::start_recorded(lane, lookup, None).await
@@ -393,7 +457,7 @@ impl Running {
     /// Starts the face under `lane` over a CDR whose EHR lookup answers
     /// `lookup`, recording each commit through `log` when one is given.
     pub(crate) async fn start_recorded(
-        lane: Hl7v2Settings,
+        lane: Lane,
         lookup: ResponseTemplate,
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, Box<dyn Error>> {
@@ -409,7 +473,20 @@ impl Running {
     /// Starts the face under `lane` over a CDR whose EHR lookup answers
     /// `lookup` and whose `ferrobridge.diagnose.v1` is `opt`.
     pub(crate) async fn start_serving(
-        lane: Hl7v2Settings,
+        lane: Lane,
+        lookup: ResponseTemplate,
+        log: Option<Arc<AccessLog>>,
+        opt: &str,
+    ) -> Result<Self, Box<dyn Error>> {
+        let routes = lane.routes()?;
+        Self::start_over((lane.listeners, routes), lookup, log, opt).await
+    }
+
+    /// Starts the face on `listeners`, routing through `routes`, over a CDR
+    /// whose EHR lookup answers `lookup` and whose
+    /// `ferrobridge.diagnose.v1` is `opt`.
+    pub(crate) async fn start_over(
+        (listeners, routes): (Hl7v2Settings, Arc<dyn Routes>),
         lookup: ResponseTemplate,
         log: Option<Arc<AccessLog>>,
         opt: &str,
@@ -442,7 +519,7 @@ impl Running {
             client(&cdr),
             settings(),
         ));
-        let serving = Serving::start(facade, lane, log).await?;
+        let serving = Serving::start_routed(facade, listeners, routes, log).await?;
         Ok(Self { cdr, serving })
     }
 
@@ -504,3 +581,4 @@ mod facility;
 mod feeder_audit;
 mod plain;
 mod relay;
+mod routes;

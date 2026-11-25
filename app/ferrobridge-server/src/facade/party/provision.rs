@@ -3,7 +3,7 @@
 
 //! The pseudonym and the EHR a `Patient` written in a party context is given.
 //!
-//! Every EHR is keyed by the patient's ITI-83 pseudonym (PIXm 3.1.0
+//! Every EHR is keyed by the patient's ITI-83 pseudonym (`PIXm` 3.1.0
 //! §2:3.83.4.1.2.2), so a `Patient` party is asked for its pseudonym by its
 //! identifier in the first accepted domain before it is committed, and the
 //! map records the party's `versioned_object_uid` against it, which a
@@ -21,11 +21,11 @@ use crate::cdr::CdrClient;
 use crate::facade::Facade;
 use crate::facade::ehr;
 use crate::facade::ehr::Policy;
+use crate::facade::identity::PersonId;
 use crate::facade::ingest::Refused;
 use crate::facade::ingest::refusal::ehr_refusal;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::identity::PersonId;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use ferrohealth_server::run::chain;

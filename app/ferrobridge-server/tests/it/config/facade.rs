@@ -4,10 +4,10 @@
 //! The `[facade]` section: off until present, its policy, its store, the
 //! identity source its subject link asks, and its refusals.
 
+use crate::support::IDENTITY_SOURCE;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
-use crate::support::IDENTITY_SOURCE;
 use std::collections::BTreeMap;
 
 #[test]
@@ -456,7 +456,9 @@ fn the_subject_link_names_the_pseudonym_domain_and_the_source_domains_in_order()
         ["urn:oid:2.999.2", "urn:oid:2.999.1"],
         link.identity().source_domains()
     );
-    let identity = settings.identity_source.ok_or("the identity source is resolved")?;
+    let identity = settings
+        .identity_source
+        .ok_or("the identity source is resolved")?;
     assert_eq!("urn:oid:2.999.9", identity.pseudonym_domain());
     Ok(())
 }

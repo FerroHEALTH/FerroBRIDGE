@@ -43,7 +43,8 @@ const SPLIT_PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobr
 /// `limits`, its subject bound to the suite's EHR.
 async fn splitting(limits: Limits) -> Harness {
     let harness = harness_built(CREATED, settings(), Some(limits)).await;
-    let person = PersonId::new("http://example.org/fhir", SUBJECT).expect("a legal person key");
+    let person =
+        PersonId::new("http://example.org/fhir", super::PSEUDONYM).expect("a legal person key");
     harness
         .store
         .record_ehr(
@@ -233,7 +234,7 @@ async fn a_code_shared_by_the_entries_of_a_page_and_its_total_is_translated_once
         translator(&terminology)?,
     )
     .await;
-    let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
+    let person = PersonId::new("http://example.org/fhir", super::PSEUDONYM)?;
     harness
         .store
         .record_ehr(&person, &EhrId::new(super::super::EHR_ID)?)

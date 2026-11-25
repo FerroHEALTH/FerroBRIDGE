@@ -146,14 +146,14 @@ async fn a_patient_is_stored_as_the_kds_person_composition_of_its_own_ehr()
     assert!(
         query.contains(&(
             String::from("subject_id"),
-            String::from("synthetic-patient-0001")
+            String::from(crate::support::PSEUDONYM)
         )),
-        "the Patient is keyed by its first identifier: {query:?}"
+        "the Patient is keyed by its pseudonym: {query:?}"
     );
     assert!(
         query.contains(&(
             String::from("subject_namespace"),
-            String::from("http://example.org/fhir/sid/ferrobridge-patient")
+            String::from(settings().subject.namespace())
         )),
         "{query:?}"
     );
@@ -234,7 +234,15 @@ async fn a_stored_kds_person_composition_reads_back_as_the_patient() -> Result<(
 async fn post_patient_with(
     resource: &serde_json::Value,
     pix: Option<ResponseTemplate>,
-) -> Result<(Harness, StatusCode, serde_json::Value, Vec<(String, String)>), Box<dyn Error>> {
+) -> Result<
+    (
+        Harness,
+        StatusCode,
+        serde_json::Value,
+        Vec<(String, String)>,
+    ),
+    Box<dyn Error>,
+> {
     let (harness, _directory) = person_harness().await?;
     if let Some(answer) = pix {
         Mock::given(matchers::method("POST"))

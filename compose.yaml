@@ -30,12 +30,19 @@
 # callers' tokens, or say the network is trusted. Each trusted server is a
 # named [auth.issuer.<name>] table naming its issuer, written in a configuration
 # file in the ./config directory beside this one, which FERROBRIDGE_CONFIG
-# names. Its audience is the facade's base_url unless the table sets one:
+# names. Its audience is the facade's base_url unless the table sets one. The
+# facade also needs the identity source (a PIXm Manager such as FerroPIX) that
+# holds each patient's pseudonym, the subject of every EHR:
 #
 #   mkdir -p config
 #   cat > config/ferrobridge.toml <<'TOML'
 #   [facade]
 #   base_url = "https://bridge.example.org/fhir"
+#
+#   [identity_source]
+#   endpoint.url = "https://pix.example.org/fhir"
+#   pseudonym_domain = "https://example.org/fhir/sid/pseudonym"
+#   source_domains = ["http://fhir.nl/fhir/NamingSystem/bsn"]
 #
 #   [auth.issuer.clinic]
 #   issuer = "https://auth.example.org/realms/clinic"
@@ -132,7 +139,6 @@ services:
       # The operator API (it needs [auth]) saves console mapping files under
       # this path, the writable volume below; it saves nothing while it is off.
       FERROBRIDGE__OPERATOR__ENABLED:
-      FERROBRIDGE__OPERATOR__MAPPING_DIR: /var/lib/ferrobridge/mappings
       # `auto` renders pretty output on a terminal and JSON otherwise.
       FERROBRIDGE__TELEMETRY__FORMAT: ${FERROBRIDGE_LOG_FORMAT:-auto}
       FERROBRIDGE__TELEMETRY__FILTER: ${FERROBRIDGE_LOG_FILTER:-info}
@@ -148,30 +154,21 @@ services:
       - cdm_url
       - cdr_password
       - terminology_password
-    # The server writes two things, each to its own volume: the usage report's
-    # state under the image's home directory (owned by its runtime user, uid
-    # 65532, so a fresh named volume there is writable), and the console's
-    # saved mapping files. No cache, no scratch file, no upload directory, and
-    # every secret is read once at boot, so the root filesystem is read-only.
+    # The server writes one thing to a volume: the usage report's state under
+    # the image's home directory (owned by its runtime user, uid 65532, so a
+    # fresh named volume there is writable). The console's saved mapping files
+    # live in the state store. No cache, no scratch file, no upload directory,
+    # and every secret is read once at boot, so the root filesystem is
+    # read-only.
     # Should a lane ever need another writable path, mount it for that path
     # alone rather than dropping this line.
     read_only: true
-    # The saved mapping files survive a restart. The container runs as
-    # 65532:65532, so create the directory and hand it over before the first
-    # `docker compose up`:
-    #
-    #   mkdir -p operator-mappings && sudo chown 65532:65532 operator-mappings
     volumes:
       - ferrobridge-state:/home/nonroot
       - type: bind
         source: ${FERROBRIDGE_CONFIG_DIR:-./config}
         target: /etc/ferrobridge
         read_only: true
-        bind:
-          create_host_path: true
-      - type: bind
-        source: ${FERROBRIDGE_OPERATOR_MAPPINGS:-./operator-mappings}
-        target: /var/lib/ferrobridge/mappings
         bind:
           create_host_path: true
     cap_drop:

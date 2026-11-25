@@ -115,14 +115,14 @@ fn medication() -> serde_json::Value {
         "id": "synthetic-product",
         "meta": {"profile": ["http://hl7.eu/fhir/mpd/StructureDefinition/Medication-eu-mpd"]},
         "code": {"coding": [{
-            "system": "http://example.org/fhir/CodeSystem/ferrobridge-products",
-            "code": "SYN-PRODUCT-0001",
-            "display": "Synthetic tablet 500 mg"
+            "system": "http://www.whocc.no/atc",
+            "code": "N02BE01",
+            "display": "paracetamol"
         }]},
         "form": {"coding": [{
-            "system": "http://example.org/fhir/CodeSystem/ferrobridge-forms",
-            "code": "SYN-TABLET",
-            "display": "Synthetic tablet"
+            "system": "http://standardterms.edqm.eu",
+            "code": "10219000",
+            "display": "Tablet"
         }]}
     })
 }

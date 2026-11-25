@@ -282,7 +282,6 @@ pub async fn subject(
     permission: Permission,
     reference: Option<&str>,
 ) -> Result<Subject, Refusal> {
-    let link = &facade.settings().subject;
     let subject = reference
         .ok_or_else(|| {
             reply::refusal(
@@ -292,7 +291,7 @@ pub async fn subject(
             )
         })
         .and_then(|literal| {
-            link.patient_of_reference(literal).map_err(|error| {
+            crate::facade::subject::patient_of_reference(literal).map_err(|error| {
                 reply::refusal(
                     StatusCode::UNPROCESSABLE_ENTITY,
                     Issue::error(IssueType::Value)
@@ -349,13 +348,15 @@ pub async fn export_context(
         .await
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
     let reference = match person.as_ref() {
-        Some(person) => crate::facade::subject::reference_of(
-            &facade.settings().subject,
-            facade.store(),
-            &facade.programs(),
-            person,
-        )
-        .await?,
+        Some(person) => {
+            crate::facade::subject::reference_of(
+                &facade.settings().subject,
+                facade.store(),
+                &facade.programs(),
+                person,
+            )
+            .await?
+        }
         None => None,
     };
     let subject = match reference {

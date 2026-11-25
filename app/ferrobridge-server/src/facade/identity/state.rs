@@ -231,11 +231,12 @@ impl Store for StateStore {
     }
 
     async fn person_of_party(&self, party: &str) -> Result<Option<PersonId>, StoreError> {
-        let row = sqlx::query("SELECT key_id, person_sealed FROM party_person WHERE party_uid = $1")
-            .bind(party)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(database)?;
+        let row =
+            sqlx::query("SELECT key_id, person_sealed FROM party_person WHERE party_uid = $1")
+                .bind(party)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(database)?;
         let Some(row) = row else {
             return Ok(None);
         };

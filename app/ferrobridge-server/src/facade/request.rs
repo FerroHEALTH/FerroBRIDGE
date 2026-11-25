@@ -244,7 +244,7 @@ impl Inbound {
             .get("reference")
             .and_then(Value::as_str)
             .ok_or(RequestError::NoSubject)?;
-        link.patient_of_reference(literal).map_err(link_error)
+        crate::facade::subject::patient_of_reference(literal).map_err(link_error)
     }
 }
 
@@ -362,7 +362,10 @@ mod tests {
         )
         .expect("the resource reads");
         let subject = named.subject(&link()).expect("a subject is named");
-        assert_eq!((String::from(MRN), String::from("p-1")), identified(&subject));
+        assert_eq!(
+            (String::from(MRN), String::from("p-1")),
+            identified(&subject)
+        );
 
         let referenced = Inbound::read(
             &body(&serde_json::json!({
@@ -373,7 +376,10 @@ mod tests {
         )
         .expect("the resource reads");
         let subject = referenced.subject(&link()).expect("a subject is named");
-        assert!(matches!(subject, Subject::Patient(ref id) if id == "p-2"), "{subject:?}");
+        assert!(
+            matches!(subject, Subject::Patient(ref id) if id == "p-2"),
+            "{subject:?}"
+        );
     }
 
     #[test]
@@ -386,7 +392,9 @@ mod tests {
             "Condition",
         )
         .expect("the resource reads");
-        let error = named.subject(&link()).expect_err("the domain is not accepted");
+        let error = named
+            .subject(&link())
+            .expect_err("the domain is not accepted");
         assert!(
             matches!(
                 error,
@@ -487,7 +495,10 @@ mod tests {
         )
         .expect("the resource reads");
         let subject = patient.subject(&link()).expect("the Patient names itself");
-        assert_eq!((String::from(MRN), String::from("p-3")), identified(&subject));
+        assert_eq!(
+            (String::from(MRN), String::from("p-3")),
+            identified(&subject)
+        );
     }
 
     #[test]

@@ -42,7 +42,7 @@ async fn sectioned() -> Harness {
     )
     .await;
     let person =
-        PersonId::new("http://example.org/fhir", super::SUBJECT).expect("a legal person key");
+        PersonId::new("http://example.org/fhir", super::PSEUDONYM).expect("a legal person key");
     harness
         .store
         .record_ehr(&person, &EhrId::new(EHR_ID).expect("a legal ehr_id"))

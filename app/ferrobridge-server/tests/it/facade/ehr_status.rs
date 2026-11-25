@@ -142,7 +142,9 @@ async fn an_anonymous_ehr_status_takes_the_subject_before_the_composition()
         .ok_or("a PUT was sent")?;
     let post = requests
         .iter()
-        .position(|request| request.method.as_str() == "POST")
+        .position(|request| {
+            request.method.as_str() == "POST" && request.url.path() != crate::support::PIX_PATH
+        })
         .ok_or("a POST was sent")?;
     assert!(
         put < post,

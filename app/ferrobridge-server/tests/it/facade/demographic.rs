@@ -280,7 +280,7 @@ async fn a_patient_creates_a_person() -> Result<(), Box<dyn Error>> {
     let requests = cdr.received_requests().await.unwrap_or_default();
     let sent = requests
         .iter()
-        .find(|request| request.method.as_str() == "POST")
+        .find(|request| request.url.path() == "/demographic/person")
         .ok_or("the CDR received the person")?;
     let sent: serde_json::Value = serde_json::from_slice(&sent.body)?;
     assert_eq!(sent["_type"], "PERSON");

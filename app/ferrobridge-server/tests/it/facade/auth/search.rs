@@ -41,7 +41,7 @@ async fn search_as(
     harness
         .store
         .record_ehr(
-            &PersonId::new("http://example.org/fhir", "Patient/p-1")?,
+            &PersonId::new("http://example.org/fhir", "p-1")?,
             &EhrId::new(EHR_ID)?,
         )
         .await?;

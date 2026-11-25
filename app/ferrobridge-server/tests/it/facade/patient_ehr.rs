@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! A `Patient` written in a party context is given the EHR its ITI-83
-//! pseudonym keys (PIXm 3.1.0 §2:3.83.4.1.2.2), found with
+//! pseudonym keys (`PIXm` 3.1.0 §2:3.83.4.1.2.2), found with
 //! `GET /ehr?subject_id=` or created with `POST /ehr` (ITS-REST 1.1.0 EHR,
 //! `ehr_get_by_subject` and `ehr_create`), when the facade creates EHRs, and
 //! the identity map records the party against that pseudonym. No
@@ -41,11 +41,11 @@ use crate::support::PSEUDONYM;
 const NAMESPACE: &str = "http://example.org/fhir";
 
 /// Returns facade settings with `policy`.
-fn linked(policy: Policy) -> Result<Settings, Box<dyn Error>> {
-    Ok(Settings {
+fn linked(policy: Policy) -> Settings {
+    Settings {
         ehr_policy: policy,
         ..settings()
-    })
+    }
 }
 
 /// Mounts `POST /demographic/{class}` answering `204` with the first version
@@ -89,7 +89,7 @@ async fn ehr_calls(cdr: &MockServer) -> Vec<(String, String, serde_json::Value)>
 
 #[tokio::test]
 async fn a_created_patient_gets_the_ehr_its_pseudonym_keys() -> Result<(), Box<dyn Error>> {
-    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
+    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)).await?;
     mount_party_create(&cdr, "person").await;
     mount_no_ehr(&cdr).await;
     mount_ehr_create(&cdr).await;
@@ -111,7 +111,9 @@ async fn a_created_patient_gets_the_ehr_its_pseudonym_keys() -> Result<(), Box<d
         "{lookup:?}"
     );
     assert!(
-        lookup.1.contains("subject_namespace=http%3A%2F%2Fexample.org%2Ffhir"),
+        lookup
+            .1
+            .contains("subject_namespace=http%3A%2F%2Fexample.org%2Ffhir"),
         "{lookup:?}"
     );
     let (_, _, status_sent) = calls
@@ -128,7 +130,7 @@ async fn a_created_patient_gets_the_ehr_its_pseudonym_keys() -> Result<(), Box<d
 
 #[tokio::test]
 async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(), Box<dyn Error>> {
-    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
+    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)).await?;
     mount_party_create(&cdr, "person").await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path("/ehr"))
@@ -156,7 +158,7 @@ async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(),
 #[tokio::test]
 async fn under_the_existing_policy_a_patient_create_sends_no_ehr_call() -> Result<(), Box<dyn Error>>
 {
-    let (cdr, facade) = harness_with(linked(Policy::Existing)?).await?;
+    let (cdr, facade) = harness_with(linked(Policy::Existing)).await?;
     mount_party_create(&cdr, "person").await;
 
     let (status, body) = call(
@@ -173,8 +175,67 @@ async fn under_the_existing_policy_a_patient_create_sends_no_ehr_call() -> Resul
 }
 
 #[tokio::test]
+async fn a_created_patient_party_is_recorded_against_its_pseudonym() -> Result<(), Box<dyn Error>> {
+    let (cdr, facade) = harness_with(linked(Policy::Existing)).await?;
+    mount_party_create(&cdr, "person").await;
+
+    let (status, body) = call(
+        app_over(&facade),
+        with_body(http::Method::POST, "/fhir/Patient", &patient())?,
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    let person = PersonId::new(NAMESPACE, PSEUDONYM)?;
+    assert_eq!(
+        Some(person.clone()),
+        facade.store().person_of_party(UID).await?
+    );
+    assert_eq!(
+        Some(String::from(UID)),
+        facade.store().party_of(&person).await?
+    );
+    let asked = cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|request| request.url.path() == crate::support::PIX_PATH)
+        .count();
+    assert_eq!(1, asked, "the pseudonym is asked once, before the commit");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_patient_with_no_accepted_identifier_is_refused_before_the_party_commit()
+-> Result<(), Box<dyn Error>> {
+    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)).await?;
+    mount_party_create(&cdr, "person").await;
+    let unaccepted = serde_json::json!({
+        "resourceType": "Patient",
+        "identifier": [{"system": "http://example.org/other", "value": "synthetic-2"}],
+        "name": [{"text": "Synthetic Person"}]
+    });
+
+    let (status, body) = call(
+        app_over(&facade),
+        with_body(http::Method::POST, "/fhir/Patient", &unaccepted)?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    let committed = cdr
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|request| request.url.path().starts_with("/demographic/person"))
+        .count();
+    assert_eq!(0, committed, "nothing reaches the CDR");
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_practitioner_create_sends_no_ehr_call() -> Result<(), Box<dyn Error>> {
-    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
+    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)).await?;
     mount_party_create(&cdr, "person").await;
     let practitioner = serde_json::json!({
         "resourceType": "Practitioner",
@@ -197,7 +258,7 @@ async fn a_practitioner_create_sends_no_ehr_call() -> Result<(), Box<dyn Error>>
 #[tokio::test]
 async fn a_refused_ehr_creation_is_a_refusal_that_names_the_stored_patient()
 -> Result<(), Box<dyn Error>> {
-    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
+    let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)).await?;
     mount_party_create(&cdr, "person").await;
     mount_no_ehr(&cdr).await;
     Mock::given(matchers::method("POST"))
@@ -276,18 +337,8 @@ async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<
     let (first_store, second_store) = (MemoryStore::default(), MemoryStore::default());
 
     let (first, second) = tokio::join!(
-        ehr::resolve(
-            &client,
-            &first_store,
-            &person,
-            Policy::CreateOnFirstWrite
-        ),
-        ehr::resolve(
-            &client,
-            &second_store,
-            &person,
-            Policy::CreateOnFirstWrite
-        ),
+        ehr::resolve(&client, &first_store, &person, Policy::CreateOnFirstWrite),
+        ehr::resolve(&client, &second_store, &person, Policy::CreateOnFirstWrite),
     );
     assert_eq!(EHR_ID, first?.as_str());
     assert_eq!(EHR_ID, second?.as_str());

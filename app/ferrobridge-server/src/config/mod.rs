@@ -23,6 +23,7 @@ mod events;
 mod fhir_outbound;
 pub mod hl7v2;
 pub mod identity_source;
+mod inbound;
 mod omop_incremental;
 mod resolve;
 pub mod section;
@@ -69,6 +70,7 @@ use section::events::Events;
 use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
 use section::identity_source::IdentitySource;
+use section::inbound::Inbound;
 use section::omop_incremental::OmopIncremental;
 use section::shl::Shl;
 use section::state::State;
@@ -165,6 +167,8 @@ pub struct Config {
     pub audit: Audit,
     /// The person's SMART Health Links, off until its section turns it on.
     pub shl: Shl,
+    /// The inbound intake, off until its section turns it on.
+    pub inbound: Inbound,
     /// Where each key came from, which the load records and no file states.
     #[serde(skip)]
     provenance: Provenance,
@@ -400,11 +404,8 @@ impl Config {
             omop_incremental: omop_incremental::resolve(self)?,
             fhir_outbound: fhir_outbound::resolve(self)?,
             shl: shl::resolve(self)?,
-            hl7v2: if self.hl7v2.enabled {
-                Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
-            } else {
-                None
-            },
+            inbound: inbound::resolve(self)?,
+            hl7v2: resolve_hl7v2(self)?,
             operations: OperationsSettings {
                 enabled: self.operations.enabled,
                 device_reference: self.operations.device_reference.clone(),
@@ -474,41 +475,20 @@ pub struct SummarySettings {
     pub operator: String,
 }
 
-/// The HL7 v2 face, resolved.
+/// The HL7 v2 face's listeners, resolved; its senders are MLLP sources.
 #[derive(Debug, Clone)]
 pub struct Hl7v2Settings {
     /// The socket address the TLS listener binds, when one runs.
     pub listen: SocketAddr,
-    /// The character set a message with an empty MSH-18 is read in.
-    pub default_charset: ferrobridge_hl7v2::decode::Charset,
-    /// What an entry no program maps does to the message.
-    pub unmapped: crate::facade::ingest::UnmappedEntries,
-    /// The EHR policy of the face, when it differs from the facade's.
-    pub ehr_policy: Option<crate::facade::ehr::Policy>,
-    /// The profile each resource type claims when the message map wrote
-    /// none, by resource type.
-    pub profiles: BTreeMap<String, String>,
     /// How long a connection and a frame may wait on the peer.
     pub timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts,
     /// The largest message one frame may carry, in bytes.
     pub frame_limit: usize,
-    /// Whether an `AE` or an `AR` also logs the counted outcomes.
-    pub log_outcomes: bool,
-    /// The issuer a facility's namespace id is written under, when one is
-    /// configured.
-    pub facility_issuer: Option<String>,
-    /// The sending facilities the face accepts; empty accepts any.
-    pub senders: Vec<hl7v2::Sender>,
-    /// The senders that are devices, whose results commit as device acts.
-    pub devices: Vec<hl7v2::Device>,
-    /// The DNS name the client certificate of each sender carries.
-    pub subjects: Vec<hl7v2::Subject>,
     /// The TLS the listener serves, requiring a client certificate; `None`
-    /// when every sender is plain, and no TLS listener runs.
+    /// when no TLS listener runs.
     pub tls: Option<hl7v2::Tls>,
-    /// The plain listener for the devices that cannot speak TLS, when one
-    /// is configured.
-    pub plain: Option<hl7v2::Plain>,
+    /// The socket address the plain listener binds, when one runs.
+    pub plain: Option<SocketAddr>,
 }
 
 /// The settings the run path holds, with every secret already read.
@@ -566,6 +546,8 @@ pub struct Settings {
     pub fhir_outbound: Option<crate::outbound::Settings>,
     /// The person's SMART Health Links, when they are served.
     pub shl: Option<crate::shl::Settings>,
+    /// The inbound intake, when it is on.
+    pub inbound: Option<crate::inbound::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.
@@ -620,12 +602,10 @@ pub struct OperationsSettings {
     pub composition_territory: Option<String>,
 }
 
-/// The operator API, resolved from `[operator]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OperatorSettings {
-    /// The writable directory console saves go to, when one is configured.
-    pub mapping_dir: Option<PathBuf>,
-}
+/// The operator API, resolved from `[operator]`: mounted, saving the
+/// console's mapping files when `[state]` is configured.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OperatorSettings;
 
 /// The derived visits a run writes before the compositions.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -248,8 +248,7 @@ where
     use anyhow::Context;
 
     let began = std::time::Instant::now();
-    let (stop, _) = tokio::sync::watch::channel(false);
-    let stop = Arc::new(stop);
+    let stop = Arc::new(tokio::sync::watch::channel(false).0);
     let signal = {
         let stop = Arc::clone(&stop);
         tokio::spawn(async move {
@@ -281,13 +280,10 @@ where
         }
         Err(error) => return Err(error),
     };
-    let followers: Vec<_> = started
-        .feeds
-        .into_iter()
-        .map(|feed| feed.spawn(&stop))
-        .collect();
+    let followers = crate::lanes::spawn_followers(started.feeds, &started.state, settings, &stop);
     let state = Arc::new(started.state.with_lanes(started.lanes));
     let delivery = state.access_log().map(|log| log.spawn());
+    listen(&state);
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let report =
         crate::usage_report::start(&settings.usage_report, state.reported(), began, ci).await;
@@ -348,6 +344,13 @@ where
     }
     signal.abort();
     Ok(())
+}
+
+/// Starts the `LISTEN` sessions of the state held in memory: the settings
+/// registers and the running mapping revision.
+fn listen(state: &crate::state::AppState) {
+    crate::settings::listen(state.registers(), state.store());
+    crate::operator::watch::spawn(state.operator(), state.store());
 }
 
 /// Serves the health routes on `listener` and retries the start after
