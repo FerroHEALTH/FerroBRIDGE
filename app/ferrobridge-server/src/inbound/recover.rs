@@ -10,19 +10,21 @@
 //! the entities changed since its cursor and marks each one's work item due.
 //! One replica runs a source's recovery under the lane lease
 //! `inbound-recover:<source id>`, and a cursor moves only under the lease
-//! generation that read it. No specification governs the recovery schedule:
-//! our own design.
+//! generation that read it. Every call goes through the source's client in
+//! [`super::clients`]. No specification governs the recovery schedule: our
+//! own design.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use secrecy::ExposeSecret as _;
+use ferrohealth_smart::client::outbound::{OutboundClient, OutboundError, SendError};
 use serde::Deserialize;
 use tokio::sync::watch;
 use uuid::Uuid;
 
+use super::clients::Clients;
 use super::event::Change;
 use super::store::{CursorError, InboxStore};
 use crate::sources::document::{Document, SecretRef, Webhook};
@@ -177,10 +179,10 @@ pub enum RecoverError {
     NoCredentials,
     /// The client certificate does not read as PEM.
     #[error("the recovery step's client certificate does not read")]
-    Identity(#[source] reqwest::Error),
+    Identity(#[source] OutboundError),
     /// The call could not be made.
     #[error("the recovery call failed")]
-    Call(#[source] reqwest::Error),
+    Call(#[source] SendError),
     /// The source answered with a failure status.
     #[error("the source answered {0}")]
     Status(http::StatusCode),
@@ -248,6 +250,8 @@ pub struct Recoverer {
     sources: Arc<Sources>,
     /// How long a recovery lease holds.
     lease: Duration,
+    /// The HTTP client of each source and credential.
+    clients: Clients,
 }
 
 impl Recoverer {
@@ -260,6 +264,7 @@ impl Recoverer {
             store,
             sources,
             lease,
+            clients: Clients::default(),
         }
     }
 
@@ -285,15 +290,17 @@ impl Recoverer {
         else {
             return Ok(false);
         };
-        let client = self.client(source, redeliver.credentials.as_ref())?;
+        let url = url::Url::parse(&redeliver.url).map_err(|_url| RecoverError::Unreadable)?;
+        let client =
+            self.clients
+                .client(&self.sources, source, redeliver.credentials.as_ref(), &url)?;
         let method = match redeliver.method {
-            CallMethod::Get => reqwest::Method::GET,
-            CallMethod::Put => reqwest::Method::PUT,
-            CallMethod::Post => reqwest::Method::POST,
+            CallMethod::Get => http::Method::GET,
+            CallMethod::Put => http::Method::PUT,
+            CallMethod::Post => http::Method::POST,
         };
         let answer = client
-            .request(method, &redeliver.url)
-            .send()
+            .send(&method, &url, |request| request)
             .await
             .map_err(RecoverError::Call)?;
         if !answer.status().is_success() {
@@ -323,7 +330,6 @@ impl Recoverer {
         };
         let mut marked = 0;
         for tenant in webhook.tenants.iter().filter(|tenant| tenant.enabled) {
-            let client = self.client(source, tenant.credentials.as_ref())?;
             for (index, poll) in reconcile.polls.iter().enumerate() {
                 let index = i32::try_from(index).unwrap_or(i32::MAX);
                 let started = jiff::Timestamp::now();
@@ -348,7 +354,17 @@ impl Recoverer {
                             )
                     }
                 };
-                let entities = fetch(&client, poll, since).await?;
+                let mut url =
+                    url::Url::parse(&poll.url).map_err(|_url| RecoverError::Unreadable)?;
+                url.query_pairs_mut()
+                    .append_pair(&poll.cursor, &since.to_string());
+                let client = self.clients.client(
+                    &self.sources,
+                    source,
+                    tenant.credentials.as_ref(),
+                    &url,
+                )?;
+                let entities = entities(&get_json(&client, &url, "application/json").await?, poll)?;
                 let change = match poll.change {
                     PollChange::Upsert => Change::Upsert,
                     PollChange::Remove => Change::Remove,
@@ -396,13 +412,15 @@ impl Recoverer {
                 .iter()
                 .find(|tenant| tenant.name == gap.tenant)
                 .and_then(|tenant| tenant.credentials.as_ref());
-            let client = self.client(source, credentials)?;
             let mut url = events_url(subscription.base.as_deref(), &gap.subscription)?;
             url.query_pairs_mut()
                 .append_pair("eventsSinceNumber", &gap.from.to_string())
                 .append_pair("eventsUntilNumber", &gap.to.to_string())
                 .append_pair("content", "id-only");
-            let body = get_json(&client, url, "application/fhir+json").await?;
+            let client = self
+                .clients
+                .client(&self.sources, source, credentials, &url)?;
+            let body = get_json(&client, &url, "application/fhir+json").await?;
             let notification =
                 super::subscription::read(&body).map_err(|_malformed| RecoverError::Unreadable)?;
             if notification.subscription != gap.subscription {
@@ -418,31 +436,6 @@ impl Recoverer {
             keeper.close(lease, generation, source.id, &gap).await?;
         }
         Ok(stored)
-    }
-
-    /// Returns a client presenting the PEM certificate and key `credentials`
-    /// names, or none.
-    fn client(
-        &self,
-        source: &Source,
-        credentials: Option<&SecretRef>,
-    ) -> Result<reqwest::Client, RecoverError> {
-        let builder = reqwest::Client::builder().timeout(Duration::from_secs(30));
-        let builder = match credentials {
-            Some(credentials) => {
-                let pem = self
-                    .sources
-                    .keys(source, std::slice::from_ref(credentials))
-                    .map_err(RecoverError::Secret)?;
-                let pem = pem
-                    .first()
-                    .map(|secret| secret.expose_secret().as_bytes().to_vec())
-                    .ok_or(RecoverError::NoCredentials)?;
-                builder.identity(reqwest::Identity::from_pem(&pem).map_err(RecoverError::Identity)?)
-            }
-            None => builder,
-        };
-        builder.build().map_err(RecoverError::Call)
     }
 
     /// Runs recovery for every webhook source on its own task until `stop`
@@ -545,14 +538,14 @@ fn events_url(base: Option<&str>, subscription: &str) -> Result<url::Url, Recove
 /// Reads the JSON answer of a `GET` of `url` accepting `accept`, refusing a
 /// failure status with the status.
 async fn get_json(
-    client: &reqwest::Client,
-    url: url::Url,
+    client: &OutboundClient,
+    url: &url::Url,
     accept: &'static str,
 ) -> Result<serde_json::Value, RecoverError> {
     let answer = client
-        .get(url)
-        .header(http::header::ACCEPT, accept)
-        .send()
+        .send(&http::Method::GET, url, |request| {
+            request.header(http::header::ACCEPT, accept)
+        })
         .await
         .map_err(RecoverError::Call)?;
     if !answer.status().is_success() {
@@ -564,16 +557,8 @@ async fn get_json(
         .map_err(|_json| RecoverError::Unreadable)
 }
 
-/// Reads the entities `poll` returns since `since`.
-async fn fetch(
-    client: &reqwest::Client,
-    poll: &Poll,
-    since: jiff::Timestamp,
-) -> Result<Vec<String>, RecoverError> {
-    let mut url = url::Url::parse(&poll.url).map_err(|_url| RecoverError::Unreadable)?;
-    url.query_pairs_mut()
-        .append_pair(&poll.cursor, &since.to_string());
-    let body = get_json(client, url, "application/json").await?;
+/// Reads the entities `poll` declares in its answer `body`.
+fn entities(body: &serde_json::Value, poll: &Poll) -> Result<Vec<String>, RecoverError> {
     let items = body
         .pointer(&poll.items)
         .and_then(serde_json::Value::as_array)
