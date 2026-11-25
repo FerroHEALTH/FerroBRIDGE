@@ -431,6 +431,7 @@ No build reads anything here.
 | `hl7.terminology` | 7.5.0 sha256 `c54ebe534cd3f2474459eaed68e54c34f09b003766605b19e5552db376f2cc42` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.extensions` | 5.3.0 sha256 `6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.terminology.r5` | 7.1.0 sha256 `473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology.r5` | 7.0.1 sha256 `f2de7264bd4a9c6771f211ee96b9952d32ab866e8b5d657884f8c375a34ffb87` | read by `scripts/vendor/hl7-validator-agreement.sh` (a dependency of `xtehr.eu.ehds.models` 0.3.0, which the MyHealth@EU Vaccination closure holds) |
 | `hl7.fhir.uv.extensions.r5` | 5.2.0 sha256 `e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.ips` | 1.1.0 sha256 `403c4141101810e924f2928287985084819d8a5cc3a62e2b3840a557129840ef` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.terminology.r4` | 5.0.0 sha256 `c863bef14eddb01d2884d8f14826b9b152f9fcef6b99e107025136af69ce2c18` | read by `scripts/vendor/hl7-validator-agreement.sh` |
