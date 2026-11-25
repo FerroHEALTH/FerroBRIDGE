@@ -8,8 +8,8 @@
 use std::error::Error;
 use std::time::Duration;
 
-use http::StatusCode;
 use ferrohealth_smart::jws::algorithm::Algorithm as Verified;
+use http::StatusCode;
 use jsonwebtoken::Algorithm;
 use jsonwebtoken::EncodingKey;
 use jsonwebtoken::Header;

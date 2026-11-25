@@ -20,10 +20,10 @@ use ferrobridge_server::smart::SmartSettings;
 use ferrohealth_smart::basic::Credential;
 use ferrohealth_smart::basic::StoreError;
 use ferrohealth_smart::config::ConfigError;
+use ferrohealth_smart::jws::algorithm::Algorithm;
 use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_smart::metadata::DiscoveryError;
 use ferrohealth_smart::resource::ResourceError;
-use ferrohealth_smart::jws::algorithm::Algorithm;
 use secrecy::SecretString;
 
 use crate::support::random_secret;
