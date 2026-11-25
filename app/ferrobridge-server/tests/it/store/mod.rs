@@ -68,18 +68,6 @@ async fn open_sealed(url: &str, lookup: &str) -> Result<Store, Box<dyn std::erro
     Ok(Store::open(&settings).await?)
 }
 
-/// A migrated store over a PostgreSQL started for the caller, kept alive
-/// beside it; `None` unless `FERROBRIDGE_E2E=1` admits the harness.
-pub(crate) async fn store()
--> Result<Option<(ferrobridge_testkit::containers::Postgres, Store)>, Box<dyn std::error::Error>> {
-    if !ferrobridge_testkit::containers::e2e_enabled() {
-        return Ok(None);
-    }
-    let postgres = ferrobridge_testkit::containers::postgres().await?;
-    let store = open(postgres.url()).await?;
-    Ok(Some((postgres, store)))
-}
-
 /// A migrated store with sealing keys over a PostgreSQL started for the
 /// caller, kept alive beside it; `None` unless `FERROBRIDGE_E2E=1` admits the
 /// harness.

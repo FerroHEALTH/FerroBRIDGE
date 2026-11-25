@@ -98,6 +98,8 @@ pub struct AppState {
     registers: Option<Arc<crate::settings::Registers>>,
     /// The inbound sources, when `[state]` is configured.
     sources: Option<Arc<crate::sources::Sources>>,
+    /// The inbound intake, when `[inbound]` is on.
+    intake: Option<Arc<crate::inbound::intake::Intake>>,
 }
 
 impl AppState {
@@ -209,6 +211,7 @@ impl AppState {
                 .map(|store| Arc::new(crate::settings::Registers::new(store))),
             store,
             sources: None,
+            intake: None,
         })
     }
 
@@ -237,6 +240,7 @@ impl AppState {
             store: None,
             registers: None,
             sources: None,
+            intake: None,
         }
     }
 
@@ -272,6 +276,19 @@ impl AppState {
     pub fn with_sources(mut self, sources: Arc<crate::sources::Sources>) -> Self {
         self.sources = Some(sources);
         self
+    }
+
+    /// Returns this state serving the inbound intake `intake`.
+    #[must_use]
+    pub fn with_intake(mut self, intake: Arc<crate::inbound::intake::Intake>) -> Self {
+        self.intake = Some(intake);
+        self
+    }
+
+    /// Returns the inbound intake, when `[inbound]` is on.
+    #[must_use]
+    pub const fn intake(&self) -> Option<&Arc<crate::inbound::intake::Intake>> {
+        self.intake.as_ref()
     }
 
     /// Returns the inbound sources, when `[state]` is configured.

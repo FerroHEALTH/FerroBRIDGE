@@ -2444,6 +2444,60 @@ and the facade's own App State and launch `Task`s live there; the change-feed
 and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
 own design on family precedent.
 
+**The inbound intake.** No specification governs an inbound patient-event
+intake: ITS-REST 1.1.0 defines no change notification in either direction
+(<https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/>), so
+the intake is our own design, built on the standard of each step. Behind
+`[inbound]`, `POST /inbound/{source}` serves every webhook source of `0008`.
+The raw body is read within the source's `limits.body_limit` and
+`[inbound] body_limit`. The source's verifier runs over the raw bytes before
+any parse, comparing in constant time over a key list: `hmac` (RFC 2104,
+SHA-256 or SHA-512, hex or base64), `standard-webhooks` (`v1` and `v1a` of
+release v1.3.0, `v2a` of its main branch with the producer's endpoint id,
+<https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md>),
+`static-header` and `mtls` (a DNS name the verified client certificate
+carries). A failure answers `401` and stores nothing. The event map selects
+the tenant, entity and stamp by JSON Pointer (RFC 6901) and the action by
+the first matching rule; a probe, an ignored event and an unserved tenant
+answer `200` unstored. The de-duplication key is the SHA-256 of the
+source's event id (`webhook-id`, CloudEvents 1.0.2 `source` and `id`) or of
+the declared fields that tell two events apart. The inbox (`0009`) is
+written before the answer, in one transaction: the event `ON CONFLICT
+(source_id, dedupe_key) DO NOTHING`, the entity's one work item moved to a
+new generation, and `pg_notify('ferrobridge_inbound', …)`. Above the
+source's `limits.max_pending`, or with the store down, the intake answers
+`503` with `Retry-After`. Workers on every replica claim due items through
+a materialized `FOR UPDATE SKIP LOCKED` selection under a lease
+(<https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE>),
+make their remote calls outside any transaction, and give the item back at
+the generation they saw, so an event that arrived during the work runs the
+item again and a fetched source ends in the same state in any arrival order.
+`limits.concurrency` bounds the remote calls in flight per source and tenant
+across replicas, one leased `inbound_slot` row per call, taken and given back
+in two short statements. Idempotence is the inbox key and the generation; the
+failure policy is ours: a network failure, `5xx`, `429` or `423` retries
+after `backoff·2^(n-1)`, capped at `max_backoff`, with jitter, until
+`max_attempts`, and every other refusal parks at once with a fixed reason
+that names no value. An operator settles a parked item (retry or discard,
+recorded with the token's subject and the reason) and replays work by
+entity or by received range through `/operator/sources/{id}/…`.
+Recovery is the receiver's job for a webhook source that retries nothing on
+its own: a source declares a `redeliver` call, made when a replica first
+leads the source and after a run of `503` answers, and `reconcile` polls
+that read the entities changed since a cursor per tenant and mark each one
+due. One replica runs a source's recovery under the lane lease
+`inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
+a transaction that fences the generation that read it. The schedule is our
+own design, since no specification governs it.
+A `fhir-subscription` source receives R4 notifications of the Subscriptions
+R5 Backport IG STU 1.1.0
+(<https://hl7.org/fhir/uv/subscriptions-backport/notifications.html>) on the
+same route, the `rest-hook` channel of the NL Generic Functions notification
+page; each event becomes one work item keyed by the subscription and its
+event number, `fhir_subscription_state` keeps each subscription's status,
+highest event and gap, and the recovery leader recovers a gap through
+`$events` (errors.html).
+
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
 `docs/VERSIONS.md`: `openehr-base`, `openehr-rm`, `openehr-its`,

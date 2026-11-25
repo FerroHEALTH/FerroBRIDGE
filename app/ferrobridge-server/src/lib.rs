@@ -469,6 +469,9 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
         .merge(operations::router(state.served_operations()));
+    if let Some(intake) = state.intake() {
+        routes = routes.merge(inbound::intake::routes(Arc::clone(intake)));
+    }
     if let Some(smart) = state.auth() {
         routes = routes.merge(smart::routes(smart, app_state));
         if let Some(links) = state.links() {
@@ -489,6 +492,7 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 smart,
             ));
             routes = routes.merge(operator::sources::routes(state.sources().cloned(), smart));
+            routes = routes.merge(operator::inbound::routes(state.intake().cloned(), smart));
         }
     }
     if let Some(mounted) = state.facade() {

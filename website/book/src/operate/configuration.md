@@ -661,6 +661,33 @@ and rename it over it.
 dir = "/run/secrets/ferrobridge-sources"
 ```
 
+### `[inbound]`
+
+The intake every inbound source shares, off until the section turns it on.
+It needs `[state]`: `POST /inbound/{source}` stores each verified event in
+the state store before it answers, and the workers on every replica apply
+the stored work ([The inbound intake](../integrate/inbound.md)). A source's
+own limits (`limits.body_limit`, `limits.concurrency`, `limits.max_pending`)
+live in its document, within these.
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `enabled` | `false` | no | Whether `/inbound/{source}` is served |
+| `body_limit` | `1048576` | no | The largest body any source may send, in bytes, at least 1; a larger one answers `413` |
+| `workers` | `4` | no | The workers on each replica, at least 1 |
+| `lease` | `60s` | no | How long a claimed work item and a slot stay held before another worker may take them; more than `0s` |
+| `backoff` | `2s` | no | The delay before the first repeat of a failed item, doubled for each repeat after it; more than `0s` |
+| `max_backoff` | `600s` | no | The longest delay between repeats, at least `backoff` |
+| `max_attempts` | `10` | no | The attempts before a failing item parks for an operator, at least 1 |
+| `idle` | `5s` | no | How long an idle worker waits for a notification before it looks for due work again; more than `0s` |
+| `recovery_tick` | `30s` | no | How often each replica looks for a source whose redelivery or reconciliation is due ([Recover what an outage lost](../integrate/inbound.md#recover-what-an-outage-lost)); more than `0s` |
+
+```toml
+[inbound]
+enabled = true
+workers = 8
+```
+
 ### `[etl]`
 
 The OMOP ETL jobs `ferrobridge etl run` and `ferrobridge etl fhir` run. Both queries are parsed and
