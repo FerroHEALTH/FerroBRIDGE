@@ -13,18 +13,18 @@ script with `--stamp`, and record the count and digest it prints.
 - Version: 9.2.0
 - Source: the guide's canonical site, http://fhir.ehdsi.eu/hdr
 - Tarball: https://build-fhir.ehdsi.eu/hdr/package.tgz
-- SHA-1 (tarball): b5f158b2af07ec4d9dd0aa349220a1e5461cabbd
-- SHA-256 (tarball): f3b649348d82c94821ef201ab9513517cfc143aa30cf623093f8772f21b93f6b
+- SHA-1 (tarball): b145e9d3ed02149b6503336292a3bb72fb1a2225
+- SHA-256 (tarball): f41a42d80ea01be9d89e8a4582f741e1dee14641fdd3b9fbb3d26e6b5905f8b0
 - Upstream license: CC0-1.0 (the `license` field of `package/package.json`)
 - Author: MyHealth@Eu (the `author` field of `package/package.json`)
 - Layout: the tarball's `package/` directory, extracted unchanged
 - Files: 68
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `525bbbac099beb266d22d9eebb2cc664c84f1cc6279aae286a8319cce82f57de`
-- Built: 20261124162202 (the `date` field of `package/package.json`), a CI build
+  `PROVENANCE.md` excluded): `30746090501bf692188da5f5d6cb4b2287d74ea1a15fb62bf9829da69dba05b7`
+- Built: 20261125081751 (the `date` field of `package/package.json`), a CI build
 - Declared dependencies (`package/package.json`): `hl7.fhir.r4.core` 4.0.1, `hl7.terminology.r4` 7.5.0, `hl7.fhir.uv.extensions.r4` 5.4.0, `hl7.fhir.uv.ips` 2.0.1, `hl7.fhir.eu.laboratory` 2.1.0, `myhealth.eu.fhir.laboratory` 9.2.0, `hl7.fhir.eu.hdr` 1.0.0, `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.eu.extensions.r4` 1.3.1, `ihe.pharm.mpd.r4` 1.0.0-comment-2, `myhealth.eu.fhir.mvc-package` 9.1.0, `myhealth.eu.fhir.core` 1.0.1, `xtehr.eu.ehds.models` 1.0.0
 - FHIR versions (`fhirVersions` of `package/package.json`): 4.0.1
-- Stamped: 2026-11-24
+- Stamped: 2026-11-25
 
 Each declared dependency is fetched beside this tree at the version named,
 except `hl7.fhir.r4.core` 4.0.1, which is read from the committed
