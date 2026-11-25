@@ -165,9 +165,9 @@ The ones to know before you deploy:
   ([running it with compose](../operate/container.md#running-it-with-compose)).
 - **A sender's client certificate leaking.** The HL7 v2 face serves MLLP
   over TLS and admits a message only on a connection whose client certificate
-  carries the `certificate_subject` of the sender its MSH-4 names, so a
-  stolen client key sends as that sender until its authority revokes it.
-  Keep the keys of `[[hl7v2.senders]]` with the senders
+  carries the `certificate_subject` of the route its MSH-3 and MSH-4 name, so
+  a stolen client key sends as that sender until its authority revokes it or
+  an operator disables its source. Keep each client key with its sender
   ([the HL7 v2 face](../operate/hl7v2-face.md)).
 - **A lost identity store or lookup key.** A lost state database makes the
   next create of a resource the CDR already holds write a second composition,

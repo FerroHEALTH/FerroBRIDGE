@@ -122,12 +122,135 @@ pub struct Route {
     pub source_cidrs: Vec<String>,
 }
 
-/// An MLLP source.
+/// What stands behind an MLLP sender.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Origin {
+    /// A system that names its clinicians.
+    #[default]
+    Clinician,
+    /// An analyser feed with no human, whose results commit as acts of the
+    /// device.
+    Device,
+}
+
+/// What an entry no program maps does to an MLLP sender's message.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Unmapped {
+    /// The entry is skipped with a typed reason, and the others commit.
+    #[default]
+    SkipAndCount,
+    /// The whole message is refused, naming every such entry.
+    Refuse,
+}
+
+impl From<Unmapped> for crate::facade::ingest::UnmappedEntries {
+    fn from(unmapped: Unmapped) -> Self {
+        match unmapped {
+            Unmapped::SkipAndCount => Self::SkipAndCount,
+            Unmapped::Refuse => Self::Refuse,
+        }
+    }
+}
+
+/// An MLLP source: the HL7 v2 senders it routes and how their messages are
+/// read and committed.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct Mllp {
     /// The routes.
     pub routes: Vec<Route>,
+    /// What stands behind the senders.
+    pub origin: Origin,
+    /// The `PARTY_REF.namespace` a device's identifiers are issued in,
+    /// required with `origin = "device"`.
+    pub device_identifier_issuer: Option<String>,
+    /// The profile each R4 resource type claims when the message map wrote
+    /// none, by resource type.
+    pub profiles: std::collections::BTreeMap<String, String>,
+    /// What an entry no program maps does to the message.
+    pub unmapped_entries: Unmapped,
+    /// The EHR policy, `existing` or `create_on_first_write`; absent, the
+    /// facade's.
+    pub ehr_policy: Option<String>,
+    /// The HL7 table 0211 code a message with an empty MSH-18 is read in.
+    pub default_charset: String,
+    /// The `DV_IDENTIFIER.issuer` of a facility's namespace id; absent, the
+    /// identifier names no issuer.
+    pub facility_identifier_issuer: Option<String>,
+    /// Whether an `AE` or an `AR` also logs the counted outcomes.
+    pub log_outcomes: bool,
+}
+
+impl Default for Mllp {
+    fn default() -> Self {
+        Self {
+            routes: Vec::new(),
+            origin: Origin::Clinician,
+            device_identifier_issuer: None,
+            profiles: std::collections::BTreeMap::new(),
+            unmapped_entries: Unmapped::SkipAndCount,
+            ehr_policy: None,
+            default_charset: String::from("ASCII"),
+            facility_identifier_issuer: None,
+            log_outcomes: false,
+        }
+    }
+}
+
+impl Mllp {
+    /// Returns the character set a message with an empty MSH-18 is read in.
+    #[must_use]
+    pub fn charset(&self) -> ferrobridge_hl7v2::decode::Charset {
+        ferrobridge_hl7v2::decode::Charset::from_code(&self.default_charset)
+            .unwrap_or(ferrobridge_hl7v2::decode::Charset::Ascii)
+    }
+
+    /// Returns the EHR policy the senders' messages commit under, `None` for
+    /// the facade's.
+    #[must_use]
+    pub fn policy(&self) -> Option<crate::facade::ehr::Policy> {
+        match self.ehr_policy.as_deref() {
+            Some("existing") => Some(crate::facade::ehr::Policy::Existing),
+            Some("create_on_first_write") => Some(crate::facade::ehr::Policy::CreateOnFirstWrite),
+            _ => None,
+        }
+    }
+
+    /// Refuses a setting that does not read.
+    fn check(&self) -> Result<(), Invalid> {
+        routes(&self.routes)?;
+        if ferrobridge_hl7v2::decode::Charset::from_code(&self.default_charset).is_none() {
+            return Err(Invalid(format!(
+                "default_charset {} is no HL7 table 0211 code",
+                self.default_charset
+            )));
+        }
+        if self.ehr_policy.is_some() && self.policy().is_none() {
+            return Err(Invalid(String::from(
+                "ehr_policy is existing or create_on_first_write",
+            )));
+        }
+        let issued = self
+            .device_identifier_issuer
+            .as_deref()
+            .is_some_and(|issuer| !issuer.is_empty());
+        if (self.origin == Origin::Device) != issued {
+            return Err(Invalid(String::from(
+                "device_identifier_issuer is named with origin = device, and only then",
+            )));
+        }
+        for (resource_type, profile) in &self.profiles {
+            if !fhir_types::r4::schema::SCHEMAS.is_resource(resource_type) {
+                return Err(Invalid(format!("{resource_type} is no R4 resource type")));
+            }
+            if url::Url::parse(profile).is_err() {
+                return Err(Invalid(format!("the profile of {resource_type} is no URL")));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// A document of one kind.
@@ -195,7 +318,7 @@ impl Document {
                 }
                 tenants(&subscription.tenants)
             }
-            Self::Mllp(mllp) => routes(&mllp.routes),
+            Self::Mllp(mllp) => mllp.check(),
         }
     }
 
