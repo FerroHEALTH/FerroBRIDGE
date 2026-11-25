@@ -117,12 +117,15 @@ impl Document {
         composition_url: &str,
     ) -> Result<Option<(String, DiagnosticReport)>, DocumentError> {
         match (self.form.report, self.report.take()) {
-            (Some(companion), Some(report)) => Ok(Some(self.report_entry(
-                companion,
-                report,
-                subject,
-                composition_url,
-            ))),
+            (Some(companion), Some(mut report)) => {
+                self.categorise_report(&mut report);
+                Ok(Some(self.report_entry(
+                    companion,
+                    report,
+                    subject,
+                    composition_url,
+                )))
+            }
             (None, None) => Ok(None),
             (Some(_), None) => Err(DocumentError::Report {
                 expected: "requires",

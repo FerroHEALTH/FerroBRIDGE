@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM EVALUATION.obstetric_summary.v1
+# (revision 1.0.1) to a FHIR R4 Observation, the draft EEHRxF Annex X data
+# group EHDSPregnancyHistory: the count of live births as LOINC 11636-8
+# ([#] Births.live), one outcome the IPS pregnancy outcome profile binds,
+# observed when the summary was last updated.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: EVALUATION.obstetric_summary.v1.Observation
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.obstetric_summary.v1
+    revision: 1.0.1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "statusCode"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "liveBirths"
+        fhir:
+          - path: "status"
+            value: "final"
+          - path: "category.coding.system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "category.coding.code"
+            value: "social-history"
+          - path: "code.coding.system"
+            value: "http://loinc.org"
+          - path: "code.coding.code"
+            value: "11636-8"
+
+  - name: "effective"
+    with:
+      fhir: "$resource.effective.as(DateTime)"
+      openehr: "$archetype/protocol[at0008]/items[at0009]"
+
+  - name: "value"
+    with:
+      fhir: "$resource.value.as(Quantity)"
+      openehr: "$archetype/data[at0001]/items[at0006]"

@@ -155,9 +155,28 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
     let Some(store) = state.store() else {
         return Ok(state);
     };
-    let sources = crate::sources::Sources::open(store, settings.secrets.as_ref())
-        .context("opening the [secrets] directory the inbound sources name")?;
-    Ok(state.with_sources(Arc::new(sources)))
+    let sources = Arc::new(
+        crate::sources::Sources::open(store, settings.secrets.as_ref())
+            .context("opening the [secrets] directory the inbound sources name")?,
+    );
+    let intake = settings.inbound.map(|inbound| {
+        // TODO(#2048): start the worker pool with the identity-feed handler.
+        crate::inbound::intake::Intake::new(
+            Arc::clone(&sources),
+            crate::inbound::store::InboxStore::new(store.pool().clone()),
+            inbound.body_limit,
+        )
+        .with_recoverer(Arc::new(crate::inbound::recover::Recoverer::new(
+            store.clone(),
+            Arc::clone(&sources),
+            inbound.workers.lease,
+        )))
+    });
+    let state = state.with_sources(sources);
+    Ok(match intake {
+        Some(intake) => state.with_intake(Arc::new(intake)),
+        None => state,
+    })
 }
 
 /// One change-feed consumer, ready to follow its source.
@@ -193,6 +212,24 @@ impl StartedFeed {
             .await;
         })
     }
+}
+
+/// Spawns every change-feed follower and the inbound recovery of `state`,
+/// each on its own task until `stop` reads `true`.
+pub(crate) fn spawn_followers(
+    feeds: Vec<StartedFeed>,
+    state: &AppState,
+    settings: &Settings,
+    stop: &tokio::sync::watch::Sender<bool>,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let (Some(recoverer), Some(inbound)) = (
+        state.intake().and_then(|intake| intake.recoverer()),
+        settings.inbound,
+    ) {
+        followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    followers
 }
 
 /// Opens the change-feed source over the state store once, and starts every
@@ -735,12 +772,13 @@ async fn build_facade(
     let owned: Vec<&str> = [
         (lane.app_state, facade::app_state::BASIC),
         (lane.launch_task, facade::launch_task::TASK),
+        (lane.endpoints.is_some(), facade::endpoint::ENDPOINT),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
     .collect();
     facade::programs::check_owned(&programs, &owned)
-        .context("checking the contexts against [facade.app_state] and [facade.launch_task]")?;
+        .context("checking the contexts against [facade.app_state], [facade.launch_task] and [facade.endpoint]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -789,6 +827,7 @@ async fn build_facade(
             .with_app_state(app_state)
             .with_launch_tasks(launch_tasks)
             .with_summary(summary)
+            .with_endpoints(lane.endpoints.clone())
             .with_cors(lane.cors.clone()),
         counts,
     ))

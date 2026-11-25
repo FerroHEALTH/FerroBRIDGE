@@ -1,0 +1,1 @@
+- The facade serves the draft EEHRxF Annex X group EHDSServiceRequest as a `ServiceRequest-eu-lab` over the published `KDS_Laborauftrag`, with its requester `Organization` and specimen, searched by the FHIR R4 base `patient` parameter.

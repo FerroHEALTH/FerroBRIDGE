@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The search of the EHDSMedicationAdministration resources: the R4
+# MedicationAdministration `patient` parameter and the time of the
+# administration as the R4 `effective-time`.
+context: ferrobridge_ehds_medication_administration.context
+patient:
+  parameters: [patient]
+parameters:
+  effective-time:
+    type: date
+    node: { class: ACTION, archetype: openEHR-EHR-ACTION.medication.v1 }
+    path: time/value

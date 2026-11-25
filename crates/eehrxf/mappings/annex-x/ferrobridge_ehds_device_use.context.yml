@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data groups
+# EHDSDeviceUse (Table 12) and EHDSDevice (Table 11), served by the facade as
+# individual resources (draft act Art 7(2), #2087): each device summary of
+# the patient summary template becomes one DeviceUseStatement with the HL7
+# Europe Patient Summary 1.0.0-ballot deviceUseStatement-eu-eps profile,
+# naming the device-eu-eps Device the run creates.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_device_use.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/eps/StructureDefinition/deviceUseStatement-eu-eps"
+    version: "1.0.0-ballot"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "EVALUATION.device_summary.v0"
+  start: "EVALUATION.device_summary.v0"

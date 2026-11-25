@@ -87,6 +87,12 @@ pub enum Change {
 pub struct DedupeKey([u8; 32]);
 
 impl DedupeKey {
+    /// Returns the key of `parts`: the SHA-256 of their JSON array.
+    #[must_use]
+    pub fn of(parts: Vec<Value>) -> Self {
+        Self(Sha256::digest(Value::Array(parts).to_string().as_bytes()).into())
+    }
+
     /// Returns the key's bytes.
     #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 32] {
@@ -238,9 +244,7 @@ impl Dedupe {
         if parts.is_empty() {
             return Err(Unreadable::Missing(Part::Dedupe));
         }
-        Ok(DedupeKey(
-            Sha256::digest(Value::Array(parts).to_string().as_bytes()).into(),
-        ))
+        Ok(DedupeKey::of(parts))
     }
 }
 

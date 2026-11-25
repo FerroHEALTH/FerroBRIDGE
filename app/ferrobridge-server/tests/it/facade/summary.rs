@@ -25,6 +25,7 @@ use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
 use ferrobridge_server::facade::subject::IdForm;
 use ferrobridge_server::facade::subject::SubjectLink;
+use ferrobridge_server::facade::summary::MYHEALTH_EU_COMPOSITION;
 use ferrobridge_server::facade::summary::Summary;
 use ferrobridge_server::terminology::Translator;
 use ferrobridge_testkit::fixtures::CKM_MEDICATION_ARCHETYPES;
@@ -509,6 +510,92 @@ async fn the_eps_profile_answers_the_hl7_europe_form() -> Result<(), Box<dyn Err
     assert_eq!(
         device["type"]["coding"][0]["system"], "http://snomed.info/sct",
         "{device}"
+    );
+    Ok(())
+}
+
+/// The ICD-10 system (MyHealth@EU Core 1.0.1 `eHDSIProblemWithExceptions`).
+const ICD_10: &str = "http://hl7.org/fhir/sid/icd-10";
+
+/// Mounts the terminology server's ICD-10 mapping of the synthetic
+/// hypertension, SNOMED CT 38341003, to I10.
+async fn mount_icd_10(term: &MockServer) {
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/r4/ConceptMap/$translate"))
+        .and(matchers::body_string_contains("38341003"))
+        .and(matchers::body_string_contains(ICD_10))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "Parameters",
+            "parameter": [
+                {"name": "result", "valueBoolean": true},
+                {"name": "match", "part": [
+                    {"name": "equivalence", "valueCode": "equivalent"},
+                    {"name": "concept", "valueCoding": {"system": ICD_10, "code": "I10"}}
+                ]}
+            ]
+        })))
+        .with_priority(1)
+        .mount(term)
+        .await;
+}
+
+/// The codings of the summary's `Condition` coded SNOMED CT 38341003.
+fn hypertension(bundle: &serde_json::Value) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
+    let conditions = of_kind(bundle, "Condition");
+    let condition = conditions
+        .iter()
+        .find(|condition| condition["code"]["coding"][0]["code"] == "38341003")
+        .ok_or("the hypertension Condition")?;
+    Ok(condition["code"]["coding"]
+        .as_array()
+        .ok_or("the hypertension codings")?
+        .clone())
+}
+
+#[tokio::test]
+async fn the_myhealth_eu_profile_adds_the_codings_its_core_bindings_take()
+-> Result<(), Box<dyn Error>> {
+    let term = MockServer::start().await;
+    let Some(harness) = harness(&term).await? else {
+        return Ok(());
+    };
+    mount_icd_10(&term).await;
+    mount_terminology(&term).await;
+    mount_record(&harness.cdr, &[composition()?]).await;
+    let (status, body) = call(
+        app_over(&harness.facade),
+        get(&format!(
+            "/fhir/Patient/{UID}/$summary?profile={MYHEALTH_EU_COMPOSITION}|1.0.1"
+        ))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(body["meta"]["profile"][0], EPS_BUNDLE);
+    emit("server-summary-myhealth-eu", &body)?;
+    let codings = hypertension(&body)?;
+    assert_eq!(
+        codings[0]["system"], "http://snomed.info/sct",
+        "{codings:?}"
+    );
+    assert!(
+        codings
+            .iter()
+            .any(|coding| coding["system"] == ICD_10 && coding["code"] == "I10"),
+        "the ICD-10 coding Core binds Condition.code to: {codings:?}"
+    );
+    let (status, body) = call(
+        app_over(&harness.facade),
+        get(&format!(
+            "/fhir/Patient/{UID}/$summary?profile={EPS_COMPOSITION}"
+        ))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert!(
+        hypertension(&body)?
+            .iter()
+            .all(|coding| coding["system"] != ICD_10),
+        "the EPS form asks for no binding's system"
     );
     Ok(())
 }

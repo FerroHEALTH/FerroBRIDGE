@@ -21,6 +21,7 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use crate::facade::search::declaration::Coded;
 use crate::facade::search::declaration::Node;
 use crate::facade::search::declaration::ParameterType;
+use crate::facade::search::declaration::Step;
 
 /// Places `path`, read under `node` (or under the composition), and returns
 /// the coded value's type for a `token`.
@@ -56,6 +57,22 @@ pub fn locate(
         });
         return Err(format!("the template holds no {wanted}"));
     }
+    let roots = match node.and_then(|node| node.step.as_ref()) {
+        None => roots,
+        Some(step) => {
+            let inner: Vec<&ResolvedNode> = roots
+                .iter()
+                .flat_map(|root| stepped(index, root, step))
+                .collect();
+            if inner.is_empty() {
+                return Err(format!(
+                    "the archetype holds no {} [{}]",
+                    step.class, step.node_id
+                ));
+            }
+            inner
+        }
+    };
     let mut answer: Option<Option<Coded>> = None;
     for root in roots {
         let placed = place(index, root, path, kind)?;
@@ -67,6 +84,29 @@ pub fn locate(
         answer = Some(placed);
     }
     answer.ok_or_else(|| String::from("the template holds no such node"))
+}
+
+/// Returns the nodes of `step` inside the archetype `root` roots, never
+/// inside an archetype slotted below it.
+fn stepped<'i>(
+    index: &'i WebTemplateIndex,
+    root: &ResolvedNode,
+    step: &Step,
+) -> Vec<&'i ResolvedNode> {
+    let base = root.aql_path().as_str();
+    index
+        .nodes()
+        .filter(|candidate| {
+            candidate.node_id() == Some(step.node_id.as_str())
+                && candidate.rm_type() == step.class
+                && candidate
+                    .aql_path()
+                    .as_str()
+                    .strip_prefix(base)
+                    .and_then(|rest| rest.strip_prefix('/'))
+                    .is_some_and(|rest| !rest.contains("[openEHR-"))
+        })
+        .collect()
 }
 
 /// Whether `path` below `root` names the instant of an RM attribute the Web
@@ -89,6 +129,20 @@ fn rm_instant(index: &WebTemplateIndex, root: &ResolvedNode, path: &str) -> bool
             }),
         _ => false,
     }
+}
+
+/// Whether `target` names a string attribute of the structural `node` the
+/// Simplified Formats write as its family, such as `EVENT_CONTEXT.location`
+/// ([`fhirconnect::engine::rm::FAMILY_TEXTS`]).
+fn family_text(node: &ResolvedNode, target: &str) -> bool {
+    target
+        .strip_prefix(node.aql_path().as_str())
+        .and_then(|rest| rest.strip_prefix('/'))
+        .is_some_and(|attribute| {
+            fhirconnect::engine::rm::FAMILY_TEXTS
+                .iter()
+                .any(|&(class, held)| class == node.rm_type() && held == attribute)
+        })
 }
 
 /// Places `path` under one placement `root` of the bound node.
@@ -140,6 +194,7 @@ fn place(
                 )),
             }
         }
+        ParameterType::String if family_text(value, &target) => Ok(None),
         ParameterType::String | ParameterType::Date => {
             if value.rm_type().starts_with("DV_") {
                 Ok(None)
@@ -189,6 +244,7 @@ pub fn placement(index: &WebTemplateIndex, archetype: &str) -> Option<Placement>
         entry: Node {
             class: first.rm_type().to_owned(),
             archetype: archetype.to_owned(),
+            step: None,
         },
         top_level: placed.iter().all(|node| top.contains(node.flat_id())),
     })

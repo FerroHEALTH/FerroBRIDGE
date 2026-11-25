@@ -72,6 +72,10 @@ const DOCUMENT_DEFINITION: &str = "http://hl7.org/fhir/OperationDefinition/Compo
 /// (<https://hl7.org/fhir/R4/capabilitystatement.html>).
 const RESOURCE_INTERACTIONS: [&str; 4] = ["create", "read", "vread", "update"];
 
+/// The interactions of [`RESOURCE_INTERACTIONS`] a type whose programs only
+/// read keeps.
+const READ_INTERACTIONS: [&str; 2] = ["read", "vread"];
+
 /// The type-level interactions a type only a `reference` mapping creates
 /// answers.
 const CREATED_INTERACTIONS: [&str; 2] = ["read", "vread"];
@@ -417,7 +421,7 @@ fn resources(
         .resource_types()
         .into_iter()
         .map(|name| {
-            let entry = resource(&name, search, chains);
+            let entry = resource(&name, search, chains, programs.read_only(&name));
             (name, entry)
         })
         .collect();
@@ -557,13 +561,23 @@ pub fn declared_params(
         .collect()
 }
 
-/// Returns the `rest.resource` entry of one supported type.
-fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatementRestResource {
+/// Returns the `rest.resource` entry of one supported type, which declares
+/// no write when every program of the type only reads.
+fn resource(
+    name: &str,
+    search: &Catalog,
+    chains: Chains,
+    read_only: bool,
+) -> CapabilityStatementRestResource {
     let surface = search.surface(name);
     let searched = surface.as_ref().map(|_surface| SEARCH_INTERACTION);
+    let interacting = RESOURCE_INTERACTIONS
+        .iter()
+        .copied()
+        .filter(|code| !read_only || READ_INTERACTIONS.contains(code));
     CapabilityStatementRestResource {
         r#type: name.into(),
-        interaction: interactions(RESOURCE_INTERACTIONS.iter().copied().chain(searched)),
+        interaction: interactions(interacting.chain(searched)),
         search_param: surface
             .map(|surface| search_params(name, &surface, chains))
             .unwrap_or_default(),

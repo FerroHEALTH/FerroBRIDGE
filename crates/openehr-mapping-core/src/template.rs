@@ -416,6 +416,18 @@ pub enum PathError {
         /// The template.
         template_id: String,
     },
+    /// The name of a structural node does not write into the built
+    /// instance.
+    #[error("the name at `{path}` does not write into the instance built against `{template_id}`")]
+    NameWrite {
+        /// The template.
+        template_id: String,
+        /// The path of the name.
+        path: String,
+        /// Why the write was refused.
+        #[source]
+        source: Box<openehr_rm::v1_2::paths::write::SetPathError>,
+    },
     /// The built composition does not validate against its template.
     #[error("the composition does not validate against `{template_id}`: {}", messages.join("; "))]
     InvalidComposition {
@@ -485,6 +497,7 @@ impl PathError {
             | Self::InstanceIndex { .. }
             | Self::CompositionFlatten { .. }
             | Self::InvalidComposition { .. }
+            | Self::NameWrite { .. }
             | Self::NotComposition { .. }
             | Self::UntypedAlternative { .. }
             | Self::TemplateMismatch { .. } => DiagnosticCode::InvalidComposition,

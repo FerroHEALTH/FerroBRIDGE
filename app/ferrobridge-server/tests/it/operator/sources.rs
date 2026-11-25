@@ -75,7 +75,9 @@ fn webhook(name: &str, enabled: bool, tenants: &[&str]) -> serde_json::Value {
         "kind": "webhook",
         "enabled": enabled,
         "document": {
-            "verify": {"scheme": "hmac-sha256", "header": "X-Signature", "keys": [{"secret": "webhook-key"}]},
+            "verify": {"kind": "hmac", "header": "X-Signature"},
+            "keys": [{"secret": "webhook-key"}],
+            "events": {"tenant": "/tenant", "entity": "/id", "dedupe": {"pointers": ["/id"]}},
             "tenants": tenants.iter().map(|tenant| json!({
                 "tenant": tenant,
                 "identifier_system": format!("urn:example:{tenant}")

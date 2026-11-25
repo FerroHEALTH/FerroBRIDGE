@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's party context for the draft EEHRxF Annex X data group
+# EHDSOrganisation (Table 25): the HL7 Europe Base and Core 2.0.1
+# organization-eu-core profile over the testkit's ORGANISATION template,
+# through the Demographic API.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_organisation.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/organization-eu-core"
+    version: "2.0.1"
+  template:
+    id: "ferrobridge.organisation.v1"
+  archetypes:
+    - "ferrobridge_ehds_organisation"
+  start: "ferrobridge_ehds_organisation"

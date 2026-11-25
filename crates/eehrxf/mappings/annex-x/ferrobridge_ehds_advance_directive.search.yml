@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The search of the EHDSAdvanceDirective Consents: the R4 Consent `patient`
+# parameter, the scope `adr` the mapping writes as a constant, which a
+# Consent search names to reach the advance directives beside the access
+# directives, and the time the directive was last updated as the R4 `date`.
+context: ferrobridge_ehds_advance_directive.context
+patient:
+  parameters: [patient]
+parameters:
+  scope:
+    type: token
+    fixed:
+      system: "http://terminology.hl7.org/CodeSystem/consentscope"
+      code: adr
+  date:
+    type: date
+    node: { class: EVALUATION, archetype: openEHR-EHR-EVALUATION.advance_care_directive.v2 }
+    path: protocol[at0010]/items[at0055]/value/value

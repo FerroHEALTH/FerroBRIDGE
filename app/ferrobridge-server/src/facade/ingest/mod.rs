@@ -599,13 +599,14 @@ impl<'a> Ingest<'a> {
 ///
 /// Returns a `422` [`Refused`] located at `Resource.meta.profile` when no
 /// program, or more than one, answers; an ambiguous choice lists the
-/// candidates the `templateId` pin can name.
+/// candidates the `templateId` pin can name. A program that only reads
+/// ([`Loaded::read_only`]) answers `405`.
 pub fn select<'p>(
     programs: &'p Programs,
     inbound: &Inbound,
     pin: Option<&TemplateId>,
 ) -> Result<&'p Loaded, Refused> {
-    programs.select(inbound.profiles(), pin).map_err(|error| {
+    let selected = programs.select(inbound.profiles(), pin).map_err(|error| {
         let candidates = programs.candidates(inbound.profiles());
         let issue = if candidates.len() > 1 {
             Issue::error(IssueType::NotSupported).diagnosing(format!(
@@ -620,7 +621,19 @@ pub fn select<'p>(
             StatusCode::UNPROCESSABLE_ENTITY,
             issue.at("Resource.meta.profile"),
         )
-    })
+    })?;
+    if selected.read_only() {
+        return Err(Refused::new(
+            StatusCode::METHOD_NOT_ALLOWED,
+            Issue::error(IssueType::NotSupported).diagnosing(format!(
+                "the context {} derives {} from the record and writes nothing into openEHR, so \
+                 the resource is read-only",
+                selected.program().context().as_str(),
+                selected.program().resource().as_str()
+            )),
+        ));
+    }
+    Ok(selected)
 }
 
 /// Why the composition the CDR returned cannot stand as the stored one.

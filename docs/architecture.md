@@ -1119,7 +1119,18 @@ expression is a load error: the reference CDR's connector let `where()` and
   the profile HL7 Europe Base and Core 2.0.1 gives the group and the IHE
   QEDm 3.0.0 PCC-44 searches of its option as a search declaration beside
   it (#2087). A date search may read `ACTION.time` and `HISTORY.origin`,
-  which the RM defines and the Web Template leaves out.
+  which the RM defines and the Web Template leaves out, and a string search
+  `EVENT_CONTEXT.location`. Two contexts of one type may share a template
+  when each starts at an archetype of its own. A context whose mappings all
+  run openEHR to FHIR, such as the Location derived from an encounter's
+  context, is read-only: a write answers `405`. A `Consent` search without
+  `scope` answers the access directives and then the mapped advance
+  directives (scope `adr`) as one paged searchset, a `scope` picks the
+  lane its code names, and a read reaches the access directives for their
+  64-hex-digit id and the mapped lane for any other. A `patient-eu-core` party
+  write refuses an identifier without a type, as draft Annex X gives
+  `EHDSPatient.identifier.type` 1..1. Each of these is FerroBRIDGE's own
+  design.
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a
@@ -1265,9 +1276,22 @@ exchange format (Article 15), whose content the Commission fixes by
 implementing act. The regulation applies from 2027-03-26, with the exchange
 obligations phased by category group from 2029-03-26 and 2031-03-26
 (Article 105). The implementing act for the format is a planned initiative
-(`PLAN/2026/837`, published 2026-03-30, adoption due 2027-03-26) with no
-published draft on 2026-09-12, so **no profile version is legally pinned**,
-and every target below is a candidate, never a conformance claim. The HL7
+(`PLAN/2026/837`, published 2026-03-30, adoption due 2027-03-26). Its
+draft was published for feedback on 2026-11-23 (Have your say initiative
+17512, vendored under `docs/specs/ehds-eehrxf-draft/`): **the draft is the
+authority for the data sets** (Annexes III to X) and **the Xt-EHR models
+1.0.0 are the logical model the `eehrxf` crate reads** until the
+implementation guide the draft's Art 9 promises for 2027-10-31 is
+published. `eehrxf::draft` crosswalks every annex element to its Xt-EHR
+element, and where the two differ the draft leads. Its Art 6 is the coding
+rule the component follows: a code goes out as recorded, a translation the
+terminology server states `equivalent` or `equal` is added beside it with
+the concept map that made it (`elementSource`) and its equivalence in the
+translator's record, and a code no map covers goes out with its English
+designation from `$lookup` when the content is not in English, the gap
+counted. Value maps come only from the terminology server. The draft names no
+profile package, so **no profile version is legally pinned**, and every
+target below is a candidate, never a conformance claim. The HL7
 Europe implementation guides are the current best proxy for the format, and
 every category has an R4 line, so the R4 pin costs nothing (read 2026-09-12
 from each guide's `package-list.json` and `ImplementationGuide` resource):
@@ -2443,6 +2467,60 @@ stored as an HMAC under. The identity map (section 9), the SMART Health Links
 and the facade's own App State and launch `Task`s live there; the change-feed
 and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
 own design on family precedent.
+
+**The inbound intake.** No specification governs an inbound patient-event
+intake: ITS-REST 1.1.0 defines no change notification in either direction
+(<https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/>), so
+the intake is our own design, built on the standard of each step. Behind
+`[inbound]`, `POST /inbound/{source}` serves every webhook source of `0008`.
+The raw body is read within the source's `limits.body_limit` and
+`[inbound] body_limit`. The source's verifier runs over the raw bytes before
+any parse, comparing in constant time over a key list: `hmac` (RFC 2104,
+SHA-256 or SHA-512, hex or base64), `standard-webhooks` (`v1` and `v1a` of
+release v1.3.0, `v2a` of its main branch with the producer's endpoint id,
+<https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md>),
+`static-header` and `mtls` (a DNS name the verified client certificate
+carries). A failure answers `401` and stores nothing. The event map selects
+the tenant, entity and stamp by JSON Pointer (RFC 6901) and the action by
+the first matching rule; a probe, an ignored event and an unserved tenant
+answer `200` unstored. The de-duplication key is the SHA-256 of the
+source's event id (`webhook-id`, CloudEvents 1.0.2 `source` and `id`) or of
+the declared fields that tell two events apart. The inbox (`0009`) is
+written before the answer, in one transaction: the event `ON CONFLICT
+(source_id, dedupe_key) DO NOTHING`, the entity's one work item moved to a
+new generation, and `pg_notify('ferrobridge_inbound', …)`. Above the
+source's `limits.max_pending`, or with the store down, the intake answers
+`503` with `Retry-After`. Workers on every replica claim due items through
+a materialized `FOR UPDATE SKIP LOCKED` selection under a lease
+(<https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE>),
+make their remote calls outside any transaction, and give the item back at
+the generation they saw, so an event that arrived during the work runs the
+item again and a fetched source ends in the same state in any arrival order.
+`limits.concurrency` bounds the remote calls in flight per source and tenant
+across replicas, one leased `inbound_slot` row per call, taken and given back
+in two short statements. Idempotence is the inbox key and the generation; the
+failure policy is ours: a network failure, `5xx`, `429` or `423` retries
+after `backoff·2^(n-1)`, capped at `max_backoff`, with jitter, until
+`max_attempts`, and every other refusal parks at once with a fixed reason
+that names no value. An operator settles a parked item (retry or discard,
+recorded with the token's subject and the reason) and replays work by
+entity or by received range through `/operator/sources/{id}/…`.
+Recovery is the receiver's job for a webhook source that retries nothing on
+its own: a source declares a `redeliver` call, made when a replica first
+leads the source and after a run of `503` answers, and `reconcile` polls
+that read the entities changed since a cursor per tenant and mark each one
+due. One replica runs a source's recovery under the lane lease
+`inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
+a transaction that fences the generation that read it. The schedule is our
+own design, since no specification governs it.
+A `fhir-subscription` source receives R4 notifications of the Subscriptions
+R5 Backport IG STU 1.1.0
+(<https://hl7.org/fhir/uv/subscriptions-backport/notifications.html>) on the
+same route, the `rest-hook` channel of the NL Generic Functions notification
+page; each event becomes one work item keyed by the subscription and its
+event number, `fhir_subscription_state` keeps each subscription's status,
+highest event and gap, and the recovery leader recovers a gap through
+`$events` (errors.html).
 
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in

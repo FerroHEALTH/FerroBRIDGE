@@ -21,6 +21,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use fhirconnect::model::ast::keyword::Direction;
 use fhirconnect::model::load::MappingSet;
 use fhirconnect::resolve::program::Program;
 use fhirconnect::resolve::program::binding::TemplateId;
@@ -156,6 +157,21 @@ impl Loaded {
     pub fn index(&self) -> &Arc<WebTemplateIndex> {
         &self.index
     }
+
+    /// Whether the program only reads: every mapping of its context is
+    /// `unidirectional: openehr->fhir`, so it writes nothing into openEHR and
+    /// a write of its resource would commit a composition holding none of
+    /// it (FHIRconnect `basics/body.adoc`, `unidirectional`; no specification
+    /// governs the refusal: our own design).
+    #[must_use]
+    pub fn read_only(&self) -> bool {
+        !self.program.mappings().is_empty()
+            && self
+                .program
+                .mappings()
+                .iter()
+                .all(|mapping| mapping.direction() == Some(Direction::OpenehrToFhir))
+    }
 }
 
 /// Every program this deployment loaded.
@@ -245,6 +261,18 @@ impl Programs {
             .iter()
             .map(|entry| String::from(entry.program.resource().as_str()))
             .collect()
+    }
+
+    /// Whether a program maps `resource_type` and every program that maps it
+    /// only reads ([`Loaded::read_only`]).
+    #[must_use]
+    pub fn read_only(&self, resource_type: &str) -> bool {
+        let mut mapping = self
+            .loaded
+            .iter()
+            .filter(|entry| entry.program.resource().as_str() == resource_type)
+            .peekable();
+        mapping.peek().is_some() && mapping.all(Loaded::read_only)
     }
 
     /// Whether any program maps `resource_type`.

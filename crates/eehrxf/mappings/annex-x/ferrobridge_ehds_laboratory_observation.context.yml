@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSLaboratoryObservation (Table 19), served by the facade as an individual
+# resource (draft act Art 7(2), #2087): each analyte of a laboratory result
+# in the published KDS_Laborbericht template becomes one Observation with the
+# HL7 Europe Laboratory Report 2.0.0 Observation-resultslab-eu-lab profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_laboratory_observation.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab"
+    version: "2.0.0"
+  template:
+    id: "KDS_Laborbericht"
+  archetypes:
+    - "CLUSTER.laboratory_test_analyte.v1"
+  extensions:
+    - "ferrobridge_eu_laboratory_analyte"
+  start: "CLUSTER.laboratory_test_analyte.v1"

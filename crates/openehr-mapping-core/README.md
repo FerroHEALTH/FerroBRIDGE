@@ -46,10 +46,10 @@ uses it:
 
 ```toml
 [dependencies]
-openehr-mapping-core = "0.5"
+openehr-mapping-core = "0.6"
 ```
 
-Name a patch (`"0.5.N"`) when you need the first release that carries what
+Name a patch (`"0.6.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## Licence

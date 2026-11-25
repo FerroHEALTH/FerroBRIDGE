@@ -1,0 +1,96 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's EHDS medication administration template over published CKM
+-- archetypes (fixtures/ckm/medication): an encounter COMPOSITION holding the
+-- ACTION.medication.v1 of a medication administration, its amount slot
+-- filled with CLUSTER.dosage.v2 by a template overlay. The administration has
+-- a template of its own because the EHDS record template holds the same
+-- archetype for an immunisation, and a template overlay leaves no trace in
+-- the data that would tell the two apart. No specification governs this
+-- template: our own design for the Annex X facade resources. Node
+-- identifiers are at-coded, the ADL 1.4 codes of the CKM sources.
+
+template (adl_version=2.4.0; rm_release=1.1.0)
+    openEHR-EHR-COMPOSITION.ferrobridge_ehds_administration.v1.0.0
+
+specialize
+    openEHR-EHR-COMPOSITION.encounter.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The medication administrations FerroBRIDGE serves as draft EEHRxF Annex X resources.">
+        >
+    >
+
+definition
+    COMPOSITION[at0000.1] matches {
+        content matches {
+            use_archetype ACTION[at0000.2, openEHR-EHR-ACTION.medication-ferrobridge_administration.v1] occurrences matches {0..*}
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"EHDS medication administration">
+                description = <"One medication administration of the draft EEHRxF Annex X data group EHDSMedicationAdministration.">
+            >
+            ["at0000.2"] = <
+                text = <"Medication administration">
+                description = <"The administration of a medicine a MedicationAdministration carries, with its dosage.">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-ACTION.medication-ferrobridge_administration.v1.0.0
+
+specialize
+    openEHR-EHR-ACTION.medication.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The medication administrations FerroBRIDGE serves as draft EEHRxF Annex X resources.">
+        >
+    >
+
+definition
+    ACTION[at0000.1] matches {
+        /description[at0017]/items matches {
+            use_archetype CLUSTER[at0131.1, openEHR-EHR-CLUSTER.dosage.v2]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Medication administration">
+                description = <"Medication administration">
+            >
+            ["at0131.1"] = <
+                text = <"Amount">
+                description = <"Amount">
+            >
+        >
+    >

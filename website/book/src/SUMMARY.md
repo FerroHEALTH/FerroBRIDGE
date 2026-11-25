@@ -27,6 +27,7 @@
   - [The Yellow Button API](integrate/yellow-button.md)
 - [The FHIRconnect operations](integrate/operations.md)
 - [The OMOP ETL](integrate/omop-etl.md)
+- [The inbound intake](integrate/inbound.md)
 - [The change feed](integrate/change-feed.md)
   - [The events lane](integrate/events.md)
   - [The outbound FHIR lane](integrate/fhir-outbound.md)
