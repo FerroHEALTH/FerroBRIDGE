@@ -12,10 +12,12 @@
 
 use std::error::Error;
 
+use eehrxf::category::{Category, PRIORITY_SYSTEM};
 #[cfg(feature = "laboratory")]
 use eehrxf::document::metadata::Header;
 use eehrxf::document::metadata::{
-    Attestation, COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, DocumentMetadata, FHIR_JSON,
+    Attestation, COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, DocumentMetadata,
+    EEHRXF_MHD_DOCUMENT_REFERENCE, FHIR_JSON,
 };
 use eehrxf::document::{Document, DocumentError, LOINC};
 #[cfg(feature = "laboratory")]
@@ -41,6 +43,19 @@ fn category(code: &str) -> CodeableConcept {
     }
 }
 
+/// The Art 14(1) priority category of the LOINC document category `code`.
+fn priority(code: &str) -> Option<Category> {
+    match code {
+        #[cfg(feature = "laboratory")]
+        "11502-2" => Some(Category::Laboratory),
+        #[cfg(feature = "imaging")]
+        "18748-4" => Some(Category::Imaging),
+        #[cfg(feature = "discharge")]
+        "34105-7" => Some(Category::Discharge),
+        _ => None,
+    }
+}
+
 /// The metadata of a synthetic composition in the category `code`.
 fn metadata(code: &str) -> Result<DocumentMetadata, DocumentError> {
     let composition = json!({
@@ -52,7 +67,7 @@ fn metadata(code: &str) -> Result<DocumentMetadata, DocumentError> {
         }
     });
     Ok(
-        DocumentMetadata::from_composition(&composition, category(code))?
+        DocumentMetadata::from_composition(&composition, category(code), priority(code))?
             .with_event_category(category("26436-6"))
             .with_service_specialty(category("394915009"))
             .with_attestation(Attestation::new(
@@ -96,9 +111,24 @@ fn holds_table_1(metadata: &DocumentMetadata, bundle: &Bundle) -> Result<(), Box
     assert_eq!(reference["description"], composition["title"]);
     assert_eq!(reference["status"], "current");
     assert_eq!(reference["docStatus"], composition["status"]);
+    // EehrxfMhdDocumentReference: the claim, one category holding the Annex III
+    // documentCategory and the Art 14(1) priority category, a custodian and the format.
     assert_eq!(
-        reference["category"][0],
-        serde_json::to_value(metadata.category())?
+        reference["meta"]["profile"][0],
+        EEHRXF_MHD_DOCUMENT_REFERENCE
+    );
+    assert_eq!(reference["category"].as_array().map(Vec::len), Some(1));
+    let codings = &reference["category"][0]["coding"];
+    assert_eq!(
+        codings[0],
+        serde_json::to_value(&metadata.category().coding[0])?
+    );
+    assert_eq!(codings[1]["system"], PRIORITY_SYSTEM);
+    assert!(codings[1]["code"].is_string());
+    assert_eq!(reference["custodian"], composition["custodian"]);
+    assert_eq!(
+        reference["content"][0]["format"]["code"],
+        bundle["meta"]["profile"][0]
     );
     assert_eq!(extension(&reference, DOCUMENT_REFERENCE_VERSION), Some("2"));
     assert_eq!(
@@ -126,13 +156,19 @@ fn extension<'a>(resource: &'a Value, url: &str) -> Option<&'a str> {
         .as_str()
 }
 
-/// Adds a synthetic organization as an author of `document`.
+/// Adds a synthetic organization as an author and the custodian of
+/// `document`.
 fn authored(mut document: Document) -> Result<Document, DocumentError> {
     document.with_author(&Resource::Organization(Box::new(Organization {
         id: Some(String::from("hospital")),
         name: Some("Synthetic hospital".into()),
         ..Organization::default()
     })))?;
+    document.with_custodian(Organization {
+        id: Some(String::from("record-keeper")),
+        name: Some("Synthetic record keeper".into()),
+        ..Organization::default()
+    })?;
     Ok(document)
 }
 
@@ -237,7 +273,7 @@ fn a_header_describes_the_document_before_it_is_written() -> Result<(), Box<dyn 
 fn a_composition_without_a_version_is_refused() {
     let composition = json!({"language": {"code_string": "en"}});
     assert!(matches!(
-        DocumentMetadata::from_composition(&composition, category("11502-2")),
+        DocumentMetadata::from_composition(&composition, category("11502-2"), None),
         Err(DocumentError::MissingMetadata { element: "version" })
     ));
 }

@@ -10,8 +10,9 @@
 //! [`Document`] already takes (subject, author, date, type, title,
 //! custodian); [`Document::with_metadata`] writes it on the `Composition`,
 //! and [`DocumentMetadata::describe`] writes the `DocumentReference` that
-//! describes the written document, the shape MyHealth@EU
-//! DocumentReference-minimal (`myhealth.eu.fhir.ncp-api` 9.1.0) constrains;
+//! describes the written document, one resource in the shape both the HL7
+//! Europe EU Health Data API `EehrxfMhdDocumentReference` and MyHealth@EU
+//! DocumentReference-minimal (`myhealth.eu.fhir.ncp-api` 9.1.0) constrain;
 //! [`DocumentMetadata::describe_at`] writes it from a [`Header`] before the
 //! document is written.
 //!
@@ -25,7 +26,7 @@
 //! | attestation | `attester`, mode `professional` | none in R4 |
 //! | status | `status` | `docStatus` |
 //! | language | `language` | `content.attachment.language` |
-//! | documentCategory | `category`, and the report's `category` on a laboratory or test report; not on an imaging report, whose form fixes it | `category` |
+//! | documentCategory | `category`, and the report's `category` on a laboratory or test report; not on an imaging report, whose form fixes it | `category`, one concept with the Art 14(1) priority category beside it |
 //! | documentType | `type` | `type` |
 //! | documentTitle | `title` | `description` |
 //! | period | `event.period` | `context.period` |
@@ -44,6 +45,7 @@ use base64::engine::general_purpose::STANDARD;
 use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
+use fhir_types::r4::coding::Coding;
 use fhir_types::r4::composition::{Composition, CompositionAttester, CompositionEvent};
 use fhir_types::r4::diagnostic_report::DiagnosticReport;
 use fhir_types::r4::document_reference::{
@@ -58,8 +60,9 @@ use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use sha1::{Digest as _, Sha1};
 
+use crate::category::{Category, PRIORITY_SYSTEM};
 use crate::document::representation::PdfA;
-use crate::document::{Document, DocumentError, reference};
+use crate::document::{Document, DocumentError, URN_SYSTEM, reference};
 
 /// The cross-version extension that carries R5 `Composition.version` in R4
 /// (<https://hl7.org/fhir/extensions/xver.html>).
@@ -70,6 +73,11 @@ pub const COMPOSITION_VERSION: &str =
 /// in R4 (<https://hl7.org/fhir/extensions/xver.html>).
 pub const DOCUMENT_REFERENCE_VERSION: &str =
     "http://hl7.org/fhir/5.0/StructureDefinition/extension-DocumentReference.version";
+
+/// The canonical URL of the HL7 Europe EU Health Data API 1.0.0-ballot
+/// profile every description claims.
+pub const EEHRXF_MHD_DOCUMENT_REFERENCE: &str =
+    "http://hl7.eu/fhir/health-data-api/StructureDefinition/EehrxfMhdDocumentReference";
 
 /// The media type of a PDF document (RFC 8118).
 pub const PDF: &str = "application/pdf";
@@ -98,6 +106,7 @@ impl Attestation {
 pub struct DocumentMetadata {
     version: String,
     category: CodeableConcept,
+    priority: Option<Category>,
     status: String,
     languages: Vec<String>,
     period: Option<Period>,
@@ -110,13 +119,20 @@ pub struct DocumentMetadata {
 
 impl DocumentMetadata {
     /// Creates the metadata of a document at `version` in the document
-    /// category `category` (LOINC, Table 1 `documentCategory`), keeping the
-    /// status the document writes.
+    /// category `category` (LOINC, Table 1 `documentCategory`) of the
+    /// Art 14(1) priority category `priority`, or none for a document
+    /// outside them, such as a vaccination history, keeping the status the
+    /// document writes.
     #[must_use]
-    pub const fn new(version: String, category: CodeableConcept) -> Self {
+    pub const fn new(
+        version: String,
+        category: CodeableConcept,
+        priority: Option<Category>,
+    ) -> Self {
         Self {
             version,
             category,
+            priority,
             status: String::new(),
             languages: Vec::new(),
             period: None,
@@ -129,7 +145,8 @@ impl DocumentMetadata {
     }
 
     /// Reads the metadata an openEHR composition carries, in its canonical
-    /// JSON form, for a document in the category `category`.
+    /// JSON form, for a document in the category `category` of the priority
+    /// category `priority`, if any.
     ///
     /// openEHR RM 1.1.0 (`COMPOSITION`, `EVENT_CONTEXT`): the version is the
     /// version tree id of `uid`, an `OBJECT_VERSION_ID`
@@ -145,6 +162,7 @@ impl DocumentMetadata {
     pub fn from_composition(
         composition: &serde_json::Value,
         category: CodeableConcept,
+        priority: Option<Category>,
     ) -> Result<Self, DocumentError> {
         let text = |pointer: &str| {
             composition
@@ -155,7 +173,7 @@ impl DocumentMetadata {
             .and_then(|uid| uid.split("::").nth(2))
             .filter(|version| !version.is_empty())
             .ok_or(DocumentError::MissingMetadata { element: "version" })?;
-        let mut metadata = Self::new(version.to_owned(), category);
+        let mut metadata = Self::new(version.to_owned(), category, priority);
         if let Some(language) = text("/language/code_string") {
             metadata.languages.push(language.to_owned());
         }
@@ -247,8 +265,9 @@ impl DocumentMetadata {
     ///
     /// [`DocumentError::Dangling`] when `bundle` holds no `Composition`
     /// first, [`DocumentError::MissingMetadata`] when it carries no
-    /// identifier, type, date or title, and [`DocumentError::TooMany`] for
-    /// more than one service specialty or language.
+    /// identifier, type, date, title or custodian, and
+    /// [`DocumentError::TooMany`] for more than one service specialty or
+    /// language.
     pub fn describe(&self, bundle: &Bundle, id: &str) -> Result<DocumentReference, DocumentError> {
         let header = Header::of_document(bundle)?;
         let title = header.title.clone();
@@ -270,8 +289,9 @@ impl DocumentMetadata {
     /// # Errors
     ///
     /// [`DocumentError::TooMany`] for more than one service specialty,
-    /// language or legal authentication, and [`DocumentError::TooLarge`]
-    /// for a PDF whose size an R4 `unsignedInt` cannot hold.
+    /// language or legal authentication, [`DocumentError::TooLarge`] for a
+    /// PDF whose size an R4 `unsignedInt` cannot hold, and
+    /// [`DocumentError::MissingMetadata`] for a header with no custodian.
     pub fn describe_pdf(
         &self,
         header: &Header,
@@ -306,10 +326,20 @@ impl DocumentMetadata {
     /// with no written `Bundle`, so a caller that lists documents describes
     /// each before it writes it.
     ///
+    /// One resource answers both guides: it claims the HL7 Europe EU Health
+    /// Data API `EehrxfMhdDocumentReference`, whose IHE MHD 4.2.2 Minimal
+    /// base holds `category` to one, so the Annex III `documentCategory`
+    /// and the Art 14(1) priority category are two codings of that one
+    /// category; it names the custodian `EehrxfMhdDocumentReference`
+    /// requires, and the priority category's `Bundle` profile, when it has
+    /// one, as its `format`; and it carries every element MyHealth@EU
+    /// DocumentReference-minimal requires.
+    ///
     /// # Errors
     ///
     /// [`DocumentError::TooMany`] for more than one service specialty,
-    /// language or legal authentication.
+    /// language or legal authentication, and
+    /// [`DocumentError::MissingMetadata`] for a header with no custodian.
     pub fn describe_at(
         &self,
         header: &Header,
@@ -319,11 +349,34 @@ impl DocumentMetadata {
         let practice_setting = at_most_one("serviceSpecialty", &self.specialties)?.cloned();
         let language = at_most_one("language", &self.languages)?;
         let legal = at_most_one("legalAuthentication", &self.legal)?;
+        let custodian = header
+            .custodian
+            .clone()
+            .ok_or(DocumentError::MissingMetadata {
+                element: "custodian",
+            })?;
         attachment.language = language.map(|language| language.as_str().into());
+        let mut category = self.category.clone();
+        if let Some(priority) = self.priority {
+            category.coding.push(Coding {
+                system: Some(PRIORITY_SYSTEM.into()),
+                code: Some(priority.code().into()),
+                ..Coding::default()
+            });
+        }
+        let format = self
+            .priority
+            .and_then(Category::profiles)
+            .map(|profiles| Coding {
+                system: Some(URN_SYSTEM.into()),
+                code: Some(profiles.bundle.into()),
+                ..Coding::default()
+            });
         Ok(DocumentReference {
             id: Some(id.to_owned()),
-            meta: self.source.as_ref().map(|source| Meta {
-                source: Some(source.as_str().into()),
+            meta: Some(Meta {
+                profile: vec![EEHRXF_MHD_DOCUMENT_REFERENCE.into()],
+                source: self.source.as_ref().map(|source| source.as_str().into()),
                 ..Meta::default()
             }),
             extension: vec![version_extension(DOCUMENT_REFERENCE_VERSION, &self.version)],
@@ -332,15 +385,16 @@ impl DocumentMetadata {
             status: "current".into(),
             doc_status: Some(header.status.as_str().into()),
             r#type: Some(header.kind.clone()),
-            category: vec![self.category.clone()],
+            category: vec![category],
             subject: Some(header.subject.clone()),
             date: Some(header.date.as_str().into()),
             author: header.authors.clone(),
             authenticator: legal.map(|legal| reference(&legal.party)),
-            custodian: header.custodian.clone(),
+            custodian: Some(custodian),
             description: Some(header.title.as_str().into()),
             content: vec![DocumentReferenceContent {
                 attachment,
+                format,
                 ..DocumentReferenceContent::default()
             }],
             // NOTE: R4 Element ele-1: an element holds a value or children, so a context with

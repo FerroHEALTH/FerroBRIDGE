@@ -79,10 +79,15 @@ fn described(pdf: &PdfA) -> Result<DocumentReference, DocumentError> {
         loinc("11502-2"),
         String::from("Laboratory report"),
         to("Organization/laboratory"),
-    );
-    DocumentMetadata::new(String::from("1"), loinc("11502-2"))
-        .with_language(String::from("en"))
-        .describe_pdf(&header, pdf, "pdf-report")
+    )
+    .with_custodian(to("Organization/laboratory"));
+    DocumentMetadata::new(
+        String::from("1"),
+        loinc("11502-2"),
+        Some(Category::Laboratory),
+    )
+    .with_language(String::from("en"))
+    .describe_pdf(&header, pdf, "pdf-report")
 }
 
 #[test]

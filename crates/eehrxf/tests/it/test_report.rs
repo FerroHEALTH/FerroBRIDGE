@@ -247,7 +247,11 @@ fn document_of(
         }],
         ..CodeableConcept::default()
     };
-    document.with_metadata(DocumentMetadata::from_composition(&source, category)?);
+    document.with_metadata(DocumentMetadata::from_composition(
+        &source,
+        category,
+        Some(Category::Laboratory),
+    )?);
     let bundle = document.into_bundle()?;
     Ok(serde_json::to_value(bundle)?)
 }
