@@ -25,7 +25,7 @@
 //! Cadasto's experimental AQL demographic extension
 //! (`crate::facade::search::party`), and the `CapabilityStatement` says so.
 //!
-//! This module owns what every party interaction shares: the [`Call`] it
+//! This module owns what every party interaction shares: the `Call` it
 //! serves, its admission, the party it opens and the read of one version.
 
 pub(crate) mod ehds;
