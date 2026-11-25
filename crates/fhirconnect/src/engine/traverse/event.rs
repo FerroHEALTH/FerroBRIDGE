@@ -34,7 +34,6 @@ use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::Occurrence;
 use crate::tree::element::Table;
-use crate::tree::read::read;
 
 use crate::engine::traverse::Binding;
 use crate::engine::traverse::Run;
@@ -121,13 +120,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         binding: &Binding,
     ) -> Result<(), EngineError> {
         let read_at = event.read();
-        let matches = read(self.table, self.document_for(read_at), read_at.expression()).map_err(
-            |source| EngineError::Read {
-                mapping: String::from(mapping.name()),
-                expression: String::from(read_at.expression().as_str()),
-                source: Box::new(source),
-            },
-        )?;
+        let matches = self.matches_of(mapping.name(), read_at)?;
         let Some(found) = matches.iter().find(|matched| matched.occurrence() == input) else {
             return Ok(());
         };

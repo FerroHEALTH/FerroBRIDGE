@@ -26,7 +26,6 @@ use crate::resolve::program::target::Target;
 use crate::tree::Occurrence;
 
 use crate::tree::element::Table;
-use crate::tree::write::write;
 
 use crate::engine::traverse::Binding;
 use crate::engine::traverse::Held;
@@ -270,19 +269,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 reason.clone_from(&written);
             }
             let text = Value::String(written);
-            let table = self.table;
-            write(
-                table,
-                self.document_for_mut(target),
-                target.expression(),
+            self.write_at(
+                &format!("{}.{}", mapping.name(), entry.name()),
+                target,
                 &occurrence,
                 text,
-            )
-            .map_err(|source| EngineError::Write {
-                mapping: format!("{}.{}", mapping.name(), entry.name()),
-                element,
-                source: Box::new(source),
-            })?;
+            )?;
         }
         if let Some(url) = absent {
             let location = self.locate_targets(Some(url), &binding.fhir, None);

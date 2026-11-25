@@ -24,6 +24,7 @@ use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::text_of;
+use crate::engine::lens::quantified;
 use crate::model::ast::keyword::Direction;
 
 /// The name the `dateTime` cell carries in a diagnostic.
@@ -228,14 +229,10 @@ impl Lens<DvDateTime, Period> for PeriodStartLens {
 /// `other_reference_ranges` are `-` in the table, so they come from the value
 /// the target already holds.
 pub(crate) fn instant(value: String, existing: Option<&DvDateTime>) -> DvDateTime {
-    DvDateTime {
-        normal_status: existing.and_then(|held| held.normal_status.clone()),
-        normal_range: existing.and_then(|held| held.normal_range.clone()),
-        other_reference_ranges: existing.and_then(|held| held.other_reference_ranges.clone()),
-        magnitude_status: existing.and_then(|held| held.magnitude_status.clone()),
+    quantified!(DvDateTime, existing, {
         accuracy: existing.and_then(|held| held.accuracy.clone()),
         value,
-    }
+    })
 }
 
 #[cfg(test)]

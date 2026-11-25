@@ -43,6 +43,7 @@ use crate::engine::lens::number::decimal_text;
 use crate::engine::lens::number::narrow;
 use crate::engine::lens::number::point;
 use crate::engine::lens::number::whole;
+use crate::engine::lens::quantified;
 use crate::engine::lens::quantity::UCUM;
 use crate::model::ast::keyword::Direction;
 
@@ -257,15 +258,11 @@ fn unbounded(comparator: Option<&Code>, cell: &'static str) -> Result<(), LensEr
 /// Returns the count of `magnitude`, with the attributes no FHIR element
 /// carries taken from the held value.
 fn counted(magnitude: i64, existing: Option<&DvCount>) -> DvCount {
-    DvCount {
-        normal_status: existing.and_then(|held| held.normal_status.clone()),
-        normal_range: existing.and_then(|held| held.normal_range.clone()),
-        other_reference_ranges: existing.and_then(|held| held.other_reference_ranges.clone()),
-        magnitude_status: existing.and_then(|held| held.magnitude_status.clone()),
+    quantified!(DvCount, existing, {
         accuracy: existing.and_then(|held| held.accuracy),
         accuracy_is_percent: existing.and_then(|held| held.accuracy_is_percent),
         magnitude,
-    }
+    })
 }
 
 #[cfg(test)]
