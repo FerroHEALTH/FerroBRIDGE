@@ -283,6 +283,7 @@ source-cdr = the CDR
 owner-provisioned = provisioned
 owner-provisioned-title = Read from the provisioned mapping directory; the console checks a draft of it but never saves over it
 owner-console = console
+language-structuremap = FHIR Mapping Language
 owner-console-title = Saved by the console in the state store
 filter-show-languages = Show languages
 filter-show-owners = Show owners
