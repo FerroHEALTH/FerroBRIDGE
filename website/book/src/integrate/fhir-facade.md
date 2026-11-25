@@ -889,9 +889,10 @@ context. Point `[mappings] directory` at a copy of it
 CDR: FerroBRIDGE's patient summary template, its EHDS record and EHDS
 medication administration templates and the published `KDS_Laborbericht`
 and `KDS_Laborauftrag`. The party groups are party contexts, so
-the project needs `[cdr] demographic` and the reference CDR's patient and
-healthcare professional `PERSON` definitions with an `ORGANISATION`
-template; each party resource claims the profile its context names, as an
+the project needs `[cdr] demographic`, the reference CDR's patient and
+healthcare professional `PERSON` definitions, FerroBRIDGE's related person
+`PERSON` definition (`openEHR-DEMOGRAPHIC-PERSON.ferrobridge_related_person.v1.0.0`)
+and an `ORGANISATION` template; each party resource claims the profile its context names, as an
 entry's resource does.
 
 | Annex X group | Resource | Profile | Search (IHE QEDm 3.0.0 PCC-44) |
@@ -916,6 +917,7 @@ entry's resource does.
 | EHDSTelecom | the `telecom` of a `Patient` | | as its patient; the system is the coded name of the electronic `ADDRESS` |
 | EHDSHealthProfessional | `Practitioner` | `practitioner-eu-core` | read, from the reference CDR's healthcare professional `PERSON` |
 | EHDSOrganisation | `Organization` | `organization-eu-core` | read, from an `ORGANISATION` |
+| EHDSRelatedPerson | `RelatedPerson` | FHIR R4 `RelatedPerson` | read, from FerroBRIDGE's related person `PERSON` |
 | EHDSAlert | `Flag` | `flag-patient-eu-core` | `patient`, `date`; from the CKM precaution |
 | EHDSAdvanceDirective | `Consent` | `consent-eu-eps` | `patient` with `scope=adr`, `date` |
 | EHDSAttachment | the `sourceAttachment` of an advance directive's `Consent` | | as its consent |
@@ -929,6 +931,18 @@ entry's resource does.
 | EHDSEncounter | `Encounter` | `encounter-eu-hdr` | `patient`, `date` |
 | EHDSLocation | `Location` | `location-eu-core` | `name`; read-only from the encounter's context |
 | (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category`, `code` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
+
+A related person's `patient` is the target of the `PARTY_RELATIONSHIP` its
+`PERSON` holds and its `relationship` the codes in that relationship's
+details. HL7 Europe publishes only the HDR 1.0.0 obligation profile for
+RelatedPerson, so the context names the FHIR R4 profile. Every relationship
+a party holds has the party as its source (RM Demographic IM, `PARTY`
+invariant `Relationships_validity`), and the CDR assigns the uid when it
+commits the party, so a create commits the person, then a second version
+whose relationship names it as the source. When that second write fails,
+the answer is the CDR's refusal with a warning that the person stands
+without its relationship; an update writes it again. An update sources the
+relationship before its one write.
 
 The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device,
 consent and travel profiles HL7 Europe Patient Summary 1.0.0-ballot, the
