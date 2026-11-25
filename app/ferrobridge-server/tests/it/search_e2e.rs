@@ -37,9 +37,6 @@ const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures")
 /// The profile the fixture context claims.
 const PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobridge-facade-diagnosis";
 
-/// The namespace a literal subject reference is keyed in.
-const NAMESPACE: &str = "http://example.org/fhir";
-
 /// The FHIR service base the facade answers under.
 const BASE: &str = "http://ferrobridge.invalid/fhir/";
 
@@ -57,6 +54,7 @@ async fn a_patient_search_pages_the_committed_conditions_back_from_a_real_cdr()
     let compiled = programs::compile_set(&set, &templates)?;
     let catalog = search::load(std::path::Path::new(FIXTURES), &compiled)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(
         Facade::new(
             compiled,
@@ -65,7 +63,7 @@ async fn a_patient_search_pages_the_committed_conditions_back_from_a_real_cdr()
             Settings {
                 base_url: String::from(BASE.trim_end_matches('/')),
                 ehr_policy: Policy::CreateOnFirstWrite,
-                subject: crate::support::subject_link(NAMESPACE),
+                subject,
                 system_id: String::from("ferrobridge.e2e"),
                 language: String::from("en"),
                 territory: String::from("GB"),
@@ -145,6 +143,7 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
     let catalog = search::load(directory.path(), &compiled)?;
     let memory = Arc::new(MemoryStore::default());
     let store: Arc<dyn Store> = memory.clone();
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(
         Facade::new(
             compiled,
@@ -153,7 +152,7 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
             Settings {
                 base_url: String::from(BASE.trim_end_matches('/')),
                 ehr_policy: Policy::CreateOnFirstWrite,
-                subject: crate::support::subject_link(NAMESPACE),
+                subject,
                 system_id: String::from("ferrobridge.e2e"),
                 language: String::from("de"),
                 territory: String::from("DE"),

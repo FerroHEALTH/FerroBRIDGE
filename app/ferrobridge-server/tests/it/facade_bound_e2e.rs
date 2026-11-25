@@ -84,6 +84,7 @@ async fn a_facade_write_and_a_transaction_commit_under_the_committer_the_cdr_wri
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(Facade::new(
         programs,
         Arc::new(MemoryStore::default()),
@@ -91,9 +92,7 @@ async fn a_facade_write_and_a_transaction_commit_under_the_committer_the_cdr_wri
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject: crate::support::subject_link(
-                "http://example.org/fhir/sid/ferrobridge-subject",
-            ),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),

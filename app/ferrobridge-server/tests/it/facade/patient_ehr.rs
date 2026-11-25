@@ -350,3 +350,26 @@ async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<
     assert_eq!(2, creates, "both writers tried to create");
     Ok(())
 }
+
+#[tokio::test]
+async fn the_per_identifier_stub_answers_each_identifier_with_its_own_pseudonym()
+-> Result<(), Box<dyn Error>> {
+    // The e2e suites rest on this stub: two subjects never share an EHR.
+    let (_pix, link) = crate::support::per_identifier(&[]).await;
+    let mut seen = std::collections::BTreeSet::new();
+    for (system, value) in [
+        (crate::support::SOURCE_DOMAIN, "synthetic-a"),
+        (crate::support::SOURCE_DOMAIN, "synthetic-b"),
+        (crate::support::PATIENT_SYSTEM, "synthetic-a"),
+    ] {
+        let source = link.identity().source(Some(system), value)?;
+        let person = link
+            .identity()
+            .pseudonym(&source, &ihe_atna_next::user::OnBehalfOf::System)
+            .await?;
+        assert_eq!(crate::support::PSEUDONYM_DOMAIN, person.namespace());
+        assert_eq!(crate::support::pseudonym_of(system, value), person.id());
+        assert!(seen.insert(person.id().to_owned()), "{system}|{value}");
+    }
+    Ok(())
+}

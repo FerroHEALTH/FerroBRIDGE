@@ -41,9 +41,6 @@ use crate::facade::server_settings;
 /// How many passing cases the gated run takes from the pass list.
 const SAMPLE: usize = 3;
 
-/// The namespace the reference CDR's EHRs are created under.
-const SUBJECT_NAMESPACE: &str = "http://example.org/fhir/sid/ferrobridge-subject";
-
 /// Returns the first [`SAMPLE`] ids the committed pass list records.
 fn sample() -> Result<Vec<String>, Box<dyn Error>> {
     let text = std::fs::read_to_string(Corpus::FhirR4Facade.pass_list())?;
@@ -77,13 +74,14 @@ async fn the_first_passing_facade_examples_round_trip_through_a_real_cdr()
             .find(|context| context.id() == context_id)
             .ok_or("a case id names a context the corpus runs")?;
         let compiled = compile(context).await?;
+        let (_pix, subject) = crate::support::per_identifier(&[]).await;
         let facade = Arc::new(Facade::new(
             Programs::new(compiled.loaded.clone()),
             handle(&Arc::new(MemoryStore::default())),
             CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?))?,
             Settings {
                 ehr_policy: Policy::CreateOnFirstWrite,
-                subject: crate::support::subject_link(SUBJECT_NAMESPACE),
+                subject,
                 system_id: String::from("ferrobridge.e2e"),
                 ..context.settings()
             },

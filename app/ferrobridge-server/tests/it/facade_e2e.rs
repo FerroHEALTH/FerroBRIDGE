@@ -55,6 +55,7 @@ async fn the_facade_commits_a_condition_and_reads_it_back_from_a_real_cdr()
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -64,7 +65,7 @@ async fn the_facade_commits_a_condition_and_reads_it_back_from_a_real_cdr()
             // The CDR holds no EHR for the synthetic subject, so this case
             // exercises the policy that creates one on the first write.
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),
@@ -137,6 +138,7 @@ async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cd
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -144,7 +146,7 @@ async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cd
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),
@@ -167,14 +169,9 @@ async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cd
     let tag = read.etag.ok_or("a read carries an ETag")?;
     assert_eq!("W/\"1\"", tag);
     // R4 condition.html: Condition.subject is 1..1, so the read names the
-    // person the identity map binds to the EHR although the mapping has no
-    // outbound row for it.
-    assert_eq!(
-        Some(SUBJECT_ID),
-        read.body["subject"]["identifier"]["value"].as_str(),
-        "{}",
-        read.body
-    );
+    // pseudonym the EHR is bound to although the mapping has no outbound row
+    // for it.
+    assert_eq!(read_subject(), read.body["subject"], "{}", read.body);
 
     // The read body goes back unchanged: what a client reads it can send.
     let updated = send(app(&facade), put_condition(&id, &read.body, &tag)?).await?;
@@ -303,6 +300,13 @@ pub(crate) async fn upload_template(base_url: &str) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
+/// Returns the `subject` a read names the case's subject by: a reference to
+/// its pseudonym from the stub identity source.
+fn read_subject() -> serde_json::Value {
+    let pseudonym = crate::support::pseudonym_of(SUBJECT_NAMESPACE, SUBJECT_ID);
+    serde_json::json!({ "reference": format!("Patient/{pseudonym}") })
+}
+
 /// Returns the create request the case sends.
 pub(crate) fn post_condition() -> Result<Request<Body>, Box<dyn Error>> {
     let mut resource: serde_json::Value = serde_json::from_str(fixtures::R4_CONDITION)?;
@@ -425,6 +429,7 @@ async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr() -> Result
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -432,7 +437,7 @@ async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr() -> Result
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("de"),
             territory: String::from("DE"),
@@ -463,12 +468,8 @@ async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr() -> Result
     .await?;
     assert_eq!(StatusCode::OK, read.0, "{}", read.1);
     let mut output = read.1;
-    // R4 condition.html: Condition.subject is 1..1, and the KDS context has no
-    // outbound row for it, so the facade names the person the EHR is bound to.
-    assert_eq!(
-        input["subject"]["identifier"], output["subject"]["identifier"],
-        "the read names the subject the create was written for: {output}"
-    );
+    // R4 condition.html: Condition.subject is 1..1, so the facade names the EHR's pseudonym.
+    assert_eq!(read_subject(), output["subject"], "{output}");
     strip_facade_owned(&mut output);
     let mut compared = input.clone();
     strip_facade_owned(&mut compared);
@@ -578,6 +579,7 @@ async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -585,7 +587,7 @@ async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject: crate::support::subject_link(SUBJECT_NAMESPACE),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),

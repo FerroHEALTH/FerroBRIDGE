@@ -34,6 +34,9 @@ use crate::facade_e2e::app;
 use crate::facade_e2e::call;
 use crate::facade_e2e::upload_published;
 
+/// The identifier system the synthetic parties carry.
+const SYNTHETIC: &str = "http://example.org/fhir/sid/synthetic";
+
 /// The demographic fixture mapping set.
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures_demographic");
 
@@ -56,7 +59,7 @@ pub(crate) fn with_body(
 
 /// Returns `resource` with an identifier and `name` set as `type` names it.
 fn resource(resource_type: &str, name: &str) -> serde_json::Value {
-    let identifier = serde_json::json!([{"system": "http://example.org/fhir/sid/synthetic", "value": "SYN-0001"}]);
+    let identifier = serde_json::json!([{"system": SYNTHETIC, "value": "SYN-0001"}]);
     match resource_type {
         "Organization" => serde_json::json!({
             "resourceType": resource_type, "identifier": identifier, "name": name
@@ -72,7 +75,7 @@ fn resource(resource_type: &str, name: &str) -> serde_json::Value {
 fn practitioner_role(name: &str, performer: &str) -> serde_json::Value {
     serde_json::json!({
         "resourceType": "PractitionerRole",
-        "identifier": [{"system": "http://example.org/fhir/sid/synthetic", "value": "SYN-0001"}],
+        "identifier": [{"system": SYNTHETIC, "value": "SYN-0001"}],
         "code": [{"text": name}],
         "practitioner": {"reference": format!("Practitioner/{performer}")}
     })
@@ -209,6 +212,7 @@ async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[SYNTHETIC]).await;
     let facade = Arc::new(Facade::new(
         compiled,
         store,
@@ -216,7 +220,7 @@ async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::Existing,
-            subject: crate::support::subject_link("http://example.org/fhir"),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),
