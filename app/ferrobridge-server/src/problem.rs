@@ -136,7 +136,7 @@ impl Kind {
             ),
             Self::NotConfigured => (
                 "not-configured",
-                "No mapping directory is configured",
+                "What the request needs is not configured",
                 StatusCode::CONFLICT,
             ),
             Self::PreconditionFailed => (

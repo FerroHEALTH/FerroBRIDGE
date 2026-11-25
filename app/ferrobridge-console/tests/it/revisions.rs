@@ -84,7 +84,7 @@ async fn a_bridge_that_saves_nothing_keeps_no_revisions() -> Result<(), Box<dyn 
         &bridge,
         "/operator/revisions",
         409,
-        &json!({"type": "https://ferrobridge.eu/docs/operate/problems.html#not-configured", "title": "No mapping directory is configured", "status": 409}),
+        &json!({"type": "https://ferrobridge.eu/docs/operate/problems.html#not-configured", "title": "What the request needs is not configured", "status": 409}),
     )
     .await;
     let (service, cookie) = signed_in(&bridge).await?;
