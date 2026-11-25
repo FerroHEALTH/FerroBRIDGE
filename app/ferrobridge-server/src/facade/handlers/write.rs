@@ -91,19 +91,10 @@ pub(crate) async fn create(
     uri: &Uri,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Present)?;
-    crate::facade::handlers::supported(facade, resource_type)?;
-    let inbound = read::parse(body, resource_type)?;
-    let client = facade.client_for(headers, access).await?;
-    compartment::admit_inbound(
-        (facade, access),
-        &facade.patients(&client, access),
-        Permission::Create,
-        &inbound,
-    )
-    .await?;
-    let program = &select_program(facade, &inbound, headers)?;
-    let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let inbound = crate::facade::handlers::inbound(facade, resource_type, (headers, uri), body)?;
+    let (program, client, resolved) =
+        prepared(facade, access, Permission::Create, &inbound, headers).await?;
+    let program = &program;
     let ingest = ingest_for(facade, access, client, &resolved);
     let claim = ingest.claim_resource(&inbound)?;
 
@@ -200,16 +191,9 @@ pub(crate) async fn update(
     }
     let inbound = read::parse(body, resource_type)?;
     same_id(&inbound, id)?;
-    let client = facade.client_for(headers, access).await?;
-    compartment::admit_inbound(
-        (facade, access),
-        &facade.patients(&client, access),
-        Permission::Update,
-        &inbound,
-    )
-    .await?;
-    let program = &select_program(facade, &inbound, headers)?;
-    let resolved = references::resolve(facade, &client, inbound.document()).await;
+    let (program, client, resolved) =
+        prepared(facade, access, Permission::Update, &inbound, headers).await?;
+    let program = &program;
     let ingest = ingest_for(facade, access, client, &resolved);
     resend(
         facade,
@@ -399,6 +383,28 @@ async fn precondition(
         None => read::version::followed_version(client, ehr_id, &version).await?,
     };
     Ok((version, composition))
+}
+
+/// Admits `inbound` for `permission` in the caller's compartment, selects
+/// its program and resolves its references through the caller's client.
+async fn prepared(
+    facade: &Facade,
+    access: &Access,
+    permission: Permission,
+    inbound: &Inbound,
+    headers: &HeaderMap,
+) -> Result<(Loaded, CdrClient, references::Resolved), Refusal> {
+    let client = facade.client_for(headers, access).await?;
+    compartment::admit_inbound(
+        (facade, access),
+        &facade.patients(&client, access),
+        permission,
+        inbound,
+    )
+    .await?;
+    let program = select_program(facade, inbound, headers)?;
+    let resolved = references::resolve(facade, &client, inbound.document()).await;
+    Ok((program, client, resolved))
 }
 
 /// Selects the program one inbound resource runs.
