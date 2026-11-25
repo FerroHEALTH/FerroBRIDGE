@@ -911,6 +911,7 @@ entry's resource does.
 | EHDSPatient | `Patient` | `patient-eu-core` | read, from the reference CDR's patient `PERSON` |
 | EHDSHumanName | the `name` of a `Patient` or `Practitioner` | | as its party |
 | EHDSAddress | the `address` of a `Patient` | | as its patient |
+| EHDSTelecom | the `telecom` of a `Patient` | | as its patient; the system is the coded name of the electronic `ADDRESS` |
 | EHDSHealthProfessional | `Practitioner` | `practitioner-eu-core` | read, from the reference CDR's healthcare professional `PERSON` |
 | EHDSOrganisation | `Organization` | `organization-eu-core` | read, from an `ORGANISATION` |
 | EHDSAlert | `Flag` | `flag-patient-eu-core` | `patient`, `date`; from the CKM precaution |

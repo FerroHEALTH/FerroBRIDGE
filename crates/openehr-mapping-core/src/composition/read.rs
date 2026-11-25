@@ -25,6 +25,13 @@ use super::NodeValue;
 use super::Place;
 use super::RmPosition;
 
+/// The family a structural node's name travels under.
+const NAME_FAMILY: &str = "_name";
+
+/// The name of one structural node instance: the path of its `name` and the
+/// text it takes.
+pub(crate) type Name = (RmPath, Value);
+
 impl WebTemplateIndex {
     /// Builds a canonical composition from `values`.
     ///
@@ -52,11 +59,74 @@ impl WebTemplateIndex {
         values: &[NodeValue],
         now: &str,
     ) -> Result<CanonicalComposition, PathError> {
+        let (carried, names) = self.split_names(values)?;
         let mut flat = serde_json::Map::new();
-        for value in values {
+        for value in carried {
             flat.insert(self.flat_key(value)?.to_string(), value.value.clone());
         }
-        self.build_from_flat(&flat, now)
+        let mut built = self.build_from_flat(&flat, now)?;
+        if names.is_empty() {
+            return Ok(built);
+        }
+        self.write_names(&mut built.value, names)?;
+        self.accept(built.value)
+    }
+
+    /// Splits `values` into the ones a FLAT document carries and the names
+    /// of structural nodes, each with the path of its instance's `name`.
+    ///
+    /// No FLAT key names a node's `LOCATABLE.name` (RM common, the
+    /// `LOCATABLE` class), so a name travels as the node's `_name` family and
+    /// is written into the built instance. No specification governs the
+    /// family: our own design.
+    pub(crate) fn split_names<'v>(
+        &self,
+        values: &'v [NodeValue],
+    ) -> Result<(Vec<&'v NodeValue>, Vec<Name>), PathError> {
+        let mut carried = Vec::new();
+        let mut names = Vec::new();
+        for value in values {
+            match (&value.place, value.sub_path.as_slice()) {
+                (
+                    Place::Node {
+                        flat_id,
+                        occurrences,
+                    },
+                    [only],
+                ) if only.name == NAME_FAMILY => {
+                    let node = self.node_by_flat_id(flat_id)?;
+                    let mut path = self.instance_path(node, occurrences)?;
+                    path.segments.push(PathSegment {
+                        attribute: String::from("name"),
+                        predicate: openehr_rm::v1_2::paths::Predicate::default(),
+                        descendant: false,
+                    });
+                    names.push((path, value.value.clone()));
+                }
+                _ => carried.push(value),
+            }
+        }
+        Ok((carried, names))
+    }
+
+    /// Writes each of `names` into `built`, an instance of the template's
+    /// root.
+    pub(crate) fn write_names(
+        &self,
+        built: &mut Value,
+        names: Vec<Name>,
+    ) -> Result<(), PathError> {
+        let root = openehr_rm::v1_2::typing::RmType::simple(self.root().rm_type());
+        for (path, name) in names {
+            openehr_rm::v1_2::paths::write::set_at_path(built, &root, &path, name).map_err(
+                |source| PathError::NameWrite {
+                    template_id: self.template_id().to_owned(),
+                    path: path.to_string(),
+                    source: Box::new(source),
+                },
+            )?;
+        }
+        Ok(())
     }
 
     /// Builds a canonical composition from a FLAT document.

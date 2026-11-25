@@ -472,9 +472,10 @@ const fn embedded_groups() -> [(&'static str, Embedded); 3] {
 
 /// The data-type groups asserted in the served `Patient`, by name, with the
 /// JSON pointer of the element.
-const PATIENT_PARTS: [(&str, &str); 2] = [
+const PATIENT_PARTS: [(&str, &str); 3] = [
     ("EHDSHumanName", "/name/0/family"),
     ("EHDSAddress", "/address/0/city"),
+    ("EHDSTelecom", "/telecom/0/system"),
 ];
 
 /// Returns the served group named `name`.

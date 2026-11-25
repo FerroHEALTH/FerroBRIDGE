@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: BUSL-1.1
 # The model mapping of EHDSPatient over the reference CDR's patient PERSON
 # definition: the identifiers with their type, the name with its parts, the
-# date of birth, the administrative gender from the recorded sex and each
-# postal address.
+# date of birth, the administrative gender from the recorded sex, each
+# postal address and each electronic address, its type the coded name of
+# the ADDRESS (value set ac4) as the ContactPoint system R4 cpt-2 requires
+# beside a value, a mobile number read as a phone of the use mobile.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -154,3 +156,141 @@ mappings:
           with:
             fhir: "country"
             openehr: "items[id18]"
+  - name: "telecom"
+    with:
+      fhir: "$resource.telecom"
+      openehr: "$archetype/contacts[id11]/addresses[id19]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "value"
+          with:
+            fhir: "value"
+            openehr: "details[id20]/items[id22]"
+        - name: "system"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "name"
+          manual:
+            - name: "phone"
+              fhir:
+                - path: "system"
+                  value: "phone"
+              fhirCondition:
+                targetRoot: "$fhirRoot"
+                targetAttribute: "system"
+                operator: "one of"
+                criteria: "phone"
+              openehr:
+                - path: "defining_code/terminology_id/value"
+                  value: "local"
+                - path: "defining_code/code_string"
+                  value: "at40"
+                - path: "value"
+                  value: "Telephone"
+              openehrCondition:
+                targetRoot: "$openehrRoot"
+                targetAttribute: "defining_code/code_string"
+                operator: "one of"
+                criteria: "at40"
+            - name: "fax"
+              fhir:
+                - path: "system"
+                  value: "fax"
+              fhirCondition:
+                targetRoot: "$fhirRoot"
+                targetAttribute: "system"
+                operator: "one of"
+                criteria: "fax"
+              openehr:
+                - path: "defining_code/terminology_id/value"
+                  value: "local"
+                - path: "defining_code/code_string"
+                  value: "at41"
+                - path: "value"
+                  value: "Fax"
+              openehrCondition:
+                targetRoot: "$openehrRoot"
+                targetAttribute: "defining_code/code_string"
+                operator: "one of"
+                criteria: "at41"
+            - name: "pager"
+              fhir:
+                - path: "system"
+                  value: "pager"
+              fhirCondition:
+                targetRoot: "$fhirRoot"
+                targetAttribute: "system"
+                operator: "one of"
+                criteria: "pager"
+              openehr:
+                - path: "defining_code/terminology_id/value"
+                  value: "local"
+                - path: "defining_code/code_string"
+                  value: "at43"
+                - path: "value"
+                  value: "Pager"
+              openehrCondition:
+                targetRoot: "$openehrRoot"
+                targetAttribute: "defining_code/code_string"
+                operator: "one of"
+                criteria: "at43"
+            - name: "email"
+              fhir:
+                - path: "system"
+                  value: "email"
+              fhirCondition:
+                targetRoot: "$fhirRoot"
+                targetAttribute: "system"
+                operator: "one of"
+                criteria: "email"
+              openehr:
+                - path: "defining_code/terminology_id/value"
+                  value: "local"
+                - path: "defining_code/code_string"
+                  value: "at44"
+                - path: "value"
+                  value: "E-mail"
+              openehrCondition:
+                targetRoot: "$openehrRoot"
+                targetAttribute: "defining_code/code_string"
+                operator: "one of"
+                criteria: "at44"
+            - name: "url"
+              fhir:
+                - path: "system"
+                  value: "url"
+              fhirCondition:
+                targetRoot: "$fhirRoot"
+                targetAttribute: "system"
+                operator: "one of"
+                criteria: "url"
+              openehr:
+                - path: "defining_code/terminology_id/value"
+                  value: "local"
+                - path: "defining_code/code_string"
+                  value: "at45"
+                - path: "value"
+                  value: "URL"
+              openehrCondition:
+                targetRoot: "$openehrRoot"
+                targetAttribute: "defining_code/code_string"
+                operator: "one of"
+                criteria: "at45"
+        - name: "mobile"
+          unidirectional: "openehr->fhir"
+          with:
+            fhir: "$fhirRoot"
+            openehr: "name"
+          manual:
+            - name: "mobile"
+              fhir:
+                - path: "system"
+                  value: "phone"
+                - path: "use"
+                  value: "mobile"
+              openehrCondition:
+                targetRoot: "$openehrRoot"
+                targetAttribute: "defining_code/code_string"
+                operator: "one of"
+                criteria: "at42"

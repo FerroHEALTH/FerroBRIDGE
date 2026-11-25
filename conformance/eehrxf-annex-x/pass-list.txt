@@ -28,5 +28,6 @@ EHDSPregnancyHistory
 EHDSProcedure
 EHDSServiceRequest
 EHDSSpecimen
+EHDSTelecom
 EHDSTravelHistory
 total 33

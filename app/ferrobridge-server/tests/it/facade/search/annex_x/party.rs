@@ -83,6 +83,17 @@ pub(super) fn patient_person() -> serde_json::Value {
                         element("id16", "Suburb/town/locality", text("Synthetic Town")),
                         element("id18", "Country", text("NL"))
                     ]))
+                }, {
+                    "_type": "ADDRESS",
+                    "name": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "E-mail",
+                        "defining_code": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "local"}, "code_string": "at44"}
+                    },
+                    "archetype_node_id": "id19",
+                    "details": tree("id20", "Components", serde_json::json!([
+                        element("id22", "Details", text("patient@synthetic.example"))
+                    ]))
                 }]
             }]
         }),
@@ -354,6 +365,68 @@ async fn a_patient_identifier_without_a_type_is_refused() -> Result<(), Box<dyn 
         Some("Patient.identifier[1].type"),
         issue["location"][0].as_str(),
         "{body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_telecom_writes_its_system_as_the_coded_name_of_its_address() -> Result<(), Box<dyn Error>>
+{
+    // R4 cpt-2: a ContactPoint with a value carries its system, which the
+    // patient PERSON records as the coded name of the electronic ADDRESS.
+    let harness = annex_x().await?;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/demographic/person"))
+        .respond_with(
+            ResponseTemplate::new(204)
+                .insert_header("ETag", format!("\"{PATIENT_UID}::synthetic.example::1\"")),
+        )
+        .mount(&harness.cdr)
+        .await;
+    let patient = serde_json::json!({
+        "resourceType": "Patient",
+        "meta": { "profile": [format!("{BASE}/patient-eu-core")] },
+        "identifier": [{
+            "type": { "coding": [{
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "NI"
+            }]},
+            "system": "http://example.org/fhir/sid/synthetic-national-id",
+            "value": "SYN-NI-0003"
+        }],
+        "name": [{ "family": "Patient", "given": ["Synthetic"] }],
+        "birthDate": "1970-01-01",
+        "telecom": [{ "system": "email", "value": "patient@synthetic.example" }]
+    });
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir/Patient")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(patient.to_string()))?,
+    )
+    .await?;
+    assert!(status.is_success(), "{status}: {body}");
+    let requests = harness.cdr.received_requests().await.unwrap_or_default();
+    let sent = requests
+        .iter()
+        .find(|request| request.method.as_str() == "POST")
+        .ok_or("the CDR received the person")?;
+    let sent: serde_json::Value = serde_json::from_slice(&sent.body)?;
+    let address = sent["contacts"][0]["addresses"]
+        .as_array()
+        .and_then(|addresses| {
+            addresses
+                .iter()
+                .find(|address| address["archetype_node_id"] == "id19")
+        })
+        .ok_or_else(|| format!("no electronic address in {sent}"))?;
+    assert_eq!("DV_CODED_TEXT", address["name"]["_type"], "{sent}");
+    assert_eq!(
+        "at44", address["name"]["defining_code"]["code_string"],
+        "{sent}"
+    );
+    assert_eq!(
+        "patient@synthetic.example", address["details"]["items"][0]["value"]["value"],
+        "{sent}"
     );
     Ok(())
 }
