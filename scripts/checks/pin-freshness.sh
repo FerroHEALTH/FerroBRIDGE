@@ -24,7 +24,10 @@
 # against the current release its guide's `package-list.json` names when the
 # pin comes from the guide's canonical site, and
 # the Chrome for Testing release against the newest Stable version its JSON
-# endpoint lists, and a MyHealth@EU CI build against the version, build date
+# endpoint lists, a draft implementing act of Regulation (EU) 2025/327
+# against the first document of the newest publication on its Have your say
+# initiative, which moves when a new draft or the adopted act is published,
+# and a MyHealth@EU CI build against the version, build date
 # and bytes build-fhir.ehdsi.eu serves now, with any guide listed there that
 # the matrix does not know. Needs an authenticated `gh`, curl and jq. `--self-test` runs
 # the Chrome for Testing reader and the product image readers over fixtures
@@ -118,6 +121,13 @@ registry_newest() {
 # entry is marked.
 package_list_current() {
   jq -er '[.list[]? | select(.current == true) | .version] | select(length == 1) | .[0]'
+}
+
+# The document id of the first attachment of the newest publication that
+# carries any, in a Have your say initiative document on stdin.
+initiative_newest() {
+  jq -er '[.publications[]? | select((.attachments // []) | length > 0)]
+    | sort_by(.publishedDate) | last | .attachments[0].documentId | select(type == "string")'
 }
 
 # One "package<TAB>version<TAB>tarball URL<TAB>sha256" record per profile
@@ -389,6 +399,10 @@ self_test() {
   expect "1.0.0-ballot" "$got" "the highest version of a ballot-only package"
   got="$(package_list_current <<< '{"list":[{"version":"current"},{"version":"0.3.0","current":true},{"version":"0.2.0"}]}')"
   expect "0.3.0" "$got" "the current release of a package list"
+  got="$(initiative_newest <<< '{"publications":[{"publishedDate":"2026/03/30 18:08:00","attachments":[]},{"publishedDate":"2026/11/23 09:17:20","attachments":[{"documentId":"090166e5374c0181"},{"documentId":"090166e5374c0182"}]},{"publishedDate":null,"attachments":[]}]}')"
+  expect "090166e5374c0181" "$got" "the newest draft of an initiative"
+  got="$(initiative_newest <<< '{"publications":[{"publishedDate":"2026/11/23 09:17:20","attachments":[{"documentId":"a"}]},{"publishedDate":"2027/05/02 10:00:00","attachments":[{"documentId":"b"}]}]}')"
+  expect "b" "$got" "the adopted act of an initiative"
   # shellcheck disable=SC2016 # the backticks are the matrix's own text
   got="$(ci_build_pins <<< '| `myhealth.eu.fhir.core` | 1.0.1 files `134` digest `ab` tarball `https://build-fhir.ehdsi.eu/core/package.tgz` sha256 `cd` | x |
 | `hl7.fhir.eu.base` | 2.0.1 files `75` digest `ef` | y |' | tr '\t' ' ')"
@@ -619,6 +633,29 @@ while IFS=$'\t' read -r label url; do
   fi
 done <<< "$WATCHED_PACKAGES"
 
+# One "matrix label<TAB>initiative id" record per line: a draft implementing
+# act pinned by the document ids Have your say serves it under.
+readonly WATCHED_INITIATIVES="\
+EHDS draft EEHRxF implementing act	17512
+EHDS draft testing environment implementing act	17513"
+
+while IFS=$'\t' read -r label initiative; do
+  [[ -n "$label" ]] || continue
+  url="https://ec.europa.eu/info/law/better-regulation/brpapi/groupInitiatives/$initiative"
+  pinned="$(matrix_pin "$label")"
+  if [[ -z "$pinned" ]]; then
+    printf 'UNREADABLE %s: no pin row in %s\n' "$label" "$MATRIX"
+    unreadable=1
+    continue
+  fi
+  if ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$url" | initiative_newest 2>&1)"; then
+    printf 'UNREADABLE %s: could not read the newest publication at %s (%s)\n' "$label" "$url" "$latest"
+    unreadable=1
+    continue
+  fi
+  verdict "$label" "$pinned" "$latest" "$url"
+  [[ "$pinned" = "$latest" ]] || stale=1
+done <<< "$WATCHED_INITIATIVES"
 # Each MyHealth@EU CI build, read against the build its URL serves now: the
 # version and date of its package.manifest.json, and the sha256 of its bytes,
 # since the publisher overwrites a build in place.
