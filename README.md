@@ -15,12 +15,12 @@
 **Project**<br>
 [![Release](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver&logo=github&label=release)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroBRIDGE/ci.yml?branch=main&logo=githubactions&logoColor=white&label=CI)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml)
-[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue)](LICENSE)
+[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTEyIDN2MThNNyAyMWgxME00IDdoMTZNNCA3TDEgMTRhMyAzIDAgMCAwIDYgMFpNMjAgN2wtMyA3YTMgMyAwIDAgMCA2IDBaIi8%2BPC9zdmc%2B)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-ferrobridge.eu-blue?logo=mdbook)](https://ferrobridge.eu/docs/)
 [![GHCR](https://img.shields.io/badge/ghcr.io-ferrobridge-2496ED?logo=docker&logoColor=white)](https://github.com/FerroHEALTH/FerroBRIDGE/pkgs/container/ferrobridge)
 
 **Quality and security**<br>
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroBRIDGE/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroBRIDGE)
+[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/FerroHEALTH/FerroBRIDGE?label=openssf%20scorecard&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTEyIDJsOCAzdjZjMCA1LTMuNSA5LjUtOCAxMS00LjUtMS41LTgtNi04LTExVjVaTTguNSAxMmwyLjUgMi41IDQuNS01Ii8%2BPC9zdmc%2B)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroBRIDGE)
 [![Quality gate](https://img.shields.io/sonar/quality_gate/FerroHEALTH_FerroBRIDGE?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=quality%20gate)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroBRIDGE)
 [![Coverage](https://img.shields.io/sonar/coverage/FerroHEALTH_FerroBRIDGE?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroBRIDGE)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroBRIDGE/codeql.yml?branch=main&logo=github&label=CodeQL)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml)
@@ -28,6 +28,7 @@
 [![SLSA Build L3](https://slsa.dev/images/gh-badge-level3.svg)](SECURITY.md#verifying-a-release)
 
 **Conformance and compliance**<br>
+<sub>(self-tested and self-assessed counts; none is a certification)</sub><br>
 [![FHIRconnect mapping library](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Ffhirconnect-mapping-lib.json)](conformance/fhirconnect-mapping-lib/pass-list.txt)
 [![FHIRconnect REST API](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Frest-api.json)](conformance/rest-api/pass-list.txt)
 [![OMOCL mapping library](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fomocl.json)](conformance/omocl/pass-list.txt)
@@ -45,9 +46,9 @@
 [![HL7 v2 message corpora](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2.json)](conformance/hl7v2/pass-list.txt)
 [![HL7 v2 smoke corpora (NIST, AIRA)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2-smoke.json)](conformance/hl7v2-smoke/pass-list.txt)
 <br>
-[![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
+[![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
 
-**EHDS and EEHRxF**: self-tests against the named build, never a certification<br>
+**EHDS and EEHRxF**<br>
 [![EEHRxF draft 2026-11-23, Patient Summary](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Feehrxf-draft-patient-summary.json)](conformance/eehrxf-draft-patient-summary/pass-list.txt)
 [![EEHRxF draft 2026-11-23, ePrescription](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Feehrxf-draft-eprescription.json)](conformance/eehrxf-draft-eprescription/pass-list.txt)
 [![EEHRxF draft 2026-11-23, eDispensation](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Feehrxf-draft-edispensation.json)](conformance/eehrxf-draft-edispensation/pass-list.txt)
