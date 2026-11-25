@@ -3,7 +3,7 @@
 
 //! Every replica runs the running revision.
 //!
-//! The replica listens on [`CHANNEL`]; a notification, and every connect of
+//! The replica listens on [`MAPPINGS`]; a notification, and every connect of
 //! the listener, wakes one task that reads the running revision and, when it
 //! is not the one this replica compiled, compiles it with the provisioned
 //! files and swaps it in as a reload does. A revision that does not compile
@@ -14,27 +14,12 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::mappings::revisions::CHANNEL;
 use crate::operator::Operator;
 use crate::operator::save::{Failure, blocking};
-use crate::store::listen::{Dropping, Listened, Subscriber};
+use crate::store::listen::{Listened, MAPPINGS, Wake};
 
 /// The pause before a revision that did not swap in is tried again.
 pub const RETRY: Duration = Duration::from_secs(5);
-
-/// The wake of the converging task.
-#[derive(Debug, Default)]
-struct Wake(tokio::sync::Notify);
-
-impl Subscriber for Wake {
-    fn notified<'a>(&'a self, _payload: &'a str) -> Dropping<'a> {
-        Box::pin(async move { self.0.notify_one() })
-    }
-
-    fn reset(&self) -> Dropping<'_> {
-        Box::pin(async move { self.0.notify_one() })
-    }
-}
 
 /// When an attempt compiles the running revision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,12 +74,12 @@ impl Operator {
 /// Starts the task that runs each revision that becomes the running one.
 ///
 /// The task is detached and ends with the runtime. Returns the state of
-/// [`CHANNEL`], through which the replica's `LISTEN` session wakes it;
+/// [`MAPPINGS`], through which the replica's `LISTEN` session wakes it;
 /// `None` when `operator` saves no revisions.
 pub fn start(operator: &Arc<Operator>) -> Option<Arc<Listened>> {
     operator.revisions()?;
-    let wake = Arc::new(Wake::default());
-    let listened = Arc::new(Listened::with_subscriber(CHANNEL, wake.clone()));
+    let wake = Arc::new(Wake::one());
+    let listened = Arc::new(Listened::with_subscriber(MAPPINGS.name(), wake.clone()));
     tokio::spawn(converging(Arc::clone(operator), wake));
     Some(listened)
 }
@@ -117,11 +102,11 @@ async fn converging(operator: Arc<Operator>, wake: Arc<Wake>) {
     loop {
         if failed {
             tokio::select! {
-                () = wake.0.notified() => {}
+                () = wake.armed() => {}
                 () = tokio::time::sleep(RETRY) => {}
             }
         } else {
-            wake.0.notified().await;
+            wake.armed().await;
         }
         match operator.converge(When::Changed).await {
             Ok(Converged::Current) => failed = false,
