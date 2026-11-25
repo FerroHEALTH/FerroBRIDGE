@@ -16,7 +16,7 @@
 
 use crate::containers::{
     CDR, CDR_DATABASE_ROLE, CDR_PORT, CDR_POSTGRES, Cdr, HarnessError, NETWORK_SEQUENCE,
-    POSTGRES_PORT, await_readiness, cdr_request, postgres_health_check,
+    POSTGRES_PORT, PinnedImage, await_readiness, cdr_request, postgres_health_check,
 };
 use serde::Serialize;
 use std::sync::atomic::Ordering;
@@ -39,18 +39,20 @@ pub(crate) struct Placement {
     pub(crate) dsn: String,
 }
 
-/// Starts the PostgreSQL the reference CDR image documents, on a network of
+/// Starts the PostgreSQL of `image`, the one the reference CDR image documents, on a network of
 /// its own, and returns it with where the CDR reaches it.
 ///
 /// # Errors
 ///
 /// Returns [`HarnessError::Container`] when Docker refuses the container.
-pub(crate) async fn database() -> Result<(ContainerAsync<GenericImage>, Placement), HarnessError> {
+pub(crate) async fn database(
+    image: PinnedImage,
+) -> Result<(ContainerAsync<GenericImage>, Placement), HarnessError> {
     let sequence = NETWORK_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let process = std::process::id();
     let network = format!("ferrobridge-e2e-{process}-{sequence}");
     let database_name = format!("ferrobridge-e2e-db-{process}-{sequence}");
-    let database = CDR_POSTGRES
+    let database = image
         .image()
         .with_wait_for(WaitFor::healthcheck())
         .with_health_check(postgres_health_check(CDR_DATABASE_ROLE, CDR_DATABASE_ROLE))
@@ -60,7 +62,7 @@ pub(crate) async fn database() -> Result<(ContainerAsync<GenericImage>, Placemen
         .start()
         .await
         .map_err(|source| HarnessError::Container {
-            image: CDR_POSTGRES.repository,
+            image: image.repository,
             source,
         })?;
     let dsn = format!(
@@ -280,10 +282,10 @@ impl RelayClient {
 pub async fn relay(client: &RelayClient) -> Result<Cdr, RelayError> {
     let configuration = client.configuration()?;
     let keys = serde_json::to_vec(&client.keys).map_err(RelayError::Keys)?;
-    let (database, placement) = database().await?;
+    let (database, placement) = database(CDR_POSTGRES).await?;
     let first = serve(
         database,
-        cdr_request(placement.dsn.clone(), placement.network.clone()),
+        cdr_request(CDR, placement.dsn.clone(), placement.network.clone()),
     )
     .await?;
     upload(first.base_url(), &client.templates).await?;
@@ -291,7 +293,7 @@ pub async fn relay(client: &RelayClient) -> Result<Cdr, RelayError> {
         server, database, ..
     } = first;
     server.rm().await.map_err(RelayError::Remove)?;
-    let request = cdr_request(placement.dsn, placement.network)
+    let request = cdr_request(CDR, placement.dsn, placement.network)
         .with_env_var("FERROEHR__AUTH__ENABLED", "true")
         .with_env_var("FERROEHR_CONFIG", CONFIG_PATH)
         .with_copy_to(CONFIG_PATH, configuration.into_bytes())

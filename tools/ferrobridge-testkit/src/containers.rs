@@ -6,7 +6,8 @@
 //! A container-backed test asks [`e2e_enabled`] first and returns without
 //! touching Docker when the gate is unset, so the ordinary suite stays offline.
 //! Every image is pinned by tag and digest in [`POSTGRES`], [`CDR`],
-//! [`CDR_POSTGRES`] and [`TERMINOLOGY`], which `docs/VERSIONS.md` repeats and
+//! [`CDR_POSTGRES`], [`CDR_MAIN`], [`CDR_MAIN_POSTGRES`], [`TERMINOLOGY`] and
+//! [`FERROSMART`], which `docs/VERSIONS.md` repeats and
 //! `scripts/checks/versions.sh` compares.
 //!
 //! No specification governs the harness; it is FerroBRIDGE's own design.
@@ -181,6 +182,28 @@ pub const CDR_POSTGRES: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr-postgres",
     tag: "5.7.0",
     digest: "sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a",
+};
+
+/// The reference CDR as its `main` branch publishes it, which the Yellow
+/// Button journey runs against until `FerroEHR` 6.0.0 is released (#2018).
+pub const CDR_MAIN: PinnedImage = PinnedImage {
+    repository: "ghcr.io/ferrohealth/ferroehr",
+    tag: "main",
+    digest: "sha256:482c3f3cbcef8dfc213330e1bc50d33a83cec5cfe246f79e0a1cdd8553ec7a22",
+};
+
+/// The PostgreSQL image published with [`CDR_MAIN`].
+pub const CDR_MAIN_POSTGRES: PinnedImage = PinnedImage {
+    repository: "ghcr.io/ferrohealth/ferroehr-postgres",
+    tag: "main",
+    digest: "sha256:7d71098414533dadb712d01a4ca5846a1b1a88b11dfcbffec6e6a8a2bcd59fd2",
+};
+
+/// The `FerroHEALTH` SMART App Launch 2.x authorization server.
+pub const FERROSMART: PinnedImage = PinnedImage {
+    repository: "ghcr.io/ferrohealth/ferrosmart",
+    tag: "0.6.0",
+    digest: "sha256:28ca6593c5055390c5cb9796f9b183519e1323ffe1fb70d7cf260316db6467cc",
 };
 
 /// The reference FHIR terminology server.
@@ -577,8 +600,20 @@ pub async fn postgres_tls(material: &TlsMaterial) -> Result<Postgres, HarnessErr
 /// [`HarnessError::Probe`] when the readiness probe cannot be sent, and
 /// [`HarnessError::NotReady`] when the CDR does not answer it in time.
 pub async fn cdr() -> Result<Cdr, HarnessError> {
-    let (database, placement) = crate::facility_cdr::database().await?;
-    let request = cdr_request(placement.dsn.clone(), placement.network.clone());
+    let (database, placement) = crate::facility_cdr::database(CDR_POSTGRES).await?;
+    let request = cdr_request(CDR, placement.dsn.clone(), placement.network.clone());
+    crate::facility_cdr::serve(database, request).await
+}
+
+/// Starts the reference CDR of [`CDR_MAIN`] with its own PostgreSQL of
+/// [`CDR_MAIN_POSTGRES`], as [`cdr`] starts the released one.
+///
+/// # Errors
+///
+/// As [`cdr`].
+pub async fn cdr_main() -> Result<Cdr, HarnessError> {
+    let (database, placement) = crate::facility_cdr::database(CDR_MAIN_POSTGRES).await?;
+    let request = cdr_request(CDR_MAIN, placement.dsn.clone(), placement.network.clone());
     crate::facility_cdr::serve(database, request).await
 }
 
@@ -609,15 +644,20 @@ fn terminology_request(directories: &[(&str, &str)]) -> ContainerRequest<Generic
     request
 }
 
-/// Returns the request that starts the reference CDR against `dsn` on
+/// Returns the request that starts the reference CDR of `image` against `dsn` on
 /// `network`.
 ///
 /// The usage report is switched off: a container does not inherit the CI
 /// runner's environment, so the CDR's own CI detection cannot see that it runs
 /// in a test, and every run would report itself as an installation. The EHR
 /// index is the CDR's own, since the harness runs no patient identity source.
-pub(crate) fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
-    CDR.image()
+pub(crate) fn cdr_request(
+    image: PinnedImage,
+    dsn: String,
+    network: String,
+) -> ContainerRequest<GenericImage> {
+    image
+        .image()
         .with_wait_for(WaitFor::message_on_stdout("ferroehr-rest listening"))
         .with_exposed_port(CDR_PORT.tcp())
         .with_network(network)
@@ -734,13 +774,21 @@ pub async fn rabbitmq() -> Result<RabbitMq, HarnessError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CDR, CDR_POSTGRES, POSTGRES, PinnedImage, TERMINOLOGY, TERMINOLOGY_FIXTURES, cdr_request,
-        terminology_request,
+        CDR, CDR_MAIN, CDR_MAIN_POSTGRES, CDR_POSTGRES, FERROSMART, POSTGRES, PinnedImage,
+        TERMINOLOGY, TERMINOLOGY_FIXTURES, cdr_request, terminology_request,
     };
 
     #[test]
     fn every_pin_names_a_tag_and_a_digest() {
-        for image in [POSTGRES, CDR, CDR_POSTGRES, TERMINOLOGY] {
+        for image in [
+            POSTGRES,
+            CDR,
+            CDR_POSTGRES,
+            CDR_MAIN,
+            CDR_MAIN_POSTGRES,
+            TERMINOLOGY,
+            FERROSMART,
+        ] {
             assert!(!image.tag.is_empty(), "{} has no tag", image.repository);
             assert!(
                 image.digest.starts_with("sha256:"),
@@ -762,7 +810,7 @@ mod tests {
 
     #[test]
     fn the_cdr_starts_with_its_usage_report_off() {
-        let request = cdr_request("postgres://cdr".to_owned(), "net".to_owned());
+        let request = cdr_request(CDR, "postgres://cdr".to_owned(), "net".to_owned());
         let usage_report = request
             .env_vars()
             .find(|(name, _)| name == "FERROEHR__USAGE_REPORT__ENABLED")

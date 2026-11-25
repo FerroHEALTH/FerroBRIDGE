@@ -14,7 +14,7 @@
 //! committer of every commit from the bound party. No specification governs
 //! the harness: our own design, after the reference CDR's quickstart.
 
-use crate::containers::{Cdr, HarnessError, cdr_request};
+use crate::containers::{CDR, CDR_POSTGRES, Cdr, HarnessError, cdr_request};
 use crate::facility_cdr::{database, serve};
 use crate::oidc::{Provider, ProviderError};
 use testcontainers::ImageExt;
@@ -213,10 +213,10 @@ enabled = false
 pub async fn bound(provider: &Provider, templates: &[(&str, &str)]) -> Result<Bound, BoundError> {
     let (password, password_hash) = password()?;
     let keys = serde_json::to_vec(&provider.jwks()).map_err(BoundError::Keys)?;
-    let (database, placement) = database().await?;
+    let (database, placement) = database(CDR_POSTGRES).await?;
     let first = serve(
         database,
-        cdr_request(placement.dsn.clone(), placement.network.clone()),
+        cdr_request(CDR, placement.dsn.clone(), placement.network.clone()),
     )
     .await?;
     let http = reqwest::Client::new();
@@ -247,7 +247,7 @@ pub async fn bound(provider: &Provider, templates: &[(&str, &str)]) -> Result<Bo
         server, database, ..
     } = first;
     server.rm().await.map_err(BoundError::Remove)?;
-    let request = cdr_request(placement.dsn, placement.network)
+    let request = cdr_request(CDR, placement.dsn, placement.network)
         .with_env_var("FERROEHR__AUTH__ENABLED", "true")
         .with_env_var("FERROEHR_CONFIG", CONFIG_PATH)
         .with_copy_to(

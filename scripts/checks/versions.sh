@@ -601,7 +601,10 @@ if [[ -f "$harness" ]] && [[ -f docs/VERSIONS.md ]]; then
     "PostgreSQL image|POSTGRES" \
     "FerroEHR CDR image|CDR" \
     "FerroEHR CDR database image|CDR_POSTGRES" \
-    "FerroTERM terminology server image|TERMINOLOGY"; do
+    "FerroEHR main CDR image|CDR_MAIN" \
+    "FerroEHR main CDR database image|CDR_MAIN_POSTGRES" \
+    "FerroTERM terminology server image|TERMINOLOGY" \
+    "FerroSMART authorization server image|FERROSMART"; do
     item="${image%%|*}"
     constant="${image##*|}"
     expected=$((expected + 1))
