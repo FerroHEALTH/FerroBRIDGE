@@ -43,6 +43,7 @@ mod mapping_walk;
 mod omop;
 mod operations;
 mod operator;
+mod post_quantum;
 mod quality;
 mod readiness;
 mod run;

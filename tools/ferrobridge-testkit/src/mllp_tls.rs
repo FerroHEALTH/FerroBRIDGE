@@ -29,6 +29,8 @@ use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_rustls::client::TlsStream;
 
+use crate::post_quantum::Peer;
+
 /// The material could not be generated or used.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -136,18 +138,21 @@ impl Pki {
         })
     }
 
-    /// Returns a connector that trusts the CA and presents `identity`, or no
-    /// certificate when none is given.
+    /// Returns a connector that trusts the CA, offers `peer`'s key exchange
+    /// groups and presents `identity`, or no certificate when none is given.
     ///
     /// # Errors
     ///
     /// Returns [`PkiError::Pem`] or [`PkiError::Tls`] when the configuration
     /// cannot be built.
-    pub fn connector(&self, identity: Option<&ClientIdentity>) -> Result<TlsConnector, PkiError> {
-        let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    pub fn connector(
+        &self,
+        identity: Option<&ClientIdentity>,
+        peer: Peer,
+    ) -> Result<TlsConnector, PkiError> {
         let mut roots = RootCertStore::empty();
         roots.add(CertificateDer::from_pem_slice(self.ca().as_bytes())?)?;
-        let builder = ClientConfig::builder_with_provider(provider)
+        let builder = ClientConfig::builder_with_provider(peer.provider())
             .with_safe_default_protocol_versions()?
             .with_root_certificates(roots);
         let config = match identity {

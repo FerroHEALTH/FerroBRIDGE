@@ -33,16 +33,6 @@ pub struct ParkedItem {
     pub since: String,
 }
 
-/// How a parked item is settled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Settlement {
-    /// Run it again.
-    Retry,
-    /// Leave it unapplied for good.
-    Discard,
-}
-
 /// `POST /operator/sources/{id}/settle`: the body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -52,7 +42,7 @@ pub struct Settle {
     /// Its entity.
     pub entity: String,
     /// How it is settled.
-    pub settlement: Settlement,
+    pub settlement: crate::events::Decision,
     /// Why, recorded with the operator who decided.
     pub reason: String,
 }
