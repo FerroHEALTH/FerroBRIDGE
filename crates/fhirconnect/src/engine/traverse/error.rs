@@ -6,6 +6,7 @@
 use core::fmt;
 
 use openehr_mapping_core::composition::PositionError;
+use openehr_mapping_core::index::ResolvedNode;
 use openehr_mapping_core::template::PathError;
 use openehr_rm::v1_2::paths::EhrUriError;
 use openehr_rm::v1_2::paths::write::SetPathError;
@@ -20,6 +21,8 @@ use crate::engine::rm::RmError;
 use crate::engine::seam::ReferenceError;
 use crate::engine::terminology::TerminologyError;
 use crate::resolve::program::hierarchy::Create;
+use crate::resolve::program::mapping::Mapping;
+use crate::resolve::program::target::FhirTarget;
 use openehr_mapping_core::party::PartyClass;
 use openehr_mapping_core::party::PartyError;
 
@@ -436,6 +439,32 @@ pub enum EngineError {
         #[source]
         breach: Breach,
     },
+}
+
+impl EngineError {
+    /// Returns the refusal of the cell that converts `target` for `mapping`.
+    pub(crate) fn cell<'run>(
+        mapping: &'run Mapping,
+        target: &'run FhirTarget,
+    ) -> impl Fn(LensError) -> Self + Copy + 'run {
+        |source| Self::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(source),
+        }
+    }
+
+    /// Returns the refusal of the value `mapping` carries at `node`.
+    pub(crate) fn rm<'run>(
+        mapping: &'run Mapping,
+        node: &'run ResolvedNode,
+    ) -> impl Fn(RmError) -> Self + Copy + 'run {
+        |source| Self::Rm {
+            mapping: String::from(mapping.name()),
+            node: String::from(node.aql_path().as_str()),
+            source: Box::new(source),
+        }
+    }
 }
 
 /// Why an event time cannot be carried between a FHIR time and an `EVENT`.

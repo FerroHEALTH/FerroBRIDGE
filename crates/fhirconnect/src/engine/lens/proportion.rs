@@ -22,6 +22,8 @@ use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::text_of;
+use crate::engine::lens::number::render;
+use crate::engine::lens::quantified;
 use crate::model::ast::keyword::Direction;
 
 /// The name this cell carries in a diagnostic.
@@ -104,33 +106,18 @@ impl Lens<DvProportion, Quantity> for PercentLens {
             reason: "a proportion's numerator is a real number",
             direction: Direction::FhirToOpenehr,
         })?;
-        Ok(DvProportion {
-            normal_status: existing.and_then(|held| held.normal_status.clone()),
-            normal_range: existing.and_then(|held| held.normal_range.clone()),
-            other_reference_ranges: existing.and_then(|held| held.other_reference_ranges.clone()),
-            magnitude_status: existing.and_then(|held| held.magnitude_status.clone()),
+        Ok(quantified!(DvProportion, existing, {
             accuracy: existing.and_then(|held| held.accuracy),
             accuracy_is_percent: existing.and_then(|held| held.accuracy_is_percent),
             numerator,
             denominator: PERCENT_DENOMINATOR,
             r#type: ProportionKind::PkPercent.value(),
             precision: places(text),
-        })
+        }))
     }
 
     fn fallbacks(&self, _view: &Quantity) -> Vec<Fallback> {
         Vec::new()
-    }
-}
-
-/// Renders a real to the number of decimal places the proportion declares.
-///
-/// `precision` is "the number of decimal places", and -1 means no limit, so a
-/// negative or absent precision renders the shortest form that reads back.
-fn render(value: f64, precision: Option<i32>) -> String {
-    match precision.and_then(|places| usize::try_from(places).ok()) {
-        Some(places) => format!("{value:.places$}"),
-        None => format!("{value}"),
     }
 }
 
