@@ -25,6 +25,11 @@
 //! `[cdr.endpoint.credentials.onward]`, with a token the caller's was exchanged for
 //! (`crate::cdr::onward`).
 
+use crate::assurance::Assurance;
+use crate::assurance::AssuranceError;
+use crate::assurance::Guarded;
+use crate::assurance::Minimums;
+use crate::assurance::RouteClass;
 use crate::mount::BASE_PATH;
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -89,6 +94,8 @@ pub struct SmartSettings {
     /// The scope that guards the operator API and admits the operations that
     /// commit nothing.
     pub operator_scope: String,
+    /// The assurance level each guarded route class requires, `[assurance]`.
+    pub assurance: Minimums,
 }
 
 impl SmartSettings {
@@ -105,7 +112,29 @@ impl SmartSettings {
             realm: None,
             options: SmartOptions::default(),
             operator_scope: String::from(OPERATOR_SCOPE),
+            assurance: Minimums::default(),
         }
+    }
+
+    /// Returns the assurance check of these settings over each issuer's
+    /// `acr` mapping.
+    ///
+    /// # Errors
+    ///
+    /// The [`AssuranceError`] of a class minimum no issuer reaches, or of a
+    /// mapped value the step-up challenge cannot carry.
+    pub fn assurance_check(&self) -> Result<Assurance, AssuranceError> {
+        Assurance::new(
+            self.assurance,
+            self.issuers
+                .iter()
+                .map(|issuer| (issuer.issuer.as_str(), issuer.assurance.as_ref()))
+                .chain(
+                    self.introspection
+                        .iter()
+                        .map(|issuer| (issuer.issuer.as_str(), issuer.assurance.as_ref())),
+                ),
+        )
     }
 }
 
@@ -142,6 +171,13 @@ pub enum SmartError {
         /// Why `describe` refused.
         #[source]
         source: DescribeError,
+    },
+    /// The `[assurance]` section cannot be held to.
+    #[error("[assurance] is refused")]
+    Assurance {
+        /// The rule it breaks.
+        #[source]
+        source: AssuranceError,
     },
     /// The issuer the discovery document names publishes no token endpoint,
     /// which the document requires (SMART App Launch 2.2.0, Conformance,
@@ -197,6 +233,8 @@ pub struct Smart {
     options: SmartOptions,
     /// The operator scope.
     operator_scope: String,
+    /// The assurance level each guarded route class requires.
+    assurance: Arc<Assurance>,
 }
 
 impl Smart {
@@ -213,8 +251,12 @@ impl Smart {
     /// an introspection check cannot start, [`SmartError::Described`] when no
     /// issuer can be described, and
     /// [`SmartError::NoTokenEndpoint`] when the issuer the documents name
-    /// names no token endpoint.
+    /// names no token endpoint, and [`SmartError::Assurance`] when
+    /// `[assurance]` cannot be held to.
     pub async fn discover(settings: SmartSettings) -> Result<Self, SmartError> {
+        let assurance = settings
+            .assurance_check()
+            .map_err(|source| SmartError::Assurance { source })?;
         let (issuers, candidates) = Self::issuers(settings.issuers, settings.introspection).await?;
         let described = describe(candidates, settings.described_issuer.as_ref())
             .map_err(|source| SmartError::Described { source })?;
@@ -240,6 +282,7 @@ impl Smart {
             token_endpoint,
             options: settings.options,
             operator_scope: settings.operator_scope,
+            assurance: Arc::new(assurance),
         })
     }
 
@@ -300,6 +343,16 @@ impl Smart {
     #[must_use]
     pub fn operator_scope(&self) -> &str {
         &self.operator_scope
+    }
+
+    /// Returns the layer state that holds `class` to its assurance level.
+    #[must_use]
+    pub fn assurance(&self, class: RouteClass) -> Arc<Guarded> {
+        Arc::new(Guarded::new(
+            Arc::clone(&self.assurance),
+            class,
+            self.gate.realm().map(str::to_owned),
+        ))
     }
 
     /// Returns the SMART discovery document, listing as `scopes_supported`

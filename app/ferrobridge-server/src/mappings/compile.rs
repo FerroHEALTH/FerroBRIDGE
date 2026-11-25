@@ -40,6 +40,13 @@ pub const NO_TEMPLATE_ID: &str = "fb-no-template-id";
 /// The code of a search declaration that does not bind to the set.
 pub const SEARCH_DECLARATION: &str = "fb-search-declaration";
 
+/// The code of a FHIR Mapping Language map outside the grammar of
+/// `mapping.g4` (FHIR R4 §7.7).
+pub const STRUCTUREMAP_SYNTAX: &str = "fb-structuremap-syntax";
+
+/// The code of a map whose URL another map of the set carries.
+pub const STRUCTUREMAP_URL: &str = "fb-structuremap-url";
+
 /// Where one template came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateOrigin {
@@ -362,6 +369,13 @@ fn language(code: &str) -> DiagnosticCode {
 #[must_use]
 pub fn search_declaration(file: &Path, message: String) -> Diagnostic {
     Diagnostic::error(file, language(SEARCH_DECLARATION), message)
+}
+
+/// Returns the error diagnostic `code` of the map `file`, `message` saying
+/// why.
+#[must_use]
+pub fn structuremap(file: &Path, code: &str, message: String) -> Diagnostic {
+    Diagnostic::error(file, language(code), message)
 }
 
 /// Renders the error diagnostics of `diagnostics` as one line.
