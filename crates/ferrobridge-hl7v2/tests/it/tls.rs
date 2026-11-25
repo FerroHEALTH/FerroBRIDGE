@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! MLLP over TLS: a peer with a certificate from the configured authorities
-//! is served and its certificate reaches the handler, and a peer without one
-//! never completes the handshake. The certificate path is RFC 5280's as
+//! is served and its certificate reaches the handler, a peer without one never
+//! completes the handshake, and the key exchange prefers X25519MLKEM768
+//! (RFC 10024) and still serves a classical peer. The certificate path is RFC 5280's as
 //! `rustls` validates it; requiring one is our own design.
 
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use ferrobridge_hl7v2::mllp::Codec;
 use ferrobridge_hl7v2::mllp::listener::{Connection, Handler, Timeouts, serve_tls};
 use ferrobridge_hl7v2::mllp::tls;
 use ferrobridge_testkit::mllp_tls::{Pki, connect};
+use ferrobridge_testkit::post_quantum::{Peer, agreed};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -79,7 +81,9 @@ async fn a_peer_with_a_certificate_is_served_and_named() {
     let pki = Pki::generate().expect("the material");
     let (address, _stop) = start(&pki).await;
     let identity = pki.client(SENDER).expect("a client certificate");
-    let connector = pki.connector(Some(&identity)).expect("a connector");
+    let connector = pki
+        .connector(Some(&identity), Peer::Hybrid)
+        .expect("a connector");
     let mut stream = connect(address, &connector).await.expect("the handshake");
     stream
         .write_all(&frame(b"MSH|^~\\&|"))
@@ -93,6 +97,20 @@ async fn a_peer_with_a_certificate_is_served_and_named() {
     assert_eq!(b"\x0bnamed\x1c\x0d"[..], answer[..read]);
 }
 
+// NOTE: RFC 10024; the listener agrees on X25519MLKEM768 with a peer that offers
+// it, and on a classical group with one that does not.
+#[tokio::test]
+async fn the_listener_agrees_on_the_hybrid_group_and_still_serves_a_classical_peer() {
+    let pki = Pki::generate().expect("the material");
+    let (address, _stop) = start(&pki).await;
+    let identity = pki.client(SENDER).expect("a client certificate");
+    for peer in Peer::BOTH {
+        let connector = pki.connector(Some(&identity), peer).expect("a connector");
+        let stream = connect(address, &connector).await.expect("the handshake");
+        assert_eq!(Some(peer.agreed()), agreed(stream.get_ref().1), "{peer:?}");
+    }
+}
+
 #[tokio::test]
 async fn a_peer_with_another_name_is_served_as_a_stranger() {
     let pki = Pki::generate().expect("the material");
@@ -100,7 +118,9 @@ async fn a_peer_with_another_name_is_served_as_a_stranger() {
     let identity = pki
         .client("other.example.org")
         .expect("a client certificate");
-    let connector = pki.connector(Some(&identity)).expect("a connector");
+    let connector = pki
+        .connector(Some(&identity), Peer::Hybrid)
+        .expect("a connector");
     let mut stream = connect(address, &connector).await.expect("the handshake");
     stream.write_all(&frame(b"MSH|")).await.expect("sent");
     let mut answer = vec![0u8; 11];
@@ -115,7 +135,7 @@ async fn a_peer_with_another_name_is_served_as_a_stranger() {
 async fn a_peer_without_a_certificate_is_never_served() {
     let pki = Pki::generate().expect("the material");
     let (address, _stop) = start(&pki).await;
-    let connector = pki.connector(None).expect("a connector");
+    let connector = pki.connector(None, Peer::Hybrid).expect("a connector");
     // NOTE: RFC 8446 §4.4.2.4: a server that requires a client certificate aborts
     // the handshake; under TLS 1.3 the client may learn it only on its first read.
     let refused = match connect(address, &connector).await {

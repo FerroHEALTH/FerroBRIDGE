@@ -30,6 +30,7 @@ use ferrobridge_testkit::containers::Cdr;
 use ferrobridge_testkit::facility_cdr::{Facility, RelayClient, relay};
 use ferrobridge_testkit::mllp_tls::ClientIdentity;
 use ferrobridge_testkit::oidc::{Provider, TokenAnswer};
+use ferrobridge_testkit::post_quantum::Peer;
 use ferrohealth_smart::client::{ClientCredentials, Endpoint};
 use secrecy::SecretString;
 use tokio::io::AsyncWriteExt;
@@ -100,7 +101,7 @@ async fn send_as(
     identity: &ClientIdentity,
     message: &[u8],
 ) -> Result<String, Box<dyn Error>> {
-    let connector = PKI.connector(Some(identity))?;
+    let connector = PKI.connector(Some(identity), Peer::Hybrid)?;
     let mut stream = ferrobridge_testkit::mllp_tls::connect(serving.address, &connector).await?;
     stream.write_all(&frame(message)).await?;
     read_ack(&mut stream).await

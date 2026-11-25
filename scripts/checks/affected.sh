@@ -213,6 +213,10 @@ classify() {
     scripts/security/* | security/* | trivy.yaml | .trivyignore.yaml) echo inert ;;
     scripts/checks/todo-issues.sh | scripts/checks/usage-report-off.sh) echo inert ;;
     scripts/deploy-probe.sh) echo inert ;;
+    # The post-quantum inventory, its table and its badge are read by the CI
+    # `versions` job alone, which runs on every change.
+    conformance/post-quantum.tsv | conformance/badges/post-quantum.json) echo inert ;;
+    scripts/checks/post-quantum.sh | docs/post-quantum.md) echo inert ;;
     # The pass lists, the badges and the README badge block are read by the
     # conformance tests and scripts/checks/conformance.sh alone: a corpus's
     # list and badge by the one package that measures it, the script and the
