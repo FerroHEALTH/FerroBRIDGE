@@ -374,12 +374,7 @@ impl Config {
                 None
             },
             auth: if serves && self.guards_a_surface() {
-                auth::resolve_auth(
-                    &self.auth,
-                    &self.basic_grants,
-                    self.assurance,
-                    &self.facade.base_url,
-                )?
+                auth::resolve_auth(self)?
             } else {
                 None
             },

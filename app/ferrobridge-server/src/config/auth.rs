@@ -6,17 +6,16 @@
 use std::sync::Arc;
 
 use ferrohealth_smart::basic::PasswordStore;
-use ferrohealth_smart::config::AuthSection;
 use ferrohealth_smart::config::BasicGrants;
 use ferrohealth_smart::config::ConfigError;
 
 use super::error::Error;
-use crate::assurance::Minimums;
+use super::Config;
 use crate::smart::OPERATOR_SCOPE;
 use crate::smart::SmartSettings;
 
-/// Returns the resource server settings `auth` describes, `None` when it is
-/// off.
+/// Returns the resource server settings `config`'s `[auth]` describes,
+/// `None` when it is off.
 ///
 /// `ferrohealth-smart` checks the section: every `[auth.issuer.<name>]` with
 /// its audience (`base_url`, the facade's base, when the table names none),
@@ -26,23 +25,22 @@ use crate::smart::SmartSettings;
 /// §Capabilities, every listed scope, and the product scope in an extension
 /// form of Scopes and Launch Context, §Extensibility. The product scope is
 /// the bridge's operator scope, [`OPERATOR_SCOPE`] when the section names
-/// none. Each Basic user is granted the scopes and roles `grants` holds
-/// for its user-id. An issuer with `mode = "introspection"` is checked by RFC 7662 in
+/// none. Each Basic user is granted the scopes and roles `[basic_grants]`
+/// holds for its user-id. An issuer with `mode = "introspection"` is checked by RFC 7662 in
 /// place of its key set. A section the crate resolves to Basic users alone
 /// is refused: the bridge names an issuer's token endpoint in its discovery
 /// document and its `CapabilityStatement`. The crate refuses a grant
 /// naming a user `[[auth.basic.users]]` does not list, and a grant of a
 /// `system/` scope, naming the user and the scope: a Basic credential is a
-/// person's. `assurance` is the minimum of each route class, refused when no
-/// issuer's `acr` mapping reaches it.
-pub(super) fn resolve_auth(
-    auth: &AuthSection,
-    grants: &BasicGrants,
-    assurance: Minimums,
-    base_url: &str,
-) -> Result<Option<SmartSettings>, Error> {
-    let resolved = auth
-        .resolve_with_tls(&ferrohealth_smart::config::ServerTls, &[base_url])
+/// person's. An `[assurance]` minimum no issuer's `acr` mapping reaches is
+/// refused.
+pub(super) fn resolve_auth(config: &Config) -> Result<Option<SmartSettings>, Error> {
+    let resolved = config
+        .auth
+        .resolve_with_tls(
+            &ferrohealth_smart::config::ServerTls,
+            &[config.facade.base_url.as_str()],
+        )
         .map_err(|source| Error::Auth {
             source: Box::new(source),
         })?;
@@ -61,13 +59,13 @@ pub(super) fn resolve_auth(
         issuers: resolved.issuers,
         introspection: resolved.introspection,
         described_issuer: resolved.described_issuer,
-        basic: granted(resolved.basic, grants)?.map(Arc::new),
+        basic: granted(resolved.basic, &config.basic_grants)?.map(Arc::new),
         realm: resolved.realm,
         options,
         operator_scope: resolved
             .product_scope
             .unwrap_or_else(|| String::from(OPERATOR_SCOPE)),
-        assurance,
+        assurance: config.assurance,
     };
     settings
         .assurance_check()
