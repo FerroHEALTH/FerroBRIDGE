@@ -73,6 +73,7 @@ pub fn locate(
 /// Template leaves out: `ACTION.time` and `HISTORY.origin`, each a
 /// `DV_DATE_TIME` that occurs once (openEHR RM EHR Information Model, the
 /// `ACTION` and `HISTORY` classes).
+// TODO(#2122): delete once openehr-sdt places both instants (FerroHEALTH/FerroEHR#6566).
 fn rm_instant(index: &WebTemplateIndex, root: &ResolvedNode, path: &str) -> bool {
     let base = root.aql_path().as_str();
     match root.rm_type() {
