@@ -30,7 +30,7 @@ pub(super) const DESCRIBED: &[(&str, Result<&str, &str>)] = &[
     (
         "status",
         Err(
-            "EehrxfMhdDocumentReference holds docStatus to 0..0 (IHE MHD Minimal), and status is the reference's own availability",
+            "EehrxfMhdDocumentReference holds docStatus to 0..0 (IHE MHD Minimal), and status is the reference's own availability (upstream report #2231)",
         ),
     ),
     (
