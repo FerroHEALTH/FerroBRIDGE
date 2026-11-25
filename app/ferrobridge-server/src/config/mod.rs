@@ -381,15 +381,7 @@ impl Config {
             omop_incremental: omop_incremental::resolve(self)?,
             fhir_outbound: fhir_outbound::resolve(self)?,
             shl: shl::resolve(self)?,
-            hl7v2: if self.hl7v2.enabled {
-                Some(resolve_hl7v2(
-                    &self.hl7v2,
-                    self.facade.enabled,
-                    self.state.is_some(),
-                )?)
-            } else {
-                None
-            },
+            hl7v2: resolve_hl7v2(self)?,
             operations: OperationsSettings {
                 enabled: self.operations.enabled,
                 device_reference: self.operations.device_reference.clone(),

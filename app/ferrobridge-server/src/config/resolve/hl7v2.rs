@@ -11,10 +11,10 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use super::super::Config;
 use super::super::Hl7v2Settings;
 use super::super::error::Error;
 use super::super::hl7v2;
-use super::super::section::Hl7v2;
 use super::super::section::Hl7v2Tls;
 
 /// Returns whether listeners at `one` and `other` would take one port: the
@@ -70,15 +70,18 @@ fn timeout_of(span: ferrohealth_config::units::Duration) -> Option<Duration> {
     (!span.is_zero()).then(|| span.get())
 }
 
-/// Returns the HL7 v2 face `hl7v2` describes, refused without the facade it
+/// Returns the HL7 v2 face `config` turns on, refused without the facade it
 /// writes through, without the state store its senders are routed from, and
-/// without a listener.
-pub(in crate::config) fn resolve_hl7v2(
-    hl7v2: &Hl7v2,
-    facade: bool,
-    state: bool,
-) -> Result<Hl7v2Settings, Error> {
-    for (present, needs) in [(facade, "facade.enabled"), (state, "[state]")] {
+/// without a listener; `None` while it is off.
+pub(in crate::config) fn resolve_hl7v2(config: &Config) -> Result<Option<Hl7v2Settings>, Error> {
+    let hl7v2 = &config.hl7v2;
+    if !hl7v2.enabled {
+        return Ok(None);
+    }
+    for (present, needs) in [
+        (config.facade.enabled, "facade.enabled"),
+        (config.state.is_some(), "[state]"),
+    ] {
         if !present {
             return Err(Error::Needs {
                 key: String::from("hl7v2.enabled"),
@@ -130,7 +133,7 @@ pub(in crate::config) fn resolve_hl7v2(
             needs: String::from("[hl7v2.tls] or [hl7v2.plain]"),
         });
     }
-    Ok(Hl7v2Settings {
+    Ok(Some(Hl7v2Settings {
         listen,
         timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts {
             idle: timeout_of(hl7v2.idle_timeout),
@@ -139,5 +142,5 @@ pub(in crate::config) fn resolve_hl7v2(
         frame_limit,
         tls,
         plain,
-    })
+    }))
 }
