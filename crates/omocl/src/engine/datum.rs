@@ -115,7 +115,7 @@ pub(crate) fn read(node: &Value) -> Result<Option<Datum>, DatumError> {
         let element = decode::<Element>(node, class)?;
         return element
             .value
-            .map(|carried| value(carried, class))
+            .map(|carried| value(*carried, class))
             .transpose();
     }
     let dates: Vec<&str> = model::attributes(class)

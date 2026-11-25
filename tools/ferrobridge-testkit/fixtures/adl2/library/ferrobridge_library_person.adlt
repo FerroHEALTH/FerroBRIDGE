@@ -10,7 +10,7 @@ template (adl_version=2.4.0; rm_release=1.1.0)
     openEHR-EHR-COMPOSITION.ferrobridge_library_person.v1.0.0
 
 specialize
-    openEHR-EHR-COMPOSITION.person.v0
+    openEHR-EHR-COMPOSITION.person.v0.0.1-alpha
 
 language
     original_language = <[ISO_639-1::en]>

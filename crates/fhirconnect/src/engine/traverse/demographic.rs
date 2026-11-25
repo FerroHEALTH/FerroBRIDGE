@@ -180,7 +180,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok(RmValue::Party(match shape {
             Shape::Identifier => with_identifier(party, &identity),
             Shape::ExternalRef => PartyIdentifiedData {
-                external_ref: Some(identity.to_party_ref()),
+                external_ref: Some(Box::new(identity.to_party_ref())),
                 ..party
             },
         }))
@@ -211,7 +211,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if reference.is_none()
             && let Some(found) = named(
                 external_ref
-                    .as_ref()
+                    .as_deref()
                     .and_then(PartyIdentity::from_party_ref),
             )
         {

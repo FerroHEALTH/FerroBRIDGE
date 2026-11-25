@@ -152,12 +152,12 @@ impl WebTemplateIndex {
         let built = crate::release::build(
             |release| {
                 let options = BuildOptions::default().with_rm_version(release.spec_version());
-                build_composition_with(&document, self.web_template(), now, &options).map_err(
-                    |source| PathError::CompositionBuild {
+                build_composition_with(&document, self.web_template(), now, &options)
+                    .map(|composition| openehr_its::json::to_canonical_value(&composition))
+                    .map_err(|source| PathError::CompositionBuild {
                         template_id: self.template_id().to_owned(),
                         source: Box::new(source),
-                    },
-                )
+                    })
             },
             |refusal| PathError::InvalidComposition {
                 template_id: self.template_id().to_owned(),

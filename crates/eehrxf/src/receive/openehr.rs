@@ -199,30 +199,32 @@ impl Mapping {
             .and_then(|details| details.template_id.as_ref())
             .map(|template| template.value.clone())
             .ok_or(ReceiveMappingError::Untemplated)?;
-        let audit = composition.feeder_audit.get_or_insert_with(|| FeederAudit {
-            originating_system_item_ids: None,
-            feeder_system_item_ids: None,
-            original_content: None,
-            originating_system_audit: Box::new(FeederAuditDetails {
-                system_id: settings.device().to_owned(),
-                location: None,
-                subject: None,
-                provider: None,
-                time: None,
-                version_id: None,
-                other_details: None,
-            }),
-            feeder_system_audit: None,
+        let audit = composition.feeder_audit.get_or_insert_with(|| {
+            Box::new(FeederAudit {
+                originating_system_item_ids: None,
+                feeder_system_item_ids: None,
+                original_content: None,
+                originating_system_audit: Box::new(FeederAuditDetails {
+                    system_id: settings.device().to_owned(),
+                    location: None,
+                    subject: None,
+                    provider: None,
+                    time: None,
+                    version_id: None,
+                    other_details: None,
+                }),
+                feeder_system_audit: None,
+            })
         });
         if audit.original_content.is_some() {
             return Err(ReceiveMappingError::OriginalTaken);
         }
-        audit.original_content = Some(DvEncapsulated::DvParsable(DvParsable {
+        audit.original_content = Some(Box::new(DvEncapsulated::DvParsable(DvParsable {
             charset: None,
             language: None,
             value: original.to_owned(),
             formalism: FHIR_JSON.to_owned(),
-        }));
+        })));
         let canonical = serde_json::to_string(&composition)
             .map_err(|source| ReceiveMappingError::Encode { source })?;
         Ok(ReceivedComposition {
@@ -371,7 +373,7 @@ fn mark(items: &mut [ContentItem], provider: &PartyProxy) -> Result<usize, Subje
             ContentItem::Instruction(entry) => &mut entry.provider,
             ContentItem::Observation(entry) => &mut entry.provider,
         };
-        *named = Some(provider.clone());
+        *named = Some(Box::new(provider.clone()));
         marked = marked.saturating_add(1);
     }
     Ok(marked)
@@ -460,7 +462,7 @@ fn instruct(
                 if action.instruction_details.is_some() {
                     return Err(InstructionError::Taken);
                 }
-                action.instruction_details = Some(details.clone());
+                action.instruction_details = Some(Box::new(details.clone()));
                 named = named.saturating_add(1);
             }
             ContentItem::AdminEntry(_)

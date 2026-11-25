@@ -4,7 +4,9 @@
 //! Writing a facade answer onto the wire.
 //!
 //! Every response carries `Content-Type: application/fhir+json`
-//! (<https://hl7.org/fhir/R4/http.html#mime-type>), and every body is either a
+//! (<https://hl7.org/fhir/R4/http.html#mime-type>), but a document and the
+//! MHD resources, which a client may ask for as `application/fhir+xml`
+//! ([`formatted`]), and every body is either a
 //! FHIR resource or an `OperationOutcome` the facade authored
 //! (no specification governs this: our own design). A refusal that cannot be encoded is still a
 //! refusal: it answers `500` with a plain outcome rather than a truncated
@@ -23,6 +25,8 @@ use http::header;
 
 use crate::facade::ingest::Refused;
 use crate::facade::media::FHIR_JSON;
+use crate::facade::media::FHIR_XML;
+use crate::facade::media::Format;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::outcome::outcome;
@@ -91,7 +95,7 @@ impl Header {
 #[must_use]
 pub fn resource(status: StatusCode, body: &Object, headers: &[Header]) -> Response {
     match serde_json::to_vec(body) {
-        Ok(bytes) => assemble(status, bytes, headers),
+        Ok(bytes) => assemble(status, (bytes, FHIR_JSON), headers),
         Err(error) => {
             tracing::error!(
                 error = error.to_string(),
@@ -99,6 +103,30 @@ pub fn resource(status: StatusCode, body: &Object, headers: &[Header]) -> Respon
             );
             internal_failure()
         }
+    }
+}
+
+/// Returns the response carrying `body` under `status` in `format`, with
+/// `headers`.
+#[must_use]
+pub fn formatted(
+    status: StatusCode,
+    body: &Object,
+    format: Format,
+    headers: &[Header],
+) -> Response {
+    match format {
+        Format::Json => resource(status, body, headers),
+        Format::Xml => match fhir_types::xml::to_xml(&fhir_types::r4::schema::SCHEMAS, body) {
+            Ok(text) => assemble(status, (text.into_bytes(), FHIR_XML), headers),
+            Err(error) => {
+                tracing::error!(
+                    error = error.to_string(),
+                    "a facade body could not be written as XML"
+                );
+                internal_failure()
+            }
+        },
     }
 }
 
@@ -202,14 +230,18 @@ pub fn refusals(status: StatusCode, issues: &[Issue], headers: &[Header]) -> Ref
 /// headers still carry `ETag` and `Location`.
 #[must_use]
 pub fn minimal(status: StatusCode, headers: &[Header]) -> Response {
-    assemble(status, Vec::new(), headers)
+    assemble(status, (Vec::new(), FHIR_JSON), headers)
 }
 
 /// Builds the response from its parts.
-fn assemble(status: StatusCode, bytes: Vec<u8>, headers: &[Header]) -> Response {
+fn assemble(
+    status: StatusCode,
+    (bytes, media_type): (Vec<u8>, &'static str),
+    headers: &[Header],
+) -> Response {
     let mut response = Response::builder().status(status);
     if !bytes.is_empty() {
-        response = response.header(header::CONTENT_TYPE, FHIR_JSON);
+        response = response.header(header::CONTENT_TYPE, media_type);
     }
     for entry in headers {
         match HeaderValue::from_str(&entry.value) {
