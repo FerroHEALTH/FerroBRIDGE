@@ -69,6 +69,27 @@ pub fn locate(
     answer.ok_or_else(|| String::from("the template holds no such node"))
 }
 
+/// Whether `path` below `root` names the instant of an RM attribute the Web
+/// Template leaves out: `ACTION.time` and `HISTORY.origin`, each a
+/// `DV_DATE_TIME` that occurs once (openEHR RM EHR Information Model, the
+/// `ACTION` and `HISTORY` classes).
+fn rm_instant(index: &WebTemplateIndex, root: &ResolvedNode, path: &str) -> bool {
+    let base = root.aql_path().as_str();
+    match root.rm_type() {
+        "ACTION" => path == "time/value",
+        "OBSERVATION" => path
+            .strip_suffix("/origin/value")
+            .filter(|history| history.starts_with("data[") && !history.contains('/'))
+            .is_some_and(|history| {
+                let events = format!("{base}/{history}/events[");
+                index
+                    .nodes()
+                    .any(|node| node.aql_path().as_str().starts_with(&events))
+            }),
+        _ => false,
+    }
+}
+
 /// Places `path` under one placement `root` of the bound node.
 fn place(
     index: &WebTemplateIndex,
@@ -93,7 +114,13 @@ fn place(
             deepest = Some(candidate);
         }
     }
-    let value = deepest.ok_or_else(|| format!("the template holds no node at {target}"))?;
+    let Some(value) = deepest else {
+        return if kind == ParameterType::Date && rm_instant(index, root, path) {
+            Ok(None)
+        } else {
+            Err(format!("the template holds no node at {target}"))
+        };
+    };
     match kind {
         ParameterType::Token => {
             if value.aql_path().as_str() != target {

@@ -1111,6 +1111,13 @@ expression is a load error: the reference CDR's connector let `where()` and
   of the value of the system property" (§3.1.1.4.10). The
   `CapabilityStatement` documents the chain on each subject parameter while
   it is on (our own design).
+- **The draft EEHRxF Annex X groups are served as resources** (draft act
+  Art 7(2)) through the `eehrxf` Annex X project: one context per group
+  over FerroBRIDGE's patient summary and EHDS record templates, each with
+  the profile HL7 Europe Base and Core 2.0.1 gives the group and the IHE
+  QEDm 3.0.0 PCC-44 searches of its option as a search declaration beside
+  it (#2087). A date search may read `ACTION.time` and `HISTORY.origin`,
+  which the RM defines and the Web Template leaves out.
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a

@@ -875,6 +875,33 @@ Bundle generated on demand from the latest information the CDR holds.
 The read path, the empty reasons, the `404` for another patient and the
 refusal of an invalid document are FerroBRIDGE's own design.
 
+## The EEHRxF Annex X data groups as resources
+
+Art 7(2) of the draft EEHRxF implementing act (Have your say initiative
+17512, 2026-11-23) exchanges the 33 common data groups of its Annex X as
+individual resources as well as inside documents. The `eehrxf` crate ships
+the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
+(`eehrxf::mappings::ANNEX_X`), with a search declaration beside each
+context. Point `[mappings] directory` at a copy of it
+(`ANNEX_X.write_to(dir)` writes one) and load its two templates into the
+CDR: FerroBRIDGE's patient summary template and its EHDS record template.
+
+| Annex X group | Resource | Profile | Search (IHE QEDm 3.0.0 PCC-44) |
+|---|---|---|---|
+| EHDSAllergyIntolerance | `AllergyIntolerance` | `allergyIntolerance-eu-core` | `patient` (2:3.44.4.1.2.2) |
+| EHDSCondition | `Condition` | `condition-eu-core` | `patient`, `onset-date` (2:3.44.4.1.2.1.3) |
+| EHDSMedicationUse | `MedicationStatement` | `medicationStatement-eu-core` | `patient` with `_include=MedicationStatement:medication` (2:3.44.4.1.2.1.5) |
+| EHDSMedication | `Medication` | `medication-eu-core` | read, and included by the statement that references it |
+| EHDSImmunisation | `Immunization` | `immunization-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.6) |
+| EHDSObservation | `Observation` | FHIR R4 `bodyweight` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSProcedure | `Procedure` | `procedure-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.7) |
+
+The profiles other than `bodyweight` are HL7 Europe Base and Core 2.0.1.
+A body weight observation carries the category `vital-signs` and the LOINC
+code `29463-7` the profile fixes, so both are `fixed` tokens. The
+`conformance/eehrxf-annex-x` pass list records the groups served, and its
+badge counts them out of 33.
+
 ## `$validate` is a dry run of this server
 
 `POST /fhir/{type}/$validate` runs the whole inbound path up to the commit and
@@ -1017,7 +1044,9 @@ names the coded value itself, a `DV_CODED_TEXT`, a `DV_TEXT` or a
 `CODE_PHRASE`, and the facade reads its code and its system from that one
 value, so `[system]|[code]` never pairs the system of one diagnosis with the
 code of another. A `string` or a `date` names a data value, with any
-attribute below it.
+attribute below it. A `date` may also name `time/value` under an `ACTION`
+and `data[atNNNN]/origin/value` under an `OBSERVATION`: the RM defines both
+instants, each once, and the Web Template leaves them out.
 
 A `token` whose value the mapping writes as a constant, such as the category
 of every observation a context maps, has no openEHR path to compare. Declare
