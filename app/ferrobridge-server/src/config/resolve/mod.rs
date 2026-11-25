@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The resolution of each lane of the tree into the settings the run path
-//! holds.
+//! The resolution of each section of the tree into the settings the run path
+//! holds: one file per section, each a `resolve(&Config)` that answers the
+//! section's settings or `None` when it is off, and the one refusal of a
+//! section set without a neighbour it needs ([`needs`]).
 
 use super::error::Error;
 
