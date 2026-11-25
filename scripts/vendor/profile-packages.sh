@@ -381,8 +381,15 @@ keep_or_replace() {
 
 # Prints the PROVENANCE.md write_provenance writes, from its locals.
 render_provenance() {
-  local sha1_note="registry shasum"
+  local sha1_note="registry shasum" built="" ci=""
   [[ -z "$canonical" ]] || sha1_note="tarball"
+  # A canonical-site tarball whose URL names no version is a CI build, which
+  # its publisher overwrites in place.
+  if [[ -n "$canonical" && "$tarball_url" != *"/$ver/"* ]]; then
+    ci=1
+    built="
+- Built: $(jq -r '.date // "unstated"' "$dir/package/package.json") (the \`date\` field of \`package/package.json\`), a CI build"
+  fi
   cat << PROV
 <!-- This file describes third-party material fetched at build time; the bytes
      it describes keep their upstream terms and are never committed. -->
@@ -406,7 +413,7 @@ script with \`--stamp\`, and record the count and digest it prints.
 - Layout: the tarball's \`package/\` directory, extracted unchanged
 - Files: $files
 - Tree digest (sha256 over the sorted per-file \`sha256  path\` listing,
-  \`PROVENANCE.md\` excluded): \`$digest\`
+  \`PROVENANCE.md\` excluded): \`$digest\`$built
 - Declared dependencies (\`package/package.json\`): $deps$resolved
 - FHIR versions (\`fhirVersions\` of \`package/package.json\`): ${fhir:-none declared}
 - Stamped: $(corpus_fetched)
@@ -428,7 +435,18 @@ a cache keyed on \`scripts/vendor/profile-packages.sh --cache-key\`, and the
 script verifies the count and digest of a restored tree as it does of a
 download.
 PROV
-  if [[ -n "$canonical" ]]; then
+  if [[ -n "$ci" ]]; then
+    cat << PROV
+
+## Why a CI build
+
+The FHIR package registry lists no $ver of $pkg: the version is a
+continuous-integration build of the guide, served at an unversioned URL its
+publisher overwrites with every build. The pin is the sha256 in
+docs/VERSIONS.md, so a moved build is refused here and reported by
+\`scripts/checks/pin-freshness.sh\`, and a re-pin records the new build.
+PROV
+  elif [[ -n "$canonical" ]]; then
     cat << PROV
 
 ## Why the canonical site
@@ -851,10 +869,21 @@ PINS
   fi
   grep -qxF -- '- SHA-1 (registry shasum): s' "$work/rendered.md" || die "self-test: a registry tarball is not named by its registry shasum"
   ! grep -q '^## Why the canonical site' "$work/rendered.md" || die "self-test: a registry tarball says it came from a canonical site"
-  canonical=h
+  canonical=h tarball_url=https://example.org/ig/2.0.0/package.tgz
   render_provenance > "$work/rendered.md"
   grep -qxF -- '- SHA-1 (tarball): s' "$work/rendered.md" || die "self-test: a canonical-site tarball names a registry shasum"
   grep -q '^## Why the canonical site' "$work/rendered.md" || die "self-test: a canonical-site tarball does not say why"
+  ! grep -q '^- Built: ' "$work/rendered.md" || die "self-test: a released tarball is named a CI build"
+  # A canonical-site tarball at an unversioned URL is a CI build, named with
+  # its build date.
+  local dir="$work/ci"
+  mkdir -p "$dir/package"
+  printf '{"date":"20261124114216"}' > "$dir/package/package.json"
+  tarball_url=https://example.org/ig/package.tgz
+  render_provenance > "$work/rendered.md"
+  grep -q '^## Why a CI build' "$work/rendered.md" || die "self-test: a CI build does not say why"
+  grep -q '^- Built: 20261124114216 ' "$work/rendered.md" || die "self-test: a CI build does not name its build date"
+  ! grep -q '^## Why the canonical site' "$work/rendered.md" || die "self-test: a CI build says it is a release"
 
   # A row with a tarball and its sha256 is fetched from that URL; any other
   # row from the registry.

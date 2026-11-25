@@ -12,6 +12,13 @@
 #   scripts/checks/conformance.sh --check    # run and fail on any drift (CI)
 #   scripts/checks/conformance.sh --update fhir-r4b   # one corpus: its test, list, badge
 #
+# The MyHealth@EU corpora (#2083) are measured by HL7's FHIR Validator in
+# scripts/checks/fhir-validator.sh --myhealth-eu, which writes their results
+# under target/conformance/; this script runs no test for them. Named alone,
+# such a corpus compares or rewrites its list from that result, which must
+# exist; a run of every corpus compares one whose result is present and
+# otherwise keeps its list and badge as they are.
+#
 # A corpus name after the mode (or alone, to compare) runs that corpus's test
 # only and compares or rewrites only its list and badge. The README block is
 # still compared or rewritten. The family and version badges count both HL7 v2
@@ -64,6 +71,10 @@ readonly CORPUS_TESTS=(
   'fhirpath-r4-stu3 ferrobridge-fhirpath conformance_fhirpath_r4_stu3'
   'validator-agreement ferrobridge-validator conformance_the_validator_agrees_with_the_hl7_validator_on_its_corpus'
 )
+# The corpora HL7's FHIR Validator measures (scripts/checks/fhir-validator.sh
+# --myhealth-eu), whose results this script reads and never produces.
+readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc)
+
 # Whether $1 equals one of the remaining arguments.
 contains() {
   local needle=$1 item
@@ -101,7 +112,7 @@ test_of() {
 
 usage() {
   echo "usage: $0 [--update|--check] [corpus]" >&2
-  echo "corpora: ${CORPORA[*]}" >&2
+  echo "corpora: ${CORPORA[*]} ${EXTERNAL_CORPORA[*]}" >&2
   exit 2
 }
 
@@ -114,15 +125,21 @@ while [[ $# -gt 0 ]]; do
     -*) usage ;;
     *)
       [[ -z "$only" ]] || usage
-      test_of "$1" >/dev/null || { echo "conformance: no corpus is named $1" >&2; usage; }
+      test_of "$1" >/dev/null || contains "$1" "${EXTERNAL_CORPORA[@]}" \
+        || { echo "conformance: no corpus is named $1" >&2; usage; }
       only="$1"
       ;;
   esac
   shift
 done
 
+external_only=0
+if [[ -n "$only" ]] && contains "$only" "${EXTERNAL_CORPORA[@]}"; then
+  external_only=1
+fi
+
 # A missing cargo would otherwise read as every corpus test failing.
-if ! command -v cargo >/dev/null 2>&1; then
+if [[ "$external_only" -eq 0 ]] && ! command -v cargo >/dev/null 2>&1; then
   echo "conformance: cargo not found on PATH" >&2
   exit 1
 fi
@@ -171,8 +188,22 @@ label_of() {
     fhirpath-r4) echo "FHIRPath R4 test suite, N1" ;;
     fhirpath-r4-stu3) echo "FHIRPath R4 test suite, 3.0.0 STU functions" ;;
     validator-agreement) echo "R4 profile validator, agreement with the HL7 FHIR Validator" ;;
+    myhealth-eu-core) echo "MyHealth@EU Core $(ci_build_version myhealth.eu.fhir.core) (CI)" ;;
+    myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
+    myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
+    myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI), codes in its value sets" ;;
     *) return 1 ;;
   esac
+}
+
+# The version docs/VERSIONS.md pins for the MyHealth@EU CI build of package
+# $1, read from its profile package row, so a re-pin moves the badge label.
+ci_build_version() {
+  awk -F'|' -v want="$1" '
+    NF >= 4 && $3 ~ /tarball `https:\/\/build-fhir\.ehdsi\.eu\// {
+      k = $2; gsub(/[ `]/, "", k)
+      if (k == want) { split($3, t, /[[:space:]]+/); print t[2]; exit }
+    }' docs/VERSIONS.md
 }
 
 # The badge colour of k passing out of n: the share in quarters.
@@ -223,7 +254,8 @@ emit_badge() {
   fi
 }
 
-rm -rf "$OUT"
+# A MyHealth@EU corpus named alone reads the result the validator lane left.
+[[ "$external_only" -eq 1 ]] || rm -rf "$OUT"
 export FERROBRIDGE_CONFORMANCE_OUT="$PWD/$OUT"
 if [[ "$mode" = update ]]; then
   export FERROBRIDGE_CONFORMANCE_UPDATE=1
@@ -231,14 +263,14 @@ fi
 # The hl7v2-smoke corpus reads the HL7 v2 sets fetched at build time; the
 # script keeps a tree already at its pinned digest without a download. A run
 # of one corpus fetches only what that corpus reads.
-if [[ -z "$only" || "$only" = hl7v2* ]] && ! scripts/vendor/hl7v2-samples.sh --build-time; then
+if [[ "$external_only" -eq 0 ]] && [[ -z "$only" || "$only" = hl7v2* ]] && ! scripts/vendor/hl7v2-samples.sh --build-time; then
   echo "conformance: the build-time HL7 v2 sets could not be fetched" >&2
   exit 2
 fi
 
 # The FHIR corpora read the examples packages fetched at build time, kept the
 # same way at their pinned count and digest.
-if [[ -z "$only" || "$only" = fhir-* ]] && ! scripts/vendor/fhir-packages.sh --build-time; then
+if [[ "$external_only" -eq 0 ]] && [[ -z "$only" || "$only" = fhir-* ]] && ! scripts/vendor/fhir-packages.sh --build-time; then
   echo "conformance: the FHIR examples packages could not be fetched" >&2
   exit 2
 fi
@@ -277,8 +309,10 @@ measure_corpus() {
 if [[ -z "$only" ]]; then
   measure 'test(/conformance_/)' "${PACKAGES[@]}"
 fi
-selected=("${CORPORA[@]}")
-if [[ -n "$only" ]]; then
+selected=("${CORPORA[@]}" "${EXTERNAL_CORPORA[@]}")
+if [[ "$external_only" -eq 1 ]]; then
+  selected=("$only")
+elif [[ -n "$only" ]]; then
   selected=("$only")
   measure_corpus "$only"
   # The other HL7 v2 corpus is measured for the family and version badges,
@@ -296,9 +330,22 @@ fi
 for corpus in "${selected[@]}"; do
   result="$OUT/$corpus.json"
   list="conformance/$corpus/pass-list.txt"
+  if [[ ! -f "$result" ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}" && [[ -z "$only" ]]; then
+    echo "conformance: $corpus is measured by scripts/checks/fhir-validator.sh --myhealth-eu, not in this run"
+    emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
+    continue
+  fi
   if [[ ! -f "$result" ]]; then
     echo "conformance: no test reported $corpus ($result is missing)" >&2
     exit 2
+  fi
+  # The validator lane writes no pass list, so --update writes it here.
+  if [[ "$mode" = update ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}"; then
+    mkdir -p "conformance/$corpus"
+    {
+      jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort
+      echo "total $(jq -r '.total' "$result")"
+    } >"$list"
   fi
   passing="$(jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort)"
   measured_total="$(jq -r '.total' "$result")"
@@ -415,6 +462,11 @@ render_block() {
   done
   echo '<br>'
   printf '%s\n' "${COMPLIANCE_BADGES[@]}"
+  echo
+  echo '**EHDS and EEHRxF**: self-tests against the named build, never a certification<br>'
+  for name in "${EXTERNAL_CORPORA[@]}"; do
+    badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
+  done
   # The per-family and per-version badges fold into a collapsed block, so the
   # per-corpus badges stay in view; GitHub renders Markdown inside <details>
   # only after a blank line.
