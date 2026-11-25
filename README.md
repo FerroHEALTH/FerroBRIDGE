@@ -47,10 +47,11 @@
 [![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
 
 **EHDS and EEHRxF**: self-tests against the named build, never a certification<br>
+[![Xt-EHR models 1.0.0 crosswalk, EEHRxF draft 2026-11-23](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fxtehr-crosswalk.json)](conformance/xtehr-crosswalk/pass-list.txt)
 [![MyHealth@EU Core 1.0.1 (CI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-core.json)](conformance/myhealth-eu-core/pass-list.txt)
 [![MyHealth@EU Laboratory 9.2.0 (CI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-laboratory.json)](conformance/myhealth-eu-laboratory/pass-list.txt)
 [![MyHealth@EU HDR 9.2.0 (CI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-hdr.json)](conformance/myhealth-eu-hdr/pass-list.txt)
-[![MyHealth@EU MVC 10.1.0 (CI), codes in bound value sets](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-mvc.json)](conformance/myhealth-eu-mvc/pass-list.txt)
+[![MyHealth@EU MVC 10.1.0 (CI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-mvc.json)](conformance/myhealth-eu-mvc/pass-list.txt)
 
 <details>
 <summary>HL7 v2 by message family and by version, across both corpora</summary>

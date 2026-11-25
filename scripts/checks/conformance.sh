@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the fifteen corpus tests, compares what they
+# The conformance gate (#24): runs the sixteen corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
@@ -70,6 +70,7 @@ readonly CORPUS_TESTS=(
   'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
   'fhirpath-r4-stu3 ferrobridge-fhirpath conformance_fhirpath_r4_stu3'
   'validator-agreement ferrobridge-validator conformance_the_validator_agrees_with_the_hl7_validator_on_its_corpus'
+  'xtehr-crosswalk eehrxf conformance_the_xtehr_crosswalk_holds_its_pass_list'
 )
 # The corpora HL7's FHIR Validator measures (scripts/checks/fhir-validator.sh
 # --myhealth-eu), whose results this script reads and never produces.
@@ -188,6 +189,7 @@ label_of() {
     fhirpath-r4) echo "FHIRPath R4 test suite, N1" ;;
     fhirpath-r4-stu3) echo "FHIRPath R4 test suite, 3.0.0 STU functions" ;;
     validator-agreement) echo "R4 profile validator, agreement with the HL7 FHIR Validator" ;;
+    xtehr-crosswalk) echo "Xt-EHR models 1.0.0 crosswalk, $(draft_label)" ;;
     myhealth-eu-core) echo "MyHealth@EU Core $(ci_build_version myhealth.eu.fhir.core) (CI)" ;;
     myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
     myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
@@ -202,8 +204,14 @@ unit_of() {
   case "$1" in
     myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr) echo " valid" ;;
     myhealth-eu-mvc) echo " codes in bound value sets" ;;
+    xtehr-crosswalk) echo " elements aligned" ;;
     *) echo "" ;;
   esac
+}
+
+# The draft act the crosswalk reads, as eehrxf names it (`eehrxf::draft::DRAFT`).
+draft_label() {
+  sed -n 's/^pub const DRAFT: &str = "\(.*\)";$/\1/p' crates/eehrxf/src/draft/mod.rs
 }
 
 # The version docs/VERSIONS.md pins for the MyHealth@EU CI build of package
@@ -475,7 +483,7 @@ render_block() {
   printf '%s\n' "${COMPLIANCE_BADGES[@]}"
   echo
   echo '**EHDS and EEHRxF**: self-tests against the named build, never a certification<br>'
-  for name in "${EXTERNAL_CORPORA[@]}"; do
+  for name in xtehr-crosswalk "${EXTERNAL_CORPORA[@]}"; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
   # The per-family and per-version badges fold into a collapsed block, so the

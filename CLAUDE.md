@@ -347,11 +347,12 @@ the testkit tool crate. Beside it:
   that fail a rise, pass a fall and only tighten (#1359); `forwarders.sh`,
   the ratchet of the same kind over the functions that only forward to
   another, which `tools/forwarders` lists (#1414); and `conformance.sh`, the pass-list gate over the six
-  corpora under `conformance/` (fifteen: the two mapping libraries, the
+  corpora under `conformance/` (sixteen: the two mapping libraries, the
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
   FHIR examples packages per version, STU3 to R6, the R4 facade, the HL7
-  FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, and
-  the R4 profile validator's agreement with the HL7 FHIR Validator), and the four
+  FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, the
+  R4 profile validator's agreement with the HL7 FHIR Validator, and the
+  draft EEHRxF annexes against the Xt-EHR models 1.0.0), and the four
   MyHealth@EU corpora HL7's FHIR Validator measures in the `fhir-validator`
   job (`scripts/checks/fhir-validator.sh --myhealth-eu`: Core, Laboratory and
   HDR on their CI builds, and the codes against the MVC catalogue), (a regression fails, a new pass asks for the

@@ -1,10 +1,11 @@
-eehrxf-discharge-full.0.Composition
 eehrxf-discharge-full.1.Patient
 eehrxf-discharge-full.3.Organization
+eehrxf-discharge-full.5.Condition
+eehrxf-discharge-full.6.Procedure
 eehrxf-discharge-full.7.MedicationRequest
-eehrxf-discharge-mapped.0.Composition
 eehrxf-discharge-mapped.1.Patient
 eehrxf-discharge-mapped.3.Organization
+eehrxf-discharge-mapped.5.Condition
 eehrxf-eps-summary-problem-allergy-procedure.0.Composition
 eehrxf-eps-summary-problem-allergy-procedure.1.Patient
 eehrxf-eps-summary-problem-allergy-procedure.3.Condition
@@ -18,6 +19,7 @@ eehrxf-imaging-mapped.6.Organization
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition
 eehrxf-ips-summary-medicine-and-vaccine.1.Patient
 eehrxf-ips-summary-medicine-and-vaccine.3.MedicationStatement
+eehrxf-ips-summary-medicine-and-vaccine.4.Immunization
 eehrxf-ips-summary-problem-allergy-procedure.0.Composition
 eehrxf-ips-summary-problem-allergy-procedure.1.Patient
 eehrxf-ips-summary-problem-allergy-procedure.3.Condition
@@ -28,15 +30,21 @@ eehrxf-laboratory-mapped.1.DiagnosticReport
 eehrxf-laboratory-mapped.2.Patient
 eehrxf-laboratory-mapped.4.Organization
 eehrxf-laboratory-mapped.6.Observation
+eehrxf-mpd-dispense.1.Medication
 eehrxf-mpd-prescription.0.MedicationRequest
+eehrxf-mpd-prescription.1.Medication
 eehrxf-summary-eu-mapping.0.Composition
 eehrxf-summary-eu-mapping.1.Patient
 eehrxf-summary-eu-mapping.3.Organization
+eehrxf-summary-eu-mapping.4.AllergyIntolerance
 eehrxf-summary-medicine-and-vaccine.0.Composition
 eehrxf-summary-medicine-and-vaccine.1.Patient
 eehrxf-summary-medicine-and-vaccine.3.Organization
 eehrxf-summary-medicine-and-vaccine.4.MedicationStatement
+eehrxf-summary-medicine-and-vaccine.5.Immunization
 eehrxf-summary-two-runs.0.Composition
 eehrxf-summary-two-runs.1.Patient
 eehrxf-summary-two-runs.3.Organization
+eehrxf-summary-two-runs.4.AllergyIntolerance
+eehrxf-summary-two-runs.6.AllergyIntolerance
 total 51
