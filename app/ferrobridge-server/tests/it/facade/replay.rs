@@ -134,7 +134,8 @@ async fn a_create_of_a_known_id_at_a_new_version_id_commits_a_later_version()
         Some(CONTAINER),
         harness
             .store
-            .consumed(&source)?
+            .consumed(&source)
+            .await?
             .as_ref()
             .map(|known| known.versioned_object_uid.as_str()),
         "the new version is recorded against the same composition"
@@ -206,15 +207,18 @@ async fn a_create_of_an_id_the_map_binds_to_two_compositions_is_refused_and_comm
         ("1", CONTAINER),
         ("2", "5f0e2b1a-0000-4000-8000-00000000000d"),
     ] {
-        harness.store.record_consumed(
-            &source(version)?,
-            &ferrobridge_server::facade::identity::record::ConsumedSource {
-                ehr_id: String::from(EHR_ID),
-                versioned_object_uid: String::from(container),
-                internal_id: String::from("abc"),
-                context: String::from("ferrobridge_facade.context"),
-            },
-        )?;
+        harness
+            .store
+            .record_consumed(
+                &source(version)?,
+                &ferrobridge_server::facade::identity::record::ConsumedSource {
+                    ehr_id: String::from(EHR_ID),
+                    versioned_object_uid: String::from(container),
+                    internal_id: String::from("abc"),
+                    context: String::from("ferrobridge_facade.context"),
+                },
+            )
+            .await?;
     }
     let (status, _, body) = post_located(&harness, &condition_at("3")).await?;
     assert_eq!(StatusCode::CONFLICT, status, "{body}");
@@ -235,21 +239,24 @@ async fn the_refusal_of_a_split_id_names_the_update_of_each_resource_it_binds()
         ("1", CONTAINER, "splitone"),
         ("2", "5f0e2b1a-0000-4000-8000-00000000000d", "splittwo"),
     ] {
-        harness.store.record_consumed(
-            &ferrobridge_server::facade::identity::record::SourceVersion::new(
-                "Condition",
-                ferrobridge_server::facade::identity::ExternalResourceId::new(
-                    "ferrobridge-synthetic-condition-1",
-                )?,
-                Some(String::from(version)),
-            ),
-            &ferrobridge_server::facade::identity::record::ConsumedSource {
-                ehr_id: String::from(EHR_ID),
-                versioned_object_uid: String::from(container),
-                internal_id: String::from(internal),
-                context: String::from("ferrobridge_facade.context"),
-            },
-        )?;
+        harness
+            .store
+            .record_consumed(
+                &ferrobridge_server::facade::identity::record::SourceVersion::new(
+                    "Condition",
+                    ferrobridge_server::facade::identity::ExternalResourceId::new(
+                        "ferrobridge-synthetic-condition-1",
+                    )?,
+                    Some(String::from(version)),
+                ),
+                &ferrobridge_server::facade::identity::record::ConsumedSource {
+                    ehr_id: String::from(EHR_ID),
+                    versioned_object_uid: String::from(container),
+                    internal_id: String::from(internal),
+                    context: String::from("ferrobridge_facade.context"),
+                },
+            )
+            .await?;
     }
     let (status, _, body) = post_located(&harness, &condition_at("3")).await?;
     assert_eq!(StatusCode::CONFLICT, status, "{body}");

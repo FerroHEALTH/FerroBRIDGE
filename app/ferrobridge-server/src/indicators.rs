@@ -177,7 +177,7 @@ impl HealthIndicator for IdentityStore {
             let probe = crate::facade::identity::ExternalResourceId::new("ferrobridge-readiness");
             match probe {
                 Err(error) => Outcome::down(reason(error)),
-                Ok(key) => match self.store.internal_of("OperationOutcome", &key) {
+                Ok(key) => match self.store.internal_of("OperationOutcome", &key).await {
                     Ok(_answered) => Outcome::up(),
                     Err(error) => Outcome::down(reason(error)),
                 },

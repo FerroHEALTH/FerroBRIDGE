@@ -73,17 +73,21 @@ async fn if_none_exist_answers_four_hundred_and_twelve_when_several_match()
     let harness = harness().await;
     let first = create_one(&harness).await?;
     let second = ferrobridge_server::facade::identity::FhirResourceId::new("secondmatch")?;
-    harness.store.record_binding(
-        "Condition",
-        &second,
-        &harness
-            .store
-            .binding_of(
-                "Condition",
-                &ferrobridge_server::facade::identity::FhirResourceId::new(&first)?,
-            )?
-            .expect("the first create recorded a binding"),
-    )?;
+    harness
+        .store
+        .record_binding(
+            "Condition",
+            &second,
+            &harness
+                .store
+                .binding_of(
+                    "Condition",
+                    &ferrobridge_server::facade::identity::FhirResourceId::new(&first)?,
+                )
+                .await?
+                .expect("the first create recorded a binding"),
+        )
+        .await?;
     // A resource the map already consumed resolves to an update before any
     // conditional create runs, so this case sends a source id the map does
     // not know.

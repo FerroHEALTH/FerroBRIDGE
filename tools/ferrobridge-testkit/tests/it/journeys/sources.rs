@@ -24,7 +24,7 @@ async fn a_source_is_created_disabled_and_deleted_from_the_pages() -> Result<(),
     if !journeys_enabled() {
         return Ok(());
     }
-    let stack = Stack::start_with(Lanes::WithSources).await?;
+    let stack = Stack::start_with(Lanes::All).await?;
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
         browser.goto(&stack.url("/sources/new")).await?;

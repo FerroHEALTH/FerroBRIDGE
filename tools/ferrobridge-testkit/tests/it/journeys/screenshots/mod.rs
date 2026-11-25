@@ -676,7 +676,7 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
             let off = Stack::capture(Lanes::WithoutOperations, BRIDGE_PORT_OFF).await?;
             let events = Stack::capture(Lanes::WithEvents, BRIDGE_PORT_EVENTS).await?;
             let etl = Stack::capture(Lanes::WithEtl, BRIDGE_PORT_ETL).await?;
-            let sources = Stack::capture(Lanes::WithSources, BRIDGE_PORT_SOURCES).await?;
+            let sources = Stack::capture(Lanes::All, BRIDGE_PORT_SOURCES).await?;
             with_browser(async |browser| {
                 window(browser, width, HEIGHT).await?;
                 every_page(browser, &stack, (theme, width)).await?;

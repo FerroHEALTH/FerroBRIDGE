@@ -173,6 +173,7 @@ impl Ingest<'_> {
         if self
             .store
             .consumed(&source)
+            .await
             .map_err(|error| store_refusal(&error))?
             .is_some()
         {
@@ -181,6 +182,7 @@ impl Ingest<'_> {
         let Some(committed) = self
             .store
             .committed(&source)
+            .await
             .map_err(|error| store_refusal(&error))?
         else {
             return Ok(None);
@@ -219,12 +221,14 @@ impl Ingest<'_> {
                 "its versions do not bind the resource once",
             ));
         };
-        let placed = self.place(
-            &mapped,
-            &[Some(source)],
-            &ehr_id,
-            vec![(version.clone(), stored.clone())],
-        )?;
+        let placed = self
+            .place(
+                &mapped,
+                &[Some(source)],
+                &ehr_id,
+                vec![(version.clone(), stored.clone())],
+            )
+            .await?;
         let [ref entry] = mapped;
         let Ok([place]) = <[Placed; 1]>::try_from(placed) else {
             return Err(unbound(
@@ -266,7 +270,9 @@ impl Ingest<'_> {
                 Scope::Whole,
             )
             .await?;
-        let placed = self.place(&partition.mapped, sources, &ehr_id, versions)?;
+        let placed = self
+            .place(&partition.mapped, sources, &ehr_id, versions)
+            .await?;
         Ok(Ingested {
             ehr_id,
             commit: Commit::AlreadyConsumed,
@@ -310,7 +316,7 @@ impl Ingest<'_> {
     /// entries of one message share its control id and are no versions of
     /// each other. The by-id lookup is the one a single create runs
     /// ([`Ingest::recognise`]).
-    pub(super) fn recorded(
+    pub(super) async fn recorded(
         &self,
         source: &SourceVersion,
         provenance: &Provenance,
@@ -318,10 +324,12 @@ impl Ingest<'_> {
         let consumed = self
             .store
             .consumed(source)
+            .await
             .map_err(|error| store_refusal(&error))?;
         let committed = self
             .store
             .committed(source)
+            .await
             .map_err(|error| store_refusal(&error))?;
         if consumed.is_some() || committed.is_some() || *provenance != Provenance::EachResource {
             return Ok(Recorded {
@@ -333,6 +341,7 @@ impl Ingest<'_> {
         let versions = self
             .store
             .consumed_versions(source)
+            .await
             .map_err(|error| store_refusal(&error))?;
         Ok(Recorded {
             consumed: None,
@@ -343,7 +352,7 @@ impl Ingest<'_> {
 
     /// Records that every keyed entry of a Bundle was committed in
     /// `contribution`, before any of them is bound.
-    pub(super) fn record_commitment(
+    pub(super) async fn record_commitment(
         &self,
         sources: &[Option<SourceVersion>],
         ehr_id: &EhrId,
@@ -356,6 +365,7 @@ impl Ingest<'_> {
         for source in sources.iter().flatten() {
             self.store
                 .record_committed(source, &record)
+                .await
                 .map_err(|error| {
                     unbound(
                         contribution,

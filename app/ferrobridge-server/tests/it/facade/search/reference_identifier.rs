@@ -38,6 +38,7 @@ async fn keyed_by_identifier() -> super::super::Harness {
             &PersonId::new(SYSTEM, VALUE).expect("a legal person key"),
             &EhrId::new(EHR_ID).expect("a legal ehr_id"),
         )
+        .await
         .expect("the identifier records");
     harness
 }
