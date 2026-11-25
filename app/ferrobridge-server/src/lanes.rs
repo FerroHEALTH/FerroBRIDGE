@@ -77,9 +77,10 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     }
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
-        let (mounted, counts) = build_facade(settings, lane, state.terminology().cloned())
-            .await
-            .context("starting the FHIR facade")?;
+        let (mounted, counts) =
+            build_facade(settings, lane, state.terminology().cloned(), state.store())
+                .await
+                .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
@@ -622,12 +623,13 @@ async fn build_operator(
 /// The mapping set is read and compiled once, at boot, against the templates
 /// the CDR holds, so a mapping that does not compile refuses the start rather
 /// than the first request that touches it (no specification governs this: our own design). The
-/// identity store is opened here too, so a path that cannot be written is a
-/// boot error.
+/// identity map is opened here too, so a store without `[state.seal]` or of
+/// another derivation is a boot error.
 async fn build_facade(
     settings: &Settings,
     lane: &config::FacadeSettings,
     terminology: Option<ferrobridge_term::client::Client>,
+    state: Option<&crate::store::Store>,
 ) -> anyhow::Result<(facade::Facade, startup::MappingCounts)> {
     use anyhow::Context;
 
@@ -676,8 +678,12 @@ async fn build_facade(
         templates: templates.len(),
     };
     let search = facade::search::load(directory, &programs).context("reading the searches")?;
-    let store = facade::identity::redb_store::RedbStore::open(&lane.identity_store)
-        .with_context(|| format!("opening {}", lane.identity_store.display()))?;
+    let state = state.context(
+        "the facade needs a [state] section: every replica resolves its identities in the state store",
+    )?;
+    let store = facade::identity::state::StateStore::open(state)
+        .await
+        .context("opening the identity map in the state store")?;
     let owned_store = |path: Option<&std::path::PathBuf>| {
         path.map(|path| {
             facade::owned::OwnedStore::open(path)

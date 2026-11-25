@@ -110,6 +110,12 @@ pub(crate) enum Lanes {
     WithEtl,
 }
 
+/// The base64 of the synthetic lookup key of the stack's state store.
+const LOOKUP_KEY: &str = "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=";
+
+/// The base64 of the synthetic sealing key of the stack's state store.
+const SEAL_KEY: &str = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=";
+
 /// The run the history of a [`Lanes::WithEtl`] stack holds with one refused
 /// record.
 pub(crate) const RUN_ID: &str = "0b6c5a3e-1d3f-4c7e-9a43-000000000001";
@@ -119,14 +125,15 @@ const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS vers
     c AS composition FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
     ORDER BY c/context/start_time/value, v/uid/value";
 
-/// Starts the PostgreSQL of a [`Lanes::WithEtl`] stack, creates its bridge
-/// schema and records two synthetic runs in its history.
-async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box<dyn Error>> {
+/// Initialises the CDM of a [`Lanes::WithEtl`] stack in `postgres`, creates
+/// its bridge schema and records two synthetic runs in its history.
+async fn etl_database(
+    postgres: &ferrobridge_testkit::containers::Postgres,
+) -> Result<(), Box<dyn Error>> {
     use ferrobridge_operator_api::etl::RunKind;
     use ferrobridge_server::etl::history;
     use ferrobridge_server::etl::report::{RefusalEntry, RunReport};
 
-    let postgres = ferrobridge_testkit::containers::postgres().await?;
     let mut writer = omop_cdm::writer::CdmWriter::connect(
         postgres.url(),
         omop_cdm::ddl::SchemaName::new("cdm")?,
@@ -182,7 +189,7 @@ async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box
         let run = history::document(report, kind, started.parse()?, finished.parse()?);
         history::record(&writer, &run).await?;
     }
-    Ok(postgres)
+    Ok(())
 }
 
 /// The running stack.
@@ -190,7 +197,7 @@ async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box
 pub(crate) struct Stack {
     /// The CDR, kept so it outlives the bridge.
     _cdr: MockServer,
-    /// The mapping tree, the templates and the identity store.
+    /// The mapping tree and the templates.
     _tree: tempfile::TempDir,
     /// The test OpenID Provider.
     provider: Provider,
@@ -204,9 +211,9 @@ pub(crate) struct Stack {
     access_token: String,
     /// The bridge's own thread and the sender that stops it.
     bridge: Running,
-    /// The PostgreSQL of a [`Lanes::WithEtl`] stack, kept so it outlives the
-    /// bridge.
-    _postgres: Option<ferrobridge_testkit::containers::Postgres>,
+    /// The PostgreSQL of the bridge's state store, and of the CDM of a
+    /// [`Lanes::WithEtl`] stack, kept so it outlives the bridge.
+    _postgres: ferrobridge_testkit::containers::Postgres,
 }
 
 /// A bridge serving on a thread of its own, and the way to stop it.
@@ -250,13 +257,22 @@ impl Stack {
             fixed => Provider::start_on(listen(fixed)?).await?,
         };
         provider.publish_metadata().await;
-        let postgres = match lanes {
-            Lanes::WithEtl => Some(etl_database().await?),
+        let postgres = ferrobridge_testkit::containers::postgres().await?;
+        let cdm = match lanes {
+            Lanes::WithEtl => {
+                etl_database(&postgres).await?;
+                Some(postgres.url())
+            }
             Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => None,
         };
-        let cdm = postgres.as_ref().map(|postgres| postgres.url().to_owned());
-        let (bridge, running) =
-            bridge(tree.path(), &cdr, &provider, (lanes, cdm.as_deref()), port).await?;
+        let (bridge, running) = bridge(
+            tree.path(),
+            &cdr,
+            &provider,
+            (lanes, cdm, postgres.url()),
+            port,
+        )
+        .await?;
 
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let console = format!("http://{}", listener.local_addr()?);
@@ -395,8 +411,8 @@ async fn cdr(port: u16) -> Result<MockServer, Box<dyn Error>> {
 /// specification governs this: our own design).
 const CAPTURE_TREES: &str = "/tmp/ferrobridge-journey-capture";
 
-/// The mapping tree: the provisioned mappings, the template, and the
-/// console's empty directory. A capture's tree (`port` not `0`) is
+/// The mapping tree: the provisioned mappings and the template. A capture's
+/// tree (`port` not `0`) is
 /// [`CAPTURE_TREES`]`/bridge-<port>`, the same path each run and in every
 /// checkout, since the configuration and diagnostics pages draw it; every
 /// other tree is a fresh temporary directory.
@@ -420,7 +436,7 @@ fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
     };
     let mappings = tree.path().join("mappings");
     let templates = tree.path().join("templates");
-    for directory in [&mappings, &templates, &tree.path().join("console")] {
+    for directory in [&mappings, &templates] {
         std::fs::create_dir_all(directory)?;
     }
     std::fs::write(
@@ -461,18 +477,14 @@ async fn bridge(
     tree: &Path,
     cdr: &MockServer,
     provider: &Provider,
-    (lanes, cdm): (Lanes, Option<&str>),
+    (lanes, cdm, state): (Lanes, Option<&str>, &str),
     port: u16,
 ) -> Result<(String, Running), Box<dyn Error>> {
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, identity] = [
-        tree.join("mappings"),
-        tree.join("templates"),
-        tree.join("identity.redb"),
-    ]
-    .map(|file| toml::Value::String(file.display().to_string()));
+    let [mappings, templates] = [tree.join("mappings"), tree.join("templates")]
+        .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
     let mllp_tls = mllp_tls(tree)?;
     let events = match lanes {
@@ -490,7 +502,9 @@ async fn bridge(
         "[cdr]\nendpoint.url = \"{cdr}/\"\nendpoint.timeout = \"2s\"\n\n[cdr.endpoint.retry]\nmax_attempts = 1\n\n\
          [mappings]\ndirectory = {mappings}\ntemplates = {templates}\n\n\
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
-         [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
+         [state]\nurl = \"{state}\"\n\n[state.seal]\nlookup_key = \"{LOOKUP_KEY}\"\n\n\
+         [[state.seal.keys]]\nid = \"journey\"\nkey = \"{SEAL_KEY}\"\n\n\
+         [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
          [operator]\nenabled = true\n\n\

@@ -98,7 +98,7 @@ the testkit tool crate. Beside it:
   is the FHIR R4 facade (#85), mounted under `/fhir` behind `[facade]`: the
   six interactions over the CDR and search over the AQL projections a
   `*.search.yml` file declares beside a context (#98),
-  the `redb` identity store with the derivation
+  the identity map in the state store with the derivation
   `docs/architecture.md` §9 fixes, the one status table
   from a CDR answer to a FHIR answer, and the `CapabilityStatement` built from
   the loaded programs. `facade::summary` is `Patient/[id]/$summary` behind

@@ -146,7 +146,7 @@ pub async fn omocl_set(
             .await
             .map_err(JobError::Revision)?,
         (true, None, Some(state)) => {
-            let store = crate::store::Store::open(state)
+            let store = Box::pin(crate::store::Store::open(state))
                 .await
                 .map_err(JobError::State)?;
             Revisions::new(&store)

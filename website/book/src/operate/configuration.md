@@ -610,7 +610,8 @@ tls_ca_file = "/run/secrets/state_ca.pem"
 
 ### `[state.seal]`
 
-The keys the store seals stored bodies under. Each key is 32 random bytes
+The keys the store seals stored values under, and the key it digests
+identifier values under. Each key is 32 random bytes
 written as base64 (`openssl rand -base64 32`) and named by an id that every
 sealed row records. The first key seals; every listed key opens what was
 sealed under it, so a rotation adds the new key first and keeps the old one
@@ -622,8 +623,13 @@ until no row names it.
 | `keys.id` | none, required | no | The id, 1 to 64 characters of `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, unique in the list |
 | `keys.key` | none, required | yes | The base64 of the key's 32 bytes |
 | `keys.key_file` | none | yes | A file holding that base64, read at boot |
+| `lookup_key` | none, required when the section is present | yes | The base64 of the 32-byte key identifier values are stored as an HMAC under. It never changes: the store pins its fingerprint and refuses to start under another |
+| `lookup_key_file` | none | yes | A file holding that base64, read at boot |
 
 ```toml
+[state.seal]
+lookup_key_file = "/run/secrets/state_lookup_key"
+
 [[state.seal.keys]]
 id = "2026-11"
 key_file = "/run/secrets/state_seal_2026_11"
@@ -736,7 +742,6 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `enabled` | `false` | Whether the facade routes are mounted |
 | `base_url` | `http://127.0.0.1:8080/fhir` | The absolute FHIR service base a client reaches, which `Location` is written under |
 | `ehr_policy` | `existing` | `existing` writes only into an EHR the CDR already holds; `create_on_first_write` creates one for an unknown subject |
-| `identity_store` | `identity.redb` | The file the identity map is kept in, opened at boot and refused when it cannot be written |
 | `subject_namespace` | `ferrobridge` | The namespace a literal subject reference is looked up in on the CDR, the `PARTY_REF.namespace` of `EHR_STATUS.subject` |
 | `subject_id_form` | `reference` | How the id of a literal subject reference is written: `reference` keeps `Patient/<id>`, `logical_id` keeps the bare `<id>`, and `uuid` keeps the bare `<id>` and refuses one that is no UUID |
 | `subject_type` | `PERSON` | The `PARTY_REF.type` of the subject of an EHR the facade creates, one of the BASE `Type_validity` values (`PERSON`, `ORGANISATION`, `GROUP`, `AGENT`, `ROLE`, `PARTY`, `ACTOR`) or `ANY` |
@@ -792,13 +797,13 @@ project performing the mapping, and there is no correct language for a clinical
 record you did not write, so an enabled facade with either key unset is a boot
 error naming the key.
 
-The identity store holds identifiers: a subject to its `ehr_id`, a resource id
+The identity map holds identifiers: a subject to its `ehr_id`, a resource id
 to the composition it came from, and the source identity of every resource the
-facade consumed. No clinical content is written into it. Back it up with the
+facade consumed. It lives in the state store, so the facade needs `[state]` and
+`[state.seal]`, and every replica shares it. No clinical content and no
+identifier value in clear is written into it. Back the database up with the
 CDR, because a lost map means the next create writes a second composition for a
-resource the CDR already holds. In a container with a read-only root
-filesystem, put the file on a persistent volume and run one process per file
-([the identity store](container.md#the-identity-store)).
+resource the CDR already holds ([the identity store](container.md#the-identity-store)).
 
 ### `[facade.references]`
 
@@ -1505,6 +1510,7 @@ it carries.
 | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 | `FERROBRIDGE__STATE__URL` | `FERROBRIDGE__STATE__URL_FILE` |
+| `FERROBRIDGE__STATE__SEAL__LOOKUP_KEY` | `FERROBRIDGE__STATE__SEAL__LOOKUP_KEY_FILE` |
 | `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
 | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
@@ -1577,7 +1583,6 @@ directory = "/etc/ferrobridge/mappings"
 enabled = true
 base_url = "https://bridge.example.org/fhir"
 ehr_policy = "create_on_first_write"
-identity_store = "/var/lib/ferrobridge/identity.redb"
 subject_namespace = "https://example.org/fhir/sid/patient"
 composition_language = "en"
 composition_territory = "GB"

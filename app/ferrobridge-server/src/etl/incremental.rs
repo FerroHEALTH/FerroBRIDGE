@@ -148,7 +148,7 @@ impl Incremental {
         ) else {
             return Err(JobError::Missing("[etl], [cdm] and [mappings] omocl"));
         };
-        let set = crate::etl::job::omocl_set(settings, store).await?;
+        let set = Box::pin(crate::etl::job::omocl_set(settings, store)).await?;
         let (mapper, _pool) = crate::etl::job::mapper(etl, cdm, set).await?;
         let run_id =
             RunId::new(format!("{NAME}-{}", uuid::Uuid::new_v4())).map_err(JobError::RunId)?;

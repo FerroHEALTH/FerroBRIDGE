@@ -89,7 +89,6 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
             ehr_status_system: (!facade.ehr_status_identifier_system.is_empty())
                 .then(|| facade.ehr_status_identifier_system.clone()),
         },
-        identity_store: facade.identity_store.clone(),
         search: search_limits(facade)?,
         references: reference_policy(facade)?,
         identifier: identifier_search(facade)?,

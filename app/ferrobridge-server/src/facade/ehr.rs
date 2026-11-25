@@ -109,7 +109,7 @@ pub async fn resolve(
     link: &SubjectLink,
     policy: Policy,
 ) -> Result<EhrId, EhrError> {
-    if let Some(known) = store.ehr_of(person).map_err(store_error)? {
+    if let Some(known) = store.ehr_of(person).await.map_err(store_error)? {
         return Ok(known);
     }
     let subject_id = SubjectId::new(person.id()).map_err(|source| EhrError::Subject {
@@ -138,7 +138,7 @@ pub async fn resolve(
             }
         },
     };
-    store.record_ehr(person, &ehr_id).map_err(store_error)
+    store.record_ehr(person, &ehr_id).await.map_err(store_error)
 }
 
 /// Creates an EHR whose `EHR_STATUS.subject` names `person`, or returns the
