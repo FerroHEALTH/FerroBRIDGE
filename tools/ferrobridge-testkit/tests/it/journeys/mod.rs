@@ -38,6 +38,7 @@ mod revisions;
 mod screenshots;
 mod shell;
 mod sign_in;
+mod sources;
 mod stack;
 mod states;
 

@@ -2378,7 +2378,12 @@ area on the store (`0006`): the watermarks of the AQL source, the dead
 letters with the operator's settlement (who decided, retry or discard, and
 why) and the poisoned-pass counts, every follower write fenced by its
 reader's lease; the reference CDR's feed keeps its cursor in the CDR and
-takes only the lease. The audit outbox (`0010`)
+takes only the lease. The inbound sources (`0008`)
+are versioned rows: one write validates the kind's document, appends the
+version with its committer, derives the tenants and MLLP routes and
+notifies `ferrobridge_sources`, and each replica reloads the named source
+into a snapshot behind one pointer swap; a source names its secrets, which
+resolve through the `[secrets]` directory of `ferrohealth-secret`. The audit outbox (`0010`)
 holds each BALP `AuditEvent` until the Audit Record Repository takes it:
 the recorder commits the row before the answer, and each replica's
 `ihe-atna` forwarder claims the oldest unclaimed row for a lease with

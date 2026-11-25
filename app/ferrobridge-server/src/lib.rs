@@ -42,6 +42,7 @@ pub mod problem;
 pub mod quality;
 pub mod shl;
 pub mod smart;
+pub mod sources;
 pub mod startup;
 pub mod state;
 pub mod store;
@@ -481,6 +482,7 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 state.etl_history().cloned(),
                 state.concept_maps().cloned(),
             ));
+            routes = routes.merge(operator::sources::routes(state.sources().cloned(), smart));
         }
     }
     if let Some(mounted) = state.facade() {
