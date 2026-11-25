@@ -3,8 +3,8 @@
 
 //! The resolution of `[shl]` into the settings of the links lane.
 
-use super::Config;
-use super::error::Error;
+use crate::config::Config;
+use crate::config::error::Error;
 use crate::shl::Settings;
 
 /// The longest manifest URL: it "SHALL NOT exceed 128 characters"
@@ -21,22 +21,18 @@ const LOCATION_MAX_SECONDS: u64 = 3600;
 /// and inbound authentication, without a public origin, with an
 /// origin that leaves no room for a manifest id, or with limits outside
 /// their range; `None` while it is off.
-pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
     let section = &config.shl;
     if !section.enabled {
         return Ok(None);
     }
-    for (on, needed) in [
-        (config.facade.summary.enabled, "facade.summary.enabled"),
-        (config.auth.enabled, "auth.enabled"),
-    ] {
-        if !on {
-            return Err(Error::Needs {
-                key: String::from("shl.enabled"),
-                needs: String::from(needed),
-            });
-        }
-    }
+    super::needs(
+        "shl.enabled",
+        &[
+            (config.facade.summary.enabled, "facade.summary.enabled"),
+            (config.auth.enabled, "auth.enabled"),
+        ],
+    )?;
     let base = url::Url::parse(&section.base_url).map_err(|source| Error::Url {
         key: String::from("shl.base_url"),
         source,

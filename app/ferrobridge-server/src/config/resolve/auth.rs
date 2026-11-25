@@ -9,8 +9,8 @@ use ferrohealth_smart::basic::PasswordStore;
 use ferrohealth_smart::config::BasicGrants;
 use ferrohealth_smart::config::ConfigError;
 
-use super::Config;
-use super::error::Error;
+use crate::config::Config;
+use crate::config::error::Error;
 use crate::smart::OPERATOR_SCOPE;
 use crate::smart::SmartSettings;
 
@@ -34,7 +34,7 @@ use crate::smart::SmartSettings;
 /// `system/` scope, naming the user and the scope: a Basic credential is a
 /// person's. An `[assurance]` minimum no issuer's `acr` mapping reaches is
 /// refused.
-pub(super) fn resolve_auth(config: &Config) -> Result<Option<SmartSettings>, Error> {
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<SmartSettings>, Error> {
     let resolved = config
         .auth
         .resolve_with_tls(

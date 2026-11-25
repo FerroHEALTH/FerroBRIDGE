@@ -3,24 +3,19 @@
 
 //! The resolution of `[inbound]` into the settings of the intake.
 
-use super::Config;
-use super::error::Error;
+use crate::config::Config;
+use crate::config::error::Error;
 use crate::inbound::Settings;
 use crate::retry::{Backoff, Policy};
 
 /// Returns the intake `config` turns on, refused without the state store or
 /// with a zero bound or a backoff above its cap; `None` while it is off.
-pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
     let section = &config.inbound;
     if !section.enabled {
         return Ok(None);
     }
-    if config.state.is_none() {
-        return Err(Error::Needs {
-            key: String::from("inbound.enabled"),
-            needs: String::from("state.url"),
-        });
-    }
+    super::needs("inbound.enabled", &[(config.state.is_some(), "state.url")])?;
     let zero = [
         ("inbound.body_limit", section.body_limit == 0),
         ("inbound.workers", section.workers == 0),
