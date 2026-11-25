@@ -173,8 +173,9 @@ pub struct Criteria {
 pub struct Included {
     /// The reference parameter's code.
     pub code: String,
-    /// The FHIRPath expression of the standard parameter.
-    pub expression: &'static str,
+    /// The branches of the standard parameter's FHIRPath expression that
+    /// select from the searched type.
+    pub expression: String,
     /// The target type the value names.
     pub target: Option<String>,
 }
@@ -378,7 +379,7 @@ impl Reader<'_> {
             (Some(source), Some(include), None) if source == self.declared.resource_type() => {
                 self.criteria.includes.push(Included {
                     code: include.code.clone(),
-                    expression: include.expression,
+                    expression: include.expression.clone(),
                     target: target.map(str::to_owned),
                 });
                 self.criteria.used.push((name.to_owned(), text.to_owned()));

@@ -270,8 +270,44 @@ impl Parameter {
 pub struct Include {
     /// The parameter code.
     pub code: String,
-    /// The FHIRPath expression of the standard parameter.
-    pub expression: &'static str,
+    /// The branches of the standard parameter's FHIRPath expression that
+    /// select from the type.
+    pub expression: String,
+}
+
+/// Returns the union branches of a standard parameter's `expression` that
+/// start from `resource_type`, joined again by `|`.
+///
+/// A parameter several types share writes one branch per type, and a branch
+/// naming another type is an error on this one's instances (FHIRPath N1
+/// §4.1).
+fn own_branches(expression: &str, resource_type: &str) -> String {
+    let mut branches = Vec::new();
+    let mut depth = 0_usize;
+    let mut start = 0;
+    for (at, character) in expression.char_indices() {
+        match character {
+            '(' => depth = depth.saturating_add(1),
+            ')' => depth = depth.saturating_sub(1),
+            '|' if depth == 0 => {
+                branches.push(expression.get(start..at).unwrap_or_default());
+                start = at.saturating_add(1);
+            }
+            _ => {}
+        }
+    }
+    branches.push(expression.get(start..).unwrap_or_default());
+    branches
+        .into_iter()
+        .map(str::trim)
+        .filter(|branch| {
+            branch
+                .trim_start_matches('(')
+                .strip_prefix(resource_type)
+                .is_some_and(|rest| rest.starts_with('.'))
+        })
+        .collect::<Vec<&str>>()
+        .join(" | ")
 }
 
 /// Checks the `include` list of one declaration against the standard R4
@@ -300,8 +336,10 @@ pub fn check_includes(
             .ok_or_else(|| refuse("R4 defines no reference parameter of this code on the type"))?;
         let expression = standard
             .expression
-            .ok_or_else(|| refuse("the standard parameter states no expression"))?;
-        ferrobridge_fhirpath::expression::Expression::parse(expression).map_err(|source| {
+            .map(|expression| own_branches(expression, resource_type))
+            .filter(|expression| !expression.is_empty())
+            .ok_or_else(|| refuse("the standard parameter states no expression for the type"))?;
+        ferrobridge_fhirpath::expression::Expression::parse(&expression).map_err(|source| {
             DeclarationError::IncludeExpression {
                 file: file.to_path_buf(),
                 code: code.clone(),
