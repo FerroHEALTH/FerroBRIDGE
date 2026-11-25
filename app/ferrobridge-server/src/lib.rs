@@ -43,6 +43,7 @@ pub mod quality;
 pub mod settings;
 pub mod shl;
 pub mod smart;
+pub mod sources;
 pub mod startup;
 pub mod state;
 pub mod store;
@@ -432,12 +433,12 @@ async fn serve_command(settings: Settings) -> anyhow::Result<()> {
             .await
             .with_context(|| format!("binding {listen}"))
     };
-    boot::serve_settings(
+    Box::pin(boot::serve_settings(
         &settings,
         bind,
         boot::Backoff::default(),
         ferrohealth_server::serve::shutdown_signal(),
-    )
+    ))
     .await?;
     tracing::info!("ferrobridge stopped");
     Ok(())
@@ -486,6 +487,7 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 state.registers().cloned(),
                 smart,
             ));
+            routes = routes.merge(operator::sources::routes(state.sources().cloned(), smart));
         }
     }
     if let Some(mounted) = state.facade() {

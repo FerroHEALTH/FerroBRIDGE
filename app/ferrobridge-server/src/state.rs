@@ -96,6 +96,8 @@ pub struct AppState {
     store: Option<crate::store::Store>,
     /// The runtime settings registers of the state store.
     registers: Option<Arc<crate::settings::Registers>>,
+    /// The inbound sources, when `[state]` is configured.
+    sources: Option<Arc<crate::sources::Sources>>,
 }
 
 impl AppState {
@@ -206,6 +208,7 @@ impl AppState {
                 .as_ref()
                 .map(|store| Arc::new(crate::settings::Registers::new(store))),
             store,
+            sources: None,
         })
     }
 
@@ -233,6 +236,7 @@ impl AppState {
             links: None,
             store: None,
             registers: None,
+            sources: None,
         }
     }
 
@@ -261,6 +265,19 @@ impl AppState {
     pub fn with_registers(mut self, store: &crate::store::Store) -> Self {
         self.registers = Some(Arc::new(crate::settings::Registers::new(store)));
         self
+    }
+
+    /// Returns this state serving the inbound sources `sources`.
+    #[must_use]
+    pub fn with_sources(mut self, sources: Arc<crate::sources::Sources>) -> Self {
+        self.sources = Some(sources);
+        self
+    }
+
+    /// Returns the inbound sources, when `[state]` is configured.
+    #[must_use]
+    pub const fn sources(&self) -> Option<&Arc<crate::sources::Sources>> {
+        self.sources.as_ref()
     }
 
     /// Returns the links lane, when it is on.

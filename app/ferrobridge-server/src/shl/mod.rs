@@ -17,7 +17,7 @@
 //! its wrong passcodes are counted over its life; its file locations are
 //! single-use and lapse within the hour the specification allows. A link
 //! that is no longer active answers `404`, the answer the specification
-//! fixes. The store is [`store::LinkStore`] on one replica.
+//! fixes. The store is [`store::LinkStore`], shared by every replica.
 
 mod handlers;
 pub mod passcode;
@@ -25,7 +25,6 @@ pub mod record;
 pub mod seal;
 pub mod store;
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -57,8 +56,6 @@ const SWEEP: Duration = Duration::from_secs(60);
 /// The links lane, resolved from `[shl]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
-    /// The `redb` file the links are kept in.
-    pub store: PathBuf,
     /// The public origin a receiver reaches the manifest routes at, with no
     /// trailing slash.
     pub base_url: String,
@@ -96,18 +93,19 @@ pub struct Links {
 pub struct OpenError(#[source] store::StoreError);
 
 impl Links {
-    /// Opens the store `settings` names, writing documents through `facade`
-    /// and recording through `log`.
+    /// Opens the links of `state`, writing documents through `facade` and
+    /// recording through `log`.
     ///
     /// # Errors
     ///
-    /// Returns [`OpenError`] when the store cannot be opened.
+    /// Returns [`OpenError`] when `state` carries no sealing keys.
     pub fn open(
+        state: &crate::store::Store,
         settings: Settings,
         facade: Arc<Facade>,
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, OpenError> {
-        let store = store::LinkStore::open(&settings.store).map_err(OpenError)?;
+        let store = store::LinkStore::open(state).map_err(OpenError)?;
         let endpoint = log.as_ref().map_or_else(
             || NetworkAddress::MachineName(settings.base_url.clone()),
             |log| log.endpoint().clone(),
@@ -144,19 +142,16 @@ impl Links {
     /// Removes every expired link and lapsed location now, recording each
     /// link that ends.
     pub async fn sweep(&self) {
-        let store = Arc::clone(&self.store);
         let now = jiff::Timestamp::now().as_second();
-        match tokio::task::spawn_blocking(move || store.sweep(now)).await {
-            Ok(Ok(ended)) => {
+        match self.store.sweep(now).await {
+            Ok(store::Swept::Done(ended)) => {
                 for gone in ended {
                     self.ended(&gone).await;
                 }
             }
-            Ok(Err(error)) => {
-                tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the link store could not be swept");
-            }
+            Ok(store::Swept::Busy) => {}
             Err(error) => {
-                tracing::warn!(error = %error, "the link sweep did not finish");
+                tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the link store could not be swept");
             }
         }
     }

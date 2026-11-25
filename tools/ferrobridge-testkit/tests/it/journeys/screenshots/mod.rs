@@ -56,6 +56,9 @@ use crate::journeys::screenshots::catalogue::PLAYGROUND_REFUSED;
 use crate::journeys::screenshots::catalogue::REVISION;
 use crate::journeys::screenshots::catalogue::SIGN_IN;
 use crate::journeys::screenshots::catalogue::SIGNED_OUT;
+use crate::journeys::screenshots::catalogue::SOURCE;
+use crate::journeys::screenshots::catalogue::SOURCE_NEW;
+use crate::journeys::screenshots::catalogue::SOURCES;
 use crate::journeys::screenshots::catalogue::shots;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::{Lanes, Stack};
@@ -77,6 +80,12 @@ const BRIDGE_PORT_EVENTS: u16 = 47182;
 
 /// The loopback port of the bridge whose ETL keeps a run history.
 const BRIDGE_PORT_ETL: u16 = 47183;
+
+/// The loopback port of the bridge that keeps inbound sources.
+const BRIDGE_PORT_SOURCES: u16 = 47184;
+
+/// The document of the inbound source the capture creates.
+const SOURCE_DOCUMENT: &str = r#"{"routes": [{"sending_application": "MONITOR", "sending_facility": "WARD-4", "source_cidrs": ["10.20.0.0/16"]}]}"#;
 
 /// The book's folder of console screenshots, from the workspace root.
 const IMAGES: &str = "website/book/src/operate/img/console";
@@ -443,7 +452,13 @@ async fn capture(
 
 /// The shots that draw an instant the bridge read from its clock: when it
 /// started, or when it recorded a revision.
-const PINNED_INSTANTS: [&str; 3] = ["hl7v2-concept-maps", "mappings-revisions", "revision"];
+const PINNED_INSTANTS: [&str; 5] = [
+    "hl7v2-concept-maps",
+    "mappings-revisions",
+    "revision",
+    "source",
+    "sources",
+];
 
 /// The instant [`pin_instants`] draws in place of the clock's.
 const PINNED: &str = "2026-11-03T09:00:00Z";
@@ -584,6 +599,56 @@ async fn etl_runs(
     visit(browser, stack, &OMOP_RUN, (theme, width)).await
 }
 
+/// Runs `script` in the page the browser shows.
+async fn submit(browser: &Browser, script: &str) -> Result<(), Box<dyn Error>> {
+    browser
+        .driver()
+        .cdp()
+        .send_raw("Runtime.evaluate", json!({ "expression": script }))
+        .await?;
+    Ok(())
+}
+
+/// Captures the inbound sources in `theme`: the form of a new source, the
+/// source the form creates once disabled, and the list.
+async fn inbound_sources(
+    browser: &Browser,
+    stack: &Stack,
+    (theme, width): (Theme, Width),
+) -> Result<(), Box<dyn Error>> {
+    enter(browser, stack, theme).await?;
+    sign_in(browser, stack).await?;
+    visit(browser, stack, &SOURCE_NEW, (theme, width)).await?;
+    // NOTE: no specification governs this: our own design; the form is filled and posted in
+    // one script, so no element a WebDriver call found goes stale while the page settles.
+    submit(
+        browser,
+        &format!(
+            "const f = document.querySelector('form[action=\"/sources/new\"]'); \
+             f.elements['name'].value = 'ward-monitors'; f.elements['kind'].value = 'mllp'; \
+             f.elements['document'].value = {}; \
+             f.requestSubmit(f.querySelector('button[value=\"save\"]')); true",
+            serde_json::to_string(SOURCE_DOCUMENT)?
+        ),
+    )
+    .await?;
+    browser
+        .titled(&format!(
+            "ward-monitors · {}",
+            ferrobridge_console::app::PRODUCT
+        ))
+        .await?;
+    submit(
+        browser,
+        "const f = document.querySelector('form[method=\"post\"] input[name=\"etag\"]').form; \
+         f.elements['enabled'].checked = false; \
+         f.requestSubmit(f.querySelector('button[value=\"save\"]')); true",
+    )
+    .await?;
+    capture(browser, &SOURCE, theme, width).await?;
+    visit(browser, stack, &SOURCES, (theme, width)).await
+}
+
 /// Captures the playground of a bridge whose operations lane is off in
 /// `theme`.
 async fn lane_off(
@@ -611,18 +676,21 @@ async fn the_book_shows_every_console_page_in_light_and_dark() -> Result<(), Box
             let off = Stack::capture(Lanes::WithoutOperations, BRIDGE_PORT_OFF).await?;
             let events = Stack::capture(Lanes::WithEvents, BRIDGE_PORT_EVENTS).await?;
             let etl = Stack::capture(Lanes::WithEtl, BRIDGE_PORT_ETL).await?;
+            let sources = Stack::capture(Lanes::All, BRIDGE_PORT_SOURCES).await?;
             with_browser(async |browser| {
                 window(browser, width, HEIGHT).await?;
                 every_page(browser, &stack, (theme, width)).await?;
                 lane_off(browser, &off, (theme, width)).await?;
                 events_degraded(browser, &events, (theme, width)).await?;
-                etl_runs(browser, &etl, (theme, width)).await
+                etl_runs(browser, &etl, (theme, width)).await?;
+                inbound_sources(browser, &sources, (theme, width)).await
             })
             .await?;
             stack.stop().await?;
             off.stop().await?;
             events.stop().await?;
             etl.stop().await?;
+            sources.stop().await?;
         }
     }
     std::fs::write(

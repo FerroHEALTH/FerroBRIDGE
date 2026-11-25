@@ -45,30 +45,18 @@ on:
         required: false
         default: false
         type: boolean
-      measure:
-        description: Build and measure.
-        required: false
-        default: true
-        type: boolean
   workflow_call:
     inputs:
       base:
         description: >-
           The commit or ref the base is the merge base with: the pull
-          request's base, the merge group's, or the commit before a push.
+          request's base, or the commit before a push.
           Empty takes the previous release.
         required: false
         default: ""
         type: string
       cache:
         description: Restore and save the Rust build cache; the release lane passes false.
-        required: false
-        default: true
-        type: boolean
-      measure:
-        description: >-
-          Build and measure; ci.yml passes false in a merge group, where the
-          verdict passes and says why nothing ran (#1790).
         required: false
         default: true
         type: boolean
@@ -101,7 +89,6 @@ env:
 jobs:
   build:
     name: perf build
-    if: inputs.measure
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -253,16 +240,8 @@ jobs:
       - name: The run was cancelled
         if: cancelled()
         run: echo "RUN_CANCELLED=true" >> "$GITHUB_ENV"
-      - name: Not run in the merge queue
-        if: ${{ !inputs.measure }}
-        run: |
-          {
-            echo "## Performance gate, verdict"
-            echo
-            echo "Not run in the merge queue: the performance gate is a non-functional gate that ran on the pull request and runs again on the push to main (#1790)."
-          } >> "$GITHUB_STEP_SUMMARY"
       - name: The last attempt passed
-        if: ${{ always() && inputs.measure }}
+        if: always()
         env:
           RESULT_1: ${{ needs.perf.result }}
           RESULT_2: ${{ needs.perf-retry.result }}

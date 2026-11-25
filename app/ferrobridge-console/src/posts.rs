@@ -4,12 +4,12 @@
 //! What the posts of `crate::actions` ask the bridge.
 //!
 //! Reload the set, the editor's post, where a discarded draft goes back to,
-//! the replay of a parked change-feed event, and the apply of a revision. No
+//! the settlement of a parked change-feed event, and the apply of a revision. No
 //! specification governs the console: our own design.
 
 use crate::actions::{
-    ApplyAnswer, ApplyPost, Edited, EditorPost, ImportAnswer, ImportPost, Reloaded, ReplayAnswer,
-    ReplayPost,
+    ApplyAnswer, ApplyPost, Edited, EditorPost, ImportAnswer, ImportPost, Reloaded, SettleAnswer,
+    SettlePost,
 };
 use crate::bridge::AccessToken;
 use crate::locale::messages::Msg;
@@ -26,25 +26,35 @@ pub async fn reloaded(state: &ConsoleState, token: &AccessToken) -> Reloaded {
     )
 }
 
-/// The answer to the replay `post`, as the operator whose token is `token`:
-/// the bridge is asked only for a consumer and a number it can name.
-pub async fn replayed(
-    state: &ConsoleState,
-    token: &AccessToken,
-    post: &ReplayPost,
-) -> ReplayAnswer {
+/// The answer to the settlement `post`, as the operator whose token is
+/// `token`: the bridge is asked only for a consumer, a number and a decision
+/// it can name, with a reason it takes.
+pub async fn settled(state: &ConsoleState, token: &AccessToken, post: &SettlePost) -> SettleAnswer {
+    use ferrobridge_operator_api::events::Decision;
+
     let Ok(id) = post.id.trim().parse::<u64>() else {
-        return ReplayAnswer::Invalid;
+        return SettleAnswer::Invalid;
+    };
+    let decision = match post.decision.as_str() {
+        "retry" => Decision::Retry,
+        "discard" => Decision::Discard,
+        _ => return SettleAnswer::Invalid,
     };
     if post.consumer.is_empty() {
-        return ReplayAnswer::Invalid;
+        return SettleAnswer::Invalid;
     }
-    ReplayAnswer::Answered(loaded(
-        state
-            .bridge()
-            .replay_parked(&post.consumer, id, token)
-            .await,
-    ))
+    if let Some(fault) = crate::pages::editor::answer::reason_fault(&post.reason) {
+        return SettleAnswer::Reason(fault);
+    }
+    SettleAnswer::Answered(
+        decision,
+        loaded(
+            state
+                .bridge()
+                .settle_parked(&post.consumer, id, decision, &post.reason, token)
+                .await,
+        ),
+    )
 }
 
 /// The answer to the editor's post `post` at `address`, as the operator

@@ -75,6 +75,12 @@ impl Default for Holder {
 pub struct Generation(i64);
 
 impl Generation {
+    /// Returns the generation the store holds as `value`.
+    #[must_use]
+    pub const fn new(value: i64) -> Self {
+        Self(value)
+    }
+
     /// Returns the number the store holds.
     #[must_use]
     pub const fn get(self) -> i64 {
@@ -250,6 +256,102 @@ impl Lease {
             held: generation.0,
             current,
         })
+    }
+}
+
+/// A lease this replica holds: the lease and the generation it was taken
+/// at, the fence of every write made under it.
+#[derive(Debug, Clone)]
+pub struct Term {
+    /// The lease.
+    lease: Lease,
+    /// The generation it was taken at.
+    generation: Generation,
+}
+
+impl Term {
+    /// Returns the term `lease` was taken at `generation` for.
+    #[must_use]
+    pub const fn new(lease: Lease, generation: Generation) -> Self {
+        Self { lease, generation }
+    }
+
+    /// Returns the lease.
+    #[must_use]
+    pub const fn lease(&self) -> &Lease {
+        &self.lease
+    }
+
+    /// Returns the generation.
+    #[must_use]
+    pub const fn generation(&self) -> Generation {
+        self.generation
+    }
+
+    /// Returns the pool the lease statements run on, for a write fenced by
+    /// this term.
+    #[must_use]
+    pub const fn pool(&self) -> &PgPool {
+        &self.lease.pool
+    }
+
+    /// Refuses the caller's write on `connection` unless this term is still
+    /// the lane's, as [`Lease::fence`] does.
+    ///
+    /// # Errors
+    /// Returns every error of [`Lease::fence`].
+    pub async fn fence(&self, connection: &mut PgConnection) -> Result<(), LeaseError> {
+        self.lease.fence(connection, self.generation).await
+    }
+}
+
+/// How a single-consumer lane takes, keeps and gives up its leadership.
+///
+/// [`Lease`] is the one production implementation; a test of a lane's loop
+/// stands in its own.
+#[async_trait::async_trait]
+pub trait Leadership: fmt::Debug + Send + Sync {
+    /// Takes the lane when no live holder has it; `None` while another
+    /// replica holds it.
+    ///
+    /// # Errors
+    /// Returns [`LeaseError`] when the claim cannot be made.
+    async fn claim(&self) -> Result<Option<Term>, LeaseError>;
+
+    /// Holds `term` for another period, unless another replica took it.
+    ///
+    /// # Errors
+    /// Returns [`LeaseError`] when the renewal cannot be made.
+    async fn renew(&self, term: &Term) -> Result<Renewed, LeaseError>;
+
+    /// Gives `term` up, so another replica takes the lane at once.
+    ///
+    /// # Errors
+    /// Returns [`LeaseError`] when the release cannot be made.
+    async fn release(&self, term: &Term) -> Result<(), LeaseError>;
+
+    /// Returns how often the holder renews.
+    fn renew_every(&self) -> Duration;
+}
+
+#[async_trait::async_trait]
+impl Leadership for Lease {
+    async fn claim(&self) -> Result<Option<Term>, LeaseError> {
+        Ok(Self::claim(self)
+            .await?
+            .map(|generation| Term::new(self.clone(), generation)))
+    }
+
+    async fn renew(&self, term: &Term) -> Result<Renewed, LeaseError> {
+        Self::renew(self, term.generation).await
+    }
+
+    async fn release(&self, term: &Term) -> Result<(), LeaseError> {
+        Self::release(self, term.generation).await
+    }
+
+    fn renew_every(&self) -> Duration {
+        Self::renew_every(self)
     }
 }
 

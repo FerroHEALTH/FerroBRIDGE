@@ -7,10 +7,11 @@
 //! The page reads `GET /operator/events` and draws each consumer's source,
 //! reader and position, its health, what it published since the bridge
 //! started and its last failure with the cause, then the events each one
-//! parked in the dead-letter store with a Replay form, then the exchange,
-//! the routing-key grammar and the bound queues. Replay posts to the page,
-//! which asks the bridge to mark the event and draws the page again with
-//! the answer. A bridge with no consumer says so in one quiet line.
+//! parked in the dead-letter store with a settlement form (a reason, Retry
+//! and Discard), then the exchange, the routing-key grammar and the bound
+//! queues. A settlement posts to the page, which asks the bridge to record it
+//! and draws the page again with the answer. A bridge with no consumer says
+//! so in one quiet line.
 
 use axum::response::Response;
 use ferrobridge_operator_api::events::{
@@ -31,7 +32,7 @@ use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::{Container, Header, definitions};
 use ferrohealth_ui::view::template::detail::{DetailPage, detail_page};
 
-use crate::actions::{ReplayAnswer, ReplayPost};
+use crate::actions::{SettleAnswer, SettlePost};
 use crate::app::{CONFIGURATION, Drawn, EVENTS};
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
@@ -41,45 +42,54 @@ use crate::pages::parts::{faulted, refused, refused_operator, section};
 use crate::visit::Visit;
 use ferrohealth_ui::view::template::list::list_empty;
 
-/// The events page, with the answer to the replay the operator just asked
-/// for when `replayed` holds one.
-pub async fn page(visit: &Visit, replayed: Option<ReplayAnswer>) -> Drawn {
+/// The events page, with the answer to the settlement the operator just
+/// posted when `settled` holds one.
+pub async fn page(visit: &Visit, settled: Option<SettleAnswer>) -> Drawn {
     let events = visit.reads.events().await;
     Drawn::shell(
         visit.tr(Msg::Events),
-        drawn(&visit.locale, &events, replayed.as_ref()),
+        drawn(&visit.locale, &events, settled.as_ref()),
     )
 }
 
-/// Asks the bridge to replay the parked event the form body `body` names for
+/// Asks the bridge to settle the parked event the form body `body` names for
 /// the operator of `visit`, and draws the page with its answer.
 pub async fn posted(visit: &Visit, body: &str) -> Response {
-    let post = ReplayPost::from_form(body);
+    let post = SettlePost::from_form(body);
     let answer = match visit.reads.signed_in() {
-        Ok((state, token)) => crate::posts::replayed(state, token, &post).await,
-        Err(fault) => ReplayAnswer::Answered(Err(fault)),
+        Ok((state, token)) => crate::posts::settled(state, token, &post).await,
+        Err(fault) => SettleAnswer::Answered(
+            ferrobridge_operator_api::events::Decision::Retry,
+            Err(fault),
+        ),
     };
     let drawn = page(visit, Some(answer)).await;
     crate::app::render(visit, drawn).await
 }
 
-/// The answer to a replay, in the place it was asked from.
-fn answer(l: &Locale, replayed: &ReplayAnswer) -> Html {
-    match replayed {
-        ReplayAnswer::Invalid => {
-            notice_text(Tone::Bad, Announce::Alert, tr(l, Msg::EventsReplayInvalid))
+/// The answer to a settlement, in the place it was asked from.
+fn answer(l: &Locale, settled: &SettleAnswer) -> Html {
+    use ferrobridge_operator_api::events::Decision;
+
+    match settled {
+        SettleAnswer::Invalid => {
+            notice_text(Tone::Bad, Announce::Alert, tr(l, Msg::EventsSettleInvalid))
         }
-        ReplayAnswer::Answered(Ok(Outcome::Shown(()))) => {
-            notice_text(Tone::Ok, Announce::Status, tr(l, Msg::EventsReplayed))
+        SettleAnswer::Reason(said) => notice_text(Tone::Bad, Announce::Alert, tr(l, *said)),
+        SettleAnswer::Answered(Decision::Retry, Ok(Outcome::Shown(()))) => {
+            notice_text(Tone::Ok, Announce::Status, tr(l, Msg::EventsRetried))
         }
-        ReplayAnswer::Answered(Ok(Outcome::Refused(refusal))) => refused(l, refusal),
-        ReplayAnswer::Answered(Err(fault)) => faulted(l, fault, EVENTS),
+        SettleAnswer::Answered(Decision::Discard, Ok(Outcome::Shown(()))) => {
+            notice_text(Tone::Ok, Announce::Status, tr(l, Msg::EventsDiscarded))
+        }
+        SettleAnswer::Answered(_, Ok(Outcome::Refused(refusal))) => refused(l, refusal),
+        SettleAnswer::Answered(_, Err(fault)) => faulted(l, fault, EVENTS),
     }
 }
 
-/// The page over the document `events`, with the answer `replayed`.
-fn drawn(l: &Locale, events: &Loaded<Events>, replayed: Option<&ReplayAnswer>) -> Html {
-    let shown = replayed.map(|replayed| answer(l, replayed));
+/// The page over the document `events`, with the answer `settled`.
+fn drawn(l: &Locale, events: &Loaded<Events>, settled: Option<&SettleAnswer>) -> Html {
+    let shown = settled.map(|settled| answer(l, settled));
     let events = match events {
         Ok(Outcome::Shown(events)) => events,
         Ok(Outcome::Refused(refusal)) => {
@@ -153,7 +163,7 @@ fn with_answer(shown: Option<Html>, body: Html) -> Html {
     }
 }
 
-/// The events every consumer parked, each with its Replay form, or the line
+/// The events every consumer parked, each with its settlement form, or the line
 /// that none is parked.
 fn parked_table(l: &Locale, consumers: &[Consumer]) -> Html {
     let parked: Vec<(&Consumer, &Parked)> = consumers
@@ -208,7 +218,7 @@ fn parked_table(l: &Locale, consumers: &[Consumer]) -> Html {
                     )),
                 ),
                 cell(at, code(&entry.at)),
-                cell(actions, replay(l, consumer, entry)),
+                cell(actions, settle(l, consumer, entry)),
             ))
         })
         .collect::<Html>();
@@ -221,26 +231,49 @@ fn parked_table(l: &Locale, consumers: &[Consumer]) -> Html {
     })
 }
 
-/// The Replay form of `entry`, or the state of a replay already requested.
-fn replay(l: &Locale, consumer: &Consumer, entry: &Parked) -> Html {
+/// The settlement form of `entry`: a reason, Retry and Discard; or the state
+/// of a retry already decided.
+fn settle(l: &Locale, consumer: &Consumer, entry: &Parked) -> Html {
     if entry.replay_requested {
-        return state(Mark::Neutral, tr(l, Msg::EventsReplayRequested), None);
+        return state(Mark::Neutral, tr(l, Msg::EventsRetryPending), None);
     }
+    let field = format!("settle-reason-{}-{}", t(&consumer.name), entry.id);
+    let button = |decision: &str, variant: Variant, glyph: Glyph, label: Msg, words: Msg| {
+        format!(
+            r#"<button type="submit" name="decision" value="{decision}" class="{class}" aria-label="{label}">{glyph}{words}</button>"#,
+            class = variant.class(),
+            label = t(tr_with(
+                l,
+                label,
+                &[
+                    ("id", entry.id.into()),
+                    ("consumer", consumer.name.as_str().into()),
+                ],
+            )),
+            glyph = ferrohealth_ui::icon::icon(glyph, "16"),
+            words = t(tr(l, words)),
+        )
+    };
     h(format!(
-        r#"<form method="post" action="{EVENTS}" class="fui-action-form"><input type="hidden" name="consumer" value="{consumer}"><input type="hidden" name="id" value="{id}"><button type="submit" class="{class}" aria-label="{label}">{glyph}{words}</button></form>"#,
+        r#"<form method="post" action="{EVENTS}" class="fui-action-form"><input type="hidden" name="consumer" value="{consumer}"><input type="hidden" name="id" value="{id}"><label for="{field}" class="fui-sr-only">{reason}</label><input id="{field}" name="reason" class="fui-input" maxlength="200" required autocomplete="off" placeholder="{placeholder}">{retry}{discard}</form>"#,
         consumer = t(&consumer.name),
         id = entry.id,
-        class = Variant::Secondary.class(),
-        label = t(tr_with(
-            l,
-            Msg::EventsReplayLabel,
-            &[
-                ("id", entry.id.into()),
-                ("consumer", consumer.name.as_str().into()),
-            ],
-        )),
-        glyph = ferrohealth_ui::icon::icon(Glyph::ROTATE_CCW, "16"),
-        words = t(tr(l, Msg::EventsReplay)),
+        reason = t(tr(l, Msg::Reason)),
+        placeholder = t(tr(l, Msg::EventsSettleReasonPlaceholder)),
+        retry = button(
+            "retry",
+            Variant::Secondary,
+            Glyph::ROTATE_CCW,
+            Msg::EventsRetryLabel,
+            Msg::EventsRetry
+        ),
+        discard = button(
+            "discard",
+            Variant::Danger,
+            Glyph::TRASH,
+            Msg::EventsDiscardLabel,
+            Msg::EventsDiscard
+        ),
     ))
 }
 
@@ -393,6 +426,7 @@ fn positions(l: &Locale, positions: &[Position]) -> Html {
 fn consumer_state(l: &Locale, consumer: State) -> Html {
     match consumer {
         State::Following => state(Mark::Ok, tr(l, Msg::StateFollowing), None),
+        State::Standby => state(Mark::Neutral, tr(l, Msg::StateStandby), None),
         State::Starting => state(Mark::Neutral, tr(l, Msg::StateStarting), None),
         State::Stalled => state(Mark::Warn, tr(l, Msg::StateStalled), None),
     }

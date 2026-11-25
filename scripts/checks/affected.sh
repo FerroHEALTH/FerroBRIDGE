@@ -16,8 +16,7 @@
 #   --local        the local gate: the CI configuration under .github and
 #                  this script's own pair change no cargo result, so they
 #                  are inert; in CI they run everything
-#   --all          every package, every lane (a push to main, a merge group,
-#                  a dispatch)
+#   --all          every package, every lane (a push to main, a dispatch)
 #   --self-test    checks the classification on synthetic paths against the
 #                  real workspace graph
 #

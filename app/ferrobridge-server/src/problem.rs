@@ -55,6 +55,11 @@ pub enum Kind {
     PreconditionRequired,
     /// `422`: the template has no example composition.
     NoExample,
+    /// `422`: a source's document breaks a rule of its kind or names a
+    /// secret the `[secrets]` directory does not hold.
+    InvalidSource,
+    /// `409`: another source carries the name or routes the MLLP sender.
+    SourceConflict,
     /// `500`: a mapping directory could not be read.
     Unreadable,
     /// `500`: the mapping directory could not be written.
@@ -68,13 +73,15 @@ pub enum Kind {
     RunHistoryUnavailable,
     /// `503`: a settings register could not be read or written.
     RegistersUnavailable,
+    /// `503`: the inbound sources could not be read or written.
+    SourcesUnavailable,
     /// `503`: the access token could not be checked.
     AuthorizationUnavailable,
 }
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 22] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
@@ -88,22 +95,22 @@ impl Kind {
         Self::PreconditionFailed,
         Self::PreconditionRequired,
         Self::NoExample,
+        Self::InvalidSource,
+        Self::SourceConflict,
         Self::Unreadable,
         Self::Unwritable,
         Self::DeadLettersUnavailable,
         Self::ReloadUnavailable,
         Self::RunHistoryUnavailable,
         Self::RegistersUnavailable,
+        Self::SourcesUnavailable,
         Self::AuthorizationUnavailable,
     ];
 
     /// The slug, the fragment of the type under [`BASE`], its title and
     /// its status.
     #[must_use]
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one arm per problem type, the registry the book's problem page mirrors"
-    )]
+    #[expect(clippy::too_many_lines, reason = "one arm per problem kind")]
     pub const fn definition(self) -> (&'static str, &'static str, StatusCode) {
         match self {
             Self::InvalidRequest => (
@@ -171,6 +178,16 @@ impl Kind {
                 "The template has no example composition",
                 StatusCode::UNPROCESSABLE_ENTITY,
             ),
+            Self::InvalidSource => (
+                "invalid-source",
+                "The source's document is refused",
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            Self::SourceConflict => (
+                "source-conflict",
+                "Another source holds the name or the MLLP route",
+                StatusCode::CONFLICT,
+            ),
             Self::Unreadable => (
                 "unreadable",
                 "A mapping directory could not be read",
@@ -199,6 +216,9 @@ impl Kind {
             Self::RegistersUnavailable => (
                 "registers-unavailable",
                 "The settings register could not be read or written",
+            Self::SourcesUnavailable => (
+                "sources-unavailable",
+                "The inbound sources could not be read or written",
                 StatusCode::SERVICE_UNAVAILABLE,
             ),
             Self::AuthorizationUnavailable => (
@@ -277,6 +297,13 @@ pub fn respond(problem: Problem, challenge: Option<&str>) -> Response {
         headers.insert(header::WWW_AUTHENTICATE, value);
     }
     response
+}
+
+/// Returns the response of a problem of `kind` with `detail`, a sentence
+/// built from what the bridge refused, never from a secret.
+#[must_use]
+pub fn refuse_with(kind: Kind, detail: String) -> Response {
+    respond(Problem::of(kind.problem_type()).with_detail(detail), None)
 }
 
 /// Returns the response of a problem of `kind` with `detail`.
