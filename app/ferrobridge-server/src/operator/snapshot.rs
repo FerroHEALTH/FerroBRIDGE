@@ -213,6 +213,12 @@ impl Snapshot {
                 .iter()
                 .any(|file| file == path)
                 .then_some("mapping"),
+            Language::Structuremap => self
+                .report
+                .structuremap_files()
+                .iter()
+                .any(|file| file == path)
+                .then_some("map"),
             Language::Fhirconnect => {
                 if crate::walk::is_declaration(path) {
                     return Some("search");

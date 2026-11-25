@@ -101,7 +101,7 @@ pub fn import(archive: &[u8]) -> Result<Files, ArchiveError> {
         let wire = entry.name().map_err(ArchiveError::Zip)?.into_owned();
         let console =
             files::relative(&wire).is_ok_and(|(root, _relative)| Language::of_root(root).is_some());
-        if !console || !files::is_mapping(std::path::Path::new(&wire)) {
+        if !console || !files::is_mapping(&wire) {
             return Err(ArchiveError::BadEntry);
         }
         let mut bytes = Vec::new();

@@ -86,6 +86,41 @@ Art 9). The bridge reads it as `ferrohealth-smart` classifies it
 stays a professional held to the launch context. For the patient's own
 token, the facade's access record carries the binding `self`.
 
+## The assurance level
+
+FerroSMART writes the eIDAS level of each login into the token as `acr`:
+`http://eidas.europa.eu/LoA/low`, `/substantial` or `/high`. Map the three
+values on the issuer table and set the level each route class requires in
+[`[assurance]`](configuration.md#assurance):
+
+```toml
+[auth.issuer.ferrosmart.assurance]
+levels = { "http://eidas.europa.eu/LoA/low" = "low", "http://eidas.europa.eu/LoA/substantial" = "substantial", "http://eidas.europa.eu/LoA/high" = "high" }
+
+[assurance]
+fhir = "substantial"
+shl = "substantial"
+```
+
+The facade then checks the level of every token itself, beside the minimum
+FerroSMART holds each client to and the check FerroEHR makes of the
+exchanged token. A token below the level, or with no `acr`, answers `401`
+with the RFC 9470 §3 step-up challenge, whose `acr_values` name the values
+that meet it:
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Bridge as FerroBRIDGE
+    participant AS as FerroSMART
+    App->>Bridge: GET /fhir/Patient/p/$summary (acr LoA/low)
+    Bridge-->>App: 401 insufficient_user_authentication, acr_values
+    App->>AS: authorize with acr_values=LoA/substantial
+    AS-->>App: token (acr LoA/substantial)
+    App->>Bridge: GET /fhir/Patient/p/$summary
+    Bridge-->>App: 200 Bundle
+```
+
 ## The patient summary reads FerroEHR as the patient
 
 `Patient/$summary` ([`[facade.summary]`](configuration.md#facadesummary))

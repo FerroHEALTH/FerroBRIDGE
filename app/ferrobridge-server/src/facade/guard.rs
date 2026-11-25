@@ -385,7 +385,7 @@ impl Outcome {
 
     /// Returns the `OperationOutcome` response of `denied`, whose challenge
     /// carries the reason code as `error_description` (RFC 6750 §3).
-    fn respond(&self, denied: &Denied) -> Response {
+    pub(crate) fn respond(&self, denied: &Denied) -> Response {
         let refusal = denied.refusal();
         let issue = match refusal {
             Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => {
@@ -398,6 +398,9 @@ impl Outcome {
                 .diagnosing("the access token does not permit this request"),
             Refusal::Unavailable => Issue::error(IssueType::Transient).diagnosing(
                 "the access token could not be checked: the authorization server's keys could not be read",
+            ),
+            Refusal::StepUp(_) => Issue::error(IssueType::Login).diagnosing(
+                "the authentication behind the access token is below the assurance level this request requires",
             ),
             _ => Issue::error(IssueType::Exception)
                 .diagnosing("the request was refused at the gate"),

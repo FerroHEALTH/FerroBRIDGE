@@ -685,6 +685,7 @@ async fn build_operator(
             omocl: settings.omocl_directory.is_some(),
             facade,
             operations,
+            structuremaps: Some(Arc::default()),
         };
         let revisions = crate::mappings::revisions::Revisions::new(store);
         revisions

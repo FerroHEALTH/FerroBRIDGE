@@ -155,6 +155,62 @@ pub fn omocl_set(tree: &Tree) -> Result<omocl::model::load::MappingSet, Vec<Diag
     })
 }
 
+/// Parses the FHIR Mapping Language maps of `tree`, one map per file.
+///
+/// # Errors
+///
+/// Returns what [`load_texts`] returns: a diagnostic for each map outside the
+/// grammar, at its line and column, and for each map whose URL an earlier
+/// file already carries.
+pub fn structuremap_set(
+    tree: &Tree,
+) -> Result<Vec<crate::structuremap::syntax::StructureMap>, Vec<Diagnostic>> {
+    load_texts(tree, |texts| {
+        let mut maps: Vec<crate::structuremap::syntax::StructureMap> = Vec::new();
+        let mut diagnostics = Vec::new();
+        for (path, text) in texts {
+            match crate::structuremap::parse::parse(text) {
+                Ok(map) if maps.iter().any(|known| known.url == map.url) => {
+                    diagnostics.push(crate::mappings::compile::structuremap(
+                        &path,
+                        crate::mappings::compile::STRUCTUREMAP_URL,
+                        format!("another map already carries the URL {}", map.url),
+                    ));
+                }
+                Ok(map) => maps.push(map),
+                Err(error) => diagnostics.push(
+                    crate::mappings::compile::structuremap(
+                        &path,
+                        crate::mappings::compile::STRUCTUREMAP_SYNTAX,
+                        format!("expected {}", error.expected),
+                    )
+                    .with_position(position(text, error.at)),
+                ),
+            }
+        }
+        if diagnostics.is_empty() {
+            Ok(maps)
+        } else {
+            Err(diagnostics)
+        }
+    })
+}
+
+/// Returns the line and column, both from one, of the byte offset `at` in
+/// `text`.
+fn position(text: &str, at: usize) -> openehr_mapping_core::position::Position {
+    let before = text.get(..at).unwrap_or(text);
+    let line = before.matches('\n').count();
+    let column = before
+        .rsplit('\n')
+        .next()
+        .map_or(0, |last| last.chars().count());
+    openehr_mapping_core::position::Position::new(
+        u64::try_from(line).unwrap_or(u64::MAX).saturating_add(1),
+        u64::try_from(column).unwrap_or(u64::MAX).saturating_add(1),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -162,7 +218,7 @@ mod tests {
 
     use openehr_mapping_core::diagnostic::DiagnosticCode;
 
-    use super::{Tree, fhirconnect_set};
+    use super::{Tree, fhirconnect_set, structuremap_set};
 
     #[test]
     fn a_file_that_is_not_utf8_is_an_unreadable_diagnostic_on_its_path() {
@@ -171,6 +227,47 @@ mod tests {
         let diagnostics = fhirconnect_set(&tree).expect_err("the file is no text");
         assert_eq!(Path::new("fhirconnect/a.yml"), diagnostics[0].file());
         assert_eq!(DiagnosticCode::Unreadable, *diagnostics[0].code());
+    }
+
+    #[test]
+    fn a_map_outside_the_grammar_and_a_repeated_url_are_refused_at_their_files() {
+        let mut tree = Tree::default();
+        let map = "map \"http://example.org/StructureMap/a\" = a\ngroup g(source s : A, target t : B) { s.x -> t.x; }\n";
+        tree.insert("structuremap/a.map", Arc::from(map.as_bytes()));
+        tree.insert("structuremap/b.map", Arc::from(map.as_bytes()));
+        tree.insert("structuremap/c.map", Arc::from(&b"map\n  = broken"[..]));
+        let diagnostics = structuremap_set(&tree).expect_err("two files are refused");
+        assert_eq!(2, diagnostics.len());
+        assert_eq!(Path::new("structuremap/b.map"), diagnostics[0].file());
+        assert_eq!(Path::new("structuremap/c.map"), diagnostics[1].file());
+        assert_eq!(
+            Some(2),
+            diagnostics[1]
+                .position()
+                .map(openehr_mapping_core::position::Position::line)
+        );
+    }
+
+    #[test]
+    fn the_maps_of_a_tree_parse_in_path_order() {
+        let mut tree = Tree::default();
+        for name in ["b", "a"] {
+            let map = format!(
+                "map \"http://example.org/StructureMap/{name}\" = {name}\ngroup g(source s : A, target t : B) {{ s.x -> t.x; }}\n"
+            );
+            tree.insert(
+                format!("structuremap/{name}.map"),
+                Arc::from(map.as_bytes()),
+            );
+        }
+        let maps = structuremap_set(&tree).expect("both maps parse");
+        assert_eq!(
+            vec![
+                "http://example.org/StructureMap/a",
+                "http://example.org/StructureMap/b"
+            ],
+            maps.iter().map(|map| map.url.as_str()).collect::<Vec<_>>()
+        );
     }
 
     #[test]
