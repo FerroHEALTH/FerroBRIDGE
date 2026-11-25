@@ -25,7 +25,9 @@
 # mode. Under --check, an unlisted passing case, a moved total, a badge that
 # disagrees with what --update would write, a family or version badge no case
 # counts, and a README block that disagrees with the badges fail too, because
-# the list is what the ratchet protects.
+# the list is what the ratchet protects. Every badge file, and every static
+# badge in the README, carries a logo from scripts/checks/badge-logos/, and a
+# badge without one fails --check.
 #
 # The family and version badges count the cases of both HL7 v2 corpora by the
 # family (MSH-9.1) and the version (MSH-12) the corpus test records per case:
@@ -128,6 +130,8 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 cd "$(dirname "$0")/../.."
+# shellcheck source=scripts/checks/badge-logos/logo.sh
+source scripts/checks/badge-logos/logo.sh
 
 readonly OUT=target/conformance
 readonly BADGES=conformance/badges
@@ -137,16 +141,16 @@ readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubu
 readonly PROJECT_BADGES=(
   '[![Release](https://img.shields.io/github/v/release/FerroHEALTH/FerroBRIDGE?sort=semver&logo=github&label=release)](https://github.com/FerroHEALTH/FerroBRIDGE/releases/latest)'
   '[![CI](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroBRIDGE/ci.yml?branch=main&logo=githubactions&logoColor=white&label=CI)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/ci.yml)'
-  '[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue)](LICENSE)'
+  '[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTEyIDN2MThNNyAyMWgxME00IDdoMTZNNCA3TDEgMTRhMyAzIDAgMCAwIDYgMFpNMjAgN2wtMyA3YTMgMyAwIDAgMCA2IDBaIi8%2BPC9zdmc%2B)](LICENSE)'
   '[![Docs](https://img.shields.io/badge/docs-ferrobridge.eu-blue?logo=mdbook)](https://ferrobridge.eu/docs/)'
   '[![GHCR](https://img.shields.io/badge/ghcr.io-ferrobridge-2496ED?logo=docker&logoColor=white)](https://github.com/FerroHEALTH/FerroBRIDGE/pkgs/container/ferrobridge)'
 )
 # The compliance markers, on their own line under the conformance badges.
 readonly COMPLIANCE_BADGES=(
-  '[![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)'
+  '[![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)'
 )
 readonly QUALITY_BADGES=(
-  '[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroBRIDGE/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroBRIDGE)'
+  '[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/FerroHEALTH/FerroBRIDGE?label=openssf%20scorecard&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTEyIDJsOCAzdjZjMCA1LTMuNSA5LjUtOCAxMS00LjUtMS41LTgtNi04LTExVjVaTTguNSAxMmwyLjUgMi41IDQuNS01Ii8%2BPC9zdmc%2B)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroBRIDGE)'
   '[![Quality gate](https://img.shields.io/sonar/quality_gate/FerroHEALTH_FerroBRIDGE?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=quality%20gate)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroBRIDGE)'
   '[![Coverage](https://img.shields.io/sonar/coverage/FerroHEALTH_FerroBRIDGE?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroBRIDGE)'
   '[![CodeQL](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroBRIDGE/codeql.yml?branch=main&logo=github&label=CodeQL)](https://github.com/FerroHEALTH/FerroBRIDGE/actions/workflows/codeql.yml)'
@@ -177,6 +181,20 @@ label_of() {
   esac
 }
 
+# The badge logo of a corpus: the EU emblem for an EU act, else a pictogram.
+logo_of() {
+  case "$1" in
+    fhirconnect-mapping-lib | roundtrip) echo exchange ;;
+    omocl) echo database ;;
+    rest-api | fhirpath-r4 | fhirpath-r4-stu3) echo code ;;
+    hl7v2 | hl7v2-smoke) echo message ;;
+    fhir-stu3 | fhir-r4 | fhir-r4b | fhir-r5 | fhir-r6) echo document ;;
+    fhir-r4-facade | validator-agreement) echo shield-check ;;
+    eehrxf-annex-x) echo eu ;;
+    *) return 1 ;;
+  esac
+}
+
 # The badge colour of k passing out of n: the share in quarters.
 colour_of() {
   local passed="$1" total="$2" share
@@ -193,11 +211,12 @@ colour_of() {
   fi
 }
 
-# The badge JSON of a label and k passing out of n.
+# The badge JSON of a label, k passing out of n, and a logo.
 fraction_badge() {
-  local label="$1" passed="$2" total="$3"
+  local label="$1" passed="$2" total="$3" logo
+  logo="$(badge_logo_fields "$4")"
   jq -cn --arg label "$label" --arg message "$passed / $total" --arg color "$(colour_of "$passed" "$total")" \
-    '{schemaVersion: 1, label: $label, message: $message, color: $color}'
+    --argjson logo "$logo" '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo'
 }
 
 # The badge JSON a pass list implies.
@@ -206,7 +225,7 @@ badge_of() {
   passed="$(grep -vc '^total ' "$list" || true)"
   total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   [[ -n "$total" ]] || { echo "conformance: $list has no total line" >&2; return 2; }
-  fraction_badge "$(label_of "$corpus")" "$passed" "$total"
+  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(logo_of "$corpus")"
 }
 
 failed=0
@@ -363,7 +382,7 @@ badges_measured() {
     read -r passed total < <(fraction_of family "$family")
     name="hl7v2-family-$(tr '[:upper:]' '[:lower:]' <<<"$family")"
     families+=("$name")
-    emit_badge "$name" "$(fraction_badge "$family" "$passed" "$total")" "the HL7 v2 results"
+    emit_badge "$name" "$(fraction_badge "$family" "$passed" "$total" message)" "the HL7 v2 results"
   done < <(jq -r '[.[] | .family | select(. != null and test("^[A-Z0-9]+$"))] | unique | .[]' \
     <<<"$hl7v2_cases" | LC_ALL=C sort)
   while IFS= read -r version; do
@@ -371,7 +390,7 @@ badges_measured() {
     read -r passed total < <(fraction_of version "$version")
     name="hl7v2-version-$version"
     versions+=("$name")
-    emit_badge "$name" "$(fraction_badge "v$version" "$passed" "$total")" "the HL7 v2 results"
+    emit_badge "$name" "$(fraction_badge "v$version" "$passed" "$total" message)" "the HL7 v2 results"
   done < <(jq -r '[.[] | .version | select(. != null and test("^[0-9]+(\\.[0-9]+)+$"))]
     | unique | sort_by(split(".") | map(tonumber)) | .[]' <<<"$hl7v2_cases")
 
@@ -454,6 +473,10 @@ if [[ "$mode" = update ]]; then
   cat "$rendered.readme" >README.md
 elif [[ "$(sed -n '/^<!-- badges:begin -->$/,/^<!-- badges:end -->$/p' README.md)" != "$block" ]]; then
   echo "conformance: the README.md badge block disagrees with the badge files; run $0 --update"
+  if [[ "$mode" = check ]]; then failed=1; fi
+fi
+
+if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md; then
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
