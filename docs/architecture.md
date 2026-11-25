@@ -1265,9 +1265,22 @@ exchange format (Article 15), whose content the Commission fixes by
 implementing act. The regulation applies from 2027-03-26, with the exchange
 obligations phased by category group from 2029-03-26 and 2031-03-26
 (Article 105). The implementing act for the format is a planned initiative
-(`PLAN/2026/837`, published 2026-03-30, adoption due 2027-03-26) with no
-published draft on 2026-09-12, so **no profile version is legally pinned**,
-and every target below is a candidate, never a conformance claim. The HL7
+(`PLAN/2026/837`, published 2026-03-30, adoption due 2027-03-26). Its
+draft was published for feedback on 2026-11-23 (Have your say initiative
+17512, vendored under `docs/specs/ehds-eehrxf-draft/`): **the draft is the
+authority for the data sets** (Annexes III to X) and **the Xt-EHR models
+1.0.0 are the logical model the `eehrxf` crate reads** until the
+implementation guide the draft's Art 9 promises for 2027-10-31 is
+published. `eehrxf::draft` crosswalks every annex element to its Xt-EHR
+element, and where the two differ the draft leads. Its Art 6 is the coding
+rule the component follows: a code goes out as recorded, a translation the
+terminology server states `equivalent` or `equal` is added beside it with
+the concept map that made it (`elementSource`) and its equivalence in the
+translator's record, and a code no map covers goes out with its English
+designation from `$lookup` when the content is not in English, the gap
+counted. Value maps come only from the terminology server. The draft names no
+profile package, so **no profile version is legally pinned**, and every
+target below is a candidate, never a conformance claim. The HL7
 Europe implementation guides are the current best proxy for the format, and
 every category has an R4 line, so the R4 pin costs nothing (read 2026-09-12
 from each guide's `package-list.json` and `ImplementationGuide` resource):

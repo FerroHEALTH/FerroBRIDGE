@@ -14,6 +14,9 @@
 //!   Xt-EHR *EHDS Logical Information Models* package and keyed on its
 //!   element paths, with the producer and consumer obligations of each
 //!   element;
+//! - [`draft`]: the crosswalk of the data sets of the draft `EEHRxF`
+//!   implementing act (Annexes III to X, 2026-11-23) to the Xt-EHR logical
+//!   models, element by element, checked against both;
 //! - [`category`]: the priority categories this build carries, one Cargo
 //!   feature each, and the logical model and obligations profile of each;
 //! - [`crosswalk`]: per category, the crosswalk from the Xt-EHR element
@@ -84,6 +87,7 @@ pub mod dataset;
     )
 ))]
 pub mod document;
+pub mod draft;
 #[cfg(feature = "openehr")]
 pub mod mapping;
 #[cfg(feature = "openehr")]

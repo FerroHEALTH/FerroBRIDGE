@@ -124,6 +124,10 @@ fn glucose() -> Resource {
     Resource::Observation(Box::new(Observation {
         id: Some(String::from("glucose")),
         status: "final".into(),
+        subject: Some(Reference {
+            reference: Some("Patient/patient-1".into()),
+            ..Reference::default()
+        }),
         code: CodeableConcept {
             coding: vec![Coding {
                 system: Some(LOINC.into()),
@@ -150,7 +154,7 @@ fn report(result: &str) -> DiagnosticReport {
 }
 
 /// A laboratory report document over the synthetic resources.
-fn document() -> Result<Document, Box<dyn Error>> {
+pub(crate) fn document() -> Result<Document, Box<dyn Error>> {
     let mut document = Document::of(
         &LABORATORY_REPORT_FORM,
         BASE,

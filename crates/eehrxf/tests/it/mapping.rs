@@ -88,7 +88,15 @@ pub(crate) const COMPOSITION: &str = r#"{
             "_type": "ELEMENT",
             "name": { "_type": "DV_TEXT", "value": "Substance" },
             "archetype_node_id": "at0002",
-            "value": { "_type": "DV_TEXT", "value": "Synthetic substance one" }
+            "value": {
+              "_type": "DV_CODED_TEXT",
+              "value": "Peanut",
+              "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "http://snomed.info/sct" },
+                "code_string": "762952008"
+              }
+            }
           },
           {
             "_type": "ELEMENT",
@@ -155,7 +163,7 @@ fn a_composition_maps_to_its_resource_with_one_provenance() -> Result<(), Box<dy
             .as_ref()
             .and_then(|code| code.text.as_ref())
             .and_then(|text| text.value.as_deref()),
-        Some("Synthetic substance one"),
+        Some("Peanut"),
         "the substance became the code"
     );
     // FHIR R4 Resource.meta.profile: the mapped resource claims the profile its context maps to.
