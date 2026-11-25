@@ -105,9 +105,17 @@ fn mapping() -> Result<Mapping, Box<dyn Error>> {
 /// The run settings: a synthetic engine device, a fixed instant and the
 /// composition defaults a received document does not state.
 fn settings() -> Settings {
-    Settings::new("Device/ferrobridge-eehrxf-test", NOW)
-        .with_defaults(Defaults::at(NOW).with_language("en").with_territory("NL"))
+    Settings::new("Device/ferrobridge-eehrxf-test", NOW).with_defaults(
+        Defaults::at(NOW)
+            .with_language("en")
+            .with_territory("NL")
+            .with_composer(COMPOSER),
+    )
 }
+
+/// The reporting clinician a received document does not state, the
+/// composition's composer.
+const COMPOSER: &str = "Synthetic Radiologist";
 
 /// Decodes the FHIR JSON `value` as the R4 resource of `kind`.
 fn resource(kind: &str, value: &Value) -> Result<Resource, Box<dyn Error>> {
@@ -503,6 +511,13 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
             "{pointer}: {study_after}"
         );
     }
+    // NOTE: draft EEHRxF Annex VII EHDSImagingStudy header.author[x] is the reporting clinician,
+    // the RM COMPOSITION.composer of the imaging report.
+    assert_eq!(
+        study_after.pointer("/interpreter/0/display"),
+        Some(&serde_json::json!(COMPOSER)),
+        "{study_after}"
+    );
     // NOTE: HL7 Europe Imaging Report 1.0.0-ballot, ImagingStudyEuImaging im-imagingstudy-01:
     // a DICOM study UID identifier carries a value in the urn:oid: form.
     assert!(
