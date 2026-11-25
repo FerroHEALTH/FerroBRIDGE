@@ -8,9 +8,10 @@
 use ferrohealth_smart::client::outbound::OutboundClient;
 use ferrohealth_smart::config::ServerTls;
 
-use super::error::Error;
-use super::section::audit::Audit;
 use crate::audit::Settings;
+use crate::config::Config;
+use crate::config::error::Error;
+use crate::config::section::audit::Audit;
 
 /// Returns the lane `audit` describes, refused without the facade it records
 /// for, without `[auth]`, whose callers it names, without `[state]`, which
@@ -19,33 +20,23 @@ use crate::audit::Settings;
 ///
 /// `system_id` is the facade's, which the bridge names itself by when
 /// `[audit] source_id` is empty.
-pub(super) fn resolve_audit(
+fn settings(
     audit: &Audit,
     facade: bool,
     auth: bool,
     state: bool,
     system_id: &str,
 ) -> Result<Settings, Error> {
-    if !facade {
-        return Err(Error::Needs {
-            key: String::from("audit.enabled"),
-            needs: String::from("facade.enabled"),
-        });
-    }
     // NOTE: Regulation (EU) 2025/327 Annex II 3.2(b) asks for the natural person who
     // accessed, which an open surface never names, so the lane needs `[auth]`.
-    if !auth {
-        return Err(Error::Needs {
-            key: String::from("audit.enabled"),
-            needs: String::from("auth.enabled"),
-        });
-    }
-    if !state {
-        return Err(Error::Needs {
-            key: String::from("audit.enabled"),
-            needs: String::from("[state]"),
-        });
-    }
+    super::needs(
+        "audit.enabled",
+        &[
+            (facade, "facade.enabled"),
+            (auth, "auth.enabled"),
+            (state, "[state]"),
+        ],
+    )?;
     let client =
         OutboundClient::build(&audit.endpoint, "audit.endpoint", &ServerTls).map_err(|source| {
             Error::Client {
@@ -68,4 +59,23 @@ pub(super) fn resolve_audit(
         },
         site: audit.site.clone().filter(|site| !site.is_empty()),
     })
+}
+
+/// Returns the access-record lane of `[audit]`, when it is on.
+///
+/// # Errors
+///
+/// Returns the [`Error`] of the section's first fault.
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
+    if !config.audit.enabled {
+        return Ok(None);
+    }
+    settings(
+        &config.audit,
+        config.facade.enabled,
+        config.auth.enabled,
+        config.state.is_some(),
+        &config.facade.system_id,
+    )
+    .map(Some)
 }
