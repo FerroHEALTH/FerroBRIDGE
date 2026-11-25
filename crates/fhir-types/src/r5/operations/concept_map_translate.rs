@@ -61,16 +61,16 @@ pub struct ConceptMapTranslateRequest {
     /// A full codeableConcept to validate. The server can translate any of the
     /// coding values (e.g. existing translations) as it chooses
     pub source_codeable_concept: Option<super::super::codeable_concept::CodeableConcept>,
-    /// Typed as the FHIR R6 ballot declares it, for the terminology ecosystem
+    /// Typed as FHIR R6 declares it, for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// target code that is to be translated to. If a code is provided, a system
     /// must be provided
     pub target_code: Option<super::super::primitives::Code>,
-    /// Typed as the FHIR R6 ballot declares it, for the terminology ecosystem
+    /// Typed as FHIR R6 declares it, for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A target
     /// coding to translate to
     pub target_coding: Option<super::super::coding::Coding>,
-    /// Typed as the FHIR R6 ballot declares it, for the terminology ecosystem
+    /// Typed as FHIR R6 declares it, for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A full
     /// codeableConcept to validate. The server can translate any of the coding
     /// values (e.g. existing translations) as it chooses
@@ -88,13 +88,13 @@ pub struct ConceptMapTranslateRequest {
     pub target_system: Option<super::super::primitives::Uri>,
     /// Data from another attribute that may help produce the correct mapping
     pub dependency: Vec<ConceptMapTranslateRequestDependency>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// system for the sourceCode to be translated. Note: the previous name of
     /// this input parameter was \`system\`, and servers MAY choose to still
     /// accept that name
     pub source_system: Option<super::super::primitives::Uri>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// version for the system of the sourceCode to be translated. Note: the
     /// previous name of this input parameter was \`version\`, and servers MAY
@@ -158,7 +158,7 @@ pub struct ConceptMapTranslateResponseMatch {
     pub product: Vec<ConceptMapTranslateResponseMatchProduct>,
     /// An data value in an additional attribute that this mapping depends on
     pub depends_on: Vec<ConceptMapTranslateResponseMatchDependsOn>,
-    /// Typed as the FHIR R6 ballot declares it, for the terminology ecosystem
+    /// Typed as FHIR R6 declares it, for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// canonical reference to the concept map from which this mapping comes
     /// from

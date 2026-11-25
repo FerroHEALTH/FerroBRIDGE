@@ -58830,7 +58830,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "stu3-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "Provenance",
             path: "Provenance",
@@ -59072,7 +59072,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "stu3-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "ProvenanceAgent",
             path: "Provenance.agent",
@@ -59189,7 +59189,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "stu3-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "ProvenanceEntity",
             path: "Provenance.entity",
@@ -77630,7 +77630,7 @@ pub static SCHEMAS: Schemas = Schemas {
         "ProcessRequest",
         #[cfg(any(feature = "resources", feature = "stu3-resources"))]
         "ProcessResponse",
-        #[cfg(any(feature = "resources", feature = "stu3-resources"))]
+        #[cfg(feature = "terminology")]
         "Provenance",
         #[cfg(any(feature = "resources", feature = "stu3-resources"))]
         "Questionnaire",

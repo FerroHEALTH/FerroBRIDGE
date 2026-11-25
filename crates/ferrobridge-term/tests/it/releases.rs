@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! R5 and the R6 ballot, written and read per release.
+//! R5 and R6, written and read per release.
 //!
 //! Every parameter name asserted here is the one the release's vendored
 //! `OperationDefinition` declares, under
 //! `tools/fhir-codegen/vendor/hl7.fhir.r5.core` 5.0.0 and
-//! `hl7.fhir.r6.core` 6.0.0-ballot5.
+//! `hl7.fhir.r6.core` 6.0.0-snapshot1.
 
 use ferrobridge_term::concept::Relationship;
 use ferrobridge_term::config::{Form, WireVersion};

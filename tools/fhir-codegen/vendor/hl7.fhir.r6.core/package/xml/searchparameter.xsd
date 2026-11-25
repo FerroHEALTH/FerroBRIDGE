@@ -47,7 +47,7 @@
   POSSIBILITY OF SUCH DAMAGE.
   
 
-  Generated on Fri, Jul 17, 2026 17:22+1000 for FHIR v6.0.0-ballot5 
+  Generated on Thu, Sep 10, 2026 16:50+1000 for FHIR v6.0.0-snapshot1 
 
   Note: the schemas &amp; schematrons do not contain all of the rules about what makes resources
   valid. Implementers will still need to be familiar with the content of the specification and with
@@ -1228,9 +1228,34 @@
           <xs:documentation xml:lang="en">SubstanceSpecification</xs:documentation>
         </xs:annotation>
       </xs:enumeration>
+      <xs:enumeration value="ViewDefinition">
+        <xs:annotation>
+          <xs:documentation xml:lang="en">ViewDefinition</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="TestPlan">
+        <xs:annotation>
+          <xs:documentation xml:lang="en">TestPlan</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
       <xs:enumeration value="TestScript">
         <xs:annotation>
           <xs:documentation xml:lang="en">TestScript</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="TestReport">
+        <xs:annotation>
+          <xs:documentation xml:lang="en">TestReport</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="PublicationRecord">
+        <xs:annotation>
+          <xs:documentation xml:lang="en">PublicationRecord</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="StructureMap">
+        <xs:annotation>
+          <xs:documentation xml:lang="en">PublicationRecord</xs:documentation>
         </xs:annotation>
       </xs:enumeration>
     </xs:restriction>

@@ -233,6 +233,7 @@ impl Outbound {
             .facade
             .store()
             .person_of(ehr)
+            .await
             .map_err(OutboundError::Identity)?
             .is_none()
         {
