@@ -218,6 +218,41 @@ impl Revisions {
     }
 }
 
+impl Revisions {
+    /// Records the baseline, the provisioned tree with no console file, as
+    /// the running revision when the store holds no revision yet; `None`
+    /// when it holds one. The change holds the `mapping_running` row, so
+    /// replicas starting together record it once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RevisionError::Database`] when a statement or the commit
+    /// fails, and nothing is recorded.
+    pub async fn baseline(&self) -> Result<Option<Revision>, RevisionError> {
+        let mut change = self.change().await?;
+        let recorded: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM mapping_revision)")
+            .fetch_one(&mut *change.transaction)
+            .await
+            .map_err(database)?;
+        if recorded {
+            return Ok(None);
+        }
+        let entry = Entry {
+            origin: Origin::Baseline,
+            author: String::from(BRIDGE),
+            reason: String::from("the provisioned files at the bridge's first start"),
+            source: None,
+        };
+        change
+            .record(entry, &Files::new(), Recording::Run)
+            .await
+            .map(Some)
+    }
+}
+
+/// The author a revision the bridge records by itself names.
+pub const BRIDGE: &str = "-";
+
 /// Whether a recorded revision runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Recording {
@@ -424,6 +459,7 @@ fn revision(row: &PgRow) -> Result<Revision, RevisionError> {
         .map_err(database)?
         .as_str()
     {
+        "baseline" => Origin::Baseline,
         "save" => Origin::Save,
         "apply" => Origin::Apply,
         "import" => Origin::Import,
@@ -454,6 +490,7 @@ fn revision(row: &PgRow) -> Result<Revision, RevisionError> {
 /// Returns the text an origin is stored as.
 const fn origin_text(origin: Origin) -> &'static str {
     match origin {
+        Origin::Baseline => "baseline",
         Origin::Save => "save",
         Origin::Apply => "apply",
         Origin::Import => "import",

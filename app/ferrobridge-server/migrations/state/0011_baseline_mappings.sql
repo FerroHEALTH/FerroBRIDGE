@@ -9,7 +9,9 @@
 -- bytes once per digest. mapping_running is one row naming the revision every
 -- replica runs. A write that moves it notifies ferrobridge_mappings in the
 -- same transaction, and each replica compiles that revision and swaps its
--- programs. The provisioned mapping files stay on disk and are in no revision.
+-- programs. The provisioned mapping files stay on disk and are in no revision;
+-- the first start records the baseline, revision 1 with no file, so an apply of
+-- it runs the provisioned tree alone.
 --
 -- No specification governs how the bridge stores its mapping revisions: our
 -- own design.
@@ -25,7 +27,7 @@ CREATE TABLE mapping_revision (
     -- The revision that ran when this one was recorded.
     parent bigint REFERENCES mapping_revision (id),
     origin text NOT NULL CONSTRAINT mapping_revision_origin_check
-        CHECK (origin IN ('save', 'apply', 'import')),
+        CHECK (origin IN ('baseline', 'save', 'apply', 'import')),
     author text NOT NULL,
     reason text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),

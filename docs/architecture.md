@@ -1535,7 +1535,10 @@ transaction. The replica then replaces its running set in a single pointer
 swap: each request takes the set at entry and finishes on it, so a request
 in flight completes on the old set. An apply of an earlier or an imported
 revision runs the same way, and an import records a revision that waits for
-an apply. A reload compiles the provisioned files and the running revision
+an apply. The first start on an empty store records the baseline, revision 1
+with no console file: the provisioned tree at first start, in the same
+transaction that holds `mapping_running`, so replicas starting together
+record it once, and an apply of it runs the provisioned tree alone. A reload compiles the provisioned files and the running revision
 again and records nothing. An ETL run reads the set when it starts.
 
 **Every replica runs the running revision.** Each replica reads the running

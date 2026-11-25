@@ -7,10 +7,11 @@
 //!
 //! A revision is the whole set of mapping files the console owns, kept in
 //! the state store, each by its wire path and SHA-256 digest, with who
-//! recorded it, when and why. Every save and apply records one, and an
-//! import records one that waits for an apply; the provisioned files belong
-//! to the deployment and are in no revision. No specification governs these
-//! documents: our own design.
+//! recorded it, when and why. The first start records the baseline, the
+//! provisioned tree with no console file; every save and apply records one,
+//! and an import records one that waits for an apply. The provisioned files
+//! belong to the deployment and are in no revision. No specification governs
+//! these documents: our own design.
 
 use std::collections::BTreeMap;
 
@@ -96,6 +97,9 @@ impl Revision {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Origin {
+    /// The provisioned tree at the bridge's first start, with no console
+    /// file of its own.
+    Baseline,
     /// A save of one file through the operator API.
     Save,
     /// An apply of an earlier or an imported revision.

@@ -579,12 +579,17 @@ async fn build_operator(
             facade,
             operations,
         };
+        let revisions = crate::mappings::revisions::Revisions::new(store);
+        revisions
+            .baseline()
+            .await
+            .context("recording the baseline revision of the mapping set")?;
         let operator = Arc::new(
             operator::Operator::new(
                 roots,
                 operator::snapshot::Snapshot::new(check::Report::default(), searches),
             )
-            .with_saving(crate::mappings::revisions::Revisions::new(store), reloader),
+            .with_saving(revisions, reloader),
         );
         operator
             .converge(operator::watch::When::Always)

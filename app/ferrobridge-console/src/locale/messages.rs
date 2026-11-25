@@ -677,6 +677,7 @@ messages! {
     #[doc = "The revision the bridge runs."] RevisionRunning = "revision-running",
     #[doc = "A revision that ran before."] RevisionRanBefore = "revision-ran-before",
     #[doc = "A revision never applied."] RevisionNotApplied = "revision-not-applied",
+    #[doc = "What recorded a revision."] OriginBaseline = "origin-baseline",
     #[doc = "What recorded a revision."] OriginSave = "origin-save",
     #[doc = "What recorded a revision."] OriginApply = "origin-apply",
     #[doc = "What recorded a revision."] OriginImport = "origin-import",

@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The state store over a PostgreSQL 19 container: the migrations at start,
-//! the lane lease with its fencing generation, and the `LISTEN` session.
+//! The state store over a PostgreSQL 19 container: the migrations and the
+//! mapping set's baseline at start, the lane lease with its fencing
+//! generation, and the `LISTEN` session.
 //! The cases run only when `FERROBRIDGE_E2E=1` admits the harness.
 
+mod baseline;
 mod identity;
 mod lease;
 mod listen;

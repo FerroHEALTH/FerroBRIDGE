@@ -761,6 +761,7 @@ col-files = Files
 revision-running = Running
 revision-ran-before = Ran before
 revision-not-applied = Not applied
+origin-baseline = Baseline: the provisioned files at the bridge's first start
 origin-save = Saved in the editor
 origin-apply = Applied from an earlier revision
 origin-import = Imported, not applied

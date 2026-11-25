@@ -300,9 +300,11 @@ Without `[state]` the routes below answer `409`.
 Answers `running`, the id of the revision the bridge runs, and `revisions`,
 newest first. Each names its `id` (a number that grows with each revision),
 its `parent` (the revision that ran when it was recorded), the `author` (the
-token's subject), the `time`, the `reason`, the `origin` (`save`, `apply` or
-`import`), whether it was
-`applied`, and how many `files` it holds.
+token's subject), the `time`, the `reason`, the `origin` (`baseline`,
+`save`, `apply` or `import`), whether it was `applied`, and how many `files`
+it holds. The baseline is revision 1: the provisioned tree at the bridge's
+first start, with no console file, recorded once by whichever replica
+starts first on an empty store.
 
 ### `GET /operator/revisions/{id}`
 
@@ -321,7 +323,8 @@ out.
 ### `POST /operator/revisions/{id}/apply`
 
 Runs the revision's files on every replica, recorded as a new revision. A
-rollback is the apply of an earlier revision. The request carries:
+rollback is the apply of an earlier revision; an apply of the baseline runs
+the provisioned tree alone. The request carries:
 
 | Header | Meaning |
 |---|---|
