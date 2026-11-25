@@ -878,6 +878,33 @@ Bundle generated on demand from the latest information the CDR holds.
 The read path, the empty reasons, the `404` for another patient and the
 refusal of an invalid document are FerroBRIDGE's own design.
 
+## The EEHRxF Annex X data groups as resources
+
+Art 7(2) of the draft EEHRxF implementing act (Have your say initiative
+17512, 2026-11-23) exchanges the 33 common data groups of its Annex X as
+individual resources as well as inside documents. The `eehrxf` crate ships
+the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
+(`eehrxf::mappings::ANNEX_X`), with a search declaration beside each
+context. Point `[mappings] directory` at a copy of it
+(`ANNEX_X.write_to(dir)` writes one) and load its two templates into the
+CDR: FerroBRIDGE's patient summary template and its EHDS record template.
+
+| Annex X group | Resource | Profile | Search (IHE QEDm 3.0.0 PCC-44) |
+|---|---|---|---|
+| EHDSAllergyIntolerance | `AllergyIntolerance` | `allergyIntolerance-eu-core` | `patient` (2:3.44.4.1.2.2) |
+| EHDSCondition | `Condition` | `condition-eu-core` | `patient`, `onset-date` (2:3.44.4.1.2.1.3) |
+| EHDSMedicationUse | `MedicationStatement` | `medicationStatement-eu-core` | `patient` with `_include=MedicationStatement:medication` (2:3.44.4.1.2.1.5) |
+| EHDSMedication | `Medication` | `medication-eu-core` | read, and included by the statement that references it |
+| EHDSImmunisation | `Immunization` | `immunization-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.6) |
+| EHDSObservation | `Observation` | FHIR R4 `bodyweight` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSProcedure | `Procedure` | `procedure-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.7) |
+
+The profiles other than `bodyweight` are HL7 Europe Base and Core 2.0.1.
+A body weight observation carries the category `vital-signs` and the LOINC
+code `29463-7` the profile fixes, so both are `fixed` tokens. The
+`conformance/eehrxf-annex-x` pass list records the groups served, and its
+badge counts them out of 33.
+
 ## `$validate` is a dry run of this server
 
 `POST /fhir/{type}/$validate` runs the whole inbound path up to the commit and
@@ -1004,6 +1031,13 @@ parameters:
   recorded:
     type: date
     path: context/start_time/value             # no node: read under the composition
+  category:
+    type: token
+    fixed:                                     # the coding the mapping writes as a constant
+      system: "http://terminology.hl7.org/CodeSystem/condition-category"
+      code: problem-list-item
+include:                                       # the reference parameters _include may name
+  - evidence-detail
 ```
 
 A parameter names the node it is read under with `node`, the RM class and
@@ -1013,7 +1047,35 @@ names the coded value itself, a `DV_CODED_TEXT`, a `DV_TEXT` or a
 `CODE_PHRASE`, and the facade reads its code and its system from that one
 value, so `[system]|[code]` never pairs the system of one diagnosis with the
 code of another. A `string` or a `date` names a data value, with any
-attribute below it.
+attribute below it. A `date` may also name `time/value` under an `ACTION`
+and `data[atNNNN]/origin/value` under an `OBSERVATION`: the RM defines both
+instants, each once, and the Web Template leaves them out.
+
+A `token` whose value the mapping writes as a constant, such as the category
+of every observation a context maps, has no openEHR path to compare. Declare
+it with `fixed`, the one coding every resource of the context carries, and no
+`node` or `path`: a value that matches the coding adds no condition, and any
+other value answers an empty `searchset` with no query to the CDR.
+
+`include` lists the codes of the type's standard R4 reference parameters a
+search may name in `_include`. The facade stores nothing, so it includes the
+resources the match's own mapping creates beside it and the match references
+through that parameter's R4 expression, each once with
+`search.mode = include`. The `CapabilityStatement` names each as
+`searchInclude`.
+
+A `token` whose value the mapping writes as a constant, such as the category
+of every observation a context maps, has no openEHR path to compare. Declare
+it with `fixed`, the one coding every resource of the context carries, and no
+`node` or `path`: a value that matches the coding adds no condition, and any
+other value answers an empty `searchset` with no query to the CDR.
+
+`include` lists the codes of the type's standard R4 reference parameters a
+search may name in `_include`. The facade stores nothing, so it includes the
+resources the match's own mapping creates beside it and the match references
+through that parameter's R4 expression, each once with
+`search.mode = include`. The `CapabilityStatement` names each as
+`searchInclude`.
 
 The facade writes the query itself:
 `SELECT e/ehr_id/value, v/uid/value, c FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c`,
@@ -1034,7 +1096,9 @@ that crosses a node which may occur more than once below the bound one (bind
 that node instead), a token over a value that is not coded, a path that is not
 one AQL path, a query that does not parse as AQL, two declarations of one
 resource type over one template, two declarations of one type that state
-different parameters, and a parameter that takes the code of a standard R4
+different parameters or includes, a `fixed` coding beside a `node` or a
+`path` or on a type other than `token`, an `include` code that is no standard
+R4 reference parameter of the type, and a parameter that takes the code of a standard R4
 search parameter of the resource type with another type (`code` on a
 `Condition` is a `token`; `patient` and `subject` are references). R4 says
 "standard parameters cannot be redefined". A parameter that takes a standard
@@ -1059,6 +1123,7 @@ key that is unique per composition.
 | `_sort` | declared parameters read under the composition, `-` for descending, ahead of the declared order; a parameter read under a node is refused, because it has a value per node |
 | `_summary` | `count` answers the total alone; `false` is the default |
 | `_total` | `none`, `estimate` or `accurate` |
+| `_include` | `[type]:[parameter]` or `[type]:[parameter]:[target type]` for a declared include; `:iterate` and any other include are a `400`, or ignored under `Prefer: handling=lenient` |
 
 A comma inside a value is an OR and a repeated parameter an AND. An empty
 parameter is ignored. A subject or an id the identity map does not know
