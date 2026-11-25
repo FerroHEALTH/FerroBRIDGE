@@ -95,12 +95,13 @@ fn parameters(run: &Run<'_>, invocation: &Invocation, scope: &Scope) -> Vec<Valu
 
 /// Returns the text of a primitive `value`.
 fn text(value: &Value) -> Option<String> {
-    match value {
-        Value::String(text) => Some(text.clone()),
-        Value::Number(number) => Some(number.as_str().to_owned()),
-        Value::Bool(flag) => Some(flag.to_string()),
-        _ => None,
-    }
+    Some(match value {
+        Value::Bool(true) => String::from("true"),
+        Value::Bool(false) => String::from("false"),
+        Value::Number(number) => number.as_str().to_owned(),
+        Value::String(text) => text.clone(),
+        Value::Null | Value::Array(_) | Value::Object(_) => return None,
+    })
 }
 
 /// Returns an object of the members `pairs` names, skipping absent ones.
