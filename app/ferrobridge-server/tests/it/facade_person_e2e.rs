@@ -41,6 +41,7 @@ async fn the_facade_round_trips_the_kds_patient_through_a_real_cdr() -> Result<(
     let templates = programs::fetch_templates(&set, &client).await?;
     let programs = programs::compile_set(&set, &templates)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(Facade::new(
         programs,
         store,
@@ -48,7 +49,7 @@ async fn the_facade_round_trips_the_kds_patient_through_a_real_cdr() -> Result<(
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::CreateOnFirstWrite,
-            subject: crate::support::subject_link("http://example.org/fhir"),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("de"),
             territory: String::from("DE"),

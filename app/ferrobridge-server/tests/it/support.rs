@@ -164,6 +164,77 @@ pub(crate) async fn served_identity_accepting(
     }
 }
 
+/// The domain the per-identifier stub identity source mints pseudonyms in.
+pub(crate) const PSEUDONYM_DOMAIN: &str = "urn:oid:2.999.9";
+
+/// Returns the pseudonym the per-identifier stub identity source answers the
+/// source identifier `system` and `value` with, for a value no FHIR search
+/// escape changes.
+pub(crate) fn pseudonym_of(system: &str, value: &str) -> String {
+    token_pseudonym(&format!("{system}|{value}"))
+}
+
+/// Returns the pseudonym of the `sourceIdentifier` token `token`: distinct
+/// tokens get distinct pseudonyms.
+fn token_pseudonym(token: &str) -> String {
+    use sha2::Digest as _;
+    let digest = sha2::Sha256::digest(token.as_bytes());
+    let mut head = [0_u8; 16];
+    head.copy_from_slice(&digest[..16]);
+    format!("pseudonym-{:032x}", u128::from_be_bytes(head))
+}
+
+/// A stub `$ihe-pix` that answers each `sourceIdentifier` of an ITI-83 `POST`
+/// with its own pseudonym in `domain`.
+struct PerIdentifier {
+    /// The pseudonym domain.
+    domain: String,
+}
+
+impl wiremock::Respond for PerIdentifier {
+    fn respond(&self, request: &wiremock::Request) -> wiremock::ResponseTemplate {
+        let token = serde_json::from_slice::<serde_json::Value>(&request.body)
+            .ok()
+            .and_then(|parameters| {
+                parameters["parameter"]
+                    .as_array()?
+                    .iter()
+                    .find(|parameter| parameter["name"] == "sourceIdentifier")?["valueString"]
+                    .as_str()
+                    .map(str::to_owned)
+            });
+        match token {
+            Some(token) => pseudonym_answer(&self.domain, &token_pseudonym(&token)),
+            None => wiremock::ResponseTemplate::new(400),
+        }
+    }
+}
+
+/// Returns a stub identity source and the subject link over it, minting in
+/// [`PSEUDONYM_DOMAIN`] and accepting [`SOURCE_DOMAIN`], [`PATIENT_SYSTEM`]
+/// and [`SUBJECT_SYSTEM`] then `more`: each source identifier gets its own
+/// pseudonym ([`pseudonym_of`]), so each subject keeps its own EHR.
+pub(crate) async fn per_identifier(
+    more: &[&str],
+) -> (MockServer, ferrobridge_server::facade::subject::SubjectLink) {
+    let server = MockServer::start().await;
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path(PIX_PATH))
+        .respond_with(PerIdentifier {
+            domain: String::from(PSEUDONYM_DOMAIN),
+        })
+        .mount(&server)
+        .await;
+    let mut accepted = vec![SOURCE_DOMAIN, PATIENT_SYSTEM, SUBJECT_SYSTEM];
+    accepted.extend_from_slice(more);
+    let link = ferrobridge_server::facade::subject::SubjectLink::new(identity_source_accepting(
+        &format!("{}/pix", server.uri()),
+        PSEUDONYM_DOMAIN,
+        &accepted,
+    ));
+    (server, link)
+}
+
 /// A `tracing` writer that keeps every line in memory.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Logs(Arc<Mutex<Vec<u8>>>);
