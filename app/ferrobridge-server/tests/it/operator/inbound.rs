@@ -94,7 +94,7 @@ async fn a_parked_item_is_listed_and_settled() -> Result<(), Box<dyn Error>> {
         store,
         inbox,
         source,
-        ..
+        _kept: _container,
     }) = parked_case().await?
     else {
         return Ok(());
@@ -173,6 +173,7 @@ async fn work_is_replayed_by_entity_and_a_backwards_range_is_refused() -> Result
         case,
         inbox,
         source,
+        _kept: _container,
         ..
     }) = parked_case().await?
     else {
