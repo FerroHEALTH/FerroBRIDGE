@@ -9,6 +9,7 @@ use std::error::Error;
 use std::time::Duration;
 
 use http::StatusCode;
+use ferrohealth_smart::jws::algorithm::Algorithm as Verified;
 use jsonwebtoken::Algorithm;
 use jsonwebtoken::EncodingKey;
 use jsonwebtoken::Header;
@@ -195,7 +196,7 @@ async fn an_algorithm_outside_the_configured_set_is_refused() -> Result<(), Box<
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
     let mut settings = issuer.settings();
-    settings.issuers[0].algorithms = vec![Algorithm::RS256, Algorithm::ES256];
+    settings.issuers[0].algorithms = vec![Verified::Rs256, Verified::Es256];
     let app = secured(&harness, &authority(settings).await);
     let token = mint(&key, &issuer.claims("system/Condition.r"));
     assert_refused(&read_with(app, Some(&token)).await?, "algorithm-refused");
@@ -208,7 +209,7 @@ async fn a_symmetric_token_is_refused() -> Result<(), Box<dyn Error>> {
     let issuer = Issuer::start(&[&key]).await;
     let harness = harness().await;
     let mut settings = issuer.settings();
-    settings.issuers[0].algorithms = vec![Algorithm::ES256];
+    settings.issuers[0].algorithms = vec![Verified::Es256];
     let app = secured(&harness, &authority(settings).await);
     let mut header = Header::new(Algorithm::HS256);
     header.kid = Some(String::from("k1"));
