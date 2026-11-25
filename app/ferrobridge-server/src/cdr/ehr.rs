@@ -20,6 +20,7 @@ use openehr_its::rest::generated::ehr::client::EhrStatusUpdateOutcome;
 use openehr_rm::v1_2::ehr::ehr_status::EhrStatus;
 
 use crate::cdr::commit::CommitContext;
+use crate::cdr::commit::commit_params;
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::SubjectId;
@@ -139,17 +140,11 @@ impl CdrClient {
     ) -> Result<Answered<EhrStatusUpdateOutcome>, CdrError> {
         let headers = commit.headers()?;
         let client = self.call(HeaderMap::new())?;
-        let params = EhrStatusUpdateParams {
+        let params = commit_params!(EhrStatusUpdateParams, headers, prefer, {
             ehr_id: String::from(ehr_id.as_str()),
             if_match: if_match_value(preceding),
-            prefer: Some(String::from(prefer.as_str())),
-            accept: None,
-            content_type: None,
             openehr_item_tag: None,
-            openehr_version_item_tag: None,
-            openehr_version: headers.version,
-            openehr_audit_details: headers.audit_details,
-        };
+        });
         let answered = EhrClient::new(&client)
             .ehr_status_update(&params, status)
             .await;

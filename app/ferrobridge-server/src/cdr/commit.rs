@@ -10,7 +10,8 @@
 //! (`openEHR-VERSION`, `openEHR-AUDIT_DETAILS`, `openEHR-TEMPLATE_ID`, which
 //! carried the attribute path in the header NAME) onto them, and the bridge
 //! sends only the 1.1.0 form. The generated parameters of the commit
-//! operations carry the three as fields, and this module renders their values.
+//! operations carry the three as fields, and this module renders their values
+//! and fills them into those parameters (`commit_params!`).
 //!
 //! The audit header states no `committer`: the CDR writes who committed from
 //! the caller it authenticated, and a CDR that does so refuses a stated
@@ -217,6 +218,25 @@ fn header_value(header: &'static str, value: String) -> Result<String, HeaderErr
 fn quoted(header: &'static str, kind: &'static str, text: &str) -> Result<String, HeaderError> {
     quotable(kind, text).map_err(|source| HeaderError::Attribute { header, source })
 }
+
+/// Builds the generated parameters of a commit operation that carries a
+/// representation: the operation's own `fields`, `prefer`, the committal
+/// headers in `headers` and no version tag, media type or `Accept`.
+macro_rules! commit_params {
+    ($params:ident, $headers:ident, $prefer:ident, { $($field:ident: $value:expr),* $(,)? }) => {
+        $params {
+            $($field: $value,)*
+            prefer: Some(String::from($prefer.as_str())),
+            accept: None,
+            content_type: None,
+            openehr_version_item_tag: None,
+            openehr_version: $headers.version,
+            openehr_audit_details: $headers.audit_details,
+        }
+    };
+}
+
+pub(crate) use commit_params;
 
 #[cfg(test)]
 mod tests {

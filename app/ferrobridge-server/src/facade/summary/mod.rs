@@ -308,13 +308,8 @@ async fn record(
     (id, person): (&str, &crate::facade::identity::PersonId),
 ) -> Result<(Patient, Vec<String>), Refusal> {
     let uid = party::party_id(PATIENT, id)?;
-    let held = party::get(
-        party::demographic(client)?,
-        party::read::class_of(loaded)?,
-        PATIENT,
-        uid.value(),
-    )
-    .await?;
+    let (demographic, class) = party::reach(client, loaded)?;
+    let held = party::get(demographic, class, PATIENT, uid.value()).await?;
     let rendered = party::render(
         facade,
         loaded,

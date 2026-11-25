@@ -35,8 +35,6 @@ use crate::facade::Facade;
 use crate::facade::compartment;
 use crate::facade::ehr::Policy;
 use crate::facade::engine;
-use crate::facade::handlers::Body;
-use crate::facade::handlers::read;
 use crate::facade::handlers::write;
 use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
@@ -67,9 +65,7 @@ pub(crate) async fn validate(
     uri: &Uri,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Present)?;
-    crate::facade::handlers::supported(facade, resource_type)?;
-    let inbound = read::parse(body, resource_type)?;
+    let inbound = crate::facade::handlers::inbound(facade, resource_type, (headers, uri), body)?;
     let program = &write::select_program(facade, &inbound, headers)?;
     let person = match inbound.subject(&facade.settings().subject) {
         Ok(person) => person,
