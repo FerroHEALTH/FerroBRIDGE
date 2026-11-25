@@ -3,7 +3,7 @@
 Per-version FHIR types and terminology operation contracts.
 
 Generated Rust types for the FHIR STU3 (3.0.2), R4 (4.0.1), R4B (4.3.0), R5
-(5.0.0), and R6 (6.0.0-ballot5) terminology surface: `CodeSystem`, `ValueSet`,
+(5.0.0), and R6 (6.0.0-snapshot1) terminology surface: `CodeSystem`, `ValueSet`,
 `ConceptMap`, `Parameters`, `OperationOutcome`, `CapabilityStatement`,
 `TerminologyCapabilities` (R4 and later; STU3 defines none), `Bundle`, the
 datatypes and primitives they reach,
@@ -39,7 +39,7 @@ it. The default set is what a dependant gets with no feature list.
 | `r4` | the FHIR R4 (4.0.1) module | yes |
 | `r4b` | the FHIR R4B (4.3.0) module | yes |
 | `r5` | the FHIR R5 (5.0.0) module | yes |
-| `r6` | the FHIR R6 (6.0.0-ballot5) module | yes |
+| `r6` | the FHIR R6 (6.0.0-snapshot1) module | yes |
 | `terminology` | the terminology root set, the closure of the types it references, and the operation contracts | yes |
 | `resources` | every concrete resource each package defines, with its complete closure; enables `terminology` | no |
 | `stu3-resources`, `r4-resources`, `r4b-resources`, `r5-resources`, `r6-resources` | the `resources` set in that version module alone; enables the version and `terminology` | no |
@@ -162,7 +162,7 @@ a value carrying a non-breaking space, which the HL7 packages themselves
 publish inside a `display` and a `code`, is not refused for it.
 
 The forms differ between versions and are read per version, never copied:
-3.0.2, 4.0.1, 4.3.0 and 6.0.0-ballot5 require a timezone offset once a
+3.0.2, 4.0.1, 4.3.0 and 6.0.0-snapshot1 require a timezone offset once a
 `dateTime` carries a time, and 5.0.0 makes it optional. 3.0.2 states its forms
 in the `structuredefinition-regex` extension and publishes none for
 `base64Binary`, `markdown`, `string` or `uri`, so the STU3 module holds those
