@@ -1,0 +1,93 @@
+-- SPDX-FileCopyrightText: Cadasto B.V.
+-- SPDX-License-Identifier: BUSL-1.1
+-- FerroBRIDGE's PERSON of a person related to a patient, the draft EEHRxF
+-- Annex X data group EHDSRelatedPerson: identifiers, a name, a birth date
+-- and the PARTY_RELATIONSHIP to the patient, its target the patient's PERSON
+-- and its kind coded in its details. No specification governs this
+-- definition: our own design for the Annex X facade resources.
+
+archetype (adl_version=2.0.6; rm_release=1.1.0)
+    openEHR-DEMOGRAPHIC-PERSON.ferrobridge_related_person.v1.0.0
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+        ["organisation"] = <"Cadasto B.V.">
+    >
+    lifecycle_state = <"unmanaged">
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"A person related to a patient, such as a relative, a guardian or a contact person.">
+            use = <"The person's identifiers and date of birth in details, the name in identities, and one PARTY_RELATIONSHIP whose target is the patient's PERSON and whose details code the kind of relationship.">
+        >
+    >
+
+definition
+    PERSON[id1] matches {
+        details matches {
+            ITEM_TREE[id2] matches {
+                items matches {
+                    ELEMENT[id3] occurrences matches {0..*} matches {
+                        value matches { DV_IDENTIFIER[id20] }
+                    }
+                    ELEMENT[id4] occurrences matches {0..1} matches {
+                        value matches { DV_DATE[id21] }
+                    }
+                }
+            }
+        }
+        identities matches {
+            PARTY_IDENTITY[id5] matches {
+                details matches {
+                    ITEM_TREE[id6] matches {
+                        items matches {
+                            ELEMENT[id7] occurrences matches {0..1} matches {
+                                value matches { DV_TEXT[id22] }
+                            }
+                            ELEMENT[id8] occurrences matches {0..1} matches {
+                                value matches { DV_TEXT[id23] }
+                            }
+                            ELEMENT[id9] occurrences matches {0..1} matches {
+                                value matches { DV_TEXT[id24] }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        relationships matches {
+            PARTY_RELATIONSHIP[id10] occurrences matches {0..1} matches {
+                details matches {
+                    ITEM_TREE[id11] matches {
+                        items matches {
+                            ELEMENT[id12] occurrences matches {0..*} matches {
+                                value matches { DV_CODED_TEXT[id25] }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["id1"] = <text = <"Related person"> description = <"A person related to a patient.">>
+            ["id2"] = <text = <"Details"> description = <"The identifiers and the date of birth of the person.">>
+            ["id3"] = <text = <"Identifier"> description = <"An identifier of the person.">>
+            ["id4"] = <text = <"Date of birth"> description = <"The date the person was born.">>
+            ["id5"] = <text = <"Name"> description = <"The name of the person.">>
+            ["id6"] = <text = <"Name structure"> description = <"The structure of the name.">>
+            ["id7"] = <text = <"Full name"> description = <"The name as it is written in full.">>
+            ["id8"] = <text = <"Given name"> description = <"The given name.">>
+            ["id9"] = <text = <"Family name"> description = <"The family name.">>
+            ["id10"] = <text = <"Relationship to the patient"> description = <"The relationship of this person to the patient, its target.">>
+            ["id11"] = <text = <"Relationship details"> description = <"The details of the relationship.">>
+            ["id12"] = <text = <"Kind of relationship"> description = <"A code for the kind of relationship, such as one of the HL7 v3 RoleCode personal relationships.">>
+        >
+    >

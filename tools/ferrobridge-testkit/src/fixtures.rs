@@ -236,6 +236,19 @@ pub const FERROEHR_PATIENT_PERSON_ADL2: &str = include_str!(
 /// of [`FERROEHR_PATIENT_PERSON_ADL2`].
 pub const FERROEHR_PATIENT_PERSON_ID: &str = "openEHR-DEMOGRAPHIC-PERSON.patient.v1.0.0";
 
+/// FerroBRIDGE's ADL 2 `PERSON` of a person related to a patient.
+///
+/// The identifiers, the date of birth and the name of the person, and one
+/// `PARTY_RELATIONSHIP` whose target is the patient's `PERSON` and whose
+/// details code the kind of relationship.
+pub const FERROBRIDGE_RELATED_PERSON_ADL2: &str =
+    include_str!("../fixtures/adl2/ferrobridge_related_person.adls");
+
+/// The archetype id, and the template id a CDR serves it under, of
+/// [`FERROBRIDGE_RELATED_PERSON_ADL2`].
+pub const FERROBRIDGE_RELATED_PERSON_ID: &str =
+    "openEHR-DEMOGRAPHIC-PERSON.ferrobridge_related_person.v1.0.0";
+
 /// The published `KDS_Prozedur` operational template, vendored verbatim.
 ///
 /// One `COMPOSITION.report.v1` holding `ACTION.procedure.v1` with its
