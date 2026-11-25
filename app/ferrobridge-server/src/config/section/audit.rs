@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The `[audit]` section: the Audit Record Repository the access records go
-//! to and the category map they are classified by; the records wait in the
-//! state store's outbox.
+//! to.
+//!
+//! The records wait in the state store's outbox, and the category map they
+//! are classified by is the `audit-categories` settings register.
 //!
 //! The record is Regulation (EU) 2025/327 Annex II 3.2's, sent as an IHE BALP
 //! `AuditEvent` over the ITI-20 ATX: FHIR Feed. The section's shape is our
 //! own design; no specification governs the configuration.
 
-use std::collections::BTreeMap;
-
-use ehds_logging::map::Declared;
 use ferrohealth_config::units::Duration;
 use ferrohealth_smart::config::endpoint::EndpointSection;
 use serde::{Deserialize, Serialize};
@@ -34,8 +33,6 @@ pub struct Audit {
     pub source_id: String,
     /// The site the bridge runs at (`AuditEvent.source.site`).
     pub site: Option<String>,
-    /// The categories the data under each template and archetype belong to.
-    pub categories: AuditCategories,
 }
 
 impl Default for Audit {
@@ -52,20 +49,6 @@ impl Default for Audit {
             cleartext: false,
             source_id: String::new(),
             site: None,
-            categories: AuditCategories::default(),
         }
     }
-}
-
-/// The deployment's category map (Annex II 3.2(c)): each template id and
-/// archetype id to its Art 14(1) categories, or to `none`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct AuditCategories {
-    /// The national categories the map may name, each `<system>|<code>`.
-    pub national: Vec<String>,
-    /// The categories of the data under each template id.
-    pub templates: BTreeMap<String, Declared>,
-    /// The categories of the data under each archetype id.
-    pub archetypes: BTreeMap<String, Declared>,
 }

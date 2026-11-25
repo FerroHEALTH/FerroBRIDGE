@@ -441,15 +441,6 @@ pub enum Error {
         #[source]
         source: ihe_atna::atna::feed::FeedConfigError,
     },
-    /// A category map `ehds-logging` refuses.
-    #[error("{key} is no category map")]
-    Categories {
-        /// The table that holds it.
-        key: String,
-        /// Every defect of the map.
-        #[source]
-        source: ehds_logging::map::MapErrors,
-    },
     /// A span of time outside the range its key admits.
     #[error("{key} is {value}; {reason}")]
     Span {

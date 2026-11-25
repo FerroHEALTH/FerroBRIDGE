@@ -30,8 +30,18 @@ the token verified, the route and the status, and never a body.
   `jti`, or the Basic user, and the roles the token grants.
 - **The categories (3.2(c)):** classified from the template and archetype ids
   of every composition and party the request read or wrote, through the
-  `[audit.categories]` map. An id the map does not name leaves the record
-  unclassified, and the record says so.
+  `audit-categories` settings register
+  ([settings registers](operator-api.md#settings-registers)). An id the map
+  does not name leaves the record unclassified, and the record says so.
+  Template and archetype ids compare without case, as openEHR BASE compares
+  every composite identifier.
+- **The register revision:** every record names the `audit-categories`
+  revision it was classified under, as the `audit-categories/<version>` map
+  digest. A replica reads the register at start and refuses to serve without
+  it. When the register cannot be read later, the replica classifies with the
+  newest revision it holds and logs a warning naming it, so a record
+  classified during an outage can be found and checked again. The revision
+  field is FerroBRIDGE's own design.
 - **When (3.2(d)):** the moment the access was answered.
 - **The origin (3.2(e)):** the CDR at `[cdr] base_url`, with each `ehr_id`
   the access reached and the patient the identity map binds to it.

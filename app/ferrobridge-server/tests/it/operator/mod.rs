@@ -29,6 +29,7 @@ mod configuration;
 mod etl_runs;
 mod events;
 mod problem;
+mod registers;
 mod save;
 mod sources;
 mod templates;

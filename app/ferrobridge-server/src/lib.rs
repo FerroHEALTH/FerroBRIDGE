@@ -40,6 +40,7 @@ pub mod outbound;
 pub mod panic;
 pub mod problem;
 pub mod quality;
+pub mod settings;
 pub mod shl;
 pub mod smart;
 pub mod sources;
@@ -482,6 +483,10 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 state.change_feed().cloned(),
                 state.etl_history().cloned(),
                 state.concept_maps().cloned(),
+            ));
+            routes = routes.merge(operator::registers::routes(
+                state.registers().cloned(),
+                smart,
             ));
             routes = routes.merge(operator::sources::routes(state.sources().cloned(), smart));
         }

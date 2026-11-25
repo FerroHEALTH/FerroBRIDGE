@@ -54,6 +54,7 @@ the process is not ready.
 | [`reason-required`](#reason-required) | `400` | A save names no reason. |
 | [`bad-path`](#bad-path) | `400` | The path names no mapping file the console can write. |
 | [`bad-archive`](#bad-archive) | `400` | The body is no mapping-set archive the bridge reads. |
+| [`bad-register`](#bad-register) | `400` | The document does not hold for the register. |
 | [`unauthenticated`](#unauthenticated) | `401` | The request carries no valid access token. |
 | [`not-permitted`](#not-permitted) | `403` | The token does not carry the operator scope. |
 | [`not-found`](#not-found) | `404` | The mapping file, the revision or the configuration does not exist. |
@@ -69,6 +70,7 @@ the process is not ready.
 | [`dead-letters-unavailable`](#dead-letters-unavailable) | `500` | The dead-letter store could not be read or written. |
 | [`reload-unavailable`](#reload-unavailable) | `503` | The mapping set could not be reloaded. |
 | [`run-history-unavailable`](#run-history-unavailable) | `503` | The run history could not be read. |
+| [`registers-unavailable`](#registers-unavailable) | `503` | The settings register could not be read or written. |
 | [`sources-unavailable`](#sources-unavailable) | `503` | The inbound sources could not be read or written. |
 | [`authorization-unavailable`](#authorization-unavailable) | `503` | The token could not be checked. |
 
@@ -96,6 +98,13 @@ holds more than 4096 entries or more than 64 MiB of content, names a file
 outside `fhirconnect/` and `omocl/` or one that is not `.yml` or `.yaml`, or
 names one file twice. Export a revision to see the shape an import reads.
 
+## bad-register
+
+`400`. The body of a register write is no JSON document, is not the
+register's shape, or breaks its rules: for `audit-categories`, a category
+that is neither an Art 14(1) category nor a declared national one. The
+version in force stays.
+
 ## unauthenticated
 
 `401`. The request carries no access token, or one the server does not
@@ -122,7 +131,8 @@ file under another path.
 ## not-configured
 
 `409`. No `[state]` is configured, so the operator API checks, saves and
-reloads nothing. Configure the state store to turn on editing.
+reloads nothing and keeps no settings register. Configure the state store to
+turn on editing.
 
 ## precondition-failed
 
@@ -188,6 +198,12 @@ not be read, because the CDM database did not answer or holds no run table.
 The server log names the cause. A bridge schema an earlier release created
 gets its run table from `ferrobridge cdm init`, which leaves every other
 table as it is.
+
+## registers-unavailable
+
+`503`. A settings register could not be read or written, because the state
+store did not answer. The server log names the cause, and the version in
+force stays.
 
 ## sources-unavailable
 

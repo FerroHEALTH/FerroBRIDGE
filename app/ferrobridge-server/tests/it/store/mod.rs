@@ -34,6 +34,18 @@ pub(crate) async fn open(url: &str) -> Result<Store, Box<dyn std::error::Error>>
     Ok(Store::open(&settings(url)?).await?)
 }
 
+/// A migrated store over a PostgreSQL started for the caller, kept alive
+/// beside it; `None` unless `FERROBRIDGE_E2E=1` admits the harness.
+pub(crate) async fn store()
+-> Result<Option<(ferrobridge_testkit::containers::Postgres, Store)>, Box<dyn std::error::Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(None);
+    }
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+    let store = open(postgres.url()).await?;
+    Ok(Some((postgres, store)))
+}
+
 /// The base64 of 32 bytes of `A`, made for the tests.
 const KEY_A: &str = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=";
 

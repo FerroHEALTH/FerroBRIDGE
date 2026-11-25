@@ -386,6 +386,49 @@ until an apply.
 | `422` | The set does not compile with the archive's files; the body names every diagnostic, and nothing is recorded |
 | `503` | The CDR did not serve a template, so the set could not be checked |
 
+## Settings registers
+
+With [`[state]`](configuration.md) configured, operational policy you
+change at runtime lives in a register: every write appends one version with
+its committer, and the change is in force on every replica without a
+restart. A register with no version holds its default, version `0`. Without
+`[state]` the routes below answer `409`.
+
+| Register | Document |
+|---|---|
+| `audit-categories` | The category of the data under each template and archetype (Regulation (EU) 2025/327 Annex II 3.2(c)): `national`, the national categories the map may name, each `<system>\|<code>`, and `templates` and `archetypes`, each id to its Art 14(1) categories or `none`. The default maps nothing |
+
+### `GET /operator/registers/{register}`
+
+The version in force: `register`, `version`, `document`, `committer` and
+`committed_at` (both absent for the default), with the version as the
+`ETag`. A name no register has answers `404`.
+
+### `PUT /operator/registers/{register}`
+
+The body is the whole new document, as JSON. The write names, in
+`If-Match`, the version it replaces, as the read's `ETag` gave it, such as
+`"0"` for the default.
+
+| Answer | When |
+|---|---|
+| `200` | The version is committed and every replica classifies by it from its next request on. The body is the new version and the `ETag` its number |
+| `400` | The document is no JSON, is not the register's shape, or breaks its rules (`bad-register`); the version in force stays |
+| `404` | No register has the name |
+| `409` | No `[state]` is configured |
+| `412` | The register changed since the version `If-Match` names: read it again |
+| `428` | No `If-Match` |
+| `503` | The state store did not answer (`registers-unavailable`) |
+
+A write notifies every replica in the transaction that commits it, and each
+replica drops its copy of the register. While a replica's listener is
+disconnected, every request on it reads the register from the store, so a
+lost notification never leaves an old version in force.
+
+### `GET /operator/registers/{register}/history`
+
+Every committed version, newest first.
+
 ## Inbound sources
 
 The systems that send patient events to the bridge are inbound sources, each
