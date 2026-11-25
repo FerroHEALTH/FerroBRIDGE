@@ -9,17 +9,29 @@
 //! Every subject is the patient's pseudonym in the identity source's
 //! pseudonym domain, asked over ITI-83 (PIXm 3.1.0 §2:3.83.4.1.2.2,
 //! <https://profiles.ihe.net/ITI/PIXm/3.1.0/ITI-83.html>), so no direct
-//! identifier reaches the CDR (GDPR Art 4(5), Art 25(1)). The facade's
-//! `Patient` logical id is that pseudonym.
+//! identifier reaches the CDR (GDPR Art 4(5), Art 25(1)). The `Patient`
+//! logical id is the party's `versioned_object_uid` where a `Patient` party
+//! context is loaded, which the identity map records against the pseudonym,
+//! and the pseudonym itself elsewhere.
 
 use std::sync::Arc;
 
+use fhir_types::codec::Value;
+use fhirconnect::engine::demographics::Demographics;
+use http::StatusCode;
 use ihe_atna_next::user::OnBehalfOf;
 use ihe_iti::pixm::identifier::SourceIdentifier;
+use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 
+use crate::cdr::CdrClient;
 use crate::facade::identity::IdError;
 use crate::facade::identity::PersonId;
+use crate::facade::identity::store::Store;
+use crate::facade::ingest::Refused;
+use crate::facade::outcome::{Issue, IssueType};
+use crate::facade::programs::Programs;
 use crate::identity_source::{IdentitySource, PseudonymError, SourceError};
+use crate::terminology::Translator;
 
 /// The resource type a literal subject reference names.
 const PATIENT: &str = "Patient";
@@ -47,11 +59,11 @@ pub enum SubjectError {
     },
 }
 
-/// A subject as a request names it, before the identity source is asked.
+/// A subject as a request names it, before it is resolved to a person.
 #[derive(Debug, Clone)]
 pub enum Subject {
-    /// The pseudonym itself, from a `Patient/<id>` reference.
-    Person(PersonId),
+    /// A `Patient/<id>` reference, by the `Patient`'s logical id.
+    Patient(String),
     /// An identifier, whose pseudonym the identity source holds.
     Identified(SourceIdentifier),
 }
@@ -82,30 +94,30 @@ impl SubjectLink {
         &self.identity
     }
 
-    /// Returns the person a literal `Patient/<pseudonym>` reference names.
+    /// Returns the subject a literal `Patient/<id>` reference names.
     ///
     /// # Errors
     ///
-    /// Returns [`SubjectError::NotPatient`] for any other reference and
-    /// [`SubjectError::Key`] when the id cannot be a key.
-    pub fn person_of_reference(&self, literal: &str) -> Result<PersonId, SubjectError> {
-        let id = logical_id(literal).ok_or(SubjectError::NotPatient)?;
+    /// Returns [`SubjectError::NotPatient`] for any other reference.
+    pub fn patient_of_reference(&self, literal: &str) -> Result<Subject, SubjectError> {
+        logical_id(literal)
+            .map(|id| Subject::Patient(id.to_owned()))
+            .ok_or(SubjectError::NotPatient)
+    }
+
+    /// Returns the person whose pseudonym is `id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SubjectError::Key`] when `id` cannot be a key.
+    pub fn person_of_pseudonym(&self, id: &str) -> Result<PersonId, SubjectError> {
         PersonId::new(self.namespace(), id).map_err(|source| SubjectError::Key { source })
     }
 
-    /// Returns the person the patient with logical id `patient` is.
-    ///
-    /// # Errors
-    ///
-    /// Returns the refusals of [`SubjectLink::person_of_reference`].
-    pub fn person_of_patient(&self, patient: &str) -> Result<PersonId, SubjectError> {
-        self.person_of_reference(&format!("{PATIENT}/{patient}"))
-    }
-
-    /// Returns the literal reference `person` is read from, `None` for a
+    /// Returns the `Patient/<pseudonym>` reference of `person`, `None` for a
     /// person keyed in another namespace.
     #[must_use]
-    pub fn reference_of(&self, person: &PersonId) -> Option<String> {
+    pub fn pseudonym_reference(&self, person: &PersonId) -> Option<String> {
         (person.namespace() == self.namespace() && !person.id().contains('/'))
             .then(|| format!("{PATIENT}/{}", person.id()))
     }
@@ -126,41 +138,188 @@ impl SubjectLink {
     /// # Errors
     ///
     /// Returns [`SubjectError::Source`] when it carries none.
-    pub fn patient(&self, document: &fhir_types::codec::Value) -> Result<Subject, SubjectError> {
+    pub fn patient(&self, document: &Value) -> Result<Subject, SubjectError> {
         let identifiers: Vec<(Option<&str>, &str)> = document
             .get("identifier")
-            .and_then(fhir_types::codec::Value::as_array)
+            .and_then(Value::as_array)
             .unwrap_or_default()
             .iter()
             .filter_map(|identifier| {
-                let value = identifier
-                    .get("value")
-                    .and_then(fhir_types::codec::Value::as_str)?;
-                let system = identifier
-                    .get("system")
-                    .and_then(fhir_types::codec::Value::as_str);
+                let value = identifier.get("value").and_then(Value::as_str)?;
+                let system = identifier.get("system").and_then(Value::as_str);
                 Some((system, value))
             })
             .collect();
         Ok(Subject::Identified(self.identity.source_of(&identifiers)?))
     }
+}
 
-    /// Returns the person `subject` is, asking the identity source for the
-    /// pseudonym of an identified subject on behalf of `on_behalf`.
+/// What resolving a subject to its person reaches: the identity source, the
+/// identity map, and the `Patient` party context with the CDR it reads.
+#[derive(Debug)]
+pub struct Patients<'a> {
+    /// The subject link.
+    pub(crate) link: &'a SubjectLink,
+    /// The identity map.
+    pub(crate) store: &'a dyn Store,
+    /// The programs, whose `Patient` party context decides the id form.
+    pub(crate) programs: Arc<Programs>,
+    /// The CDR client a party is read through.
+    pub(crate) client: &'a CdrClient,
+    /// What a party is rendered through.
+    pub(crate) renders: (&'a Translator, &'a dyn Demographics),
+    /// Whom the identity source is asked for on behalf of.
+    pub(crate) on_behalf: OnBehalfOf,
+}
+
+impl Patients<'_> {
+    /// Returns the person `subject` is.
     ///
     /// # Errors
     ///
-    /// Returns the [`PseudonymError`] of the identity source.
-    pub async fn person(
-        &self,
-        subject: Subject,
-        on_behalf: &OnBehalfOf,
-    ) -> Result<PersonId, PseudonymError> {
+    /// Returns the refusals of [`Patients::person_of_patient`] and of a
+    /// failed pseudonym query.
+    pub async fn person(&self, subject: Subject) -> Result<PersonId, Refused> {
         match subject {
-            Subject::Person(person) => Ok(person),
-            Subject::Identified(source) => self.identity.pseudonym(&source, on_behalf).await,
+            Subject::Identified(source) => self.pseudonym(&source).await,
+            Subject::Patient(id) => self.person_of_patient(&id).await,
         }
     }
+
+    /// Returns the person the `Patient` with logical id `id` is.
+    ///
+    /// Under a `Patient` party context the identity map answers, and on a
+    /// miss the party is read, its identifier in the first accepted domain
+    /// asked of the identity source, and the answer recorded.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `422` for an id that names no person or no party the CDR
+    /// holds, the refusals of the party read and of a failed pseudonym
+    /// query, and a `500` when the identity map cannot be used.
+    pub async fn person_of_patient(&self, id: &str) -> Result<PersonId, Refused> {
+        let Some(loaded) = self.programs.party(PATIENT) else {
+            return self.link.person_of_pseudonym(id).map_err(|error| {
+                unprocessable(IssueType::Value, ferrohealth_server::run::chain(&error))
+            });
+        };
+        if let Some(person) = self
+            .store
+            .person_of_party(id)
+            .await
+            .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))?
+        {
+            return Ok(person);
+        }
+        let unknown = || {
+            unprocessable(
+                IssueType::NotFound,
+                format!("{PATIENT}/{id} names no {PATIENT} party the CDR holds"),
+            )
+        };
+        let uid = HierObjectId::new(id).map_err(|_not_a_uid| unknown())?;
+        let class = loaded.program().party().ok_or_else(|| {
+            Refused::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Issue::error(IssueType::Exception).diagnosing(format!(
+                    "the context {} is served as a party and compiled no party context",
+                    loaded.program().context()
+                )),
+            )
+        })?;
+        let held = crate::facade::party::find(
+            crate::facade::party::demographic(self.client)?,
+            class,
+            uid.value(),
+        )
+        .await?
+        .ok_or_else(unknown)?;
+        let accepted = crate::facade::party::accept(loaded, PATIENT, id, &held)?;
+        let resource =
+            crate::facade::party::render(self.renders, loaded, &accepted, &held.version).await?;
+        let subject = self
+            .link
+            .patient(&Value::Object(resource))
+            .map_err(|error| {
+                Refused::new(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    Issue::error(IssueType::Required)
+                        .diagnosing(ferrohealth_server::run::chain(&error))
+                        .at(format!("{PATIENT}.identifier")),
+                )
+            })?;
+        let Subject::Identified(source) = subject else {
+            return Err(unknown());
+        };
+        let person = self.pseudonym(&source).await?;
+        self.store
+            .record_party(id, &person)
+            .await
+            .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))?;
+        Ok(person)
+    }
+
+    /// Asks the identity source for the pseudonym of `source`.
+    async fn pseudonym(&self, source: &SourceIdentifier) -> Result<PersonId, Refused> {
+        self.link
+            .identity
+            .pseudonym(source, &self.on_behalf)
+            .await
+            .map_err(|error| refused(&error))
+    }
+}
+
+/// Returns the literal `Patient` reference `person` is read from: the party
+/// the identity map records it for under a `Patient` party context, its
+/// pseudonym elsewhere; `None` when there is none.
+///
+/// # Errors
+///
+/// Returns a `500` when the identity map cannot be read.
+pub async fn reference_of(
+    link: &SubjectLink,
+    store: &dyn Store,
+    programs: &Programs,
+    person: &PersonId,
+) -> Result<Option<String>, Refused> {
+    if programs.party(PATIENT).is_none() {
+        return Ok(link.pseudonym_reference(person));
+    }
+    Ok(store
+        .party_of(person)
+        .await
+        .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))?
+        .map(|party| format!("{PATIENT}/{party}")))
+}
+
+/// Returns the person the `Patient` with logical id `patient` is as far as
+/// the identity map knows, `None` for an id that names none.
+///
+/// # Errors
+///
+/// Returns a `500` when the identity map cannot be read.
+pub async fn recorded_person(
+    link: &SubjectLink,
+    store: &dyn Store,
+    programs: &Programs,
+    patient: &str,
+) -> Result<Option<PersonId>, Refused> {
+    if programs.party(PATIENT).is_none() {
+        // NOTE: an id that cannot be a pseudonym legitimately names no person.
+        return Ok(link.person_of_pseudonym(patient).ok());
+    }
+    store
+        .person_of_party(patient)
+        .await
+        .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))
+}
+
+/// Returns a `422` of `kind` diagnosing `text`.
+fn unprocessable(kind: IssueType, text: String) -> Refused {
+    Refused::new(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        Issue::error(kind).diagnosing(text),
+    )
 }
 
 /// Returns whom the identity source is asked for on behalf of: the caller
@@ -183,10 +342,7 @@ pub fn on_behalf(access: &ferrohealth_smart::resource::Access) -> OnBehalfOf {
 // NOTE: R4 http.html leaves an upstream failure to the server; no specification governs this:
 // our own design, never an EHR under another subject.
 #[must_use]
-pub fn refused(error: &PseudonymError) -> crate::facade::ingest::Refused {
-    use crate::facade::outcome::{Issue, IssueType};
-    use http::StatusCode;
-
+pub fn refused(error: &PseudonymError) -> Refused {
     let text = ferrohealth_server::run::chain(error);
     let text = match error.upstream_status() {
         Some(status) => format!("{text} (the identity source answered {status})"),
@@ -199,7 +355,7 @@ pub fn refused(error: &PseudonymError) -> crate::facade::ingest::Refused {
         PseudonymError::Upstream(_) => (StatusCode::BAD_GATEWAY, IssueType::Exception),
         _ => (StatusCode::UNPROCESSABLE_ENTITY, IssueType::Processing),
     };
-    crate::facade::ingest::Refused::new(status, Issue::error(kind).diagnosing(text))
+    Refused::new(status, Issue::error(kind).diagnosing(text))
 }
 
 /// Returns the logical id of a relative `Patient/<id>` reference.

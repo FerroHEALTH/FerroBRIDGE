@@ -100,13 +100,13 @@ pub(crate) async fn history(
         .await
         .map_err(|error| party::client_refusal(&error))?;
     let VersionedPartyRevisionHistoryOutcome::Ok { body, .. } = outcome else {
-        return Err(party::refused(&upstream));
+        return Err(party::refused(&upstream).into());
     };
     let mut entries = Vec::new();
     for item in body.items.iter().rev() {
         let held = party::get(demographic, class, resource_type, item.version_id.value()).await?;
         let accepted = party::accept(loaded, resource_type, id, &held)?;
-        let resource = party::render(facade, loaded, &accepted, &held.version).await?;
+        let resource = party::render(facade.renders(), loaded, &accepted, &held.version).await?;
         entries.push(entry(facade, resource_type, &held.version, resource));
     }
     let mut bundle = Object::new();
@@ -174,7 +174,7 @@ async fn answer(
     held: &party::Held,
 ) -> Result<axum::response::Response, Refusal> {
     let accepted = party::accept(loaded, resource_type, id, held)?;
-    let resource = party::render(facade, loaded, &accepted, &held.version).await?;
+    let resource = party::render(facade.renders(), loaded, &accepted, &held.version).await?;
     Ok(reply::resource(
         StatusCode::OK,
         &resource,

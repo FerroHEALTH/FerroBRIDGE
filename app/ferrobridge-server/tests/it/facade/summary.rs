@@ -23,8 +23,6 @@ use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::Settings;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
-use ferrobridge_server::facade::subject::IdForm;
-use ferrobridge_server::facade::subject::SubjectLink;
 use ferrobridge_server::facade::summary::Summary;
 use ferrobridge_server::terminology::Translator;
 use ferrobridge_testkit::fixtures::CKM_MEDICATION_ARCHETYPES;
@@ -67,8 +65,12 @@ const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures_s
 /// The object id of the synthetic patient.
 pub(crate) const UID: &str = "a1b2c3d4-0000-4000-8000-000000002014";
 
-/// The namespace the CDR links each EHR to its patient's party under.
-pub(crate) const NAMESPACE: &str = "fhir_facade";
+/// The pseudonym domain every EHR subject is keyed in.
+pub(crate) const NAMESPACE: &str = "http://example.org/fhir/sid/pseudonym";
+
+/// The identifier system of the synthetic patient's identifier, the source
+/// domain its pseudonym is asked by.
+const PATIENT_SYSTEM: &str = "http://example.org/fhir/sid/patients";
 
 /// The ATC code the terminology server maps the synthetic medicine to.
 const ATC_CODE: &str = "N02BE01";
@@ -139,13 +141,19 @@ fn person_template() -> Result<String, Box<dyn Error>> {
     Ok(openehr_its::json::to_canonical_json(&raw.template))
 }
 
-/// Returns the facade settings of the suite: patients linked to their EHR by
-/// their party id.
-pub(crate) fn linked() -> Result<Settings, Box<dyn Error>> {
-    Ok(Settings {
-        subject: SubjectLink::new(NAMESPACE, IdForm::LogicalId, "PERSON")?,
-        ..super::settings()
-    })
+/// Returns the facade settings of the suite: patients keyed by the
+/// pseudonym the identity source `cdr` also serves holds for their
+/// identifier.
+pub(crate) async fn linked(cdr: &MockServer) -> Settings {
+    crate::support::served_identity_accepting(
+        cdr,
+        Settings {
+            subject: crate::support::subject_link(NAMESPACE),
+            ..super::settings()
+        },
+        &[PATIENT_SYSTEM],
+    )
+    .await
 }
 
 /// Mounts the patient `PERSON` template on the `adl2` route alone.
@@ -195,7 +203,7 @@ pub(crate) async fn summary_facade(
         String::from("Synthetic operator"),
     )?;
     Ok(Some(Arc::new(
-        Facade::new(compiled, handle(store), client, linked()?)
+        Facade::new(compiled, handle(store), client, linked(cdr).await)
             .with_translator(terminology)
             .with_summary(Some(summary)),
     )))
@@ -265,7 +273,7 @@ pub(crate) async fn mount_record(cdr: &MockServer, compositions: &[serde_json::V
     mount_patient(cdr, &person("at11")).await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path("/ehr"))
-        .and(matchers::query_param("subject_id", UID))
+        .and(matchers::query_param("subject_id", crate::support::PSEUDONYM))
         .and(matchers::query_param("subject_namespace", NAMESPACE))
         .respond_with(ResponseTemplate::new(200).set_body_string(ehr_body()))
         .mount(cdr)

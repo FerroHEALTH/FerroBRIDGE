@@ -43,7 +43,7 @@ const PATIENT: &str = "Patient";
 /// domain, and the refusal of a failed pseudonym query.
 pub(crate) async fn pseudonym(
     facade: &Facade,
-    access: &ferrohealth_smart::resource::Access,
+    (access, client): (&ferrohealth_smart::resource::Access, &CdrClient),
     resource_type: &str,
     document: &fhir_types::codec::Value,
 ) -> Result<Option<PersonId>, Refusal> {
@@ -59,10 +59,7 @@ pub(crate) async fn pseudonym(
                 .at(format!("{PATIENT}.identifier")),
         )
     })?;
-    link.person(subject, &crate::facade::subject::on_behalf(access))
-        .await
-        .map(Some)
-        .map_err(|error| Refusal::from(crate::facade::subject::refused(&error)))
+    Ok(Some(facade.patients(client, access).person(subject).await?))
 }
 
 /// Records `person` as the pseudonym of the `Patient` party committed as

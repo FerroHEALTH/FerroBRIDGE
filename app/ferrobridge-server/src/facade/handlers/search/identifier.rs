@@ -79,10 +79,16 @@ async fn ehr_of_party(
     client: &CdrClient,
     party: &str,
 ) -> Result<Option<EhrId>, Refusal> {
-    let link = &facade.settings().subject;
-    // NOTE: no specification governs this: our own design, a party uid no person key
-    // can hold names no subject the facade links, so it matches nothing.
-    let Ok(person) = link.person_of_patient(party) else {
+    // NOTE: no specification governs this: our own design, a party the identity
+    // map records no person for matches nothing.
+    let Some(person) = crate::facade::subject::recorded_person(
+        &facade.settings().subject,
+        facade.store(),
+        &facade.programs(),
+        party,
+    )
+    .await?
+    else {
         return Ok(None);
     };
     match ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing).await {

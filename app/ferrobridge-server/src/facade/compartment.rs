@@ -34,8 +34,9 @@ use crate::facade::request::Inbound;
 /// # Errors
 ///
 /// Returns the `403` refusal when the token grants no such permission, or
-/// grants it for another patient's compartment only.
-pub fn admit_person(
+/// grants it for another patient's compartment only, and a `500` when the
+/// identity map cannot be read.
+pub async fn admit_person(
     facade: &Facade,
     access: &Access,
     permission: Permission,
@@ -45,9 +46,15 @@ pub fn admit_person(
     match access.reach(permission, resource_type) {
         Some(Compartment::Any) => Ok(()),
         Some(Compartment::Patient(patient)) => {
-            // NOTE: no specification governs this: our own design, a patient id the
-            // subject link cannot read is no person, so it admits nothing.
-            let launched = facade.settings().subject.person_of_patient(&patient).ok();
+            // NOTE: no specification governs this: our own design, a launch patient the
+            // identity map records no person for admits nothing.
+            let launched = crate::facade::subject::recorded_person(
+                &facade.settings().subject,
+                facade.store(),
+                &facade.programs(),
+                &patient,
+            )
+            .await?;
             let admitted = person.is_some_and(|person| launched.as_ref() == Some(person));
             if admitted {
                 Ok(())
@@ -60,16 +67,15 @@ pub fn admit_person(
 }
 
 /// Checks that `access` lets `permission` reach the subject `inbound` names,
-/// asking the identity source for the pseudonym of a subject named by
-/// identifier.
+/// resolving it through `patients`.
 ///
 /// # Errors
 ///
 /// Returns the `403` refusal of [`admit_person`], and the refusal of a
-/// failed pseudonym query.
+/// subject that cannot be resolved.
 pub async fn admit_inbound(
-    facade: &Facade,
-    access: &Access,
+    (facade, access): (&Facade, &Access),
+    patients: &crate::facade::subject::Patients<'_>,
     permission: Permission,
     inbound: &Inbound,
 ) -> Result<(), Refusal> {
@@ -79,15 +85,10 @@ pub async fn admit_inbound(
     ) {
         return Ok(());
     }
-    let link = &facade.settings().subject;
     // NOTE: a resource naming no usable subject is legitimately outside every
     // patient's compartment, so the failed lookup becomes the refusal below.
-    let person = match inbound.subject(link).ok() {
-        Some(subject) => Some(
-            link.person(subject, &crate::facade::subject::on_behalf(access))
-                .await
-                .map_err(|error| Refusal::from(crate::facade::subject::refused(&error)))?,
-        ),
+    let person = match inbound.subject(&facade.settings().subject).ok() {
+        Some(subject) => Some(patients.person(subject).await?),
         None => None,
     };
     admit_person(
@@ -97,6 +98,7 @@ pub async fn admit_inbound(
         inbound.resource_type(),
         person.as_ref(),
     )
+    .await
 }
 
 /// Checks that `access` lets `permission` on `resource_type` reach the data
@@ -128,5 +130,5 @@ pub async fn admit_ehr(
             )),
         )
     })?;
-    admit_person(facade, access, permission, resource_type, person.as_ref())
+    admit_person(facade, access, permission, resource_type, person.as_ref()).await
 }

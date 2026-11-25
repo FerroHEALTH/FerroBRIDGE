@@ -60,9 +60,14 @@ pub(crate) async fn create(
     let inbound = parse(body, resource_type)?;
     let built = build(facade, loaded, inbound.document()).await?;
     party::unbound(facade, resource_type, built.value())?;
-    let person =
-        party::provision::pseudonym(facade, access, resource_type, inbound.document()).await?;
     let client = facade.client_for(headers, access).await?;
+    let person = party::provision::pseudonym(
+        facade,
+        (access, &client),
+        resource_type,
+        inbound.document(),
+    )
+    .await?;
     let demographic = party::demographic(&client)?;
     let commit = commit(facade, loaded, Change::Creation)?;
     let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
@@ -100,9 +105,14 @@ pub(crate) async fn update(
     same_id(&inbound, id)?;
     let built = build(facade, loaded, inbound.document()).await?;
     party::unbound(facade, resource_type, built.value())?;
-    let person =
-        party::provision::pseudonym(facade, access, resource_type, inbound.document()).await?;
     let client = facade.client_for(headers, access).await?;
+    let person = party::provision::pseudonym(
+        facade,
+        (access, &client),
+        resource_type,
+        inbound.document(),
+    )
+    .await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
@@ -162,7 +172,7 @@ pub(crate) async fn delete(
                 .answered;
             match outcome {
                 $outcome::NoContent { .. } => {}
-                _ => return Err(party::refused(&upstream)),
+                _ => return Err(party::refused(&upstream).into()),
             }
         }};
     }
@@ -287,7 +297,7 @@ async fn commit_party(
                             &upstream,
                             headers.etag.as_deref(),
                         )?,
-                        _ => return Err(party::refused(&upstream)),
+                        _ => return Err(party::refused(&upstream).into()),
                     }
                 }
                 Some((uid, preceding)) => {
@@ -307,7 +317,7 @@ async fn commit_party(
                             &upstream,
                             headers.etag.as_deref(),
                         )?,
-                        _ => return Err(party::refused(&upstream)),
+                        _ => return Err(party::refused(&upstream).into()),
                     }
                 }
             }
@@ -352,6 +362,6 @@ async fn respond(
         Header::location(&party::location(facade, resource_type, version)),
         Header::entity_tag(version.version_tree_id().value()),
     ];
-    let resource = party::render(facade, loaded, party, version).await?;
+    let resource = party::render(facade.renders(), loaded, party, version).await?;
     Ok(reply::resource(status, &resource, &headers))
 }

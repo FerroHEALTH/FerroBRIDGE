@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! A `Patient` created in a party context is given the EHR the subject link
-//! keys by the new party's id, found with `GET /ehr?subject_id=` or created
-//! with `POST /ehr` (ITS-REST 1.1.0 EHR, `ehr_get_by_subject` and
-//! `ehr_create`), when the facade creates EHRs. No specification governs
-//! provisioning an EHR from a FHIR `Patient` create: our own design.
+//! A `Patient` written in a party context is given the EHR its ITI-83
+//! pseudonym keys (PIXm 3.1.0 §2:3.83.4.1.2.2), found with
+//! `GET /ehr?subject_id=` or created with `POST /ehr` (ITS-REST 1.1.0 EHR,
+//! `ehr_get_by_subject` and `ehr_create`), when the facade creates EHRs, and
+//! the identity map records the party against that pseudonym. No
+//! specification governs provisioning an EHR from a FHIR `Patient` create:
+//! our own design.
 
 use std::error::Error;
 
@@ -16,8 +18,6 @@ use ferrobridge_server::facade::ehr;
 use ferrobridge_server::facade::ehr::Policy;
 use ferrobridge_server::facade::identity::PersonId;
 use ferrobridge_server::facade::identity::store::MemoryStore;
-use ferrobridge_server::facade::subject::IdForm;
-use ferrobridge_server::facade::subject::SubjectLink;
 use http::StatusCode;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -35,16 +35,15 @@ use super::demographic::with_body;
 use super::ehr_body;
 use super::settings;
 use super::stub::mount_no_ehr;
+use crate::support::PSEUDONYM;
 
-/// The namespace the CDR's owner links each EHR to its party under.
-const NAMESPACE: &str = "fhir_facade";
+/// The pseudonym domain every EHR subject is keyed in.
+const NAMESPACE: &str = "http://example.org/fhir";
 
-/// Returns facade settings with `policy` and a subject link that keys a
-/// patient by its logical id in [`NAMESPACE`].
+/// Returns facade settings with `policy`.
 fn linked(policy: Policy) -> Result<Settings, Box<dyn Error>> {
     Ok(Settings {
         ehr_policy: policy,
-        subject: SubjectLink::new(NAMESPACE, IdForm::LogicalId, "PERSON")?,
         ..settings()
     })
 }
@@ -89,7 +88,7 @@ async fn ehr_calls(cdr: &MockServer) -> Vec<(String, String, serde_json::Value)>
 }
 
 #[tokio::test]
-async fn a_created_patient_gets_the_ehr_its_party_id_keys() -> Result<(), Box<dyn Error>> {
+async fn a_created_patient_gets_the_ehr_its_pseudonym_keys() -> Result<(), Box<dyn Error>> {
     let (cdr, facade) = harness_with(linked(Policy::CreateOnFirstWrite)?).await?;
     mount_party_create(&cdr, "person").await;
     mount_no_ehr(&cdr).await;
@@ -108,11 +107,11 @@ async fn a_created_patient_gets_the_ehr_its_party_id_keys() -> Result<(), Box<dy
         .find(|(method, _, _)| method == "GET")
         .ok_or("the EHR was looked up")?;
     assert!(
-        lookup.1.contains(&format!("subject_id={UID}")),
+        lookup.1.contains(&format!("subject_id={PSEUDONYM}")),
         "{lookup:?}"
     );
     assert!(
-        lookup.1.contains(&format!("subject_namespace={NAMESPACE}")),
+        lookup.1.contains("subject_namespace=http%3A%2F%2Fexample.org%2Ffhir"),
         "{lookup:?}"
     );
     let (_, _, status_sent) = calls
@@ -122,7 +121,7 @@ async fn a_created_patient_gets_the_ehr_its_party_id_keys() -> Result<(), Box<dy
     let reference = &status_sent["subject"]["external_ref"];
     assert_eq!(reference["namespace"], NAMESPACE, "{status_sent}");
     assert_eq!(reference["type"], "PERSON", "{status_sent}");
-    assert_eq!(reference["id"]["value"], UID, "{status_sent}");
+    assert_eq!(reference["id"]["value"], PSEUDONYM, "{status_sent}");
     assert_eq!(reference["id"]["scheme"], NAMESPACE, "{status_sent}");
     Ok(())
 }
@@ -133,7 +132,7 @@ async fn an_ehr_the_cdr_holds_for_the_party_is_found_not_created() -> Result<(),
     mount_party_create(&cdr, "person").await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path("/ehr"))
-        .and(matchers::query_param("subject_id", UID))
+        .and(matchers::query_param("subject_id", PSEUDONYM))
         .and(matchers::query_param("subject_namespace", NAMESPACE))
         .respond_with(ResponseTemplate::new(200).set_body_string(ehr_body()))
         .mount(&cdr)
@@ -252,7 +251,7 @@ async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<
         .await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path("/ehr"))
-        .and(matchers::query_param("subject_id", UID))
+        .and(matchers::query_param("subject_id", PSEUDONYM))
         .and(matchers::query_param("subject_namespace", NAMESPACE))
         .respond_with(ResponseTemplate::new(200).set_body_string(ehr_body()))
         .mount(&cdr)
@@ -273,8 +272,7 @@ async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<
         .mount(&cdr)
         .await;
     let client = CdrClient::new(&CdrConfig::new(cdr.uri().parse()?))?;
-    let link = SubjectLink::new(NAMESPACE, IdForm::LogicalId, "PERSON")?;
-    let person = PersonId::new(NAMESPACE, UID)?;
+    let person = PersonId::new(NAMESPACE, PSEUDONYM)?;
     let (first_store, second_store) = (MemoryStore::default(), MemoryStore::default());
 
     let (first, second) = tokio::join!(
@@ -282,14 +280,12 @@ async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<
             &client,
             &first_store,
             &person,
-            &link,
             Policy::CreateOnFirstWrite
         ),
         ehr::resolve(
             &client,
             &second_store,
             &person,
-            &link,
             Policy::CreateOnFirstWrite
         ),
     );

@@ -97,6 +97,7 @@ pub(super) fn person(tree: u32) -> serde_json::Value {
 pub(super) fn patient() -> serde_json::Value {
     serde_json::json!({
         "resourceType": "Patient",
+        "identifier": [{"system": crate::support::PATIENT_SYSTEM, "value": "synthetic-1"}],
         "name": [{"text": "Synthetic Person"}]
     })
 }
@@ -117,11 +118,13 @@ pub(super) async fn harness_with(
 }
 
 /// Returns the stub CDR and the facade over the demographic fixture set that
-/// runs with `facade_settings`, unshared so a case can configure it further.
+/// runs with `facade_settings`, unshared so a case can configure it further,
+/// asking the identity source the stub CDR also serves.
 pub(super) async fn facade_over(
     facade_settings: ferrobridge_server::facade::Settings,
 ) -> Result<(MockServer, Facade), Box<dyn Error>> {
     let cdr = MockServer::start().await;
+    let facade_settings = crate::support::served_identity(&cdr, facade_settings).await;
     for (id, opt) in [
         (
             "ferrobridge.person.v1",

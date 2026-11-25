@@ -299,9 +299,14 @@ fn start_of(
 /// and a patient the map does not know reaches no data (no specification
 /// governs the mapping from a compartment to an EHR: our own design).
 async fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
-    // NOTE: no specification governs this: our own design, a patient id no
-    // person key can hold names no EHR the map binds, so the token reaches none.
-    let Ok(person) = facade.settings().subject.person_of_patient(patient) else {
+    let Some(person) = crate::facade::subject::recorded_person(
+        &facade.settings().subject,
+        facade.store(),
+        &facade.programs(),
+        patient,
+    )
+    .await?
+    else {
         return Ok(Vec::new());
     };
     let found = facade
@@ -324,15 +329,28 @@ async fn resolve(
     criteria: &Criteria,
 ) -> Result<Resolved, Refusal> {
     let link = &facade.settings().subject;
+    let programs = facade.programs();
     let mut resolved = Resolved::default();
     for subjects in &criteria.subjects {
         let mut ehrs: Vec<EhrId> = Vec::new();
         for subject in subjects {
             let found: Vec<EhrId> = match *subject {
                 Subject::Literal(ref reference) => {
-                    // NOTE: no specification governs this: our own design, a reference no
-                    // person key can hold names no subject the map binds, so it matches none.
-                    let Ok(person) = link.person_of_reference(reference) else {
+                    // NOTE: no specification governs this: our own design, a reference the
+                    // identity map records no person for matches none.
+                    let Ok(crate::facade::subject::Subject::Patient(id)) =
+                        link.patient_of_reference(reference)
+                    else {
+                        continue;
+                    };
+                    let Some(person) = crate::facade::subject::recorded_person(
+                        link,
+                        facade.store(),
+                        &programs,
+                        &id,
+                    )
+                    .await?
+                    else {
                         continue;
                     };
                     facade
@@ -357,7 +375,10 @@ async fn resolve(
                     let Ok(person) = PersonId::new(system, value) else {
                         continue;
                     };
-                    if link.reference_of(&person).is_some() {
+                    if crate::facade::subject::reference_of(link, facade.store(), &programs, &person)
+                        .await?
+                        .is_some()
+                    {
                         continue;
                     }
                     facade

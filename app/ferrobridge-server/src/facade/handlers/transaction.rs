@@ -90,8 +90,8 @@ pub(crate) async fn transaction(
                 .at("Bundle.type"),
         ));
     }
-    admit_entries(facade, access, bundle.document()).await?;
     let client = facade.client_for(headers, access).await?;
+    admit_entries(facade, access, &client, bundle.document()).await?;
     let resolved =
         crate::facade::references::resolve_bundle(facade, &client, bundle.document()).await;
     let bundled = fhirconnect::engine::seam::BundleReferences::new(
@@ -131,7 +131,13 @@ pub(crate) async fn transaction(
 /// permission of the method its `request` names, `create` for a `POST` and a
 /// request-less entry, and a `patient/` grant reaches only an entry whose
 /// subject is the patient in the launch context.
-async fn admit_entries(facade: &Facade, access: &Access, bundle: &Value) -> Result<(), Refusal> {
+async fn admit_entries(
+    facade: &Facade,
+    access: &Access,
+    client: &crate::cdr::CdrClient,
+    bundle: &Value,
+) -> Result<(), Refusal> {
+    let patients = facade.patients(client, access);
     let entries = bundle
         .get("entry")
         .and_then(Value::as_array)
@@ -157,7 +163,7 @@ async fn admit_entries(facade: &Facade, access: &Access, bundle: &Value) -> Resu
         else {
             continue;
         };
-        compartment::admit_inbound(facade, access, permission, &inbound).await?;
+        compartment::admit_inbound((facade, access), &patients, permission, &inbound).await?;
     }
     Ok(())
 }

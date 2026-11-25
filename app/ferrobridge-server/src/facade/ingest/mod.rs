@@ -523,16 +523,21 @@ impl<'a> Ingest<'a> {
     }
 
     /// Returns the person `subject` is, its pseudonym asked of the identity
-    /// source when it is named by identifier.
+    /// source.
     pub(super) async fn person_of(
         &self,
         subject: crate::facade::subject::Subject,
     ) -> Result<crate::facade::identity::PersonId, Refused> {
-        self.settings
-            .subject
-            .person(subject, &self.on_behalf)
-            .await
-            .map_err(|error| crate::facade::subject::refused(&error))
+        crate::facade::subject::Patients {
+            link: &self.settings.subject,
+            store: self.store,
+            programs: Arc::clone(&self.programs),
+            client: &self.client,
+            renders: (self.translator, self.demographics),
+            on_behalf: self.on_behalf.clone(),
+        }
+        .person(subject)
+        .await
     }
 
     /// Returns this ingest naming `originating` as the system every

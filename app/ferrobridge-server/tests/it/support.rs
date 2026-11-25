@@ -34,6 +34,9 @@ pub(crate) fn basic_authorization(user: &str, password: &str) -> String {
     )
 }
 
+/// The smallest `[identity_source]` table, which an enabled facade needs.
+pub(crate) const IDENTITY_SOURCE: &str = "[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\n\n[identity_source.endpoint]\nurl = \"http://127.0.0.1:9/fhir\"\n\n";
+
 /// The identifier system the test patients' source identifiers are in.
 pub(crate) const SOURCE_DOMAIN: &str = "urn:oid:2.999.1";
 
@@ -47,16 +50,23 @@ pub(crate) fn identity_source(
     base: &str,
     domain: &str,
 ) -> Arc<ferrobridge_server::identity_source::IdentitySource> {
+    identity_source_accepting(base, domain, &[SOURCE_DOMAIN, PATIENT_SYSTEM, domain])
+}
+
+/// Returns the identity source at `base` whose pseudonyms are in `domain`,
+/// accepting source identifiers in `accepted`, in that order.
+pub(crate) fn identity_source_accepting(
+    base: &str,
+    domain: &str,
+    accepted: &[&str],
+) -> Arc<ferrobridge_server::identity_source::IdentitySource> {
     let section = ferrobridge_server::config::section::identity_source::IdentitySource {
         endpoint: ferrohealth_smart::config::endpoint::EndpointSection {
             url: ferrohealth_secret::secret_url::SecretUrl::new(base),
             ..ferrohealth_smart::config::endpoint::EndpointSection::default()
         },
         pseudonym_domain: String::from(domain),
-        source_domains: [SOURCE_DOMAIN, PATIENT_SYSTEM, domain]
-            .into_iter()
-            .map(String::from)
-            .collect(),
+        source_domains: accepted.iter().copied().map(String::from).collect(),
     };
     Arc::new(
         ferrobridge_server::config::identity_source::resolve(&section)
@@ -109,14 +119,34 @@ pub(crate) async fn served_identity(
     settings: ferrobridge_server::facade::Settings,
 ) -> ferrobridge_server::facade::Settings {
     let domain = settings.subject.namespace().to_owned();
+    served_identity_accepting(
+        server,
+        settings,
+        &[SOURCE_DOMAIN, PATIENT_SYSTEM, domain.as_str()],
+    )
+    .await
+}
+
+/// Returns `settings` asking the identity source served by `server` under
+/// `/pix`, which answers every patient with [`PSEUDONYM`] and accepts source
+/// identifiers in `accepted`.
+pub(crate) async fn served_identity_accepting(
+    server: &wiremock::MockServer,
+    settings: ferrobridge_server::facade::Settings,
+    accepted: &[&str],
+) -> ferrobridge_server::facade::Settings {
+    let domain = settings.subject.namespace().to_owned();
     wiremock::Mock::given(wiremock::matchers::method("POST"))
         .and(wiremock::matchers::path(PIX_PATH))
         .respond_with(pseudonym_answer(&domain, PSEUDONYM))
         .with_priority(10)
         .mount(server)
         .await;
+    let base = format!("{}/pix", server.uri());
     ferrobridge_server::facade::Settings {
-        subject: subject_link_at(&format!("{}/pix", server.uri()), &domain),
+        subject: ferrobridge_server::facade::subject::SubjectLink::new(identity_source_accepting(
+            &base, &domain, accepted,
+        )),
         ..settings
     }
 }

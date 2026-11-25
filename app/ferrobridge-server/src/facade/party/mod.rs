@@ -44,8 +44,8 @@ use crate::cdr::Answered;
 use crate::cdr::CdrClient;
 use crate::cdr::demographic::Demographic;
 use crate::cdr::error::Upstream;
+use crate::facade::ingest::Refused;
 use crate::facade::Facade;
-use crate::facade::handlers::write::refuse;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -53,6 +53,8 @@ use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::status;
 use crate::terminology::Direction;
+use crate::terminology::Translator;
+use fhirconnect::engine::demographics::Demographics;
 
 /// The label every surface the Demographic API backs carries.
 pub const LABEL: &str = "ITS-REST 1.1.0 Demographic API, DEVELOPMENT";
@@ -78,9 +80,9 @@ pub(crate) struct Held {
 /// A party program loads only with `[cdr] demographic` set
 /// ([`crate::facade::programs::check_parties`]), so an absent API is a
 /// deployment fault.
-pub(crate) fn demographic(client: &CdrClient) -> Result<Demographic<'_>, Refusal> {
+pub(crate) fn demographic(client: &CdrClient) -> Result<Demographic<'_>, Refused> {
     client.demographic().ok_or_else(|| {
-        reply::refusal(
+        Refused::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "a party program is loaded and the {LABEL} is off: set [cdr] demographic"
@@ -131,10 +133,10 @@ pub(crate) fn party_id(resource_type: &str, id: &str) -> Result<HierObjectId, Re
 
 /// Returns the refusal a CDR answer outside the documented successes renders
 /// as: its row in the Demographic table, or the undocumented row.
-pub(crate) fn refused(upstream: &Upstream) -> Refusal {
+pub(crate) fn refused(upstream: &Upstream) -> Refused {
     match status::demographic::of_demographic_refusal(upstream) {
-        Some(answer) => refuse(&answer),
-        None => refuse(&status::Answer::new(
+        Some(answer) => Refused::of_answer(&answer),
+        None => Refused::of_answer(&status::Answer::new(
             status::UNDOCUMENTED,
             format!(
                 "the {LABEL} answered {} outside the operation's documented answers",
@@ -145,8 +147,8 @@ pub(crate) fn refused(upstream: &Upstream) -> Refusal {
 }
 
 /// Returns the refusal a call that reached no documented answer renders as.
-pub(crate) fn client_refusal(error: &crate::cdr::error::CdrError) -> Refusal {
-    refuse(&status::of_client_error(error))
+pub(crate) fn client_refusal(error: &crate::cdr::error::CdrError) -> Refused {
+    Refused::of_answer(&status::of_client_error(error))
 }
 
 /// Returns the version the `ETag` of a successful answer names.
@@ -154,7 +156,7 @@ pub(crate) fn version_of(
     operation: &'static str,
     upstream: &Upstream,
     etag: Option<&str>,
-) -> Result<ObjectVersionId, Refusal> {
+) -> Result<ObjectVersionId, Refused> {
     crate::cdr::version_from_etag(operation, upstream.status(), etag)
         .map_err(|error| client_refusal(&error))
 }
@@ -168,7 +170,7 @@ pub(crate) async fn get(
     class: PartyClass,
     resource_type: &str,
     uid: &str,
-) -> Result<Held, Refusal> {
+) -> Result<Held, Refused> {
     macro_rules! get_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
@@ -203,7 +205,7 @@ pub(crate) async fn find(
     demographic: Demographic<'_>,
     class: PartyClass,
     uid: &str,
-) -> Result<Option<Held>, Refusal> {
+) -> Result<Option<Held>, Refused> {
     macro_rules! find_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
@@ -237,8 +239,8 @@ pub(crate) fn of_template(loaded: &Loaded, held: &Held) -> bool {
 }
 
 /// Returns the `410` of a party the CDR reports deleted.
-fn gone(resource_type: &str, uid: &str) -> Refusal {
-    reply::refusal(
+fn gone(resource_type: &str, uid: &str) -> Refused {
+    Refused::new(
         StatusCode::GONE,
         Issue::error(IssueType::Deleted)
             .diagnosing(format!("{resource_type}/{uid} is deleted in the {LABEL}")),
@@ -254,7 +256,7 @@ pub(crate) fn accept(
     resource_type: &str,
     id: &str,
     held: &Held,
-) -> Result<CanonicalParty, Refusal> {
+) -> Result<CanonicalParty, Refused> {
     crate::cdr::reach::touched(
         crate::cdr::reach::Touch::Read,
         None,
@@ -266,7 +268,7 @@ pub(crate) fn accept(
         .and_then(serde_json::Value::as_str);
     let wanted = loaded.program().template().id().as_str();
     if template != Some(wanted) {
-        return Err(reply::refusal(
+        return Err(Refused::new(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!(
                 "{resource_type}/{id} is a party of the template {}, and this server serves \
@@ -276,7 +278,7 @@ pub(crate) fn accept(
         ));
     }
     loaded.index().accept_party(&held.value).map_err(|error| {
-        reply::refusal(
+        Refused::new(
             StatusCode::BAD_GATEWAY,
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "the {LABEL} answered {resource_type}/{id} with a party the template does not \
@@ -287,28 +289,29 @@ pub(crate) fn accept(
     })
 }
 
-/// Maps `party` back to a resource carrying its id and version.
+/// Maps `party` back to a resource carrying its id and version, translating
+/// through `translator` and resolving party references through
+/// `demographics`.
 pub(crate) async fn render(
-    facade: &Facade,
+    (translator, demographics): (&Translator, &dyn Demographics),
     loaded: &Loaded,
     party: &CanonicalParty,
     version: &ObjectVersionId,
-) -> Result<Object, Refusal> {
-    let outcome = facade
-        .translator()
+) -> Result<Object, Refused> {
+    let outcome = translator
         .run(Direction::ToFhir, |terminology| {
             crate::facade::engine::party_outbound(
                 loaded.program(),
                 loaded.index(),
                 party,
                 terminology,
-                facade.demographics(),
+                demographics,
             )
         })
         .await
-        .map_err(|error| refuse(&status::of_outbound_refusal(&error)))?;
+        .map_err(|error| Refused::of_answer(&status::of_outbound_refusal(&error)))?;
     let Value::Object(mut resource) = outcome.into_value() else {
-        return Err(reply::refusal(
+        return Err(Refused::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception)
                 .diagnosing("the party program produced no resource object"),

@@ -67,7 +67,17 @@ pub(crate) async fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option
         .person_of(ehr_id)
         .await
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
-    Ok(person.map(|person| complete::reference_to(&person, &facade.settings().subject)))
+    let Some(person) = person else {
+        return Ok(None);
+    };
+    let literal = crate::facade::subject::reference_of(
+        &facade.settings().subject,
+        facade.store(),
+        &facade.programs(),
+        &person,
+    )
+    .await?;
+    Ok(Some(complete::reference_to(&person, literal)))
 }
 
 /// Where one rendered resource comes from: the composition version, the

@@ -203,12 +203,9 @@ pub(crate) async fn document(
             "the patient summary needs a Patient party context, and none is loaded",
         ))
     })?;
-    let person = facade
-        .settings()
-        .subject
-        .person_of_patient(id)
-        .map_err(|_refused| unknown(id))?;
+    party::party_id(PATIENT, id).map_err(|_refused| unknown(id))?;
     let client = facade.client_for(headers, access).await?;
+    let person = facade.patients(&client, access).person_of_patient(id).await?;
     let (patient, compositions) = record(facade, &client, &loaded, (id, &person)).await?;
     let timestamp = jiff::Timestamp::now().to_string();
     let base = facade.settings().base_url.trim_end_matches('/').to_owned();
@@ -244,7 +241,7 @@ pub(crate) async fn document(
     let object = Json::to_json(&assembled.bundle)
         .map_err(|error| internal(format!("the patient summary could not be encoded: {error}")))?;
     for kind in entry_kinds(&object, &assembled.authored) {
-        compartment::admit_person(facade, access, Permission::Read, &kind, Some(&person))?;
+        compartment::admit_person(facade, access, Permission::Read, &kind, Some(&person)).await?;
     }
     validate(summary, facade, form, &object).await?;
     Ok(object)
@@ -268,7 +265,7 @@ async fn record(
     )
     .await?;
     let rendered = party::render(
-        facade,
+        facade.renders(),
         loaded,
         &party::accept(loaded, PATIENT, id, &held)?,
         &held.version,
