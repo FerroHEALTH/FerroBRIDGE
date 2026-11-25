@@ -92,8 +92,10 @@ pub(super) fn resolve_change_feed(
         polling: Polling {
             page_size,
             idle: section.poll_interval.get(),
-            backoff: section.backoff.get(),
-            max_backoff: section.max_backoff.get(),
+            backoff: crate::retry::Backoff {
+                initial: section.backoff.get(),
+                max: section.max_backoff.get(),
+            },
         },
     })
 }

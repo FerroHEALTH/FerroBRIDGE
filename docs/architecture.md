@@ -2502,7 +2502,11 @@ in two short statements. Idempotence is the inbox key and the generation; the
 failure policy is ours: a network failure, `5xx`, `429` or `423` retries
 after `backoff·2^(n-1)`, capped at `max_backoff`, with jitter, until
 `max_attempts`, and every other refusal parks at once with a fixed reason
-that names no value. An operator settles a parked item (retry or discard,
+that names no value. One module, `retry`, owns the backoff, the
+transient-or-poisoned verdict and the status tables of every loop of the
+bridge's own (the start, the change-feed follower, the inbound workers and
+the outbound sink), each lane keeping its numbers and its park rule. An
+operator settles a parked item (retry or discard,
 recorded with the token's subject and the reason) and replays work by
 entity or by received range through `/operator/sources/{id}/…`.
 Recovery is the receiver's job for a webhook source that retries nothing on
