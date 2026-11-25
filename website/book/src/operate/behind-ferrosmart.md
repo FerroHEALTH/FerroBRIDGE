@@ -114,6 +114,16 @@ with no `act`; it carries `fhirUser`, `patient`, `ehrId`, the scopes
 `acr` and `auth_time`, and lives at most five minutes. FerroEHR trusts
 FerroSMART the same way, with an issuer table that names only the issuer.
 
+FerroSMART reads the launch patient at the bridge during a standalone
+launch as a SMART Backend Services client (SMART App Launch 2.2.0, Backend
+Services): its token carries `system/Patient.rs`, and its `sub` equals its
+`client_id` (IHE IUA ITI-71 §3.71.4.2.2.1). Such a token names no user, so
+the bridge exchanges nothing for it (RFC 8693 §2.1) and records the access
+with the client alone (IHE BALP 1.1.4, 3:5.7.5.4). The bridge then reaches
+FerroEHR under its own credential of `[cdr.endpoint.credentials.oauth]`, as
+it does for every machine. No specification governs that last step: it is
+FerroHEALTH's own design.
+
 ## The discovery document
 
 An app that starts at the bridge reads `GET /fhir/.well-known/smart-configuration`
