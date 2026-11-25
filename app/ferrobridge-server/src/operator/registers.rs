@@ -16,10 +16,11 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Bytes;
-use axum::extract::{Path, State};
+use axum::extract::{FromRequestParts, Path};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use ferrohealth_smart::resource::Access;
+use http::request::Parts;
 use http::{HeaderMap, StatusCode, header};
 
 use crate::operator::guard::AUDIT_TARGET;
@@ -86,25 +87,31 @@ impl IntoResponse for Unresolved {
     }
 }
 
-/// Returns the registers and the register `name` names.
-fn resolve(
-    registers: Option<Arc<Registers>>,
-    name: &str,
-) -> Result<(Arc<Registers>, Register), Unresolved> {
-    let registers = registers.ok_or(Unresolved::Unconfigured)?;
-    let register = Register::of_name(name).ok_or(Unresolved::Unknown)?;
-    Ok((registers, register))
+/// The registers and the register a request's path names.
+#[derive(Debug)]
+struct Named(Arc<Registers>, Register);
+
+impl FromRequestParts<Option<Arc<Registers>>> for Named {
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        registers: &Option<Arc<Registers>>,
+    ) -> Result<Self, Self::Rejection> {
+        let Path(name) = Path::<String>::from_request_parts(parts, registers)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let registers = registers
+            .clone()
+            .ok_or_else(|| Unresolved::Unconfigured.into_response())?;
+        let register =
+            Register::of_name(&name).ok_or_else(|| Unresolved::Unknown.into_response())?;
+        Ok(Self(registers, register))
+    }
 }
 
 /// `GET /operator/registers/{register}`: the version in force.
-async fn read(
-    State(registers): State<Option<Arc<Registers>>>,
-    Path(name): Path<String>,
-) -> Response {
-    let (registers, register) = match resolve(registers, &name) {
-        Ok(found) => found,
-        Err(refusal) => return refusal.into_response(),
-    };
+async fn read(Named(registers, register): Named) -> Response {
     match registers.current(register).await {
         Ok(version) => answer(StatusCode::OK, register, &version),
         Err(error) => unavailable(&error),
@@ -113,14 +120,7 @@ async fn read(
 
 /// `GET /operator/registers/{register}/history`: every committed version,
 /// newest first.
-async fn history(
-    State(registers): State<Option<Arc<Registers>>>,
-    Path(name): Path<String>,
-) -> Response {
-    let (registers, register) = match resolve(registers, &name) {
-        Ok(found) => found,
-        Err(refusal) => return refusal.into_response(),
-    };
+async fn history(Named(registers, register): Named) -> Response {
     match registers.history(register).await {
         Ok(versions) => axum::Json(
             versions
@@ -136,17 +136,12 @@ async fn history(
 /// `PUT /operator/registers/{register}`: appends the body as the version
 /// after the one `If-Match` names.
 async fn write(
-    State(registers): State<Option<Arc<Registers>>>,
+    Named(registers, register): Named,
     access: Access,
-    Path(name): Path<String>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let subject = subject_of(&access).to_owned();
-    let (registers, register) = match resolve(registers, &name) {
-        Ok(found) => found,
-        Err(refusal) => return refusal.into_response(),
-    };
     let (replaces, response) = match (Precondition::of(&headers), replaced(&headers)) {
         (Precondition::Missing | Precondition::Absent, _) => (
             None,
