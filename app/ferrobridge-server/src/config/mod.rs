@@ -122,6 +122,9 @@ pub struct Config {
     pub cdm: Option<Cdm>,
     /// The PostgreSQL state store, when one is configured.
     pub state: Option<State>,
+    /// The directory the secrets an inbound source names are read from,
+    /// one file per secret, when one is configured.
+    pub secrets: Option<ferrohealth_secret::dir::SecretDirConfig>,
     /// The OMOP ETL job, when one is configured.
     pub etl: Option<Etl>,
     /// Where the mapping files are read from.
@@ -340,6 +343,7 @@ impl Config {
                 .as_ref()
                 .map(|state| state::resolve(state).map(Box::new))
                 .transpose()?,
+            secrets: self.secrets.clone(),
             etl: self.etl.as_ref().map(resolve_etl).transpose()?,
             mapping_directory: self.mappings.directory.clone(),
             omocl_directory: self.mappings.omocl.clone(),
@@ -358,6 +362,7 @@ impl Config {
                 Some(change_feed::resolve_change_feed(
                     &self.change_feed,
                     self.cdr.is_some(),
+                    self.state.is_some(),
                     usize::from(self.events.enabled)
                         + usize::from(self.omop_incremental.enabled)
                         + usize::from(self.fhir_outbound.enabled),
@@ -430,12 +435,10 @@ pub struct FacadeSettings {
     pub binding_issuers: Vec<String>,
     /// The access directive exchange, when `Consent` is served.
     pub consent: Option<crate::consent::exchange::Settings>,
-    /// The file SMART App State is kept in, when `Basic` is the App State
-    /// endpoint.
-    pub app_state: Option<PathBuf>,
-    /// The file the SMART launch `Task`s are kept in, when `Task` is the launch
-    /// endpoint.
-    pub launch_task: Option<PathBuf>,
+    /// Whether `Basic` is the SMART App State endpoint.
+    pub app_state: bool,
+    /// Whether `Task` is the SMART launch endpoint.
+    pub launch_task: bool,
     /// The CORS policy of the FHIR base.
     pub cors: crate::facade::cors::Cors,
     /// The patient summary, when `Patient/[id]/$summary` is served.
@@ -507,6 +510,9 @@ pub struct Settings {
     /// The PostgreSQL state store, when one is configured, boxed so the
     /// settings stay small enough to move through a job's future.
     pub state: Option<Box<crate::store::Settings>>,
+    /// The directory of the secrets the inbound sources name, when one is
+    /// configured.
+    pub secrets: Option<ferrohealth_secret::dir::SecretDirConfig>,
     /// The OMOP ETL job, when it is configured.
     pub etl: Option<EtlSettings>,
     /// The directory the mapping files are read from, when one is configured.

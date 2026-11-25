@@ -71,14 +71,7 @@ impl Bridge {
         tail: Option<&str>,
         token: &AccessToken,
     ) -> Result<Vec<u8>, BridgeError> {
-        let mut url = self.url("operator/revisions")?;
-        {
-            let mut segments = url.path_segments_mut().map_err(|()| BridgeError::Path)?;
-            segments.push(id);
-            if let Some(tail) = tail {
-                segments.push(tail);
-            }
-        }
+        let url = self.item_url("operator/revisions", id, tail)?;
         let (_status, _headers, body) = self.fetch(url, JSON, token, &[StatusCode::OK]).await?;
         Ok(body)
     }

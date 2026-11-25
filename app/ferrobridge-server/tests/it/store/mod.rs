@@ -11,6 +11,8 @@ mod identity;
 mod lease;
 mod listen;
 mod migrate;
+mod owned;
+mod shl;
 
 use std::time::Duration;
 
@@ -63,5 +65,18 @@ pub(crate) async fn store()
     }
     let postgres = ferrobridge_testkit::containers::postgres().await?;
     let store = open(postgres.url()).await?;
+    Ok(Some((postgres, store)))
+}
+
+/// A migrated store with sealing keys over a PostgreSQL started for the
+/// caller, kept alive beside it; `None` unless `FERROBRIDGE_E2E=1` admits the
+/// harness.
+pub(crate) async fn sealed_store()
+-> Result<Option<(ferrobridge_testkit::containers::Postgres, Store)>, Box<dyn std::error::Error>> {
+    if !ferrobridge_testkit::containers::e2e_enabled() {
+        return Ok(None);
+    }
+    let postgres = ferrobridge_testkit::containers::postgres().await?;
+    let store = open_sealed(postgres.url(), KEY_B).await?;
     Ok(Some((postgres, store)))
 }

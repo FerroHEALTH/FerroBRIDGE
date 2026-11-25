@@ -92,16 +92,29 @@ lane is off answers `200` with no consumer and a `null` topology.
   reports as), its `source` (`aql` or `ferroehr`), its `reader`, its
   `positions` (one per stream: `clinical` or `party` with the last
   acknowledged `seq` in `at`, or `committed` with the watermark instant in
-  `at` and `versions_at_instant`), its `state` (`starting`, `following` or
-  `stalled`), the messages it `published` since the bridge started, the
-  instant it `last_published`, and its `last_error`, the `at` and `cause` of
-  the last failed pass, kept after it recovers;
+  `at` and `versions_at_instant`), its `state` (`starting`, `standby` while
+  another replica leads its reader, `following` or `stalled`), the messages
+  it `published` since the bridge started, the instant it `last_published`,
+  its `last_error`, the `at` and `cause` of the last failed pass, kept after
+  it recovers, and its open `parked` events, each with its `id`, position,
+  identifiers, `cause`, `attempts`, `at`, `replay_requested` and the last
+  `decision` an operator recorded (`retry` or `discard`, `by` and `reason`);
 - `topology`: the `exchange`, the `routing_key` grammar
   (`<kind>.<change_type>.<template_id>`) and the bound `queues`, each a
   `name` and a `binding`.
 
 The document carries identifiers, instants and counts, never an event body,
 and never the broker URL.
+
+### `POST /operator/events/{consumer}/parked/{id}/{decision}`
+
+Settles one open parked event: `retry` offers it to its consumer again
+before the consumer's next page (`202`), and `discard` settles it without
+offering it again (`204`). The `ferrobridge-reason` header carries why, one
+line of at most 200 characters, and the subject of the operator's token is
+recorded as who decided. A settlement without a reason answers `400`
+[`reason-required`](problems.md#reason-required); a consumer that does not
+run, an event that is not open or another decision answers `404`.
 
 ## `GET /operator/etl/runs`
 
@@ -372,6 +385,77 @@ until an apply.
 | `409` | No `[state]` is configured |
 | `422` | The set does not compile with the archive's files; the body names every diagnostic, and nothing is recorded |
 | `503` | The CDR did not serve a template, so the set could not be checked |
+
+## Inbound sources
+
+The systems that send patient events to the bridge are inbound sources, each
+a versioned row of the state store ([`[state]`](configuration.md#state)), so
+an operator adds, changes, disables or deletes one without a restart and
+without a new port. A bridge without `[state]` answers `404` to every route
+below. Every version is kept with its committer, the subject of the
+operator's token, a deletion included, which is the record of who configured
+each flow (GDPR Art 30).
+
+A source carries a `name` (`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, at most
+128 characters, unique), a `kind` (`webhook`, `fhir-subscription` or
+`mllp`), `enabled`, and the kind's `document`:
+
+| Kind | Document |
+|---|---|
+| `webhook` | `verify`: `scheme` (`hmac-sha256`), `header` and `keys`, a list of secrets any of which verifies, newest first; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled` |
+| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; `tenants` as above |
+| `mllp` | `routes`: each `sending_application` (MSH-3) and `sending_facility` (MSH-4), bound to a `certificate_subject`, to `source_cidrs`, or to both |
+
+A secret is named, never written: `{"secret": "<name>"}` resolves through
+[`[secrets]`](configuration.md#secrets) when the source uses it.
+
+One write is one transaction: it validates the document, appends the
+version, updates the head row with its tenants and routes, and notifies
+every replica. Each replica's `LISTEN` session reloads the source into its
+snapshot; while the session is down, every lookup reads the row.
+
+```mermaid
+sequenceDiagram
+    participant O as Operator
+    participant A as Replica A
+    participant S as State store
+    participant B as Replica B
+    O->>A: PUT /operator/sources/{id} (If-Match)
+    A->>S: one transaction: validate, append the version, update the head, pg_notify
+    S-->>B: NOTIFY ferrobridge_sources '<id>:<version>'
+    B->>S: reload the source into the snapshot
+```
+
+### `GET /operator/sources`
+
+Every source at its head version, by name.
+
+### `GET /operator/sources/{id}`
+
+One source, with its version as its `ETag` (`"<version>"`).
+
+### `GET /operator/sources/{id}/versions`
+
+Every version of one source, oldest first, a deleted source included.
+
+### `POST /operator/sources`
+
+Creates a source from `{"name", "kind", "enabled", "document"}` as version 1;
+`201` with its `Location` and `ETag`. A document that breaks a rule of its
+kind or names a secret the directory does not hold answers `422`
+[`invalid-source`](problems.md#invalid-source); a name or an MLLP route
+another source holds answers `409` [`source-conflict`](problems.md#source-conflict).
+
+### `PUT /operator/sources/{id}`
+
+Changes a source to its next version; the body is that of a create and keeps
+the kind. `If-Match` names the `ETag` it replaces: a stale one answers `412`
+and a missing one `428`. Disabling is a `PUT` with `"enabled": false`.
+
+### `DELETE /operator/sources/{id}`
+
+Deletes a source under `If-Match`, recording the deletion as its last
+version; `204`.
 
 ## What the log records
 

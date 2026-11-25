@@ -35,6 +35,7 @@ pub mod reload;
 pub mod revisions;
 pub mod save;
 pub mod snapshot;
+pub mod sources;
 pub mod templates;
 pub mod watch;
 
@@ -47,6 +48,7 @@ use std::sync::RwLock;
 use axum::Router;
 use axum::extract::Path;
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::routing::get;
@@ -193,8 +195,8 @@ pub fn routes(
     let lane = Router::new()
         .route("/operator/events", get(events_lane))
         .route(
-            "/operator/events/{consumer}/parked/{id}/replay",
-            post(replay_parked),
+            "/operator/events/{consumer}/parked/{id}/{decision}",
+            post(settle_parked),
         )
         .with_state(change_feed);
     let history = Router::new()
@@ -251,7 +253,7 @@ async fn readiness(State((health, lifecycle)): State<(Registry, Lifecycle)>) -> 
     (status, axum::Json(document)).into_response()
 }
 
-/// `GET /operator/events`: the change-feed consumers with their parked
+/// `GET /operator/events`: the change-feed consumers with their open parked
 /// events and the AMQP topology, an empty document when no consumer runs.
 async fn events_lane(
     State(report): State<Option<Arc<crate::change_feed::report::Report>>>,
@@ -259,48 +261,69 @@ async fn events_lane(
     let Some(report) = report else {
         return axum::Json(ferrobridge_operator_api::events::Events::default()).into_response();
     };
-    on_store(move || match report.document() {
+    match report.document().await {
         Ok(document) => axum::Json(document).into_response(),
         Err(error) => dead_letters_unavailable(&error),
-    })
-    .await
+    }
 }
 
-/// `POST /operator/events/{consumer}/parked/{id}/replay`: marks one parked
-/// event for a replay before its consumer's next page; `202` once marked,
-/// `404` when no running consumer or parked event has the name.
-async fn replay_parked(
+/// `POST /operator/events/{consumer}/parked/{id}/{decision}`: settles one
+/// parked event by `retry`, offered again before its consumer's next page
+/// (`202`), or `discard`, never offered again (`204`), recording who decided
+/// and the reason the `ferrobridge-reason` header gives; `400` without a
+/// reason, `404` when no running consumer, open parked event or decision has
+/// the name.
+async fn settle_parked(
     State(report): State<Option<Arc<crate::change_feed::report::Report>>>,
-    Path((consumer, id)): Path<(String, String)>,
+    Path((consumer, id, decision)): Path<(String, String, String)>,
+    headers: HeaderMap,
     access: ferrohealth_smart::resource::Access,
 ) -> Response {
-    let subject = save::subject_of(&access).to_owned();
-    let (Some(report), Ok(id)) = (report, id.parse::<u64>()) else {
+    use crate::change_feed::dead_letter::Decision;
+    use crate::change_feed::report::Settlement;
+
+    let (Some(report), Ok(id), Some(decision)) =
+        (report, id.parse::<u64>(), Decision::parse(&decision))
+    else {
         return refuse(Kind::NotFound, "no parked event has this number");
     };
-    on_store(move || match report.replay(&consumer, id) {
-        Ok(crate::change_feed::report::Replay::Requested) => {
+    let Some(reason) = save::reason(&headers) else {
+        return refuse(
+            Kind::ReasonRequired,
+            "a settlement names its reason in one short line of the ferrobridge-reason header",
+        );
+    };
+    let decided = crate::change_feed::dead_letter::Decided {
+        decision,
+        by: save::subject_of(&access).to_owned(),
+        reason,
+    };
+    match report.settle(&consumer, id, &decided).await {
+        Ok(Settlement::Recorded) => {
+            let status = match decision {
+                Decision::Retry => StatusCode::ACCEPTED,
+                Decision::Discard => StatusCode::NO_CONTENT,
+            };
             tracing::info!(
                 target: guard::AUDIT_TARGET,
-                subject = subject.as_str(),
-                action = "replay",
+                subject = decided.by.as_str(),
+                action = decision.as_str(),
                 consumer = consumer.as_str(),
                 parked = id,
-                status = StatusCode::ACCEPTED.as_u16(),
+                status = status.as_u16(),
                 "operator"
             );
-            StatusCode::ACCEPTED.into_response()
+            status.into_response()
         }
-        Ok(crate::change_feed::report::Replay::UnknownConsumer) => refuse(
+        Ok(Settlement::UnknownConsumer) => refuse(
             Kind::NotFound,
             "no change-feed consumer runs under this name",
         ),
-        Ok(crate::change_feed::report::Replay::UnknownEvent) => {
-            refuse(Kind::NotFound, "no parked event has this number")
+        Ok(Settlement::UnknownEvent) => {
+            refuse(Kind::NotFound, "no open parked event has this number")
         }
         Err(error) => dead_letters_unavailable(&error),
-    })
-    .await
+    }
 }
 
 /// `GET /operator/etl/runs`: the newest OMOP ETL runs the bridge schema
@@ -361,21 +384,6 @@ async fn concept_map_directory(
     match directory {
         Some(directory) => axum::Json(directory.document()).into_response(),
         None => refuse(Kind::NotFound, "this bridge runs no HL7 v2 face"),
-    }
-}
-
-/// Runs `work`, which reads or writes the dead-letter store, off the async
-/// runtime.
-async fn on_store(work: impl FnOnce() -> Response + Send + 'static) -> Response {
-    match tokio::task::spawn_blocking(work).await {
-        Ok(response) => response,
-        Err(error) => {
-            tracing::error!(%error, "a dead-letter store call did not finish");
-            refuse(
-                Kind::DeadLettersUnavailable,
-                "the dead-letter store could not be read or written",
-            )
-        }
     }
 }
 

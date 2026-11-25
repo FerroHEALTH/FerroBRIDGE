@@ -40,6 +40,7 @@ use crate::facade::owned::Change;
 use crate::facade::owned::Held;
 use crate::facade::owned::OwnedStore;
 use crate::facade::owned::answer::Search;
+use crate::facade::owned::answer::SearchFuture;
 use crate::facade::owned::answer::Written;
 use crate::facade::owned::answer::answer;
 use crate::facade::owned::answer::encoded;
@@ -67,6 +68,7 @@ pub async fn create(
     let (store, state) = written(facade, &access, (&headers, &uri, &body), Intent::Create)?;
     let created = store
         .create(BASIC, state.resource)
+        .await
         .map_err(|error| store_refusal(&error))?;
     Ok(answer(
         facade,
@@ -112,6 +114,7 @@ pub async fn update(
             }
             Ok(Change::Put(state.resource.clone()))
         })
+        .await
         .map_err(|error| store_refusal(&error))??;
     match held {
         Held::Live { version, resource } => Ok(answer(
@@ -162,6 +165,7 @@ pub async fn delete(
             )?;
             Ok::<_, Refusal>(Change::Delete)
         })
+        .await
         .map_err(|error| store_refusal(&error))??;
     Ok(reply::minimal(StatusCode::NO_CONTENT, &[]))
 }
@@ -186,53 +190,56 @@ enum Subject {
 /// `system|code`, or with a parameter the endpoint does not take; the `403`
 /// of a token that does not reach the subject named; and a `500` when the
 /// store fails.
-pub fn searched(search: &Search<'_>) -> Result<Response, Refusal> {
-    let Search {
-        facade,
-        access,
-        uri,
-        parameters,
-    } = *search;
-    let store = store(facade)?;
-    let (code, subject) = criteria(parameters)?;
-    match &subject {
-        Subject::Is(reference) => {
-            admit(facade, access, Permission::Search, &code, Some(reference))?;
-        }
-        Subject::Missing => admit(facade, access, Permission::Search, &code, None)?,
-        Subject::Unnamed | Subject::Present => {
-            if reach(access, Permission::Search, &code).is_none() {
-                return Err(crate::facade::guard::forbidden());
+pub fn searched<'a>(search: &'a Search<'a>) -> SearchFuture<'a> {
+    Box::pin(async move {
+        let Search {
+            facade,
+            access,
+            uri,
+            parameters,
+        } = *search;
+        let store = store(facade)?;
+        let (code, subject) = criteria(parameters)?;
+        match &subject {
+            Subject::Is(reference) => {
+                admit(facade, access, Permission::Search, &code, Some(reference))?;
+            }
+            Subject::Missing => admit(facade, access, Permission::Search, &code, None)?,
+            Subject::Unnamed | Subject::Present => {
+                if reach(access, Permission::Search, &code).is_none() {
+                    return Err(crate::facade::guard::forbidden());
+                }
             }
         }
-    }
-    let base = facade.settings().base_url.clone();
-    let mut matched = Vec::new();
-    let held = scanned(store, BASIC, |resource, bytes| {
-        profile::read(bytes, Intent::Update(id_of(resource)), &base)
-    })?;
-    for (resource, persisted) in held {
-        let fits = persisted.code == code
-            && match &subject {
-                Subject::Is(reference) => persisted.subject.as_ref() == Some(reference),
-                Subject::Missing => persisted.subject.is_none(),
-                Subject::Present => persisted.subject.is_some(),
-                Subject::Unnamed => true,
-            };
-        let reached = fits
-            && admit(
-                facade,
-                access,
-                Permission::Search,
-                &code,
-                persisted.subject.as_deref(),
-            )
-            .is_ok();
-        if reached {
-            matched.push(resource);
+        let base = facade.settings().base_url.clone();
+        let mut matched = Vec::new();
+        let held = scanned(store, BASIC, |resource, bytes| {
+            profile::read(bytes, Intent::Update(id_of(resource)), &base)
+        })
+        .await?;
+        for (resource, persisted) in held {
+            let fits = persisted.code == code
+                && match &subject {
+                    Subject::Is(reference) => persisted.subject.as_ref() == Some(reference),
+                    Subject::Missing => persisted.subject.is_none(),
+                    Subject::Present => persisted.subject.is_some(),
+                    Subject::Unnamed => true,
+                };
+            let reached = fits
+                && admit(
+                    facade,
+                    access,
+                    Permission::Search,
+                    &code,
+                    persisted.subject.as_deref(),
+                )
+                .is_ok();
+            if reached {
+                matched.push(resource);
+            }
         }
-    }
-    searchset(facade, BASIC, uri, matched)
+        searchset(facade, BASIC, uri, matched)
+    })
 }
 
 /// Returns the store and the App State a create or an update carries, checked

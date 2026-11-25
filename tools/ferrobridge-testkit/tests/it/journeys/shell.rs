@@ -19,13 +19,14 @@ use crate::journeys::stack::Stack;
 
 /// Every navigation entry: its words, the page it leads to, and the title
 /// that page carries.
-const ENTRIES: [(&str, &str, &str); 10] = [
+const ENTRIES: [(&str, &str, &str); 11] = [
     ("Mapping set", "/mappings", "Mapping set"),
     ("Playground", "/playground", "Playground"),
     ("FHIR facade", "/facade", "FHIR facade"),
     ("HL7 v2", "/hl7v2", "HL7 v2"),
     ("OMOP ETL", "/omop", "OMOP ETL"),
     ("Events", "/events", "Events"),
+    ("Sources", "/sources", "Sources"),
     ("Connections", "/connections", "Connections"),
     ("Configuration", "/configuration", "Configuration"),
     ("About", "/about", "About"),
