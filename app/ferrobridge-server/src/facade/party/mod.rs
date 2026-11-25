@@ -315,7 +315,19 @@ pub(crate) async fn render(
         ));
     };
     stamp(&mut resource, version);
+    claim(&mut resource, loaded.program().profile().url().as_str());
     Ok(resource)
+}
+
+/// Writes the profile the party context names into `meta.profile`, as a
+/// rendered entry claims its context's profile.
+fn claim(resource: &mut Object, profile: &str) {
+    if let Some(Value::Object(meta)) = resource.get_mut("meta") {
+        meta.insert(
+            String::from("profile"),
+            Value::Array(vec![Value::String(profile.to_owned())]),
+        );
+    }
 }
 
 /// Writes the id and `meta.versionId` a party version gives its resource.

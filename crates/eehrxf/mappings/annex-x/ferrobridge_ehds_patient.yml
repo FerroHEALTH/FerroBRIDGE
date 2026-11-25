@@ -1,0 +1,156 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The model mapping of EHDSPatient over the reference CDR's patient PERSON
+# definition: the identifiers with their type, the name with its parts, the
+# date of birth, the administrative gender from the recorded sex and each
+# postal address.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_ehds_patient
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-DEMOGRAPHIC-PERSON.patient.v1
+    revision: 1.0.0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Patient
+
+mappings:
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$archetype/details[id2]/items[id3]"
+  - name: "birthDate"
+    with:
+      fhir: "$resource.birthDate"
+      openehr: "$archetype/details[id2]/items[id4]"
+  - name: "gender"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/details[id2]/items[id5]/value"
+    manual:
+      - name: "male"
+        fhir:
+          - path: "gender"
+            value: "male"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at10"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at10"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "male"
+      - name: "female"
+        fhir:
+          - path: "gender"
+            value: "female"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at11"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at11"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "female"
+      - name: "other"
+        fhir:
+          - path: "gender"
+            value: "other"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at12"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at12"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "other"
+      - name: "unknown"
+        fhir:
+          - path: "gender"
+            value: "unknown"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at13"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at13"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "gender"
+          operator: "one of"
+          criteria: "unknown"
+  - name: "name"
+    with:
+      fhir: "$resource.name"
+      openehr: "$archetype/identities[id6]/details[id7]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "fullName"
+          with:
+            fhir: "text"
+            openehr: "items[id8]"
+        - name: "givenName"
+          with:
+            fhir: "given"
+            openehr: "items[id9]"
+        - name: "familyName"
+          with:
+            fhir: "family"
+            openehr: "items[id10]"
+  - name: "address"
+    with:
+      fhir: "$resource.address"
+      openehr: "$archetype/contacts[id11]/addresses[id12]/details[id13]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "line"
+          with:
+            fhir: "line"
+            openehr: "items[id14]"
+        - name: "postalCode"
+          with:
+            fhir: "postalCode"
+            openehr: "items[id15]"
+        - name: "city"
+          with:
+            fhir: "city"
+            openehr: "items[id16]"
+        - name: "state"
+          with:
+            fhir: "state"
+            openehr: "items[id17]"
+        - name: "country"
+          with:
+            fhir: "country"
+            openehr: "items[id18]"

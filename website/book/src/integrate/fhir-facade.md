@@ -885,7 +885,11 @@ the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
 context. Point `[mappings] directory` at a copy of it
 (`ANNEX_X.write_to(dir)` writes one) and load its two templates into the
 CDR: FerroBRIDGE's patient summary template, its EHDS record template and
-the published `KDS_Laborbericht`.
+the published `KDS_Laborbericht`. The party groups are party contexts, so
+the project needs `[cdr] demographic` and the reference CDR's patient and
+healthcare professional `PERSON` definitions with an `ORGANISATION`
+template; each party resource claims the profile its context names, as an
+entry's resource does.
 
 | Annex X group | Resource | Profile | Search (IHE QEDm 3.0.0 PCC-44) |
 |---|---|---|---|
@@ -902,6 +906,11 @@ the published `KDS_Laborbericht`.
 | EHDSDevice | `Device` | `device-eu-eps` | read, and included by the statement that names it |
 | EHDSDosage | the `dosage` of a `MedicationStatement` | | as its statement |
 | EHDSEndpoint | `Endpoint` | FHIR R4 `Endpoint` | `_id`, `connection-type`, `status`; read-only from the configuration |
+| EHDSPatient | `Patient` | `patient-eu-core` | read, from the reference CDR's patient `PERSON` |
+| EHDSHumanName | the `name` of a `Patient` or `Practitioner` | | as its party |
+| EHDSAddress | the `address` of a `Patient` | | as its patient |
+| EHDSHealthProfessional | `Practitioner` | `practitioner-eu-core` | read, from the reference CDR's healthcare professional `PERSON` |
+| EHDSOrganisation | `Organization` | `organization-eu-core` | read, from an `ORGANISATION` |
 | (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category`, `code` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
 
 The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device

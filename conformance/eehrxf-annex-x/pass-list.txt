@@ -1,14 +1,19 @@
+EHDSAddress
 EHDSAllergyIntolerance
 EHDSCondition
 EHDSDevice
 EHDSDeviceUse
 EHDSDosage
 EHDSEndpoint
+EHDSHealthProfessional
+EHDSHumanName
 EHDSImmunisation
 EHDSLaboratoryObservation
 EHDSMedication
 EHDSMedicationUse
 EHDSObservation
+EHDSOrganisation
+EHDSPatient
 EHDSProcedure
 EHDSSpecimen
 total 33
