@@ -434,5 +434,32 @@ pub(crate) fn annex_iii(code: &str) -> eehrxf::document::metadata::DocumentMetad
             }],
             ..fhir_types::r4::codeable_concept::CodeableConcept::default()
         },
+        priority(code),
     )
+}
+
+/// The Art 14(1) priority category of the LOINC document category `code`,
+/// none for a document outside them.
+#[cfg(all(
+    feature = "openehr",
+    any(
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging",
+        feature = "discharge"
+    )
+))]
+fn priority(code: &str) -> Option<eehrxf::category::Category> {
+    use eehrxf::category::Category;
+    match code {
+        #[cfg(feature = "patient-summary")]
+        "60591-5" => Some(Category::PatientSummary),
+        #[cfg(feature = "laboratory")]
+        "11502-2" => Some(Category::Laboratory),
+        #[cfg(feature = "imaging")]
+        "18748-4" => Some(Category::Imaging),
+        #[cfg(feature = "discharge")]
+        "18842-5" => Some(Category::Discharge),
+        _ => None,
+    }
 }

@@ -79,8 +79,14 @@ fn described(pdf: &PdfA) -> Result<DocumentReference, DocumentError> {
         loinc("11502-2"),
         String::from("Laboratory report"),
         to("Organization/laboratory"),
-    );
-    DocumentMetadata::new(String::from("1"), loinc("11502-2"))
+    )
+    .with_custodian(to("Organization/laboratory"));
+    // The laboratory report's priority category, in a build that has it.
+    #[cfg(feature = "laboratory")]
+    let priority = Some(Category::Laboratory);
+    #[cfg(not(feature = "laboratory"))]
+    let priority = None;
+    DocumentMetadata::new(String::from("1"), loinc("11502-2"), priority)
         .with_language(String::from("en"))
         .describe_pdf(&header, pdf, "pdf-report")
 }

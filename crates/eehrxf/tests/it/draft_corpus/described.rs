@@ -22,7 +22,7 @@ pub(super) const DESCRIBED: &[(&str, Option<&str>)] = &[
     ("attestation", None),
     ("attestation.attester[x]", None),
     ("attestation.dateTime", None),
-    ("status", Some("DocumentReference.docStatus")),
+    ("status", None),
     (
         "language",
         Some("DocumentReference.content.attachment.language"),
