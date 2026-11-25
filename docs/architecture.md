@@ -2590,8 +2590,14 @@ cannot describe another source, so this second language serves the inbound
 sources. The grammar leaves `fhirPath` a placeholder, so an embedded
 expression is parenthesized or runs to the next clause, as the tutorial
 writes it, and `ferrobridge-fhirpath` evaluates it with the map's variables
-bound by name over untyped logical-model nodes. `translate` waits on the
-terminology client (#2118); `dateOp` and `escape`, which R4 leaves
+bound by name over untyped logical-model nodes. `translate` (#2118) sends
+a `Coding`, or each coding of a `CodeableConcept` in order, with the map URL
+to `ConceptMap/$translate` through `ferrobridge-term`, since R4 takes a code
+only with its system; the first coding with exactly one accepted concept
+answers, and a refusal, no translation or two concepts stop the map. The
+engine stays synchronous behind a `Translate` seam: the lane runs it with
+`Engine::transform_blocking` on a blocking thread, where the terminology
+call waits with `Handle::block_on`. `dateOp` and `escape`, which R4 leaves
 undocumented, are refused.
 
 ## 8. What each seam carries
