@@ -41,6 +41,7 @@ use crate::engine::lens::range::QuantityIntervalLens;
 use crate::engine::lens::string::StringLens;
 use crate::engine::lens::text::TextLens;
 use crate::engine::lens::time::TimeLens;
+use crate::engine::lens::uid::UidLens;
 use crate::engine::lens::uri::UriLens;
 use crate::engine::rm::RmValue;
 use crate::model::ast::keyword::Direction;
@@ -131,6 +132,9 @@ pub fn get(
             .map(|reference| FhirValue::Reference(Box::new(reference))),
         (RmValue::Identifier(identifier), FhirKind::Identifier) => IdentifierLens
             .get(identifier)
+            .map(|identifier| FhirValue::Identifier(Box::new(identifier))),
+        (RmValue::Uid(uid), FhirKind::Identifier) => UidLens
+            .get(uid)
             .map(|identifier| FhirValue::Identifier(Box::new(identifier))),
         (RmValue::Proportion(proportion), FhirKind::Quantity) => PercentLens
             .get(proportion.as_ref())

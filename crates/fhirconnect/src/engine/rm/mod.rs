@@ -16,7 +16,9 @@
 //! attributes of a class.
 
 use openehr_base::containers::NonEmptyVec;
+use openehr_base::v1_3::base_types::identification::locatable_ref::LocatableRef;
 use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
+use openehr_base::v1_3::base_types::identification::uid_based_id::UidBasedId;
 use openehr_its::json::JsonParseError;
 use openehr_its::json::from_canonical_value;
 use openehr_its::json::to_canonical_value;
@@ -101,6 +103,10 @@ pub enum RmValue {
     Boolean(DvBoolean),
     /// A `PARTY_REF`, the party a `ROLE` names as its `performer`.
     PartyRef(PartyRef),
+    /// A `UID_BASED_ID`, the `uid` of a `LOCATABLE`.
+    Uid(UidBasedId),
+    /// A `LOCATABLE_REF`, the `INSTRUCTION` an `ACTION` carries out.
+    LocatableRef(LocatableRef),
 }
 
 /// Why a reference-model value could not be read or written.
@@ -169,6 +175,8 @@ impl RmValue {
             Self::Parsable(_) => "DV_PARSABLE",
             Self::Boolean(_) => "DV_BOOLEAN",
             Self::PartyRef(_) => "PARTY_REF",
+            Self::Uid(_) => "UID_BASED_ID",
+            Self::LocatableRef(_) => "LOCATABLE_REF",
         }
     }
 
@@ -254,6 +262,12 @@ impl RmValue {
             "PARTY_REF" => from_canonical_value(value)
                 .map(Self::PartyRef)
                 .map_err(refuse),
+            "UID_BASED_ID" | "HIER_OBJECT_ID" | "OBJECT_VERSION_ID" => {
+                from_canonical_value(value).map(Self::Uid).map_err(refuse)
+            }
+            "LOCATABLE_REF" => from_canonical_value(value)
+                .map(Self::LocatableRef)
+                .map_err(refuse),
             other => Err(RmError::UnknownClass {
                 rm_type: String::from(other),
             }),
@@ -281,6 +295,8 @@ impl RmValue {
             Self::Party(ref party) => to_canonical_value(party),
             Self::Identifier(ref identifier) => to_canonical_value(identifier),
             Self::PartyRef(ref party) => to_canonical_value(party),
+            Self::Uid(ref uid) => to_canonical_value(uid),
+            Self::LocatableRef(ref reference) => to_canonical_value(reference),
             Self::Proportion(ref proportion) => {
                 for number in [proportion.numerator, proportion.denominator] {
                     if !number.is_finite() {
@@ -406,6 +422,18 @@ pub fn holds_party_ref(rm_type: &str) -> bool {
     PARTY_REFS.iter().any(|&(owner, _)| owner == rm_type)
 }
 
+/// The identifying attributes of a structural node a mapping reads out of
+/// openEHR although no template node holds them.
+///
+/// `LOCATABLE.uid` is a `UID_BASED_ID` (RM Common, the `LOCATABLE` class)
+/// and `ACTION.instruction_details` names the `INSTRUCTION` by its
+/// `instruction_id`, a `LOCATABLE_REF` (RM EHR, the `INSTRUCTION_DETAILS`
+/// class). No specification governs reading them: our own design.
+pub const IDENTITIES: &[(&str, &str)] = &[
+    ("LOCATABLE", "uid"),
+    ("ACTION", "instruction_details/instruction_id"),
+];
+
 /// Returns the FLAT family a tail of [`carried::Carried::Family`] below an
 /// `owner` node is written under, `None` when no FLAT key names the attribute.
 #[must_use]
@@ -475,6 +503,18 @@ mod tests {
             Some("2026-09-12T10:00:00+02:00"),
             "the offset survives byte for byte"
         );
+    }
+
+    #[test]
+    fn a_uid_reads_as_the_class_its_document_names() {
+        let written = serde_json::json!({
+            "_type": "OBJECT_VERSION_ID",
+            "value": "5f0c2a9e-0000-4000-8000-000000000001::synthetic.example.org::1"
+        });
+        let value = RmValue::from_canonical("UID_BASED_ID", "/uid", &written)
+            .expect("the canonical form reads back");
+        assert_eq!(value.rm_type(), "UID_BASED_ID");
+        assert_eq!(value.to_canonical().expect("a uid encodes"), written);
     }
 
     #[test]

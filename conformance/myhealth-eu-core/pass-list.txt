@@ -36,6 +36,8 @@ eehrxf-manifest-study.5.Organization
 eehrxf-mpd-dispense.1.Medication
 eehrxf-mpd-prescription.0.MedicationRequest
 eehrxf-mpd-prescription.1.Medication
+eehrxf-narrative-discharge.1.Patient
+eehrxf-narrative-discharge.3.Organization
 eehrxf-summary-eu-mapping.0.Composition
 eehrxf-summary-eu-mapping.1.Patient
 eehrxf-summary-eu-mapping.3.Organization
@@ -56,4 +58,4 @@ eehrxf-test-report-ecg.4.Organization
 eehrxf-test-report-spirometry.1.DiagnosticReport
 eehrxf-test-report-spirometry.2.Patient
 eehrxf-test-report-spirometry.4.Organization
-total 62
+total 65

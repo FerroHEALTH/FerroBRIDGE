@@ -13,7 +13,7 @@ use openehr_rm::v1_2::typing::base_name;
 
 use super::tail_walk;
 use super::tail_walk::concrete_forms;
-use super::{ENTRY_TIMES, FAMILIES, FAMILY_TEXTS, PARTY_REFS};
+use super::{ENTRY_TIMES, FAMILIES, FAMILY_TEXTS, IDENTITIES, PARTY_REFS};
 
 /// What the attribute a tail ends on holds.
 ///
@@ -61,7 +61,8 @@ pub enum Carried {
 /// class, and a bound below it is its parameter
 /// ([`derive::attribute_class`]). A tail may step through a `List` attribute,
 /// and then names one element of the list ([`list_steps`]). A tail below a
-/// structural node other than a [`FAMILIES`] or [`PARTY_REFS`] entry, one
+/// structural node other than a [`FAMILIES`], [`PARTY_REFS`] or [`IDENTITIES`]
+/// entry, one
 /// that steps through a `Set` or `Hash`, whose members have no position, and
 /// one that ends on a container attribute, which holds no single value, is
 /// `None`. No specification governs the walk: our own design.
@@ -90,6 +91,12 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
     if let Some(&(owner, _)) = PARTY_REFS
         .iter()
         .find(|&&(owner, path)| path == wanted && class == owner)
+    {
+        return Some((owner, Carried::Value));
+    }
+    if let Some(&(owner, _)) = IDENTITIES
+        .iter()
+        .find(|&&(owner, path)| path == wanted && model::is_a(class, owner))
     {
         return Some((owner, Carried::Value));
     }
@@ -318,6 +325,27 @@ mod tests {
         assert_eq!(carried("DV_QUANTITY", &["other_reference_ranges"]), None);
         assert_eq!(carried("EVALUATION", &["other_participations"]), None);
         assert_eq!(carried("DV_TEXT", &["no_such_attribute"]), None);
+    }
+
+    #[test]
+    fn the_identities_of_a_record_are_carried_below_its_structure() {
+        // RM Common §LOCATABLE `uid`, RM EHR §INSTRUCTION_DETAILS `instruction_id`.
+        assert_eq!(
+            carried("INSTRUCTION", &["uid"]),
+            Some(("LOCATABLE", Carried::Value))
+        );
+        assert_eq!(
+            carried("COMPOSITION", &["uid"]),
+            Some(("LOCATABLE", Carried::Value))
+        );
+        assert_eq!(
+            carried("ACTION", &["instruction_details", "instruction_id"]),
+            Some(("ACTION", Carried::Value))
+        );
+        assert_eq!(
+            carried("INSTRUCTION", &["instruction_details", "instruction_id"]),
+            None
+        );
     }
 
     #[test]

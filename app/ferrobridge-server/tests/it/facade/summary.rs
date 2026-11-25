@@ -79,6 +79,12 @@ const ATC: &str = "http://www.whocc.no/atc";
 
 /// The profile packages the documents are validated over.
 fn packages() -> Result<Option<PackageSet>, Box<dyn Error>> {
+    Ok(package_paths()?.map(PackageSet::load).transpose()?)
+}
+
+/// The paths of the profile packages the documents are validated over;
+/// `None` when they are not fetched outside CI.
+pub(crate) fn package_paths() -> Result<Option<Vec<PathBuf>>, Box<dyn Error>> {
     static FOUND: OnceLock<Option<Vec<PathBuf>>> = OnceLock::new();
     let found = FOUND.get_or_init(|| {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -100,7 +106,7 @@ fn packages() -> Result<Option<PackageSet>, Box<dyn Error>> {
         Some(paths)
     });
     match found {
-        Some(paths) => Ok(Some(PackageSet::load(paths.clone())?)),
+        Some(paths) => Ok(Some(paths.clone())),
         None if std::env::var("CI").is_ok_and(|value| value == "true") => Err(
             "the pinned profile packages are not fetched; run scripts/vendor/profile-packages.sh"
                 .into(),
@@ -339,7 +345,7 @@ pub(crate) async fn mount_terminology(term: &MockServer) {
 
 /// Writes `body`, a document the bridge served, as `name` under the
 /// directory `EEHRXF_EMIT_DIR` names, for a run of HL7's FHIR Validator.
-pub(super) fn emit(name: &str, body: &serde_json::Value) -> Result<(), Box<dyn Error>> {
+pub(crate) fn emit(name: &str, body: &serde_json::Value) -> Result<(), Box<dyn Error>> {
     let Some(dir) = std::env::var_os("EEHRXF_EMIT_DIR") else {
         return Ok(());
     };

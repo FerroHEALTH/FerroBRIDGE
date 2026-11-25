@@ -150,18 +150,6 @@ fn answered(source: &crate::sources::Source, status: StatusCode) -> Response {
     response
 }
 
-/// Logs one write of a source on the operator audit target.
-fn audited(subject: &str, action: &str, id: Uuid, status: StatusCode) {
-    tracing::info!(
-        target: guard::AUDIT_TARGET,
-        subject,
-        action,
-        source = %id,
-        status = status.as_u16(),
-        "operator"
-    );
-}
-
 /// `GET /operator/sources`: every source at its head version, by name.
 async fn list(State(sources): Held) -> Response {
     let Some(sources) = sources else {
@@ -219,7 +207,7 @@ async fn create(
         .create(&write, &document, subject)
         .await
         .map_err(|error| Refusal::new(refused(&error)))?;
-    audited(subject, "create-source", created.id, StatusCode::CREATED);
+    guard::source_audited(subject, "create-source", created.id, StatusCode::CREATED);
     let mut response = answered(&created, StatusCode::CREATED);
     if let Ok(location) = HeaderValue::from_str(&format!("/operator/sources/{}", created.id)) {
         response.headers_mut().insert(header::LOCATION, location);
@@ -248,7 +236,7 @@ async fn change(
         .update(id, expected, &write, &document, subject)
         .await
         .map_err(|error| Refusal::new(refused(&error)))?;
-    audited(subject, "change-source", id, StatusCode::OK);
+    guard::source_audited(subject, "change-source", id, StatusCode::OK);
     Ok(answered(&changed, StatusCode::OK))
 }
 
@@ -271,7 +259,7 @@ async fn remove(
         .delete(id, expected, subject)
         .await
         .map_err(|error| Refusal::new(refused(&error)))?;
-    audited(subject, "delete-source", id, StatusCode::NO_CONTENT);
+    guard::source_audited(subject, "delete-source", id, StatusCode::NO_CONTENT);
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
