@@ -10,31 +10,24 @@ use std::collections::BTreeSet;
 use secrecy::ExposeSecret;
 use secrecy::SecretString;
 
+use super::Config;
+use super::change_feed::Consumer;
 use super::credentials::secret;
 use super::error::Error;
-use super::section::events::Events;
-use crate::change_feed::ReaderName;
 use crate::events::Queue;
 use crate::events::Settings;
 
 /// Returns the lane `events` describes, refused without the change feed it
 /// follows, a reader name, an AMQP broker URL or an exchange.
-pub(super) fn resolve_events(events: &Events, change_feed: bool) -> Result<Settings, Error> {
-    if !change_feed {
+pub(super) fn resolve_events(config: &Config) -> Result<Settings, Error> {
+    let events = &config.events;
+    if !config.change_feed.enabled {
         return Err(Error::Needs {
             key: String::from("events.enabled"),
             needs: String::from("change_feed.enabled"),
         });
     }
-    if events.reader.is_empty() {
-        return Err(Error::Missing {
-            key: String::from("events.reader"),
-        });
-    }
-    let reader = ReaderName::new(&events.reader).map_err(|source| Error::ReaderName {
-        key: String::from("events.reader"),
-        source,
-    })?;
+    let reader = Consumer::Events.reader(config)?;
     let url = secret(
         "events.url",
         events.url.as_ref(),
