@@ -16,6 +16,7 @@
 //! own design.
 
 use core::fmt;
+use std::sync::Mutex;
 
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::identity::IdentityRequest;
@@ -31,17 +32,23 @@ use crate::facade::identity::store::StoreError;
 /// The identity sink of one outbound run over the entry a parent resource
 /// maps.
 ///
-/// The first time a created resource is identified, its id is derived from
-/// the parent's entry and the engine's [`IdentityRequest`] and recorded with a
-/// binding; from then on the store answers it, because the map wins once
-/// written.
+/// A created resource's id is derived from the parent's entry and the
+/// engine's [`IdentityRequest`], so the run reads no store: the sink derives
+/// each id and keeps the request, and [`CreatedIdentities::persist`] records
+/// the ids and their bindings once the run has succeeded. The map wins once
+/// written, so a stored id other than the derived one refuses the answer.
 pub struct CreatedIdentities<'a> {
-    /// The identity map the bindings are read from and recorded in.
+    /// The identity map the bindings are recorded in.
     store: &'a dyn Store,
     /// The resource type of the parent.
     parent_type: &'a str,
     /// The logical id of the parent.
     parent: &'a FhirResourceId,
+    /// The binding of the parent, read before the run, when the map holds
+    /// one.
+    binding: Option<CompositionBinding>,
+    /// The resources the run identified, in the order it asked.
+    asked: Mutex<Vec<(String, String, FhirResourceId)>>,
 }
 
 impl fmt::Debug for CreatedIdentities<'_> {
@@ -56,60 +63,91 @@ impl fmt::Debug for CreatedIdentities<'_> {
 impl<'a> CreatedIdentities<'a> {
     /// Returns the sink of a run that maps the entry `parent_type/parent` is
     /// bound to.
-    #[must_use]
-    pub fn new(store: &'a dyn Store, parent_type: &'a str, parent: &'a FhirResourceId) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CreatedError::Store`] when the map cannot be read.
+    pub async fn new(
+        store: &'a dyn Store,
+        parent_type: &'a str,
+        parent: &'a FhirResourceId,
+    ) -> Result<Self, CreatedError> {
+        let binding = store.binding_of(parent_type, parent).await?;
+        Ok(Self {
             store,
             parent_type,
             parent,
-        }
+            binding,
+            asked: Mutex::new(Vec::new()),
+        })
     }
 
-    /// Returns the id of the resource `request` describes, recording it and
-    /// its binding the first time.
-    fn bind(&self, request: &IdentityRequest) -> Result<FhirResourceId, CreatedError> {
-        let parent = self
-            .store
-            .binding_of(self.parent_type, self.parent)?
-            .ok_or_else(|| CreatedError::UnboundParent {
-                parent: format!("{}/{}", self.parent_type, self.parent),
-            })?;
-        let created_type = request.resource_type();
-        let derived = derive::created_id(&parent, request);
-        let map_key = derive::created_map_key(&derived);
-        let id = match self.store.internal_of(created_type, &map_key)? {
-            Some(known) => known,
-            None => self
+    /// Records every id the run derived and its binding, the first time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CreatedError::Taken`] when the map holds another id for a
+    /// created resource or binds its id to an entry of its own, and
+    /// [`CreatedError::Store`] when the map cannot be read or written.
+    pub async fn persist(self) -> Result<(), CreatedError> {
+        let asked = self
+            .asked
+            .into_inner()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(parent) = self.binding else {
+            return Ok(());
+        };
+        for (created_type, mapping, derived) in asked {
+            let map_key = derive::created_map_key(&derived);
+            let id = self
                 .store
-                .record_internal(created_type, &map_key, &derived)?,
-        };
-        let binding = CompositionBinding {
-            resource_type: created_type.to_owned(),
-            created: Some(CreatedBy {
-                parent_type: self.parent_type.to_owned(),
-                parent_id: self.parent.as_str().to_owned(),
-                mapping: request.mapping().to_owned(),
-            }),
-            ..parent
-        };
-        let stood = self.store.record_binding(created_type, &id, &binding)?;
-        if stood.created.is_none() {
-            return Err(CreatedError::Taken {
-                resource: format!("{created_type}/{id}"),
-            });
+                .record_internal(&created_type, &map_key, &derived)
+                .await?;
+            let binding = CompositionBinding {
+                resource_type: created_type.clone(),
+                created: Some(CreatedBy {
+                    parent_type: self.parent_type.to_owned(),
+                    parent_id: self.parent.as_str().to_owned(),
+                    mapping,
+                }),
+                ..parent.clone()
+            };
+            let stood = self
+                .store
+                .record_binding(&created_type, &id, &binding)
+                .await?;
+            if id != derived || stood.created.is_none() {
+                return Err(CreatedError::Taken {
+                    resource: format!("{created_type}/{id}"),
+                });
+            }
         }
-        Ok(id)
+        Ok(())
     }
 }
 
 impl IdentitySink for CreatedIdentities<'_> {
     fn identify(&self, request: &IdentityRequest) -> Result<String, ReferenceError> {
-        self.bind(request)
-            .map(|id| id.as_str().to_owned())
-            .map_err(|source| ReferenceError::Identity {
+        let binding = self
+            .binding
+            .as_ref()
+            .ok_or_else(|| ReferenceError::Identity {
                 resource_type: request.resource_type().to_owned(),
-                source: Box::new(source),
-            })
+                source: Box::new(CreatedError::UnboundParent {
+                    parent: format!("{}/{}", self.parent_type, self.parent),
+                }),
+            })?;
+        let derived = derive::created_id(binding, request);
+        let answer = derived.as_str().to_owned();
+        self.asked
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push((
+                request.resource_type().to_owned(),
+                request.mapping().to_owned(),
+                derived,
+            ));
+        Ok(answer)
     }
 }
 

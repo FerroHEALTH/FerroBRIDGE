@@ -42,7 +42,7 @@ pub struct CodeSystemLookupRequest {
     /// in named parameters (when the names match), and the rest (except for
     /// lang.X) in the property parameter group
     pub property: Vec<super::super::primitives::Code>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>).
     /// Supplements to take into account when performing the $lookup operation.
     /// The supplements must be for the same CodeSystem. By default, supplements

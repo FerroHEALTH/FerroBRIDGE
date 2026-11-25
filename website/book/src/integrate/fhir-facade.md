@@ -310,19 +310,21 @@ lowercase base32 characters. `meta.versionId` carries the openEHR
 composition reads back under the same id with a new `meta.versionId`.
 `meta.source` names the openEHR version uid the answer was read from.
 
-The identity map is a `redb` file with seven tables: a patient identifier to its
+The identity map lives in the state store ([`[state]`](../operate/configuration.md#state)),
+which every replica shares, in eight tables: a patient identifier to its
 `ehr_id` and each `ehr_id` back to the first person recorded for it, an
 external resource id to the internal one, an internal id to the
 composition version container with the entry path and split occurrence, and the
 source resource `id` with its `meta.versionId` to the mapping that consumed
-them, beside the contribution each source was committed in and each
-`Resource.identifier` of a committed resource. The map wins once written. The
-store file records its schema, and a file an earlier schema wrote is refused at
-boot with its path named: the ids this release derives differ from the ids the
-facade served before 0.0.14, so the reset is to remove the file, which the
-bridge then creates anew. The store keeps identifiers and nothing else:
-no clinical content is written into it, and a test greps the file for a mapped
-value to prove it.
+them, beside the contribution each source was committed in, each
+`Resource.identifier` of a committed resource, and one row that pins the
+identity derivation and the lookup key. The map wins once written: every row
+is recorded once, so two replicas agree on the one that stands. A map another
+derivation wrote is refused at start. The store keeps identifiers and nothing
+else, and no identifier value in clear: a patient identifier and every
+`Resource.identifier` value are stored as an HMAC under the `[state.seal]`
+lookup key, and the person of an EHR is sealed, which a test proves by
+scanning the tables for the value.
 
 That last table is what makes create idempotent. A resource re-sent with the
 same `id` and `meta.versionId` commits nothing and answers `200 OK` with the
@@ -1144,6 +1146,19 @@ The query reads `CONTAINS OBSERVATION[<archetype>] CONTAINS EVENT n0[at0002]`
 does, and the bound node is never one inside an archetype slotted below the
 root. A path names the Web Template's name predicate where the template
 gives the node a name.
+
+A `token` whose value the mapping writes as a constant, such as the category
+of every observation a context maps, has no openEHR path to compare. Declare
+it with `fixed`, the one coding every resource of the context carries, and no
+`node` or `path`: a value that matches the coding adds no condition, and any
+other value answers an empty `searchset` with no query to the CDR.
+
+`include` lists the codes of the type's standard R4 reference parameters a
+search may name in `_include`. The facade stores nothing, so it includes the
+resources the match's own mapping creates beside it and the match references
+through that parameter's R4 expression, each once with
+`search.mode = include`. The `CapabilityStatement` names each as
+`searchInclude`.
 
 A `token` whose value the mapping writes as a constant, such as the category
 of every observation a context maps, has no openEHR path to compare. Declare

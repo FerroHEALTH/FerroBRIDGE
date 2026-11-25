@@ -420,10 +420,10 @@ macro_rules! r5_contracts {
     };
 }
 
-/// The request writers of the R6 ballot, after
+/// The request writers of R6, after
 /// `OperationDefinition-ConceptMap-translate` of `hl7.fhir.r6.core`
-/// 6.0.0-ballot5, which also renamed `system` and `version` to
-/// `sourceSystem` and `sourceVersion`.
+/// 6.0.0-snapshot1, which names `system` and `version` `sourceSystem` and
+/// `sourceVersion`.
 #[cfg(feature = "r6")]
 macro_rules! r6_contracts {
     ($release:ident) => {
@@ -431,7 +431,7 @@ macro_rules! r6_contracts {
         relationship_match!($release);
 
         /// Returns `displayLanguage`, which repeats in R6
-        /// (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
+        /// (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
         fn validate_language(
             language: Option<&str>,
         ) -> Vec<fhir_types::$release::primitives::Code> {

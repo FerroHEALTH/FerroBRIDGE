@@ -142,8 +142,8 @@ fn stu3_publishes_no_uri_form() {
 /// (<https://hl7.org/fhir/R4/resource-definitions.html#Resource.id>), and R4
 /// resource.html §2.26.3.3 limits an id to 64 ASCII letters, numerals, `-` and
 /// `.`. The 4.0.1 package's `structuredefinition-fhir-type` extension names
-/// `string` on `Resource.id` and every copy, and 6.0.0-ballot5 names `string`
-/// on 123 of the copies its own `Resource.id` types `id`; the emitter follows
+/// `string` on `Resource.id` and every copy, and 6.0.0-snapshot1 names `string`
+/// on 116 of the copies its own `Resource.id` types `id`; the emitter follows
 /// the definitions (#798).
 #[test]
 fn a_resource_id_takes_the_id_form_in_every_version() {
@@ -192,7 +192,7 @@ fn an_r4_resource_id_is_held_to_sixty_four_characters() {
 
 /// A `dateTime` carrying a time without an offset, as each package states it.
 ///
-/// 3.0.2, 4.0.1, 4.3.0 and 6.0.0-ballot5 put the offset inside the time group of the
+/// 3.0.2, 4.0.1, 4.3.0 and 6.0.0-snapshot1 put the offset inside the time group of the
 /// `dateTime` form, so a time without one is outside the form; 5.0.0 moves the
 /// offset out of that group and makes it optional, so the same value keeps the
 /// 5.0.0 form.
@@ -207,7 +207,7 @@ fn a_time_without_an_offset_follows_each_package() {
         decode::<fhir_types::r4b::code_system::CodeSystem>(&code_system(body), "CodeSystem")
             .expect_err("4.3.0 requires the offset"),
         decode::<fhir_types::r6::code_system::CodeSystem>(&code_system(body), "CodeSystem")
-            .expect_err("6.0.0-ballot5 requires the offset"),
+            .expect_err("6.0.0-snapshot1 requires the offset"),
     ] {
         assert_eq!(error.kind, DecodeErrorKind::BadValue);
         assert_eq!(error.path, "CodeSystem.date");

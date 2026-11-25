@@ -12,7 +12,7 @@
 //! R4 to R6 declare the same `in` and `out` parameters outside `$translate`
 //! (the vendored `OperationDefinition`s of `hl7.fhir.r4.core` 4.0.1,
 //! `hl7.fhir.r4b.core` 4.3.0, `hl7.fhir.r5.core` 5.0.0 and `hl7.fhir.r6.core`
-//! 6.0.0-ballot5, with the terminology ecosystem's additions), which
+//! 6.0.0-snapshot1, with the terminology ecosystem's additions), which
 //! `modern_contracts` carries; R6 repeats `$validate-code`
 //! `displayLanguage` and makes `compose.include.filter.value` optional.
 //! `$translate` is spelled three ways: R4 and R4B take `code` and

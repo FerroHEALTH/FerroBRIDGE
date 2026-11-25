@@ -125,7 +125,7 @@ pub async fn create(
     match (media::Prefer::of(headers), added.as_slice()) {
         (media::Prefer::Minimal, _) => Ok(reply::minimal(StatusCode::CREATED, &headers_out)),
         (media::Prefer::Representation, [one]) => {
-            let context = export_context(facade, &reached.ehr, policy.as_ref(), now())?;
+            let context = export_context(facade, &reached.ehr, policy.as_ref(), now()).await?;
             let body = render(release, one, &context, ids.first().map(String::as_str))?;
             Ok(answer(StatusCode::CREATED, release, &body, &headers_out))
         }
@@ -168,7 +168,7 @@ pub async fn read(
         )
     };
     let (ehr, key) = parse_id(id).ok_or_else(not_found)?;
-    crate::facade::compartment::admit_ehr(facade, access, Permission::Read, CONSENT, &ehr)?;
+    crate::facade::compartment::admit_ehr(facade, access, Permission::Read, CONSENT, &ehr).await?;
     let client = facade.client_for(headers, access).await?;
     let State { current, policy } = state(facade, &client, &ehr, settings).await?;
     let directive = current
@@ -176,7 +176,7 @@ pub async fn read(
         .iter()
         .find(|directive| exchange::key(directive) == key)
         .ok_or_else(not_found)?;
-    let context = export_context(facade, &ehr, policy.as_ref(), now())?;
+    let context = export_context(facade, &ehr, policy.as_ref(), now()).await?;
     let body = render(release, directive, &context, Some(id))?;
     Ok(answer(StatusCode::OK, release, &body, &[]))
 }
@@ -364,7 +364,7 @@ async fn directives(
     release: Release,
 ) -> Result<Vec<(Option<String>, Object)>, Refusal> {
     let State { current, policy } = state(facade, client, ehr, settings).await?;
-    let context = export_context(facade, ehr, policy.as_ref(), now())?;
+    let context = export_context(facade, ehr, policy.as_ref(), now()).await?;
     let mut entries = Vec::with_capacity(current.directives().len());
     for directive in current.directives() {
         let id = logical_id(ehr, exchange::key(directive));

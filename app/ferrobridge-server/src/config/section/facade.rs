@@ -22,8 +22,6 @@ pub struct Facade {
     pub base_url: String,
     /// The EHR policy: `existing` or `create_on_first_write`.
     pub ehr_policy: String,
-    /// The file the identity map is kept in.
-    pub identity_store: PathBuf,
     /// The namespace a literal subject reference is read in, the
     /// `PARTY_REF.namespace` of `EHR_STATUS.subject`.
     pub subject_namespace: String,
@@ -82,7 +80,6 @@ impl Default for Facade {
             enabled: false,
             base_url: String::from("http://127.0.0.1:8080/fhir"),
             ehr_policy: String::from("existing"),
-            identity_store: PathBuf::from("identity.redb"),
             subject_namespace: String::from("ferrobridge"),
             subject_id_form: String::from("reference"),
             subject_type: String::from("PERSON"),

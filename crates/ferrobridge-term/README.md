@@ -19,10 +19,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-term = "0.18"
+ferrobridge-term = "0.19"
 ```
 
-Name a patch (`"0.18.N"`) when you need the first release that carries what
+Name a patch (`"0.19.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -112,15 +112,15 @@ a true answer too, every `details.coding` and `expression` of each issue, the
 
 ## Five wire versions
 
-`WireVersion` selects STU3, R4, R4B, R5 or the R6 ballot (6.0.0-ballot5), and
+`WireVersion` selects STU3, R4, R4B, R5 or R6 (6.0.0-snapshot1), and
 the release decides which generated model writes the request and reads the
 answer. Each release is a feature of this crate, `stu3`, `r4`, `r4b`, `r5` and
 `r6`, and a release whose feature is off has no `WireVersion` variant, so a
 call in it does not compile. The default is `stu3`, `r4` and `r4b`; a
-consumer that speaks R5 or the R6 ballot turns `r5` or `r6` on:
+consumer that speaks R5 or R6 turns `r5` or `r6` on:
 
 ```toml
-ferrobridge-term = { version = "0.18", features = ["r5", "r6"] }
+ferrobridge-term = { version = "0.19", features = ["r5", "r6"] }
 ```
 
 The HTTP client is the default `client` feature: `reqwest`, the retry
@@ -130,7 +130,7 @@ request, concept and outcome types and the transport-free writers and readers
 speaks with no HTTP stack:
 
 ```toml
-ferrobridge-term = { version = "0.18", default-features = false, features = ["r4"] }
+ferrobridge-term = { version = "0.19", default-features = false, features = ["r4"] }
 ```
 
 R5 and R6 are off by default because a binary that also enables the

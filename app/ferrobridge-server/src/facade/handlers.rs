@@ -314,7 +314,7 @@ async fn document(
             ));
         }
     };
-    admit_existing(facade, access, Permission::Read, read::COMPOSITION, &id)?;
+    admit_existing(facade, access, Permission::Read, read::COMPOSITION, &id).await?;
     read::document(
         facade,
         access,
@@ -466,9 +466,11 @@ pub async fn transaction_route(
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    transaction::transaction(&facade, &access, &headers, &uri, &body)
-        .await
-        .unwrap_or_else(Refusal::into_response)
+    Box::pin(transaction::transaction(
+        &facade, &access, &headers, &uri, &body,
+    ))
+    .await
+    .unwrap_or_else(Refusal::into_response)
 }
 
 /// The read interaction behind its route and a batch entry: the compartment
@@ -491,7 +493,7 @@ pub(crate) async fn read(
         )
         .await;
     }
-    admit_existing(facade, access, Permission::Read, resource_type, id)?;
+    admit_existing(facade, access, Permission::Read, resource_type, id).await?;
     read::read(
         facade,
         &facade.client_for(headers, access).await?,
@@ -522,7 +524,7 @@ pub(crate) async fn vread(
         )
         .await;
     }
-    admit_existing(facade, access, Permission::Read, resource_type, id)?;
+    admit_existing(facade, access, Permission::Read, resource_type, id).await?;
     read::vread(
         facade,
         &facade.client_for(headers, access).await?,
@@ -554,7 +556,7 @@ pub(crate) async fn update(
         )
         .await;
     }
-    admit_existing(facade, access, Permission::Update, resource_type, id)?;
+    admit_existing(facade, access, Permission::Update, resource_type, id).await?;
     write::update(facade, access, (resource_type, id), headers, uri, body).await
 }
 
@@ -563,7 +565,7 @@ pub(crate) async fn update(
 ///
 /// An id the map does not know passes, so the handler answers its `404` as
 /// it does for any caller.
-fn admit_existing(
+async fn admit_existing(
     facade: &Facade,
     access: &Access,
     permission: Permission,
@@ -573,13 +575,13 @@ fn admit_existing(
     let Ok(internal) = crate::facade::identity::FhirResourceId::new(id) else {
         return Ok(());
     };
-    let Some(binding) = read::binding(facade, resource_type, &internal)? else {
+    let Some(binding) = read::binding(facade, resource_type, &internal).await? else {
         return Ok(());
     };
     let ehr = binding
         .ehr(&internal)
         .map_err(|error| read::stored_identifier(&error))?;
-    compartment::admit_ehr(facade, access, permission, resource_type, &ehr)
+    compartment::admit_ehr(facade, access, permission, resource_type, &ehr).await
 }
 
 /// Returns the IHE operation `uri` ends in on `resource_type`, or the
