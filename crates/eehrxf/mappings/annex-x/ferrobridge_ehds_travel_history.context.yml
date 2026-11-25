@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSTravelHistory (Table 33), served by the facade as an individual
+# Observation (draft act Art 7(2), #2087): each ADMIN_ENTRY.travel_event.v0
+# entry of the EHDS record template becomes one Observation with the HL7
+# Europe Patient Summary observation-travel-eu-eps profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_travel_history.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/eps/StructureDefinition/observation-travel-eu-eps"
+    version: "1.0.0-ballot"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "ADMIN_ENTRY.travel_event.v0.Observation"
+  start: "ADMIN_ENTRY.travel_event.v0.Observation"

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group EHDSAlert
+# (Table 4), served by the facade as an individual Flag (draft act Art 7(2),
+# #2087): each EVALUATION.precaution.v1 entry of the EHDS record template
+# becomes one Flag with the HL7 Europe Base and Core 2.0.1
+# flag-patient-eu-core profile. The CKM publishes no alert archetype, so the
+# precaution, a warning to heed in the care of the patient, carries the
+# group: FerroBRIDGE's own design.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_alert.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/flag-patient-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "EVALUATION.precaution.v1.Flag"
+  start: "EVALUATION.precaution.v1.Flag"

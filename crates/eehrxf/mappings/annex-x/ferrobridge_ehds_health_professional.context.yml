@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's party context for the draft EEHRxF Annex X data group
+# EHDSHealthProfessional (Table 16): the HL7 Europe Base and Core 2.0.1
+# practitioner-eu-core profile over the reference CDR's healthcare
+# professional PERSON definition, through the Demographic API.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_health_professional.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/practitioner-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-DEMOGRAPHIC-PERSON.healthcare_professional.v1.0.0"
+  archetypes:
+    - "ferrobridge_ehds_health_professional"
+  start: "ferrobridge_ehds_health_professional"

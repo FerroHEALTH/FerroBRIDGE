@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSCurrentPregnancyStatus (Table 10), served by the facade as an
+# individual Observation (draft act Art 7(2), #2087): each
+# OBSERVATION.pregnancy_assertion.v0 entry of the EHDS record template
+# becomes one Observation with the HL7 International Patient Summary 2.0.1
+# Observation-pregnancy-status-uv-ips profile the EPS crosswalk names.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_pregnancy_status.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/uv/ips/StructureDefinition/Observation-pregnancy-status-uv-ips"
+    version: "2.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "OBSERVATION.pregnancy_assertion.v0.Observation"
+  start: "OBSERVATION.pregnancy_assertion.v0.Observation"

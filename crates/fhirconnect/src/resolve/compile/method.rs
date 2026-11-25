@@ -180,11 +180,22 @@ impl<'a> Compiler<'a> {
         let archetype = archetype_of(slotted).cloned();
         if let (Some(archetype), Ok(reached)) = (archetype, self.locate(&scope.openehr)) {
             let node = reached.node;
-            match node.node_id() {
-                Some(carried) if node_id_matches(archetype.as_str(), carried) => {
+            // NOTE: AM Release-2.3.0 AOM2 §3.6.4 and §3.6.6: a template specialises its root
+            // archetype, so the root also carries every archetype its lineage names.
+            let lineage = (node.rm_path() == self.template.root().rm_path())
+                .then(|| {
+                    self.template
+                        .root_lineage()
+                        .iter()
+                        .find(|carried| node_id_matches(archetype.as_str(), carried))
+                })
+                .flatten();
+            match (node.node_id(), lineage) {
+                (Some(carried), _) if node_id_matches(archetype.as_str(), carried) => {
                     self.check_revision(slotted, Some(carried));
                 }
-                carried => self.diagnostics.push(diagnostic(
+                (_, Some(carried)) => self.check_revision(slotted, Some(carried)),
+                (carried, None) => self.diagnostics.push(diagnostic(
                     file.file(),
                     owner,
                     ResolveCode::ArchetypeMismatch,

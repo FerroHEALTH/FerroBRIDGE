@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/composition/org.highmed/fall.v1.Encounter.yml, a
+# derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the archetype is the international encounter COMPOSITION the EHDS
+# record template specialises, so the metadata name follows it, and no revision is
+# pinned, since the template's root carries its own.
+# The `healthcareFacility` and `contextPeriod` methods are kept. The
+# `composer` method maps `serviceProvider` a second time and is left out,
+# and `contextStartTimeEmpty` and `composerEmpty` write `null_flavour` below
+# a DV_DATE_TIME and a PARTY_PROXY, which carry none.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.encounter.v1.Encounter
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.encounter.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Encounter
+
+mappings:
+  - name: healthcareFacility
+    with:
+      fhir: $resource.serviceProvider
+      openehr: $composition/context/health_care_facility
+
+  - name: contextPeriod
+    with:
+      fhir: $resource.period
+      openehr: $composition/context
+      type: NONE
+    followedBy:
+      mappings:
+        - name: contextStart
+          with:
+            fhir: start
+            openehr: start_time
+        - name: contextEnd
+          with:
+            fhir: end
+            openehr: end_time

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's party context for the draft EEHRxF Annex X data group
+# EHDSPatient (Table 26), with EHDSHumanName, EHDSAddress and EHDSTelecom
+# inside it: the HL7 Europe Base and Core 2.0.1 patient-eu-core profile over
+# the reference CDR's patient PERSON definition, read and written through
+# the Demographic API.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_patient.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/patient-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-DEMOGRAPHIC-PERSON.patient.v1.0.0"
+  archetypes:
+    - "ferrobridge_ehds_patient"
+  start: "ferrobridge_ehds_patient"

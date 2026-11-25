@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the EVENT_CONTEXT of the CKM encounter
+# COMPOSITION to a FHIR R4 Location, the draft EEHRxF Annex X data group
+# EHDSLocation: the location where the encounter took place as the name and
+# the health care facility as the managing organization. Every mapping runs
+# openEHR to FHIR, since the place is recorded only as the encounter's
+# context.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.encounter.v1.Location
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.encounter.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Location
+
+mappings:
+  - name: "status"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "active"
+        fhir:
+          - path: "status"
+            value: "active"
+
+  - name: "name"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource.name"
+      openehr: "$composition/context/location"
+
+  - name: "managingOrganization"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource.managingOrganization"
+      openehr: "$composition/context/health_care_facility"

@@ -234,6 +234,7 @@ impl WebTemplateIndex {
         let root = self.root().flat_id().as_str().to_owned();
         let mut flat = Map::new();
         let mut performed = false;
+        let (values, names) = self.split_names(values)?;
         for value in values {
             if self.party_value(value)? {
                 let Value::Object(ref members) = value.value else {
@@ -270,6 +271,8 @@ impl WebTemplateIndex {
                 },
                 other => refused(other),
             })?;
+        let mut built = built;
+        self.write_names(&mut built, names)?;
         let value = decode(kind, &built).map_err(|source| PartyError::Invalid {
             template_id: self.template_id().to_owned(),
             class: kind,

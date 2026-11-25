@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group EHDSCarePlan
+# (Table 8), served by the facade as an individual CarePlan (draft act
+# Art 7(2), #2087): each INSTRUCTION.care_plan_request.v0 entry of the EHDS
+# record template becomes one CarePlan with the HL7 Europe Hospital
+# Discharge Report 1.0.0 carePlan-eu-hdr profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_care_plan.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/hdr/StructureDefinition/carePlan-eu-hdr"
+    version: "1.0.0"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "INSTRUCTION.care_plan_request.v0.CarePlan"
+  start: "INSTRUCTION.care_plan_request.v0.CarePlan"

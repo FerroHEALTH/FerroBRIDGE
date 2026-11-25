@@ -171,6 +171,7 @@ async fn build(
     loaded: &Loaded,
     document: &fhir_types::codec::Value,
 ) -> Result<CanonicalParty, Refusal> {
+    party::ehds::typed_identifiers(loaded, document)?;
     facade
         .translator()
         .run(Direction::ToOpenehr, |terminology| {
