@@ -1485,13 +1485,11 @@ FerroBRIDGE's own design.
 | `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
-| `categories.national` | `[]` | The national categories the map may name, each `<system>\|<code>` |
-| `categories.templates` | `{}` | Each template id to its Art 14(1) categories, such as `["Patient-Summaries"]`, or to `"none"` |
-| `categories.archetypes` | `{}` | Each archetype id to its categories or to `"none"`; a template key wins for the same object |
 
-Template and archetype keys compare without case, as openEHR BASE compares
-every composite identifier. A missing `endpoint.url`, an `http` base without
-`cleartext`, a zero timeout, a category code that names no category, and the
+The category map the records are classified by is the `audit-categories`
+settings register, which the operator API reads and writes
+([settings registers](operator-api.md#settings-registers)). A missing
+`endpoint.url`, an `http` base without `cleartext`, a zero timeout, and the
 lane without the facade, `[auth]` or `[state]` are each a boot error naming
 the key.
 

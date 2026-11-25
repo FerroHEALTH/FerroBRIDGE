@@ -94,6 +94,8 @@ pub struct AppState {
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
     /// The state store, when `[state]` is configured.
     store: Option<crate::store::Store>,
+    /// The runtime settings registers of the state store.
+    registers: Option<Arc<crate::settings::Registers>>,
     /// The inbound sources, when `[state]` is configured.
     sources: Option<Arc<crate::sources::Sources>>,
     /// The inbound intake, when `[inbound]` is on.
@@ -204,6 +206,9 @@ impl AppState {
             change_feed: None,
             access_log: None,
             links: None,
+            registers: store
+                .as_ref()
+                .map(|store| Arc::new(crate::settings::Registers::new(store))),
             store,
             sources: None,
             intake: None,
@@ -233,6 +238,7 @@ impl AppState {
             access_log: None,
             links: None,
             store: None,
+            registers: None,
             sources: None,
             intake: None,
         }
@@ -250,6 +256,19 @@ impl AppState {
     #[must_use]
     pub const fn store(&self) -> Option<&crate::store::Store> {
         self.store.as_ref()
+    }
+
+    /// Returns the runtime settings registers, when `[state]` is configured.
+    #[must_use]
+    pub const fn registers(&self) -> Option<&Arc<crate::settings::Registers>> {
+        self.registers.as_ref()
+    }
+
+    /// Returns this state keeping its runtime settings registers in `store`.
+    #[must_use]
+    pub fn with_registers(mut self, store: &crate::store::Store) -> Self {
+        self.registers = Some(Arc::new(crate::settings::Registers::new(store)));
+        self
     }
 
     /// Returns this state serving the inbound sources `sources`.

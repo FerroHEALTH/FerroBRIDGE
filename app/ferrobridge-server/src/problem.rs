@@ -35,6 +35,9 @@ pub enum Kind {
     BadPath,
     /// `400`: an import's body is no mapping-set archive the bridge reads.
     BadArchive,
+    /// `400`: a register document is not the register's shape, or its rules
+    /// do not hold.
+    BadRegister,
     /// `401`: the request carries no valid credential.
     Unauthenticated,
     /// `403`: the access token does not carry the operator scope.
@@ -67,6 +70,8 @@ pub enum Kind {
     ReloadUnavailable,
     /// `503`: the run history of the bridge schema could not be read.
     RunHistoryUnavailable,
+    /// `503`: a settings register could not be read or written.
+    RegistersUnavailable,
     /// `503`: the inbound sources could not be read or written.
     SourcesUnavailable,
     /// `401`: an inbound request does not prove it comes from its source.
@@ -91,11 +96,12 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 31] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
         Self::BadArchive,
+        Self::BadRegister,
         Self::Unauthenticated,
         Self::NotPermitted,
         Self::NotFound,
@@ -111,6 +117,7 @@ impl Kind {
         Self::DeadLettersUnavailable,
         Self::ReloadUnavailable,
         Self::RunHistoryUnavailable,
+        Self::RegistersUnavailable,
         Self::SourcesUnavailable,
         Self::Unverified,
         Self::UnreadableEvent,
@@ -147,6 +154,11 @@ impl Kind {
             Self::BadArchive => (
                 "bad-archive",
                 "The body is no mapping-set archive the bridge reads",
+                StatusCode::BAD_REQUEST,
+            ),
+            Self::BadRegister => (
+                "bad-register",
+                "The document does not hold for the register",
                 StatusCode::BAD_REQUEST,
             ),
             Self::Unauthenticated => (
@@ -222,6 +234,11 @@ impl Kind {
             Self::RunHistoryUnavailable => (
                 "run-history-unavailable",
                 "The run history could not be read",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::RegistersUnavailable => (
+                "registers-unavailable",
+                "The settings register could not be read or written",
                 StatusCode::SERVICE_UNAVAILABLE,
             ),
             Self::SourcesUnavailable => (

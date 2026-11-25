@@ -30,6 +30,7 @@ mod etl_runs;
 mod events;
 mod inbound;
 mod problem;
+mod registers;
 mod save;
 mod sources;
 mod templates;
