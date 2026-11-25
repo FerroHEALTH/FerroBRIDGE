@@ -22,14 +22,15 @@
 # sha256, over the profile packages scripts/vendor/profile-packages.sh
 # fetched (hl7.fhir.uv.ips 2.0.1, hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
 # hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0, hl7.fhir.eu.hdr 1.0.0,
-# hl7.fhir.eu.imaging 1.0.0-ballot and hl7.eu.fhir.xshare-yb 0.3.0 with their
-# dependency closure). This
+# hl7.fhir.eu.imaging 1.0.0-ballot, hl7.fhir.eu.imaging-manifest 1.0.0-ballot
+# and hl7.eu.fhir.xshare-yb 0.3.0 with their dependency closure). This
 # script adds the vendored MyHealth@EU Master Value Sets Catalogue, whose
 # value sets the patient summary profiles bind, and the remaining-dispensations
 # extension eehrxf publishes. Each guide's documents run on their own, so no
 # closure reads another guide's documents: a discharge report with
 # hl7.fhir.eu.hdr 1.0.0 and the catalogue loaded, an imaging report with
-# hl7.fhir.eu.imaging 1.0.0-ballot loaded, and every other document with the
+# hl7.fhir.eu.imaging 1.0.0-ballot loaded, an imaging study manifest with
+# hl7.fhir.eu.imaging-manifest 1.0.0-ballot loaded, and every other document with the
 # other four guides, IPS 2.0.1, the catalogue and the extension loaded. Every
 # patient summary also runs once more with the xShare Yellow Button guide
 # 0.3.0 and the catalogue loaded, held to the profile the guide's provider
@@ -136,6 +137,10 @@ readonly LAB_BUNDLE="http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu
 # The imaging report document a run validates over the Imaging Report guide.
 readonly IMAGING_BUNDLE="http://hl7.eu/fhir/imaging/StructureDefinition/BundleReportEuImaging"
 readonly IMAGING_IG="hl7.fhir.eu.imaging#1.0.0-ballot"
+
+# The imaging study manifest a run validates over the Imaging Manifest guide.
+readonly MANIFEST_BUNDLE="http://hl7.eu/fhir/imaging-manifest/StructureDefinition/EuMadoBundle"
+readonly MANIFEST_IG="hl7.fhir.eu.imaging-manifest#1.0.0-ballot"
 
 # The discharge report document a run validates over the Hospital Discharge
 # Report guide.
@@ -294,7 +299,8 @@ validate() {
 
 # run DOCUMENTS OUT: prepares the jar and the package cache, runs the
 # validator offline over every document in DOCUMENTS and judges its output.
-# An imaging report and a discharge report are each validated in a run of
+# An imaging report, an imaging study manifest and a discharge report are
+# each validated in a run of
 # their own, over their guide's closure: one validator context holding
 # several closures read the laboratory report against the imaging guide's
 # dependencies too (no specification governs this: our own design).
@@ -312,7 +318,7 @@ run() {
     tar -xzf "$MVC" -C "$CACHE/$name"
   fi
   mkdir -p "$out/xshare-yb"
-  local docs=() general=() imaging=() discharge=() summaries=() doc copies
+  local docs=() general=() imaging=() manifest=() discharge=() summaries=() doc copies
   copies="$(cd "$out/xshare-yb" && pwd)"
   for doc in "$documents"/*.json; do
     [[ -f "$doc" ]] || continue
@@ -324,6 +330,8 @@ run() {
     fi
     if jq -e --arg bundle "$IMAGING_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       imaging+=("$doc")
+    elif jq -e --arg bundle "$MANIFEST_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
+      manifest+=("$doc")
     elif jq -e --arg bundle "$HDR_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       discharge+=("$doc")
     else
@@ -345,6 +353,10 @@ run() {
   if [[ "${#imaging[@]}" -gt 0 ]]; then
     validate "$out" imaging "${imaging[@]}" -- "$IMAGING_IG" > "$out/imaging.bundle.json" || return 1
     parts+=("$out/imaging.bundle.json")
+  fi
+  if [[ "${#manifest[@]}" -gt 0 ]]; then
+    validate "$out" manifest "${manifest[@]}" -- "$MANIFEST_IG" > "$out/manifest.bundle.json" || return 1
+    parts+=("$out/manifest.bundle.json")
   fi
   if [[ "${#discharge[@]}" -gt 0 ]]; then
     validate "$out" discharge "${discharge[@]}" -- "$HDR_IG" "$name" > "$out/discharge.bundle.json" || return 1

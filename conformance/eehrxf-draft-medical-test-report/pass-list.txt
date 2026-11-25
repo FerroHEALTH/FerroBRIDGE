@@ -22,6 +22,7 @@ eehrxf-laboratory-mapped:header.attestation.dateTime
 eehrxf-laboratory-mapped:header.author[x]
 eehrxf-laboratory-mapped:header.custodian
 eehrxf-laboratory-mapped:header.date
+eehrxf-laboratory-mapped:header.documentCategory
 eehrxf-laboratory-mapped:header.documentTitle
 eehrxf-laboratory-mapped:header.documentType
 eehrxf-laboratory-mapped:header.eventCategory
@@ -61,6 +62,7 @@ eehrxf-test-report-ecg:header.attestation.dateTime
 eehrxf-test-report-ecg:header.author[x]
 eehrxf-test-report-ecg:header.custodian
 eehrxf-test-report-ecg:header.date
+eehrxf-test-report-ecg:header.documentCategory
 eehrxf-test-report-ecg:header.documentTitle
 eehrxf-test-report-ecg:header.documentType
 eehrxf-test-report-ecg:header.eventCategory
@@ -100,6 +102,7 @@ eehrxf-test-report-spirometry:header.attestation.dateTime
 eehrxf-test-report-spirometry:header.author[x]
 eehrxf-test-report-spirometry:header.custodian
 eehrxf-test-report-spirometry:header.date
+eehrxf-test-report-spirometry:header.documentCategory
 eehrxf-test-report-spirometry:header.documentTitle
 eehrxf-test-report-spirometry:header.documentType
 eehrxf-test-report-spirometry:header.eventCategory

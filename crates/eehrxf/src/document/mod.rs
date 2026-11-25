@@ -634,10 +634,7 @@ impl Document {
         if self.form.language && self.language.is_none() {
             return Err(DocumentError::Missing { part: "language" });
         }
-        let mut report = self.report_written(&subject, &composition_url)?;
-        if let Some((_, written)) = report.as_mut() {
-            self.categorise_report(written);
-        }
+        let report = self.report_written(&subject, &composition_url)?;
         let mut composition = Composition {
             id: Some(id),
             meta: Some(claiming(self.form.composition)),

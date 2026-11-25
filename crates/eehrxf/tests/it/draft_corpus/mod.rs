@@ -51,12 +51,34 @@ mod paths;
 const CORPUS_DIR: &str = "EEHRXF_DRAFT_CORPUS_DIR";
 
 /// One category of the corpus: its corpus name, its annex, the crosswalks
-/// that carry its elements and the prefixes of its documents' names.
+/// that carry its elements, the prefixes of its documents' names, and the
+/// Xt-EHR models a document of its own carries, with that document's
+/// prefixes.
 struct Category {
     corpus: &'static str,
     annex: Annex,
     crosswalks: &'static [&'static Crosswalk<'static>],
     prefixes: &'static [&'static str],
+    models: &'static [(&'static str, &'static [&'static str])],
+}
+
+impl Category {
+    /// Returns the prefixes of the documents the rows of `model` are
+    /// measured against.
+    fn prefixes_of(&self, model: &str) -> &'static [&'static str] {
+        self.models
+            .iter()
+            .find(|(held, _)| *held == model)
+            .map_or(self.prefixes, |(_, prefixes)| prefixes)
+    }
+
+    /// Returns every prefix of the category's documents.
+    fn every_prefix(&self) -> impl Iterator<Item = &'static str> {
+        self.prefixes
+            .iter()
+            .chain(self.models.iter().flat_map(|(_, prefixes)| prefixes.iter()))
+            .copied()
+    }
 }
 
 /// The categories, one per annex of a priority category.
@@ -66,36 +88,44 @@ const CATEGORIES: [Category; 6] = [
         annex: Annex::Iv,
         crosswalks: &[&PATIENT_SUMMARY],
         prefixes: &["eehrxf-summary-", "eehrxf-eps-summary-"],
+        models: &[],
     },
     Category {
         corpus: "eehrxf-draft-eprescription",
         annex: Annex::V,
         crosswalks: &[&PRESCRIPTION],
         prefixes: &["eehrxf-mpd-prescription"],
+        models: &[],
     },
     Category {
         corpus: "eehrxf-draft-edispensation",
         annex: Annex::Vi,
         crosswalks: &[&DISPENSATION],
         prefixes: &["eehrxf-mpd-dispense"],
+        models: &[],
     },
     Category {
         corpus: "eehrxf-draft-imaging",
         annex: Annex::Vii,
         crosswalks: &[&IMAGING_REPORT, &IMAGING_STUDY],
         prefixes: &["eehrxf-imaging-"],
+        // NOTE: draft EEHRxF Annex II(d) and Annex VII Table 2: the study is the manifest
+        // beside the report.
+        models: &[("EHDSImagingStudy", &["eehrxf-manifest-"])],
     },
     Category {
         corpus: "eehrxf-draft-medical-test-report",
         annex: Annex::Viii,
         crosswalks: &[&LABORATORY],
         prefixes: &["eehrxf-laboratory-", "eehrxf-test-report-"],
+        models: &[],
     },
     Category {
         corpus: "eehrxf-draft-discharge",
         annex: Annex::Ix,
         crosswalks: &[&DISCHARGE],
         prefixes: &["eehrxf-discharge-"],
+        models: &[],
     },
 ];
 
@@ -234,8 +264,7 @@ fn measure(category: &Category, dir: &Path) -> Result<Value, Box<dyn Error>> {
             .and_then(|name| name.to_str())
             .is_some_and(|name| {
                 category
-                    .prefixes
-                    .iter()
+                    .every_prefix()
                     .any(|prefix| name.starts_with(prefix))
                     && path
                         .extension()
@@ -252,6 +281,13 @@ fn measure(category: &Category, dir: &Path) -> Result<Value, Box<dyn Error>> {
             .ok_or("a document name")?;
         let bundle: Value = serde_json::from_str(&std::fs::read_to_string(document)?)?;
         for row in &rows {
+            if !category
+                .prefixes_of(row.xtehr_model())
+                .iter()
+                .any(|prefix| name.starts_with(prefix))
+            {
+                continue;
+            }
             let (Some(element), Some(cardinality)) = (row.draft_element(), row.draft_cardinality())
             else {
                 continue;

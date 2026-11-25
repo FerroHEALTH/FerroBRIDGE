@@ -239,6 +239,8 @@ fn the_manifest_validates_against_eu_mado_bundle() -> Result<(), Box<dyn Error>>
     };
     let text =
         serde_json::to_string(&manifest(vec![series("2.25.1001.1", 2, service())]).into_bundle()?)?;
+    #[cfg(feature = "openehr")]
+    crate::support::emit("eehrxf-manifest-study", &text)?;
     let received = ReceivedDocument::read(&text)?;
     let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     runtime
