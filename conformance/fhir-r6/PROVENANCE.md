@@ -4,7 +4,7 @@
 # Provenance: the FHIR R6 examples pass list
 
 `pass-list.txt` records which resources of HL7's `hl7.fhir.r6.examples` package
-(6.0.0-ballot5) round-trip through the `fhir-types` model of FHIR R6, one file name
+(6.0.0-snapshot1) round-trip through the `fhir-types` model of FHIR R6, one file name
 per line, and the resource count on its `total` line. It holds no copy of any
 input. The package is fetched at build time into
 `tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/` by

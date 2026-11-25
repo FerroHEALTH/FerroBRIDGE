@@ -23,8 +23,12 @@ pub struct ParameterFile {
     /// `FROM`; absent, the path is read under the composition.
     pub node: Option<NodeFile>,
     /// The AQL path compared, relative to the node: for a `token`, the coded
-    /// text or code phrase whose code and system it compares.
-    pub path: String,
+    /// text or code phrase whose code and system it compares. Absent for a
+    /// `fixed` token.
+    pub path: Option<String>,
+    /// The one coding every resource of the context carries, for a `token`
+    /// the mapping writes as a constant.
+    pub fixed: Option<FixedFile>,
     /// The FHIR system URI to openEHR terminology id table of a `token`
     /// parameter.
     #[serde(default)]
@@ -40,6 +44,16 @@ pub struct NodeFile {
     pub class: String,
     /// The archetype id of the root.
     pub archetype: String,
+}
+
+/// The coding a `fixed` token compares, as written.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FixedFile {
+    /// The code system URI.
+    pub system: String,
+    /// The code.
+    pub code: String,
 }
 
 /// Parses one declaration from `text`, naming `file` in a refusal.

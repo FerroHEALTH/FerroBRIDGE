@@ -219,6 +219,8 @@ default branch.
 | HL7 v2 legacy tables | `usnistgov/igamt-hl7Tools-service` `src/main/resources/hl7db` at `83322dffdac18cb129a1bd80149f5439cf5686fd` (169 files, the NIST IGAMT export of HL7's v2 database for versions 2.1 to 2.8.2; no LICENSE, HL7's content) | the generator input for the structures v2.9.1 withdrew (#303); fetched at build time into an ignored directory and never committed, on the same terms as the definitions |
 | openEHR ITS-REST | 1.1.0 (OpenAPI at `openEHR/specifications-ITS-REST` tag `Release-1.1.0`, commit `24058992`; each document declares CC-BY-ND-3.0 in `info.license` while the repository's `LICENSE` file is Apache-2.0, both recorded in the provenance; modules Overview, System, EHR, Query and Definition, `STABLE`, and Demographic, `DEVELOPMENT`) | the released REST API a conformant CDR speaks; Admin and Demographic are `x-status: DEVELOPMENT` in the same release; the bridge reaches Demographic only behind `[cdr] demographic`, off by default and labelled DEVELOPMENT (section 15, #894), and does not vendor Admin; every tagged OAS file says `info.version: latest`, so provenance records tag and blob |
 | openEHR RM | 1.1.0 (Release 1.1.0, <https://specifications.openehr.org/releases/RM/Release-1.1.0/>; the code compiles against the `openehr_rm::v1_2` development generation) | the newest published RM release and the conformance target; ITS-REST 1.1.0 links its RM types to `releases/RM/latest`. openEHR has published no Release 1.2.0, and `openehr-rm` documents `v1_2` as specification version 1.2.0, the development baseline (<https://specifications.openehr.org/releases/RM/development/>). The code compiles against `v1_2` because `openehr-sdt` builds only against it and the canonical codecs and ITS-REST types of `openehr-its` are generated over it; `scripts/checks/versions.sh` fails a hand-written `openehr_rm::v1_N` path that names another generation. Against Release 1.1.0, `v1_2` adds `EHR.tags`, widens `GENERIC_ENTRY.data` from `ITEM_TREE` to `ITEM` (SPECRM-18), and removes `PARTY.reverse_relationships` (SPECRM-124), so a Release 1.1.0 `PARTY` carrying that attribute is refused by the strict reader (#845). The `ARCHETYPED.rm_version` stamp names Release 1.1.0 wherever the object conforms to it (section 3, #844) |
+| Standard Webhooks | v1.3.0 (<https://github.com/standard-webhooks/standard-webhooks/blob/v1.3.0/spec/standard-webhooks.md>) | the newest release; the inbound intake verifies its `v1` (HMAC-SHA-256) and `v1a` (Ed25519) schemes over `msg_id.timestamp.payload` by this text |
+| Standard Webhooks v2a | `main` at `4a8ee40c5bcb6157f856905cc8871040d41a78ce`, whose specification text is unchanged since `3d65b1824` introduced `v2a` | `v2a` (Ed25519 over the SHA-256 of `endpoint_id.msg_id.timestamp.payload`) is on `main` only and deprecates `v1a`; the intake accepts it where a source declares its endpoint id, and pin freshness reports a release that changes it |
 | `openehr-base` | 0.3.0 (minor line 0.3; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, to 0.0.84 on 2026-10-05, to 0.0.86 on 2026-10-15, to 0.0.87 on 2026-10-16, the line the federation gateway pins, and to 0.0.89 on 2026-10-19, which adds the `v1_3` generation with its `Hrid` and the BASE 1.3.0 `ARCHETYPE_ID` grammar, and to 0.0.90 on 2026-10-20, and to 0.0.99 on 2026-10-25, and to 0.0.100 on 2026-10-26, and to 0.0.109 on 2026-10-27, and to 0.0.116 on 2026-11-02, and to 0.0.128 on 2026-11-04, and to 0.0.129 on 2026-11-05, and to 0.0.130 on 2026-11-08, and to 0.0.133 and 0.0.135 the same day, and to 0.0.136 on 2026-11-09, and to 0.1.0 on 2026-11-11, the first release FerroEHR cuts under the Cargo SemVer rules, and to 0.1.1 on 2026-11-12, and to 0.2.0 on 2026-11-14, whose `openehr-rm` carries the draft access control package behind its `draft` feature, and to 0.3.0, whose `openehr-sdt` publishes the `ARCHETYPE_SLOT` admission matcher `openehr-mapping-core` takes and whose draft access terminology moves to `openehr_access` |
 | `openehr-rm` | 0.3.0 (Apache-2.0) | the RM model in two generations, `v1_1` (Release 1.1.0) and `v1_2` (the development baseline the bridge compiles against, see the openEHR RM row), its canonical JSON codec and the BASE path parser |
 | `openehr-its` | 0.3.0 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
@@ -227,7 +229,7 @@ default branch.
 | `openehr-term` | 0.3.0 (Apache-2.0 AND CC-BY-SA-3.0) | the openEHR terminology; the server names its `audit_change_type` and `version_lifecycle_state` concepts (`codes`) for the `change_type` and `lifecycle_state` a commit carries |
 | `openehr-am` | 0.3.0 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
 | `openehr-adl` | not taken in the first cut (0.1.1, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
-| `fhir-types` | 0.1.131 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
+| `fhir-types` | 0.2.0 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
 | FHIR terminology operations | R4, R4B tolerant | `CodeSystem/$lookup`, `ConceptMap/$translate`, `ValueSet/$validate-code`, `ValueSet/$expand`, `CodeSystem/$subsumes`; a server may answer R4 or R4B; the reference server selects the version by path (section 6) |
@@ -1093,7 +1095,12 @@ expression is a load error: the reference CDR's connector let `where()` and
   the total count those resources, the count reads the rows, and an `_id`
   naming a created resource answers it alone (#731). One resource type
   answers one parameter set, and two declarations of one type over one
-  template are refused at load. A parameter outside the set is refused unless the client
+  template are refused at load. A `token` the mapping writes as a constant
+  is declared `fixed` with its one coding and compared without a query, and
+  an `include` list names the standard reference parameters `_include` may
+  follow to the resources the match's own run creates, each answered once
+  with `search.mode` `include` (R4 search §3.1.1.5.4; the IHE QEDm 3.0.0
+  PCC-44 category and `_include` searches, #2087). A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
   modifier is always refused (§3.1.1.4.4); `_count=0` answers the total
   alone, as R4 treats it as `_summary=count` (§3.1.1.5.3). The one chain
@@ -1106,6 +1113,13 @@ expression is a load error: the reference CDR's connector let `where()` and
   of the value of the system property" (§3.1.1.4.10). The
   `CapabilityStatement` documents the chain on each subject parameter while
   it is on (our own design).
+- **The draft EEHRxF Annex X groups are served as resources** (draft act
+  Art 7(2)) through the `eehrxf` Annex X project: one context per group
+  over FerroBRIDGE's patient summary and EHDS record templates, each with
+  the profile HL7 Europe Base and Core 2.0.1 gives the group and the IHE
+  QEDm 3.0.0 PCC-44 searches of its option as a search declaration beside
+  it (#2087). A date search may read `ACTION.time` and `HISTORY.origin`,
+  which the RM defines and the Web Template leaves out.
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a
@@ -2735,7 +2749,7 @@ everywhere else, under `.claude/rules/codegen.md`.
 **Generated by FerroBRIDGE, the FHIR model:** `fhir-types`, by `tools/fhir-codegen`
 from the vendored `hl7.fhir.r3.core` 3.0.2, `hl7.fhir.r4.core` 4.0.1,
 `hl7.fhir.r4b.core` 4.3.0, `hl7.fhir.r5.core` 5.0.0, `hl7.fhir.r6.core`
-6.0.0-ballot5 and `hl7.terminology` 7.5.0 packages (CC0), fetched from the FHIR package registry with checksum
+6.0.0-snapshot1 and `hl7.terminology` 7.5.0 packages (CC0), fetched from the FHIR package registry with checksum
 verification. Root set per version: every `kind: resource` StructureDefinition
 behind the `resources` feature, the terminology root set otherwise, each with
 the complete closure of the datatypes and primitives it references, plus the
