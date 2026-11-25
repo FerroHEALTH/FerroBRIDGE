@@ -113,6 +113,8 @@ redb.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde.workspace = true
+# The FHIRPath a FHIR Mapping Language map embeds.
+ferrobridge-fhirpath.workspace = true
 # The search declarations beside the context mappings are YAML.
 serde-saphyr.workspace = true
 serde_json.workspace = true

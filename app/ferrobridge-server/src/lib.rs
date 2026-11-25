@@ -42,6 +42,7 @@ pub mod quality;
 pub mod shl;
 pub mod smart;
 pub mod startup;
+pub mod structuremap;
 pub mod state;
 pub mod store;
 pub mod terminology;

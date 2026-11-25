@@ -48,6 +48,7 @@ mod run;
 mod search_e2e;
 mod shutdown;
 mod store;
+mod structuremap;
 mod support;
 mod telemetry;
 mod terminology_oauth;
