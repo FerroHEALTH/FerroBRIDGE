@@ -124,6 +124,21 @@ pub fn signing_key_pem() -> Result<String, SmartError> {
     Ok(pkcs8_pem(der.as_ref()))
 }
 
+/// Returns a fresh P-384 key as PKCS#8 PEM, the form
+/// `[ferrosmart.backend.keys] private_key_file` reads under `ES384`.
+///
+/// # Errors
+///
+/// Returns [`SmartError::Key`] when no key can be generated.
+pub fn backend_key_pem() -> Result<String, SmartError> {
+    let document = aws_lc_rs::signature::EcdsaKeyPair::generate_pkcs8(
+        &aws_lc_rs::signature::ECDSA_P384_SHA384_ASN1_SIGNING,
+        &aws_lc_rs::rand::SystemRandom::new(),
+    )
+    .map_err(|_unspecified| SmartError::Key)?;
+    Ok(pkcs8_pem(document.as_ref()))
+}
+
 /// Returns the PKCS#8 DER `der` as PEM (RFC 7468 §10).
 #[must_use]
 pub fn pkcs8_pem(der: &[u8]) -> String {

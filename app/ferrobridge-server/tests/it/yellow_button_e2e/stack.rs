@@ -21,7 +21,6 @@ use ferrobridge_testkit::containers::Cdr;
 use ferrobridge_testkit::containers::Postgres;
 use ferrobridge_testkit::ferrosmart;
 use ferrobridge_testkit::ferrosmart::FerroSmart;
-use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID;
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::MockServer;
@@ -84,6 +83,9 @@ pub(super) struct Stack {
     _smart_database: Postgres,
     /// The bridge's state store, kept for the run's length.
     _state: Postgres,
+    /// The operator's Basic credential, user and password, whose
+    /// `[basic_grants]` table grants the operator scope.
+    pub(super) operator: (String, String),
 }
 
 impl Stack {
@@ -124,6 +126,7 @@ impl Stack {
             &assertion,
         )?)
         .await?;
+        let password = crate::support::random_secret();
         let text = bridge_config(&BridgeConfig {
             origin: &origin,
             cdr: cdr.base_url(),
@@ -131,6 +134,7 @@ impl Stack {
             terminology: &terminology.uri(),
             arr: &arr.uri(),
             state: state.url(),
+            operator: &password_hash(&password)?,
             onward: (onward == Onward::On).then_some(&assertion),
         })?;
         let settings =
@@ -147,8 +151,30 @@ impl Stack {
             _terminology: terminology,
             _smart_database: smart_database,
             _state: state,
+            operator: (String::from(OPERATOR), password),
         })
     }
+}
+
+/// The user-id of the operator who commits the `audit-categories` register.
+const OPERATOR: &str = "journey-operator";
+
+/// Returns the Argon2id PHC string of `password` under a fresh salt, as
+/// `[[auth.basic.users]] password_hash` takes it.
+fn password_hash(password: &str) -> Result<String, Box<dyn Error>> {
+    use aws_lc_rs::rand::SecureRandom as _;
+    let mut salt = [0_u8; 16];
+    aws_lc_rs::rand::SystemRandom::new()
+        .fill(&mut salt)
+        .map_err(|_unspecified| "a salt")?;
+    Ok(
+        argon2::password_hash::PasswordHasher::hash_password_with_salt(
+            &argon2::Argon2::default(),
+            password.as_bytes(),
+            &salt,
+        )?
+        .to_string(),
+    )
 }
 
 /// The bridge's assertion key for `private_key_jwt` at FerroSMART (RFC 7523
@@ -161,17 +187,19 @@ struct Assertion {
 }
 
 impl Assertion {
-    /// Generates the key.
+    /// Generates a P-384 key, which signs under ES384, one of the two
+    /// algorithms SMART App Launch 2.2.0 (Client Authentication: Asymmetric)
+    /// has a server validate.
     fn new() -> Result<Self, Box<dyn Error>> {
         let pkcs8 = aws_lc_rs::signature::EcdsaKeyPair::generate_pkcs8(
-            &aws_lc_rs::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &aws_lc_rs::signature::ECDSA_P384_SHA384_FIXED_SIGNING,
             &aws_lc_rs::rand::SystemRandom::new(),
         )
         .map_err(|_unspecified| "an assertion key")?;
         let encoding = jsonwebtoken::EncodingKey::from_ec_der(pkcs8.as_ref());
         let mut jwk = serde_json::to_value(jsonwebtoken::jwk::Jwk::from_encoding_key(
             &encoding,
-            jsonwebtoken::Algorithm::ES256,
+            jsonwebtoken::Algorithm::ES384,
         )?)?;
         jwk["kid"] = serde_json::json!(BRIDGE_KID);
         jwk["use"] = serde_json::json!("sig");
@@ -192,8 +220,9 @@ impl Assertion {
 }
 
 /// Returns FerroSMART's run on `port`: the facade and the CDR as its
-/// resources, the upstream provider with `client_secret_basic` and its
-/// assurance levels, the app and the bridge as clients.
+/// resources, its own Backend Services client, the upstream provider with
+/// `client_secret_basic` and its assurance levels, the app and the bridge as
+/// clients.
 fn smart_launch(
     port: u16,
     database: &Postgres,
@@ -207,6 +236,8 @@ fn smart_launch(
     let config = format!(
         "[ferrosmart]\nissuer = {issuer:?}\n\n\
          [ferrosmart.keys]\nprivate_key_files = [\"/etc/ferrosmart/signing.pem\"]\n\n\
+         [ferrosmart.backend]\nalgorithm = \"ES384\"\n\n\
+         [ferrosmart.backend.keys]\nprivate_key_file = \"/etc/ferrosmart/backend.pem\"\n\n\
          [[ferrosmart.resource]]\nbase = {facade:?}\nkind = \"fhir\"\n\n\
          [[ferrosmart.resource]]\nbase = {openehr:?}\nkind = \"openehr\"\n\
          subject_namespace = {NAMESPACE:?}\nfhir_base = {facade:?}\nsubject_system = {SUBJECT_SYSTEM:?}\n\n\
@@ -237,12 +268,16 @@ fn smart_launch(
     });
     Ok(ferrosmart::Launch {
         port,
-        database_url: format!("{}?sslmode=disable", database.url()),
+        database_url: database.url().to_owned(),
         config,
         files: vec![
             (
                 String::from("signing.pem"),
                 ferrosmart::signing_key_pem()?.into_bytes(),
+            ),
+            (
+                String::from("backend.pem"),
+                ferrosmart::backend_key_pem()?.into_bytes(),
             ),
             (String::from("upstream-secret"), secret.into_bytes()),
         ],
@@ -264,6 +299,8 @@ struct BridgeConfig<'a> {
     arr: &'a str,
     /// The state store's URL.
     state: &'a str,
+    /// The Argon2id PHC string of the operator's password.
+    operator: &'a str,
     /// The assertion key of the onward lane, when it is on.
     onward: Option<&'a Assertion>,
 }
@@ -277,6 +314,7 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
         terminology,
         arr,
         state,
+        operator,
         onward,
     } = config;
     let packages: Vec<String> = package_paths()?
@@ -295,15 +333,17 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
          [terminology]\nendpoint.url = \"{terminology}/r4\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{origin}/fhir\"\n\
          subject_namespace = {NAMESPACE:?}\nsubject_id_form = \"logical_id\"\nsubject_type = \"PERSON\"\n\
-         composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
+         composition_language = \"en\"\ncomposition_territory = \"NL\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n\
          [facade.summary]\nenabled = true\noperator = \"Synthetic operator\"\npackages = [{packages}]\n\n\
          [auth.issuer.ferrosmart]\nissuer = {smart:?}\n\n\
-         [state]\nurl = \"{state}?sslmode=disable\"\n\n\
+         [[auth.basic.users]]\nuser = {OPERATOR:?}\npassword_hash = {operator:?}\n\n\
+         [basic_grants.{OPERATOR}]\nscopes = [\"__ferrobridge.operator\"]\n\n\
+         [operator]\nenabled = true\n\n\
+         [state]\nurl = \"{state}\"\n\n\
          [state.seal]\nlookup_key = {lookup:?}\n\n\
          [[state.seal.keys]]\nid = \"journey\"\nkey = {seal:?}\n\n\
          [shl]\nenabled = true\nbase_url = {origin:?}\n\n\
-         [audit]\nenabled = true\ncleartext = true\nendpoint.url = {arr:?}\n\n\
-         [audit.categories.templates]\n{FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID:?} = [\"Patient-Summaries\"]\n",
+         [audit]\nenabled = true\ncleartext = true\nendpoint.url = {arr:?}\n",
         listen = origin.trim_start_matches("http://"),
         packages = packages.join(", "),
     );

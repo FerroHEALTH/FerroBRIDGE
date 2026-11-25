@@ -11,12 +11,13 @@
 //! Every certificate is synthetic, generated at run time and never
 //! committed. No specification governs the stand-in: our own design.
 
+use ferrobridge_testkit::post_quantum::{Peer, agreed};
 use omop_cdm::connection::{CdmConnection, ConnectionError};
 use omop_cdm::database::CdmPool;
 use omop_cdm::ddl::SchemaName;
 use rcgen::KeyPair;
 use rcgen::{BasicConstraints, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa, Issuer};
-use rustls::crypto::aws_lc_rs;
+use rustls::NamedGroup;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use sqlx::postgres::{PgPoolOptions, PgSslMode};
 use std::error::Error;
@@ -61,21 +62,24 @@ fn material(name: &str) -> Result<Material, BoxError> {
     })
 }
 
-/// Starts a stand-in server for one connection: it answers `SSLRequest`
-/// with `S`, handshakes with the material's certificate, and returns the
-/// first eight bytes the client sends over TLS, or `None` when the handshake
-/// fails.
+/// What the stand-in saw over TLS: the group the handshake agreed on and
+/// the first eight bytes the client sent.
+type Seen = Option<(NamedGroup, [u8; 8])>;
+
+/// Starts a stand-in server for one connection as `peer`: it answers
+/// `SSLRequest` with `S`, handshakes with the material's certificate, and
+/// returns what it saw over TLS, or `None` when the handshake fails.
 async fn stand_in(
     material: &Material,
-) -> Result<(SocketAddr, JoinHandle<Result<Option<[u8; 8]>, BoxError>>), BoxError> {
-    let config =
-        rustls::ServerConfig::builder_with_provider(Arc::new(aws_lc_rs::default_provider()))
-            .with_safe_default_protocol_versions()?
-            .with_no_client_auth()
-            .with_single_cert(
-                vec![material.server.clone()],
-                PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(material.server_key.clone())),
-            )?;
+    peer: Peer,
+) -> Result<(SocketAddr, JoinHandle<Result<Seen, BoxError>>), BoxError> {
+    let config = rustls::ServerConfig::builder_with_provider(peer.provider())
+        .with_safe_default_protocol_versions()?
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![material.server.clone()],
+            PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(material.server_key.clone())),
+        )?;
     let acceptor = TlsAcceptor::from(Arc::new(config));
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
@@ -90,9 +94,10 @@ async fn stand_in(
         let Ok(mut tls) = acceptor.accept(tcp).await else {
             return Ok(None);
         };
+        let group = agreed(tls.get_ref().1).ok_or("the handshake agreed on no group")?;
         let mut startup = [0_u8; 8];
         tls.read_exact(&mut startup).await?;
-        Ok(Some(startup))
+        Ok(Some((group, startup)))
     });
     Ok((address, served))
 }
@@ -115,12 +120,12 @@ async fn try_pool(connection: &CdmConnection) -> Result<(), BoxError> {
 #[tokio::test]
 async fn the_pool_reaches_the_server_over_tls_trusting_the_configured_ca() -> Result<(), BoxError> {
     let material = material("Synthetic CDM root")?;
-    let (address, served) = stand_in(&material).await?;
+    let (address, served) = stand_in(&material, Peer::Hybrid).await?;
     let url = format!("postgres://bridge:secret@{address}/cdm?sslmode=verify-full");
     let connection = CdmConnection::new(&url, Some(material.root.as_bytes()))?;
     try_pool(&connection).await?;
-    let startup = tokio::time::timeout(Duration::from_secs(10), served).await???;
-    let startup = startup.ok_or("the handshake completed")?;
+    let seen = tokio::time::timeout(Duration::from_secs(10), served).await???;
+    let (_, startup) = seen.ok_or("the handshake completed")?;
     assert_eq!(
         Some(&[0, 3, 0, 0][..]),
         startup.get(4..8),
@@ -129,19 +134,34 @@ async fn the_pool_reaches_the_server_over_tls_trusting_the_configured_ca() -> Re
     Ok(())
 }
 
+// NOTE: RFC 10024; the pool and the writer share one TLS configuration, which
+// agrees on X25519MLKEM768 with a server that offers it and on X25519 otherwise.
+#[tokio::test]
+async fn the_pool_agrees_on_the_hybrid_group_and_still_reaches_a_classical_server()
+-> Result<(), BoxError> {
+    let material = material("Synthetic CDM root")?;
+    for peer in Peer::BOTH {
+        let (address, served) = stand_in(&material, peer).await?;
+        let url = format!("postgres://bridge:secret@{address}/cdm?sslmode=verify-full");
+        let connection = CdmConnection::new(&url, Some(material.root.as_bytes()))?;
+        try_pool(&connection).await?;
+        let seen = tokio::time::timeout(Duration::from_secs(10), served).await???;
+        let (group, _) = seen.ok_or("the handshake completed")?;
+        assert_eq!(peer.agreed(), group, "{peer:?}");
+    }
+    Ok(())
+}
+
 #[tokio::test]
 async fn the_pool_refuses_a_server_another_root_signed() -> Result<(), BoxError> {
     let presented = material("Synthetic CDM root")?;
     let configured = material("Another synthetic root")?;
-    let (address, served) = stand_in(&presented).await?;
+    let (address, served) = stand_in(&presented, Peer::Hybrid).await?;
     let url = format!("postgres://bridge:secret@{address}/cdm?sslmode=verify-ca");
     let connection = CdmConnection::new(&url, Some(configured.root.as_bytes()))?;
     try_pool(&connection).await?;
-    let startup = tokio::time::timeout(Duration::from_secs(10), served).await???;
-    assert_eq!(
-        None, startup,
-        "no message crosses a handshake the CA refuses"
-    );
+    let seen = tokio::time::timeout(Duration::from_secs(10), served).await???;
+    assert_eq!(None, seen, "no message crosses a handshake the CA refuses");
     Ok(())
 }
 

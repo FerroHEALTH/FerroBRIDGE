@@ -17,8 +17,9 @@
 //! bounds are inclusive (R4 `Period.start` "The boundary is inclusive",
 //! `Period.end` "includes any matching date/time"), so a present bound the
 //! interval excludes has no `Period` that states it and is refused going out,
-//! as the `Range` cell refuses one. The `DV_QUANTITY` interval against `Range`
-//! is not in this module.
+//! as the `Range` cell refuses one. The module owns that bound reading for
+//! both cells; the `DV_QUANTITY` interval against `Range` is in
+//! `lens/range.rs`.
 
 use fhir_types::r4::period::Period;
 use fhir_types::r4::primitives::DateTime;
@@ -73,14 +74,7 @@ impl Lens<DvInterval<DvDateTime>, Period> for DateTimeIntervalLens {
             view.end.as_ref(),
             existing.and_then(|held| held.upper.as_ref()),
         );
-        Ok(DvInterval {
-            lower_unbounded: lower.is_none(),
-            upper_unbounded: upper.is_none(),
-            lower_included: lower.is_some(),
-            upper_included: upper.is_some(),
-            lower,
-            upper,
-        })
+        Ok(closed(lower, upper))
     }
 
     fn fallbacks(&self, _view: &Period) -> Vec<Fallback> {
@@ -95,19 +89,54 @@ fn limit(
     included: bool,
     attribute: &'static str,
 ) -> Result<Option<DateTime>, LensError> {
-    let Some(bound) = bound else {
-        return Ok(None);
-    };
-    if !included {
+    let bound = inclusive(
+        bound,
+        included,
+        attribute,
+        CELL,
+        "a Period bound is inclusive",
+    )?;
+    Ok(bound.map(|bound| DateTime::from(bound.value.clone())))
+}
+
+/// Returns the interval of the bounds FHIR gave, a present bound included
+/// and an absent one unbounded, the reading the `Period` and `Range` cells
+/// share.
+pub(crate) fn closed<T>(lower: Option<T>, upper: Option<T>) -> DvInterval<T> {
+    DvInterval {
+        lower_unbounded: lower.is_none(),
+        upper_unbounded: upper.is_none(),
+        lower_included: lower.is_some(),
+        upper_included: upper.is_some(),
+        lower,
+        upper,
+    }
+}
+
+/// Returns a bound going out, refusing a present bound the interval
+/// excludes, which neither `Period` nor `Range` can state.
+///
+/// # Errors
+///
+/// Returns [`LensError::Shape`] naming `cell`, `attribute` and `reason` when
+/// the bound is present and not included.
+pub(crate) fn inclusive<'bound, T>(
+    bound: Option<&'bound T>,
+    included: bool,
+    attribute: &'static str,
+    cell: &'static str,
+    reason: &'static str,
+) -> Result<Option<&'bound T>, LensError> {
+    if bound.is_some() && !included {
         return Err(LensError::Shape {
-            cell: CELL,
+            cell,
             attribute,
             found: String::from("false"),
-            reason: "a Period bound is inclusive",
+            reason,
             direction: Direction::OpenehrToFhir,
         });
     }
-    Ok(Some(DateTime::from(bound.value.clone())))
+    Ok(bound)
 }
 
 /// Returns one bound of the interval, `None` when the period leaves it open.

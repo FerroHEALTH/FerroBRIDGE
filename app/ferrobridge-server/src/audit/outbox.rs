@@ -8,15 +8,14 @@
 //! send it when it can, so the recorder returns once the row is committed and
 //! the forwarder sends it over the ATX: FHIR Feed. Every replica stores into
 //! one table and runs a forwarder over it: a forwarder claims the oldest
-//! unclaimed row for [`LEASE`] with `FOR UPDATE SKIP LOCKED`
-//! (<https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE>),
-//! deletes it once the repository took it and moves it to `audit_quarantine`
-//! once the repository refused it, so two replicas never send one record and
-//! a record a stopped replica claimed is sent by another once the lease runs
-//! out. Where the records wait is our own design.
+//! unclaimed row for [`LEASE`] through [`crate::store::claim`], deletes it
+//! once the repository took it and moves it to `audit_quarantine` once the
+//! repository refused it, so two replicas never send one record and a record
+//! a stopped replica claimed is sent by another once the lease runs out.
+//! Where the records wait is our own design.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use ihe_atna::atna::forwarder::{Outbox, OutboxError};
@@ -30,6 +29,8 @@ use secrecy::{ExposeSecret as _, SecretSlice};
 use sqlx::postgres::PgPool;
 use tokio::sync::Notify;
 
+use crate::store::claim::{Claim, millis};
+
 /// How long a forwarder holds a claimed record before another may send it.
 // NOTE: no specification governs this: our own design; one delivery round of the FHIR Feed
 // ends well within it, so a live forwarder settles its claim first.
@@ -38,6 +39,20 @@ pub const LEASE: Duration = Duration::from_secs(120);
 /// How long a forwarder that found nothing waits before it reads again, so a
 /// record another replica stored is sent without its wake.
 const IDLE: Duration = Duration::from_secs(1);
+
+/// The claim of the oldest record no live claim holds.
+static OLDEST: LazyLock<String> = LazyLock::new(|| {
+    Claim {
+        table: "audit_outbox",
+        keys: &["seq"],
+        due: "claimed_until IS NULL OR claimed_until < clock_timestamp()",
+        order: "seq",
+        limit: "1",
+        mark: "claimed_until = clock_timestamp() + $1 * interval '1 millisecond'",
+        returning: "claimed.seq, claimed.message",
+    }
+    .statement()
+});
 
 /// The forwarder's error for a store failure.
 fn outbox_error(error: impl std::error::Error + Send + Sync + 'static) -> OutboxError {
@@ -111,18 +126,11 @@ impl StateOutbox {
 #[async_trait::async_trait]
 impl Outbox for StateOutbox {
     async fn oldest(&self) -> Result<Option<Stored>, OutboxError> {
-        let lease_ms = i64::try_from(self.lease.as_millis()).unwrap_or(i64::MAX);
-        let claimed: Option<(i64, Vec<u8>)> = sqlx::query_as(
-            "UPDATE audit_outbox SET claimed_until = clock_timestamp() + $1 * interval '1 millisecond' \
-             WHERE seq = (SELECT seq FROM audit_outbox \
-                 WHERE claimed_until IS NULL OR claimed_until < clock_timestamp() \
-                 ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED) \
-             RETURNING seq, message",
-        )
-        .bind(lease_ms)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(outbox_error)?;
+        let claimed: Option<(i64, Vec<u8>)> = sqlx::query_as(OLDEST.as_str())
+            .bind(millis(self.lease))
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(outbox_error)?;
         let (waiting, quarantined): (i64, i64) = sqlx::query_as(
             "SELECT (SELECT count(*) FROM audit_outbox), (SELECT count(*) FROM audit_quarantine)",
         )

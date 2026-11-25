@@ -19,10 +19,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-term = "0.19"
+ferrobridge-term = "0.21"
 ```
 
-Name a patch (`"0.19.N"`) when you need the first release that carries what
+Name a patch (`"0.21.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -120,7 +120,7 @@ call in it does not compile. The default is `stu3`, `r4` and `r4b`; a
 consumer that speaks R5 or R6 turns `r5` or `r6` on:
 
 ```toml
-ferrobridge-term = { version = "0.19", features = ["r5", "r6"] }
+ferrobridge-term = { version = "0.21", features = ["r5", "r6"] }
 ```
 
 The HTTP client is the default `client` feature: `reqwest`, the retry
@@ -130,7 +130,7 @@ request, concept and outcome types and the transport-free writers and readers
 speaks with no HTTP stack:
 
 ```toml
-ferrobridge-term = { version = "0.19", default-features = false, features = ["r4"] }
+ferrobridge-term = { version = "0.21", default-features = false, features = ["r4"] }
 ```
 
 R5 and R6 are off by default because a binary that also enables the

@@ -801,6 +801,19 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `search_count` | `20` | The page size of a search that names no `_count` |
 | `search_count_max` | `100` | The largest page one search answers; a larger `_count` is answered with this many |
 | `binding_identifier_issuers` | none | The `DV_IDENTIFIER.issuer` of each binding key the CDR binds a login to (the `identifier_issuer` of its issuers' party tables); the facade refuses with `403` to create, update or delete a party resource whose party carries an identifier of one of them |
+| `custodian.name` | none, required | The name of the healthcare provider that holds the records behind the CDR, the custodian every document the bridge writes names |
+| `custodian.identifier_system` | none, required | The system of that provider's identifier |
+| `custodian.identifier_value` | none, required | The value of that provider's identifier |
+
+`[facade.custodian]` names the custodian of every document the bridge
+writes, `Composition/$document`, the documents the MHD Document Responder
+describes, and `Patient/$summary`: the healthcare provider that holds the
+records behind the CDR, the health data holder of Regulation (EU) 2025/327,
+never the bridge. FHIR R4 `Composition.custodian` is the organisation
+"responsible for ongoing maintenance of and access to the
+composition/document information", and HL7 Europe EU Health Data API
+`EehrxfMhdDocumentReference` requires `DocumentReference.custodian`. An
+enabled facade refuses to start without each of the three keys.
 
 The three `subject_` keys make the facade's link between a Patient and its
 EHR match the one the CDR's owner writes, because the facade finds an EHR
@@ -1168,7 +1181,7 @@ decides nothing.
 | `issuer` | none, required | The authorization server's issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2), or plain `http` on a loopback host; a token's `iss` must equal it |
 | `kind` | none | `federation` for another party's issuer, whose tokens name its professionals or its organisation and which needs its `[auth.issuer.<name>.federation]` table; unset for a SMART App Launch 2.2 authorization server such as FerroSMART ([running behind FerroSMART](behind-ferrosmart.md)) |
 | `audience` | `[facade] base_url` | The audiences, a list, of which every token's `aud` must contain one (RFC 9068 §4); unset, the facade's base URL |
-| `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use; a symmetric `HS*` algorithm is refused and `none` is no algorithm |
+| `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use, from `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `EdDSA`, `ML-DSA-44`, `ML-DSA-65` and `ML-DSA-87`; any other value, a symmetric `HS*` algorithm or `none` included, fails to parse |
 | `clock_skew` | `"1min"` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
 | `jwks_max_age` | `"10min"` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
 | `jwks_refresh_interval` | `"1min"` | The shortest time between two reads of the key set that a token naming an unknown `kid`, or a failed read, triggers |
@@ -1722,6 +1735,11 @@ ehr_policy = "create_on_first_write"
 subject_namespace = "https://example.org/fhir/sid/patient"
 composition_language = "en"
 composition_territory = "GB"
+
+[facade.custodian]
+name = "Example Hospital"
+identifier_system = "urn:oid:2.999.1.1"
+identifier_value = "example-hospital"
 
 [auth]
 issuer = "https://auth.example.org/realms/clinic"

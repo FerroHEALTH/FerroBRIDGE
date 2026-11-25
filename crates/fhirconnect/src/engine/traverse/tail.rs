@@ -28,7 +28,6 @@ use crate::engine::lens::LensError;
 use crate::engine::lens::null_flavour::NullFlavourLens;
 use crate::engine::lens::scalar::IntegerLens;
 use crate::engine::lens::scalar::RealLens;
-use crate::engine::outcome::Warning;
 use crate::engine::rm;
 use crate::engine::rm::RmError;
 use crate::engine::rm::RmValue;
@@ -71,11 +70,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let node = openehr.node();
         let segments = tail_segments(openehr);
         if openehr.on_element() && segments == [rm::null_flavour::NULL_FLAVOUR] {
-            let refuse = |source: LensError| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            };
+            let refuse = EngineError::cell(mapping, target);
             let FhirValue::String(ref code) = *view else {
                 return Err(refuse(LensError::NoCell {
                     rm_type: String::from("ELEMENT.null_flavour"),
@@ -91,19 +86,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let leaf = openehr
             .leaf_class()
             .ok_or_else(|| unsupported_tail(mapping, openehr))?;
-        let produced = cell::put(view, leaf, None, self.binding_of(node).as_deref(), &[]).map_err(
-            |source| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            },
-        )?;
-        for taken in &produced.fallbacks {
-            self.warnings.push(Warning::fallback(
-                taken,
-                self.locate(mapping, &binding.fhir),
-            ));
-        }
+        let produced = cell::put(view, leaf, None, self.binding_of(node).as_deref(), &[])
+            .map_err(EngineError::cell(mapping, target))?;
+        self.warn_fallbacks(mapping, &binding.fhir, &produced.fallbacks);
         let value = self.identified(mapping, view, produced.value, Shape::Identifier)?;
         let under =
             rm::family_of(owner, &segments).ok_or_else(|| unsupported_tail(mapping, openehr))?;
@@ -127,13 +112,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 ));
             }
             _ => {
-                return Err(EngineError::Rm {
-                    mapping: String::from(mapping.name()),
-                    node: String::from(node.aql_path().as_str()),
-                    source: Box::new(RmError::UnknownClass {
-                        rm_type: String::from(value.rm_type()),
-                    }),
-                });
+                return Err(EngineError::rm(mapping, node)(RmError::UnknownClass {
+                    rm_type: String::from(value.rm_type()),
+                }));
             }
         }
         Ok(())
@@ -156,14 +137,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
             FhirValue::String(ref string) => string.value.as_deref(),
             _ => None,
         }
-        .ok_or_else(|| EngineError::Cell {
-            mapping: String::from(mapping.name()),
-            element: String::from(target.expression().as_str()),
-            source: Box::new(LensError::NoCell {
+        .ok_or_else(|| {
+            EngineError::cell(mapping, target)(LensError::NoCell {
                 rm_type: String::from("String"),
                 kind: view.kind().as_str(),
                 direction: Direction::FhirToOpenehr,
-            }),
+            })
         })?;
         let under =
             rm::family_of(class, &segments).ok_or_else(|| unsupported_tail(mapping, openehr))?;
@@ -191,11 +170,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let segments = tail_segments(openehr);
         let (class, carried) = rm::carried::carried(openehr.tail_class(), &segments)
             .ok_or_else(|| unsupported_tail(mapping, openehr))?;
-        let refuse_rm = |source: RmError| EngineError::Rm {
-            mapping: String::from(mapping.name()),
-            node: String::from(node.aql_path().as_str()),
-            source: Box::new(source),
-        };
+        let refuse_rm = EngineError::rm(mapping, node);
         if carried == Carried::EntryTime {
             let key = rm::entry_time_key(class, &segments.join("/"))
                 .ok_or_else(|| unsupported_tail(mapping, openehr))?;
@@ -232,17 +207,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 self.binding_of(node).as_deref(),
                 &[],
             )
-            .map_err(|source| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            })?;
-            for taken in &produced.fallbacks {
-                self.warnings.push(Warning::fallback(
-                    taken,
-                    self.locate(mapping, &binding.fhir),
-                ));
-            }
+            .map_err(EngineError::cell(mapping, target))?;
+            self.warn_fallbacks(mapping, &binding.fhir, &produced.fallbacks);
             self.identified(mapping, view, produced.value, Shape::Identifier)?
                 .to_canonical()
                 .map_err(refuse_rm)?
@@ -299,17 +265,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         (carried, class, node): (Carried, &str, &ResolvedNode),
     ) -> Result<serde_json::Value, EngineError> {
         if let (Carried::Text, Some(produced)) = (carried, cell::put_string(view)) {
-            let produced = produced.map_err(|source| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            })?;
-            for taken in &produced.fallbacks {
-                self.warnings.push(Warning::fallback(
-                    taken,
-                    self.locate(mapping, &binding.fhir),
-                ));
-            }
+            let produced = produced.map_err(EngineError::cell(mapping, target))?;
+            self.warn_fallbacks(mapping, &binding.fhir, &produced.fallbacks);
             return Ok(serde_json::Value::String(produced.value));
         }
         let number = match (carried, view) {
@@ -324,11 +281,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             _ => None,
         };
         if let Some(number) = number {
-            return number.map_err(|source| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            });
+            return number.map_err(EngineError::cell(mapping, target));
         }
         let element = String::from(target.resolved().leaf());
         let text = view.write(&element).map_err(|source| EngineError::Fhir {
@@ -336,11 +289,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             element: element.clone(),
             source: Box::new(source),
         })?;
-        scalar_json(carried, class, node, &text).map_err(|source| EngineError::Rm {
-            mapping: String::from(mapping.name()),
-            node: String::from(node.aql_path().as_str()),
-            source: Box::new(source),
-        })
+        scalar_json(carried, class, node, &text).map_err(EngineError::rm(mapping, node))
     }
 
     /// Writes a date-time attribute of an entry, an observation's history origin
@@ -359,26 +308,13 @@ impl<T: Table + ?Sized> Run<'_, T> {
         binding: &Binding,
         key: &str,
     ) -> Result<(), EngineError> {
-        let produced =
-            cell::put(view, DV_DATE_TIME, None, None, &[]).map_err(|source| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            })?;
-        for taken in &produced.fallbacks {
-            self.warnings.push(Warning::fallback(
-                taken,
-                self.locate(mapping, &binding.fhir),
-            ));
-        }
+        let produced = cell::put(view, DV_DATE_TIME, None, None, &[])
+            .map_err(EngineError::cell(mapping, target))?;
+        self.warn_fallbacks(mapping, &binding.fhir, &produced.fallbacks);
         let RmValue::DateTime(ref time) = produced.value else {
-            return Err(EngineError::Rm {
-                mapping: String::from(mapping.name()),
-                node: String::from(node.aql_path().as_str()),
-                source: Box::new(RmError::UnknownClass {
-                    rm_type: String::from(produced.value.rm_type()),
-                }),
-            });
+            return Err(EngineError::rm(mapping, node)(RmError::UnknownClass {
+                rm_type: String::from(produced.value.rm_type()),
+            }));
         };
         self.families.push(
             NodeValue::new(node, serde_json::Value::String(time.value.clone()))

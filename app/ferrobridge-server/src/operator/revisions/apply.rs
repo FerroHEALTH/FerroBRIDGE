@@ -15,7 +15,7 @@ use ferrobridge_operator_api::revisions::{Origin, Revision};
 use crate::mappings::revisions::Entry;
 use crate::operator::Operator;
 use crate::operator::reload::ReloadError;
-use crate::operator::save::{Failure, OnBlockingThread, Precondition, Refused};
+use crate::operator::save::{Failure, OnBlockingThread, Precondition, Uncompiled};
 
 /// How an apply ended, short of a failure to reach the store.
 #[derive(Debug)]
@@ -70,8 +70,10 @@ impl Operator {
             .map_err(Failure::Store)?;
         let prepared = match self.compile(thread, &contents) {
             Ok(prepared) => prepared,
-            Err(Refused::Rejected(report)) => return Ok((running, Applied::Rejected { report })),
-            Err(Refused::Unavailable(error)) => {
+            Err(Uncompiled::Rejected(report)) => {
+                return Ok((running, Applied::Rejected { report }));
+            }
+            Err(Uncompiled::Unavailable(error)) => {
                 return Ok((running, Applied::Unreloaded { error }));
             }
         };

@@ -23,9 +23,11 @@ use ferrohealth_smart::resource::Access;
 use http::request::Parts;
 use http::{HeaderMap, StatusCode, header};
 
-use crate::operator::guard::AUDIT_TARGET;
+use crate::operator::guard::audited;
+use crate::operator::lane::Lane;
+use crate::operator::refused::Refused;
 use crate::operator::save::{Precondition, subject_of};
-use crate::problem::{Kind, refuse};
+use crate::problem::Kind;
 use crate::settings::{Register, RegisterError, Registers, Version, Written};
 
 /// One version of a register as the operator API answers it.
@@ -66,27 +68,6 @@ pub fn routes(registers: Option<Arc<Registers>>, smart: &crate::smart::Smart) ->
         .route_layer(crate::operator::guard::layer(smart))
 }
 
-/// Why a request names no register it can act on.
-#[derive(Debug, Clone, Copy)]
-enum Unresolved {
-    /// No `[state]` is configured.
-    Unconfigured,
-    /// No register has the name.
-    Unknown,
-}
-
-impl IntoResponse for Unresolved {
-    fn into_response(self) -> Response {
-        match self {
-            Self::Unconfigured => refuse(
-                Kind::NotConfigured,
-                "no [state] is configured, so the bridge keeps no settings register",
-            ),
-            Self::Unknown => refuse(Kind::NotFound, "no settings register has this name"),
-        }
-    }
-}
-
 /// The registers and the register a request's path names.
 #[derive(Debug)]
 struct Named(Arc<Registers>, Register);
@@ -101,11 +82,12 @@ impl FromRequestParts<Option<Arc<Registers>>> for Named {
         let Path(name) = Path::<String>::from_request_parts(parts, registers)
             .await
             .map_err(IntoResponse::into_response)?;
-        let registers = registers
-            .clone()
-            .ok_or_else(|| Unresolved::Unconfigured.into_response())?;
-        let register =
-            Register::of_name(&name).ok_or_else(|| Unresolved::Unknown.into_response())?;
+        let Lane(registers) = Lane::from_request_parts(parts, registers)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let register = Register::of_name(&name).ok_or_else(|| {
+            Refused::Problem(Kind::NotFound, "no settings register has this name").into_response()
+        })?;
         Ok(Self(registers, register))
     }
 }
@@ -145,31 +127,31 @@ async fn write(
     let (replaces, response) = match (Precondition::of(&headers), replaced(&headers)) {
         (Precondition::Missing | Precondition::Absent, _) => (
             None,
-            refuse(
+            Refused::Problem(
                 Kind::PreconditionRequired,
                 "send If-Match with the version the write replaces, as the read's ETag gave it",
-            ),
+            )
+            .into_response(),
         ),
         (Precondition::Match(_), None) => (
             None,
-            refuse(
+            Refused::Problem(
                 Kind::PreconditionFailed,
                 "If-Match names no version of the register",
-            ),
+            )
+            .into_response(),
         ),
         (Precondition::Match(_), Some(replaces)) => (
             Some(replaces),
             committed(&registers, register, replaces, &body, &subject).await,
         ),
     };
-    tracing::info!(
-        target: AUDIT_TARGET,
-        subject = subject.as_str(),
-        action = "register",
+    audited!(
+        subject.as_str(),
+        "register",
+        response.status(),
         register = register.name(),
         replaces = replaces.unwrap_or(-1),
-        status = response.status().as_u16(),
-        "operator"
     );
     response
 }
@@ -185,7 +167,8 @@ async fn committed(
     let document: serde_json::Value = match serde_json::from_slice(body) {
         Ok(document) => document,
         Err(_unreadable) => {
-            return refuse(Kind::BadRegister, "the body is no JSON document");
+            return Refused::Problem(Kind::BadRegister, "the body is no JSON document")
+                .into_response();
         }
     };
     match registers
@@ -193,14 +176,16 @@ async fn committed(
         .await
     {
         Ok(Written::Committed(version)) => answer(StatusCode::OK, register, &version),
-        Ok(Written::Stale { .. }) => refuse(
+        Ok(Written::Stale { .. }) => Refused::Problem(
             Kind::PreconditionFailed,
             "the register changed since the version If-Match names",
-        ),
-        Err(RegisterError::Shape(_) | RegisterError::Categories(_)) => refuse(
+        )
+        .into_response(),
+        Err(RegisterError::Shape(_) | RegisterError::Categories(_)) => Refused::Problem(
             Kind::BadRegister,
             "the document is not the register's shape, or its rules do not hold",
-        ),
+        )
+        .into_response(),
         Err(error) => unavailable(&error),
     }
 }
@@ -234,10 +219,11 @@ fn unavailable(error: &RegisterError) -> Response {
         error = ferrohealth_server::run::chain(error),
         "a settings register could not be read or written"
     );
-    refuse(
+    Refused::Problem(
         Kind::RegistersUnavailable,
         "the settings register could not be read or written",
     )
+    .into_response()
 }
 
 #[cfg(test)]

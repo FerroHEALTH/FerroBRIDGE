@@ -12,7 +12,7 @@ use ferrobridge_server::config::Process;
 /// An enabled facade with `app_state` as its `[facade.app_state]` table.
 fn with_app_state(app_state: &str) -> String {
     format!(
-        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[facade.app_state]\n{app_state}"
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[facade.app_state]\n{app_state}"
     )
 }
 
