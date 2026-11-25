@@ -81,7 +81,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 23] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
@@ -216,6 +216,8 @@ impl Kind {
             Self::RegistersUnavailable => (
                 "registers-unavailable",
                 "The settings register could not be read or written",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
             Self::SourcesUnavailable => (
                 "sources-unavailable",
                 "The inbound sources could not be read or written",
