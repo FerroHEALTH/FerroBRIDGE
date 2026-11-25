@@ -41,12 +41,14 @@ pub mod outbound;
 pub mod panic;
 pub mod problem;
 pub mod quality;
+pub mod settings;
 pub mod shl;
 pub mod smart;
 pub mod sources;
 pub mod startup;
 pub mod state;
 pub mod store;
+pub mod structuremap;
 pub mod terminology;
 pub mod usage_report;
 pub mod walk;
@@ -470,6 +472,9 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
     let mut routes = Router::new()
         .route("/", get(root))
         .merge(operations::router(state.served_operations()));
+    if let Some(intake) = state.intake() {
+        routes = routes.merge(inbound::intake::routes(Arc::clone(intake)));
+    }
     if let Some(smart) = state.auth() {
         routes = routes.merge(smart::routes(smart, app_state));
         if let Some(links) = state.links() {
@@ -485,7 +490,12 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
                 state.etl_history().cloned(),
                 state.concept_maps().cloned(),
             ));
+            routes = routes.merge(operator::registers::routes(
+                state.registers().cloned(),
+                smart,
+            ));
             routes = routes.merge(operator::sources::routes(state.sources().cloned(), smart));
+            routes = routes.merge(operator::inbound::routes(state.intake().cloned(), smart));
         }
     }
     if let Some(mounted) = state.facade() {

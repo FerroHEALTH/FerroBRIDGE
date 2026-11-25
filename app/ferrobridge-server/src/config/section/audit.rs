@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The `[audit]` section: the Audit Record Repository the access records go
-//! to, the spool they wait in, and the category map they are classified by.
+//! to.
+//!
+//! The records wait in the state store's outbox, and the category map they
+//! are classified by is the `audit-categories` settings register.
 //!
 //! The record is Regulation (EU) 2025/327 Annex II 3.2's, sent as an IHE BALP
 //! `AuditEvent` over the ITI-20 ATX: FHIR Feed. The section's shape is our
 //! own design; no specification governs the configuration.
 
-use std::collections::BTreeMap;
-use std::path::PathBuf;
-
-use ehds_logging::map::Declared;
-use ferrohealth_config::units::{ByteSize, Duration};
+use ferrohealth_config::units::Duration;
 use ferrohealth_smart::config::endpoint::EndpointSection;
 use serde::{Deserialize, Serialize};
 
@@ -29,21 +28,11 @@ pub struct Audit {
     /// Whether an `http` base is accepted, for a TLS terminator beside the
     /// bridge that the operator answers for.
     pub cleartext: bool,
-    /// The directory records are stored in until the repository takes them.
-    pub spool_dir: Option<PathBuf>,
-    /// The most records the spool holds at once.
-    pub max_records: usize,
-    /// The most bytes the spool holds at once.
-    pub max_size: ByteSize,
-    /// The longest storing one record may take.
-    pub write_timeout: Duration,
     /// How the bridge names itself as the recording system
     /// (`AuditEvent.source.observer`); empty takes `[facade] system_id`.
     pub source_id: String,
     /// The site the bridge runs at (`AuditEvent.source.site`).
     pub site: Option<String>,
-    /// The categories the data under each template and archetype belong to.
-    pub categories: AuditCategories,
 }
 
 impl Default for Audit {
@@ -58,26 +47,8 @@ impl Default for Audit {
                 ..EndpointSection::default()
             },
             cleartext: false,
-            spool_dir: None,
-            max_records: 10_000,
-            max_size: ByteSize::from_mib(64),
-            write_timeout: Duration::from_secs(2),
             source_id: String::new(),
             site: None,
-            categories: AuditCategories::default(),
         }
     }
-}
-
-/// The deployment's category map (Annex II 3.2(c)): each template id and
-/// archetype id to its Art 14(1) categories, or to `none`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct AuditCategories {
-    /// The national categories the map may name, each `<system>|<code>`.
-    pub national: Vec<String>,
-    /// The categories of the data under each template id.
-    pub templates: BTreeMap<String, Declared>,
-    /// The categories of the data under each archetype id.
-    pub archetypes: BTreeMap<String, Declared>,
 }

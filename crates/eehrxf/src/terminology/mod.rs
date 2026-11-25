@@ -32,8 +32,12 @@
 //!   (<https://hl7.org/fhir/R4/terminology-service.html>), which fails
 //!   closed when none is configured;
 //! - [`translation`]: each concept of a mapped resource that is in no
-//!   preferred system, translated through that server, and left as
-//!   recorded under Art 10(7) when none is configured.
+//!   preferred system, translated through that server under draft `EEHRxF`
+//!   Art 6(3) (initiative 17512, 2026-11-23): the original coding kept, an
+//!   `equivalent` or `equal` translation added with its concept map and
+//!   equivalence recorded, and a code no map covers given its English
+//!   designation when the content is not in English; left as recorded when
+//!   no server is configured.
 //!
 //! The crate reaches no server itself: [`TerminologyServer`] is the seam the
 //! system that reaches one implements.
@@ -58,6 +62,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use fhir_types::r4::extension::{Extension, ExtensionValue};
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
 use http::StatusCode;
 
@@ -76,7 +81,29 @@ pub struct Match {
     pub equivalence: Option<String>,
     /// The target concept, when the server sent one.
     pub concept: Option<Coding>,
+    /// The concept map that made the match (`match.source`), a canonical
+    /// with its version where the server names one.
+    pub source: Option<String>,
 }
+
+/// One accepted translation: the coding, the equivalence the map states and
+/// the map that states it, the mapping provenance draft `EEHRxF` Art 6(2)
+/// asks a mapping rule to carry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Translated {
+    /// The target coding, carrying the map in the `elementSource` extension
+    /// when the server named one.
+    pub coding: Coding,
+    /// The `ConceptMapEquivalence` code, one of [`ACCEPTED_EQUIVALENCES`].
+    pub equivalence: String,
+    /// The concept map, when the server named one.
+    pub map: Option<String>,
+}
+
+/// The extension that names the source of one element, the concept map a
+/// translated coding comes from
+/// (<https://hl7.org/fhir/extensions/StructureDefinition-elementSource.html>).
+pub const ELEMENT_SOURCE: &str = "http://hl7.org/fhir/StructureDefinition/elementSource";
 
 /// A FHIR terminology server, as the system that reaches it implements it.
 ///
@@ -110,6 +137,22 @@ pub trait TerminologyServer: fmt::Debug + Send + Sync {
     /// A [`TerminologyError`] for a call that gives no answer, and
     /// [`TerminologyError::NotFound`] for a code the server does not know.
     async fn lookup(&self, system: &str, code: &str) -> Result<String, TerminologyError>;
+
+    /// Asks `CodeSystem/$lookup` for the designation of the code `code` of
+    /// the system `system` in the language `language`, a BCP 47 tag, among
+    /// the `designation` parts of the answer, and none when the server
+    /// returns no designation in that language.
+    ///
+    /// # Errors
+    ///
+    /// A [`TerminologyError`] for a call that gives no answer, and
+    /// [`TerminologyError::NotFound`] for a code the server does not know.
+    async fn designation(
+        &self,
+        system: &str,
+        code: &str,
+        language: &str,
+    ) -> Result<Option<String>, TerminologyError>;
 
     /// Asks `ValueSet/$validate-code` whether `concept` is in the value set
     /// `value_set`, answering its `result`
@@ -259,19 +302,47 @@ impl Terminology {
         system: &str,
         code: &str,
         target: &str,
-    ) -> Result<Vec<Coding>, TerminologyError> {
+    ) -> Result<Vec<Translated>, TerminologyError> {
         let server = self.ask(Operation::Translate)?;
         let matches = server.translate(system, code, target).await?;
         Ok(matches
             .into_iter()
-            .filter(|found| {
-                found
+            .filter_map(|found| {
+                let equivalence = found
                     .equivalence
-                    .as_deref()
-                    .is_some_and(|code| ACCEPTED_EQUIVALENCES.contains(&code))
+                    .filter(|code| ACCEPTED_EQUIVALENCES.contains(&code.as_str()))?;
+                let mut coding = found.concept?;
+                if let Some(map) = &found.source {
+                    coding.extension.push(Extension {
+                        url: ELEMENT_SOURCE.into(),
+                        value: Some(ExtensionValue::Uri(map.as_str().into())),
+                        ..Extension::default()
+                    });
+                }
+                Some(Translated {
+                    coding,
+                    equivalence,
+                    map: found.source,
+                })
             })
-            .filter_map(|found| found.concept)
             .collect())
+    }
+
+    /// Looks up the designation of the code `code` of the system `system`
+    /// in English, the textual designation draft `EEHRxF` Art 6(3) sends
+    /// beside a national code no mapping covers.
+    ///
+    /// # Errors
+    ///
+    /// [`TerminologyError::Unconfigured`] with no server, and the server's
+    /// [`TerminologyError`] for a call that gives no answer.
+    pub async fn english(
+        &self,
+        system: &str,
+        code: &str,
+    ) -> Result<Option<String>, TerminologyError> {
+        let server = self.ask(Operation::Lookup)?;
+        server.designation(system, code, "en").await
     }
 
     /// Looks up the preferred display of the code `code` of the system

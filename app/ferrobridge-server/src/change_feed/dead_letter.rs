@@ -278,29 +278,26 @@ impl DeadLetters {
         Ok(done.rows_affected() == 1)
     }
 
-    /// Settles the event `id` parked for `reader`, whose retry finished,
-    /// under `term`.
+    /// Settles the events `ids` parked for `reader`, whose retry finished,
+    /// inside the follower's transaction on `connection`.
     ///
     /// # Errors
-    /// Returns [`DeadLetterError`] when the write does not commit or `term`
-    /// is no longer the lane's.
+    /// Returns [`DeadLetterError::Store`] when the statement fails.
     pub async fn replayed(
         &self,
-        term: &Term,
+        connection: &mut sqlx::PgConnection,
         reader: &ReaderName,
-        id: u64,
+        ids: &[u64],
     ) -> Result<(), DeadLetterError> {
-        let mut tx = self.pool.begin().await?;
-        term.fence(&mut tx).await?;
+        let ids: Vec<i64> = ids.iter().map(|id| id.cast_signed()).collect();
         sqlx::query(
             "UPDATE dead_letter SET settled_at = now(), replay_requested_at = NULL \
-             WHERE reader = $1 AND id = $2",
+             WHERE reader = $1 AND id = ANY($2)",
         )
         .bind(reader.as_str())
-        .bind(id.cast_signed())
-        .execute(&mut *tx)
+        .bind(ids)
+        .execute(connection)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 

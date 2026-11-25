@@ -110,6 +110,20 @@ pub trait Consumer: std::fmt::Debug + Send + Sync {
     /// Returns [`ConsumerError`] when the event is not finished.
     async fn process(&self, event: &Event) -> Result<(), ConsumerError>;
 
+    /// Forgets what the consumer staged for a pass that never committed, at
+    /// the start of every pass.
+    fn discard(&self) {}
+
+    /// Writes what the consumer staged for the events this pass finished,
+    /// inside the transaction that moves the reader's cursor.
+    ///
+    /// # Errors
+    /// Returns [`ConsumerError`] when the staged work cannot be written; the
+    /// pass then moves no cursor, so its events are offered again.
+    async fn commit(&self, _ledger: &mut Ledger<'_>) -> Result<(), ConsumerError> {
+        Ok(())
+    }
+
     /// Finishes the work a pass shares across its events, once the pass
     /// offered its page and before it acknowledges any of it.
     ///
@@ -216,8 +230,8 @@ pub enum PassError {
         #[source]
         source: ConsumerError,
     },
-    /// The consumer did not finish the work its events share, so nothing of
-    /// the page was acknowledged.
+    /// The consumer did not finish or commit the work its events share, so
+    /// nothing of the page was acknowledged.
     #[error("the consumer did not settle the pass")]
     Settle {
         /// Why.
@@ -279,9 +293,10 @@ pub async fn pass(
     cursor: &mut Cursor,
     term: &Term,
 ) -> Result<Pass, PassError> {
+    consumer.discard();
     let replayed = match cursor.parking.clone() {
         Some(parking) => replay(&parking.store, term, reader, consumer).await?,
-        None => 0,
+        None => Vec::new(),
     };
     let page = feed.page(reader, page_size).await?;
     let mut previous: BTreeMap<Stream, &Position> = cursor
@@ -322,14 +337,33 @@ pub async fn pass(
             }
         }
     }
-    if (replayed > 0 || !finished.is_empty())
-        && let Err(source) = consumer.settle().await
-    {
+    if replayed.is_empty() && finished.is_empty() {
+        return match failed {
+            Some(error) => Err(error),
+            None => Ok(Pass {
+                read: page.events.len(),
+                acknowledged: Vec::new(),
+                full,
+            }),
+        };
+    }
+    if let Err(source) = consumer.settle().await {
         return Err(PassError::Settle { source });
     }
     let mut ledger = Ledger::new(term);
+    if let Err(source) = consumer.commit(&mut ledger).await {
+        return Err(PassError::Settle { source });
+    }
     for last in finished.values() {
         feed.record(&mut ledger, reader, last).await?;
+    }
+    if let Some(parking) = cursor.parking.as_ref()
+        && !replayed.is_empty()
+    {
+        parking
+            .store
+            .replayed(ledger.connection().await?, reader, &replayed)
+            .await?;
     }
     ledger.commit().await?;
     let mut acknowledged = Vec::new();
@@ -348,25 +382,24 @@ pub async fn pass(
     }
 }
 
-/// Offers `consumer` every event parked for `reader` with a retry pending:
-/// a finished one is settled, a poisoned one is parked again with its new
-/// cause, and a transient failure stops the pass; returns how many it
-/// offered.
+/// Offers `consumer` every event parked for `reader` with a retry pending: a
+/// poisoned one is parked again with its new cause, and a transient failure
+/// stops the pass; returns the finished ones, which the pass settles in its
+/// commit.
 async fn replay(
     store: &DeadLetters,
     term: &Term,
     reader: &ReaderName,
     consumer: &dyn Consumer,
-) -> Result<usize, PassError> {
-    let mut offered = 0_usize;
+) -> Result<Vec<u64>, PassError> {
+    let mut finished = Vec::new();
     for parked in store.parked(reader).await? {
         if !parked.replay {
             continue;
         }
-        offered = offered.saturating_add(1);
         match consumer.process(&parked.event).await {
             Ok(()) => {
-                store.replayed(term, reader, parked.id).await?;
+                finished.push(parked.id);
                 tracing::info!(consumer = consumer.name(), reader = %reader, parked = parked.id, "a replayed parked event finished");
             }
             Err(error) if error.failure() == Failure::Poisoned => {
@@ -383,7 +416,7 @@ async fn replay(
             }
         }
     }
-    Ok(offered)
+    Ok(finished)
 }
 
 /// Forgets the poisoned passes charged to the finished event at `position`.

@@ -54,11 +54,12 @@ the process is not ready.
 | [`reason-required`](#reason-required) | `400` | A save names no reason. |
 | [`bad-path`](#bad-path) | `400` | The path names no mapping file the console can write. |
 | [`bad-archive`](#bad-archive) | `400` | The body is no mapping-set archive the bridge reads. |
+| [`bad-register`](#bad-register) | `400` | The document does not hold for the register. |
 | [`unauthenticated`](#unauthenticated) | `401` | The request carries no valid access token. |
 | [`not-permitted`](#not-permitted) | `403` | The token does not carry the operator scope. |
 | [`not-found`](#not-found) | `404` | The mapping file, the revision or the configuration does not exist. |
 | [`provisioned`](#provisioned) | `409` | A provisioned file holds the path. |
-| [`not-configured`](#not-configured) | `409` | No `[operator] mapping_dir` is configured. |
+| [`not-configured`](#not-configured) | `409` | No `[state]` is configured, so nothing is saved. |
 | [`precondition-failed`](#precondition-failed) | `412` | What the request replaces changed since the `ETag` it names. |
 | [`precondition-required`](#precondition-required) | `428` | The write sends no precondition. |
 | [`no-example`](#no-example) | `422` | The template has no example composition. |
@@ -69,7 +70,16 @@ the process is not ready.
 | [`dead-letters-unavailable`](#dead-letters-unavailable) | `500` | The dead-letter store could not be read or written. |
 | [`reload-unavailable`](#reload-unavailable) | `503` | The mapping set could not be reloaded. |
 | [`run-history-unavailable`](#run-history-unavailable) | `503` | The run history could not be read. |
+| [`registers-unavailable`](#registers-unavailable) | `503` | The settings register could not be read or written. |
 | [`sources-unavailable`](#sources-unavailable) | `503` | The inbound sources could not be read or written. |
+| [`unverified`](#unverified) | `401` | An inbound request does not prove it comes from its source. |
+| [`unreadable-event`](#unreadable-event) | `400` | An inbound body is no event the source's map reads. |
+| [`unknown-source`](#unknown-source) | `404` | No enabled webhook source has the name. |
+| [`not-parked`](#not-parked) | `404` | No parked item of the source has the entity. |
+| [`inbound-busy`](#inbound-busy) | `503` | The source has as much pending work as its `max_pending` allows. |
+| [`inbound-unavailable`](#inbound-unavailable) | `503` | The inbox could not be read or written. |
+| [`recovery-leased`](#recovery-leased) | `409` | Another replica runs the source's recovery. |
+| [`recovery-failed`](#recovery-failed) | `502` | The source refused or failed a recovery call. |
 | [`authorization-unavailable`](#authorization-unavailable) | `503` | The token could not be checked. |
 
 ## invalid-request
@@ -96,6 +106,13 @@ holds more than 4096 entries or more than 64 MiB of content, names a file
 outside `fhirconnect/` and `omocl/` or one that is not `.yml` or `.yaml`, or
 names one file twice. Export a revision to see the shape an import reads.
 
+## bad-register
+
+`400`. The body of a register write is no JSON document, is not the
+register's shape, or breaks its rules: for `audit-categories`, a category
+that is neither an Art 14(1) category nor a declared national one. The
+version in force stays.
+
 ## unauthenticated
 
 `401`. The request carries no access token, or one the server does not
@@ -121,8 +138,9 @@ file under another path.
 
 ## not-configured
 
-`409`. No `[operator] mapping_dir` is configured, so the operator API checks,
-saves and reloads nothing. Set `mapping_dir` to turn on editing.
+`409`. No `[state]` is configured, so the operator API checks, saves and
+reloads nothing and keeps no settings register. Configure the state store to
+turn on editing.
 
 ## precondition-failed
 
@@ -163,8 +181,8 @@ directory and the cause.
 
 ## unwritable
 
-`500`. The mapping directory could not be written. The server log names the
-cause; check that the server's user owns `mapping_dir`.
+`500`. The mapping revisions could not be read or written in the state
+store. The server log names the cause.
 
 ## dead-letters-unavailable
 
@@ -189,11 +207,65 @@ The server log names the cause. A bridge schema an earlier release created
 gets its run table from `ferrobridge cdm init`, which leaves every other
 table as it is.
 
+## registers-unavailable
+
+`503`. A settings register could not be read or written, because the state
+store did not answer. The server log names the cause, and the version in
+force stays.
+
 ## sources-unavailable
 
 `503`. The state store could not read or write the inbound sources, or a
 secret a source names cannot be read at runtime, so the source fails closed.
 The server log names the cause, and the secret by its name alone.
+
+## unverified
+
+`401`. The inbound request failed its source's verifier: a signature that
+does not match any key, a header that is missing or does not read, a
+timestamp outside the tolerance, or a client certificate the source does
+not list. Nothing of the request is stored. The server log names the reason
+and never a value of the request.
+
+## unreadable-event
+
+`400`. The verified body is no JSON, or lacks a part the source's event map
+selects (the tenant, the entity, the stamp or a de-duplication field), or
+holds one that is no string or number. Nothing is stored.
+
+## unknown-source
+
+`404`. No source has the name in `/inbound/{source}`, or the source is
+disabled or of another kind.
+
+## not-parked
+
+`404`. The settlement names an entity that has no parked work item in the
+source.
+
+## inbound-busy
+
+`503`. The source has `max_pending` work items waiting or running, so the
+intake stores no more until the workers catch up. The answer carries
+`Retry-After`. Nothing is stored.
+
+## inbound-unavailable
+
+`503`. The state store could not store the event or read the inbox. Nothing
+is stored, so the source sends the event again. The server log names the
+cause.
+
+## recovery-leased
+
+`409`. Another replica holds the recovery lease of the source, so this one
+runs neither its redelivery nor its reconciliation. Send the request again
+later, or wait for the leader's next round.
+
+## recovery-failed
+
+`502`. The source refused or failed the redelivery call or a reconciliation
+poll, or a secret the step names cannot be read. The server log names the
+step and the status, and never a value of a record.
 
 ## authorization-unavailable
 

@@ -3,7 +3,8 @@
 
 //! Checking and compiling the whole mapping set, then swapping it in.
 //!
-//! A reload compiles the provisioned files and the console's files together,
+//! A reload compiles the provisioned files and the running revision's files
+//! together,
 //! once for the check and once more for each lane that takes its templates
 //! from another source, and only a set that compiled for every lane replaces
 //! the running one: the facade's programs and search declarations, the
@@ -12,7 +13,6 @@
 //! the old set. No specification governs the reload: our own design.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -23,9 +23,8 @@ use crate::check::Templates;
 use crate::facade::Facade;
 use crate::facade::programs::Programs;
 use crate::facade::search::Catalog;
-use crate::mappings::files;
-use crate::mappings::files::Language;
-use crate::mappings::files::Root;
+use crate::mappings::files::Sources;
+use crate::mappings::tree::Tree;
 use crate::operations::lane::OperationsLane;
 use crate::operator::snapshot::Snapshot;
 
@@ -48,27 +47,9 @@ pub enum ReloadError {
     /// The mapping directories could not be listed.
     #[error("a mapping directory could not be read")]
     Read(#[source] crate::walk::Error),
-}
-
-/// A draft standing in for one file of the set: the wire path it replaces
-/// and the file on disk holding its bytes.
-#[derive(Debug, Clone)]
-pub struct Draft {
-    /// The wire path the draft stands for.
-    pub wire: String,
-    /// The file holding the draft.
-    pub path: PathBuf,
-}
-
-/// The files of one set, by the load that reads them.
-#[derive(Debug, Clone, Default)]
-pub struct Sources {
-    /// The FHIRconnect mapping files.
-    pub fhirconnect: Vec<PathBuf>,
-    /// The search declarations, provisioned and console.
-    pub declarations: Vec<PathBuf>,
-    /// The OMOCL files.
-    pub omocl: Vec<PathBuf>,
+    /// The operator API reloads nothing: no `[state]` is configured.
+    #[error("the operator API has no reload configured")]
+    Unconfigured,
 }
 
 /// Everything a reload compiles against.
@@ -111,44 +92,6 @@ impl Prepared {
 }
 
 impl Reloader {
-    /// Returns the files of `roots` by the load that reads them, with
-    /// `draft` standing in for the file at its wire path.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ReloadError::Read`] when a directory cannot be listed.
-    pub fn sources(roots: &[Root], draft: Option<&Draft>) -> Result<Sources, ReloadError> {
-        let mut sources = Sources::default();
-        let mut push = |language: Language, wire: &str, path: PathBuf| {
-            let list = match language {
-                Language::Omocl => &mut sources.omocl,
-                Language::Fhirconnect if crate::walk::is_declaration(Path::new(wire)) => {
-                    &mut sources.declarations
-                }
-                Language::Fhirconnect => &mut sources.fhirconnect,
-            };
-            list.push(path);
-        };
-        for located in files::list(roots).map_err(ReloadError::Read)? {
-            if draft.is_some_and(|draft| draft.wire == located.wire()) {
-                continue;
-            }
-            push(
-                located.language(),
-                located.wire(),
-                located.path().to_path_buf(),
-            );
-        }
-        if let Some(draft) = draft {
-            let language = files::relative(&draft.wire)
-                .ok()
-                .and_then(|(root, _)| Language::of_root(root))
-                .unwrap_or(Language::Fhirconnect);
-            push(language, &draft.wire, draft.path.clone());
-        }
-        Ok(sources)
-    }
-
     /// Checks and compiles `sources` for every lane, each search declaration
     /// against the context it names.
     ///
@@ -216,10 +159,10 @@ impl Reloader {
             (Some(_lane), Some(directory)) => Some(
                 match (self.templates.as_deref(), self.cdr.as_ref()) {
                     (Some(templates), _) => {
-                        crate::mappings::load_files(directory, fhirconnect, templates)
+                        crate::mappings::load_tree(directory, fhirconnect, templates)
                     }
                     (None, Some(client)) => {
-                        crate::mappings::load_files_from_cdr(directory, fhirconnect, client).await
+                        crate::mappings::load_tree_from_cdr(directory, fhirconnect, client).await
                     }
                     (None, None) => Err(crate::mappings::Error::NoTemplateSource(
                         crate::config::error::NoTemplateSource {
@@ -257,10 +200,10 @@ impl Reloader {
     }
 }
 
-/// Binds the search declarations `files` to `programs`, refusing a set with
-/// one that does not bind as `report` plus its diagnostic.
-fn bind(report: &Report, files: &[PathBuf], programs: &Programs) -> Result<Catalog, ReloadError> {
-    crate::facade::search::load_files(files, programs).map_err(|error| {
+/// Binds the search declarations of `tree` to `programs`, refusing a set
+/// with one that does not bind as `report` plus its diagnostic.
+fn bind(report: &Report, tree: &Tree, programs: &Programs) -> Result<Catalog, ReloadError> {
+    crate::facade::search::load_tree(tree, programs).map_err(|error| {
         let diagnostic = crate::mappings::compile::search_declaration(
             error.file(),
             ferrohealth_server::run::chain(&error),
@@ -279,16 +222,4 @@ pub fn searches(programs: &Programs, catalog: &Catalog) -> BTreeMap<String, Path
         .flat_map(|resource_type| catalog.of_type(resource_type))
         .map(|declared| (declared.context().to_owned(), declared.file().to_path_buf()))
         .collect()
-}
-
-/// Returns how an answer names `path`: the draft's wire path, its wire path
-/// under `roots`, or its file name.
-#[must_use]
-pub fn shown(roots: &[Root], draft: Option<&Draft>, path: &Path) -> String {
-    if let Some(draft) = draft
-        && draft.path == path
-    {
-        return draft.wire.clone();
-    }
-    crate::operator::snapshot::shown(roots, path)
 }

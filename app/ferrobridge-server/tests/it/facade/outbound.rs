@@ -7,7 +7,8 @@
 //! its id with `meta.versionId` and `meta.source`; a deletion and an erasure
 //! `DELETE` what the composition was delivered as; a resource without a
 //! subject is refused as poisoned; and a refused delivery leaves the event
-//! unfinished.
+//! unfinished. The delivery record lives in the state store, so the cases run
+//! only when `FERROBRIDGE_E2E=1` admits the harness.
 
 use std::error::Error;
 
@@ -15,6 +16,7 @@ use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::change_feed::ChangedVersion;
 use ferrobridge_server::change_feed::Domain;
 use ferrobridge_server::change_feed::Event;
+use ferrobridge_server::change_feed::Ledger;
 use ferrobridge_server::change_feed::Position;
 use ferrobridge_server::change_feed::Seq;
 use ferrobridge_server::change_feed::follow::Consumer;
@@ -22,6 +24,8 @@ use ferrobridge_server::change_feed::follow::Failure;
 use ferrobridge_server::outbound::Outbound;
 use ferrobridge_server::outbound::Settings;
 use ferrobridge_server::outbound::sink::Sink;
+use ferrobridge_server::store::lease::Term;
+use ferrobridge_testkit::containers;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::client::outbound::OutboundClient;
 use ferrohealth_smart::config::ServerTls;
@@ -47,20 +51,48 @@ struct Lane {
     endpoint: MockServer,
     /// The lane.
     outbound: Outbound,
-    /// The directory of the delivery record, kept for the case.
-    _scratch: tempfile::TempDir,
+    /// The lease the lane's follower holds, which its commits are fenced by.
+    term: Term,
+    /// The state store's container, kept for the case.
+    _postgres: containers::Postgres,
+}
+
+impl Lane {
+    /// Commits what the lane staged, as its follower does at the end of a
+    /// pass.
+    async fn commit(&self) -> Result<(), Box<dyn Error>> {
+        let mut ledger = Ledger::new(&self.term);
+        self.outbound.commit(&mut ledger).await?;
+        ledger.commit().await?;
+        Ok(())
+    }
+
+    /// Returns the references the record holds for [`CONTAINER`].
+    async fn recorded(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        let refs: Option<Vec<String>> = sqlx::query_scalar(
+            "SELECT refs FROM outbound_delivered WHERE versioned_object_id = $1",
+        )
+        .bind(CONTAINER)
+        .fetch_optional(self.term.pool())
+        .await?;
+        Ok(refs.unwrap_or_default())
+    }
 }
 
 /// Returns a lane over `harness` delivering to an endpoint that answers
-/// `status`.
-async fn lane(harness: Harness, status: u16) -> Result<Lane, Box<dyn Error>> {
+/// `status`, `None` unless `FERROBRIDGE_E2E=1` admits the harness.
+async fn lane(harness: Harness, status: u16) -> Result<Option<Lane>, Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(None);
+    }
+    let postgres = containers::postgres().await?;
+    let (store, term) = crate::change_feed::led(postgres.url()).await?;
     let endpoint = MockServer::start().await;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/fhir"))
         .respond_with(ResponseTemplate::new(status))
         .mount(&endpoint)
         .await;
-    let scratch = tempfile::tempdir()?;
     let settings = Settings {
         reader: ferrobridge_server::change_feed::ReaderName::new("fhir-outbound")?,
         sink: Sink::new(OutboundClient::build(
@@ -72,19 +104,20 @@ async fn lane(harness: Harness, status: u16) -> Result<Lane, Box<dyn Error>> {
             "fhir_outbound.endpoint",
             &ServerTls,
         )?),
-        emitted: scratch.path().join("emitted.redb"),
     };
     let outbound = Outbound::start(
         &settings,
         std::sync::Arc::clone(&harness.facade),
         harness.facade.client().clone(),
-    )?;
-    Ok(Lane {
+        &store,
+    );
+    Ok(Some(Lane {
         harness,
         endpoint,
         outbound,
-        _scratch: scratch,
-    })
+        term,
+        _postgres: postgres,
+    }))
 }
 
 /// Returns the event that changed [`CONTAINER`] in [`EHR_ID`], an erasure
@@ -153,7 +186,9 @@ async fn a_changed_composition_is_put_with_its_id_version_and_source() -> Result
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
-    let lane = lane(harness, 200).await?;
+    let Some(lane) = lane(harness, 200).await? else {
+        return Ok(());
+    };
     lane.outbound.process(&event(1, "249", false)?).await?;
     let received = bundles(&lane.endpoint).await;
     assert_eq!(1, received.len(), "one event, one Bundle");
@@ -186,7 +221,9 @@ async fn an_event_delivered_again_puts_the_same_resource() -> Result<(), Box<dyn
     let harness = harness().await;
     create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
-    let lane = lane(harness, 200).await?;
+    let Some(lane) = lane(harness, 200).await? else {
+        return Ok(());
+    };
     lane.outbound.process(&event(1, "249", false)?).await?;
     lane.outbound.process(&event(1, "249", false)?).await?;
     let received = bundles(&lane.endpoint).await;
@@ -204,8 +241,12 @@ async fn a_deleted_composition_is_retracted() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
-    let lane = lane(harness, 200).await?;
+    let Some(lane) = lane(harness, 200).await? else {
+        return Ok(());
+    };
     lane.outbound.process(&event(1, "249", false)?).await?;
+    lane.commit().await?;
+    assert_eq!(vec![format!("Condition/{id}")], lane.recorded().await?);
     lane.harness.cdr.reset().await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(format!(
@@ -215,12 +256,14 @@ async fn a_deleted_composition_is_retracted() -> Result<(), Box<dyn Error>> {
         .mount(&lane.harness.cdr)
         .await;
     lane.outbound.process(&event(2, "523", false)?).await?;
+    lane.commit().await?;
     let received = bundles(&lane.endpoint).await;
     assert_eq!(
         vec![(String::from("DELETE"), format!("Condition/{id}"))],
         requests(&received[1]),
         "the deletion retracts what the composition was delivered as"
     );
+    assert!(lane.recorded().await?.is_empty(), "the record forgets it");
     Ok(())
 }
 
@@ -229,9 +272,14 @@ async fn an_erased_composition_is_retracted() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
-    let lane = lane(harness, 200).await?;
+    let Some(lane) = lane(harness, 200).await? else {
+        return Ok(());
+    };
     lane.outbound.process(&event(1, "249", false)?).await?;
+    lane.commit().await?;
     lane.outbound.process(&event(2, "erase", true)?).await?;
+    lane.commit().await?;
+    assert!(lane.recorded().await?.is_empty(), "the record forgets it");
     let received = bundles(&lane.endpoint).await;
     assert_eq!(
         vec![(String::from("DELETE"), format!("Condition/{id}"))],
@@ -242,10 +290,47 @@ async fn an_erased_composition_is_retracted() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+async fn an_erased_ehr_retracts_every_composition_the_record_holds() -> Result<(), Box<dyn Error>> {
+    let harness = harness().await;
+    let id = create_one(&harness).await?;
+    mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
+    let Some(lane) = lane(harness, 200).await? else {
+        return Ok(());
+    };
+    lane.outbound.process(&event(1, "249", false)?).await?;
+    lane.commit().await?;
+    let mut erased = event(2, "erase", true)?;
+    erased.versions = vec![ChangedVersion {
+        vo_id: None,
+        kind: String::from("EHR"),
+        sys_version: None,
+        version_tree_id: None,
+        change_type: String::from("erase"),
+        template_id: None,
+    }];
+    lane.outbound.process(&erased).await?;
+    lane.commit().await?;
+    let received = bundles(&lane.endpoint).await;
+    assert_eq!(
+        vec![(String::from("DELETE"), format!("Condition/{id}"))],
+        requests(&received[1]),
+        "the EHR's erasure retracts each composition the record holds for it"
+    );
+    assert_eq!(
+        Vec::<String>::new(),
+        lane.recorded().await?,
+        "the record forgets it"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_resource_without_a_subject_is_refused_and_never_sent() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
-    let lane = lane(harness, 200).await?;
+    let Some(lane) = lane(harness, 200).await? else {
+        return Ok(());
+    };
     let error = lane
         .outbound
         .process(&event(1, "249", false)?)
@@ -271,7 +356,9 @@ async fn an_unavailable_endpoint_leaves_the_event_transient() -> Result<(), Box<
     let harness = harness().await;
     create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
-    let lane = lane(harness, 503).await?;
+    let Some(lane) = lane(harness, 503).await? else {
+        return Ok(());
+    };
     let error = lane
         .outbound
         .process(&event(1, "249", false)?)
@@ -286,7 +373,9 @@ async fn a_refused_delivery_is_poisoned() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     create_one(&harness).await?;
     mount_read(&harness.cdr, VERSION_ONE, &harness.composition()).await;
-    let lane = lane(harness, 422).await?;
+    let Some(lane) = lane(harness, 422).await? else {
+        return Ok(());
+    };
     let error = lane
         .outbound
         .process(&event(1, "249", false)?)

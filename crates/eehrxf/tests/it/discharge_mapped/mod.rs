@@ -15,6 +15,7 @@
 
 use std::error::Error;
 
+use super::support::annex_iii;
 use eehrxf::document::Document;
 use eehrxf::document::discharge::{DISCHARGE_REPORT_FORM, HDR_SLOTS};
 use eehrxf::document::section::Section;
@@ -53,14 +54,14 @@ const BASE: &str = "https://gateway.example.org/fhir";
 /// The instant every run is stamped with, so nothing reads a clock.
 const NOW: &str = "2026-10-20T12:00:00Z";
 
-/// The synthetic diagnosis's code, in a code system under `example.org`.
-const DIAGNOSIS: &str = "SYN-DIAGNOSIS-0001";
+/// The diagnosis's ICD-10 code, which MVC 10.1.0 `eHDSIIllnessandDisorder` lists.
+const DIAGNOSIS: &str = "J45.9";
 
-/// The synthetic procedure's code, in a code system under `example.org`.
-const PROCEDURE: &str = "SYN-PROCEDURE-0001";
+/// The procedure's SNOMED CT code, which MVC 10.1.0 `eHDSIProcedure` lists.
+const PROCEDURE: &str = "80146002";
 
-/// The synthetic medicine's code, in a code system under `example.org`.
-const MEDICINE: &str = "SYN-MEDICINE-0001";
+/// The medicine's ATC code, which MVC 10.1.0 `eHDSIActiveIngredient` lists.
+const MEDICINE: &str = "N02BE01";
 
 /// The time the synthetic procedure was completed.
 const PERFORMED: &str = "2026-10-14T13:00:00Z";
@@ -141,14 +142,14 @@ fn instant(value: &str) -> String {
 /// The synthetic diagnosis, recognised during the stay.
 fn diagnosis() -> String {
     let name = format!(
-        r#"{{ "_type": "DV_CODED_TEXT", "value": "Synthetic diagnosis", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "http://example.org/fhir/CodeSystem/ferrobridge-diagnoses" }}, "code_string": "{DIAGNOSIS}" }} }}"#
+        r#"{{ "_type": "DV_CODED_TEXT", "value": "Asthma, unspecified", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "http://hl7.org/fhir/sid/icd-10" }}, "code_string": "{DIAGNOSIS}" }} }}"#
     );
     let items = [
         element("at0002", "Problem/Diagnosis name", &name),
         element(
             "at0012",
             "Body site",
-            r#"{ "_type": "DV_TEXT", "value": "Synthetic body site" }"#,
+            &coded("http://snomed.info/sct", "Lung structure", "39607008"),
         ),
         element(
             "at0077",
@@ -179,10 +180,10 @@ fn diagnosis() -> String {
     )
 }
 
-/// A coded text of the synthetic code system `system` under `example.org`.
-fn synthetic(system: &str, value: &str, code: &str) -> String {
+/// A coded text of `code` in `system`.
+fn coded(system: &str, value: &str, code: &str) -> String {
     format!(
-        r#"{{ "_type": "DV_CODED_TEXT", "value": "{value}", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "http://example.org/fhir/CodeSystem/{system}" }}, "code_string": "{code}" }} }}"#
+        r#"{{ "_type": "DV_CODED_TEXT", "value": "{value}", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "{system}" }}, "code_string": "{code}" }} }}"#
     )
 }
 
@@ -192,12 +193,12 @@ fn procedure() -> String {
         element(
             "at0002",
             "Procedure name",
-            &synthetic("ferrobridge-procedures", "Synthetic procedure", PROCEDURE),
+            &coded("http://snomed.info/sct", "Appendectomy", PROCEDURE),
         ),
         element(
             "at0063",
             "Body site",
-            r#"{ "_type": "DV_TEXT", "value": "Synthetic body site" }"#,
+            &coded("http://snomed.info/sct", "Appendix structure", "66754008"),
         ),
         element(
             "at0005",
@@ -253,7 +254,7 @@ fn order() -> String {
         medicine = element(
             "at0070",
             "Medication item",
-            &synthetic("ferrobridge-products", "Synthetic tablet 500 mg", MEDICINE),
+            &coded("http://www.whocc.no/atc", "paracetamol", MEDICINE),
         ),
         directions = element(
             "at0009",
@@ -441,6 +442,7 @@ fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String
         let paragraph = format!("{}.", section.slot.title);
         document.with_section(section.into_section(vec![paragraph]))?;
     }
+    document.with_metadata(annex_iii("18842-5"));
     Ok(serde_json::to_string(&document.into_bundle()?)?)
 }
 

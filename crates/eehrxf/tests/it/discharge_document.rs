@@ -108,7 +108,7 @@ fn every_slot_is_a_section_slice_with_the_code_the_profile_fixes() -> Result<(),
 /// A discharge report document over a synthetic patient, given its
 /// encounter when `encounter` and its language when `language`, with its
 /// hospital course.
-fn document(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
+pub(crate) fn document(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
     let mut document = bare(encounter, language)?;
     let course = HDR_SLOTS
         .iter()
@@ -178,6 +178,8 @@ fn the_document_is_a_bundle_the_discharge_report_profiles_constrain() -> Result<
     assert_eq!(composition["type"]["coding"][0]["code"], DISCHARGE_SUMMARY);
     assert_eq!(composition["subject"]["reference"], "Patient/patient-1");
     assert_eq!(composition["encounter"]["reference"], "Encounter/stay-1");
+    // NOTE: MyHealth@EU HDR 9.2.0 composition-hdr-myhealtheu: Composition.language is 1..1.
+    assert_eq!(composition["language"], "en");
     let encounter = entries
         .iter()
         .find(|entry| entry["resource"]["resourceType"] == "Encounter")

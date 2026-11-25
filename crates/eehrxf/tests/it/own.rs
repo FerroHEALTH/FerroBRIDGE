@@ -62,7 +62,7 @@ fn the_summary_the_component_writes_maps_back_to_openehr() -> Result<(), Box<dyn
     let received = mapping.to_openehr(&document, &settings)?;
     assert_eq!(received.template_id(), "ferrofed.eehrxf.allergy.v1");
     assert!(
-        received.composition().contains("Synthetic substance one"),
+        received.composition().contains("762952008"),
         "the summary's allergy is mapped back into the composition"
     );
     let composition: Composition = serde_json::from_str(received.composition())?;
