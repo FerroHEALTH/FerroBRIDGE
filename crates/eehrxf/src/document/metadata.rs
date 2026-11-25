@@ -11,7 +11,9 @@
 //! custodian); [`Document::with_metadata`] writes it on the `Composition`,
 //! and [`DocumentMetadata::describe`] writes the `DocumentReference` that
 //! describes the written document, the shape MyHealth@EU
-//! DocumentReference-minimal (`myhealth.eu.fhir.ncp-api` 9.1.0) constrains.
+//! DocumentReference-minimal (`myhealth.eu.fhir.ncp-api` 9.1.0) constrains;
+//! [`DocumentMetadata::describe_at`] writes it from a [`Header`] before the
+//! document is written.
 //!
 //! | Table 1 element | `Composition` (R4) | `DocumentReference` (R4) |
 //! |---|---|---|
@@ -250,7 +252,7 @@ impl DocumentMetadata {
     pub fn describe(&self, bundle: &Bundle, id: &str) -> Result<DocumentReference, DocumentError> {
         let header = Header::of_document(bundle)?;
         let title = header.title.clone();
-        self.reference(
+        self.describe_at(
             &header,
             id,
             Attachment {
@@ -280,7 +282,7 @@ impl DocumentMetadata {
             size: pdf.bytes().len(),
             source,
         })?;
-        self.reference(
+        self.describe_at(
             header,
             id,
             Attachment {
@@ -294,9 +296,21 @@ impl DocumentMetadata {
         )
     }
 
-    /// The `DocumentReference` of `header` and this metadata, its one
-    /// content `attachment`.
-    fn reference(
+    /// Writes the `DocumentReference` that describes the document `header`
+    /// names with this metadata, with its `id` set to `id` and its one
+    /// content `attachment` as the caller gives it: the URL the document is
+    /// read at, its media type and its title; the attachment's language is
+    /// this metadata's.
+    ///
+    /// It writes what [`DocumentMetadata::describe`] writes of a document,
+    /// with no written `Bundle`, so a caller that lists documents describes
+    /// each before it writes it.
+    ///
+    /// # Errors
+    ///
+    /// [`DocumentError::TooMany`] for more than one service specialty,
+    /// language or legal authentication.
+    pub fn describe_at(
         &self,
         header: &Header,
         id: &str,
