@@ -73,8 +73,32 @@ pub struct Parked {
     /// When it was parked, or parked again after a replay failed, RFC 3339
     /// UTC.
     pub at: String,
-    /// Whether a replay is requested and has not run yet.
+    /// Whether a retry is decided and has not run yet.
     pub replay_requested: bool,
+    /// The last settlement an operator decided, when there is one.
+    pub decision: Option<Decided>,
+}
+
+/// How an operator settles a parked event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Decision {
+    /// Offer it to its consumer again before the next page.
+    Retry,
+    /// Settle it without offering it again.
+    Discard,
+}
+
+/// The settlement an operator decided for a parked event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Decided {
+    /// Retry or discard.
+    pub decision: Decision,
+    /// Who decided: the subject of the operator's token.
+    pub by: String,
+    /// Why, in the operator's words.
+    pub reason: String,
 }
 
 /// One changed versioned object of a parked event.
@@ -122,6 +146,8 @@ pub struct Position {
 pub enum State {
     /// No pass has completed since the bridge started.
     Starting,
+    /// Another replica leads the consumer's reader; this one stands by.
+    Standby,
     /// The last pass completed.
     Following,
     /// The last pass failed; the events wait at the source.

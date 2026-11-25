@@ -201,10 +201,12 @@ console answers with the page it drew.
   last failure with the cause, never an event body; then the events each
   consumer parked in the [dead-letter
   store](../integrate/change-feed.md#poisoned-events-and-the-dead-letter-store)
-  with their cause and passes, each with a Replay button that posts
-  `POST /operator/events/{consumer}/parked/{id}/replay` and comes back to
-  the page, where the event reads "Replay requested" until its consumer
-  offers it again; then the exchange, the routing-key grammar and the bound
+  with their cause and passes, each with a reason field and a Retry and a
+  Discard button that post `POST /operator/events/{consumer}/parked/{id}/retry`
+  or `…/discard` with the reason and come back to the page, where a retried
+  event reads "Retry pending" until its consumer offers it again and a
+  discarded one leaves the list; a consumer another replica leads reads
+  "Standby"; then the exchange, the routing-key grammar and the bound
   queues. The topology changes in the configuration. A bridge with no
   consumer says so in one line.
 - **Connections** (`/connections`, `/connections/{name}`,
@@ -482,7 +484,7 @@ The Events page of a bridge whose events lane is off.
 
 The Events page of a bridge whose broker cannot be reached: the consumer
 reads degraded with its cause, its cursor stays where it was, and an event
-it parked waits for a replay.
+it parked waits for an operator to retry or discard it.
 [Dark theme](img/console/events-degraded-dark.png).
 
 ![Connections](img/console/connections.png)

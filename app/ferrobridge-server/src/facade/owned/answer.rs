@@ -4,8 +4,6 @@
 //! The FHIR answers of the resources the facade keeps itself: a created or
 //! updated resource with its `ETag` and `Location`, and a `searchset`.
 
-use std::future::Ready;
-use std::future::ready;
 use std::sync::Arc;
 
 use axum::body::Bytes;
@@ -158,8 +156,12 @@ pub fn searchset(
     Ok(reply::resource(StatusCode::OK, &object, &[]))
 }
 
+/// The future a search answers with.
+pub type SearchFuture<'a> =
+    std::pin::Pin<Box<dyn Future<Output = Result<Response, Refusal>> + Send + 'a>>;
+
 /// The search one endpoint answers over the parameters of a request.
-pub type Searched = fn(&Search<'_>) -> Result<Response, Refusal>;
+pub type Searched = for<'a> fn(&'a Search<'a>) -> SearchFuture<'a>;
 
 /// One search request, its media types already checked.
 #[derive(Debug, Clone, Copy)]
@@ -175,7 +177,7 @@ pub struct Search<'a> {
 }
 
 /// What the search handler answers with.
-pub type SearchAnswer = Ready<Result<Response, Refusal>>;
+pub type SearchAnswer = SearchFuture<'static>;
 
 /// Returns the search handler of one endpoint over `searched`.
 ///
@@ -190,16 +192,18 @@ pub fn search(
 + Sync
 + 'static {
     move |State(facade), access, headers, uri, body| {
-        let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-        parameters.extend(media::query_pairs(&body));
-        ready(guard(&headers, &uri, Body::Absent).and_then(|()| {
+        Box::pin(async move {
+            let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+            parameters.extend(media::query_pairs(&body));
+            guard(&headers, &uri, Body::Absent)?;
             searched(&Search {
                 facade: &facade,
                 access: &access,
                 uri: &uri,
                 parameters: &parameters,
             })
-        }))
+            .await
+        })
     }
 }
 
@@ -208,13 +212,14 @@ pub fn search(
 ///
 /// # Errors
 /// Returns a `500` when the store fails, and the refusal of `read`.
-pub fn scanned<T>(
+pub async fn scanned<T>(
     store: &OwnedStore,
     resource_type: &str,
     read: impl Fn(&Object, &[u8]) -> Result<T, Refusal>,
 ) -> Result<Vec<(Object, T)>, Refusal> {
     store
         .scan(resource_type)
+        .await
         .map_err(|error| store_refusal(&error))?
         .into_iter()
         .map(|resource| {

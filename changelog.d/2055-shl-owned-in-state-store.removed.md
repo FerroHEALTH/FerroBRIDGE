@@ -1,0 +1,1 @@
+- `[shl] store`, `[facade.app_state] store` and `[facade.launch_task] store`, with their `redb` files: the links and the facade's own resources live in the `[state]` store.
