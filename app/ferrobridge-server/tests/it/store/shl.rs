@@ -178,7 +178,11 @@ async fn no_token_or_handle_is_stored_in_clear() -> Result<(), Box<dyn Error>> {
             .map(|link| link.handle.as_str())
             .collect::<Vec<_>>()
     );
-    for secret in [manifest, handle, token.as_str()] {
+    for (what, secret) in [
+        ("the manifest id", manifest),
+        ("the handle", handle),
+        ("the location token", token.as_str()),
+    ] {
         let found: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM ( \
                SELECT id_hash AS b, owner || record::text AS t FROM shl_link \
@@ -191,7 +195,7 @@ async fn no_token_or_handle_is_stored_in_clear() -> Result<(), Box<dyn Error>> {
         .bind(secret)
         .fetch_one(state.pool())
         .await?;
-        assert_eq!(0, found, "{secret} is stored in clear");
+        assert_eq!(0, found, "{what} is stored in clear");
     }
     Ok(())
 }
