@@ -114,7 +114,7 @@ the real run path; a binary-only crate cannot be imported from `tests/`
 - **Clinical content reaches neither a log line nor the identity store.** A
   handler logs the matched route, the status and identifiers. A resource body,
   a composition, and a CDR error body stay out of `tracing`, out of a `Debug`
-  rendering, and out of `redb`.
+  rendering, and out of the state store.
 - **A request path never panics.** No indexing, no slicing, no `unwrap`: every
   refusal is a typed `Refusal` that renders as an `OperationOutcome`.
 - **The handlers own HTTP; `facade::ingest` owns the write.** A handler checks

@@ -69,6 +69,7 @@ async fn the_facade_commits_a_condition_and_reads_it_back_from_a_real_cdr()
             language: String::from("en"),
             territory: String::from("GB"),
             ehr_status_system: None,
+            custodian: crate::facade::custodian(),
         },
     ));
 
@@ -149,6 +150,7 @@ async fn an_update_following_the_read_etag_commits_the_next_version_on_a_real_cd
             language: String::from("en"),
             territory: String::from("GB"),
             ehr_status_system: None,
+            custodian: crate::facade::custodian(),
         },
     ));
 
@@ -437,6 +439,7 @@ async fn the_facade_round_trips_the_kds_condition_through_a_real_cdr() -> Result
             language: String::from("de"),
             territory: String::from("DE"),
             ehr_status_system: None,
+            custodian: crate::facade::custodian(),
         },
     ));
     let input: serde_json::Value = serde_json::from_str(fixtures::KDS_DIAGNOSE_CONDITION)?;
@@ -590,6 +593,7 @@ async fn a_transaction_commits_once_and_reads_each_entry_back_from_a_real_cdr()
             language: String::from("en"),
             territory: String::from("GB"),
             ehr_status_system: None,
+            custodian: crate::facade::custodian(),
         },
     ));
     let codes = ["SYN-001", "SYN-002"];
