@@ -1181,7 +1181,7 @@ decides nothing.
 | `issuer` | none, required | The authorization server's issuer identifier, an `https` URL with no query or fragment (RFC 8414 §2), or plain `http` on a loopback host; a token's `iss` must equal it |
 | `kind` | none | `federation` for another party's issuer, whose tokens name its professionals or its organisation and which needs its `[auth.issuer.<name>.federation]` table; unset for a SMART App Launch 2.2 authorization server such as FerroSMART ([running behind FerroSMART](behind-ferrosmart.md)) |
 | `audience` | `[facade] base_url` | The audiences, a list, of which every token's `aud` must contain one (RFC 9068 §4); unset, the facade's base URL |
-| `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use; a symmetric `HS*` algorithm is refused and `none` is no algorithm |
+| `algorithms` | `["RS256", "RS384", "PS256", "PS384", "ES256", "ES384"]` | The signature algorithms a token may use, from `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `EdDSA`, `ML-DSA-44`, `ML-DSA-65` and `ML-DSA-87`; any other value, a symmetric `HS*` algorithm or `none` included, fails to parse |
 | `clock_skew` | `"1min"` | The leeway `exp`, `nbf` and `iat` are checked with, at most `300` |
 | `jwks_max_age` | `"10min"` | How long a key set is used before it is read again, so a key the issuer withdrew stops verifying |
 | `jwks_refresh_interval` | `"1min"` | The shortest time between two reads of the key set that a token naming an unknown `kid`, or a failed read, triggers |
