@@ -536,11 +536,15 @@ async fn a_record_classified_while_the_register_is_unreadable_names_the_revision
     outage("ALTER TABLE settings_register RENAME TO settings_register_away").await?;
     mount_ehr(&case.harness.cdr).await;
     mount_create(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
-    let create = || case.as_caller(post_condition(&condition()), "system/Condition.c");
-    assert_eq!(
-        StatusCode::CREATED,
-        raw(case.app(), create()).await?.status()
-    );
+    let response = raw(
+        case.app(),
+        case.as_caller(post_condition(&condition()), "system/Condition.c"),
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, response.status());
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
+    let body: serde_json::Value = serde_json::from_slice(&bytes)?;
+    let id = body["id"].as_str().ok_or("an id")?.to_owned();
     let during = case.records(1).await?;
     let record = during[0].to_string();
     assert!(
@@ -552,10 +556,10 @@ async fn a_record_classified_while_the_register_is_unreadable_names_the_revision
         "the record names the revision it was classified under: {record}"
     );
     outage("ALTER TABLE settings_register_away RENAME TO settings_register").await?;
-    assert_eq!(
-        StatusCode::CREATED,
-        raw(case.app(), create()).await?.status()
-    );
+    // A re-sent create replays from the CDR's copy, so the next access is a read.
+    mount_read(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
+    let read = case.as_caller(get(&format!("/fhir/Condition/{id}")), "system/Condition.r");
+    assert_eq!(StatusCode::OK, raw(case.app(), read).await?.status());
     let after = case.records(2).await?;
     assert!(
         after
