@@ -96,7 +96,7 @@ flowchart LR
         ENG_F["fhirconnect engine<br/>one program per profile and template"]
         ENG_O["omocl engine<br/>record graph per composition"]
         CORE["openehr-mapping-core<br/>header, loader, registry, paths, Web Template index"]
-        ID["Identity store (redb)<br/>FHIR ids, EHR ids, source ids"]
+        ID["Identity map (state store)<br/>FHIR ids, EHR ids, source ids"]
         ETL["ETL runner<br/>AQL stream, COPY, watermark"]
     end
     subgraph outside["Configured deployments, never compile-time dependencies"]
@@ -2220,7 +2220,7 @@ published `openehr-*` crates do.
 | `fhir-search` | the FHIR R4 search value grammar (#1718, search.html §3.1.1.4), shared by the facade and the family's FHIR servers (`ihe-atna`, `ihe-iti`): `escape`, `token`, `string`, `prefix` and `date`; a crate of its own because `fhir-types` is emitted whole by its generator under Apache-2.0 (no specification governs the home: our own design) | hand-written | yes |
 | `eehrxf` | the European interoperability software component of an EHR system under Regulation (EU) 2025/327 (Art 2(2)(n), Art 25(1)), moved here from FerroFED (#1314): `dataset` (the format-neutral dataset model read from the Xt-EHR EHDS Logical Information Models package), one feature per Art 14(1) category with its `crosswalk` to the HL7 Europe profiles, `fhir-r4` (the R4 serialisation: `document`, `medication`, `receive`, `terminology`, `transformation`, with no openEHR crate) and `openehr` (`mapping`, FHIRconnect contexts run in process through `fhirconnect`); full validation of a received document is `ferrobridge-validator`; it links no logging component and no application, so the two harmonised components stay independent (Art 2(2)(n) and (o)) | hand-written | yes |
 | `ferrobridge-operator-api` | the documents of the bridge's health and operator surfaces (#777): the build and lane information, readiness with its indicators, the engine state, the file listing and the load report, as serde types the server serializes and the operator console decodes; each diagnostic is the `openehr-mapping-core` `Diagnostic` in its own serde form | hand-written | yes (0.0.0 reservation) |
-| `app/ferrobridge-server` | the one binary, `ferrobridge`: `serve` (the FHIR facade, the FHIRconnect operations, the ETL job API), `etl` (a batch run), `cdm init` (apply the DDL), `vocab load`, `mapping check`; thin `main.rs` over a `lib.rs`; the `cdr` module over the generated ITS-REST client of `openehr-its` (the commit headers, the kept upstream answer, the ids an `ETag` names, the template fetch, the AQL paging); the `redb` identity store; the `hl7v2` face beside the FHIR facade (the `[hl7v2]` MLLP listener, each message written through the facade's ingest service, the acknowledgment chosen from the commit outcome); the change-feed adapter | hand-written | no |
+| `app/ferrobridge-server` | the one binary, `ferrobridge`: `serve` (the FHIR facade, the FHIRconnect operations, the ETL job API), `etl` (a batch run), `cdm init` (apply the DDL), `vocab load`, `mapping check`; thin `main.rs` over a `lib.rs`; the `cdr` module over the generated ITS-REST client of `openehr-its` (the commit headers, the kept upstream answer, the ids an `ETag` names, the template fetch, the AQL paging); the identity map in the state store; the `hl7v2` face beside the FHIR facade (the `[hl7v2]` MLLP listener, each message written through the facade's ingest service, the acknowledgment chosen from the commit outcome); the change-feed adapter | hand-written | no |
 | `tools/fhir-codegen` | the FHIR generator moved from the sibling, with its `emit --check` drift gate and its vendored packages | hand-written | no |
 | `tools/omop-cdm-codegen` | the CDM generator with its `emit --check` drift gate | hand-written | no |
 | `tools/ferrobridge-testkit` | the pin-matrix reader, fixtures, the synthetic vocabulary, the CDR and terminology stubs (`wiremock`), the container harness (`testcontainers`); a path-only dev-dependency | hand-written | no |
@@ -2382,7 +2382,7 @@ maintained serde YAML with anchors, aliases, merge keys and spans;
 `jsonschema` 0.61.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
 0.7.1, `reqwest` 0.13.5 with rustls, `backon` 1.6.0; `sqlx` 0.9.0 for checked
 queries and the state store, `tokio-postgres` 0.7.18 for binary `COPY`; `redb` 4.3.0 for the
-identity store; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
+stores that have not yet moved to the state store; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
 dates stay in their lexical form in `openehr-base`; FHIR primitives keep theirs
 in `fhir-types`); `sha2` 0.11.0; `insta`, `proptest`, `wiremock`,
 `testcontainers` 0.28.0 for tests. Consuming `openehr-its` with
@@ -2501,8 +2501,9 @@ draft upstream change.
   characters with no padding, inside the FHIR id grammar
   (`fhirconnect::engine::identity::deterministic_id`). `meta.versionId`
   carries the `version_tree_id`. A hash over the full version id would change
-  the FHIR id on every update and break the FHIR rule. The id map (`redb`)
-  records patient identifier to `ehr_id`, external to internal resource id,
+  the FHIR id on every update and break the FHIR rule. The id map (the
+  state store's `0003_baseline_identity.sql`, every identifier value stored
+  as an HMAC and the person of an EHR sealed) records patient identifier to `ehr_id`, external to internal resource id,
   internal resource id to composition uid and entry path, and source resource
   `id` and `meta.versionId` to the mapping that consumed them, so a `PUT`
   resolves, a re-sent Bundle is recognised, and a re-sent resource updates
@@ -3224,7 +3225,7 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Profile targets | HL7 Europe Base and Core, Laboratory, MPD in that order; EPS planned, imaging and discharge mapped over FerroBRIDGE's templates; authored here, never a conformance claim | R4 lines exist for every category; Laboratory has a published model map and an openEHR artefact; the legal pin does not exist (section 4.8) | waiting for the implementing act; pinning ballots |
 | FHIRPath release | the evaluator is FHIRPath N1 2.0.0 by default, so a function only a later release defines is an undefined-function error; the 13 functions FHIRPath 3.0.0 adds as STU that HL7's R4 suite exercises (`lowBoundary`, `highBoundary`, `precision`, `sort`, `matchesFull`, `comparable`, `trim`, `split`, `join`, `encode`, `decode`, `escape`, `unescape`) sit behind the opt-in `Environment::with_fhirpath_stu3_functions`; the suite's tests that call one of them are the `fhirpath-r4-stu3` corpus, with its own pass list and badge, and every other test is the `fhirpath-r4` corpus (#633) | FHIR R4 fhirpath.html §2.9 cites "FHIRPath (release 2)", N1 (<http://hl7.org/fhirpath/N1/>); each of the 13 is a section FHIRPath 3.0.0 marks Standard for Trial Use (<http://hl7.org/fhirpath/STU3/>); the opt-in widens only its own path, so the default pin is unchanged | widening the default to 3.0.0; leaving the 104 tests failing as undefined; reporting them out of scope |
 | Profile validation | `ferrobridge-validator` in this repository; profiles read at run time from FHIR packages into the generated R4 model; FHIRPath through `ferrobridge-fhirpath`; every unevaluated constraint named (section 4.9) | owner direction 2026-10-15; the model, element table, terminology client and FHIRPath evaluator live here; a profile set is per-deployment data | a validator per consumer; profiles generated into Rust; the HL7 FHIR Validator as a runtime dependency |
-| Tenancy | one bridge per tenant; one mapping tree and one identity store per configured CDR | a file tree has no row-level security; the retired connector's scoping was a database property | a tenant column in the identity store |
+| Tenancy | one bridge per tenant; one mapping tree and one state store per configured CDR | a file tree has no row-level security; the retired connector's scoping was a database property | a tenant column in the state store |
 | One binary or two | one binary with subcommands | PID 1 and `args:` in Kubernetes; half the attestation surface | a server and an ETL binary |
 | Crates | published, lockstep line, Trusted Publishing | owner decision 2026-09-05 | unpublished |
 | YAML parser | `serde-saphyr` 2.0.0 | anchors, aliases, merge keys, spans, maintained | `serde_yaml` (archived), `serde-yaml-ng`, `serde_yml` |

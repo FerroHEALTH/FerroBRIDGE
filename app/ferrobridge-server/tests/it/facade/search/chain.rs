@@ -68,6 +68,7 @@ async fn identifying(search: Option<IdentifierSearch>, bound_patient: bool) -> H
                 &PersonId::new(NAMESPACE, PATIENT).expect("a legal person key"),
                 &EhrId::new(EHR_ID).expect("a legal ehr_id"),
             )
+            .await
             .expect("the patient records");
     }
     Harness {
@@ -191,10 +192,13 @@ async fn an_identifier_two_parties_carry_matches_the_resources_of_both()
     // R4 search.html §3.1.1.4.10: a bare value matches "irrespective of the
     // value of the system property", and §3.1.1.4.15 answers every match.
     let harness = identifying(Some(by_value()), true).await;
-    harness.store.record_ehr(
-        &PersonId::new(NAMESPACE, &format!("Patient/{OTHER_PARTY}"))?,
-        &EhrId::new(OTHER_EHR)?,
-    )?;
+    harness
+        .store
+        .record_ehr(
+            &PersonId::new(NAMESPACE, &format!("Patient/{OTHER_PARTY}"))?,
+            &EhrId::new(OTHER_EHR)?,
+        )
+        .await?;
     mount_parties(
         &harness,
         &[PARTY, &format!("{OTHER_PARTY}::cdr.example.org::1")],

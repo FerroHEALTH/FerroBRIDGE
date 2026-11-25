@@ -99,7 +99,8 @@ pub async fn record(
     };
     let reach = Reach::default();
     let response = reach.clone().around(next.run(request)).await;
-    let record = recording.record(asked, &reach.reached(), response.status());
+    let reached = reach.reached();
+    let record = recording.record(asked, &reached, response.status()).await;
     match place.store(record).await {
         Ok(()) => response,
         Err(error) => {
@@ -225,7 +226,7 @@ fn accessor(caller: &Caller) -> Accessor {
 impl Recording {
     /// Returns the record of `asked`, which reached `reached` and was answered
     /// with `status`.
-    fn record(&self, asked: Pending, reached: &Reached, status: StatusCode) -> AccessRecord {
+    async fn record(&self, asked: Pending, reached: &Reached, status: StatusCode) -> AccessRecord {
         let action = action(asked.interaction, reached);
         let basis = match action {
             Action::Create | Action::Update | Action::Delete => Basis::Written,
@@ -251,6 +252,14 @@ impl Recording {
                 categories: None,
             }]
         };
+        let mut ehrs = Vec::with_capacity(reached.ehrs().len());
+        for ehr_id in reached.ehrs() {
+            ehrs.push(EhrAt {
+                endpoint: self.log.origin().to_owned(),
+                ehr_id: ehr_id.clone(),
+                patient: self.patient_of(ehr_id).await,
+            });
+        }
         let recorded = jiff::Timestamp::now();
         let keys = || origins.iter().filter_map(Origin::key);
         let retention = self.log.retention().retain(recorded, &categories, keys());
@@ -263,15 +272,7 @@ impl Recording {
             accessor: asked.accessor,
             subject: DataSubject {
                 patient: None,
-                ehrs: reached
-                    .ehrs()
-                    .iter()
-                    .map(|ehr_id| EhrAt {
-                        endpoint: self.log.origin().to_owned(),
-                        ehr_id: ehr_id.clone(),
-                        patient: self.patient_of(ehr_id),
-                    })
-                    .collect(),
+                ehrs,
                 population: None,
             },
             categories,
@@ -288,11 +289,11 @@ impl Recording {
     }
 
     /// Returns the patient the identity map binds to the EHR `ehr_id`.
-    fn patient_of(&self, ehr_id: &str) -> PatientLookup {
+    async fn patient_of(&self, ehr_id: &str) -> PatientLookup {
         let Ok(ehr) = EhrId::new(ehr_id) else {
             return PatientLookup::Unavailable;
         };
-        match self.facade.store().person_of(&ehr) {
+        match self.facade.store().person_of(&ehr).await {
             Ok(Some(person)) => PatientLookup::Found(vec![PatientIdentifier {
                 namespace: Some(person.namespace().to_owned()),
                 value: SecretString::from(person.id().to_owned()),

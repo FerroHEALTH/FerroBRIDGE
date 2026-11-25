@@ -72,8 +72,11 @@ async fn a_contribution_answer_naming_no_versions_for_the_entries_is_a_typed_fai
 
 /// Returns the container the identity map bound the entry `location` names
 /// to.
-fn bound_container(harness: &Harness, location: Option<&str>) -> Result<String, Box<dyn Error>> {
-    Ok(bound(harness, location)?.1.versioned_object_uid)
+async fn bound_container(
+    harness: &Harness,
+    location: Option<&str>,
+) -> Result<String, Box<dyn Error>> {
+    Ok(bound(harness, location).await?.1.versioned_object_uid)
 }
 
 #[tokio::test]
@@ -95,9 +98,10 @@ async fn a_reversed_version_list_still_binds_each_entry_to_its_own_composition()
     )
     .await?;
     assert_eq!(StatusCode::OK, status, "{body}");
-    let first_bound = bound_container(&harness, body["entry"][0]["response"]["location"].as_str())?;
+    let first_bound =
+        bound_container(&harness, body["entry"][0]["response"]["location"].as_str()).await?;
     let second_bound =
-        bound_container(&harness, body["entry"][1]["response"]["location"].as_str())?;
+        bound_container(&harness, body["entry"][1]["response"]["location"].as_str()).await?;
     let echoed_first = ECHOED.first().copied().ok_or("a first container")?;
     let echoed_second = ECHOED.get(1).copied().ok_or("a second container")?;
     assert_eq!(
@@ -138,7 +142,7 @@ async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(),
     );
     assert_eq!(
         None,
-        harness.store.consumed(&source)?,
+        harness.store.consumed(&source).await?,
         "an unverified binding records no consumed source"
     );
     Ok(())
@@ -178,7 +182,7 @@ async fn a_commit_answered_without_its_versions_binds_from_the_contribution_read
     assert_eq!(Some("W/\"1\""), response["etag"].as_str());
     assert_eq!(
         CONTAINER,
-        bound_container(&harness, response["location"].as_str())?
+        bound_container(&harness, response["location"].as_str()).await?
     );
     assert_eq!(
         1,
@@ -187,7 +191,13 @@ async fn a_commit_answered_without_its_versions_binds_from_the_contribution_read
             .await,
         "the versions are read back once"
     );
-    assert!(harness.store.consumed(&condition_source()?)?.is_some());
+    assert!(
+        harness
+            .store
+            .consumed(&condition_source()?)
+            .await?
+            .is_some()
+    );
     Ok(())
 }
 
@@ -220,10 +230,11 @@ async fn a_contribution_that_cannot_be_read_back_is_a_typed_failure_and_its_retr
         "the failure names the committed contribution: {body}"
     );
     let source = condition_source()?;
-    assert_eq!(None, harness.store.consumed(&source)?);
+    assert_eq!(None, harness.store.consumed(&source).await?);
     let committed = harness
         .store
-        .committed(&source)?
+        .committed(&source)
+        .await?
         .ok_or("the commit is recorded before the binding")?;
     assert_eq!(CONTRIBUTION, committed.contribution_uid);
 
@@ -233,7 +244,7 @@ async fn a_contribution_that_cannot_be_read_back_is_a_typed_failure_and_its_retr
     assert_eq!(Some("200 OK"), response["status"].as_str(), "{body}");
     assert_eq!(
         CONTAINER,
-        bound_container(&harness, response["location"].as_str())?
+        bound_container(&harness, response["location"].as_str()).await?
     );
     assert_eq!(
         1,
@@ -242,12 +253,12 @@ async fn a_contribution_that_cannot_be_read_back_is_a_typed_failure_and_its_retr
             .await,
         "the retry commits nothing"
     );
-    assert!(harness.store.consumed(&source)?.is_some());
+    assert!(harness.store.consumed(&source).await?.is_some());
     Ok(())
 }
 
 /// Returns the id and the binding of the entry `location` names.
-fn bound(
+async fn bound(
     harness: &Harness,
     location: Option<&str>,
 ) -> Result<
@@ -265,7 +276,8 @@ fn bound(
     let internal = ferrobridge_server::facade::identity::FhirResourceId::new(id)?;
     let binding = harness
         .store
-        .binding_of("Condition", &internal)?
+        .binding_of("Condition", &internal)
+        .await?
         .ok_or("the entry's binding is recorded")?;
     Ok((String::from(id), binding))
 }
@@ -284,7 +296,7 @@ async fn a_retry_binds_the_identity_the_cdr_stored_as_a_first_delivery_does()
     let (status, body) = post_transaction(&first, &bundle).await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     let (first_id, first_binding) =
-        bound(&first, body["entry"][0]["response"]["location"].as_str())?;
+        bound(&first, body["entry"][0]["response"]["location"].as_str()).await?;
 
     let retried = harness().await;
     mount_ehr(&retried.cdr).await;
@@ -305,7 +317,7 @@ async fn a_retry_binds_the_identity_the_cdr_stored_as_a_first_delivery_does()
     let (status, body) = post_transaction(&retried, &bundle).await?;
     assert_eq!(StatusCode::OK, status, "{body}");
     let (retried_id, retried_binding) =
-        bound(&retried, body["entry"][0]["response"]["location"].as_str())?;
+        bound(&retried, body["entry"][0]["response"]["location"].as_str()).await?;
 
     // NOTE: FHIRconnect v1.0.0 `engine/id-management.adoc` §Deterministic IDs, by
     // the owner's ruling on #1276: the id hashes the container and the entry path,
@@ -348,8 +360,8 @@ async fn a_single_create_of_a_committed_unbound_entry_binds_from_the_read_back_a
     .await?;
     assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
     let source = condition_source()?;
-    assert_eq!(None, harness.store.consumed(&source)?);
-    assert!(harness.store.committed(&source)?.is_some());
+    assert_eq!(None, harness.store.consumed(&source).await?);
+    assert!(harness.store.committed(&source).await?.is_some());
 
     let response = raw(harness.app(), post_condition(&condition())).await?;
     let status = response.status();
@@ -365,7 +377,10 @@ async fn a_single_create_of_a_committed_unbound_entry_binds_from_the_read_back_a
         "{}",
         String::from_utf8_lossy(&bytes)
     );
-    assert_eq!(CONTAINER, bound_container(&harness, location.as_deref())?);
+    assert_eq!(
+        CONTAINER,
+        bound_container(&harness, location.as_deref()).await?
+    );
     let rendered: serde_json::Value = serde_json::from_slice(&bytes)?;
     assert_eq!(Some("Condition"), rendered["resourceType"].as_str());
     assert_eq!(
@@ -382,7 +397,7 @@ async fn a_single_create_of_a_committed_unbound_entry_binds_from_the_read_back_a
             .await,
         "the single create commits nothing"
     );
-    assert!(harness.store.consumed(&source)?.is_some());
+    assert!(harness.store.consumed(&source).await?.is_some());
     Ok(())
 }
 
@@ -463,7 +478,8 @@ async fn a_transaction_entry_at_a_new_version_id_of_a_known_resource_commits_one
         Some(CONTAINER),
         harness
             .store
-            .consumed(&condition_source_at("2")?)?
+            .consumed(&condition_source_at("2")?)
+            .await?
             .as_ref()
             .map(|known| known.versioned_object_uid.as_str()),
         "the new version is recorded against the same composition"
@@ -507,9 +523,9 @@ async fn a_revising_transaction_entry_whose_binding_failed_binds_on_retry_and_co
     let (status, body) = post_transaction(&harness, &bundle).await?;
     assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
     let source = condition_source_at("2")?;
-    assert_eq!(None, harness.store.consumed(&source)?);
+    assert_eq!(None, harness.store.consumed(&source).await?);
     assert!(
-        harness.store.committed(&source)?.is_some(),
+        harness.store.committed(&source).await?.is_some(),
         "the commit is recorded before the binding"
     );
 
@@ -520,7 +536,7 @@ async fn a_revising_transaction_entry_whose_binding_failed_binds_on_retry_and_co
     assert_eq!(Some("W/\"2\""), response["etag"].as_str(), "{body}");
     assert_eq!(
         CONTAINER,
-        bound_container(&harness, response["location"].as_str())?
+        bound_container(&harness, response["location"].as_str()).await?
     );
     assert_eq!(
         2,
@@ -534,7 +550,8 @@ async fn a_revising_transaction_entry_whose_binding_failed_binds_on_retry_and_co
         Some(CONTAINER),
         harness
             .store
-            .consumed(&source)?
+            .consumed(&source)
+            .await?
             .as_ref()
             .map(|known| known.versioned_object_uid.as_str())
     );

@@ -46,6 +46,7 @@ async fn sectioned() -> Harness {
     harness
         .store
         .record_ehr(&person, &EhrId::new(EHR_ID).expect("a legal ehr_id"))
+        .await
         .expect("the subject records");
     harness
 }
@@ -119,7 +120,8 @@ async fn each_diagnosis_inside_a_section_searches_reads_and_binds_as_its_own_res
     for id in &ids {
         let binding = harness
             .store
-            .binding_of("Condition", &FhirResourceId::new(id)?)?
+            .binding_of("Condition", &FhirResourceId::new(id)?)
+            .await?
             .ok_or("the diagnosis is bound")?;
         // NOTE: openEHR BASE Release 1.2.0, Paths and Locators: the path parses
         // back and names the diagnosis inside the section.

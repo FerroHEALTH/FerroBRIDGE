@@ -103,6 +103,7 @@ impl Ingest<'_> {
         let exact = self
             .store
             .consumed(&source)
+            .await
             .map_err(|error| store_refusal(&error))?;
         let known = if let Some(known) = exact {
             if source.version_id().is_some() {
@@ -112,7 +113,10 @@ impl Ingest<'_> {
                     .map_err(|error| engine_refusal(&error))?
                     .composition;
                 let standing = self.standing(&known).await?;
-                let written = match self.standing_entry(program, inbound, &standing, &built)? {
+                let written = match self
+                    .standing_entry(program, inbound, &standing, &built)
+                    .await?
+                {
                     Some((whole, entry)) => standing.replayed(entry.isolate(&whole)),
                     None => standing.written(&built)?,
                 };
@@ -123,6 +127,7 @@ impl Ingest<'_> {
             if self
                 .store
                 .committed(&source)
+                .await
                 .map_err(|error| store_refusal(&error))?
                 .is_some()
             {
@@ -131,6 +136,7 @@ impl Ingest<'_> {
             let versions = self
                 .store
                 .consumed_versions(&source)
+                .await
                 .map_err(|error| store_refusal(&error))?;
             let Some(known) = one_composition(&source, &versions)? else {
                 return Ok(Recognised::Unknown);
@@ -152,7 +158,10 @@ impl Ingest<'_> {
             .map_err(|error| engine_refusal(&error))?;
         let sent = strict_read(&built)?;
         let standing = self.standing(&known).await?;
-        let Some((whole, entry)) = self.standing_entry(program, inbound, &standing, &built)? else {
+        let Some((whole, entry)) = self
+            .standing_entry(program, inbound, &standing, &built)
+            .await?
+        else {
             return Ok(Recognised::Revised(known));
         };
         let Some(committed) = would_commit(program, &whole, &entry, &built, sent)? else {
@@ -169,7 +178,7 @@ impl Ingest<'_> {
     /// Returns the standing composition, canonical, with the entry the
     /// consumed resource is bound to, or nothing when the composition no
     /// longer holds that entry.
-    fn standing_entry(
+    async fn standing_entry(
         &self,
         program: &Loaded,
         inbound: &Inbound,
@@ -179,6 +188,7 @@ impl Ingest<'_> {
         let binding = self
             .store
             .binding_of(inbound.resource_type(), &standing.id)
+            .await
             .map_err(|error| store_refusal(&error))?
             .ok_or_else(|| {
                 Refused::new(
@@ -348,6 +358,7 @@ impl Ingest<'_> {
             }
         };
         self.record(program, inbound, ehr_id, &version, &stored)
+            .await
     }
 
     /// Commits a later version of the composition `revision` names, in which
@@ -482,6 +493,7 @@ impl Ingest<'_> {
             &stored,
             revision.entry_path,
         )
+        .await
     }
 }
 
