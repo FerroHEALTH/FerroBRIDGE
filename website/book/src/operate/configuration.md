@@ -1373,7 +1373,6 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the lane delivers |
 | `reader` | none, required | The reader name the lane follows the change feed under, another than `[events] reader` and `[omop_incremental] reader`: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `emitted` | none, required | The `redb` file the record of what was delivered for each composition is kept in, identifiers only |
 | `endpoint.url` | none, required | The FHIR service base each Bundle is posted to, `https` without a query or a fragment, never the facade's own `base_url` |
 | `endpoint.timeout` | `"30s"` | How long one delivery may take |
 | `endpoint.connect_timeout` | unset | How long opening the connection may take; unset, only `timeout` bounds it |

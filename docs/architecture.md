@@ -2378,7 +2378,11 @@ area on the store (`0006`): the watermarks of the AQL source, the dead
 letters with the operator's settlement (who decided, retry or discard, and
 why) and the poisoned-pass counts, every follower write fenced by its
 reader's lease; the reference CDR's feed keeps its cursor in the CDR and
-takes only the lease. The inbound sources (`0008`)
+takes only the lease. The outbound lane (`0007`) stages what each accepted
+delivery stands at and writes `outbound_delivered` in the transaction that
+moves its watermark, so with idempotent `PUT` and `DELETE` entries
+(<https://hl7.org/fhir/R4/http.html#transaction>) and one leader per lane
+each effect lands once at the endpoint. The inbound sources (`0008`)
 are versioned rows: one write validates the kind's document, appends the
 version with its committer, derives the tenants and MLLP routes and
 notifies `ferrobridge_sources`, and each replica reloads the named source

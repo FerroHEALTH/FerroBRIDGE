@@ -84,13 +84,6 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             value: base.to_string(),
         });
     }
-    let emitted = section.emitted.clone().ok_or(Error::Missing {
-        key: String::from("fhir_outbound.emitted"),
-    })?;
     let sink = Sink::new(client);
-    Ok(Some(Settings {
-        reader,
-        sink,
-        emitted,
-    }))
+    Ok(Some(Settings { reader, sink }))
 }
