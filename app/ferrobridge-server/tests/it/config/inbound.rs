@@ -43,13 +43,14 @@ fn an_intake_takes_its_defaults() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(Duration::from_secs(600), inbound.workers.policy.max_backoff);
     assert_eq!(10, inbound.workers.policy.max_attempts);
     assert_eq!(Duration::from_secs(5), inbound.workers.idle);
+    assert_eq!(Duration::from_secs(30), inbound.recovery_tick);
     Ok(())
 }
 
 #[test]
 fn every_key_is_read() -> Result<(), Box<dyn std::error::Error>> {
     let inbound = resolve(&with_inbound(
-        "body_limit = 2048\nworkers = 2\nlease = \"30s\"\nbackoff = \"1s\"\nmax_backoff = \"10s\"\nmax_attempts = 3\nidle = \"1s\"\n",
+        "body_limit = 2048\nworkers = 2\nlease = \"30s\"\nbackoff = \"1s\"\nmax_backoff = \"10s\"\nmax_attempts = 3\nidle = \"1s\"\nrecovery_tick = \"10s\"\n",
     ))?
     .inbound
     .ok_or("the intake is on")?;
@@ -60,6 +61,7 @@ fn every_key_is_read() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(Duration::from_secs(10), inbound.workers.policy.max_backoff);
     assert_eq!(3, inbound.workers.policy.max_attempts);
     assert_eq!(Duration::from_secs(1), inbound.workers.idle);
+    assert_eq!(Duration::from_secs(10), inbound.recovery_tick);
     Ok(())
 }
 
@@ -92,6 +94,7 @@ fn a_zero_bound_and_a_backoff_above_its_cap_are_refused() {
         ("body_limit = 0\n", "inbound.body_limit"),
         ("max_attempts = 0\n", "inbound.max_attempts"),
         ("lease = \"0s\"\n", "inbound.lease"),
+        ("recovery_tick = \"0s\"\n", "inbound.recovery_tick"),
     ] {
         assert!(
             matches!(resolve(&with_inbound(rest)), Err(Error::Zero { key }) if key == refused),

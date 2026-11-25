@@ -173,6 +173,11 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
             crate::inbound::store::InboxStore::new(store.pool().clone()),
             inbound.body_limit,
         )
+        .with_recoverer(Arc::new(crate::inbound::recover::Recoverer::new(
+            store.clone(),
+            Arc::clone(&sources),
+            inbound.workers.lease,
+        )))
     });
     let state = state.with_sources(sources);
     Ok(match intake {
@@ -217,6 +222,24 @@ impl StartedFeed {
             .await;
         })
     }
+}
+
+/// Spawns every change-feed follower and the inbound recovery of `state`,
+/// each on its own task until `stop` reads `true`.
+pub(crate) fn spawn_followers(
+    feeds: Vec<StartedFeed>,
+    state: &AppState,
+    settings: &Settings,
+    stop: &tokio::sync::watch::Sender<bool>,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let (Some(recoverer), Some(inbound)) = (
+        state.intake().and_then(|intake| intake.recoverer()),
+        settings.inbound,
+    ) {
+        followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    followers
 }
 
 /// Opens the change-feed source and its dead-letter store once, and starts

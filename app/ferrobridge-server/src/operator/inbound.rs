@@ -23,8 +23,10 @@ use uuid::Uuid;
 use super::guard;
 use super::save::subject_of;
 use crate::inbound::intake::Intake;
+use crate::inbound::recover::Recoverer;
 use crate::inbound::store::{self, WorkKey};
 use crate::problem::{Kind, refuse};
+use crate::sources::Source;
 
 /// The intake a request reads and writes, `None` while `[inbound]` is off.
 type Held = State<Option<Arc<Intake>>>;
@@ -35,6 +37,8 @@ pub fn routes(intake: Option<Arc<Intake>>, smart: &crate::smart::Smart) -> Route
         .route("/operator/sources/{id}/parked", get(parked))
         .route("/operator/sources/{id}/settle", post(settle))
         .route("/operator/sources/{id}/replay", post(replay))
+        .route("/operator/sources/{id}/reconcile", post(reconcile))
+        .route("/operator/sources/{id}/redeliver", post(redeliver))
         .with_state(intake)
         .route_layer(guard::layer(smart))
 }
@@ -65,6 +69,79 @@ async fn source(
 
 /// The detail of a store that failed.
 const UNAVAILABLE: &str = "the inbox could not be read or written";
+
+/// Returns the source `id` names and its recovery, or the refusal.
+async fn recovering(
+    intake: Option<&Arc<Intake>>,
+    id: &str,
+) -> Result<(Arc<Recoverer>, Arc<Source>), (Kind, &'static str)> {
+    let (intake, id) = source(intake, id).await?;
+    let recoverer = intake
+        .recoverer()
+        .cloned()
+        .ok_or((Kind::NotFound, NO_INTAKE))?;
+    match intake.sources().get(id).await {
+        Ok(Some(found)) => Ok((recoverer, found)),
+        Ok(None) => Err((Kind::NotFound, NO_SOURCE)),
+        Err(error) => {
+            tracing::warn!(%error, "the inbound sources could not be read");
+            Err((Kind::InboundUnavailable, UNAVAILABLE))
+        }
+    }
+}
+
+/// The `502` detail of a recovery call that failed.
+const FAILED: &str = "the source refused or failed the recovery call";
+
+/// `POST /operator/sources/{id}/reconcile`: runs every poll of the source
+/// now under its recovery lease; `202` with the items marked, `409` while
+/// another replica holds the lease.
+async fn reconcile(State(intake): Held, Path(id): Path<String>) -> Response {
+    let (recoverer, source) = match recovering(intake.as_ref(), &id).await {
+        Ok(found) => found,
+        Err((kind, detail)) => return refuse(kind, detail),
+    };
+    let Ok(lease) = recoverer.lease_of(source.id) else {
+        return refuse(Kind::InboundUnavailable, UNAVAILABLE);
+    };
+    let generation = match lease.claim().await {
+        Ok(Some(generation)) => generation,
+        Ok(None) => {
+            return refuse(
+                Kind::RecoveryLeased,
+                "another replica runs this source's recovery",
+            );
+        }
+        Err(error) => {
+            tracing::warn!(%error, "the recovery lease could not be taken");
+            return refuse(Kind::InboundUnavailable, UNAVAILABLE);
+        }
+    };
+    match recoverer.reconcile(&source, &lease, generation, true).await {
+        Ok(items) => (StatusCode::ACCEPTED, axum::Json(Replayed { items })).into_response(),
+        Err(error) => {
+            tracing::warn!(%error, source = %source.name, "a reconciliation an operator asked for failed");
+            refuse(Kind::RecoveryFailed, FAILED)
+        }
+    }
+}
+
+/// `POST /operator/sources/{id}/redeliver`: calls the source's redelivery
+/// step now; `204` once the source accepted it.
+async fn redeliver(State(intake): Held, Path(id): Path<String>) -> Response {
+    let (recoverer, source) = match recovering(intake.as_ref(), &id).await {
+        Ok(found) => found,
+        Err((kind, detail)) => return refuse(kind, detail),
+    };
+    match recoverer.redeliver(&source).await {
+        Ok(true) => StatusCode::NO_CONTENT.into_response(),
+        Ok(false) => refuse(Kind::NotFound, "the source declares no redelivery step"),
+        Err(error) => {
+            tracing::warn!(%error, source = %source.name, "a redelivery an operator asked for failed");
+            refuse(Kind::RecoveryFailed, FAILED)
+        }
+    }
+}
 
 /// `GET /operator/sources/{id}/parked`.
 async fn parked(State(intake): Held, Path(id): Path<String>) -> Response {

@@ -12,6 +12,7 @@
 
 pub mod event;
 pub mod intake;
+pub mod recover;
 pub mod retry;
 pub mod store;
 pub mod verify;
@@ -24,4 +25,6 @@ pub struct Settings {
     pub body_limit: usize,
     /// How the workers run.
     pub workers: worker::Settings,
+    /// How often each replica looks for a source whose recovery is due.
+    pub recovery_tick: std::time::Duration,
 }

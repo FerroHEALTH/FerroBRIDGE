@@ -179,7 +179,6 @@ impl InboxStore {
         tenant: &str,
         event: &Event,
     ) -> Result<Accepted, sqlx::Error> {
-        let change = change_text(event.change);
         let mut tx = self.pool.begin().await?;
         let inserted: Option<Uuid> = sqlx::query_scalar(
             "INSERT INTO inbound_event (source_id, dedupe_key, tenant, entity_key, change, stamp) \
@@ -190,7 +189,7 @@ impl InboxStore {
         .bind(event.dedupe_key.as_bytes().as_slice())
         .bind(tenant)
         .bind(&event.entity)
-        .bind(change)
+        .bind(change_text(event.change))
         .bind(event.stamp.as_deref())
         .fetch_optional(&mut *tx)
         .await?;
@@ -198,24 +197,14 @@ impl InboxStore {
             tx.commit().await?;
             return Ok(Accepted::Repeated);
         }
-        sqlx::query(
-            "INSERT INTO inbound_work (source_id, tenant, entity_key, generation, change, state) \
-             VALUES ($1, $2, $3, 1, $4, 'pending') \
-             ON CONFLICT (source_id, tenant, entity_key) DO UPDATE SET \
-               generation = inbound_work.generation + 1, \
-               change = EXCLUDED.change, \
-               state = CASE WHEN inbound_work.state = 'running' THEN 'running' ELSE 'pending' END, \
-               attempts = CASE WHEN inbound_work.state = 'running' THEN inbound_work.attempts ELSE 0 END, \
-               next_at = CASE WHEN inbound_work.state = 'running' THEN inbound_work.next_at ELSE now() END, \
-               updated_at = now()",
+        bump(
+            &mut tx,
+            source_id,
+            tenant,
+            std::slice::from_ref(&event.entity),
+            event.change,
         )
-        .bind(source_id)
-        .bind(tenant)
-        .bind(&event.entity)
-        .bind(change)
-        .execute(&mut *tx)
         .await?;
-        notify(&mut tx, source_id).await?;
         tx.commit().await?;
         Ok(Accepted::Stored)
     }
@@ -507,6 +496,144 @@ impl InboxStore {
         tx.commit().await?;
         Ok(replayed)
     }
+}
+
+/// Why a cursor did not move.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum CursorError {
+    /// Another replica leads the source's recovery since the cursor was
+    /// read.
+    #[error("the recovery lease moved on")]
+    Fenced(#[source] crate::store::lease::LeaseError),
+    /// A statement failed.
+    #[error("the cursor statement failed")]
+    Database(#[from] sqlx::Error),
+}
+
+impl InboxStore {
+    /// Returns the cursor of poll `poll` of `source_id` for `tenant` and when
+    /// it last moved, `None` before its first poll.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the statement fails.
+    pub async fn cursor(
+        &self,
+        source_id: Uuid,
+        tenant: &str,
+        poll: i32,
+    ) -> Result<Option<(jiff::Timestamp, jiff::Timestamp)>, sqlx::Error> {
+        let row: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT (extract(epoch FROM cursor) * 1000000)::bigint, \
+               (extract(epoch FROM polled_at) * 1000000)::bigint \
+             FROM inbound_cursor WHERE source_id = $1 AND tenant = $2 AND poll = $3",
+        )
+        .bind(source_id)
+        .bind(tenant)
+        .bind(poll)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|(cursor, polled_at)| {
+            // NOTE: our own design; an instant outside the jiff range is no cursor, so the poll reads from its first window.
+            Some((
+                jiff::Timestamp::from_microsecond(cursor).ok()?,
+                jiff::Timestamp::from_microsecond(polled_at).ok()?,
+            ))
+        }))
+    }
+
+    /// Moves the cursor of poll `poll` of `source_id` for `tenant` to `next`,
+    /// refused unless `generation` still holds `lease`.
+    ///
+    /// # Errors
+    /// Returns [`CursorError::Fenced`] when another replica took the lease,
+    /// and [`CursorError::Database`] when a statement fails.
+    pub async fn move_cursor(
+        &self,
+        lease: &crate::store::lease::Lease,
+        generation: crate::store::lease::Generation,
+        source_id: Uuid,
+        tenant: &str,
+        poll: i32,
+        next: jiff::Timestamp,
+    ) -> Result<(), CursorError> {
+        let mut tx = self.pool.begin().await?;
+        lease
+            .fence(&mut tx, generation)
+            .await
+            .map_err(|error| match error {
+                crate::store::lease::LeaseError::Database(error) => CursorError::Database(error),
+                other => CursorError::Fenced(other),
+            })?;
+        sqlx::query(
+            "INSERT INTO inbound_cursor (source_id, tenant, poll, cursor, polled_at) \
+             VALUES ($1, $2, $3, $4::timestamptz, now()) \
+             ON CONFLICT (source_id, tenant, poll) DO UPDATE \
+             SET cursor = EXCLUDED.cursor, polled_at = now()",
+        )
+        .bind(source_id)
+        .bind(tenant)
+        .bind(poll)
+        .bind(next.to_string())
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Marks the work items of `entities` of `source_id` and `tenant` due
+    /// with `change`, each at a new generation; returns how many.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when a statement fails.
+    pub async fn mark(
+        &self,
+        source_id: Uuid,
+        tenant: &str,
+        entities: &[String],
+        change: Change,
+    ) -> Result<u64, sqlx::Error> {
+        if entities.is_empty() {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await?;
+        let marked = bump(&mut tx, source_id, tenant, entities, change).await?;
+        tx.commit().await?;
+        Ok(marked)
+    }
+}
+
+/// Moves the work items of `entities` of `source_id` and `tenant` to a new
+/// generation due with `change`, inserting the missing ones, and notifies
+/// [`CHANNEL`] when `tx` commits; a running item keeps running and reruns
+/// when its worker gives it back.
+async fn bump(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    source_id: Uuid,
+    tenant: &str,
+    entities: &[String],
+    change: Change,
+) -> Result<u64, sqlx::Error> {
+    let bumped = sqlx::query(
+            "INSERT INTO inbound_work (source_id, tenant, entity_key, generation, change, state) \
+             SELECT $1, $2, entity, 1, $4, 'pending' FROM unnest($3::text[]) AS entity \
+             ON CONFLICT (source_id, tenant, entity_key) DO UPDATE SET \
+               generation = inbound_work.generation + 1, \
+               change = EXCLUDED.change, \
+               state = CASE WHEN inbound_work.state = 'running' THEN 'running' ELSE 'pending' END, \
+               attempts = CASE WHEN inbound_work.state = 'running' THEN inbound_work.attempts ELSE 0 END, \
+               next_at = CASE WHEN inbound_work.state = 'running' THEN inbound_work.next_at ELSE now() END, \
+               updated_at = now()",
+    )
+    .bind(source_id)
+    .bind(tenant)
+    .bind(entities)
+    .bind(change_text(change))
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    notify(tx, source_id).await?;
+    Ok(bumped)
 }
 
 /// Notifies [`CHANNEL`] that `source_id` has due work when `tx` commits.

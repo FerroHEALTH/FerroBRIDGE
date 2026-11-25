@@ -281,11 +281,7 @@ where
         }
         Err(error) => return Err(error),
     };
-    let followers: Vec<_> = started
-        .feeds
-        .into_iter()
-        .map(|feed| feed.spawn(&stop))
-        .collect();
+    let followers = crate::lanes::spawn_followers(started.feeds, &started.state, settings, &stop);
     let state = Arc::new(started.state.with_lanes(started.lanes));
     let delivery = state.access_log().map(|log| log.spawn());
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());

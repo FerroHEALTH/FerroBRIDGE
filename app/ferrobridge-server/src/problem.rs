@@ -81,13 +81,17 @@ pub enum Kind {
     InboundBusy,
     /// `503`: the inbox could not be read or written.
     InboundUnavailable,
+    /// `409`: another replica runs the source's recovery.
+    RecoveryLeased,
+    /// `502`: the source refused or failed a recovery call.
+    RecoveryFailed,
     /// `503`: the access token could not be checked.
     AuthorizationUnavailable,
 }
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 29] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
@@ -114,6 +118,8 @@ impl Kind {
         Self::NotParked,
         Self::InboundBusy,
         Self::InboundUnavailable,
+        Self::RecoveryLeased,
+        Self::RecoveryFailed,
         Self::AuthorizationUnavailable,
     ];
 
@@ -252,6 +258,16 @@ impl Kind {
                 "inbound-unavailable",
                 "The inbox could not be read or written",
                 StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::RecoveryLeased => (
+                "recovery-leased",
+                "Another replica runs the source's recovery",
+                StatusCode::CONFLICT,
+            ),
+            Self::RecoveryFailed => (
+                "recovery-failed",
+                "The source refused or failed the recovery call",
+                StatusCode::BAD_GATEWAY,
             ),
             Self::AuthorizationUnavailable => (
                 "authorization-unavailable",

@@ -9,7 +9,8 @@
 -- patient cost one fetch; every accepted event moves its generation on, and
 -- a worker finishing at an older generation leaves the item pending.
 -- inbound_slot bounds the remote calls in flight per source and tenant
--- across every replica. An accepted event notifies ferrobridge_inbound.
+-- across every replica. inbound_cursor holds where each reconciliation poll
+-- reads from. An accepted event notifies ferrobridge_inbound.
 --
 -- No specification governs an inbound intake: our own design.
 
@@ -83,3 +84,16 @@ CREATE TABLE inbound_slot (
 );
 
 COMMENT ON TABLE inbound_slot IS 'The remote calls in flight per inbound source and tenant across every replica, one leased row per call. Our own design.';
+
+CREATE TABLE inbound_cursor (
+    source_id uuid REFERENCES inbound_source ON DELETE CASCADE,
+    tenant text,
+    -- The poll's place in the source's reconcile list.
+    poll integer CONSTRAINT inbound_cursor_poll_check CHECK (poll >= 0),
+    -- The instant the next poll reads changes since.
+    cursor timestamptz NOT NULL,
+    polled_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (source_id, tenant, poll)
+);
+
+COMMENT ON TABLE inbound_cursor IS 'The since-cursor of each reconciliation poll per inbound source and tenant, moved only under the lease generation of the source''s recovery lane. Our own design.';

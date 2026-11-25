@@ -6,7 +6,8 @@
 //! store.
 
 mod event;
-mod intake;
+pub(crate) mod intake;
+mod recover;
 mod retry;
 pub(crate) mod store;
 mod verify;

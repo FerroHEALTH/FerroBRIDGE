@@ -25,11 +25,12 @@ use ferrohealth_server::tls::PeerCertificates;
 use secrecy::ExposeSecret as _;
 
 use super::event::{Event, Reading};
+use super::recover::{Recoverer, Unavailable};
 use super::store::InboxStore;
 use super::verify::{Key, Request};
 use crate::problem::{Kind, blank, refuse};
-use crate::sources::Sources;
 use crate::sources::document::{Document, Webhook};
+use crate::sources::{Source, Sources};
 
 /// The intake one replica serves.
 #[derive(Debug)]
@@ -40,6 +41,10 @@ pub struct Intake {
     store: InboxStore,
     /// The largest body any source may send, in bytes.
     body_limit: usize,
+    /// The recovery steps, which a run of `503` answers calls for.
+    recoverer: Option<Arc<Recoverer>>,
+    /// The consecutive `503` answers per source.
+    unavailable: Unavailable,
 }
 
 impl Intake {
@@ -51,7 +56,23 @@ impl Intake {
             sources,
             store,
             body_limit,
+            recoverer: None,
+            unavailable: Unavailable::new(),
         }
+    }
+
+    /// Returns this intake calling the redelivery steps of `recoverer`
+    /// after a run of `503` answers.
+    #[must_use]
+    pub fn with_recoverer(mut self, recoverer: Arc<Recoverer>) -> Self {
+        self.recoverer = Some(recoverer);
+        self
+    }
+
+    /// Returns the recovery steps, when they run.
+    #[must_use]
+    pub const fn recoverer(&self) -> Option<&Arc<Recoverer>> {
+        self.recoverer.as_ref()
     }
 
     /// Returns the inbox.
@@ -164,6 +185,7 @@ async fn receive(
     };
     match intake.store.pending(source.id).await {
         Ok(pending) if pending >= webhook.limits.max_pending => {
+            intake.unavailable.refused(source.id);
             return unavailable(
                 Kind::InboundBusy,
                 "the source has as much pending work as it may",
@@ -172,16 +194,42 @@ async fn receive(
         Ok(_) => {}
         Err(error) => {
             tracing::warn!(%error, source = %source.name, "the inbox could not be read");
+            intake.unavailable.refused(source.id);
             return unavailable(Kind::InboundUnavailable, "the inbox could not be read");
         }
     }
     match intake.store.accept(source.id, tenant, &event).await {
-        Ok(_) => StatusCode::OK.into_response(),
+        Ok(_) => {
+            redeliver_after_outage(&intake, &source, webhook);
+            StatusCode::OK.into_response()
+        }
         Err(error) => {
             tracing::warn!(%error, source = %source.name, "an inbound event could not be stored");
+            intake.unavailable.refused(source.id);
             unavailable(Kind::InboundUnavailable, "the event could not be stored")
         }
     }
+}
+
+/// Calls the redelivery step of `source` on its own task when this accepted
+/// event ends a run of `503` answers as long as the step asks for.
+fn redeliver_after_outage(intake: &Arc<Intake>, source: &Arc<Source>, webhook: &Webhook) {
+    let Some(redeliver) = webhook.recovery.redeliver.as_ref() else {
+        return;
+    };
+    let after = redeliver.after_unavailable.unwrap_or(1);
+    if !intake.unavailable.accepted(source.id, after) {
+        return;
+    }
+    let Some(recoverer) = intake.recoverer.clone() else {
+        return;
+    };
+    let source = Arc::clone(source);
+    drop(tokio::spawn(async move {
+        if let Err(error) = recoverer.redeliver(&source).await {
+            tracing::warn!(%error, source = %source.name, "the redelivery after an outage failed");
+        }
+    }));
 }
 
 /// Returns the tenant `event` is stored under, `None` when the source serves

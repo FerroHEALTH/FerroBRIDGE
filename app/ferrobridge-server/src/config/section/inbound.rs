@@ -31,6 +31,8 @@ pub struct Inbound {
     /// How long an idle worker waits for a notification before it looks for
     /// due work again.
     pub idle: Duration,
+    /// How often each replica looks for a source whose recovery is due.
+    pub recovery_tick: Duration,
 }
 
 impl Default for Inbound {
@@ -44,6 +46,7 @@ impl Default for Inbound {
             max_backoff: Duration::from_secs(600),
             max_attempts: 10,
             idle: Duration::from_secs(5),
+            recovery_tick: Duration::from_secs(30),
         }
     }
 }

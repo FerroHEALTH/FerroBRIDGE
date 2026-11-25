@@ -68,6 +68,9 @@ pub struct Webhook {
     /// The bounds of what the source may send and the engine may do.
     #[serde(default)]
     pub limits: Limits,
+    /// The recovery steps: redelivery and reconciliation.
+    #[serde(default)]
+    pub recovery: crate::inbound::recover::Recovery,
 }
 
 /// The bounds of one webhook source.
@@ -217,6 +220,7 @@ impl Document {
                 .iter()
                 .map(|key| key.secret.as_str())
                 .chain(tenants(&webhook.tenants))
+                .chain(webhook.recovery.secrets())
                 .collect(),
             Self::FhirSubscription(subscription) => subscription
                 .header
@@ -320,6 +324,7 @@ impl Webhook {
                 return Err(Invalid(format!("{pointer} is no JSON Pointer")));
             }
         }
+        self.recovery.check().map_err(Invalid)?;
         if self.limits.body_limit == 0
             || self.limits.concurrency == 0
             || self.limits.max_pending == 0

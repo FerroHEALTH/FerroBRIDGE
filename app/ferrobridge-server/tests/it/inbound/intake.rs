@@ -53,18 +53,19 @@ fn post(source: &str, body: Vec<u8>, signature: &str) -> Result<Request<Body>, h
         .body(Body::from(body))
 }
 
+/// Returns `product` in the shipped stack.
+pub(crate) fn app_with(product: axum::Router) -> axum::Router {
+    with_middleware(product, support::state(), &support::settings())
+}
+
 /// The intake over `sources` and the store behind `pool`, in the shipped
 /// stack.
 fn app(sources: Arc<Sources>, pool: sqlx::postgres::PgPool) -> axum::Router {
-    with_middleware(
-        routes(Arc::new(Intake::new(
-            sources,
-            InboxStore::new(pool),
-            1024 * 1024,
-        ))),
-        support::state(),
-        &support::settings(),
-    )
+    app_with(routes(Arc::new(Intake::new(
+        sources,
+        InboxStore::new(pool),
+        1024 * 1024,
+    ))))
 }
 
 #[tokio::test]

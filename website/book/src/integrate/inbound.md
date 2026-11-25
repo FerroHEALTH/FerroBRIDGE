@@ -93,3 +93,29 @@ settles it:
 - `POST /operator/sources/{id}/replay` with `tenant` and `entity`, or with
   `from` and `to` (RFC 3339, the last exclusive), runs the work of one entity,
   or of every entity an event received in that range named, again.
+
+## Recover what an outage lost
+
+A webhook source may retry nothing on its own, so the receiver recovers. A
+source declares two steps under `recovery` in its document, and one replica
+runs them per source under the lane lease `inbound-recover:<source id>`:
+
+- `redeliver` (`method`, `url`, optional `credentials`, a secret holding the
+  PEM client certificate and key, and `after_unavailable`, one when left
+  out) asks the source to send its failed events again. It runs when a
+  replica first leads the source, and when an accepted event ends a run of
+  at least `after_unavailable` `503` answers.
+- `reconcile` (`every`, `overlap`, `first`, in seconds, and `polls`) reads
+  what changed since a cursor, per enabled tenant with the tenant's
+  `credentials`. Each poll names its `url`, the `cursor` query parameter the
+  RFC 3339 instant travels in, the `items` pointer to the array of changed
+  entities, the `entity` pointer within one item, and the `change` it marks
+  (`upsert` or `remove`). Every returned entity's work item is due again at
+  a new generation. A tenant's first poll reads from `first` seconds back;
+  each next cursor is the instant the poll started, less `overlap`. A
+  cursor moves only under the lease generation that read it, so a former
+  leader paused past its lease cannot move it.
+
+Each replica looks for due recovery every `[inbound] recovery_tick`.
+`POST /operator/sources/{id}/reconcile` runs every poll at once, and
+`POST /operator/sources/{id}/redeliver` calls the redelivery step.

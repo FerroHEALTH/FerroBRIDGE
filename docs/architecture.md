@@ -2417,6 +2417,14 @@ after `backoff·2^(n-1)`, capped at `max_backoff`, with jitter, until
 that names no value. An operator settles a parked item (retry or discard,
 recorded with the token's subject and the reason) and replays work by
 entity or by received range through `/operator/sources/{id}/…`.
+Recovery is the receiver's job for a webhook source that retries nothing on
+its own: a source declares a `redeliver` call, made when a replica first
+leads the source and after a run of `503` answers, and `reconcile` polls
+that read the entities changed since a cursor per tenant and mark each one
+due. One replica runs a source's recovery under the lane lease
+`inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
+a transaction that fences the generation that read it. The schedule is our
+own design, since no specification governs it.
 
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in

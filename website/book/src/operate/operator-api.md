@@ -387,7 +387,7 @@ A source carries a `name` (`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, at most
 
 | Kind | Document |
 |---|---|
-| `webhook` | `verify`: the verifier, by `kind` (`hmac` with `algorithm`, `header`, `encoding` and `prefix`; `standard-webhooks` with `schemes`, `tolerance` and `endpoint_id`; `static-header` with `header`; `mtls` with `subjects`); `keys`: the secrets the verifier checks with, any of which verifies, newest first, none for `mtls`; `events`: the event map (`tenant`, `entity`, `rules`, `otherwise`, `dedupe` and `stamp`); `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled`; `limits`: `body_limit` (`65536`), `concurrency` (`4`) and `max_pending` (`100000`). [The inbound intake](../integrate/inbound.md) describes each part |
+| `webhook` | `verify`: the verifier, by `kind` (`hmac` with `algorithm`, `header`, `encoding` and `prefix`; `standard-webhooks` with `schemes`, `tolerance` and `endpoint_id`; `static-header` with `header`; `mtls` with `subjects`); `keys`: the secrets the verifier checks with, any of which verifies, newest first, none for `mtls`; `events`: the event map (`tenant`, `entity`, `rules`, `otherwise`, `dedupe` and `stamp`); `recovery`: the optional `redeliver` and `reconcile` steps; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled`; `limits`: `body_limit` (`65536`), `concurrency` (`4`) and `max_pending` (`100000`). [The inbound intake](../integrate/inbound.md) describes each part |
 | `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; `tenants` as above |
 | `mllp` | `routes`: each `sending_application` (MSH-3) and `sending_facility` (MSH-4), bound to a `certificate_subject`, to `source_cidrs`, or to both |
 
@@ -463,6 +463,21 @@ Runs inbound work again at a new generation, for one entity
 (`{"tenant", "entity"}`) or for every entity an event received in a range
 named (`{"from", "to"}`, RFC 3339, `to` exclusive); `202` with
 `{"items": <n>}`. A range whose `from` is not before its `to` answers `400`.
+
+### `POST /operator/sources/{id}/reconcile`
+
+Runs every reconciliation poll of the source now, whatever its cursors'
+schedule, under the source's recovery lease; `202` with `{"items": <n>}`,
+the entities marked due. While another replica holds the lease it answers
+`409` [`recovery-leased`](problems.md#recovery-leased), and a poll the
+source refuses or fails answers `502` [`recovery-failed`](problems.md#recovery-failed).
+
+### `POST /operator/sources/{id}/redeliver`
+
+Calls the source's redelivery step now; `204` once the source accepted it,
+`404` when the source declares none, and `502`
+[`recovery-failed`](problems.md#recovery-failed) when the source refused or
+failed the call.
 
 ## What the log records
 

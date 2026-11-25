@@ -76,6 +76,8 @@ the process is not ready.
 | [`not-parked`](#not-parked) | `404` | No parked item of the source has the entity. |
 | [`inbound-busy`](#inbound-busy) | `503` | The source has as much pending work as its `max_pending` allows. |
 | [`inbound-unavailable`](#inbound-unavailable) | `503` | The inbox could not be read or written. |
+| [`recovery-leased`](#recovery-leased) | `409` | Another replica runs the source's recovery. |
+| [`recovery-failed`](#recovery-failed) | `502` | The source refused or failed a recovery call. |
 | [`authorization-unavailable`](#authorization-unavailable) | `503` | The token could not be checked. |
 
 ## invalid-request
@@ -236,6 +238,18 @@ intake stores no more until the workers catch up. The answer carries
 `503`. The state store could not store the event or read the inbox. Nothing
 is stored, so the source sends the event again. The server log names the
 cause.
+
+## recovery-leased
+
+`409`. Another replica holds the recovery lease of the source, so this one
+runs neither its redelivery nor its reconciliation. Send the request again
+later, or wait for the leader's next round.
+
+## recovery-failed
+
+`502`. The source refused or failed the redelivery call or a reconciliation
+poll, or a secret the step names cannot be read. The server log names the
+step and the status, and never a value of a record.
 
 ## authorization-unavailable
 
