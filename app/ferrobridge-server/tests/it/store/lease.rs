@@ -100,3 +100,25 @@ async fn a_released_lease_is_taken_at_once() -> Result<(), Box<dyn Error>> {
     assert!(taken > held);
     Ok(())
 }
+
+#[tokio::test]
+async fn replicas_claiming_one_free_lane_together_take_it_once() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let postgres = containers::postgres().await?;
+    let mut leases = Vec::new();
+    for _replica in 0..8 {
+        let store = super::open(postgres.url()).await?;
+        leases.push(store.lease(Lane::new("change-feed:race")?, Duration::from_secs(60)));
+    }
+    let claims = futures_util::future::join_all(leases.iter().map(Lease::claim)).await;
+    let mut taken = Vec::new();
+    for claim in claims {
+        if let Some(generation) = claim? {
+            taken.push(generation);
+        }
+    }
+    assert_eq!(1, taken.len(), "one replica takes the lane: {taken:?}");
+    Ok(())
+}
