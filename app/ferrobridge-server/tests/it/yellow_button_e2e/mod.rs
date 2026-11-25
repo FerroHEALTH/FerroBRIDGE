@@ -29,6 +29,9 @@ use crate::facade::shl::kinds;
 use crate::facade::shl::open;
 use crate::facade::summary::emit;
 
+/// The bridge's usage report, off in a test.
+const USAGE_REPORT_OFF: &str = "[usage_report]\nenabled = false\n";
+
 /// How long the bridge may take to serve after its start.
 const READINESS: Duration = Duration::from_secs(180);
 

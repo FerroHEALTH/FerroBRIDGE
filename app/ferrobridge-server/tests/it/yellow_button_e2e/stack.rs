@@ -27,6 +27,7 @@ use wiremock::MockServer;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
 
+use super::USAGE_REPORT_OFF;
 use super::login::APP;
 use super::login::REDIRECT;
 use super::login::SCOPE;
@@ -209,7 +210,7 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
     let lookup = key32();
     let text = format!(
         "[server]\nlisten = {listen:?}\n\n\
-         [usage_report]\nenabled = false\n\n\
+         {USAGE_REPORT_OFF}\n\
          [operations]\nenabled = false\n\n\
          [mappings]\ndirectory = {FIXTURES:?}\n\n\
          [cdr]\nendpoint.url = \"{cdr}/\"\ndemographic = true\n\n\
