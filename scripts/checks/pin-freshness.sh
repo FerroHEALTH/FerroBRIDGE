@@ -60,7 +60,8 @@ cargo-semver-checks	obi1kenobi/cargo-semver-checks
 trivy	aquasecurity/trivy
 mdBook	rust-lang/mdBook
 mdbook-toc	badboy/mdbook-toc
-mdbook-mermaid	badboy/mdbook-mermaid"
+mdbook-mermaid	badboy/mdbook-mermaid
+Standard Webhooks	standard-webhooks/standard-webhooks"
 
 # The second cell of the matrix row whose first cell is $1, with the backticks
 # stripped.
@@ -472,7 +473,8 @@ HL7 v2 samples: NIST LRI (build time, never committed)	usnistgov/hit-mu-tools-re
 HL7 v2 samples: NIST LOI (build time, never committed)	usnistgov/hit-mu-tools-resource-bundles	loi-r1
 HL7 v2 samples: NIST syndromic surveillance (build time, never committed)	usnistgov/hit-mu-tools-resource-bundles	ss-r2
 HL7 v2 samples: AIRA MQE (build time, never committed)	immregistries/mqe	master
-HL7 v2 legacy tables (NIST IGAMT export, never committed)	usnistgov/igamt-hl7Tools-service	master"
+HL7 v2 legacy tables (NIST IGAMT export, never committed)	usnistgov/igamt-hl7Tools-service	master
+Standard Webhooks v2a	standard-webhooks/standard-webhooks	main"
 
 # The first 40-hex commit in the second cell of the matrix row whose first cell
 # is $1.
