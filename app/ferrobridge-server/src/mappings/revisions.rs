@@ -7,7 +7,7 @@
 //! A revision names each console file by its wire path and the SHA-256 of
 //! its bytes, kept once per digest. A change holds the `mapping_running` row
 //! for its whole transaction, so changes from every replica run one at a
-//! time, and one that moves the running revision notifies [`CHANNEL`] before
+//! time, and one that moves the running revision notifies [`MAPPINGS`] before
 //! it commits; each replica then compiles that revision
 //! (`crate::operator::watch`). No specification governs the store: our own
 //! design.
@@ -20,9 +20,7 @@ use sqlx::postgres::{PgPool, PgRow};
 use sqlx::{PgConnection, Postgres, Row as _, Transaction};
 
 use crate::mappings::files;
-
-/// The channel a change of the running revision is notified on.
-pub const CHANNEL: &str = "ferrobridge_mappings";
+use crate::store::listen::MAPPINGS;
 
 /// The console files of one revision, by wire path.
 pub type Files = BTreeMap<String, Arc<[u8]>>;
@@ -369,11 +367,7 @@ impl Change {
                 .bind(id)
                 .execute(&mut *self.transaction)
                 .await?;
-            sqlx::query("SELECT pg_notify($1, $2)")
-                .bind(CHANNEL)
-                .bind(&recorded.id)
-                .execute(&mut *self.transaction)
-                .await?;
+            MAPPINGS.notify(&mut self.transaction, &recorded.id).await?;
         }
         self.transaction.commit().await?;
         Ok(recorded)
