@@ -47,4 +47,10 @@ eehrxf-summary-two-runs.1.Patient
 eehrxf-summary-two-runs.3.Organization
 eehrxf-summary-two-runs.4.AllergyIntolerance
 eehrxf-summary-two-runs.6.AllergyIntolerance
-total 51
+eehrxf-test-report-ecg.1.DiagnosticReport
+eehrxf-test-report-ecg.2.Patient
+eehrxf-test-report-ecg.4.Organization
+eehrxf-test-report-spirometry.1.DiagnosticReport
+eehrxf-test-report-spirometry.2.Patient
+eehrxf-test-report-spirometry.4.Organization
+total 59
