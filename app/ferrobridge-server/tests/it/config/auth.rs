@@ -852,7 +852,7 @@ fn the_environment_alone_declares_a_named_issuer() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-/// The `acr` mapping of the issuer, eIDAS URIs as FerroSMART writes them.
+/// The `acr` mapping of the issuer, eIDAS URIs as `FerroSMART` writes them.
 const LEVELS: &str = "\n[auth.issuer.ferro.assurance]\nlevels = { \"http://eidas.europa.eu/LoA/low\" = \"low\", \"http://eidas.europa.eu/LoA/substantial\" = \"substantial\" }\n";
 
 #[test]
