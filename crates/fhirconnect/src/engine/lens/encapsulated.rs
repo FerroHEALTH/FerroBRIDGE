@@ -161,12 +161,7 @@ impl Lens<DvMultimedia, Attachment> for EncapsulatedLens {
         let url = text_of(view.url.as_ref().map(|url| &url.value));
         Ok(DvMultimedia {
             charset: existing.and_then(|held| held.charset.clone()),
-            language: coded(
-                view.language.as_ref(),
-                LANGUAGES,
-                existing.and_then(|held| held.language.as_deref()),
-            )
-            .map(Box::new),
+            language: language(view, existing.and_then(|held| held.language.as_deref())),
             alternate_text: existing.and_then(|held| held.alternate_text.clone()),
             uri: url.map(|url| uri_as(url, existing.and_then(|held| held.uri.as_ref()))),
             data: data.map(String::from),
@@ -262,12 +257,7 @@ impl Lens<DvParsable, Attachment> for EncapsulatedLens {
         let value = String::from_utf8(bytes).map_err(|_refused| refuse())?;
         Ok(DvParsable {
             charset: existing.and_then(|held| held.charset.clone()),
-            language: coded(
-                view.language.as_ref(),
-                LANGUAGES,
-                existing.and_then(|held| held.language.as_deref()),
-            )
-            .map(Box::new),
+            language: language(view, existing.and_then(|held| held.language.as_deref())),
             value,
             formalism: String::from(formalism),
         })
@@ -355,6 +345,11 @@ fn coded_text(code: &str, terminology: &str, held: Option<&CodePhrase>) -> CodeP
         Some(phrase) if phrase.code_string == code => phrase.clone(),
         _ => phrase(terminology, code),
     }
+}
+
+/// Returns the `DV_ENCAPSULATED.language` an attachment's `language` names.
+fn language(view: &Attachment, held: Option<&CodePhrase>) -> Option<Box<CodePhrase>> {
+    coded(view.language.as_ref(), LANGUAGES, held).map(Box::new)
 }
 
 /// Returns the `CODE_PHRASE` an optional FHIR code names.

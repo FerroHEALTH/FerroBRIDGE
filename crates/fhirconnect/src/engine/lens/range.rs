@@ -24,9 +24,10 @@ use openehr_rm::v1_2::data_types::quantity::dv_quantity::DvQuantity;
 use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
+use crate::engine::lens::interval::closed;
+use crate::engine::lens::interval::inclusive;
 use crate::engine::lens::number::point;
 use crate::engine::lens::quantity::QuantityLens;
-use crate::model::ast::keyword::Direction;
 
 /// The name this cell carries in a diagnostic.
 pub const CELL: &str = "DV_INTERVAL<DV_QUANTITY> against Range";
@@ -71,14 +72,7 @@ impl Lens<DvInterval<DvQuantity>, Range> for QuantityIntervalLens {
             .as_ref()
             .map(|high| QuantityLens.put(high, existing.and_then(|held| held.upper.as_ref())))
             .transpose()?;
-        Ok(DvInterval {
-            lower_unbounded: lower.is_none(),
-            upper_unbounded: upper.is_none(),
-            lower_included: lower.is_some(),
-            upper_included: upper.is_some(),
-            lower,
-            upper,
-        })
+        Ok(closed(lower, upper))
     }
 
     fn fallbacks(&self, view: &Range) -> Vec<Fallback> {
@@ -97,18 +91,10 @@ fn limit(
     included: bool,
     attribute: &'static str,
 ) -> Result<Option<Quantity>, LensError> {
-    let Some(bound) = bound else {
+    let reason = "the table fixes a Range bound included";
+    let Some(bound) = inclusive(bound, included, attribute, CELL, reason)? else {
         return Ok(None);
     };
-    if !included {
-        return Err(LensError::Shape {
-            cell: CELL,
-            attribute,
-            found: String::from("false"),
-            reason: "the table fixes a Range bound included",
-            direction: Direction::OpenehrToFhir,
-        });
-    }
     point(bound.magnitude_status.as_deref(), CELL)?;
     QuantityLens.get(bound).map(Some)
 }

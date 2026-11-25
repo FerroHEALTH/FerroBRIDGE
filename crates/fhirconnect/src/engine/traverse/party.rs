@@ -12,14 +12,12 @@
 //! own design.
 
 use fhir_types::codec::Value;
-use openehr_mapping_core::composition::RmPosition;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::party::CanonicalParty;
 
 use crate::engine::context::CallContext;
 use crate::engine::outcome::Outcome;
 use crate::engine::seam::Seams;
-use crate::model::ast::keyword::Direction;
 use crate::resolve::program::Program;
 use crate::tree::element::Table;
 
@@ -48,23 +46,7 @@ pub fn to_party<T: Table + ?Sized>(
     context: &CallContext,
 ) -> Result<Outcome<CanonicalParty>, EngineError> {
     party_program(program)?;
-    let mut run = Run::new(
-        program,
-        table,
-        index,
-        Direction::FhirToOpenehr,
-        *seams,
-        context,
-        document.clone(),
-        None,
-    );
-    // NOTE: basics/Variables.adoc, `$archetype` is the root as `$resource` is, so one
-    // resource maps into one instance of the start archetype and its axes are bound.
-    run.pins = program
-        .root_axes()
-        .iter()
-        .map(|axis| (axis.clone(), RmPosition::first()))
-        .collect();
+    let mut run = Run::inbound(program, table, index, seams, context, document);
     run.admits_context()?;
     run.split_or_run(
         program.mappings(),

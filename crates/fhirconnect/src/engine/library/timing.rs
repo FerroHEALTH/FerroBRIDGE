@@ -75,28 +75,12 @@ pub fn non_daily_to_openehr(element: &Value) -> Result<Ports, MappingCodeError> 
         &period.extension,
         period.value.as_ref(),
     )?;
-    let unit = repeat
-        .period_unit
-        .as_ref()
-        .map(|unit| {
-            primitive(
-                code,
-                "periodUnit",
-                unit.id.as_ref(),
-                &unit.extension,
-                unit.value.as_ref(),
-            )
-        })
-        .transpose()?
-        .ok_or_else(|| refused(code, "a period has a unit (R4 `tim-2`)"))?;
-    let unit = TimeUnit::from_ucum(unit)
-        .filter(|unit| NON_DAILY_UNITS.contains(unit))
-        .ok_or_else(|| {
-            refused(
-                code,
-                format!("`{unit}` is no unit of a non-daily period, which is `wk`, `mo` or `a`"),
-            )
-        })?;
+    let unit = period_unit(
+        code,
+        &repeat,
+        &NON_DAILY_UNITS,
+        "a non-daily period, which is `wk`, `mo` or `a`",
+    )?;
     let produced = duration::to_iso(code, amount, unit)?;
     Ok(Ports::new().with(NON_DAILY_PERIOD, datum(DV_DURATION, &produced)))
 }
@@ -135,6 +119,38 @@ pub fn non_daily_to_fhir(ports: &Ports) -> Result<Option<Value>, MappingCodeErro
         ..TimingRepeat::default()
     };
     encode(code, &repeat).map(Some)
+}
+
+/// Returns the `periodUnit` of a `Timing.repeat` with a period, one of
+/// `units`, the reading `timingNonDaily` and `timingToDaily` share.
+///
+/// # Errors
+///
+/// Returns [`MappingCodeError`] when the unit is absent (R4 `tim-2`), carries
+/// an id or an extension, or is none of `units`, which `kind` names.
+pub(super) fn period_unit(
+    code: &str,
+    repeat: &TimingRepeat,
+    units: &[TimeUnit],
+    kind: &str,
+) -> Result<TimeUnit, MappingCodeError> {
+    let unit = repeat
+        .period_unit
+        .as_ref()
+        .map(|unit| {
+            primitive(
+                code,
+                "periodUnit",
+                unit.id.as_ref(),
+                &unit.extension,
+                unit.value.as_ref(),
+            )
+        })
+        .transpose()?
+        .ok_or_else(|| refused(code, "a period has a unit (R4 `tim-2`)"))?;
+    TimeUnit::from_ucum(unit)
+        .filter(|unit| units.contains(unit))
+        .ok_or_else(|| refused(code, format!("`{unit}` is no unit of {kind}")))
 }
 
 /// Refuses a `Timing.repeat` that occurs other than once per period.

@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.34.0"
+version = "0.34.1"
 dependencies = [
  "bytes",
  "chumsky",
@@ -2182,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
