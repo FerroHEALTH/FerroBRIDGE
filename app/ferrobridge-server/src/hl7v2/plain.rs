@@ -1,24 +1,25 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The face's plain lane: MLLP with no TLS for the device senders that
-//! cannot speak it, each tied to the networks it connects from.
+//! The face's two lanes and the check that binds a route to its connection.
+//!
+//! The client certificate's subject binds a route on the TLS lane, and the
+//! peer's network on the plain lane for the devices that cannot speak TLS.
 //!
 //! HL7 MLLP Release 2 defines no security layer, and IHE ITI ATNA (ITI TF-2,
 //! ITI-19) adds TLS for a node that supports it. A device that cannot is
-//! served on a listener of its own, admitted by its peer address at connect
-//! and again by its MSH-4 per message. No specification governs the
-//! exception: our own design.
+//! served on a listener of its own, each message held to the networks its
+//! route names. No specification governs the exception: our own design.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use ferrobridge_hl7v2::mllp::listener::Connection;
-use ferrobridge_hl7v2::parse::Message;
 use tokio::net::TcpListener;
 
 use crate::hl7v2::answer::Settled;
-use crate::hl7v2::{Face, Listening, certified};
+use crate::hl7v2::{Face, Listening};
+use crate::sources::document::Route;
 
 /// The listener a face answers on.
 ///
@@ -32,40 +33,45 @@ pub enum Lane {
     Plain,
 }
 
-/// Returns whether the sender MSH-4 of `message` names is a plain sender of
-/// `plain` whose networks hold `peer`.
-///
-/// A plain sender is identified by its network address alone (our own
-/// design), so a facility only another network's device or a TLS sender
-/// declares is refused.
+/// Returns whether `peer` lies in one of the networks `route` names, an
+/// IPv4 peer seen as an IPv4-mapped IPv6 address included.
 #[must_use]
-pub fn addressed(
-    plain: Option<&crate::config::hl7v2::Plain>,
-    message: &Message,
-    peer: Option<SocketAddr>,
-) -> bool {
-    let (Some(plain), Some(peer)) = (plain, peer) else {
+pub fn addressed(route: &Route, peer: Option<SocketAddr>) -> bool {
+    let Some(peer) = peer else {
         return false;
     };
-    plain
-        .senders
+    let peer = peer.ip().to_canonical();
+    route
+        .source_cidrs
         .iter()
-        .any(|sender| sender.sender.names(message) && sender.connects_from(peer.ip()))
+        .filter_map(|network| network.parse::<ipnet::IpNet>().ok())
+        .any(|network| network.contains(&peer))
+}
+
+/// Returns whether the client certificate of `connection` names the subject
+/// `route` is bound to.
+#[must_use]
+pub fn certified(route: &Route, connection: &Connection) -> bool {
+    let (Some(certificate), Some(subject)) = (
+        connection.certificate(),
+        route.certificate_subject.as_deref(),
+    ) else {
+        return false;
+    };
+    ferrobridge_hl7v2::mllp::tls::names(certificate, subject)
 }
 
 impl Face {
     /// Returns this face answering on the plain listener at `bind`, sharing
-    /// its maps, its usage window and its access log; `None` when no plain
-    /// listener is configured.
+    /// its maps, its routes, its usage window and its access log.
     #[must_use]
-    pub fn on_plain(&self, bind: SocketAddr) -> Option<Self> {
-        self.plain.as_ref()?;
+    pub fn on_plain(&self, bind: SocketAddr) -> Self {
         let mut face = self.clone();
         face.lane = Lane::Plain;
         if let Some((_, listen)) = face.access_log.as_mut() {
             *listen = bind;
         }
-        Some(face)
+        face
     }
 
     /// Returns the listener this face answers on.
@@ -74,25 +80,23 @@ impl Face {
         self.lane
     }
 
-    /// Returns why `message` may not be sent on `connection` by the sender
-    /// its MSH-4 names, `None` when it may.
+    /// Returns why a message routed by `route` may not be sent on
+    /// `connection`, `None` when it may.
     ///
-    /// On the TLS listener the client certificate must name the sender. On
-    /// the plain listener the sender must be a plain sender whose networks
-    /// hold the peer address, and a refused connection is closed after its
-    /// answer, since its peer sent as a sender it is not.
-    pub(super) fn unbound(&self, message: &Message, connection: &Connection) -> Option<Settled> {
+    /// On the TLS listener the client certificate must name the subject the
+    /// route is bound to. On the plain listener the peer address must lie in
+    /// one of the route's networks, and a refused connection is closed after
+    /// its answer, since its peer sent as a sender it is not.
+    pub(super) fn unbound(&self, route: &Route, connection: &Connection) -> Option<Settled> {
         match self.lane {
-            Lane::Tls => {
-                (!certified(&self.subjects, message, connection)).then_some(Settled::Certificate)
-            }
+            Lane::Tls => (!certified(route, connection)).then_some(Settled::Certificate),
             Lane::Plain => {
-                if addressed(self.plain.as_ref(), message, connection.peer()) {
+                if addressed(route, connection.peer()) {
                     return None;
                 }
                 tracing::warn!(
                     peer = connection.peer().map(|peer| peer.ip().to_string()),
-                    "a message on the plain listener names no plain sender of its peer address; the connection closes"
+                    "a message on the plain listener names a route that holds none of its peer's networks; the connection closes"
                 );
                 connection.close();
                 Some(Settled::Address)
@@ -111,44 +115,24 @@ pub(crate) struct StartedPlain {
     pub(crate) listening: Listening,
 }
 
-/// Binds the HL7 v2 face's plain listener for `face`, warning once per plain
-/// sender that the route carries no TLS.
+/// Binds the HL7 v2 face's plain listener at `bind` for `face`, warning that
+/// the lane carries no TLS.
 ///
 /// A port that cannot be bound refuses the start.
-pub(crate) async fn bind(
-    plain: &crate::config::hl7v2::Plain,
-    face: &Face,
-) -> anyhow::Result<StartedPlain> {
+pub(crate) async fn bind(bind: SocketAddr, face: &Face) -> anyhow::Result<StartedPlain> {
     use anyhow::Context;
 
-    let socket = TcpListener::bind(plain.bind)
+    let socket = TcpListener::bind(bind)
         .await
-        .with_context(|| format!("binding {}", plain.bind))?;
-    tracing::info!(
+        .with_context(|| format!("binding {bind}"))?;
+    tracing::warn!(
         lane = "hl7v2",
-        bind = %plain.bind,
-        senders = plain.senders.len(),
-        "the HL7 v2 face listens for plain MLLP from its device senders"
+        bind = %bind,
+        "the HL7 v2 face listens for plain MLLP: no confidentiality or integrity on the wire, and each sender's identity is its network address alone"
     );
-    for sender in &plain.senders {
-        let networks = sender
-            .sources
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(", ");
-        tracing::warn!(
-            facility = sender.sender.facility(),
-            source_addresses = networks,
-            "a device sends plain MLLP: no confidentiality or integrity on the wire, and its identity is its network address alone"
-        );
-    }
-    let face = face
-        .on_plain(plain.bind)
-        .context("the plain listener has no face of its own")?;
     Ok(StartedPlain {
         socket,
-        face: Arc::new(face),
+        face: Arc::new(face.on_plain(bind)),
         listening: Listening::default(),
     })
 }

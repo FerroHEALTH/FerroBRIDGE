@@ -501,8 +501,9 @@ pub fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, LoadError> {
 /// Returns [`LoadError::Directory`] when the directory cannot be listed and
 /// [`LoadError::Mappings`] when a file is not valid FHIRconnect.
 pub fn read_set(directory: &Path) -> Result<MappingSet, LoadError> {
-    let files = mapping_files(directory)?;
-    fhirconnect::model::load::load_set(&files, &fhirconnect::engine::library::Library)
+    let tree = crate::mappings::tree::Tree::read(mapping_files(directory)?)
+        .map_err(|crate::walk::Error { path, source }| LoadError::Directory { path, source })?;
+    crate::mappings::tree::fhirconnect_set(&tree)
         .map_err(|diagnostics| mappings_error(&diagnostics))
 }
 

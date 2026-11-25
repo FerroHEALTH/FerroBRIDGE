@@ -27,6 +27,7 @@ use ferrobridge_server::shl::store::FileEntry;
 use ferrobridge_server::shl::store::Link;
 use ferrobridge_server::shl::store::LinkStore;
 use ferrobridge_server::shl::store::Resolution;
+use ferrobridge_server::shl::store::Swept;
 use http::Request;
 use http::StatusCode;
 use wiremock::MockServer;
@@ -62,18 +63,24 @@ struct Case {
     issuer: Issuer,
     /// The key the tokens are signed with.
     signing: super::auth::SigningKey,
-    /// The directory the link store lives in.
-    dir: tempfile::TempDir,
+    /// The state store the links live in, and its PostgreSQL.
+    state: (
+        ferrobridge_testkit::containers::Postgres,
+        ferrobridge_server::store::Store,
+    ),
     /// The application.
     app: Router,
 }
 
 /// Returns a case over the patient summary with the links lane on,
 /// recording through `log`; `None` when the profile packages are not
-/// fetched.
+/// fetched or the harness does not admit a PostgreSQL.
 async fn case(
     log: Option<Arc<ferrobridge_server::audit::AccessLog>>,
 ) -> Result<Option<Case>, Box<dyn Error>> {
+    let Some(stored) = crate::store::sealed_store().await? else {
+        return Ok(None);
+    };
     let term = MockServer::start().await;
     let Some(harness) = harness(&term).await? else {
         return Ok(None);
@@ -82,8 +89,12 @@ async fn case(
     mount_record(&harness.cdr, &[composition()?]).await;
     let signing = ec_key("k1", jsonwebtoken::Algorithm::ES256);
     let issuer = Issuer::start(&[&signing]).await;
-    let dir = tempfile::tempdir()?;
-    let links = Links::open(settings(&dir), Arc::clone(&harness.facade), log.clone())?;
+    let links = Links::open(
+        &stored.1,
+        settings(),
+        Arc::clone(&harness.facade),
+        log.clone(),
+    )?;
     let state = ferrobridge_server::state::AppState::with_health(
         ferrohealth_health::registry::Registry::default(),
     )
@@ -100,15 +111,14 @@ async fn case(
         _term: term,
         issuer,
         signing,
-        dir,
+        state: stored,
         app,
     }))
 }
 
-/// The lane's settings over a store in `dir`.
-fn settings(dir: &tempfile::TempDir) -> Settings {
+/// The lane's settings.
+fn settings() -> Settings {
     Settings {
-        store: dir.path().join("links.redb"),
         base_url: String::from(ORIGIN),
         default_expiry: std::time::Duration::from_hours(24),
         max_expiry: std::time::Duration::from_hours(168),
@@ -547,8 +557,15 @@ async fn neither_the_store_nor_the_log_holds_the_key_the_document_or_the_passcod
         .create(&serde_json::json!({"passcode": "correct horse"}))
         .await?;
     let key = created["payload"]["key"].as_str().ok_or("the key")?;
-    let held = std::fs::read(case.dir.path().join("links.redb"))?;
-    let text = String::from_utf8_lossy(&held);
+    let text: String = sqlx::query_scalar(
+        "SELECT string_agg(t, ' ') FROM ( \
+           SELECT encode(id_hash, 'escape') || encode(handle_hash, 'escape') \
+             || encode(handle_sealed, 'escape') || owner || record::text AS t FROM shl_link \
+           UNION ALL SELECT jwe FROM shl_file \
+           UNION ALL SELECT encode(token_hash, 'escape') FROM shl_location) AS held",
+    )
+    .fetch_one(case.state.1.pool())
+    .await?;
     let logged = logs.text();
     assert!(logged.contains("/shl"), "the log of the request is read");
     for (what, secret) in [
@@ -573,16 +590,12 @@ async fn neither_the_store_nor_the_log_holds_the_key_the_document_or_the_passcod
 
 #[tokio::test]
 async fn each_event_of_a_link_is_recorded_with_its_recipient() -> Result<(), Box<dyn Error>> {
+    let Some((_postgres, store)) = crate::audit::state().await? else {
+        return Ok(());
+    };
     let arr = crate::audit::repository().await;
-    let spool = tempfile::tempdir()?;
     let cdr: url::Url = "http://cdr.invalid/".parse()?;
-    let log = crate::audit::access_log(
-        &arr,
-        spool.path(),
-        &cdr,
-        ehds_logging::map::CategoryMap::default(),
-        64 << 20,
-    )?;
+    let log = crate::audit::access_log(&arr, &store, &cdr, None).await?;
     let Some(case) = case(Some(log)).await? else {
         return Ok(());
     };
@@ -660,14 +673,18 @@ fn stored(expires: i64) -> Link {
     }
 }
 
-#[test]
-fn an_expired_link_and_a_lapsed_location_answer_inactive() -> Result<(), Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let store = LinkStore::open(&dir.path().join("links.redb"))?;
+#[tokio::test]
+async fn an_expired_link_and_a_lapsed_location_answer_inactive() -> Result<(), Box<dyn Error>> {
+    let Some((_postgres, state)) = crate::store::sealed_store().await? else {
+        return Ok(());
+    };
+    let store = LinkStore::open(&state)?;
     let mut link = stored(1000);
     link.passcode = None;
     link.resolution = Resolution::Direct;
-    store.create("expired", &link, &[String::from("jwe")])?;
+    store
+        .create("expired", &link, &[String::from("jwe")])
+        .await?;
     assert_eq!(
         Fetched::Inactive {
             gone: Some(ferrobridge_server::shl::store::Gone {
@@ -676,44 +693,56 @@ fn an_expired_link_and_a_lapsed_location_answer_inactive() -> Result<(), Box<dyn
                 ending: Ending::Expired,
             })
         },
-        store.direct("expired", 1000)?
+        store.direct("expired", 1000).await?
     );
     let mut answered = stored(10_000);
     answered.passcode = None;
     answered.resolution = Resolution::Direct;
     answered.handle = String::from("h-2");
-    store.create("by-location", &answered, &[String::from("jwe")])?;
-    let swept = store.sweep(9_999)?;
-    assert!(swept.is_empty(), "{swept:?}");
-    let swept = store.sweep(10_000)?;
+    store
+        .create("by-location", &answered, &[String::from("jwe")])
+        .await?;
+    let swept = store.sweep(9_999).await?;
+    assert_eq!(Swept::Done(Vec::new()), swept);
+    let Swept::Done(swept) = store.sweep(10_000).await? else {
+        return Err("the sweep ran".into());
+    };
     assert_eq!(1, swept.len());
     assert_eq!(Ending::Expired, swept[0].ending);
     assert_eq!(
         Vec::<ferrobridge_server::shl::store::Listed>::new(),
-        store.list(UID, 0)?
+        store.list(UID, 0).await?
     );
     Ok(())
 }
 
-#[test]
-fn a_location_lapses_after_its_lifetime() -> Result<(), Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let store = LinkStore::open(&dir.path().join("links.redb"))?;
+#[tokio::test]
+async fn a_location_lapses_after_its_lifetime() -> Result<(), Box<dyn Error>> {
+    let Some((_postgres, state)) = crate::store::sealed_store().await? else {
+        return Ok(());
+    };
+    let store = LinkStore::open(&state)?;
     let mut link = stored(100_000);
     link.passcode = None;
-    store.create("lapsing", &link, &[String::from("jwe")])?;
-    let Answer::Manifest { files, used, .. } = store.answer("lapsing", None, None, (0, 3600))?
+    store
+        .create("lapsing", &link, &[String::from("jwe")])
+        .await?;
+    let Answer::Manifest { files, used, .. } =
+        store.answer("lapsing", None, None, (0, 3600)).await?
     else {
         return Err("a manifest".into());
     };
     assert!(!used, "the location is outstanding");
     let token = files[0].location.clone().ok_or("a location")?;
-    let fetched = store.fetch(&token, 3600)?;
+    let fetched = store.fetch(&token, 3600).await?;
     let Fetched::Inactive { gone: Some(gone) } = fetched else {
         return Err(format!("{fetched:?}").into());
     };
     assert_eq!(Ending::Used, gone.ending, "the link's last location lapsed");
-    assert_eq!(Fetched::Inactive { gone: None }, store.fetch(&token, 0)?);
+    assert_eq!(
+        Fetched::Inactive { gone: None },
+        store.fetch(&token, 0).await?
+    );
     Ok(())
 }
 

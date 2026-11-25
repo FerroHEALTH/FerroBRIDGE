@@ -385,32 +385,6 @@ pub enum Error {
         /// The lane it needs, as the key that switches it on.
         needs: String,
     },
-    /// A character set code is not one of HL7 table 0211 that is decoded.
-    #[error(
-        "{key} is `{value}`; the character sets are ASCII, UNICODE UTF-8, 8859/1 to 8859/9 and 8859/15"
-    )]
-    Charset {
-        /// The key that holds it.
-        key: String,
-        /// The value it holds.
-        value: String,
-    },
-    /// The unmapped-entry policy names neither of the two values.
-    #[error("{key} is `{value}`; the policies are skip_and_count and refuse")]
-    UnmappedEntries {
-        /// The key that holds it.
-        key: String,
-        /// The value it holds.
-        value: String,
-    },
-    /// A resource type the R4 element table does not name.
-    #[error("{key} is `{value}`, which names no R4 resource type")]
-    ResourceType {
-        /// The key that holds it.
-        key: String,
-        /// The value it holds.
-        value: String,
-    },
     /// A value named twice in one list.
     #[error("{key} names {value} twice")]
     Duplicate {
@@ -418,21 +392,6 @@ pub enum Error {
         key: String,
         /// The value named twice.
         value: String,
-    },
-    /// A sending facility named neither by a namespace id alone nor by a
-    /// universal id with its type.
-    #[error(
-        "{key} names a sender by namespace_id alone, or by universal_id with universal_id_type"
-    )]
-    Sender {
-        /// The key that holds it.
-        key: String,
-    },
-    /// A sender names no `certificate_subject`.
-    #[error("{key}: every sender names the certificate_subject its client certificate carries")]
-    CertificateSubject {
-        /// The key that holds it.
-        key: String,
     },
     /// A TLS file of the HL7 v2 face could not be read.
     #[error("{key} could not be read")]
@@ -448,68 +407,7 @@ pub enum Error {
     Hl7v2Tls {
         /// What the acceptor reported.
         #[source]
-        source: Box<ferrobridge_hl7v2::mllp::tls::TlsError>,
-    },
-    /// A sender's `origin` is neither empty nor `device`, or a device names no
-    /// `device_identifier_issuer`, or a person sender names one.
-    #[error(
-        "{key}: origin is empty or \"device\", and device_identifier_issuer is set with origin = \"device\" alone"
-    )]
-    SenderOrigin {
-        /// The key that holds it.
-        key: String,
-    },
-    /// A sender names a transport other than `tls` and `plain`.
-    #[error("{key}: transport is `{value}`; it is \"tls\" or \"plain\"")]
-    Transport {
-        /// The key that holds it.
-        key: String,
-        /// The transport it names.
-        value: String,
-    },
-    /// A sender's keys do not fit its transport.
-    #[error("{key}: {reason}")]
-    SenderTransport {
-        /// The key that holds it.
-        key: String,
-        /// What the transport requires or forbids.
-        reason: &'static str,
-    },
-    /// A source address is not a network in CIDR notation.
-    #[error("{key}: `{value}` is not a network in CIDR notation, such as 10.20.0.21/32")]
-    SourceAddress {
-        /// The key that holds it.
-        key: String,
-        /// The address as written.
-        value: String,
-        /// What the network parser reported.
-        #[source]
-        source: ipnet::AddrParseError,
-    },
-    /// A source address sets bits past its prefix, so the network it means
-    /// is unclear.
-    #[error(
-        "{key}: `{value}` sets host bits past its prefix; write the network, such as {network}"
-    )]
-    SourceNetwork {
-        /// The key that holds it.
-        key: String,
-        /// The address as written.
-        value: String,
-        /// The network its prefix names.
-        network: String,
-    },
-    /// The plain listener is configured with no sender to serve.
-    #[error("{key} is set and no sender names transport = \"plain\"")]
-    PlainUnused {
-        /// The key that holds it.
-        key: String,
-    },
-    /// The TLS listener is configured with no sender to serve.
-    #[error("{key} is set and no sender names transport = \"tls\"")]
-    TlsUnused {
-        /// The key that holds it.
-        key: String,
+        source: Box<crate::hl7v2::authorities::MaterialError>,
     },
     /// The plain listener would bind the TLS listener's address.
     #[error(
@@ -542,15 +440,6 @@ pub enum Error {
         /// Why it is refused.
         #[source]
         source: ihe_atna::atna::feed::FeedConfigError,
-    },
-    /// A category map `ehds-logging` refuses.
-    #[error("{key} is no category map")]
-    Categories {
-        /// The table that holds it.
-        key: String,
-        /// Every defect of the map.
-        #[source]
-        source: ehds_logging::map::MapErrors,
     },
     /// A span of time outside the range its key admits.
     #[error("{key} is {value}; {reason}")]

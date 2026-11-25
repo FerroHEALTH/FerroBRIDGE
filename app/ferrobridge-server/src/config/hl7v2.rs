@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The settings of the HL7 v2 face that `[hl7v2]` resolves into.
+//! The settings of the HL7 v2 face that `[hl7v2]` resolves into, and the
+//! sending facility an MLLP route names.
 
-/// One sending facility the face accepts, matched against MSH-4.
+/// One sending facility, matched against MSH-4.
 ///
 /// MSH-4 is an `HD`: a namespace id in HD.1, or a universal id in HD.2 with
-/// its type in HD.3 (HL7 v2.5.1 chapter 2, `HD` data type). No specification
-/// governs an allow list: our own design.
+/// its type in HD.3 (HL7 v2.5.1 chapter 2, `HD` data type).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Sender {
     /// A facility named by its namespace id, HD.1.
@@ -19,27 +19,6 @@ pub enum Sender {
         /// HD.3, such as `ISO`.
         kind: String,
     },
-}
-
-/// A sender declared `origin = "device"`: an analyser feed with no human,
-/// whose results commit as acts of the device. No specification governs the
-/// declaration: our own design.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Device {
-    /// The sending facility the device sends as.
-    pub sender: Sender,
-    /// The namespace its device identifiers are issued in.
-    pub identifier_issuer: String,
-}
-
-/// The DNS name a sender's client certificate carries in its subject
-/// alternative name, which ties the sender to the connection it sends on.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Subject {
-    /// The sending facility.
-    pub sender: Sender,
-    /// The DNS name its client certificate carries.
-    pub name: String,
 }
 
 /// The TLS the MLLP listener serves: its certificate and key, and the
@@ -57,6 +36,20 @@ impl std::fmt::Debug for Tls {
 }
 
 impl Sender {
+    /// Returns the facility `text` names, as a route writes it: a namespace
+    /// id, or `^<universal id>^<type>`.
+    #[must_use]
+    pub fn of(text: &str) -> Self {
+        let mut parts = text.split('^');
+        match (parts.next(), parts.next(), parts.next()) {
+            (Some(""), Some(id), Some(kind)) => Self::Universal {
+                id: id.to_owned(),
+                kind: kind.to_owned(),
+            },
+            _ => Self::Namespace(text.to_owned()),
+        }
+    }
+
     /// Returns the facility as MSH-4 writes it: the namespace id, or
     /// `^<universal id>^<type>` (HL7 v2.5.1 chapter 2, `HD` data type).
     #[must_use]
@@ -65,47 +58,5 @@ impl Sender {
             Self::Namespace(namespace) => namespace.clone(),
             Self::Universal { id, kind } => format!("^{id}^{kind}"),
         }
-    }
-}
-
-/// A device sender declared `transport = "plain"`: it sends MLLP with no
-/// TLS, and the face takes it only from the networks it names.
-///
-/// HL7 MLLP Release 2 defines no security layer, and IHE ITI ATNA (ITI TF-2,
-/// ITI-19) adds TLS only for a node that supports it; the exception for a
-/// device that cannot is our own design.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PlainSender {
-    /// The sending facility the device sends as.
-    pub sender: Sender,
-    /// The networks it connects from.
-    pub sources: Vec<ipnet::IpNet>,
-}
-
-impl PlainSender {
-    /// Returns whether `peer` lies in one of the sender's networks, an
-    /// IPv4 peer seen as an IPv4-mapped IPv6 address included.
-    #[must_use]
-    pub fn connects_from(&self, peer: std::net::IpAddr) -> bool {
-        let peer = peer.to_canonical();
-        self.sources.iter().any(|network| network.contains(&peer))
-    }
-}
-
-/// The plain MLLP listener and the device senders it serves.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Plain {
-    /// The socket address the plain listener binds.
-    pub bind: std::net::SocketAddr,
-    /// The senders declared `transport = "plain"`, at least one.
-    pub senders: Vec<PlainSender>,
-}
-
-impl Plain {
-    /// Returns whether a connection from `peer` comes from some plain
-    /// sender's network.
-    #[must_use]
-    pub fn admits(&self, peer: std::net::IpAddr) -> bool {
-        self.senders.iter().any(|sender| sender.connects_from(peer))
     }
 }

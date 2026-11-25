@@ -30,6 +30,10 @@ fn posts() -> Vec<(String, String)> {
             String::from("consumer=events&id=3"),
         ),
         (
+            String::from("/sources/new"),
+            String::from("name=a&kind=mllp&document=%7B%7D"),
+        ),
+        (
             format!("/mappings/edit/{CONTEXT}"),
             String::from("draft=x&base=&path=&reason=r&decision=check"),
         ),

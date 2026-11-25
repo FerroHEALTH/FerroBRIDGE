@@ -21,14 +21,13 @@ include = ["src/**", "README.md", "LICENSE"]
 
 # scripts/checks/public-surface.sh: a line move of one takes the next minor.
 [package.metadata.ferrohealth]
-public-dependencies = ["serde"]
+public-dependencies = ["serde", "serde_json"]
 
 [dependencies]
 # The diagnostic every document carries, in its own serde form.
 openehr-mapping-core.workspace = true
 serde.workspace = true
-
-[dev-dependencies]
+# A source's document is the kind's own JSON object.
 serde_json.workspace = true
 
 [lints]

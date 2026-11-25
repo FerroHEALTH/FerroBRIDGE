@@ -149,12 +149,15 @@ async fn a_batch_file_is_answered_with_one_acknowledgment_per_message_in_a_respo
 }
 
 #[tokio::test]
-async fn a_sending_facility_not_listed_is_answered_ar_at_msh_4_and_never_mapped()
+async fn a_sender_no_route_takes_is_answered_ar_at_msh_4_and_never_mapped()
 -> Result<(), Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.senders = vec![ferrobridge_server::config::hl7v2::Sender::Namespace(
-        String::from("SOUTHLAB"),
-    )];
+    lane.source()["routes"] = serde_json::json!([super::route(
+        "LAB",
+        "SOUTHLAB",
+        Some(super::NORTHLAB_SUBJECT),
+        &[]
+    )]);
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     let running = Running::start_with(lane, lookup).await?;
     let ack = running.send(&oru_r01(CONTROL_ID)).await?;
@@ -179,11 +182,8 @@ async fn a_sending_facility_not_listed_is_answered_ar_at_msh_4_and_never_mapped(
 }
 
 #[tokio::test]
-async fn a_listed_sending_facility_is_mapped() -> Result<(), Box<dyn Error>> {
-    let mut lane = face_settings(true);
-    lane.senders = vec![ferrobridge_server::config::hl7v2::Sender::Namespace(
-        String::from("NORTHLAB"),
-    )];
+async fn a_routed_sender_is_mapped() -> Result<(), Box<dyn Error>> {
+    let lane = face_settings(true);
     let lookup = ResponseTemplate::new(200).set_body_string(ehr_body());
     let running = Running::start_with(lane, lookup).await?;
     let ack = running.send(&oru_r01(CONTROL_ID)).await?;
@@ -265,7 +265,7 @@ async fn a_message_in_flight_when_the_stop_arrives_is_committed_and_answered()
 async fn an_adt_a01_admits_its_patient_creating_the_ehr_under_the_face_policy()
 -> Result<(), Box<dyn Error>> {
     let mut lane = face_settings(true);
-    lane.ehr_policy = Some(Policy::CreateOnFirstWrite);
+    lane.source()["ehr_policy"] = serde_json::json!("create_on_first_write");
     let running = Running::start_with(lane, its_rest::not_found("no EHR for the subject")).await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/ehr"))

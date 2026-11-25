@@ -5,16 +5,20 @@
 //! hand each event to the consumer in order, and acknowledge the prefix the
 //! consumer fully processed.
 //!
-//! The reader's cursor on the CDR is the consumer's durable watermark, so a
-//! restart resumes at the first event it had not finished. The cursor moves
-//! only by an acknowledgement, only forward, and only over events the
-//! consumer finished: a failed read, a refused acknowledgement or a consumer
-//! failure leaves it where it was, and the event is read again (delivery is
-//! at least once). No specification governs this: our own design.
+//! Each reader is a lane with one leader across replicas, held by a lease
+//! (`crate::store::lease`): only the leader reads, and every cursor write
+//! carries its lease generation, so a former leader paused past its lease
+//! moves no cursor and a new leader resumes at the first event the cursor
+//! does not cover. The cursor moves only forward and only over events the
+//! consumer finished: a failed read, a refused write or a consumer failure
+//! leaves it where it was, and the event is read again (delivery is at least
+//! once). No specification governs this: our own design.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use tokio::sync::watch;
@@ -22,6 +26,7 @@ use tokio::sync::watch;
 use crate::change_feed::ChangeFeed;
 use crate::change_feed::Event;
 use crate::change_feed::FeedError;
+use crate::change_feed::Ledger;
 use crate::change_feed::PageSize;
 use crate::change_feed::Position;
 use crate::change_feed::ReaderName;
@@ -29,6 +34,9 @@ use crate::change_feed::Stream;
 use crate::change_feed::dead_letter::DeadLetterError;
 use crate::change_feed::dead_letter::DeadLetters;
 use crate::change_feed::health::Following;
+use crate::store::lease::Leadership;
+use crate::store::lease::Renewed;
+use crate::store::lease::Term;
 
 /// Whether a failed event may succeed when it is offered again unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,6 +110,20 @@ pub trait Consumer: std::fmt::Debug + Send + Sync {
     /// Returns [`ConsumerError`] when the event is not finished.
     async fn process(&self, event: &Event) -> Result<(), ConsumerError>;
 
+    /// Forgets what the consumer staged for a pass that never committed, at
+    /// the start of every pass.
+    fn discard(&self) {}
+
+    /// Writes what the consumer staged for the events this pass finished,
+    /// inside the transaction that moves the reader's cursor.
+    ///
+    /// # Errors
+    /// Returns [`ConsumerError`] when the staged work cannot be written; the
+    /// pass then moves no cursor, so its events are offered again.
+    async fn commit(&self, _ledger: &mut Ledger<'_>) -> Result<(), ConsumerError> {
+        Ok(())
+    }
+
     /// Finishes the work a pass shares across its events, once the pass
     /// offered its page and before it acknowledges any of it.
     ///
@@ -142,7 +164,7 @@ impl Default for Polling {
 #[derive(Debug, Clone)]
 pub struct Parking {
     /// The dead-letter store.
-    pub store: Arc<DeadLetters>,
+    pub store: DeadLetters,
     /// The poisoned passes an event fails before it is parked.
     pub max_attempts: NonZeroU32,
 }
@@ -208,16 +230,16 @@ pub enum PassError {
         #[source]
         source: ConsumerError,
     },
-    /// The consumer did not finish the work its events share, so nothing of
-    /// the page was acknowledged.
+    /// The consumer did not finish or commit the work its events share, so
+    /// nothing of the page was acknowledged.
     #[error("the consumer did not settle the pass")]
     Settle {
         /// Why.
         #[source]
         source: ConsumerError,
     },
-    /// A replayed parked event met a transient failure; it stays parked
-    /// with its replay requested.
+    /// A retried parked event met a transient failure; it stays parked
+    /// with its retry pending.
     #[error("the replay of parked event {id} was not finished")]
     Replay {
         /// The parked number.
@@ -248,14 +270,17 @@ pub enum PassError {
 /// finished is then acknowledged, the last finished position of each stream,
 /// and nothing after it.
 ///
-/// With [`Parking`], the parked events a replay was requested for are
+/// The finished positions are written in one transaction fenced by `term`,
+/// and a source that keeps its cursor on the CDR is told once it commits.
+///
+/// With [`Parking`], the parked events an operator decided to retry are
 /// offered first, and a poisoned failure is charged to its event: on the
 /// bound the event is parked with its cause and counts as finished, below it
 /// the pass stops there. A transient failure is never charged.
 ///
 /// # Errors
-/// Returns [`PassError::Feed`] when the page cannot be read or an
-/// acknowledgement is refused, [`PassError::Unordered`] for a page out of
+/// Returns [`PassError::Feed`] when the page cannot be read, the cursor
+/// write is refused (a lost lease included) or an acknowledgement is refused, [`PassError::Unordered`] for a page out of
 /// order, [`PassError::Replay`] for a replay that met a transient failure,
 /// [`PassError::DeadLetter`] when the store refuses, and
 /// [`PassError::Consumer`] for the first event the consumer did not finish,
@@ -266,10 +291,12 @@ pub async fn pass(
     consumer: &dyn Consumer,
     page_size: PageSize,
     cursor: &mut Cursor,
+    term: &Term,
 ) -> Result<Pass, PassError> {
+    consumer.discard();
     let replayed = match cursor.parking.clone() {
-        Some(parking) => replay(&parking.store, reader, consumer).await?,
-        None => 0,
+        Some(parking) => replay(&parking.store, term, reader, consumer).await?,
+        None => Vec::new(),
     };
     let page = feed.page(reader, page_size).await?;
     let mut previous: BTreeMap<Stream, &Position> = cursor
@@ -295,10 +322,10 @@ pub async fn pass(
     for event in &page.events {
         match consumer.process(event).await {
             Ok(()) => {
-                settle(cursor, reader, &event.position)?;
+                forget(cursor, term, reader, &event.position).await?;
                 finished.insert(event.position.stream(), &event.position);
             }
-            Err(source) if parked(cursor, reader, event, &source)? => {
+            Err(source) if parked(cursor, term, reader, event, &source).await? => {
                 finished.insert(event.position.stream(), &event.position);
             }
             Err(source) => {
@@ -310,11 +337,35 @@ pub async fn pass(
             }
         }
     }
-    if (replayed > 0 || !finished.is_empty())
-        && let Err(source) = consumer.settle().await
-    {
+    if replayed.is_empty() && finished.is_empty() {
+        return match failed {
+            Some(error) => Err(error),
+            None => Ok(Pass {
+                read: page.events.len(),
+                acknowledged: Vec::new(),
+                full,
+            }),
+        };
+    }
+    if let Err(source) = consumer.settle().await {
         return Err(PassError::Settle { source });
     }
+    let mut ledger = Ledger::new(term);
+    if let Err(source) = consumer.commit(&mut ledger).await {
+        return Err(PassError::Settle { source });
+    }
+    for last in finished.values() {
+        feed.record(&mut ledger, reader, last).await?;
+    }
+    if let Some(parking) = cursor.parking.as_ref()
+        && !replayed.is_empty()
+    {
+        parking
+            .store
+            .replayed(ledger.connection().await?, reader, &replayed)
+            .await?;
+    }
+    ledger.commit().await?;
     let mut acknowledged = Vec::new();
     for (stream, last) in finished {
         feed.acknowledge(reader, last).await?;
@@ -331,28 +382,30 @@ pub async fn pass(
     }
 }
 
-/// Offers `consumer` every event parked for `reader` with a replay
-/// requested: a finished one leaves the store, a poisoned one is parked
-/// again with its new cause, and a transient failure stops the pass; returns
-/// how many it offered.
+/// Offers `consumer` every event parked for `reader` with a retry pending: a
+/// poisoned one is parked again with its new cause, and a transient failure
+/// stops the pass; returns the finished ones, which the pass settles in its
+/// commit.
 async fn replay(
     store: &DeadLetters,
+    term: &Term,
     reader: &ReaderName,
     consumer: &dyn Consumer,
-) -> Result<usize, PassError> {
-    let mut offered = 0_usize;
-    for parked in store.parked(reader)? {
+) -> Result<Vec<u64>, PassError> {
+    let mut finished = Vec::new();
+    for parked in store.parked(reader).await? {
         if !parked.replay {
             continue;
         }
-        offered = offered.saturating_add(1);
         match consumer.process(&parked.event).await {
             Ok(()) => {
-                store.replayed(reader, parked.id)?;
+                finished.push(parked.id);
                 tracing::info!(consumer = consumer.name(), reader = %reader, parked = parked.id, "a replayed parked event finished");
             }
             Err(error) if error.failure() == Failure::Poisoned => {
-                store.repark(reader, parked.id, &crate::indicators::reason(&error))?;
+                store
+                    .repark(term, reader, parked.id, &crate::indicators::reason(&error))
+                    .await?;
                 tracing::warn!(consumer = consumer.name(), reader = %reader, parked = parked.id, "a replayed parked event failed again and stays parked");
             }
             Err(source) => {
@@ -363,26 +416,32 @@ async fn replay(
             }
         }
     }
-    Ok(offered)
+    Ok(finished)
 }
 
 /// Forgets the poisoned passes charged to the finished event at `position`.
-fn settle(cursor: &mut Cursor, reader: &ReaderName, position: &Position) -> Result<(), PassError> {
+async fn forget(
+    cursor: &mut Cursor,
+    term: &Term,
+    reader: &ReaderName,
+    position: &Position,
+) -> Result<(), PassError> {
     let Some(parking) = cursor.parking.as_ref() else {
         return Ok(());
     };
     let before = cursor.charged.len();
     cursor.charged.retain(|charged| charged != position);
     if cursor.charged.len() != before {
-        parking.store.settle(reader, position)?;
+        parking.store.forget(term, reader, position).await?;
     }
     Ok(())
 }
 
 /// Charges the poisoned failure `error` of `event` and parks the event on the
 /// bound; returns whether it was parked.
-fn parked(
+async fn parked(
     cursor: &mut Cursor,
+    term: &Term,
     reader: &ReaderName,
     event: &Event,
     error: &ConsumerError,
@@ -393,7 +452,7 @@ fn parked(
     if error.failure() != Failure::Poisoned {
         return Ok(false);
     }
-    let attempts = parking.store.charge(reader, &event.position)?;
+    let attempts = parking.store.charge(term, reader, &event.position).await?;
     if attempts < parking.max_attempts.get() {
         if !cursor.charged.contains(&event.position) {
             cursor.charged.push(event.position.clone());
@@ -401,7 +460,10 @@ fn parked(
         return Ok(false);
     }
     let cause = crate::indicators::reason(error);
-    let id = parking.store.park(reader, event, &cause, attempts)?;
+    let id = parking
+        .store
+        .park(term, reader, event, &cause, attempts)
+        .await?;
     cursor.charged.retain(|charged| charged != &event.position);
     tracing::warn!(
         reader = %reader,
@@ -424,35 +486,159 @@ fn wait_after(done: &Pass, idle: Duration) -> Duration {
     }
 }
 
-/// Follows the feed of `reader` with `consumer` until `stop` reads `true`.
+/// What a follower needs besides its feed and its consumer.
+#[derive(Debug, Clone)]
+pub struct Lane {
+    /// How the follower paces its reads.
+    pub polling: Polling,
+    /// Where a poisoned event is parked.
+    pub parking: Option<Parking>,
+    /// What readiness reports for the consumer.
+    pub following: Following,
+}
+
+/// Follows the feed of `reader` with `consumer` while this replica leads the
+/// reader's lane through `leadership`, until `stop` reads `true`.
 ///
-/// A full page that moved a cursor is followed by the next read at once,
-/// any other pass after `polling.idle`; a failed pass is logged, recorded on `following` and
-/// retried after a backoff that doubles up to `polling.max_backoff`. With
-/// `parking`, a poisoned event is parked on its bound (see [`pass`]).
+/// A replica that does not lead waits a renewal period and claims again. A
+/// leader renews its lease on its own task at the period `leadership` names,
+/// and stops reading once the lease is lost or a fenced write is refused. A
+/// full page that moved a cursor is followed by the next read at once, any
+/// other pass after `lane.polling.idle`; a failed pass is logged, recorded on
+/// `lane.following` and retried after a backoff that doubles up to
+/// `lane.polling.max_backoff`. On `stop` the leader releases the lane.
 pub async fn follow(
     feed: &dyn ChangeFeed,
     reader: &ReaderName,
     consumer: &dyn Consumer,
-    polling: Polling,
-    parking: Option<Parking>,
-    following: &Following,
+    leadership: Arc<dyn Leadership>,
+    lane: Lane,
     mut stop: watch::Receiver<bool>,
 ) {
-    let mut cursor = parking.map_or_else(Cursor::default, Cursor::parking);
-    let mut backoff = polling.backoff;
+    let mut cursor = lane
+        .parking
+        .clone()
+        .map_or_else(Cursor::default, Cursor::parking);
+    let mut backoff = lane.polling.backoff;
     tracing::info!(consumer = consumer.name(), reader = %reader, "following the change feed");
     loop {
         if *stop.borrow() {
             break;
         }
-        let passed = pass(feed, reader, consumer, polling.page_size, &mut cursor).await;
+        let wait = match leadership.claim().await {
+            Ok(Some(term)) => {
+                tracing::info!(consumer = consumer.name(), reader = %reader, generation = term.generation().get(), "this replica leads the change-feed reader");
+                lead(
+                    feed,
+                    reader,
+                    consumer,
+                    &leadership,
+                    &lane,
+                    &term,
+                    &mut cursor,
+                    &mut stop,
+                )
+                .await;
+                if *stop.borrow() {
+                    if let Err(error) = leadership.release(&term).await {
+                        tracing::warn!(consumer = consumer.name(), reader = %reader, reason = %crate::indicators::reason(&error), "the lease could not be released; it runs out on its own");
+                    }
+                    break;
+                }
+                backoff = lane.polling.backoff;
+                lane.polling.backoff
+            }
+            Ok(None) => {
+                lane.following.standby();
+                leadership.renew_every()
+            }
+            Err(error) => {
+                let reason = crate::indicators::reason(&error);
+                tracing::warn!(consumer = consumer.name(), reader = %reader, reason = %reason, "the lease of the change-feed reader could not be claimed");
+                lane.following.stalled(reason);
+                let wait = backoff;
+                backoff = backoff.saturating_mul(2).min(lane.polling.max_backoff);
+                wait
+            }
+        };
+        if !pause(&mut stop, wait).await {
+            break;
+        }
+    }
+    tracing::info!(consumer = consumer.name(), reader = %reader, "stopped following the change feed");
+}
+
+/// Waits `wait` unless `stop` turns `true` first; returns whether to go on.
+async fn pause(stop: &mut watch::Receiver<bool>, wait: Duration) -> bool {
+    if wait.is_zero() {
+        return !*stop.borrow();
+    }
+    tokio::select! {
+        _stopped = stop.wait_for(|stopped| *stopped) => false,
+        () = tokio::time::sleep(wait) => true,
+    }
+}
+
+/// Renews `term` every renewal period until it is lost, then flags `lost`.
+async fn renew(leadership: Arc<dyn Leadership>, term: Term, lost: Arc<AtomicBool>) {
+    loop {
+        tokio::time::sleep(leadership.renew_every()).await;
+        match leadership.renew(&term).await {
+            Ok(Renewed::Held) => {}
+            Ok(Renewed::Lost) => {
+                lost.store(true, Ordering::Release);
+                return;
+            }
+            Err(error) => tracing::warn!(
+                lane = %term.lease().lane(),
+                reason = %crate::indicators::reason(&error),
+                "the lease could not be renewed; the next renewal tries again"
+            ),
+        }
+    }
+}
+
+/// Follows the feed while `term` holds, until it is lost or `stop` reads
+/// `true`.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the follower's parts, each borrowed for the one term"
+)]
+async fn lead(
+    feed: &dyn ChangeFeed,
+    reader: &ReaderName,
+    consumer: &dyn Consumer,
+    leadership: &Arc<dyn Leadership>,
+    lane: &Lane,
+    term: &Term,
+    cursor: &mut Cursor,
+    stop: &mut watch::Receiver<bool>,
+) {
+    let lost = Arc::new(AtomicBool::new(false));
+    let renewer = tokio::spawn(renew(
+        Arc::clone(leadership),
+        term.clone(),
+        Arc::clone(&lost),
+    ));
+    cursor.acknowledged.clear();
+    let mut backoff = lane.polling.backoff;
+    let begun = feed.begin(reader, term).await;
+    if let Err(error) = begun {
+        lane.following.stalled(crate::indicators::reason(&error));
+        renewer.abort();
+        return;
+    }
+    loop {
+        if *stop.borrow() || lost.load(Ordering::Acquire) {
+            break;
+        }
+        let passed = pass(feed, reader, consumer, lane.polling.page_size, cursor, term).await;
         let positions: Vec<Position> = cursor.acknowledged.values().cloned().collect();
-        following.acknowledged(&positions);
+        lane.following.acknowledged(&positions);
         let wait = match passed {
             Ok(done) => {
-                following.followed();
-                backoff = polling.backoff;
+                lane.following.followed();
+                backoff = lane.polling.backoff;
                 if done.read > 0 {
                     tracing::debug!(
                         consumer = consumer.name(),
@@ -462,7 +648,11 @@ pub async fn follow(
                         "a change-feed pass finished"
                     );
                 }
-                wait_after(&done, polling.idle)
+                wait_after(&done, lane.polling.idle)
+            }
+            Err(error) if is_lost(&error) => {
+                tracing::warn!(consumer = consumer.name(), reader = %reader, "another replica took the change-feed reader; this one stops reading");
+                break;
             }
             Err(error) => {
                 let reason = crate::indicators::reason(&error);
@@ -472,25 +662,27 @@ pub async fn follow(
                     reason = %reason,
                     "a change-feed pass failed; the cursor stays where it was"
                 );
-                following.stalled(reason);
+                lane.following.stalled(reason);
                 let wait = backoff;
-                backoff = backoff.saturating_mul(2).min(polling.max_backoff);
+                backoff = backoff.saturating_mul(2).min(lane.polling.max_backoff);
                 wait
             }
         };
-        if wait.is_zero() {
-            continue;
-        }
-        tokio::select! {
-            stopped = stop.wait_for(|stopped| *stopped) => {
-                if stopped.is_err() {
-                    break;
-                }
-            }
-            () = tokio::time::sleep(wait) => {}
+        if !pause(stop, wait).await {
+            break;
         }
     }
-    tracing::info!(consumer = consumer.name(), reader = %reader, "stopped following the change feed");
+    renewer.abort();
+}
+
+/// Returns whether `error` says the lease is no longer this replica's.
+fn is_lost(error: &PassError) -> bool {
+    use crate::store::lease::LeaseError;
+    matches!(
+        error,
+        PassError::Feed(FeedError::Lease(LeaseError::Stale { .. }))
+            | PassError::DeadLetter(DeadLetterError::Lease(LeaseError::Stale { .. }))
+    )
 }
 
 #[cfg(test)]

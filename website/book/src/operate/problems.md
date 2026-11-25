@@ -54,19 +54,24 @@ the process is not ready.
 | [`reason-required`](#reason-required) | `400` | A save names no reason. |
 | [`bad-path`](#bad-path) | `400` | The path names no mapping file the console can write. |
 | [`bad-archive`](#bad-archive) | `400` | The body is no mapping-set archive the bridge reads. |
+| [`bad-register`](#bad-register) | `400` | The document does not hold for the register. |
 | [`unauthenticated`](#unauthenticated) | `401` | The request carries no valid access token. |
 | [`not-permitted`](#not-permitted) | `403` | The token does not carry the operator scope. |
 | [`not-found`](#not-found) | `404` | The mapping file, the revision or the configuration does not exist. |
 | [`provisioned`](#provisioned) | `409` | A provisioned file holds the path. |
-| [`not-configured`](#not-configured) | `409` | No `[operator] mapping_dir` is configured. |
+| [`not-configured`](#not-configured) | `409` | No `[state]` is configured, so nothing is saved. |
 | [`precondition-failed`](#precondition-failed) | `412` | What the request replaces changed since the `ETag` it names. |
 | [`precondition-required`](#precondition-required) | `428` | The write sends no precondition. |
 | [`no-example`](#no-example) | `422` | The template has no example composition. |
+| [`invalid-source`](#invalid-source) | `422` | The source's document is refused. |
+| [`source-conflict`](#source-conflict) | `409` | Another source holds the name or the MLLP route. |
 | [`unreadable`](#unreadable) | `500` | A mapping directory could not be read. |
 | [`unwritable`](#unwritable) | `500` | The mapping directory could not be written. |
 | [`dead-letters-unavailable`](#dead-letters-unavailable) | `500` | The dead-letter store could not be read or written. |
 | [`reload-unavailable`](#reload-unavailable) | `503` | The mapping set could not be reloaded. |
 | [`run-history-unavailable`](#run-history-unavailable) | `503` | The run history could not be read. |
+| [`registers-unavailable`](#registers-unavailable) | `503` | The settings register could not be read or written. |
+| [`sources-unavailable`](#sources-unavailable) | `503` | The inbound sources could not be read or written. |
 | [`authorization-unavailable`](#authorization-unavailable) | `503` | The token could not be checked. |
 
 ## invalid-request
@@ -93,6 +98,13 @@ holds more than 4096 entries or more than 64 MiB of content, names a file
 outside `fhirconnect/` and `omocl/` or one that is not `.yml` or `.yaml`, or
 names one file twice. Export a revision to see the shape an import reads.
 
+## bad-register
+
+`400`. The body of a register write is no JSON document, is not the
+register's shape, or breaks its rules: for `audit-categories`, a category
+that is neither an Art 14(1) category nor a declared national one. The
+version in force stays.
+
 ## unauthenticated
 
 `401`. The request carries no access token, or one the server does not
@@ -118,8 +130,9 @@ file under another path.
 
 ## not-configured
 
-`409`. No `[operator] mapping_dir` is configured, so the operator API checks,
-saves and reloads nothing. Set `mapping_dir` to turn on editing.
+`409`. No `[state]` is configured, so the operator API checks, saves and
+reloads nothing and keeps no settings register. Configure the state store to
+turn on editing.
 
 ## precondition-failed
 
@@ -139,6 +152,20 @@ running revision's id. Add the header.
 `422`. The template is no composition template, such as a party's, or no
 synthetic example of it builds. The server log names the cause.
 
+## invalid-source
+
+`422`. A source's document is not the kind's object, breaks one of its rules
+(a webhook without a key, an MLLP route bound to neither a certificate
+subject nor a network, a tenant named twice), or names a secret the
+`[secrets]` directory does not hold. The detail names the rule, never a
+secret's value. Fix the document, or add the secret to the directory first.
+
+## source-conflict
+
+`409`. Another source carries the name, or already routes one of the MLLP
+senders the document names. Pick another name, or move the route off the
+other source first.
+
 ## unreadable
 
 `500`. A mapping directory could not be read. The server log names the
@@ -146,15 +173,15 @@ directory and the cause.
 
 ## unwritable
 
-`500`. The mapping directory could not be written. The server log names the
-cause; check that the server's user owns `mapping_dir`.
+`500`. The mapping revisions could not be read or written in the state
+store. The server log names the cause.
 
 ## dead-letters-unavailable
 
-`500`. The dead-letter store of the change feed (`[change_feed] dead_letters`)
-refused a read or a write, so the parked events cannot be listed or a replay
-cannot be recorded. The server log names the cause; check that the server's
-user owns the file and that the disk has room.
+`500`. The state store that keeps the dead letters of the change feed
+(`[state]`) refused a read or a write, so the parked events cannot be listed
+or a settlement cannot be recorded. The server log names the cause; check
+that the database is reachable.
 
 ## reload-unavailable
 
@@ -171,6 +198,19 @@ not be read, because the CDM database did not answer or holds no run table.
 The server log names the cause. A bridge schema an earlier release created
 gets its run table from `ferrobridge cdm init`, which leaves every other
 table as it is.
+
+## registers-unavailable
+
+`503`. A settings register could not be read or written, because the state
+store did not answer. The server log names the cause, and the version in
+force stays.
+
+## sources-unavailable
+
+`503`. The state store could not read or write the inbound sources, or a
+secret a source names cannot be read at runtime, so the source fails closed.
+The server log names the cause, and the secret by its name alone.
+
 ## authorization-unavailable
 
 `503`. The server could not check the access token, because the
