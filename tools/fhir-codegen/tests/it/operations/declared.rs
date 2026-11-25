@@ -14,8 +14,8 @@ fn every_terminology_operation_gets_a_contract_in_both_versions() {
     for (package, module) in [(&*R4, "r4"), (&*R4B, "r4b"), (&*R5, "r5"), (&*R6, "r6")] {
         let contracts = contracts(package, module);
         let modules: Vec<&str> = contracts.iter().map(|c| c.module.as_str()).collect();
-        // The R6 ballot5 core package no longer publishes CodeSystem/$find-matches
-        // and ConceptMap/$closure; every earlier version does.
+        // The R6 core package publishes neither CodeSystem/$find-matches nor
+        // ConceptMap/$closure; every earlier version does.
         let expected: Vec<&str> = if module == "r6" {
             vec![
                 "code_system_lookup",

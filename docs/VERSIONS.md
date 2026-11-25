@@ -240,7 +240,7 @@ of every `PROVENANCE.md` below back against its row.
 | `hl7.fhir.r4.core` | 4.0.1 | `tools/fhir-codegen/vendor/hl7.fhir.r4.core/PROVENANCE.md` |
 | `hl7.fhir.r4b.core` | 4.3.0 | `tools/fhir-codegen/vendor/hl7.fhir.r4b.core/PROVENANCE.md` |
 | `hl7.fhir.r5.core` | 5.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.r5.core/PROVENANCE.md` |
-| `hl7.fhir.r6.core` | 6.0.0-ballot5, held: 6.0.0-snapshot1 drops public types, which moves fhir-types to 0.2, and ihe-atna 0.23.0 still requires fhir-types 0.1 (#2072) | `tools/fhir-codegen/vendor/hl7.fhir.r6.core/PROVENANCE.md` |
+| `hl7.fhir.r6.core` | 6.0.0-snapshot1 | `tools/fhir-codegen/vendor/hl7.fhir.r6.core/PROVENANCE.md` |
 | `hl7.terminology` (THO) | 7.5.0 | `tools/fhir-codegen/vendor/hl7.terminology/PROVENANCE.md` |
 | `hl7.fhir.uv.v2mappings` (the v2-to-FHIR IG) | 1.0.0 | `tools/fhir-codegen/vendor/hl7.fhir.uv.v2mappings/PROVENANCE.md` (FHIR 4.0.1; the package declares CC0-1.0, its source repository `HL7/v2-to-fhir` Apache-2.0) |
 
@@ -249,7 +249,7 @@ of every `PROVENANCE.md` below back against its row.
 HL7's examples package per FHIR version is the corpus of the five `fhir-types`
 conformance tests and of the R4 facade test (#373, #454). Each is the version
 of the core package the table above pins, from the same registry: STU3, R4,
-R4B and R5 from packages.fhir.org, the R6 ballot from packages2.fhir.org. At
+R4B and R5 from packages.fhir.org, R6 from packages2.fhir.org. At
 about 680 MB
 unpacked they are fetched at build time by
 `scripts/vendor/fhir-packages.sh --build-time` into the ignored
@@ -266,7 +266,7 @@ against the registry's `latest`.
 | `hl7.fhir.r4.examples` | 4.0.1 files `5311` digest `51f5c093f9f197fcab683ac1bc3380e44b1c7e37c6c74baeefff7fa3eb8b7c1e` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r4.examples/PROVENANCE.md`, the `test` and `conformance` jobs of `.github/workflows/ci.yml` and the coverage job of `.github/workflows/sonar.yml` (their cache key) |
 | `hl7.fhir.r4b.examples` | 4.3.0 files `2842` digest `7c42275e73bff53eef52c9f48e3bd82d3eaef66275ac00975a259828086be6b9` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r4b.examples/PROVENANCE.md`, the same cache key |
 | `hl7.fhir.r5.examples` | 5.0.0 files `2824` digest `afddb711d22bbf8c45158cb4be0a8936ecd458df1a2a99cf5debd5274a7bee47` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r5.examples/PROVENANCE.md`, the same cache key |
-| `hl7.fhir.r6.examples` | 6.0.0-ballot5 files `2488` digest `4654c0fa42180b2ef3abec208458482cb1092fe3c63ef4ec4661a3feb50a7b3f`, held: 6.0.0-snapshot1 drops public types, which moves fhir-types to 0.2, and ihe-atna 0.23.0 still requires fhir-types 0.1 (#2072) | `tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/PROVENANCE.md`, the same cache key |
+| `hl7.fhir.r6.examples` | 6.0.0-snapshot1 files `2323` digest `cde674bd7b53b7030c8d4d7f012ed66f7f934e82a7e41f6aea8d8a705a19636a` | `tools/ferrobridge-testkit/vendor/hl7.fhir.r6.examples/PROVENANCE.md`, the same cache key |
 
 ## Profile packages (the profile validator's package set, build time, never committed)
 
@@ -422,7 +422,7 @@ at the line's current value.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `fhir-types` | 0.1.131 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
+| `fhir-types` | 0.2.0 | `docs/architecture.md`, `crates/fhir-types/Cargo.toml`, the root `Cargo.toml` `[workspace.dependencies]`, later the `version` of every published `crates/*` manifest |
 
 ## Language and runtime
 

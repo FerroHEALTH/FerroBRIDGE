@@ -71,58 +71,58 @@ pub struct ConceptMapTranslateRequest {
     /// might be mapped to this code. This parameter reverses the meaning of the
     /// source and target parameters
     pub reverse: Option<super::super::primitives::Boolean>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The code
     /// that is to be translated. If a code is provided, a system must be
     /// provided
     pub source_code: Option<super::super::primitives::Code>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// system for the sourceCode to be translated. Note: the previous name of
     /// this input parameter was \`system\`, and servers MAY choose to still
     /// accept that name
     pub source_system: Option<super::super::primitives::Uri>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// version for the system of the sourceCode to be translated. Note: the
     /// previous name of this input parameter was \`version\`, and servers MAY
     /// choose to still accept that name.
     pub source_version: Option<super::super::primitives::String>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Limits
     /// the scope of the $translate operation to source codes
     /// (ConceptMap.group.element.code) that are members of this value set.
     pub source_scope: Option<super::super::primitives::Uri>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A coding
     /// to translate
     pub source_coding: Option<super::super::coding::Coding>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A full
     /// codeableConcept to validate. The server can translate any of the coding
     /// values (e.g. existing translations) as it chooses
     pub source_codeable_concept: Option<super::super::codeable_concept::CodeableConcept>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// target code that is to be translated to. If a code is provided, a system
     /// must be provided
     pub target_code: Option<super::super::primitives::Code>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A target
     /// coding to translate to
     pub target_coding: Option<super::super::coding::Coding>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). A full
     /// codeableConcept to validate. The server can translate any of the coding
     /// values (e.g. existing translations) as it chooses
     pub target_codeable_concept: Option<super::super::codeable_concept::CodeableConcept>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). Limits
     /// the scope of the $translate operation to target codes
     /// (ConceptMap.group.element.target.code) that are members of this value
     /// set.
     pub target_scope: Option<super::super::primitives::Uri>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>).
     /// identifies a target code system in which a mapping is sought. This
     /// parameter is an alternative to the targetScope parameter - only one is
@@ -186,7 +186,7 @@ pub struct ConceptMapTranslateResponseMatch {
     /// canonical reference to the concept map from which this mapping comes
     /// from
     pub source: Option<super::super::primitives::Canonical>,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>). The
     /// canonical reference to the concept map from which this mapping comes
     /// from

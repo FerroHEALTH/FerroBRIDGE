@@ -58,7 +58,7 @@ pub enum Corpus {
     FhirR4b,
     /// The FHIR R5 examples package through `fhir-types`, one case per file.
     FhirR5,
-    /// The FHIR R6 ballot examples package through `fhir-types`, one case per
+    /// The FHIR R6 examples package through `fhir-types`, one case per
     /// file.
     FhirR6,
     /// The FHIR R4 examples the facade serves, one case per context and file.
