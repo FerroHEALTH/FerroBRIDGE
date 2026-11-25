@@ -18,7 +18,7 @@ use eehrxf::document::language::DocumentLanguage;
 use eehrxf::document::metadata::Header;
 use eehrxf::document::metadata::{
     Attestation, COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, DocumentMetadata,
-    EEHRXF_MHD_DOCUMENT_REFERENCE, FHIR_JSON,
+    EEHRXF_MHD_DOCUMENT_REFERENCE, FHIR_JSON, MHD_IDENTIFIER_TYPE,
 };
 use eehrxf::document::{Document, DocumentError, LOINC};
 #[cfg(feature = "laboratory")]
@@ -118,9 +118,13 @@ fn holds_table_1(metadata: &DocumentMetadata, bundle: &Bundle) -> Result<(), Box
     assert_eq!(reference["date"], bundle["timestamp"]);
     assert_eq!(reference["description"], composition["title"]);
     assert_eq!(reference["status"], "current");
-    // EehrxfMhdDocumentReference, on IHE MHD 4.2.2 Minimal: masterIdentifier.use is
-    // `usual`, and docStatus is held to 0.
+    // EehrxfMhdDocumentReference, on IHE MHD 4.2.5 Minimal: masterIdentifier.use is
+    // `usual` and its type uniqueId, and docStatus is held to 0.
     assert_eq!(reference["masterIdentifier"]["use"], "usual");
+    assert_eq!(
+        reference["masterIdentifier"]["type"]["coding"][0],
+        json!({"system": MHD_IDENTIFIER_TYPE, "code": "uniqueId"})
+    );
     assert!(reference.get("docStatus").is_none());
     // EehrxfMhdDocumentReference: the claim, one category holding the Annex III
     // documentCategory and the Art 14(1) priority category, a custodian and the format.
