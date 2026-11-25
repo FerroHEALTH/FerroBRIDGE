@@ -29,6 +29,7 @@
 //! import of one as an unapplied revision. No specification governs the operator surface: our own design.
 
 pub mod guard;
+pub mod registers;
 pub mod reload;
 pub mod revisions;
 pub mod save;

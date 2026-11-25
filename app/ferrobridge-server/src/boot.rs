@@ -248,8 +248,7 @@ where
     use anyhow::Context;
 
     let began = std::time::Instant::now();
-    let (stop, _) = tokio::sync::watch::channel(false);
-    let stop = Arc::new(stop);
+    let stop = Arc::new(tokio::sync::watch::channel(false).0);
     let signal = {
         let stop = Arc::clone(&stop);
         tokio::spawn(async move {
@@ -288,6 +287,7 @@ where
         .collect();
     let state = Arc::new(started.state.with_lanes(started.lanes));
     let delivery = state.access_log().map(|log| log.spawn());
+    crate::settings::listen(state.registers(), state.store());
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let report =
         crate::usage_report::start(&settings.usage_report, state.reported(), began, ci).await;

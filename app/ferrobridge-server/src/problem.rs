@@ -35,6 +35,9 @@ pub enum Kind {
     BadPath,
     /// `400`: an import's body is no mapping-set archive the bridge reads.
     BadArchive,
+    /// `400`: a register document is not the register's shape, or its rules
+    /// do not hold.
+    BadRegister,
     /// `401`: the request carries no valid credential.
     Unauthenticated,
     /// `403`: the access token does not carry the operator scope.
@@ -43,7 +46,8 @@ pub enum Kind {
     NotFound,
     /// `409`: a provisioned file holds the path.
     Provisioned,
-    /// `409`: no `[operator] mapping_dir` is configured.
+    /// `409`: what the request needs is not configured: `[operator]
+    /// mapping_dir` for a save, `[state]` for a settings register.
     NotConfigured,
     /// `412`: what the request replaces changed since the `ETag` it names.
     PreconditionFailed,
@@ -62,17 +66,20 @@ pub enum Kind {
     ReloadUnavailable,
     /// `503`: the run history of the bridge schema could not be read.
     RunHistoryUnavailable,
+    /// `503`: a settings register could not be read or written.
+    RegistersUnavailable,
     /// `503`: the access token could not be checked.
     AuthorizationUnavailable,
 }
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 20] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
         Self::BadArchive,
+        Self::BadRegister,
         Self::Unauthenticated,
         Self::NotPermitted,
         Self::NotFound,
@@ -86,12 +93,17 @@ impl Kind {
         Self::DeadLettersUnavailable,
         Self::ReloadUnavailable,
         Self::RunHistoryUnavailable,
+        Self::RegistersUnavailable,
         Self::AuthorizationUnavailable,
     ];
 
     /// The slug, the fragment of the type under [`BASE`], its title and
     /// its status.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one arm per problem type, the registry the book's problem page mirrors"
+    )]
     pub const fn definition(self) -> (&'static str, &'static str, StatusCode) {
         match self {
             Self::InvalidRequest => (
@@ -112,6 +124,11 @@ impl Kind {
             Self::BadArchive => (
                 "bad-archive",
                 "The body is no mapping-set archive the bridge reads",
+                StatusCode::BAD_REQUEST,
+            ),
+            Self::BadRegister => (
+                "bad-register",
+                "The document does not hold for the register",
                 StatusCode::BAD_REQUEST,
             ),
             Self::Unauthenticated => (
@@ -136,7 +153,7 @@ impl Kind {
             ),
             Self::NotConfigured => (
                 "not-configured",
-                "No mapping directory is configured",
+                "What the request needs is not configured",
                 StatusCode::CONFLICT,
             ),
             Self::PreconditionFailed => (
@@ -177,6 +194,11 @@ impl Kind {
             Self::RunHistoryUnavailable => (
                 "run-history-unavailable",
                 "The run history could not be read",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::RegistersUnavailable => (
+                "registers-unavailable",
+                "The settings register could not be read or written",
                 StatusCode::SERVICE_UNAVAILABLE,
             ),
             Self::AuthorizationUnavailable => (
